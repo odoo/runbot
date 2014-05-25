@@ -1,0 +1,534 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+<data>
+    <menuitem id="menu_runbot_top" name="Runbot"/>
+    <menuitem id="menu_runbot" name="Runbot" parent="menu_runbot_top"/>
+
+    <!-- repos -->
+    <record id="view_repo_form" model="ir.ui.view">
+        <field name="model">runbot.repo</field>
+        <field name="arch" type="xml">
+            <form string="repos" version="7.0">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1><field name="name" class="oe_inline"/></h1>
+                        <button name="update" type="object" string="Update"/>
+                        <button name="cron" type="object" string="Cron"/>
+                        <button name="killall" type="object" string="Killall"/>
+                    </div>
+                    <group string="Params">
+                        <field name="testing"/>
+                        <field name="running"/>
+                        <field name="auto"/>
+                        <field name="jobs"/>
+                        <field name="nginx"/>
+                        <field name="fallback_id"/>
+                        <field name="modules"/>
+                        <field name="token"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_repo_tree" model="ir.ui.view">
+        <field name="model">runbot.repo</field>
+        <field name="arch" type="xml">
+            <tree string="repos">
+                <field name="name"/>
+                <field name="testing"/>
+                <field name="running"/>
+                <field name="auto"/>
+            </tree>
+        </field>
+    </record>
+    <record id="action_repo_form" model="ir.actions.act_window">
+        <field name="name">Repositories</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">runbot.repo</field>
+        <field name="view_type">form</field>
+    </record>
+    <menuitem id="menu_repo_form" action="action_repo_form" parent="menu_runbot"/>
+
+    <!-- Branches -->
+    <record id="view_branch_form" model="ir.ui.view">
+        <field name="model">runbot.branch</field>
+        <field name="arch" type="xml">
+            <form string="Branch" version="7.0">
+                <sheet>
+                    <group>
+                        <field name="repo_id"/>
+                        <field name="name"/>
+                        <field name="branch_name"/>
+                        <field name="branch_url"/>
+                        <field name="sticky"/>
+                        <field name="state"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_branch_tree" model="ir.ui.view">
+        <field name="model">runbot.branch</field>
+        <field name="arch" type="xml">
+            <tree string="Branches">
+                <field name="repo_id"/>
+                <field name="name"/>
+                <field name="sticky"/>
+                <field name="state"/>
+            </tree>
+        </field>
+    </record>
+    <record id="view_branch_search" model="ir.ui.view">
+        <field name="model">runbot.branch</field>
+        <field name="arch" type="xml">
+            <search string="Search builds">
+                <field name="name"/>
+                <field name="state"/>
+                <filter string="Sticky" domain="[('sticky','=', True)]"/>
+                <separator />
+                <group expand="0" string="Group By...">
+                    <filter string="Repo" domain="[]" context="{'group_by':'repo_id'}"/>
+                    <filter string="Status" domain="[]" context="{'group_by':'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+    <record id="action_branch" model="ir.actions.act_window">
+        <field name="name">Branches</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">runbot.branch</field>
+        <field name="view_type">form</field>
+    </record>
+    <menuitem id="menu_branch" action="action_branch" parent="menu_runbot"/>
+
+    <!-- Builds -->
+    <record id="view_build_form" model="ir.ui.view">
+        <field name="model">runbot.build</field>
+        <field name="arch" type="xml">
+            <form string="Build" version="7.0">
+                <header>
+                     <button name="reset" type="object" string="Reset"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="repo_id"/>
+                        <field name="branch_id"/>
+                        <field name="sequence"/>
+                        <field name="name"/>
+                        <field name="date"/>
+                        <field name="committer"/>
+                        <field name="log"/>
+                        <field name="port"/>
+                        <field name="dest"/>
+                        <field name="state"/>
+                        <field name="result"/>
+                        <field name="pid"/>
+                        <field name="job_start"/>
+                        <field name="job_end"/>
+                        <field name="job_time"/>
+                        <field name="job_age"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_build_tree" model="ir.ui.view">
+        <field name="model">runbot.build</field>
+        <field name="arch" type="xml">
+            <tree string="Builds">
+                <field name="sequence"/>
+                <field name="repo_id"/>
+                <field name="dest"/>
+                <field name="date"/>
+                <field name="committer"/>
+                <field name="state"/>
+                <field name="port"/>
+                <field name="job"/>
+                <field name="result"/>
+                <field name="pid"/>
+                <field name="job_start"/>
+                <field name="job_time"/>
+                <field name="job_age"/>
+            </tree>
+        </field>
+    </record>
+    <record id="view_build_search" model="ir.ui.view">
+        <field name="model">runbot.build</field>
+        <field name="arch" type="xml">
+            <search string="Search builds">
+                <field name="branch_id"/>
+                <field name="name"/>
+                <field name="state"/>
+                <field name="dest"/>
+                <separator/>
+                <filter string="Pending" domain="[('state','=', 'pending')]"/>
+                <filter string="Testing" domain="[('state','=', 'testing')]"/>
+                <filter string="Running" domain="[('state','=', 'running')]"/>
+                <filter string="Done" domain="[('state','=','done')]"/>
+                <separator />
+                <group expand="0" string="Group By...">
+                    <filter string="Repo" domain="[]" context="{'group_by':'repo_id'}"/>
+                    <filter string="Branch" domain="[]" context="{'group_by':'branch_id'}"/>
+                    <filter string="Status" domain="[]" context="{'group_by':'state'}"/>
+                    <filter string="Result" domain="[]" context="{'group_by':'result'}"/>
+                    <filter string="Start" domain="[]" context="{'group_by':'job_start'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+    <record id="action_build" model="ir.actions.act_window">
+        <field name="name">Builds</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">runbot.build</field>
+        <field name="view_type">form</field>
+    </record>
+    <menuitem id="menu_build" action="action_build" parent="menu_runbot"/>
+
+    <!-- Events -->
+    <record id="logging_action" model="ir.actions.act_window">
+        <field name="name">Events</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">ir.logging</field>
+        <field name="view_type">form</field>
+    </record>
+    <menuitem id="logging_menu" action="logging_action" parent="menu_runbot"/>
+
+
+    <!-- Website menu -->
+    <record id="website_menu" model="website.menu">
+        <field name="name">Runbot</field>
+        <field name="url">/runbot</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" type="int">1</field>
+    </record>
+
+    <!-- Templates -->
+    <template id="runbot.build_name">
+        <t t-if="bu.state=='pending'"><i class="text-default fa fa-pause"/> pending</t>
+        <t t-if="bu.state=='testing'"><i class="text-info fa fa-spinner"/> testing <t t-esc="bu.job[4:]"/> <small><t t-esc="bu.job_time"/>s</small></t>
+        <t t-if="bu.result=='ok'"><i class="text-success fa fa-thumbs-up"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="bu.job_time"/>s</small></t>
+        <t t-if="bu.result=='ko'"><i class="text-danger fa fa-thumbs-down"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="bu.job_time"/>s</small></t>
+    </template>
+
+    <template id="runbot.build_button">
+        <div t-attf-class="btn-group {{klass}} pull-right">
+            <div t-attf-class="btn-group {{klass}}">
+                <a t-if="bu.state=='running'" t-attf-href="http://{{bu.domain}}/?db={{bu.dest}}-all" class="btn btn-primary"><i class="fa fa-sign-in"/></a>
+                <a t-attf-href="https://#{bu.repo_id.base}/commit/#{bu.name}" class="btn btn-default"><i class="fa fa-github"/></a>
+                <button class="btn btn-default dropdown-toggle" data-toggle="dropdown"><i class="fa fa-cog"/><span class="caret"></span></button>
+                <ul class="dropdown-menu" role="menu">
+                    <li t-if="bu.state=='pending'">
+                        <a t-attf-href="/runbot/build/{{bu.id}}/force">Build now <i class="fa fa-level-up"> </i></a>
+                    </li>
+                    <t t-if="bu.state=='running'">
+                        <li><a t-attf-href="http://{{bu.domain}}/?db={{bu.dest}}-all">Connect all <i class="fa fa-sign-in"></i></a></li>
+                        <li><a t-attf-href="http://{{bu.domain}}/?db={{bu.dest}}-base">Connect base <i class="fa fa-sign-in"></i></a></li>
+                        <li><a t-attf-href="http://{{bu.domain}}/">Connect <i class="fa fa-sign-in"></i></a></li>
+                    </t>
+                    <li t-if="bu.state in ['done','running']">
+                        <a t-attf-href="/runbot/build/#{bu.id}/force">Rebuild <i class="fa fa-refresh"/></a>
+                    </li>
+                    <li t-if="bu.state!='testing'" class="divider"></li>
+                    <li><a t-attf-href="/runbot/build/{{bu.name}}">Logs <i class="fa fa-file-text-o"/></a></li>
+                    <li><a t-attf-href="/runbot/static/build/#{bu.dest}/logs/job_10_test_base.txt">Full base logs <i class="fa fa-file-text-o"/></a></li>
+                    <li><a t-attf-href="/runbot/static/build/#{bu.dest}/logs/job_20_test_all.txt">Full all logs <i class="fa fa-file-text-o"/></a></li>
+                    <li class="divider"></li>
+                    <li><a t-attf-href="{{bu.branch_id.branch_url}}">Branch or pull <i class="fa fa-github"/></a></li>
+                    <li><a t-attf-href="https://{{bu.repo_id.base}}/commit/{{bu.name}}">Commit <i class="fa fa-github"/></a></li>
+                    <li><a t-attf-href="https://{{bu.repo_id.base}}/compare/{{bu.branch_id.branch_name}}">Compare <i class="fa fa-github"/></a></li>
+                    <!-- TODO branch.pull from -->
+                    <li class="divider"></li>
+                    <li class="disabled"><a href="#">Runtime: <t t-esc="bu.job_time"/>s</a></li>
+                    <li class="disabled"><a href="#">Port: <t t-esc="bu.port"/></a></li>
+                    <li class="disabled"><a href="#">Age: <t t-esc="s2h(bu.job_age)"/></a></li>
+                </ul>
+            </div>
+        </div>
+    </template>
+
+    <template id="runbot.repo">
+        <t t-call='website.layout'>
+            <t t-set="head">
+                <t t-if="refresh">
+                    <meta http-equiv="refresh" t-att-content="refresh"/>
+                </t>
+            </t>
+            <div class="container" style="width: 100%;">
+                <div class="row">
+                    <div class='col-md-12'>
+                        <nav class="navbar navbar-default" role="navigation">
+                          <div class="container-fluid">
+                            <div class="navbar-header">
+                              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                                <span class="sr-only">Toggle navigation</span>
+                                <span class="icon-bar"></span>
+                                <span class="icon-bar"></span>
+                                <span class="icon-bar"></span>
+                              </button>
+                              <a class="navbar-brand" t-attf-href="/runbot/{{'repo/' + slug(repo) if repo else ''}}"><b t-if="repo"><t t-esc="repo.base"/></b></a>
+                            </div>
+                            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                              <form class="navbar-form navbar-left form-inline">
+                                <div class="btn-group">
+                                  <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
+                                    Filter <span class="caret"></span>
+                                  </button>
+                                  <ul class="dropdown-menu" role="menu">
+                                    <li t-if="filters['pending']=='0'"><a t-att-href="qu(pending=1)">Pending</a></li>
+                                    <li t-if="filters['pending']=='1'"><a t-att-href="qu(pending='0')"><i class="fa fa-check"/> Pending</a></li>
+                                    <li t-if="filters['testing']=='0'"><a t-att-href="qu(testing=1)">Testing</a></li>
+                                    <li t-if="filters['testing']=='1'"><a t-att-href="qu(testing='0')"><i class="fa fa-check"/> Testing</a></li>
+                                    <li t-if="filters['running']=='0'"><a t-att-href="qu(running=1)">Running</a></li>
+                                    <li t-if="filters['running']=='1'"><a t-att-href="qu(running='0')"><i class="fa fa-check"/> Running</a></li>
+                                    <li t-if="filters['done']=='0'"><a t-att-href="qu(done=1)">Done</a></li>
+                                    <li t-if="filters['done']=='1'"><a t-att-href="qu(done='0')"><i class="fa fa-check"/> Done</a></li>
+                                    <li class="divider"></li>
+                                    <li t-att-class="'active' if limit=='100' else ''"><a t-att-href="qu(limit=100)">Show last 100</a></li>
+                                    <li t-att-class="'active' if limit=='1000' else ''"><a t-att-href="qu(limit=1000)">Show last 1000</a></li>
+                                    <li t-att-class="'active' if limit=='10000' else ''"><a t-att-href="qu(limit=10000)">Show last 10000</a></li>
+                                  </ul>
+                                </div>
+                              </form>
+                              <ul class="nav navbar-nav navbar-right">
+                                <li class="dropdown">
+                                  <a href="#" class="dropdown-toggle" data-toggle="dropdown">Switch repository <b class="caret"></b></a>
+                                  <ul class="dropdown-menu">
+                                    <t t-foreach='repos' t-as='repo'>
+                                        <li><a t-attf-href="/runbot/repo/{{slug(repo)}}"><t t-esc="repo.base"/></a></li>
+                                    </t>
+                                  </ul>
+                                </li>
+                              </ul>
+                              <form class="navbar-form navbar-right" role="search" t-att-action="qu(search='')" method="get">
+                                <div class="form-group">
+                                  <input type="search" name="search" class="form-control" placeholder="Search" t-att-value="search"/>
+                                  <button type="submit" class="btn btn-default">Search</button>
+                                </div>
+                              </form>
+                            </div>
+                          </div>
+                        </nav>
+                        <div t-if="not repo" class="mb32">
+                            <h1>No Repository yet.</h1>
+                        </div>
+
+                        <table t-if="repo" class="table table-condensed table-bordered table-striped">
+                        <tr>
+                            <th>Branch</th>
+                            <td colspan="4" class="text-right">
+                                <t t-esc="testing"/>/<t t-esc="repo.testing"/> testing,
+                                <t t-esc="running"/>/<t t-esc="repo.running"/> running,
+                                <t t-esc="pending"/> pending.
+                            </td>
+
+                        </tr>
+                        <tr t-foreach="branches" t-as="br">
+                            <td>
+                                <i t-if="br.sticky" class="fa fa-star"/>
+                                <b t-esc="br.branch_name"/>
+                                <small><t t-esc="s2h(br.builds[0].job_age)"/></small><br/>
+                                <div class="btn-group btn-group-xs">
+                                    <a t-attf-href="{{br.branch_url}}" class="btn btn-default btn-xs">Branch or pull <i class="fa fa-github"/></a>
+                                </div>
+                            </td>
+                            <t t-foreach="br.builds" t-as="bu">
+                                <t t-if="bu.state=='pending'"><t t-set="klass">default</t></t>
+                                <t t-if="bu.state=='testing'"><t t-set="klass">info</t></t>
+                                <t t-if="bu.state in ['running','done'] and bu.result == 'ko'"><t t-set="klass">danger</t></t>
+                                <t t-if="bu.state in ['running','done'] and bu.result == 'ok'"><t t-set="klass">success</t></t>
+                                <td t-attf-class="{{klass}}">
+                                    <t t-call="runbot.build_button"><t t-set="klass">btn-group-sm</t></t>
+                                    <t t-esc="bu.dest"/><br/>
+                                    <t t-call="runbot.build_name"/>
+                                </td>
+                            </t>
+                        </tr>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </t>
+    </template>
+
+    <template id="runbot.build">
+        <t t-call='website.layout'>
+            <div class="container" style="width: 100%;">
+                <div class="row" >
+                    <div class='col-md-12'>
+                        <nav class="navbar navbar-default" role="navigation">
+                          <div class="container-fluid">
+                            <div class="navbar-header">
+                              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                                <span class="sr-only">Toggle navigation</span>
+                                <span class="icon-bar"></span>
+                                <span class="icon-bar"></span>
+                                <span class="icon-bar"></span>
+                              </button>
+                              <a class="navbar-brand" t-attf-href="/runbot/repo/#{ slug(build.repo_id) }"><b><t t-esc="build.repo_id.base"/></b></a>
+                              <a class="navbar-brand" t-attf-href="/runbot/build/{{build.name}}">
+                                <t t-esc="build.dest"/>
+                                <t t-call="runbot.build_name">
+                                    <t t-set="bu" t-value="build"/>
+                                    <t t-set="klass" t-value="''"/>
+                                </t>
+                              </a>
+                            </div>
+                            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                              <form class="navbar-form navbar-left form-inline">
+                                <div class="btn-group">
+                                    <t t-call="runbot.build_button">
+                                        <t t-set="bu" t-value="build"/>
+                                        <t t-set="klass" t-value="''"/>
+                                    </t>
+                                </div>
+                              </form>
+                              <p class="navbar-text">
+                              </p>
+                              <form class="navbar-form navbar-left form-inline">
+                                <div class="btn-group">
+                                  <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
+                                    Filter <span class="caret"></span>
+                                  </button>
+                                  <ul class="dropdown-menu" role="menu">
+                                    <li role="presentation" class="dropdown-header">Level</li>
+                                    <li><a t-att-href="'?' + keep_query('search', 'type', level='debug')"><i t-if="level == 'debug'" class="fa fa-check"/> Debug</a></li>
+                                    <li><a t-att-href="'?' + keep_query('search', 'type', level='info')"><i t-if="level == 'info'" class="fa fa-check"/> Info</a></li>
+                                    <li><a t-att-href="'?' + keep_query('search', 'type', level='warning')"><i t-if="level == 'warning'" class="fa fa-check"/> Warning</a></li>
+                                    <li><a t-att-href="'?' + keep_query('search', 'type', level='error')"><i t-if="level == 'error'" class="fa fa-check"/> Error</a></li>
+                                    <li role="presentation" class="dropdown-header">Type</li>
+                                    <li><a t-att-href="'?' + keep_query('search', 'level',type='runbot')"><i t-if="type == 'runbot'" class="fa fa-check"/> Runbot</a></li>
+                                    <li><a t-att-href="'?' + keep_query('search', 'level',type='server')"><i t-if="type == 'server'" class="fa fa-check"/> Server</a></li>
+                                    <li><a t-att-href="'?' + keep_query('search', 'level',type='client')"><i t-if="type == 'client'" class="fa fa-check"/> Client</a></li>
+                                  </ul>
+                                </div>
+                                <div class="btn-group">
+                                  <button type="button" class="btn btn-default">Expand</button>
+                                </div>
+                              </form>
+                              <ul class="nav navbar-nav navbar-right">
+                                <li class="dropdown">
+                                  <a href="#" class="dropdown-toggle" data-toggle="dropdown">Other builds <b class="caret"></b></a>
+                                  <ul class="dropdown-menu">
+                                    <t t-foreach='other_builds' t-as='other_build'>
+                                        <li><a t-attf-href="/runbot/build/{{other_build.name}}"><t t-esc='other_build.dest'/></a></li>
+                                    </t>
+                                  </ul>
+                                </li>
+                              </ul>
+                              <form class="navbar-form navbar-right" role="search" t-attf-action="/runbot/build/{{build.name}}" method="get">
+                                <div class="form-group">
+                                  <input type="search" name="search" class="form-control" placeholder="Search" t-att-value="search or ''"/>
+                                  <button type="submit" class="btn btn-default">Search</button>
+                                </div>
+                              </form>
+                            </div>
+                          </div>
+                        </nav>
+                        <table class="table table-condensed table-striped">
+                        <tr>
+                            <th>Date</th>
+                            <th>Level</th>
+                            <th>Type</th>
+                            <th>Message</th>
+                        </tr>
+                        <t t-foreach="logs" t-as="l">
+                            <tr>
+                                <td style="white-space: nowrap;"><t t-esc="l.create_date"/></td>
+                                <td><b t-esc="l.level"/></td>
+                                <td><t t-esc="l.type"/></td>
+                                <td>
+                                    <t t-esc="l.name"/>:<t t-esc="l.line"/> <t t-esc="l.func"/> <a t-attf-href="#">File <i class="fa fa-external-link"/></a>
+                                </td>
+                            </tr>
+                            <tr><td colspan="4"><pre style="margin:0;padding:0; border: none;"><t t-esc="l.message"/></pre></td></tr>
+                        </t>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="runbot.webclient_config">
+[global]
+server.environment = "development"
+server.socket_host = "0.0.0.0"
+server.socket_port = %d
+server.thread_pool = 10
+tools.sessions.on = True
+log.access_level = "INFO"
+log.error_level = "INFO"
+tools.csrf.on = False
+tools.log_tracebacks.on = False
+tools.cgitb.on = True
+openerp.server.host = 'localhost'
+openerp.server.port = '%d'
+openerp.server.protocol = 'socket'
+openerp.server.timeout = 450
+[openerp-web]
+dblist.filter = 'BOTH'
+dbbutton.visible = True
+company.url = ''
+openerp.server.host = 'localhost'
+openerp.server.port = '%d'
+openerp.server.protocol = 'socket'
+openerp.server.timeout = 450
+    </template>
+
+    <template id="runbot.nginx_config">
+pid <t t-esc="nginx_dir"/>/nginx.pid;
+error_log <t t-esc="nginx_dir"/>/error.log;
+worker_processes  1;
+events { worker_connections  1024; }
+http {
+    include /etc/nginx/mime.types;
+    server_names_hash_max_size 512;
+    server_names_hash_bucket_size 256;
+    index index.html;
+
+    access_log <t t-esc="nginx_dir"/>/access.log;
+    client_body_temp_path <t t-esc="nginx_dir"/>;
+    fastcgi_temp_path <t t-esc="nginx_dir"/>;
+
+    autoindex on;
+
+    gzip on;
+    gzip_types text/css text/plain application/xml application/json application/javascript;
+
+    proxy_temp_path <t t-esc="nginx_dir"/>;
+    proxy_read_timeout 600;
+    proxy_connect_timeout 600;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header Host $host;
+
+    server {
+        listen 8080 default;
+        location / { proxy_pass http://127.0.0.1:<t t-esc="port"/>; }
+    }
+    <t t-foreach="builds" t-as="build">
+    server {
+        listen 8080;
+        server_name ~^<t t-esc="build.dest"/>[-.].*$;
+        location / { proxy_pass http://127.0.0.1:<t t-esc="build.port"/>; }
+        location /longpolling { proxy_pass http://127.0.0.1:<t t-esc="build.port + 1"/>; }
+    }
+    </t>
+}
+    </template>
+
+    <!-- Cron -->
+    <record model="ir.cron" id="repo_cron">
+        <field name='name'>Runbot Cron</field>
+        <field name='interval_number'>1</field>
+        <field name='interval_type'>minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="doall" eval="False" />
+        <field name="model">runbot.repo</field>
+        <field name="function">cron</field>
+        <field name="args">()</field>
+    </record>
+
+</data>
+</openerp>
