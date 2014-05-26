@@ -207,7 +207,7 @@ class runbot_repo(osv.osv):
             run(['git', 'clone', '--bare', repo.name, repo.path])
         else:
             repo.git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*'])
-            repo.git(['fetch', '-p', 'origin', '+refs/pull/*/merge:refs/pull/*'])
+            repo.git(['fetch', '-p', 'origin', '+refs/pull/*/head:refs/pull/*'])
         out = repo.git(['for-each-ref', '--format', '["%(refname)","%(objectname)","%(authordate:iso8601)"]', '--sort=-committerdate', 'refs/heads'])
         refs = [simplejson.loads(i) for i in out.split('\n') if i]
         out = repo.git(['for-each-ref', '--format', '["%(refname)","%(objectname)","%(authordate:iso8601)"]', '--sort=-committerdate', 'refs/pull'])
@@ -458,6 +458,8 @@ class runbot_build(osv.osv):
             # checkout branch
             build.branch_id.repo_id.git_export(build.name, build.path())
 
+            # TODO use git log to get commit message date and author
+
             # v6 rename bin -> openerp
             if os.path.isdir(build.path('bin/addons')):
                 shutil.move(build.path('bin'), build.path('openerp'))
@@ -533,6 +535,7 @@ class runbot_build(osv.osv):
 
     def spawn(self, cmd, lock_path, log_path, cpu_limit=None, shell=False):
         def preexec_fn():
+            os.setsid()
             if cpu_limit:
                 # set soft cpulimit
                 soft, hard = resource.getrlimit(resource.RLIMIT_CPU)
@@ -546,6 +549,22 @@ class runbot_build(osv.osv):
         _logger.debug("spawn: %s stdout: %s", ' '.join(cmd), log_path)
         p=subprocess.Popen(cmd, stdout=out, stderr=out, preexec_fn=preexec_fn, shell=shell)
         return p.pid
+
+    def github_status(self, cr, uid, ids, context=None):
+        for build in self.browse(cr, uid, ids, context=context):
+            # try to update github
+            try:
+                state = "success" if build.result == 'ok' else "failure"
+                status = {
+                    "state": state,
+                    "target_url": "http://runbot.odoo.com/runbot/build/%s" % build.id,
+                    "description": "runbot build %s (runtime %ss)" % (build.dest, build.job_time),
+                    "context": "continuous-integration/runbot"
+                }
+                build.repo_id.github('/repos/:owner/:repo/statuses/%s' % build.name, status)
+                _logger.debug("github status %s update to %s", build.name, state)
+            except Exception, e:
+                _logger.exception("github status error")
 
     def job_10_test_base(self, cr, uid, build, lock_path, log_path):
         # checkout source
@@ -576,25 +595,12 @@ class runbot_build(osv.osv):
             'job_end': time.strftime(openerp.tools.DEFAULT_SERVER_DATETIME_FORMAT, log_time),
             'result': 'ko',
         }
-        # TODO mark as failed too long post_install (after Modules loaded.)
         if grep(log_all, "openerp.modules.loading: Modules loaded."):
             if not grep(log_all, "FAIL"):
-                v['result'] = "ok"
+                if not grep(build.path("openerp/test/common.py"), "post_install") or grep(log_all, "Initiating shutdown."):
+                    v['result'] = "ok"
         build.write(v)
-
-        # try to update github
-        try:
-            state = "success" if v['result'] == 'ok' else "failure"
-            status = {
-                "state": state,
-                "target_url": "http://runbot.odoo.com/runbot/build/%s" % build.name,
-                "description": "runbot build %s (runtime %ss)" % (build.dest, build.job_time),
-                "context": "continuous-integration/runbot"
-            }
-            build.repo_id.github('/repos/:owner/:repo/statuses/%s' % build.name, status)
-            _logger.debug("github status %s update to %s", build.name, state)
-        except Exception, e:
-            _logger.exception("github status error")
+        build.github_status()
 
         # run server
         cmd, mods = build.cmd()
@@ -631,14 +637,18 @@ class runbot_build(osv.osv):
 
     def force(self, cr, uid, ids, context=None):
         for build in self.browse(cr, uid, ids, context=context):
-            if build.state in ['running']:
-                build.kill()
-            max_ids = self.search(cr, uid, [('repo_id','=',build.repo_id.id)], order='id desc', limit=1)
-            build.write({
-                'sequence':max_ids[0],
-                'state':'pending',
-                'result':'',
-            })
+            max_id = self.search(cr, uid, [('repo_id','=',build.repo_id.id)], order='id desc', limit=1)[0]
+            # Force it now
+            if build.state in ['pending']:
+                build.write({ 'sequence':max_id })
+            # or duplicate it
+            elif build.state in ['running']:
+                d = {
+                    'branch_id': build.branch_id.id,
+                    'name': build.name,
+                    'sequence': max_id,
+                }
+                self.create(cr, 1, d)
             return build.repo_id.id
 
     def schedule(self, cr, uid, ids, context=None):
@@ -828,8 +838,17 @@ class RunbotController(http.Controller):
         return werkzeug.utils.redirect('/runbot/repo/%s' % repo_id)
 
 # kill ` ps faux | grep ./static  | awk '{print $2}' `
-# ps faux| grep Cron | grep -v '_'  | awk '{print $2}' | xargs kill
+# ps faux| grep Cron | grep -- '-all'  | awk '{print $2}' | xargs kill
 # psql -l | grep " 000" | awk '{print $1}' | xargs -n1 dropdb
 # TODO
+
+# - cannibal branch
+# - commit/pull more info
+# - v6 support
+
 # - host field in build
+# - unlink build to remove ir_logging entires # ondelete=cascade
+# - gc either build or only old ir_logging
+# - if nginx server logfiles via each virtual server or map /runbot/static to root
+
 # vim:

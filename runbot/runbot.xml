@@ -215,6 +215,7 @@
         <div t-attf-class="btn-group {{klass}} pull-right">
             <div t-attf-class="btn-group {{klass}}">
                 <a t-if="bu.state=='running'" t-attf-href="http://{{bu.domain}}/?db={{bu.dest}}-all" class="btn btn-primary"><i class="fa fa-sign-in"/></a>
+                <a t-attf-href="/runbot/build/{{bu.name}}" class="btn btn-default"><i class="fa fa-file-text-o"/></a>
                 <a t-attf-href="https://#{bu.repo_id.base}/commit/#{bu.name}" class="btn btn-default"><i class="fa fa-github"/></a>
                 <button class="btn btn-default dropdown-toggle" data-toggle="dropdown"><i class="fa fa-cog"/><span class="caret"></span></button>
                 <ul class="dropdown-menu" role="menu">
