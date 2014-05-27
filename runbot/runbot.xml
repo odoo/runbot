@@ -117,8 +117,8 @@
                         <field name="sequence"/>
                         <field name="name"/>
                         <field name="date"/>
-                        <field name="committer"/>
-                        <field name="log"/>
+                        <field name="author"/>
+                        <field name="subject"/>
                         <field name="port"/>
                         <field name="dest"/>
                         <field name="state"/>
@@ -141,7 +141,7 @@
                 <field name="repo_id"/>
                 <field name="dest"/>
                 <field name="date"/>
-                <field name="committer"/>
+                <field name="author"/>
                 <field name="state"/>
                 <field name="port"/>
                 <field name="job"/>
@@ -340,7 +340,9 @@
                                 <t t-if="bu.state in ['running','done'] and bu.result == 'ok'"><t t-set="klass">success</t></t>
                                 <td t-attf-class="{{klass}}">
                                     <t t-call="runbot.build_button"><t t-set="klass">btn-group-sm</t></t>
-                                    <t t-esc="bu.dest"/><br/>
+                                    <t t-esc="bu.subject[:24] if bu.subject else ''"/><br/>
+                                    <t t-esc="bu.author"/><br/>
+                                    <small><t t-esc="bu.dest"/></small><br/>
                                     <t t-call="runbot.build_name"/>
                                 </td>
                             </t>
@@ -427,6 +429,10 @@
                             </div>
                           </div>
                         </nav>
+                        <p>
+                            Subject: <t t-esc="build.subject[:24] if build.subject else ''"/><br/>
+                            Author: <t t-esc="build.author"/><br/>
+                        </p>
                         <table class="table table-condensed table-striped">
                         <tr>
                             <th>Date</th>

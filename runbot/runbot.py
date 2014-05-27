@@ -208,11 +208,21 @@ class runbot_repo(osv.osv):
         else:
             repo.git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*'])
             repo.git(['fetch', '-p', 'origin', '+refs/pull/*/head:refs/pull/*'])
-        out = repo.git(['for-each-ref', '--format', '["%(refname)","%(objectname)","%(authordate:iso8601)"]', '--sort=-committerdate', 'refs/heads'])
-        refs = [simplejson.loads(i) for i in out.split('\n') if i]
-        out = repo.git(['for-each-ref', '--format', '["%(refname)","%(objectname)","%(authordate:iso8601)"]', '--sort=-committerdate', 'refs/pull'])
-        refs += [simplejson.loads(i) for i in out.split('\n') if i]
-        for name, sha, date in refs:
+
+        fields = ['refname','objectname','authordate:iso8601','authorname','subject']
+        fmt = "%00".join(["%("+i+")" for i in fields])
+        out = repo.git(['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/heads', 'refs/pull'])
+        out = out.strip()
+        refs = []
+        for l in out.split('\n'):
+            ref = []
+            for i in l.split('\x00'):
+                try:
+                    ref.append(i.decode('utf-8'))
+                except UnicodeDecodeError:
+                    ref.append('')
+            refs.append(ref)
+        for name, sha, date, author, subject in refs:
             # create or get branch
             branch_ids = self.pool['runbot.branch'].search(cr, uid, [('repo_id', '=', repo.id), ('name', '=', name)])
             if branch_ids:
@@ -228,7 +238,13 @@ class runbot_repo(osv.osv):
             build_ids = self.pool['runbot.build'].search(cr, uid, [('branch_id', '=', branch.id), ('name', '=', sha)])
             if not build_ids:
                 _logger.debug('repo %s branch %s new build found revno %s', branch.repo_id.name, branch.name, sha)
-                self.pool['runbot.build'].create(cr, uid, {'branch_id': branch.id, 'name': sha})
+                v = {
+                    'branch_id': branch.id,
+                    'name': sha,
+                    'author': author,
+                    'subject': subject,
+                }
+                self.pool['runbot.build'].create(cr, uid, v)
 
     def scheduler(self, cr, uid, ids=None, context=None):
         for repo in self.browse(cr, uid, ids, context=context):
@@ -391,8 +407,8 @@ class runbot_build(osv.osv):
         'dest': fields.function(_get_dest, type='char', string='Dest', readonly=1, store=True),
         'domain': fields.function(_get_domain, type='char', string='URL'),
         'date': fields.datetime('Commit date'),
-        'committer': fields.char('Comitter'),
-        'log': fields.text('Commit log'),
+        'author': fields.char('Author'),
+        'subject': fields.text('Subject'),
         'sequence': fields.integer('Sequence'),
         'result': fields.char('Result'), # ok, ko
         'pid': fields.integer('Pid'),
