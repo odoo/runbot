@@ -802,12 +802,11 @@ class RunbotController(http.Controller):
         })
         return request.render("runbot.repo", v)
 
-    @http.route(['/runbot/build/<sha>'], type='http', auth="public", website=True)
-    def build(self, sha=None, search=None, **post):
+    @http.route(['/runbot/build/<build_id>'], type='http', auth="public", website=True)
+    def build(self, build_id=None, search=None, **post):
         registry, cr, uid, context = request.registry, request.cr, 1, request.context
 
-        build_ids = registry['runbot.build'].search(cr, uid, [('name', '=', sha)])
-        build = registry['runbot.build'].browse(cr, uid, build_ids)[0]
+        build = registry['runbot.build'].browse(cr, uid, [int(build_id)])[0]
 
         # other builds
         build_ids = registry['runbot.build'].search(cr, uid, [('branch_id', '=', build.branch_id.id)])
