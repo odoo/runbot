@@ -866,8 +866,9 @@ class RunbotController(http.Controller):
             issue_number = int(issue_number[2])
         else:
             # not a pull request
-            return False
+            return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id)
 
+        label_id = int(label_id)
         if label_id not in LABELS:
             _logger.exception("unknown label")
         else:
@@ -893,7 +894,7 @@ class RunbotController(http.Controller):
                     _logger.debug("added github label %s for %s: %s", (label_name, issue_number))
                 except Exception, e:
                     _logger.exception("github error while adding label %s" % label_name)
-        return True
+        return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id)
 
 
 LABELS = {
