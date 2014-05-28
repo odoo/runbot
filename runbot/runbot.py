@@ -179,7 +179,7 @@ class runbot_repo(osv.osv):
             p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
             p2.communicate()[0]
 
-    def github(self, cr, uid, ids, url, payload=None, context=None):
+    def github(self, cr, uid, ids, url, payload=None, delete=False, context=None):
         for repo in self.browse(cr, uid, ids, context=context):
             mo = re.search('([^/]+)/([^/]+)/([^/]+)', repo.base)
             if mo:
@@ -191,6 +191,8 @@ class runbot_repo(osv.osv):
                 s.headers.update({'Accept': 'application/vnd.github.she-hulk-preview+json'})
                 if payload:
                     r = s.post(url, data=simplejson.dumps(payload))
+                elif delete:
+                    r = s.delete(url)
                 else:
                     r = s.get(url)
                 return r.json()
@@ -853,6 +855,51 @@ class RunbotController(http.Controller):
         registry, cr, uid, context = request.registry, request.cr, 1, request.context
         repo_id = registry['runbot.build'].force(cr, 1, [int(build_id)])
         return werkzeug.utils.redirect('/runbot/repo/%s' % repo_id)
+
+    @http.route(['/runbot/build/<build_id>/label/<label_id>'], type='http', auth="public", method='POST')
+    def toggle_label(self, build_id=None, label_id=None, search=None, **post):
+        registry, cr, uid, context = request.registry, request.cr, 1, request.context
+
+        build = registry['runbot.build'].browse(cr, uid, [int(build_id)])[0]
+        issue_number = build.branch_id.name.split('/')
+        if len(issue_number) == 3 and issue_number[0] == 'refs' and issue_number[1] == 'pull':
+            issue_number = int(issue_number[2])
+        else:
+            # not a pull request
+            return False
+
+        if label_id not in LABELS:
+            _logger.exception("unknown label")
+        else:
+            label_name = LABELS[label_id]
+            found = False
+            try:
+                res = build.repo_id.github('/repos/:owner/:repo/issues/%s/labels' % issue_number)
+                found = any([label for label in res if label['name'] == label_name])
+            except Exception, e:
+                _logger.exception("github error while fetching labels")
+
+            if found:
+                # removing existing label
+                try:
+                    build.repo_id.github('/repos/:owner/:repo/issues/%s/labels/%s' % (issue_number, label_name), delete=True)
+                    _logger.debug("removed github label %s for %s: %s", (label_name, issue_number))
+                except Exception, e:
+                    _logger.exception("github error while removing label %s" % label_name)
+            else:
+                # adding the label
+                try:
+                    build.repo_id.github('/repos/:owner/:repo/issues/%s/labels' % issue_number, [label_name])
+                    _logger.debug("added github label %s for %s: %s", (label_name, issue_number))
+                except Exception, e:
+                    _logger.exception("github error while adding label %s" % label_name)
+        return True
+
+
+LABELS = {
+    1: 'WIP',
+    2: 'RD',
+}
 
 # kill ` ps faux | grep ./static  | awk '{print $2}' `
 # ps faux| grep Cron | grep -- '-all'  | awk '{print $2}' | xargs kill
