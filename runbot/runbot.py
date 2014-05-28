@@ -658,11 +658,13 @@ class runbot_build(osv.osv):
             if build.state in ['pending']:
                 build.write({ 'sequence':max_id })
             # or duplicate it
-            elif build.state in ['running']:
+            elif build.state in ['running','done']:
                 d = {
+                    'sequence': max_id,
                     'branch_id': build.branch_id.id,
                     'name': build.name,
-                    'sequence': max_id,
+                    'author': build.author,
+                    'subject': build.subject,
                 }
                 self.create(cr, 1, d)
             return build.repo_id.id
@@ -742,7 +744,7 @@ class runbot_build(osv.osv):
 
 class runbot_event(osv.osv):
     _inherit = 'ir.logging'
-    _order = 'id desc'
+    _order = 'id'
     _columns = {
         'build_id': fields.many2one('runbot.build', 'Build'),
     }
@@ -865,5 +867,8 @@ class RunbotController(http.Controller):
 # - unlink build to remove ir_logging entires # ondelete=cascade
 # - gc either build or only old ir_logging
 # - if nginx server logfiles via each virtual server or map /runbot/static to root
+
+
+# list process group pids
 
 # vim:
