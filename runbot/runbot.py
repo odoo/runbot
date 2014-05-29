@@ -93,12 +93,6 @@ def run(l, env=None):
     log("run", rc=rc)
     return rc
 
-def kill(pid, sig=signal.SIGKILL):
-    try:
-        os.kill(pid, sig)
-    except OSError:
-        pass
-
 def now():
     return time.strftime(openerp.tools.DEFAULT_SERVER_DATETIME_FORMAT)
 
@@ -726,7 +720,10 @@ class runbot_build(osv.osv):
     def kill(self, cr, uid, ids, context=None):
         for build in self.browse(cr, uid, ids, context=context):
             build.logger('killing %s', build.pid)
-            kill(build.pid)
+            try:
+                os.killpg(build.pid, signal.SIGKILL)
+            except OSError:
+                pass
             build.write({'state':'done'})
             cr.commit()
             self.pg_dropdb(cr, uid, "%s-base" % build.dest)
