@@ -597,7 +597,7 @@ class runbot_build(osv.osv):
         cmd += ['-d', '%s-all' % build.dest, '-i', mods, '--stop-after-init', '--log-level=test']
         # reset job_start to an accurate job_20 job_time
         build.write({'job_start': now()})
-        return self.spawn(cmd, lock_path, log_path, cpu_limit=1800)
+        return self.spawn(cmd, lock_path, log_path, cpu_limit=2100)
 
     def job_30_run(self, cr, uid, build, lock_path, log_path):
         # adjust job_end to record an accurate job_20 job_time
@@ -679,6 +679,7 @@ class runbot_build(osv.osv):
                     'job_end': False,
                 }
                 build.write(values)
+                cr.commit()
             else:
                 # check if current job is finished
                 lock_path = build.path('logs', '%s.lock' % build.job)
@@ -686,7 +687,10 @@ class runbot_build(osv.osv):
                     # kill if overpassed
                     if build.job != jobs[-1] and build.job_time > 1800:
                         build.logger('%s time exceded (%ss)', build.job, build.job_time)
-                        kill(build.pid)
+                        try:
+                            os.killpg(build.pid, signal.SIGKILL)
+                        except OSError:
+                            pass
                     continue
                 build.logger('%s finished', build.job)
                 # schedule
