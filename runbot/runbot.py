@@ -902,7 +902,7 @@ class RunbotController(http.Controller):
     def badge(self, repo, branch, ext):
 
         domain = [('repo_id', '=', repo.id),
-                  ('branch_id.name', '=', branch),
+                  ('branch_id.branch_name', '=', branch),
                   ('branch_id.sticky', '=', True),
                   ('state', 'in', ['testing', 'running', 'done']),
                   ]
@@ -929,11 +929,16 @@ class RunbotController(http.Controller):
             'success': 'brightgreen',
             'failed': 'red',
             # 'warning': 'orange',
-        }[badge['state']]
+        }[badge['status']]
 
-        url = 'http://img.shields.io/badge/{name}-{status}-{color}.{format}'.format(badge)
+        url = 'http://img.shields.io/badge/{name}-{status}-{color}.{format}'.format(**badge)
         image = requests.get(url)
-        return werkzeug.wrappers.Response(image.content, status=image.status_code, headers=image.headers)
+        content = image.content
+        headers = werkzeug.datastructures.Headers()
+        headers.extend(image.headers.items())
+        headers['Content-Length'] = len(content)
+        headers.remove('content-encoding')
+        return werkzeug.wrappers.Response(content, status=image.status_code, headers=headers.items())
 
 
 LABELS = {
