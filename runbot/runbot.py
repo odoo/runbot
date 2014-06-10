@@ -897,6 +897,44 @@ class RunbotController(http.Controller):
                     _logger.exception("github error while adding label %s" % label_name)
         return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id)
 
+    @http.route('/runbot/badge/<model("runbot.repo"):repo>/<branch>.<any(svg,png):ext>',
+                type="http", auth="public", methods=['GET', 'HEAD'])
+    def badge(self, repo, branch, ext):
+
+        domain = [('repo_id', '=', repo.id),
+                  ('branch_id.name', '=', branch),
+                  ('branch_id.sticky', '=', True),
+                  ('state', 'in', ['testing', 'running', 'done']),
+                  ]
+
+        builds = request.registry['runbot.build'].search_read(request.cr, request.uid,
+                                                              domain, ['state', 'result'],
+                                                              order='id desc', limit=1)
+
+        if not builds:
+            return request.not_found()
+        build = builds[0]
+
+        badge = {
+            'name': branch.replace('-', '--'),
+            'format': ext,
+        }
+        if build['state'] == 'testing':
+            badge['status'] = 'testing'
+        else:
+            badge['status'] = 'success' if build['result'] == 'ok' else 'failed'
+
+        badge['color'] = {
+            'testing': 'yellow',
+            'success': 'brightgreen',
+            'failed': 'red',
+            # 'warning': 'orange',
+        }[badge['state']]
+
+        url = 'http://img.shields.io/badge/{name}-{status}-{color}.{format}'.format(badge)
+        image = requests.get(url)
+        return werkzeug.wrappers.Response(image.content, status=image.status_code, headers=image.headers)
+
 
 LABELS = {
     1: 'WIP',
