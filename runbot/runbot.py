@@ -13,11 +13,11 @@ import signal
 import simplejson
 import subprocess
 import time
-import Tkinter
-import tkFont
 
 import dateutil.parser
 import requests
+from matplotlib.font_manager import FontProperties
+from matplotlib.textpath import TextToPath
 import werkzeug
 
 import openerp
@@ -943,7 +943,10 @@ class RunbotController(http.Controller):
             'warning': "#fe7d37",
         }[state]
 
-        text_width = tkFont.Font(Tkinter.Tk(), family='Verdana', size=11).measure
+        def text_width(s):
+            fp = FontProperties(family='DejaVu Sans', size=11)
+            w, h, d = TextToPath().get_text_width_height_descent(s, fp, False)
+            return int(w + 1)
 
         class Text(object):
             __slot__ = ['text', 'color', 'width']
