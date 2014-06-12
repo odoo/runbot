@@ -3,6 +3,7 @@
 import datetime
 import fcntl
 import glob
+import hashlib
 import logging
 import os
 import re
@@ -12,6 +13,8 @@ import signal
 import simplejson
 import subprocess
 import time
+import Tkinter
+import tkFont
 
 import dateutil.parser
 import requests
@@ -897,9 +900,11 @@ class RunbotController(http.Controller):
                     _logger.exception("github error while adding label %s" % label_name)
         return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id)
 
-    @http.route('/runbot/badge/<model("runbot.repo"):repo>/<branch>.<any(svg,png):ext>',
-                type="http", auth="public", methods=['GET', 'HEAD'])
-    def badge(self, repo, branch, ext):
+    @http.route([
+        '/runbot/badge/<model("runbot.repo"):repo>/<branch>.svg',
+        '/runbot/badge/<any(default,flat):theme>/<model("runbot.repo"):repo>/<branch>.svg',
+    ], type="http", auth="public", methods=['GET', 'HEAD'])
+    def badge(self, repo, branch, theme='default'):
 
         domain = [('repo_id', '=', repo.id),
                   ('branch_id.branch_name', '=', branch),
@@ -907,38 +912,57 @@ class RunbotController(http.Controller):
                   ('state', 'in', ['testing', 'running', 'done']),
                   ]
 
-        builds = request.registry['runbot.build'].search_read(request.cr, request.uid,
-                                                              domain, ['state', 'result'],
-                                                              order='id desc', limit=1)
+        last_update = '__last_update'
+        builds = request.registry['runbot.build'].search_read(
+            request.cr, request.uid,
+            domain, ['state', 'result', 'job_age', last_update],
+            order='id desc', limit=1)
 
         if not builds:
             return request.not_found()
+
         build = builds[0]
+        etag = request.httprequest.headers.get('If-None-Match')
+        retag = hashlib.md5(build[last_update]).hexdigest()
 
-        badge = {
-            'name': branch.replace('-', '--'),
-            'format': ext,
-        }
+        if etag == retag:
+            return werkzeug.wrappers.Response(status=304)
+
         if build['state'] == 'testing':
-            badge['status'] = 'testing'
+            state = 'testing'
+            cache_factor = 1
         else:
-            badge['status'] = 'success' if build['result'] == 'ok' else 'failed'
+            state = 'success' if build['result'] == 'ok' else 'failed'
+            cache_factor = 2
 
-        badge['color'] = {
-            'testing': 'yellow',
-            'success': 'brightgreen',
-            'failed': 'red',
-            # 'warning': 'orange',
-        }[badge['status']]
+        # from https://github.com/badges/shields/blob/master/colorscheme.json
+        color = {
+            'testing': "#dfb317",
+            'success': "#4c1",
+            'failed': "#e05d44",
+            'warning': "#fe7d37",
+        }[state]
 
-        url = 'http://img.shields.io/badge/{name}-{status}-{color}.{format}'.format(**badge)
-        image = requests.get(url)
-        content = image.content
-        headers = werkzeug.datastructures.Headers()
-        headers.extend(image.headers.items())
-        headers['Content-Length'] = len(content)
-        headers.remove('content-encoding')
-        return werkzeug.wrappers.Response(content, status=image.status_code, headers=headers.items())
+        text_width = tkFont.Font(Tkinter.Tk(), family='Verdana', size=11).measure
+
+        class Text(object):
+            __slot__ = ['text', 'color', 'width']
+            def __init__(self, text, color):
+                self.text = text
+                self.color = color
+                self.width = text_width(text) + 10
+
+        data = {
+            'left': Text(branch, '#555'),
+            'right': Text(state, color),
+        }
+        five_minutes = 5 * 60
+        headers = [
+            ('Content-Type', 'image/svg+xml'),
+            ('Cache-Control', 'max-age=%d' % (five_minutes * cache_factor,)),
+            ('ETag', retag),
+        ]
+        return request.render("runbot.badge_" + theme, data, headers=headers)
 
 
 LABELS = {
