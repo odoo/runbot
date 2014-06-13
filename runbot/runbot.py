@@ -409,7 +409,7 @@ class runbot_build(osv.osv):
         'author': fields.char('Author'),
         'subject': fields.text('Subject'),
         'sequence': fields.integer('Sequence'),
-        'result': fields.char('Result'), # ok, ko
+        'result': fields.char('Result'), # ok, ko, skipped
         'pid': fields.integer('Pid'),
         'state': fields.char('Status'), # pending, testing, running, done
         'job': fields.char('Job'), # job_*
