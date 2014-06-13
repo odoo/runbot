@@ -6,6 +6,9 @@
     'description': "Runbot",
     'author': 'OpenERP SA',
     'depends': ['website'],
+    'external_dependencies': {
+        'python': ['matplotlib'],
+    },
     'data': [
         'runbot.xml',
         'security/ir.model.access.csv',
