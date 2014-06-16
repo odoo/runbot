@@ -206,9 +206,9 @@
     <!-- Templates -->
     <template id="runbot.build_name">
         <t t-if="bu.state=='pending'"><i class="text-default fa fa-pause"/> pending</t>
-        <t t-if="bu.state=='testing'"><i class="text-info fa fa-spinner"/> testing <t t-esc="bu.job[4:]"/> <small><t t-esc="bu.job_time"/>s</small></t>
-        <t t-if="bu.result=='ok'"><i class="text-success fa fa-thumbs-up"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="bu.job_time"/>s</small></t>
-        <t t-if="bu.result=='ko'"><i class="text-danger fa fa-thumbs-down"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="bu.job_time"/>s</small></t>
+        <t t-if="bu.state=='testing'"><i class="text-info fa fa-spinner"/> testing <t t-esc="bu.job[4:]"/> <small><t t-esc="s2h(bu.job_time)"/></small></t>
+        <t t-if="bu.result=='ok'"><i class="text-success fa fa-thumbs-up"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="s2h(bu.job_time)"/></small></t>
+        <t t-if="bu.result=='ko'"><i class="text-danger fa fa-thumbs-down"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="s2h(bu.job_time)"/></small></t>
         <t t-if="bu.result=='skipped'"><i class="text-danger fa fa-ban"/> skipped</t>
     </template>
 
