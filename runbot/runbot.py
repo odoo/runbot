@@ -918,6 +918,7 @@ class RunbotController(http.Controller):
                   ('branch_id.branch_name', '=', branch),
                   ('branch_id.sticky', '=', True),
                   ('state', 'in', ['testing', 'running', 'done']),
+                  ('result', '!=', 'skipped'),
                   ]
 
         last_update = '__last_update'
@@ -940,8 +941,13 @@ class RunbotController(http.Controller):
             state = 'testing'
             cache_factor = 1
         else:
-            state = 'success' if build['result'] == 'ok' else 'failed'
             cache_factor = 2
+            if build['result'] == 'ok':
+                state = 'success'
+            elif build['result'] == 'warn':
+                state = 'warning'
+            else:
+                state = 'failed'
 
         # from https://github.com/badges/shields/blob/master/colorscheme.json
         color = {
