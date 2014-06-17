@@ -432,6 +432,7 @@ class runbot_build(osv.osv):
 
     _defaults = {
         'state': 'pending',
+        'result': '',
     }
 
     def create(self, cr, uid, values, context=None):
