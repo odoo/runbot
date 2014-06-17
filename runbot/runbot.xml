@@ -208,7 +208,7 @@
         <t t-if="bu.state=='pending'"><i class="text-default fa fa-pause"/> pending</t>
         <t t-if="bu.state=='testing'"><i class="text-info fa fa-spinner"/> testing <t t-esc="bu.job[4:]"/> <small><t t-esc="s2h(bu.job_time)"/></small></t>
         <t t-if="bu.result=='ok'"><i class="text-success fa fa-thumbs-up"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="s2h(bu.job_time)"/></small></t>
-        <t t-if="bu.result=='ko'"><i class="text-danger fa fa-thumbs-down"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="s2h(bu.job_time)"/></small></t>
+        <t t-if="bu.result=='ko' || bu.result=='warn'"><i class="text-danger fa fa-thumbs-down"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="s2h(bu.job_time)"/></small></t>
         <t t-if="bu.result=='skipped'"><i class="text-danger fa fa-ban"/> skipped</t>
     </template>
 
@@ -341,6 +341,7 @@
                                 <t t-if="bu.state=='pending'"><t t-set="klass">default</t></t>
                                 <t t-if="bu.state=='testing'"><t t-set="klass">info</t></t>
                                 <t t-if="bu.state in ['running','done'] and bu.result == 'ko'"><t t-set="klass">danger</t></t>
+                                <t t-if="bu.state in ['running','done'] and bu.result == 'warn'"><t t-set="klass">warning</t></t>
                                 <t t-if="bu.state in ['running','done'] and bu.result == 'ok'"><t t-set="klass">success</t></t>
                                 <t t-if="bu.state in ['running','done'] and bu.result == 'skipped'"><t t-set="klass">default</t></t>
                                 <td t-attf-class="{{klass}}">

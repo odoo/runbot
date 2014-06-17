@@ -409,7 +409,7 @@ class runbot_build(osv.osv):
         'author': fields.char('Author'),
         'subject': fields.text('Subject'),
         'sequence': fields.integer('Sequence'),
-        'result': fields.char('Result'), # ok, ko, skipped
+        'result': fields.char('Result'), # ok, ko, warn, skipped
         'pid': fields.integer('Pid'),
         'state': fields.char('Status'), # pending, testing, running, done
         'job': fields.char('Job'), # job_*
@@ -608,12 +608,16 @@ class runbot_build(osv.osv):
         log_time = time.localtime(os.path.getmtime(log_all))
         v = {
             'job_end': time.strftime(openerp.tools.DEFAULT_SERVER_DATETIME_FORMAT, log_time),
-            'result': 'ko',
         }
         if grep(log_all, "openerp.modules.loading: Modules loaded."):
-            if not grep(log_all, "FAIL"):
-                if not grep(build.path("openerp/test/common.py"), "post_install") or grep(log_all, "Initiating shutdown."):
-                    v['result'] = "ok"
+            if grep(log_all, "FAIL"):
+                v['result'] = "ko"
+            elif grep(log_all, "WARNING"):
+                v['result'] = "warn"
+            elif not grep(build.path("openerp/test/common.py"), "post_install") or grep(log_all, "Initiating shutdown."):
+                v['result'] = "ok"
+        else:
+            v['result'] = "ko"
         build.write(v)
         build.github_status()
 
