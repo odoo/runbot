@@ -59,6 +59,17 @@ def grep(filename, s):
         return open(filename).read().find(s) != -1
     return False
 
+_re_error = r'^(?:\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ (?:ERROR|CRITICAL) )|(?:Traceback \(most recent call last\):)$'
+_re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING '
+
+def rfind(filename, patern):
+    if os.path.isfile(filename):
+        p = re.compile(patern, re.M)
+        with open(filename, 'r') as f:
+            if p.findall(f.read()):
+                return True
+    return False
+
 def lock(name):
     fd = os.open(name, os.O_CREAT | os.O_RDWR, 0600)
     fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -614,9 +625,9 @@ class runbot_build(osv.osv):
             'job_end': time.strftime(openerp.tools.DEFAULT_SERVER_DATETIME_FORMAT, log_time),
         }
         if grep(log_all, "openerp.modules.loading: Modules loaded."):
-            if grep(log_all, "FAIL"):
+            if rfind(log_all, _re_error):
                 v['result'] = "ko"
-            elif grep(log_all, "WARNING"):
+            elif rfind(log_all, _re_warning):
                 v['result'] = "warn"
             elif not grep(build.path("openerp/test/common.py"), "post_install") or grep(log_all, "Initiating shutdown."):
                 v['result'] = "ok"
