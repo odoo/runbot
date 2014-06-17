@@ -560,7 +560,7 @@ class runbot_build(osv.osv):
 
         return cmd, mods
 
-    def spawn(self, cmd, lock_path, log_path, cpu_limit=None, shell=False, hidestderr=False):
+    def spawn(self, cmd, lock_path, log_path, cpu_limit=None, shell=False, showstderr=False):
         def preexec_fn():
             os.setsid()
             if cpu_limit:
@@ -574,7 +574,7 @@ class runbot_build(osv.osv):
             lock(lock_path)
         out=open(log_path,"w")
         _logger.debug("spawn: %s stdout: %s", ' '.join(cmd), log_path)
-        if hidestderr:
+        if showstderr:
             stderr = out
         else:
             stderr = open(os.devnull, 'w')
@@ -668,7 +668,7 @@ class runbot_build(osv.osv):
         #    f.close()
         #cmd=[self.client_web_bin_path]
 
-        return self.spawn(cmd, lock_path, log_path, cpu_limit=None)
+        return self.spawn(cmd, lock_path, log_path, cpu_limit=None, showstderr=True)
 
     def force(self, cr, uid, ids, context=None):
         for build in self.browse(cr, uid, ids, context=context):
