@@ -598,6 +598,7 @@ class runbot_build(osv.osv):
                 _logger.exception("github status error")
 
     def job_10_test_base(self, cr, uid, build, lock_path, log_path):
+        build._log('test_base', 'Start test base module')
         # checkout source
         build.checkout()
         # run base test
@@ -609,6 +610,7 @@ class runbot_build(osv.osv):
         return self.spawn(cmd, lock_path, log_path, cpu_limit=300)
 
     def job_20_test_all(self, cr, uid, build, lock_path, log_path):
+        build._log('test_all', 'Start test all modules')
         self.pg_createdb(cr, uid, "%s-all" % build.dest)
         cmd, mods = build.cmd()
         if grep(build.path("openerp/tools/config.py"), "test-enable"):
@@ -620,6 +622,7 @@ class runbot_build(osv.osv):
 
     def job_30_run(self, cr, uid, build, lock_path, log_path):
         # adjust job_end to record an accurate job_20 job_time
+        build._log('run', 'Start running build %s' % build.dest)
         log_all = build.path('logs', 'job_20_test_all.txt')
         log_time = time.localtime(os.path.getmtime(log_all))
         v = {
@@ -768,11 +771,26 @@ class runbot_build(osv.osv):
                 break
             _logger.debug('reaping: pid: %s status: %s', pid, status)
 
+    def _log(self, cr, uid, ids, func, message, context=None):
+        assert len(ids) == 1
+        self.pool['ir.logging'].create(cr, uid, {
+            'build_id': ids[0],
+            'level': 'INFO',
+            'name': 'odoo.runbot',
+            'message': message,
+            'path': 'runbot',
+            'func': func,
+            'line': '0',
+        }, context=context)
+
 class runbot_event(osv.osv):
     _inherit = 'ir.logging'
     _order = 'id'
+
+    TYPES = [(t, t.capitalize()) for t in 'client server runbot'.split()]
     _columns = {
         'build_id': fields.many2one('runbot.build', 'Build'),
+        'type': fields.selection(TYPES, string='Type', required=True, select=True),
     }
 
 #----------------------------------------------------------
@@ -856,7 +874,7 @@ class RunbotController(http.Controller):
         build_ids = registry['runbot.build'].search(cr, uid, [('branch_id', '=', build.branch_id.id)])
         other_builds = registry['runbot.build'].browse(cr, uid, build_ids)
 
-        domain = [('dbname', '=', '%s-all' % build.dest)]
+        domain = ['|', ('dbname', '=like', '%s-%%' % build.dest), ('build_id', '=', build.id)]
         #if type:
         #    domain.append(('type', '=', type))
         #if level:
