@@ -776,7 +776,7 @@ class runbot_build(osv.osv):
         self.pool['ir.logging'].create(cr, uid, {
             'build_id': ids[0],
             'level': 'INFO',
-            'type': 'rumbot',
+            'type': 'runbot',
             'name': 'odoo.runbot',
             'message': message,
             'path': 'runbot',
