@@ -211,7 +211,7 @@
         <t t-if="bu.result=='ko'"><i class="text-danger fa fa-thumbs-down"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="s2h(bu.job_time)"/></small></t>
         <t t-if="bu.result=='warn'"><i class="text-warning fa fa-warning"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="s2h(bu.job_time)"/></small></t>
         <t t-if="bu.result=='skipped'"><i class="text-danger fa fa-ban"/> skipped</t>
-        <t t-if="bu.result=='killed'"><i class="label-danger fa fa-times"/> killed</t>
+        <t t-if="bu.result=='killed'"><i class="text-danger fa fa-times"/> killed</t>
     </template>
 
     <template id="runbot.build_button">
@@ -262,8 +262,7 @@
                 </t>
                 <style>
                   .killed {
-                    background-color: #555;
-                    color: #fff;
+                    background-color: #aaa;
                   }
                 </style>
             </t>
@@ -326,7 +325,7 @@
                             <h1>No Repository yet.</h1>
                         </div>
 
-                        <table t-if="repo" class="table table-condensed table-bordered table-striped">
+                        <table t-if="repo" class="table table-condensed table-bordered">
                         <tr>
                             <th>Branch</th>
                             <td colspan="4" class="text-right">
