@@ -209,8 +209,9 @@
         <t t-if="bu.state=='testing'"><i class="text-info fa fa-spinner"/> testing <t t-esc="bu.job[4:]"/> <small><t t-esc="s2h(bu.job_time)"/></small></t>
         <t t-if="bu.result=='ok'"><i class="text-success fa fa-thumbs-up"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="s2h(bu.job_time)"/></small></t>
         <t t-if="bu.result=='ko'"><i class="text-danger fa fa-thumbs-down"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="s2h(bu.job_time)"/></small></t>
-        <t t-if="bu.result=='warn'"><i class="text-warning fa fa-thumbs-down"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="s2h(bu.job_time)"/></small></t>
+        <t t-if="bu.result=='warn'"><i class="text-warning fa fa-warning"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="s2h(bu.job_time)"/></small></t>
         <t t-if="bu.result=='skipped'"><i class="text-danger fa fa-ban"/> skipped</t>
+        <t t-if="bu.result=='killed'"><i class="label-danger fa fa-times"/> killed</t>
     </template>
 
     <template id="runbot.build_button">
@@ -259,6 +260,12 @@
                 <t t-if="refresh">
                     <meta http-equiv="refresh" t-att-content="refresh"/>
                 </t>
+                <style>
+                  .killed {
+                    background-color: #555;
+                    color: #fff;
+                  }
+                </style>
             </t>
             <div class="container" style="width: 100%;">
                 <div class="row">
@@ -345,6 +352,7 @@
                                 <t t-if="bu.state in ['running','done'] and bu.result == 'warn'"><t t-set="klass">warning</t></t>
                                 <t t-if="bu.state in ['running','done'] and bu.result == 'ok'"><t t-set="klass">success</t></t>
                                 <t t-if="bu.state in ['running','done'] and bu.result == 'skipped'"><t t-set="klass">default</t></t>
+                                <t t-if="bu.state in ['running','done'] and bu.result == 'killed'"><t t-set="klass">killed</t></t>
                                 <td t-attf-class="{{klass}}">
                                    <t t-call="runbot.build_button"><t t-set="klass">btn-group-sm</t></t>
                                    <t t-if="bu.subject">

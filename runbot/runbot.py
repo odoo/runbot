@@ -420,7 +420,7 @@ class runbot_build(osv.osv):
         'author': fields.char('Author'),
         'subject': fields.text('Subject'),
         'sequence': fields.integer('Sequence'),
-        'result': fields.char('Result'), # ok, ko, warn, skipped
+        'result': fields.char('Result'), # ok, ko, warn, skipped, killed
         'pid': fields.integer('Pid'),
         'state': fields.char('Status'), # pending, testing, running, done
         'job': fields.char('Job'), # job_*
@@ -754,7 +754,7 @@ class runbot_build(osv.osv):
                 os.killpg(build.pid, signal.SIGKILL)
             except OSError:
                 pass
-            build.write({'state':'done'})
+            build.write({'state':'done', 'result': 'killed'})
             cr.commit()
             self.pg_dropdb(cr, uid, "%s-base" % build.dest)
             self.pg_dropdb(cr, uid, "%s-all" % build.dest)
