@@ -291,7 +291,7 @@ class runbot_repo(osv.osv):
                 # compute the number of testing job again
                 testing = bo.search(cr, uid, dom + [('state', '=', 'testing')], count=True)
 
-            # kill and reap doomed build
+            # terminate and reap doomed build
             build_ids = bo.search(cr, uid, dom + [('state', '=', 'running')])
             # sort builds: the last build of each sticky branch then the rest
             sticky = {}
@@ -303,8 +303,8 @@ class runbot_repo(osv.osv):
                     non_sticky.append(build.id)
             build_ids = sticky.values()
             build_ids += non_sticky
-            # kill extra running builds
-            bo.kill(cr, uid, build_ids[repo.running:])
+            # terminate extra running builds
+            bo.terminate(cr, uid, build_ids[repo.running:])
             bo.reap(cr, uid, build_ids)
 
     def nginx(self, cr, uid, context=None):
@@ -332,7 +332,7 @@ class runbot_repo(osv.osv):
         # kill switch
         bo = self.pool['runbot.build']
         build_ids = bo.search(cr, uid, [('state', 'not in', ['done', 'pending'])])
-        bo.kill(cr, uid, build_ids)
+        bo.terminate(cr, uid, build_ids)
         bo.reap(cr, uid, build_ids)
 
     def cron(self, cr, uid, ids=None, context=None):
@@ -755,21 +755,26 @@ class runbot_build(osv.osv):
             # needed to prevent losing pids if multiple jobs are started and one them raise an exception
             cr.commit()
 
-    def kill(self, cr, uid, ids, context=None):
+    def terminate(self, cr, uid, ids, context=None):
         for build in self.browse(cr, uid, ids, context=context):
             build.logger('killing %s', build.pid)
-            build._log('kill', 'Kill build %s' % build.dest)
             try:
                 os.killpg(build.pid, signal.SIGKILL)
             except OSError:
                 pass
-            build.write({'state': 'done', 'result': 'killed', 'job': False})
-            build.github_status()
+            build.write({'state': 'done'})
             cr.commit()
             self.pg_dropdb(cr, uid, "%s-base" % build.dest)
             self.pg_dropdb(cr, uid, "%s-all" % build.dest)
             if os.path.isdir(build.path()):
                 shutil.rmtree(build.path())
+
+    def kill(self, cr, uid, ids, context=None):
+        for build in self.browse(cr, uid, ids, context=context):
+            build._log('kill', 'Kill build %s' % build.dest)
+            build.terminate()
+            build.write({'result': 'killed', 'job': False})
+            build.github_status()
 
     def reap(self, cr, uid, ids):
         while True:
