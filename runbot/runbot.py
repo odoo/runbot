@@ -583,22 +583,33 @@ class runbot_build(osv.osv):
 
     def github_status(self, cr, uid, ids, context=None):
         for build in self.browse(cr, uid, ids, context=context):
-            # try to update github
+            desc = "runbot build %s" % (build.dest,)
+            if build.state == 'testing':
+                state = 'pending'
+            elif build.state in ('running', 'done'):
+                state = {
+                    'ok': 'success',
+                    'killed': 'error',
+                }.get(build.result, 'failure')
+                desc += " (runtime %ss)" % (build.job_time,)
+            else:
+                continue
+
+            status = {
+                "state": state,
+                "target_url": "http://runbot.odoo.com/runbot/build/%s" % build.id,
+                "description": desc,
+                "context": "continuous-integration/runbot"
+            }
             try:
-                state = "success" if build.result == 'ok' else "failure"
-                status = {
-                    "state": state,
-                    "target_url": "http://runbot.odoo.com/runbot/build/%s" % build.id,
-                    "description": "runbot build %s (runtime %ss)" % (build.dest, build.job_time),
-                    "context": "continuous-integration/runbot"
-                }
                 build.repo_id.github('/repos/:owner/:repo/statuses/%s' % build.name, status)
                 _logger.debug("github status %s update to %s", build.name, state)
-            except Exception, e:
+            except Exception:
                 _logger.exception("github status error")
 
     def job_10_test_base(self, cr, uid, build, lock_path, log_path):
         build._log('test_base', 'Start test base module')
+        build.github_status()
         # checkout source
         build.checkout()
         # run base test
@@ -752,7 +763,8 @@ class runbot_build(osv.osv):
                 os.killpg(build.pid, signal.SIGKILL)
             except OSError:
                 pass
-            build.write({'state':'done', 'result': 'killed', 'job': False})
+            build.write({'state': 'done', 'result': 'killed', 'job': False})
+            build.github_status()
             cr.commit()
             self.pg_dropdb(cr, uid, "%s-base" % build.dest)
             self.pg_dropdb(cr, uid, "%s-all" % build.dest)
