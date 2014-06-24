@@ -713,10 +713,7 @@ class runbot_build(osv.osv):
                     # kill if overpassed
                     if build.job != jobs[-1] and build.job_time > 1800:
                         build.logger('%s time exceded (%ss)', build.job, build.job_time)
-                        try:
-                            os.killpg(build.pid, signal.SIGKILL)
-                        except OSError:
-                            pass
+                        build.kill()
                     continue
                 build.logger('%s finished', build.job)
                 # schedule
@@ -750,11 +747,12 @@ class runbot_build(osv.osv):
     def kill(self, cr, uid, ids, context=None):
         for build in self.browse(cr, uid, ids, context=context):
             build.logger('killing %s', build.pid)
+            build._log('kill', 'Kill build %s' % build.dest)
             try:
                 os.killpg(build.pid, signal.SIGKILL)
             except OSError:
                 pass
-            build.write({'state':'done', 'result': 'killed'})
+            build.write({'state':'done', 'result': 'killed', 'job': False})
             cr.commit()
             self.pg_dropdb(cr, uid, "%s-base" % build.dest)
             self.pg_dropdb(cr, uid, "%s-all" % build.dest)
