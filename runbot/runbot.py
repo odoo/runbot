@@ -630,6 +630,7 @@ class runbot_build(osv.osv):
 
     def github_status(self, cr, uid, ids, context=None):
         """Notify github of failed/successful builds"""
+        runbot_domain = self.pool['runbot.repo'].domain(cr, uid)
         for build in self.browse(cr, uid, ids, context=context):
             if build.state != 'duplicate' and build.duplicate_id:
                 self.github_status(cr, uid, [build.duplicate_id.id], context=context)
@@ -648,7 +649,7 @@ class runbot_build(osv.osv):
 
             status = {
                 "state": state,
-                "target_url": "http://runbot.odoo.com/runbot/build/%s" % build.id,
+                "target_url": "http://%s/runbot/build/%s" % (runbot_domain, build.id),
                 "description": desc,
                 "context": "continuous-integration/runbot"
             }
