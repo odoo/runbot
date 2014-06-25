@@ -13,6 +13,7 @@ import signal
 import simplejson
 import subprocess
 import time
+import sys
 
 import dateutil.parser
 import requests
@@ -540,6 +541,7 @@ class runbot_build(osv.osv):
 
             # commandline
             cmd = [
+                sys.executable,
                 server_path,
                 "--no-xmlrpcs",
                 "--xmlrpc-port=%d" % build.port,
