@@ -35,63 +35,62 @@ _logger = logging.getLogger(__name__)
 #----------------------------------------------------------
 
 def log(*l, **kw):
-    out = []
-    for i in l:
-        if not isinstance(i, basestring):
-            i = repr(i)
-        out.append(i)
-    out += ["%s=%r" % (k, v) for k, v in kw.items()]
+    out = [i if isinstance(i, basestring) else repr(i) for i in l] + \
+          ["%s=%r" % (k, v) for k, v in kw.items()]
     _logger.debug(' '.join(out))
 
-def dashes(s):
+def dashes(string):
+    """Sanitize the input string"""
     for i in '~":\'':
-        s = s.replace(i, "")
+        string = string.replace(i, "")
     for i in '/_. ':
-        s = s.replace(i, "-")
-    return s
+        string = string.replace(i, "-")
+    return string
 
 def mkdirs(dirs):
-    for i in dirs:
-        if not os.path.exists(i):
-            os.makedirs(i)
+    for d in dirs:
+        if not os.path.exists(d):
+            os.makedirs(d)
 
-def grep(filename, s):
+def grep(filename, string):
     if os.path.isfile(filename):
-        return open(filename).read().find(s) != -1
+        return open(filename).read().find(string) != -1
     return False
 
 _re_error = r'^(?:\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ (?:ERROR|CRITICAL) )|(?:Traceback \(most recent call last\):)$'
 _re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING '
 
-def rfind(filename, patern):
+def rfind(filename, pattern):
+    """Determine in something in filename matches the pattern"""
     if os.path.isfile(filename):
-        p = re.compile(patern, re.M)
+        regexp = re.compile(pattern, re.M)
         with open(filename, 'r') as f:
-            if p.findall(f.read()):
+            if regexp.findall(f.read()):
                 return True
     return False
 
-def lock(name):
-    fd = os.open(name, os.O_CREAT | os.O_RDWR, 0600)
+def lock(filename):
+    fd = os.open(filename, os.O_CREAT | os.O_RDWR, 0600)
     fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
-def locked(name):
-    r = False
+def locked(filename):
+    result = False
     try:
-        fd = os.open(name, os.O_CREAT | os.O_RDWR, 0600)
+        fd = os.open(filename, os.O_CREAT | os.O_RDWR, 0600)
         try:
             fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except IOError:
-            r = True
+            result = True
         os.close(fd)
     except OSError:
-        r = False
-    return r
+        result = False
+    return result
 
 def nowait():
     signal.signal(signal.SIGCHLD, signal.SIG_IGN)
 
 def run(l, env=None):
+    """Run a command described by l in environment env"""
     log("run", l)
     env = dict(os.environ, **env) if env else None
     if isinstance(l, list):
@@ -111,14 +110,16 @@ def run(l, env=None):
 def now():
     return time.strftime(openerp.tools.DEFAULT_SERVER_DATETIME_FORMAT)
 
-def dt2time(dt):
-    return time.mktime(time.strptime(dt, openerp.tools.DEFAULT_SERVER_DATETIME_FORMAT))
+def dt2time(datetime):
+    """Convert datetime to time"""
+    return time.mktime(time.strptime(datetime, openerp.tools.DEFAULT_SERVER_DATETIME_FORMAT))
 
-def s2human(t):
-    for m,u in [(86400,'d'),(3600,'h'),(60,'m')]:
-        if t>=m:
-            return str(int(t/m))+u
-    return str(int(t))+"s"
+def s2human(time):
+    """Convert a time in second into an human readable string"""
+    for delay, desc in [(86400,'d'),(3600,'h'),(60,'m')]:
+        if time >= delay:
+            return str(int(time / delay)) + desc
+    return str(int(time)) + "s"
 
 #----------------------------------------------------------
 # RunBot Models
@@ -129,14 +130,14 @@ class runbot_repo(osv.osv):
     _order = 'name'
 
     def _get_path(self, cr, uid, ids, field_name, arg, context=None):
-        wd = self.root(cr, uid)
-        r = {}
+        root = self.root(cr, uid)
+        result = {}
         for repo in self.browse(cr, uid, ids, context=context):
             name = repo.name
             for i in '@:/':
                 name = name.replace(i, '_')
-            r[repo.id] = os.path.join(wd, 'repo', name)
-        return r
+            result[repo.id] = os.path.join(root, 'repo', name)
+        return result
 
     def _get_base(self, cr, uid, ids, field_name, arg, context=None):
         r = {}
@@ -170,9 +171,9 @@ class runbot_repo(osv.osv):
         return domain
 
     def root(self, cr, uid, context=None):
+        """Return root directory of repository"""
         default = os.path.join(os.path.dirname(__file__), 'static')
-        root = self.pool.get('ir.config_parameter').get_param(cr, uid, 'runbot.root', default)
-        return root
+        return self.pool.get('ir.config_parameter').get_param(cr, uid, 'runbot.root', default)
 
     def git(self, cr, uid, ids, cmd, context=None):
         for repo in self.browse(cr, uid, ids, context=context):
