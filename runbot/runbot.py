@@ -140,12 +140,12 @@ class runbot_repo(osv.osv):
         return result
 
     def _get_base(self, cr, uid, ids, field_name, arg, context=None):
-        r = {}
+        result = {}
         for repo in self.browse(cr, uid, ids, context=context):
             name = re.sub('.+@', '', repo.name)
             name = name.replace(':','/')
-            r[repo.id] = name
-        return r
+            result[repo.id] = name
+        return result
 
     _columns = {
         'name': fields.char('Repository', required=True),
@@ -176,6 +176,7 @@ class runbot_repo(osv.osv):
         return self.pool.get('ir.config_parameter').get_param(cr, uid, 'runbot.root', default)
 
     def git(self, cr, uid, ids, cmd, context=None):
+        """Execute git command cmd"""
         for repo in self.browse(cr, uid, ids, context=context):
             cmd = ['git', '--git-dir=%s' % repo.path] + cmd
             _logger.info("git: %s", ' '.join(cmd))
@@ -190,22 +191,23 @@ class runbot_repo(osv.osv):
             p2.communicate()[0]
 
     def github(self, cr, uid, ids, url, payload=None, delete=False, context=None):
+        """Return a http request to be sent to github"""
         for repo in self.browse(cr, uid, ids, context=context):
-            mo = re.search('([^/]+)/([^/]+)/([^/]+)', repo.base)
-            if mo:
-                url = url.replace(':owner', mo.group(2))
-                url = url.replace(':repo', mo.group(3))
-                url = 'https://api.%s%s' % (mo.group(1),url)
-                s = requests.Session()
-                s.auth = (repo.token,'x-oauth-basic')
-                s.headers.update({'Accept': 'application/vnd.github.she-hulk-preview+json'})
+            match_object = re.search('([^/]+)/([^/]+)/([^/]+)', repo.base)
+            if match_object:
+                url = url.replace(':owner', match_object.group(2))
+                url = url.replace(':repo', match_object.group(3))
+                url = 'https://api.%s%s' % (match_object.group(1),url)
+                session = requests.Session()
+                session.auth = (repo.token,'x-oauth-basic')
+                session.headers.update({'Accept': 'application/vnd.github.she-hulk-preview+json'})
                 if payload:
-                    r = s.post(url, data=simplejson.dumps(payload))
+                    response = session.post(url, data=simplejson.dumps(payload))
                 elif delete:
-                    r = s.delete(url)
+                    response = session.delete(url)
                 else:
-                    r = s.get(url)
-                return r.json()
+                    response = session.get(url)
+                return response.json()
 
     def update(self, cr, uid, ids, context=None):
         for repo in self.browse(cr, uid, ids, context=context):
@@ -222,18 +224,17 @@ class runbot_repo(osv.osv):
             repo.git(['fetch', '-p', 'origin', '+refs/pull/*/head:refs/pull/*'])
 
         fields = ['refname','objectname','authordate:iso8601','authorname','subject']
-        fmt = "%00".join(["%("+i+")" for i in fields])
-        out = repo.git(['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/heads', 'refs/pull'])
-        out = out.strip()
-        refs = []
-        for l in out.split('\n'):
-            ref = []
-            for i in l.split('\x00'):
-                try:
-                    ref.append(i.decode('utf-8'))
-                except UnicodeDecodeError:
-                    ref.append('')
-            refs.append(ref)
+        fmt = "%00".join(["%("+field+")" for field in fields])
+        git_refs = repo.git(['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/heads', 'refs/pull'])
+        git_refs = git_refs.strip()
+
+        def decode_utf(string):
+            try:
+                return field.decode('utf-8')
+            except UnicodeDecodeError:
+                return ''
+        refs = [[decode_utf(field) for field in line.split('\x00')] for line in git_refs.split('\n')]
+
         for name, sha, date, author, subject in refs:
             # create or get branch
             branch_ids = self.pool['runbot.branch'].search(cr, uid, [('repo_id', '=', repo.id), ('name', '=', name)])
@@ -250,39 +251,39 @@ class runbot_repo(osv.osv):
             build_ids = self.pool['runbot.build'].search(cr, uid, [('branch_id', '=', branch.id), ('name', '=', sha)])
             if not build_ids:
                 _logger.debug('repo %s branch %s new build found revno %s', branch.repo_id.name, branch.name, sha)
-                v = {
+                build_info = {
                     'branch_id': branch.id,
                     'name': sha,
                     'author': author,
                     'subject': subject,
                 }
-                self.pool['runbot.build'].create(cr, uid, v)
+                self.pool['runbot.build'].create(cr, uid, build_info)
 
     def scheduler(self, cr, uid, ids=None, context=None):
         for repo in self.browse(cr, uid, ids, context=context):
-            bo = self.pool['runbot.build']
+            Build = self.pool['runbot.build']
             dom = [('repo_id', '=', repo.id)]
 
             # schedule jobs
-            build_ids = bo.search(cr, uid, dom + [('state', 'in', ['testing', 'running'])])
-            bo.schedule(cr, uid, build_ids)
+            build_ids = Build.search(cr, uid, dom + [('state', 'in', ['testing', 'running'])])
+            Build.schedule(cr, uid, build_ids)
 
             # launch new tests
-            testing = bo.search(cr, uid, dom + [('state', '=', 'testing')], count=True)
+            testing = Build.search(cr, uid, dom + [('state', '=', 'testing')], count=True)
             while testing < repo.testing:
                 # select the next build to process
-                pending_ids = bo.search(cr, uid, dom + [('state', '=', 'pending')])
+                pending_ids = Build.search(cr, uid, dom + [('state', '=', 'pending')])
                 if pending_ids:
-                    pending = bo.browse(cr, uid, pending_ids[0])
+                    pending = Build.browse(cr, uid, pending_ids[0])
                 else:
                     break
 
                 # gather information about currently running builds
-                running_ids = bo.search(cr, uid, dom + [('state', '=', 'running')])
+                running_ids = Build.search(cr, uid, dom + [('state', '=', 'running')])
                 running_len = len(running_ids)
                 running_max = 0
                 if running_ids:
-                    running_max = bo.browse(cr, uid, running_ids[0]).sequence
+                    running_max = Build.browse(cr, uid, running_ids[0]).sequence
 
                 # determine if pending one should be launched
                 if running_len < repo.running or pending.sequence >= running_max:
@@ -291,14 +292,14 @@ class runbot_repo(osv.osv):
                     break
 
                 # compute the number of testing job again
-                testing = bo.search(cr, uid, dom + [('state', '=', 'testing')], count=True)
+                testing = Build.search(cr, uid, dom + [('state', '=', 'testing')], count=True)
 
             # terminate and reap doomed build
-            build_ids = bo.search(cr, uid, dom + [('state', '=', 'running')])
+            build_ids = Build.search(cr, uid, dom + [('state', '=', 'running')])
             # sort builds: the last build of each sticky branch then the rest
             sticky = {}
             non_sticky = []
-            for build in bo.browse(cr, uid, build_ids):
+            for build in Build.browse(cr, uid, build_ids):
                 if build.branch_id.sticky and build.branch_id.id not in sticky:
                     sticky[build.branch_id.id] = build.id
                 else:
@@ -306,8 +307,8 @@ class runbot_repo(osv.osv):
             build_ids = sticky.values()
             build_ids += non_sticky
             # terminate extra running builds
-            bo.terminate(cr, uid, build_ids[repo.running:])
-            bo.reap(cr, uid, build_ids)
+            Build.terminate(cr, uid, build_ids[repo.running:])
+            Build.reap(cr, uid, build_ids)
 
     def nginx(self, cr, uid, context=None):
         v = {}
