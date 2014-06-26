@@ -262,24 +262,24 @@ class runbot_repo(osv.osv):
     def scheduler(self, cr, uid, ids=None, context=None):
         for repo in self.browse(cr, uid, ids, context=context):
             Build = self.pool['runbot.build']
-            dom = [('repo_id', '=', repo.id)]
+            domain = [('repo_id', '=', repo.id)]
 
-            # schedule jobs
-            build_ids = Build.search(cr, uid, dom + [('state', 'in', ['testing', 'running'])])
+            # schedule jobs (transitions testing -> running, kill jobs, ...)
+            build_ids = Build.search(cr, uid, domain + [('state', 'in', ['testing', 'running'])])
             Build.schedule(cr, uid, build_ids)
 
             # launch new tests
-            testing = Build.search(cr, uid, dom + [('state', '=', 'testing')], count=True)
+            testing = Build.search_count(cr, uid, domain + [('state', '=', 'testing')])
             while testing < repo.testing:
                 # select the next build to process
-                pending_ids = Build.search(cr, uid, dom + [('state', '=', 'pending')])
+                pending_ids = Build.search(cr, uid, domain + [('state', '=', 'pending')])
                 if pending_ids:
                     pending = Build.browse(cr, uid, pending_ids[0])
                 else:
                     break
 
                 # gather information about currently running builds
-                running_ids = Build.search(cr, uid, dom + [('state', '=', 'running')])
+                running_ids = Build.search(cr, uid, domain + [('state', '=', 'running')])
                 running_len = len(running_ids)
                 running_max = 0
                 if running_ids:
@@ -292,10 +292,10 @@ class runbot_repo(osv.osv):
                     break
 
                 # compute the number of testing job again
-                testing = Build.search(cr, uid, dom + [('state', '=', 'testing')], count=True)
+                testing = Build.search_count(cr, uid, domain + [('state', '=', 'testing')])
 
             # terminate and reap doomed build
-            build_ids = Build.search(cr, uid, dom + [('state', '=', 'running')])
+            build_ids = Build.search(cr, uid, domain + [('state', '=', 'running')])
             # sort builds: the last build of each sticky branch then the rest
             sticky = {}
             non_sticky = []
@@ -311,16 +311,16 @@ class runbot_repo(osv.osv):
             Build.reap(cr, uid, build_ids)
 
     def nginx(self, cr, uid, context=None):
-        v = {}
-        v['port'] = openerp.tools.config['xmlrpc_port']
+        settings = {}
+        settings['port'] = openerp.tools.config['xmlrpc_port']
         nginx_dir = os.path.join(self.root(cr, uid), 'nginx')
-        v['nginx_dir'] = nginx_dir
+        settings['nginx_dir'] = nginx_dir
         ids = self.search(cr, uid, [('nginx','=',True)], order='id')
         if ids:
             build_ids = self.pool['runbot.build'].search(cr, uid, [('repo_id','in',ids), ('state','=','running')])
-            v['builds'] = self.pool['runbot.build'].browse(cr, uid, build_ids)
+            settings['builds'] = self.pool['runbot.build'].browse(cr, uid, build_ids)
 
-            nginx_config = self.pool['ir.ui.view'].render(cr, uid, "runbot.nginx_config", v)
+            nginx_config = self.pool['ir.ui.view'].render(cr, uid, "runbot.nginx_config", settings)
             mkdirs([nginx_dir])
             open(os.path.join(nginx_dir, 'nginx.conf'),'w').write(nginx_config)
             try:
@@ -333,10 +333,10 @@ class runbot_repo(osv.osv):
 
     def killall(self, cr, uid, ids=None, context=None):
         # kill switch
-        bo = self.pool['runbot.build']
-        build_ids = bo.search(cr, uid, [('state', 'not in', ['done', 'pending'])])
-        bo.terminate(cr, uid, build_ids)
-        bo.reap(cr, uid, build_ids)
+        Build = self.pool['runbot.build']
+        build_ids = Build.search(cr, uid, [('state', 'not in', ['done', 'pending'])])
+        Build.terminate(cr, uid, build_ids)
+        Build.reap(cr, uid, build_ids)
 
     def cron(self, cr, uid, ids=None, context=None):
         ids = self.search(cr, uid, [('auto', '=', True)])
@@ -385,6 +385,7 @@ class runbot_build(osv.osv):
         return r
 
     def _get_time(self, cr, uid, ids, field_name, arg, context=None):
+        """Return the time taken by the tests"""
         r = {}
         for build in self.browse(cr, uid, ids, context=context):
             r[build.id] = 0
@@ -395,6 +396,7 @@ class runbot_build(osv.osv):
         return r
 
     def _get_age(self, cr, uid, ids, field_name, arg, context=None):
+        """Return the time between job start and now"""
         r = {}
         for build in self.browse(cr, uid, ids, context=context):
             r[build.id] = 0
@@ -439,8 +441,8 @@ class runbot_build(osv.osv):
     }
 
     def create(self, cr, uid, values, context=None):
-        bid = super(runbot_build, self).create(cr, uid, values, context=context)
-        self.write(cr, uid, [bid], {'sequence' : bid}, context=context)
+        build_id = super(runbot_build, self).create(cr, uid, values, context=context)
+        self.write(cr, uid, [build_id], {'sequence' : build_id}, context=context)
 
     def reset(self, cr, uid, ids, context=None):
         self.write(cr, uid, ids, { 'state' : 'pending' }, context=context)
@@ -452,7 +454,7 @@ class runbot_build(osv.osv):
             _logger.debug(*l)
 
     def list_jobs(self):
-        jobs = [i for i in dir(self) if i.startswith('job')]
+        jobs = [job for job in dir(self) if job.startswith('job')]
         jobs.sort()
         return jobs
 
@@ -522,6 +524,7 @@ class runbot_build(osv.osv):
         openerp.service.db._create_empty_database(dbname)
 
     def cmd(self, cr, uid, ids, context=None):
+        """Return a list describing the command to start the build"""
         for build in self.browse(cr, uid, ids, context=context):
             # Server
             server_path = build.path("openerp-server")
@@ -534,12 +537,12 @@ class runbot_build(osv.osv):
 
             # modules
             if build.repo_id.modules:
-                mods = build.repo_id.modules
+                modules = build.repo_id.modules
             else:
                 l = glob.glob(build.path('openerp/addons/*/__init__.py'))
-                mods = set([os.path.basename(os.path.dirname(i)) for i in l])
-                mods = mods - set(['auth_ldap', 'document_ftp', 'hw_escpos', 'hw_proxy', 'hw_scanner', 'base_gengo', 'website_gengo'])
-                mods = ",".join(list(mods))
+                modules = set([os.path.basename(os.path.dirname(i)) for i in l])
+                modules = modules - set(['auth_ldap', 'document_ftp', 'hw_escpos', 'hw_proxy', 'hw_scanner', 'base_gengo', 'website_gengo'])
+                modules = ",".join(list(modules))
 
             # commandline
             cmd = [
@@ -562,7 +565,7 @@ class runbot_build(osv.osv):
         #self.run_log(cmd, logfile=self.test_all_path)
         #run(["coverage","html","-d",self.coverage_base_path,"--ignore-errors","--include=*.py"],env={'COVERAGE_FILE': self.coverage_file_path})
 
-        return cmd, mods
+        return cmd, modules
 
     def spawn(self, cmd, lock_path, log_path, cpu_limit=None, shell=False, showstderr=False):
         def preexec_fn():
@@ -586,6 +589,7 @@ class runbot_build(osv.osv):
         return p.pid
 
     def github_status(self, cr, uid, ids, context=None):
+        """Notify github of failed/successful builds"""
         for build in self.browse(cr, uid, ids, context=context):
             desc = "runbot build %s" % (build.dest,)
             if build.state == 'testing':
@@ -689,6 +693,7 @@ class runbot_build(osv.osv):
         return self.spawn(cmd, lock_path, log_path, cpu_limit=None, showstderr=True)
 
     def force(self, cr, uid, ids, context=None):
+        """Force a rebuild"""
         for build in self.browse(cr, uid, ids, context=context):
             max_id = self.search(cr, uid, [('repo_id','=',build.repo_id.id)], order='id desc', limit=1)[0]
             # Force it now
@@ -872,9 +877,9 @@ class RunbotController(http.Controller):
             v['branches'] = branches
 
             # stats
-            v['testing'] = build_obj.search(cr, uid, [('repo_id','=',repo.id), ('state','=','testing')], count=True)
-            v['running'] = build_obj.search(cr, uid, [('repo_id','=',repo.id), ('state','=','running')], count=True)
-            v['pending'] = build_obj.search(cr, uid, [('repo_id','=',repo.id), ('state','=','pending')], count=True)
+            v['testing'] = build_obj.search_count(cr, uid, [('repo_id','=',repo.id), ('state','=','testing')])
+            v['running'] = build_obj.search_count(cr, uid, [('repo_id','=',repo.id), ('state','=','running')])
+            v['pending'] = build_obj.search_count(cr, uid, [('repo_id','=',repo.id), ('state','=','pending')])
 
         v.update({
             'search': search,
