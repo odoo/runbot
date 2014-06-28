@@ -172,8 +172,12 @@ class runbot_repo(osv.osv):
         'nginx': fields.boolean('Nginx'),
         'auto': fields.boolean('Auto'),
         'duplicate_id': fields.many2one('runbot.repo', 'Repository for finding duplicate builds'),
-        'fallback_id': fields.many2one('runbot.repo', 'Fallback repo'),
         'modules': fields.char("Modules to Install", help="Comma-separated list of modules to install and test."),
+        'dependency_ids': fields.many2many(
+            'runbot.repo', 'runbot_repo_dep_rel',
+            id1='dependant_id', id2='dependency_id',
+            string='Extra dependencies',
+            help="Community addon repos which need to be present to run tests."),
         'token': fields.char("Github token"),
     }
     _defaults = {
@@ -544,16 +548,17 @@ class runbot_build(osv.osv):
             if os.path.isdir(build.path('bin/addons')):
                 shutil.move(build.path('bin'), build.server())
 
-            # fallback for addons-only community/projet branches
+            # fallback for addons-only community/project branches
             if not os.path.isfile(build.server('__init__.py')):
                 # Find modules to test and store in build
                 modules_to_test = glob.glob(build.path('*/__openerp__.py'))
                 build.write({'modules': ','.join(modules_to_test)})
-                for i in modules_to_test:
-                    shutil.move(os.path.dirname(i), build.server('addons'))
                 name = build.branch_id.branch_name.split('-',1)[0]
-                if build.repo_id.fallback_id:
-                    build.repo_id.fallback_id.git_export(name, build.path())
+                for extra_repo in build.repo_id.dependency_ids:
+                    extra_repo.git_export(name, build.path())
+                # Finally move all addons to openerp/addons
+                for module in glob.glob(build.path('*/__openerp__.py')):
+                    shutil.move(os.path.dirname(module), build.path('openerp/addons'))
 
             # move all addons to server addons path
             for i in glob.glob(build.path('addons/*')):
