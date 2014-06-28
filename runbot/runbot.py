@@ -5,6 +5,7 @@ import fcntl
 import glob
 import hashlib
 import logging
+import operator
 import os
 import re
 import resource
@@ -519,6 +520,37 @@ class runbot_build(osv.osv):
 
         return port
 
+    def get_closest_branch_name(self, cr, uid, ids, target_repo_id, context=None):
+        """Return the name of the closest common branch between both repos
+        Find common branch names, get merge-base with the branch name and
+        return the most recent.
+        Fallback repos will not have always have the same names for branch
+        names.
+        Pull request branches should not have any association with PR of other
+        repos
+        """
+        branch_pool = self.pool['runbot.branch']
+        for build in self.browse(cr, uid, ids, context=context):
+            branch, repo = build.branch_id, build.repo_id
+            name = branch.branch_name
+            # Find common branch names between repo and target repo
+            branch_ids = branch_pool.search(cr, uid, [('repo_id.id', '=', repo.id)])
+            target_ids = branch_pool.search(cr, uid, [('repo_id.id', '=', target_repo_id)])
+            branch_names = branch_pool.read(cr, uid, branch_ids, ['branch_name', 'name'], context=context)
+            target_names = branch_pool.read(cr, uid, target_ids, ['branch_name', 'name'], context=context)
+            possible_repo_branches = set([i['branch_name'] for i in branch_names if i['name'].startswith('refs/heads')])
+            possible_target_branches = set([i['branch_name'] for i in target_names if i['name'].startswith('refs/heads')])
+            possible_branches = possible_repo_branches.intersection(possible_target_branches)
+            if name not in possible_branches:
+                common_refs = {}
+                for target_branch_name in possible_branches:
+                    commit = repo.git(['merge-base', branch.name, target_branch_name]).strip()
+                    cmd = ['log', '-1', '--format=%cd', '--date=iso', commit]
+                    common_refs[target_branch_name] = repo.git(cmd).strip()
+                if common_refs:
+                    name = sorted(common_refs.iteritems(), key=operator.itemgetter(1), reverse=True)[0][0]
+            return name
+
     def path(self, cr, uid, ids, *l, **kw):
         for build in self.browse(cr, uid, ids, context=None):
             root = self.pool['runbot.repo'].root(cr, uid)
@@ -553,9 +585,9 @@ class runbot_build(osv.osv):
                 # Find modules to test and store in build
                 modules_to_test = glob.glob(build.path('*/__openerp__.py'))
                 build.write({'modules': ','.join(modules_to_test)})
-                name = build.branch_id.branch_name.split('-',1)[0]
                 for extra_repo in build.repo_id.dependency_ids:
-                    extra_repo.git_export(name, build.path())
+                    closest_name = build.get_closest_branch_name(extra_repo.id)
+                    extra_repo.git_export(closest_name, build.path())
                 # Finally move all addons to openerp/addons
                 for module in glob.glob(build.path('*/__openerp__.py')):
                     shutil.move(os.path.dirname(module), build.path('openerp/addons'))
