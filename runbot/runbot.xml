@@ -468,10 +468,11 @@
                                 <td><b t-esc="l.level"/></td>
                                 <td><t t-esc="l.type"/></td>
                                 <td>
-                                    <t t-esc="l.name"/>:<t t-esc="l.line"/> <t t-esc="l.func"/> <a t-attf-href="#">File <i class="fa fa-external-link"/></a>
+                                    <a t-attf-href="https://{{build.repo_id.base}}/blob/{{build.name}}/{{l.path}}#L{{l.line}}"><t t-esc="l.name"/>:<t t-esc="l.line"/></a> <t t-esc="l.func"/>
+                                    <t t-if="'\n' not in l.message" t-esc="l.message"/>
+                                    <pre t-if="'\n' in l.message" style="margin:0;padding:0; border: none;"><t t-esc="l.message"/></pre>
                                 </td>
                             </tr>
-                            <tr><td colspan="4"><pre style="margin:0;padding:0; border: none;"><t t-esc="l.message"/></pre></td></tr>
                         </t>
                         </table>
                     </div>
