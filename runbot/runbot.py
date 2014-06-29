@@ -659,7 +659,7 @@ class runbot_build(osv.osv):
 
         # run server
         cmd, mods = build.cmd()
-        if os.path.exists(build.path('openerp/addons/im')):
+        if os.path.exists(build.path('openerp/addons/im_livechat')):
             cmd += ["--workers", "2"]
             cmd += ["--longpolling-port", "%d" % (build.port + 1)]
             cmd += ["--max-cron-threads", "1"]
