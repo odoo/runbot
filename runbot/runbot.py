@@ -212,6 +212,9 @@ class runbot_repo(osv.osv):
 
     def update_git(self, cr, uid, repo, context=None):
         _logger.debug('repo %s updating branches', repo.name)
+
+        Build = self.pool['runbot.build']
+
         if not os.path.isdir(os.path.join(repo.path)):
             os.makedirs(repo.path)
         if not os.path.isdir(os.path.join(repo.path, 'refs')):
@@ -245,9 +248,13 @@ class runbot_repo(osv.osv):
             # skip build for old branches
             if dateutil.parser.parse(date[:19]) + datetime.timedelta(30) < datetime.datetime.now():
                 continue
-            # create build if not found
+            # create build (and mark previous builds as skipped) if not found
             build_ids = self.pool['runbot.build'].search(cr, uid, [('branch_id', '=', branch.id), ('name', '=', sha)])
             if not build_ids:
+                if not branch.sticky:
+                    to_be_skipped_ids = Build.search(cr, uid, [('branch_id', '=', branch.id), ('state', '=', 'pending')])
+                    Build.write(cr, uid, to_be_skipped_ids, {'state': 'done', 'result': 'skipped'})
+
                 _logger.debug('repo %s branch %s new build found revno %s', branch.repo_id.name, branch.name, sha)
                 v = {
                     'branch_id': branch.id,
@@ -255,7 +262,14 @@ class runbot_repo(osv.osv):
                     'author': author,
                     'subject': subject,
                 }
-                self.pool['runbot.build'].create(cr, uid, v)
+                Build.create(cr, uid, v)
+
+        # skip old builds (if their sequence number is too low, they will not ever be built)
+        max_seq_id = Build.search(cr, uid, [('repo_id', '=', repo.id)], limit=1)[0]
+        max_seq = Build.browse(cr, uid, max_seq_id).sequence
+        skippable_domain = [('repo_id', '=', repo.id), ('state', '=', 'pending'), ('sequence', '<', max_seq - repo.running)]
+        to_be_skipped_ids = Build.search(cr, uid, skippable_domain)
+        Build.write(cr, uid, to_be_skipped_ids, {'state': 'done', 'result': 'skipped'})
 
     def scheduler(self, cr, uid, ids=None, context=None):
         for repo in self.browse(cr, uid, ids, context=context):
@@ -268,6 +282,7 @@ class runbot_repo(osv.osv):
 
             # launch new tests
             testing = bo.search(cr, uid, dom + [('state', '=', 'testing')], count=True)
+
             while testing < repo.testing:
                 # select the next build to process
                 pending_ids = bo.search(cr, uid, dom + [('state', '=', 'pending')])
