@@ -287,7 +287,7 @@ class runbot_repo(osv.osv):
                 # find sticky pending build if any, otherwise, last pending (by id, not by sequence) will do the job
                 pending_ids = bo.search(cr, uid, dom + [('state', '=', 'pending'), ('branch_id.sticky', '=', True)], limit=1)
                 if not pending_ids:
-                    pending_ids = bo.search(cr, uid, dom + [('state', '=', 'pending')], order="id desc")
+                    pending_ids = bo.search(cr, uid, dom + [('state', '=', 'pending')], order="sequence", limit=1)
 
                 pending = bo.browse(cr, uid, pending_ids[0])
                 pending.schedule()
