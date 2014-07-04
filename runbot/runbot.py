@@ -266,7 +266,7 @@ class runbot_repo(osv.osv):
 
         # skip old builds (if their sequence number is too low, they will not ever be built)
         skippable_domain = [('repo_id', '=', repo.id), ('state', '=', 'pending')]
-        to_be_skipped_ids = Build.search(cr, uid, skippable_domain, order='sequence', offset=repo.running)
+        to_be_skipped_ids = Build.search(cr, uid, skippable_domain, order='sequence desc', offset=repo.running)
         Build.write(cr, uid, to_be_skipped_ids, {'state': 'done', 'result': 'skipped'})
 
     def scheduler(self, cr, uid, ids=None, context=None):
