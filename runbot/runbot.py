@@ -264,7 +264,7 @@ class runbot_repo(osv.osv):
                     'author': author,
                     'subject': subject,
                 }
-                Build.create(cr, uid, v)
+                Build.create(cr, uid, build_info)
 
         # skip old builds (if their sequence number is too low, they will not ever be built)
         skippable_domain = [('repo_id', '=', repo.id), ('state', '=', 'pending')]
