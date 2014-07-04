@@ -265,10 +265,8 @@ class runbot_repo(osv.osv):
                 Build.create(cr, uid, v)
 
         # skip old builds (if their sequence number is too low, they will not ever be built)
-        max_seq_id = Build.search(cr, uid, [('repo_id', '=', repo.id)], limit=1)[0]
-        max_seq = Build.browse(cr, uid, max_seq_id).sequence
-        skippable_domain = [('repo_id', '=', repo.id), ('state', '=', 'pending'), ('sequence', '<', max_seq - repo.running)]
-        to_be_skipped_ids = Build.search(cr, uid, skippable_domain)
+        skippable_domain = [('repo_id', '=', repo.id), ('state', '=', 'pending')]
+        to_be_skipped_ids = Build.search(cr, uid, skippable_domain, order='sequence', offset=repo.running)
         Build.write(cr, uid, to_be_skipped_ids, {'state': 'done', 'result': 'skipped'})
 
     def scheduler(self, cr, uid, ids=None, context=None):
@@ -281,9 +279,14 @@ class runbot_repo(osv.osv):
             bo.schedule(cr, uid, build_ids)
 
             # launch new tests
-            testing = bo.search(cr, uid, dom + [('state', '=', 'testing')], count=True)
+            testing = bo.search_count(cr, uid, dom + [('state', '=', 'testing')])
 
             while testing < repo.testing:
+                # select sticky build if any
+
+                # pending_ids = bo.search(cr, uid, dom + [('state', '=', 'pending')])
+
+
                 # select the next build to process
                 pending_ids = bo.search(cr, uid, dom + [('state', '=', 'pending')])
                 if pending_ids:
@@ -305,7 +308,7 @@ class runbot_repo(osv.osv):
                     break
 
                 # compute the number of testing job again
-                testing = bo.search(cr, uid, dom + [('state', '=', 'testing')], count=True)
+                testing = bo.search_count(cr, uid, dom + [('state', '=', 'testing')])
 
             # terminate and reap doomed build
             build_ids = bo.search(cr, uid, dom + [('state', '=', 'running')])
