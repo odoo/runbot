@@ -222,8 +222,8 @@
                 <a t-attf-href="https://#{bu.repo_id.base}/commit/#{bu.name}" class="btn btn-default"><i class="fa fa-github"/></a>
                 <button class="btn btn-default dropdown-toggle" data-toggle="dropdown"><i class="fa fa-cog"/><span class="caret"></span></button>
                 <ul class="dropdown-menu" role="menu">
-                    <li t-if="bu.state=='pending'">
-                        <a t-attf-href="/runbot/build/{{bu.id}}/force">Build now <i class="fa fa-level-up"> </i></a>
+                    <li t-if="bu.result=='skipped'">
+                        <a t-attf-href="/runbot/build/{{bu.id}}/force">Force Build<i class="fa fa-level-up"> </i></a>
                     </li>
                     <t t-if="bu.state=='running'">
                         <li><a t-attf-href="http://{{bu.domain}}/?db={{bu.dest}}-all">Connect all <i class="fa fa-sign-in"></i></a></li>
@@ -233,11 +233,11 @@
                     <li t-if="bu.state in ['done','running'] and bu_index==0">
                         <a t-attf-href="/runbot/build/#{bu.id}/force">Rebuild <i class="fa fa-refresh"/></a>
                     </li>
-                    <li t-if="bu.state!='testing'" class="divider"></li>
+                    <li t-if="bu.state!='testing' and bu.state!='pending'" class="divider"></li>
                     <li><a t-attf-href="/runbot/build/{{bu.id}}">Logs <i class="fa fa-file-text-o"/></a></li>
                     <li><a t-attf-href="/runbot/static/build/#{bu.dest}/logs/job_10_test_base.txt">Full base logs <i class="fa fa-file-text-o"/></a></li>
                     <li><a t-attf-href="/runbot/static/build/#{bu.dest}/logs/job_20_test_all.txt">Full all logs <i class="fa fa-file-text-o"/></a></li>
-                    <li class="divider"></li>
+                    <li t-if="bu.state!='pending'" class="divider"></li>
                     <li><a t-attf-href="{{bu.branch_id.branch_url}}">Branch or pull <i class="fa fa-github"/></a></li>
                     <li><a t-attf-href="https://{{bu.repo_id.base}}/commit/{{bu.name}}">Commit <i class="fa fa-github"/></a></li>
                     <li><a t-attf-href="https://{{bu.repo_id.base}}/compare/{{bu.branch_id.branch_name}}">Compare <i class="fa fa-github"/></a></li>

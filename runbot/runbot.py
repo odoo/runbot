@@ -388,7 +388,7 @@ class runbot_branch(osv.osv):
 
 class runbot_build(osv.osv):
     _name = "runbot.build"
-    _order = 'sequence desc'
+    _order = 'id desc'
 
     def _get_dest(self, cr, uid, ids, field_name, arg, context=None):
         r = {}
@@ -705,8 +705,8 @@ class runbot_build(osv.osv):
         for build in self.browse(cr, uid, ids, context=context):
             max_id = self.search(cr, uid, [('repo_id','=',build.repo_id.id)], order='id desc', limit=1)[0]
             # Force it now
-            if build.state in ['pending']:
-                build.write({ 'sequence':max_id })
+            if build.state == 'done' and build.result == 'skipped':
+                build.write({'state': 'pending', 'sequence':max_id, 'result': '' })
             # or duplicate it
             elif build.state in ['running','done']:
                 d = {
