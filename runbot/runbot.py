@@ -280,35 +280,21 @@ class runbot_repo(osv.osv):
 
             # launch new tests
             testing = bo.search_count(cr, uid, dom + [('state', '=', 'testing')])
+            pending = bo.search_count(cr, uid, dom + [('state', '=', 'pending')])
 
-            while testing < repo.testing:
-                # select sticky build if any
+            while testing < repo.testing and pending > 0:
 
-                # pending_ids = bo.search(cr, uid, dom + [('state', '=', 'pending')])
+                # find sticky pending build if any, otherwise, last pending (by id, not by sequence) will do the job
+                pending_ids = bo.search(cr, uid, dom + [('state', '=', 'pending'), ('branch_id.sticky', '=', True)], limit=1)
+                if not pending_ids:
+                    pending_ids = bo.search(cr, uid, dom + [('state', '=', 'pending')], order="id desc")
 
+                pending = bo.browse(cr, uid, pending_ids[0])
+                pending.schedule()
 
-                # select the next build to process
-                pending_ids = bo.search(cr, uid, dom + [('state', '=', 'pending')])
-                if pending_ids:
-                    pending = bo.browse(cr, uid, pending_ids[0])
-                else:
-                    break
-
-                # gather information about currently running builds
-                running_ids = bo.search(cr, uid, dom + [('state', '=', 'running')])
-                running_len = len(running_ids)
-                running_max = 0
-                if running_ids:
-                    running_max = bo.browse(cr, uid, running_ids[0]).sequence
-
-                # determine if pending one should be launched
-                if running_len < repo.running or pending.sequence >= running_max:
-                    pending.schedule()
-                else:
-                    break
-
-                # compute the number of testing job again
+                # compute the number of testing and pending jobs again
                 testing = bo.search_count(cr, uid, dom + [('state', '=', 'testing')])
+                pending = bo.search_count(cr, uid, dom + [('state', '=', 'pending')])
 
             # terminate and reap doomed build
             build_ids = bo.search(cr, uid, dom + [('state', '=', 'running')])
