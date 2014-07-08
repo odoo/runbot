@@ -506,8 +506,12 @@ class runbot_build(osv.osv):
                     build.repo_id.fallback_id.git_export(name, build.path())
 
             # move all addons to server addons path
+            if os.path.exists(build.path('odoo')):
+                dest = build.path('odoo/addons')
+            else:
+                dest = build.path('openerp/addons')
             for i in glob.glob(build.path('addons/*')):
-                shutil.move(i, build.path('openerp/addons'))
+                shutil.move(i, dest)
 
     def pg_dropdb(self, cr, uid, dbname):
         pid_col = 'pid' if cr._cnx.server_version >= 90200 else 'procpid'
