@@ -482,6 +482,7 @@ class runbot_build(osv.osv):
         for build in self.browse(cr, uid, ids, context=None):
             if os.path.exists(build.path('odoo')):
                 return build.path('odoo', *l)
+            return build.path('openerp', *l)
 
     def checkout(self, cr, uid, ids, context=None):
         for build in self.browse(cr, uid, ids, context=context):
