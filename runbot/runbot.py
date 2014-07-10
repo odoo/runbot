@@ -533,6 +533,11 @@ class runbot_build(osv.osv):
         for build in self.browse(cr, uid, ids, context=context):
             branch, repo = build.branch_id, build.repo_id
             name = branch.branch_name
+            # Use github API to find name of branch on which the PR is made
+            if repo.token and name.startswith('refs/pull/'):
+                pull_number = name[len('refs/pull/'):]
+                pr = repo.github('/repos/:owner/:repo/pulls/%s' % pull_number)
+                name = 'refs/heads/' + pr['base']['ref']
             # Find common branch names between repo and target repo
             branch_ids = branch_pool.search(cr, uid, [('repo_id.id', '=', repo.id)])
             target_ids = branch_pool.search(cr, uid, [('repo_id.id', '=', target_repo_id)])
