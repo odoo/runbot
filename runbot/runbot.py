@@ -458,7 +458,7 @@ class runbot_build(osv.osv):
             _logger.debug(*l)
 
     def list_jobs(self):
-        jobs = [job for job in dir(self) if job.startswith('job')]
+        jobs = [job for job in dir(self) if re.match(r'^job_\d+', job)]
         jobs.sort()
         return jobs
 
@@ -882,10 +882,11 @@ class RunbotController(http.Controller):
                         branch_ids.append(br[0])
 
             branches = branch_obj.browse(cr, uid, branch_ids, context=context)
+            v['branches'] = []
             for branch in branches:
                 build_ids = build_obj.search(cr, uid, [('branch_id','=',branch.id)], limit=4)
                 branch.builds = build_obj.browse(cr, uid, build_ids, context=context)
-            v['branches'] = branches
+                v['branches'].append(branch)
 
             # stats
             v['testing'] = build_obj.search_count(cr, uid, [('repo_id','=',repo.id), ('state','=','testing')])
