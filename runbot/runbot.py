@@ -482,6 +482,12 @@ class runbot_build(osv.osv):
             root = self.pool['runbot.repo'].root(cr, uid)
             return os.path.join(root, 'build', build.dest, *l)
 
+    def server(self, cr, uid, ids, *l, **kw):
+        for build in self.browse(cr, uid, ids, context=None):
+            if os.path.exists(build.path('odoo')):
+                return build.path('odoo', *l)
+            return build.path('openerp', *l)
+
     def checkout(self, cr, uid, ids, context=None):
         for build in self.browse(cr, uid, ids, context=context):
             # starts from scratch
@@ -489,7 +495,7 @@ class runbot_build(osv.osv):
                 shutil.rmtree(build.path())
 
             # runbot log path
-            mkdirs([build.path("logs"), build.path('openerp/addons')])
+            mkdirs([build.path("logs"), build.server('addons')])
 
             # checkout branch
             build.branch_id.repo_id.git_export(build.name, build.path())
@@ -498,20 +504,20 @@ class runbot_build(osv.osv):
 
             # v6 rename bin -> openerp
             if os.path.isdir(build.path('bin/addons')):
-                shutil.move(build.path('bin'), build.path('openerp'))
+                shutil.move(build.path('bin'), build.server())
 
             # fallback for addons-only community/projet branches
-            if not os.path.isfile(build.path('openerp/__init__.py')):
+            if not os.path.isfile(build.server('__init__.py')):
                 l = glob.glob(build.path('*/__openerp__.py'))
                 for i in l:
-                    shutil.move(os.path.dirname(i), build.path('openerp/addons'))
+                    shutil.move(os.path.dirname(i), build.server('addons'))
                 name = build.branch_id.branch_name.split('-',1)[0]
                 if build.repo_id.fallback_id:
                     build.repo_id.fallback_id.git_export(name, build.path())
 
             # move all addons to server addons path
             for i in glob.glob(build.path('addons/*')):
-                shutil.move(i, build.path('openerp/addons'))
+                shutil.move(i, build.server('addons'))
 
     def pg_dropdb(self, cr, uid, dbname):
         pid_col = 'pid' if cr._cnx.server_version >= 90200 else 'procpid'
@@ -543,8 +549,8 @@ class runbot_build(osv.osv):
             if build.repo_id.modules:
                 modules = build.repo_id.modules
             else:
-                l = glob.glob(build.path('openerp/addons/*/__init__.py'))
-                modules = set([os.path.basename(os.path.dirname(i)) for i in l])
+                l = glob.glob(build.server('addons', '*', '__init__.py'))
+                modules = set(os.path.basename(os.path.dirname(i)) for i in l)
                 modules = modules - set(['auth_ldap', 'document_ftp', 'hw_escpos', 'hw_proxy', 'hw_scanner', 'base_gengo', 'website_gengo'])
                 modules = ",".join(list(modules))
 
@@ -556,9 +562,9 @@ class runbot_build(osv.osv):
                 "--xmlrpc-port=%d" % build.port,
             ]
             # options
-            if grep(build.path("openerp/tools/config.py"), "no-netrpc"):
+            if grep(build.server("tools/config.py"), "no-netrpc"):
                 cmd.append("--no-netrpc")
-            if grep(build.path("openerp/tools/config.py"), "log-db"):
+            if grep(build.server("tools/config.py"), "log-db"):
                 cmd += ["--log-db=%s" % cr.dbname] 
 
         # coverage
@@ -627,7 +633,7 @@ class runbot_build(osv.osv):
         # run base test
         self.pg_createdb(cr, uid, "%s-base" % build.dest)
         cmd, mods = build.cmd()
-        if grep(build.path("openerp/tools/config.py"), "test-enable"):
+        if grep(build.server("tools/config.py"), "test-enable"):
             cmd.append("--test-enable")
         cmd += ['-d', '%s-base' % build.dest, '-i', 'base', '--stop-after-init', '--log-level=test', '--max-cron-threads=0']
         return self.spawn(cmd, lock_path, log_path, cpu_limit=300)
@@ -636,7 +642,7 @@ class runbot_build(osv.osv):
         build._log('test_all', 'Start test all modules')
         self.pg_createdb(cr, uid, "%s-all" % build.dest)
         cmd, mods = build.cmd()
-        if grep(build.path("openerp/tools/config.py"), "test-enable"):
+        if grep(build.server("tools/config.py"), "test-enable"):
             cmd.append("--test-enable")
         cmd += ['-d', '%s-all' % build.dest, '-i', mods, '--stop-after-init', '--log-level=test', '--max-cron-threads=0']
         # reset job_start to an accurate job_20 job_time
@@ -651,12 +657,13 @@ class runbot_build(osv.osv):
         v = {
             'job_end': time.strftime(openerp.tools.DEFAULT_SERVER_DATETIME_FORMAT, log_time),
         }
-        if grep(log_all, "openerp.modules.loading: Modules loaded."):
+        logger = 'odoo.modules.loading' if os.path.exists(build.path('odoo')) else 'openerp.modules.loading'
+        if grep(log_all, "%s: Modules loaded." % logger):
             if rfind(log_all, _re_error):
                 v['result'] = "ko"
             elif rfind(log_all, _re_warning):
                 v['result'] = "warn"
-            elif not grep(build.path("openerp/test/common.py"), "post_install") or grep(log_all, "Initiating shutdown."):
+            elif not grep(build.server("test/common.py"), "post_install") or grep(log_all, "Initiating shutdown."):
                 v['result'] = "ok"
         else:
             v['result'] = "ko"
@@ -665,7 +672,7 @@ class runbot_build(osv.osv):
 
         # run server
         cmd, mods = build.cmd()
-        if os.path.exists(build.path('openerp/addons/im_livechat')):
+        if os.path.exists(build.server('addons/im_livechat')):
             cmd += ["--workers", "2"]
             cmd += ["--longpolling-port", "%d" % (build.port + 1)]
             cmd += ["--max-cron-threads", "1"]
@@ -676,7 +683,7 @@ class runbot_build(osv.osv):
         cmd += ['--log-level=debug']
         cmd += ['-d', "%s-all" % build.dest]
 
-        if grep(build.path("openerp/tools/config.py"), "db-filter"):
+        if grep(build.server("tools/config.py"), "db-filter"):
             if build.repo_id.nginx:
                 cmd += ['--db-filter','%d.*$']
             else:
