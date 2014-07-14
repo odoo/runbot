@@ -651,8 +651,7 @@ class runbot_build(osv.osv):
         v = {
             'job_end': time.strftime(openerp.tools.DEFAULT_SERVER_DATETIME_FORMAT, log_time),
         }
-        logger = 'odoo.modules.loading' if os.path.exists(build.path('odoo')) else 'openerp.modules.loading'
-        if grep(log_all, "%s: Modules loaded." % logger):
+        if grep(log_all, ".modules.loading: Modules loaded."):
             if rfind(log_all, _re_error):
                 v['result'] = "ko"
             elif rfind(log_all, _re_warning):
