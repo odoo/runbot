@@ -24,6 +24,10 @@
                                 <field name="default_running_max" class="oe_inline"/>
                                 <label for="default_running_max"/>
                             </div>
+                            <div>
+                                <field name="default_timeout" class="oe_inline"/>
+                                <label for="default_timeout"/>
+                            </div>
                         </div>
                     </group>
                 </form>

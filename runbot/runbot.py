@@ -731,6 +731,9 @@ class runbot_build(osv.osv):
 
     def schedule(self, cr, uid, ids, context=None):
         jobs = self.list_jobs()
+        icp = self.pool['ir.config_parameter']
+        timeout = int(icp.get_param(cr, uid, 'runbot.timeout', default=1800))
+
         for build in self.browse(cr, uid, ids, context=context):
             if build.state == 'pending':
                 # allocate port and schedule first job
@@ -749,7 +752,7 @@ class runbot_build(osv.osv):
                 lock_path = build.path('logs', '%s.lock' % build.job)
                 if locked(lock_path):
                     # kill if overpassed
-                    if build.job != jobs[-1] and build.job_time > 1800:
+                    if build.job != jobs[-1] and build.job_time > timeout:
                         build.logger('%s time exceded (%ss)', build.job, build.job_time)
                         build.kill()
                     continue

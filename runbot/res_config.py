@@ -26,13 +26,15 @@ class runbot_config_settings(osv.osv_memory):
     _inherit = 'res.config.settings'
     _columns = {
     	'default_workers': fields.integer('Total Number of Workers'),
-    	'default_running_max': fields.integer('Maximum Number of Running Builds'),
+        'default_running_max': fields.integer('Maximum Number of Running Builds'),
+        'default_timeout': fields.integer('Default timeout (in seconds)'),
     }
 
     def get_default_parameters(self, cr, uid, fields, context=None):
         icp = self.pool['ir.config_parameter']
         workers = icp.get_param(cr, uid, 'runbot.workers', default=6)
         running_max = icp.get_param(cr, uid, 'runbot.running_max', default=75)
+        timeout = icp.get_param(cr, uid, 'runbot.timeout', default=1800)
         return {
         	'default_workers': int(workers),
         	'default_running_max': int(running_max)
@@ -43,10 +45,12 @@ class runbot_config_settings(osv.osv_memory):
         icp = self.pool['ir.config_parameter']
         icp.set_param(cr, uid, 'runbot.workers', config.default_workers)
         icp.set_param(cr, uid, 'runbot.running_max', config.default_running_max)
+        icp.set_param(cr, uid, 'runbot.timeout', config.default_timeout)
 
     _defaults = {
     	'default_workers': 6,
     	'default_running_max': 75,
+        'default_timeout': 1800,
     }
 
 
