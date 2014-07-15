@@ -268,55 +268,56 @@ class runbot_repo(osv.osv):
 
         # skip old builds (if their sequence number is too low, they will not ever be built)
         skippable_domain = [('repo_id', '=', repo.id), ('state', '=', 'pending')]
-        to_be_skipped_ids = Build.search(cr, uid, skippable_domain, order='sequence desc', offset=repo.running)
+        icp = self.pool['ir.config_parameter']
+        running_max = int(icp.get_param(cr, uid, 'runbot.running_max', default=75))
+        to_be_skipped_ids = Build.search(cr, uid, skippable_domain, order='sequence desc', offset=running_max)
         Build.write(cr, uid, to_be_skipped_ids, {'state': 'done', 'result': 'skipped'})
 
     def scheduler(self, cr, uid, ids=None, context=None):
         icp = self.pool['ir.config_parameter']
-        workers = icp.get_param(cr, uid, 'runbot.workers', default=6)
-        running_max = icp.get_param(cr, uid, 'runbot.running_max', default=75)
+        workers = int(icp.get_param(cr, uid, 'runbot.workers', default=6))
+        running_max = int(icp.get_param(cr, uid, 'runbot.running_max', default=75))
 
-        for repo in self.browse(cr, uid, ids, context=context):
-            Build = self.pool['runbot.build']
-            domain = [('repo_id', '=', repo.id)]
+        Build = self.pool['runbot.build']
+        domain = [('repo_id', 'in', ids)]
 
-            # schedule jobs (transitions testing -> running, kill jobs, ...)
-            build_ids = Build.search(cr, uid, domain + [('state', 'in', ['testing', 'running'])])
-            Build.schedule(cr, uid, build_ids)
+        # schedule jobs (transitions testing -> running, kill jobs, ...)
+        build_ids = Build.search(cr, uid, domain + [('state', 'in', ['testing', 'running'])])
+        Build.schedule(cr, uid, build_ids)
 
-            # launch new tests
+        # launch new tests
+        testing = Build.search_count(cr, uid, domain + [('state', '=', 'testing')])
+        pending = Build.search_count(cr, uid, domain + [('state', '=', 'pending')])
+
+        while testing < workers and pending > 0:
+
+            # find sticky pending build if any, otherwise, last pending (by id, not by sequence) will do the job
+            pending_ids = Build.search(cr, uid, domain + [('state', '=', 'pending'), ('branch_id.sticky', '=', True)], limit=1)
+            if not pending_ids:
+                pending_ids = Build.search(cr, uid, domain + [('state', '=', 'pending')], order="sequence", limit=1)
+
+            pending_build = Build.browse(cr, uid, pending_ids[0])
+            pending_build.schedule()
+
+            # compute the number of testing and pending jobs again
             testing = Build.search_count(cr, uid, domain + [('state', '=', 'testing')])
             pending = Build.search_count(cr, uid, domain + [('state', '=', 'pending')])
 
-            while testing < repo.testing and pending > 0:
-
-                # find sticky pending build if any, otherwise, last pending (by id, not by sequence) will do the job
-                pending_ids = Build.search(cr, uid, domain + [('state', '=', 'pending'), ('branch_id.sticky', '=', True)], limit=1)
-                if not pending_ids:
-                    pending_ids = Build.search(cr, uid, domain + [('state', '=', 'pending')], order="sequence", limit=1)
-
-                pending = Build.browse(cr, uid, pending_ids[0])
-                pending.schedule()
-
-                # compute the number of testing and pending jobs again
-                testing = Build.search_count(cr, uid, domain + [('state', '=', 'testing')])
-                pending = Build.search_count(cr, uid, domain + [('state', '=', 'pending')])
-
-            # terminate and reap doomed build
-            build_ids = Build.search(cr, uid, domain + [('state', '=', 'running')])
-            # sort builds: the last build of each sticky branch then the rest
-            sticky = {}
-            non_sticky = []
-            for build in Build.browse(cr, uid, build_ids):
-                if build.branch_id.sticky and build.branch_id.id not in sticky:
-                    sticky[build.branch_id.id] = build.id
-                else:
-                    non_sticky.append(build.id)
-            build_ids = sticky.values()
-            build_ids += non_sticky
-            # terminate extra running builds
-            Build.terminate(cr, uid, build_ids[repo.running:])
-            Build.reap(cr, uid, build_ids)
+        # terminate and reap doomed build
+        build_ids = Build.search(cr, uid, domain + [('state', '=', 'running')])
+        # sort builds: the last build of each sticky branch then the rest
+        sticky = {}
+        non_sticky = []
+        for build in Build.browse(cr, uid, build_ids):
+            if build.branch_id.sticky and build.branch_id.id not in sticky:
+                sticky[build.branch_id.id] = build.id
+            else:
+                non_sticky.append(build.id)
+        build_ids = sticky.values()
+        build_ids += non_sticky
+        # terminate extra running builds
+        Build.terminate(cr, uid, build_ids[running_max:])
+        Build.reap(cr, uid, build_ids)
 
     def nginx(self, cr, uid, context=None):
         settings = {}
