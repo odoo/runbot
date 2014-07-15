@@ -266,7 +266,7 @@
                   }
                 </style>
             </t>
-            <div class="container" style="width: 100%;">
+            <div class="container-fluid">
                 <div class="row">
                     <div class='col-md-12'>
                         <nav class="navbar navbar-default" role="navigation">
