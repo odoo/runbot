@@ -59,6 +59,7 @@ def grep(filename, string):
 
 _re_error = r'^(?:\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ (?:ERROR|CRITICAL) )|(?:Traceback \(most recent call last\):)$'
 _re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING '
+_re_job = re.compile('job_\d')
 
 def rfind(filename, pattern):
     """Determine in something in filename matches the pattern"""
@@ -465,9 +466,7 @@ class runbot_build(osv.osv):
             _logger.debug(*l)
 
     def list_jobs(self):
-        jobs = [job for job in dir(self) if re.match(r'^job_\d+', job)]
-        jobs.sort()
-        return jobs
+        return sorted(job for job in dir(self) if _re_job.match(job))
 
     def find_port(self, cr, uid):
         # currently used port
