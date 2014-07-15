@@ -6,7 +6,7 @@
             <field name="name">Configure Runbot</field>
             <field name="model">runbot.config.settings</field>
             <field name="arch" type="xml">
-                <form string="Configure Runbot" class= "oe_form_configuration">
+                <form string="Configure Runbot" class= "oe_form_configuration" version="7.0">
                     <header>
                         <button string="Apply" type="object" name="execute" class="oe_highlight"/>
                         or
