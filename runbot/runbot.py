@@ -272,6 +272,10 @@ class runbot_repo(osv.osv):
         Build.write(cr, uid, to_be_skipped_ids, {'state': 'done', 'result': 'skipped'})
 
     def scheduler(self, cr, uid, ids=None, context=None):
+        icp = self.pool['ir.config_parameter']
+        workers = icp.get_param(cr, uid, 'runbot.workers', default=6)
+        running_max = icp.get_param(cr, uid, 'runbot.running_max', default=75)
+
         for repo in self.browse(cr, uid, ids, context=context):
             Build = self.pool['runbot.build']
             domain = [('repo_id', '=', repo.id)]
@@ -849,6 +853,13 @@ class RunbotController(http.Controller):
         registry, cr, uid, context = request.registry, request.cr, 1, request.context
         branch_obj = registry['runbot.branch']
         build_obj = registry['runbot.build']
+        icp = registry['ir.config_parameter']
+        workers = icp.get_param(cr, uid, 'runbot.workers', default=6)
+        running_max = icp.get_param(cr, uid, 'runbot.running_max', default=75)
+        pending_total = build_obj.search_count(cr, uid, [('state','=','pending')])
+        testing_total = build_obj.search_count(cr, uid, [('state','=','testing')])
+        running_total = build_obj.search_count(cr, uid, [('state','=','running')])
+
         v = self.common(cr, uid)
         # repo
         if not repo and v['repos']:
@@ -898,6 +909,11 @@ class RunbotController(http.Controller):
             'limit': limit,
             'refresh': refresh,
             'repo': repo,
+            'workers': workers,
+            'running_max': running_max,
+            'pending_total': pending_total,
+            'running_total': running_total,
+            'testing_total': testing_total,
         })
         return request.render("runbot.repo", v)
 

@@ -279,6 +279,11 @@
                                 <span class="icon-bar"></span>
                               </button>
                               <a class="navbar-brand" t-attf-href="/runbot/{{'repo/' + slug(repo) if repo else ''}}"><b t-if="repo"><t t-esc="repo.base"/></b></a>
+                              <span class="navbar-brand">
+                                <t t-esc="testing_total"/>/<t t-esc="workers"/> testing,
+                                <t t-esc="running_total"/>/<t t-esc="running_max"/> running,
+                                <t t-esc="pending_total"/> pending.
+                              </span>
                             </div>
                             <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
                               <form class="navbar-form navbar-left form-inline">
@@ -331,8 +336,8 @@
                         <tr>
                             <th>Branch</th>
                             <td colspan="4" class="text-right">
-                                <t t-esc="testing"/>/<t t-esc="repo.testing"/> testing,
-                                <t t-esc="running"/>/<t t-esc="repo.running"/> running,
+                                <t t-esc="testing"/> testing,
+                                <t t-esc="running"/> running,
                                 <t t-esc="pending"/> pending.
                             </td>
 
