@@ -11,6 +11,7 @@
     },
     'data': [
         'runbot.xml',
+        'res_config_view.xml',
         'security/ir.model.access.csv',
     ],
     'installable': True,
