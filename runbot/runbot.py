@@ -196,7 +196,7 @@ class runbot_repo(osv.osv):
         for repo in self.browse(cr, uid, ids, context=context):
             if not repo.token:
                 raise Exception('Repository does not have a token to authenticate')
-            match_object = re.search('([^/]+)/([^/]+)/([^/]+)', repo.base)
+            match_object = re.search('([^/]+)/([^/]+)/([^/.]+(.git)?)', repo.base)
             if match_object:
                 url = url.replace(':owner', match_object.group(2))
                 url = url.replace(':repo', match_object.group(3))
