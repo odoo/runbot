@@ -278,45 +278,21 @@
                                 <span class="icon-bar"></span>
                                 <span class="icon-bar"></span>
                               </button>
-                              <a class="navbar-brand" t-attf-href="/runbot/{{'repo/' + slug(repo) if repo else ''}}"><b t-if="repo"><t t-esc="repo.base"/></b></a>
-                              <span class="navbar-brand">
-                                <t t-esc="testing_total"/>/<t t-esc="workers"/> testing,
-                                <t t-esc="running_total"/>/<t t-esc="running_max"/> running,
-                                <t t-esc="pending_total"/> pending.
-                              </span>
+                              <t t-if="repo">
+                                  <ul class="nav navbar-nav">
+                                    <li class="dropdown">
+                                      <a href="#" class="dropdown-toggle" data-toggle="dropdown"><b style="font-size: 18px;"><t t-esc="repo.base"/></b><b class="caret"></b></a>
+                                      <ul class="dropdown-menu">
+                                        <t t-foreach='repos' t-as='repo'>
+                                            <li><a t-attf-href="/runbot/repo/{{slug(repo)}}"><t t-esc="repo.base"/></a></li>
+                                        </t>
+                                      </ul>
+                                    </li>
+                                  </ul>
+
+                              </t>
                             </div>
                             <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-                              <form class="navbar-form navbar-left form-inline">
-                                <div class="btn-group" t-if="repo">
-                                  <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
-                                    Filter <span class="caret"></span>
-                                  </button>
-                                  <ul class="dropdown-menu" role="menu">
-                                    <li t-if="filters['pending']=='0'"><a t-att-href="qu(pending=1)">Pending</a></li>
-                                    <li t-if="filters['pending']=='1'"><a t-att-href="qu(pending='0')"><i class="fa fa-check"/> Pending</a></li>
-                                    <li t-if="filters['testing']=='0'"><a t-att-href="qu(testing=1)">Testing</a></li>
-                                    <li t-if="filters['testing']=='1'"><a t-att-href="qu(testing='0')"><i class="fa fa-check"/> Testing</a></li>
-                                    <li t-if="filters['running']=='0'"><a t-att-href="qu(running=1)">Running</a></li>
-                                    <li t-if="filters['running']=='1'"><a t-att-href="qu(running='0')"><i class="fa fa-check"/> Running</a></li>
-                                    <li t-if="filters['done']=='0'"><a t-att-href="qu(done=1)">Done</a></li>
-                                    <li t-if="filters['done']=='1'"><a t-att-href="qu(done='0')"><i class="fa fa-check"/> Done</a></li>
-                                    <li class="divider"></li>
-                                    <li t-att-class="'active' if limit=='100' else ''"><a t-att-href="qu(limit=100)">Show last 100</a></li>
-                                    <li t-att-class="'active' if limit=='1000' else ''"><a t-att-href="qu(limit=1000)">Show last 1000</a></li>
-                                    <li t-att-class="'active' if limit=='10000' else ''"><a t-att-href="qu(limit=10000)">Show last 10000</a></li>
-                                  </ul>
-                                </div>
-                              </form>
-                              <ul class="nav navbar-nav navbar-right">
-                                <li class="dropdown">
-                                  <a href="#" class="dropdown-toggle" data-toggle="dropdown">Switch repository <b class="caret"></b></a>
-                                  <ul class="dropdown-menu">
-                                    <t t-foreach='repos' t-as='repo'>
-                                        <li><a t-attf-href="/runbot/repo/{{slug(repo)}}"><t t-esc="repo.base"/></a></li>
-                                    </t>
-                                  </ul>
-                                </li>
-                              </ul>
                               <t t-if="repo">
                                 <form class="navbar-form navbar-right" role="search" t-att-action="qu(search='')" method="get">
                                   <div class="form-group">
@@ -324,6 +300,32 @@
                                     <button type="submit" class="btn btn-default">Search</button>
                                   </div>
                                 </form>
+                                <form class="navbar-form navbar-right form-inline">
+                                  <div class="btn-group" t-if="repo">
+                                    <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
+                                      Filter <span class="caret"></span>
+                                    </button>
+                                    <ul class="dropdown-menu" role="menu">
+                                      <li t-if="filters['pending']=='0'"><a t-att-href="qu(pending=1)">Pending</a></li>
+                                      <li t-if="filters['pending']=='1'"><a t-att-href="qu(pending='0')"><i class="fa fa-check"/> Pending</a></li>
+                                      <li t-if="filters['testing']=='0'"><a t-att-href="qu(testing=1)">Testing</a></li>
+                                      <li t-if="filters['testing']=='1'"><a t-att-href="qu(testing='0')"><i class="fa fa-check"/> Testing</a></li>
+                                      <li t-if="filters['running']=='0'"><a t-att-href="qu(running=1)">Running</a></li>
+                                      <li t-if="filters['running']=='1'"><a t-att-href="qu(running='0')"><i class="fa fa-check"/> Running</a></li>
+                                      <li t-if="filters['done']=='0'"><a t-att-href="qu(done=1)">Done</a></li>
+                                      <li t-if="filters['done']=='1'"><a t-att-href="qu(done='0')"><i class="fa fa-check"/> Done</a></li>
+                                      <li class="divider"></li>
+                                      <li t-att-class="'active' if limit=='100' else ''"><a t-att-href="qu(limit=100)">Show last 100</a></li>
+                                      <li t-att-class="'active' if limit=='1000' else ''"><a t-att-href="qu(limit=1000)">Show last 1000</a></li>
+                                      <li t-att-class="'active' if limit=='10000' else ''"><a t-att-href="qu(limit=10000)">Show last 10000</a></li>
+                                    </ul>
+                                  </div>
+                                </form>
+                                <span class="navbar-brand navbar-right">
+                                  <t t-esc="testing_total"/>/<t t-esc="workers"/> testing,
+                                  <t t-esc="running_total"/>/<t t-esc="running_max"/> running,
+                                  <t t-esc="pending_total"/> pending
+                                </span>
                               </t>
                             </div>
                           </div>
@@ -336,6 +338,7 @@
                         <tr>
                             <th>Branch</th>
                             <td colspan="4" class="text-right">
+                                <t t-esc="repo.base"/>: 
                                 <t t-esc="testing"/> testing,
                                 <t t-esc="running"/> running,
                                 <t t-esc="pending"/> pending.
