@@ -193,6 +193,8 @@ class runbot_repo(osv.osv):
     def github(self, cr, uid, ids, url, payload=None, delete=False, context=None):
         """Return a http request to be sent to github"""
         for repo in self.browse(cr, uid, ids, context=context):
+            if not repo.token:
+                raise Exception('Repository does not have a token to authenticate')
             match_object = re.search('([^/]+)/([^/]+)/([^/]+)', repo.base)
             if match_object:
                 url = url.replace(':owner', match_object.group(2))
