@@ -24,6 +24,7 @@
                         <field name="jobs"/>
                         <field name="nginx"/>
                         <field name="fallback_id"/>
+                        <field name="duplicate_id"/>
                         <field name="modules"/>
                         <field name="token"/>
                     </group>
@@ -128,6 +129,7 @@
                         <field name="job_end"/>
                         <field name="job_time"/>
                         <field name="job_age"/>
+                        <field name="duplicate_id"/>
                     </group>
                 </sheet>
             </form>
@@ -166,6 +168,7 @@
                 <filter string="Testing" domain="[('state','=', 'testing')]"/>
                 <filter string="Running" domain="[('state','=', 'running')]"/>
                 <filter string="Done" domain="[('state','=','done')]"/>
+                <filter string="Duplicate" domain="[('state','=', 'duplicate')]"/>
                 <separator />
                 <group expand="0" string="Group By...">
                     <filter string="Repo" domain="[]" context="{'group_by':'repo_id'}"/>

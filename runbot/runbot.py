@@ -157,6 +157,7 @@ class runbot_repo(osv.osv):
         'jobs': fields.char('Jobs'),
         'nginx': fields.boolean('Nginx'),
         'auto': fields.boolean('Auto'),
+        'duplicate_id': fields.many2one('runbot.repo', 'Repository for finding duplicate builds'),
         'fallback_id': fields.many2one('runbot.repo', 'Fallback repo'),
         'modules': fields.char("Modules to Install"),
         'token': fields.char("Github token"),
@@ -439,12 +440,13 @@ class runbot_build(osv.osv):
         'sequence': fields.integer('Sequence'),
         'result': fields.char('Result'), # ok, ko, warn, skipped, killed
         'pid': fields.integer('Pid'),
-        'state': fields.char('Status'), # pending, testing, running, done
+        'state': fields.char('Status'), # pending, testing, running, done, duplicate
         'job': fields.char('Job'), # job_*
         'job_start': fields.datetime('Job start'),
         'job_end': fields.datetime('Job end'),
         'job_time': fields.function(_get_time, type='integer', string='Job time'),
         'job_age': fields.function(_get_age, type='integer', string='Job age'),
+        'duplicate_id': fields.many2one('runbot.build', 'Corresponding Build'),
     }
 
     _defaults = {
@@ -454,7 +456,16 @@ class runbot_build(osv.osv):
 
     def create(self, cr, uid, values, context=None):
         build_id = super(runbot_build, self).create(cr, uid, values, context=context)
-        self.write(cr, uid, [build_id], {'sequence' : build_id}, context=context)
+        extra_info = {'sequence' : build_id}
+
+        for build in self.browse(cr, uid, [build_id]):
+            domain = [('repo_id','=',build.repo_id.duplicate_id.id), ('name', '=', build.name), ('duplicate_id', '=', False)]
+            duplicate_ids = self.search(cr, uid, domain)
+            if len(duplicate_ids):
+                duplicate_id = duplicate_ids[0]
+                extra_info.update({'state': 'duplicate', 'duplicate_id': duplicate_id})
+                self.write(cr, uid, [duplicate_id], {'duplicate_id': build_id})
+        self.write(cr, uid, [build_id], extra_info, context=context)
 
     def reset(self, cr, uid, ids, context=None):
         self.write(cr, uid, ids, { 'state' : 'pending' }, context=context)
@@ -902,6 +913,10 @@ class RunbotController(http.Controller):
             for branch in branches:
                 build_ids = build_obj.search(cr, uid, [('branch_id','=',branch.id)], limit=4)
                 branch.builds = build_obj.browse(cr, uid, build_ids, context=context)
+                # # build_ids = [build.id if build.]
+                # for build in build_obj.browse(cr, uid, build_ids, context=context):
+                #     if build.state == 'duplicate':
+                #         branch.builds
                 v['branches'].append(branch)
 
             # stats
