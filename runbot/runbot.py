@@ -474,8 +474,8 @@ class runbot_build(osv.osv):
         ports = set(i['port'] for i in self.read(cr, uid, ids, ['port']))
 
         # starting port
-        # TODO take ir.config.parameters or 9000
-        port = 2000
+        icp = self.pool['ir.config_parameter']
+        port = int(icp.get_param(cr, uid, 'runbot.starting_port', default=2000))
 
         # find next free port
         while port in ports:

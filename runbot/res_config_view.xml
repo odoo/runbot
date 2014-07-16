@@ -28,6 +28,10 @@
                                 <field name="default_timeout" class="oe_inline"/>
                                 <label for="default_timeout"/>
                             </div>
+                            <div>
+                                <field name="default_starting_port" class="oe_inline"/>
+                                <label for="default_starting_port"/>
+                            </div>
                         </div>
                     </group>
                 </form>
