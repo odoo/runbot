@@ -871,7 +871,7 @@ class RunbotController(http.Controller):
 
     @http.route(['/runbot', '/runbot/repo/<model("runbot.repo"):repo>'], type='http', auth="public", website=True)
     def repo(self, repo=None, search='', limit='100', refresh='', **post):
-        registry, cr, uid, context = request.registry, request.cr, 1, request.context
+        registry, cr, uid = request.registry, request.cr, 1
         branch_obj = registry['runbot.branch']
         build_obj = registry['runbot.build']
         icp = registry['ir.config_parameter']
@@ -881,10 +881,10 @@ class RunbotController(http.Controller):
         testing_total = build_obj.search_count(cr, uid, [('state','=','testing')])
         running_total = build_obj.search_count(cr, uid, [('state','=','running')])
 
-        v = self.common(cr, uid)
+        context = self.common(cr, uid)
         # repo
-        if not repo and v['repos']:
-            repo = v['repos'][0]
+        if not repo and context['repos']:
+            repo = context['repos'][0]
         if repo:
             # filters
             dom = [('repo_id','=',repo.id)]
@@ -895,9 +895,9 @@ class RunbotController(http.Controller):
                     dom += [('state','!=',k)]
             if search:
                 dom += [('dest','ilike',search)]
-            v['filters'] = filters
+            context['filters'] = filters
             qu = QueryURL('/runbot/repo/'+slug(repo), search=search, limit=limit, refresh=refresh, **filters)
-            v['qu'] = qu
+            context['qu'] = qu
             build_ids = build_obj.search(cr, uid, dom + [('branch_id.sticky','=',True)])
             build_ids += build_obj.search(cr, uid, dom + [('branch_id.sticky','=',False)], limit=int(limit))
 
@@ -913,19 +913,19 @@ class RunbotController(http.Controller):
                     if br[0] not in branch_ids:
                         branch_ids.append(br[0])
 
-            branches = branch_obj.browse(cr, uid, branch_ids, context=context)
-            v['branches'] = []
+            branches = branch_obj.browse(cr, uid, branch_ids, context=request.context)
+            context['branches'] = []
             for branch in branches:
                 build_ids = build_obj.search(cr, uid, [('branch_id','=',branch.id)], limit=4)
-                branch.builds = build_obj.browse(cr, uid, build_ids, context=context)
-                v['branches'].append(branch)
+                branch.builds = build_obj.browse(cr, uid, build_ids, context=request.context)
+                context['branches'].append(branch)
 
             # stats
-            v['testing'] = build_obj.search_count(cr, uid, [('repo_id','=',repo.id), ('state','=','testing')])
-            v['running'] = build_obj.search_count(cr, uid, [('repo_id','=',repo.id), ('state','=','running')])
-            v['pending'] = build_obj.search_count(cr, uid, [('repo_id','=',repo.id), ('state','=','pending')])
+            context['testing'] = build_obj.search_count(cr, uid, [('repo_id','=',repo.id), ('state','=','testing')])
+            context['running'] = build_obj.search_count(cr, uid, [('repo_id','=',repo.id), ('state','=','running')])
+            context['pending'] = build_obj.search_count(cr, uid, [('repo_id','=',repo.id), ('state','=','pending')])
 
-        v.update({
+        context.update({
             'search': search,
             'limit': limit,
             'refresh': refresh,
@@ -936,7 +936,7 @@ class RunbotController(http.Controller):
             'running_total': running_total,
             'testing_total': testing_total,
         })
-        return request.render("runbot.repo", v)
+        return request.render("runbot.repo", context)
 
     @http.route(['/runbot/build/<build_id>'], type='http', auth="public", website=True)
     def build(self, build_id=None, search=None, **post):
