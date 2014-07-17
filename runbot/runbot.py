@@ -459,7 +459,12 @@ class runbot_build(osv.osv):
         extra_info = {'sequence' : build_id}
 
         for build in self.browse(cr, uid, [build_id]):
-            domain = [('repo_id','=',build.repo_id.duplicate_id.id), ('name', '=', build.name), ('duplicate_id', '=', False)]
+            domain = [
+                ('repo_id','=',build.repo_id.duplicate_id.id), 
+                ('name', '=', build.name), 
+                ('duplicate_id', '=', False), 
+                ('result', '!=', 'skipped')
+            ]
             duplicate_ids = self.search(cr, uid, domain)
             if len(duplicate_ids):
                 duplicate_id = duplicate_ids[0]
@@ -913,10 +918,6 @@ class RunbotController(http.Controller):
             for branch in branches:
                 build_ids = build_obj.search(cr, uid, [('branch_id','=',branch.id)], limit=4)
                 branch.builds = build_obj.browse(cr, uid, build_ids, context=context)
-                # # build_ids = [build.id if build.]
-                # for build in build_obj.browse(cr, uid, build_ids, context=context):
-                #     if build.state == 'duplicate':
-                #         branch.builds
                 v['branches'].append(branch)
 
             # stats
