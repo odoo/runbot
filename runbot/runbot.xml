@@ -350,14 +350,14 @@
                         </tr>
                         <tr t-foreach="branches" t-as="br">
                             <td>
-                                <i t-if="br.sticky" class="fa fa-star"/>
-                                <b t-esc="br.branch_name"/>
-                                <small><t t-esc="s2h(br.builds[0].job_age)"/></small><br/>
+                                <i t-if="br['branch'].sticky" class="fa fa-star"/>
+                                <b t-esc="br['branch'].branch_name"/>
+                                <small><t t-esc="s2h(br['builds'][0].job_age)"/></small><br/>
                                 <div class="btn-group btn-group-xs">
-                                    <a t-attf-href="{{br.branch_url}}" class="btn btn-default btn-xs">Branch or pull <i class="fa fa-github"/></a>
+                                    <a t-attf-href="{{br['branch'].branch_url}}" class="btn btn-default btn-xs">Branch or pull <i class="fa fa-github"/></a>
                                 </div>
                             </td>
-                            <t t-foreach="br.builds" t-as="bu">
+                            <t t-foreach="br['builds']" t-as="bu">
                                 <t t-if="bu.state=='pending'"><t t-set="klass">default</t></t>
                                 <t t-if="bu.state=='testing'"><t t-set="klass">info</t></t>
                                 <t t-if="bu.state in ['running','done'] and bu.result == 'ko'"><t t-set="klass">danger</t></t>
