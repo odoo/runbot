@@ -265,7 +265,7 @@ class runbot_repo(osv.osv):
             if not build_ids:
                 if not branch.sticky:
                     to_be_skipped_ids = Build.search(cr, uid, [('branch_id', '=', branch.id), ('state', '=', 'pending')])
-                    Build.write(cr, uid, to_be_skipped_ids, {'state': 'done', 'result': 'skipped'})
+                    Build.skip(cr, uid, to_be_skipped_ids)
 
                 _logger.debug('repo %s branch %s new build found revno %s', branch.repo_id.name, branch.name, sha)
                 build_info = {
@@ -281,7 +281,7 @@ class runbot_repo(osv.osv):
         icp = self.pool['ir.config_parameter']
         running_max = int(icp.get_param(cr, uid, 'runbot.running_max', default=75))
         to_be_skipped_ids = Build.search(cr, uid, skippable_domain, order='sequence desc', offset=running_max)
-        Build.write(cr, uid, to_be_skipped_ids, {'state': 'done', 'result': 'skipped'})
+        Build.skip(cr, uid, to_be_skipped_ids)
 
     def scheduler(self, cr, uid, ids=None, context=None):
         icp = self.pool['ir.config_parameter']
@@ -735,20 +735,21 @@ class runbot_build(osv.osv):
     def force(self, cr, uid, ids, context=None):
         """Force a rebuild"""
         for build in self.browse(cr, uid, ids, context=context):
-            max_id = self.search(cr, uid, [('repo_id','=',build.repo_id.id)], order='id desc', limit=1)[0]
+            domain = [('repo_id','=',build.repo_id.id), ('state', '=', 'pending')]
+            new_id = self.search(cr, uid, domain, order='id', limit=1)[0]
             # Force it now
             if build.state == 'done' and build.result == 'skipped':
-                build.write({'state': 'pending', 'sequence':max_id, 'result': '' })
+                build.write({'state': 'pending', 'sequence':new_id, 'result': '' })
             # or duplicate it
             elif build.state in ['running','done']:
-                d = {
-                    'sequence': max_id,
+                new_build = {
+                    'sequence': new_id,
                     'branch_id': build.branch_id.id,
                     'name': build.name,
                     'author': build.author,
                     'subject': build.subject,
                 }
-                self.create(cr, 1, d)
+                self.create(cr, 1, new_build, context=context)
             return build.repo_id.id
 
     def schedule(self, cr, uid, ids, context=None):
@@ -806,6 +807,12 @@ class runbot_build(osv.osv):
                 build.write({'pid': pid})
             # needed to prevent losing pids if multiple jobs are started and one them raise an exception
             cr.commit()
+
+    def skip(self, cr, uid, ids, context=None):
+        self.write(cr, uid, ids, {'state': 'done', 'result': 'skipped'}, context=context)
+        to_unduplicate = self.search(cr, uid, [('id', 'in', ids), ('duplicate_id', '!=', False)])
+        if len(to_unduplicate):
+            self.force(cr, uid, to_unduplicate, context=context)
 
     def terminate(self, cr, uid, ids, context=None):
         for build in self.browse(cr, uid, ids, context=context):
