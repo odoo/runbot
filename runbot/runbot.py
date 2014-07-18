@@ -307,7 +307,6 @@ class runbot_repo(osv.osv):
                 pending_ids = Build.search(cr, uid, domain + [('state', '=', 'pending')], order="sequence", limit=1)
 
             pending_build = Build.browse(cr, uid, pending_ids[0])
-            print 'scheduling build', pending_build
             pending_build.schedule()
 
             # compute the number of testing and pending jobs again
@@ -425,14 +424,14 @@ class runbot_build(osv.osv):
         return r
 
     def _get_domain(self, cr, uid, ids, field_name, arg, context=None):
-        r = {}
+        result = {}
         domain = self.pool['runbot.repo'].domain(cr, uid)
         for build in self.browse(cr, uid, ids, context=context):
             if build.repo_id.nginx:
-                r[build.id] = "%s.%s" % (build.dest, domain)
+                result[build.id] = "%s.%s" % (build.dest, domain)
             else:
-                r[build.id] = "%s:%s" % (domain, build.port)
-        return r
+                result[build.id] = "%s:%s" % (domain, build.port)
+        return result
 
     _columns = {
         'branch_id': fields.many2one('runbot.branch', 'Branch', required=True, ondelete='cascade'),
@@ -885,7 +884,6 @@ class RunbotController(http.Controller):
         context = {
             'repos': repos,
             'repo': repo,
-            's2h': s2human,
             'workers': icp.get_param(cr, uid, 'runbot.workers', default=6),
             'running_max': icp.get_param(cr, uid, 'runbot.running_max', default=75),
             'pending_total': build_obj.search_count(cr, uid, [('state','=','pending')]),
@@ -918,10 +916,29 @@ class RunbotController(http.Controller):
             build_ids = flatten(build_by_branch_ids.values())
             build_dict = {build.id: build for build in build_obj.browse(cr, uid, build_ids, context=request.context) }
 
+            def build_info(build):
+                real_build = build.duplicate_id if build.state == 'duplicate' else build
+                return {
+                    'id': build.id,
+                    'name': build.name,
+                    'state': real_build.state,
+                    'result': real_build.result,
+                    'subject': build.subject,
+                    'author': build.author,
+                    'dest': build.dest,
+                    'real_dest': real_build.dest,
+                    'job_age': s2human(real_build.job_age),
+                    'job_time': s2human(real_build.job_time),
+                    'job': real_build.job,
+                    'domain': real_build.domain,
+                    'port': real_build.port,
+                    'subject': build.subject,
+                }
+
             def branch_info(branch):
                 return {
                     'branch': branch,
-                    'builds': [build_dict[build_id] for build_id in build_by_branch_ids[branch.id]]
+                    'builds': [build_info(build_dict[build_id]) for build_id in build_by_branch_ids[branch.id]]
                 }
 
             context.update({
@@ -955,18 +972,18 @@ class RunbotController(http.Controller):
         logging_ids = registry['ir.logging'].search(cr, uid, domain)
         logs = registry['ir.logging'].browse(cr, uid, logging_ids)
 
-        v = self.common(cr, uid)
-        #v['type'] = type
-        #v['level'] = level
-        v['build'] = build
-        v['other_builds'] = other_builds
-        v['logs'] = logs
-        return request.render("runbot.build", v)
+        context = self.common(cr, uid)
+        #context['type'] = type
+        #context['level'] = level
+        context['build'] = build
+        context['other_builds'] = other_builds
+        context['logs'] = logs
+        return request.render("runbot.build", context)
 
     @http.route(['/runbot/build/<build_id>/force'], type='http', auth="public", website=True)
     def build_force(self, build_id, **post):
         registry, cr, uid, context = request.registry, request.cr, 1, request.context
-        repo_id = registry['runbot.build'].force(cr, 1, [int(build_id)])
+        repo_id = registry['runbot.build'].force(cr, uid, [int(build_id)])
         return werkzeug.utils.redirect('/runbot/repo/%s' % repo_id)
 
     @http.route(['/runbot/build/<build_id>/label/<label_id>'], type='http', auth="public", method='POST')
