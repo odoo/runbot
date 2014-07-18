@@ -630,15 +630,18 @@ class runbot_build(osv.osv):
     def github_status(self, cr, uid, ids, context=None):
         """Notify github of failed/successful builds"""
         for build in self.browse(cr, uid, ids, context=context):
+            if build.state != 'duplicate' and build.duplicate_id:
+                self.github_status(cr, uid, [build.duplicate_id.id], context=context)
             desc = "runbot build %s" % (build.dest,)
-            if build.state == 'testing':
+            real_build = build.duplicate_id if build.state == 'duplicate' else build
+            if real_build.state == 'testing':
                 state = 'pending'
-            elif build.state in ('running', 'done'):
+            elif real_build.state in ('running', 'done'):
                 state = {
                     'ok': 'success',
                     'killed': 'error',
-                }.get(build.result, 'failure')
-                desc += " (runtime %ss)" % (build.job_time,)
+                }.get(real_build.result, 'failure')
+                desc += " (runtime %ss)" % (real_build.job_time,)
             else:
                 continue
 
@@ -1115,18 +1118,12 @@ LABELS = {
 # kill ` ps faux | grep ./static  | awk '{print $2}' `
 # ps faux| grep Cron | grep -- '-all'  | awk '{print $2}' | xargs kill
 # psql -l | grep " 000" | awk '{print $1}' | xargs -n1 dropdb
-# TODO
 
-# - cannibal branch
 # - commit/pull more info
 # - v6 support
-
 # - host field in build
 # - unlink build to remove ir_logging entires # ondelete=cascade
 # - gc either build or only old ir_logging
 # - if nginx server logfiles via each virtual server or map /runbot/static to root
-
-
-# list process group pids
 
 # vim:
