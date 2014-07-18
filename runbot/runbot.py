@@ -127,6 +127,12 @@ def s2human(time):
 def flatten(list_of_lists):
     return itertools.chain.from_iterable(list_of_lists)
 
+def decode_utf(field):
+    try:
+        return field.decode('utf-8')
+    except UnicodeDecodeError:
+        return ''
+
 #----------------------------------------------------------
 # RunBot Models
 #----------------------------------------------------------
@@ -236,16 +242,11 @@ class runbot_repo(osv.osv):
             repo.git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*'])
             repo.git(['fetch', '-p', 'origin', '+refs/pull/*/head:refs/pull/*'])
 
-        fields = ['refname','objectname','authordate:iso8601','authorname','subject']
+        fields = ['refname','objectname','committerdate:iso8601','authorname','subject']
         fmt = "%00".join(["%("+field+")" for field in fields])
         git_refs = repo.git(['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/heads', 'refs/pull'])
         git_refs = git_refs.strip()
 
-        def decode_utf(string):
-            try:
-                return field.decode('utf-8')
-            except UnicodeDecodeError:
-                return ''
         refs = [[decode_utf(field) for field in line.split('\x00')] for line in git_refs.split('\n')]
 
         for name, sha, date, author, subject in refs:
@@ -738,15 +739,20 @@ class runbot_build(osv.osv):
     def force(self, cr, uid, ids, context=None):
         """Force a rebuild"""
         for build in self.browse(cr, uid, ids, context=context):
-            domain = [('repo_id','=',build.repo_id.id), ('state', '=', 'pending')]
-            new_id = self.search(cr, uid, domain, order='id', limit=1)[0]
+            domain = [('state', '=', 'pending')]
+            pending_ids = self.search(cr, uid, domain, order='id', limit=1)
+            if len(pending_ids):
+                sequence = pending_ids[0]
+            else:
+                sequence = self.search(cr, uid, [], order='id desc', limit=1)[0]
+
             # Force it now
             if build.state == 'done' and build.result == 'skipped':
-                build.write({'state': 'pending', 'sequence':new_id, 'result': '' })
+                build.write({'state': 'pending', 'sequence':sequence, 'result': '' })
             # or duplicate it
-            elif build.state in ['running','done']:
+            elif build.state in ['running', 'done', 'duplicate']:
                 new_build = {
-                    'sequence': new_id,
+                    'sequence': sequence,
                     'branch_id': build.branch_id.id,
                     'name': build.name,
                     'author': build.author,
@@ -926,29 +932,10 @@ class RunbotController(http.Controller):
             build_ids = flatten(build_by_branch_ids.values())
             build_dict = {build.id: build for build in build_obj.browse(cr, uid, build_ids, context=request.context) }
 
-            def build_info(build):
-                real_build = build.duplicate_id if build.state == 'duplicate' else build
-                return {
-                    'id': build.id,
-                    'name': build.name,
-                    'state': real_build.state,
-                    'result': real_build.result,
-                    'subject': build.subject,
-                    'author': build.author,
-                    'dest': build.dest,
-                    'real_dest': real_build.dest,
-                    'job_age': s2human(real_build.job_age),
-                    'job_time': s2human(real_build.job_time),
-                    'job': real_build.job,
-                    'domain': real_build.domain,
-                    'port': real_build.port,
-                    'subject': build.subject,
-                }
-
             def branch_info(branch):
                 return {
                     'branch': branch,
-                    'builds': [build_info(build_dict[build_id]) for build_id in build_by_branch_ids[branch.id]]
+                    'builds': [self.build_info(build_dict[build_id]) for build_id in build_by_branch_ids[branch.id]]
                 }
 
             context.update({
@@ -962,32 +949,58 @@ class RunbotController(http.Controller):
 
         return request.render("runbot.repo", context)
 
+    def build_info(self, build):
+        real_build = build.duplicate_id if build.state == 'duplicate' else build
+        return {
+            'id': build.id,
+            'name': build.name,
+            'state': real_build.state,
+            'result': real_build.result,
+            'subject': build.subject,
+            'author': build.author,
+            'dest': build.dest,
+            'real_dest': real_build.dest,
+            'job_age': s2human(real_build.job_age),
+            'job_time': s2human(real_build.job_time),
+            'job': real_build.job,
+            'domain': real_build.domain,
+            'port': real_build.port,
+            'subject': build.subject,
+        }
+
+
     @http.route(['/runbot/build/<build_id>'], type='http', auth="public", website=True)
     def build(self, build_id=None, search=None, **post):
         registry, cr, uid, context = request.registry, request.cr, 1, request.context
 
-        build = registry['runbot.build'].browse(cr, uid, [int(build_id)])[0]
+        Build = registry['runbot.build']
+        Logging = registry['ir.logging']
+
+        build = Build.browse(cr, uid, [int(build_id)])[0]
+        real_build = build.duplicate_id if build.state == 'duplicate' else build
 
         # other builds
-        build_ids = registry['runbot.build'].search(cr, uid, [('branch_id', '=', build.branch_id.id)])
-        other_builds = registry['runbot.build'].browse(cr, uid, build_ids)
+        build_ids = Build.search(cr, uid, [('branch_id', '=', build.branch_id.id)])
+        other_builds = Build.browse(cr, uid, build_ids)
 
-        domain = ['|', ('dbname', '=like', '%s-%%' % build.dest), ('build_id', '=', build.id)]
+        domain = ['|', ('dbname', '=like', '%s-%%' % real_build.dest), ('build_id', '=', real_build.id)]
         #if type:
         #    domain.append(('type', '=', type))
         #if level:
         #    domain.append(('level', '=', level))
         if search:
             domain.append(('name', 'ilike', search))
-        logging_ids = registry['ir.logging'].search(cr, uid, domain)
-        logs = registry['ir.logging'].browse(cr, uid, logging_ids)
+        logging_ids = Logging.search(cr, uid, domain)
 
-        context = self.common(cr, uid)
+        context = {
+            'repo': build.repo_id,
+            'build': self.build_info(build),
+            'br': {'branch': build.branch_id},
+            'logs': Logging.browse(cr, uid, logging_ids),
+            'other_builds': other_builds
+        }
         #context['type'] = type
         #context['level'] = level
-        context['build'] = build
-        context['other_builds'] = other_builds
-        context['logs'] = logs
         return request.render("runbot.build", context)
 
     @http.route(['/runbot/build/<build_id>/force'], type='http', auth="public", website=True)
