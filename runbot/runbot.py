@@ -587,9 +587,15 @@ class runbot_build(osv.osv):
 
             # fallback for addons-only community/project branches
             if not os.path.isfile(build.server('__init__.py')):
-                # Find modules to test and store in build
-                modules_to_test = glob.glob(build.path('*/__openerp__.py'))
-                build.write({'modules': ','.join(modules_to_test)})
+                # Use modules to test previously configured in the repository
+                modules_to_test = build.repo_id.modules
+                if not modules_to_test:
+                    # Find modules to test from the folder branch
+                    modules_to_test = ','.join(
+                        os.path.basename(os.path.dirname(a))
+                        for a in glob.glob(build.path('*/__openerp__.py'))
+                    )
+                build.write({'modules': modules_to_test})
                 for extra_repo in build.repo_id.dependency_ids:
                     closest_name = build.get_closest_branch_name(extra_repo.id)
                     extra_repo.git_export(closest_name, build.path())
