@@ -24,6 +24,7 @@
                         <field name="jobs"/>
                         <field name="nginx"/>
                         <field name="fallback_id"/>
+                        <field name="duplicate_id"/>
                         <field name="modules"/>
                         <field name="token"/>
                     </group>
@@ -128,6 +129,7 @@
                         <field name="job_end"/>
                         <field name="job_time"/>
                         <field name="job_age"/>
+                        <field name="duplicate_id"/>
                     </group>
                 </sheet>
             </form>
@@ -153,6 +155,15 @@
             </tree>
         </field>
     </record>
+    <record id="view_build_graph" model="ir.ui.view">
+        <field name="model">runbot.build</field>
+        <field name="arch" type="xml">
+            <graph string="Builds" type="pivot">
+                <field name="repo_id" type="row"/>
+                <field name="state" type="col"/>
+            </graph>
+        </field>
+    </record>
     <record id="view_build_search" model="ir.ui.view">
         <field name="model">runbot.build</field>
         <field name="arch" type="xml">
@@ -166,6 +177,7 @@
                 <filter string="Testing" domain="[('state','=', 'testing')]"/>
                 <filter string="Running" domain="[('state','=', 'running')]"/>
                 <filter string="Done" domain="[('state','=','done')]"/>
+                <filter string="Duplicate" domain="[('state','=', 'duplicate')]"/>
                 <separator />
                 <group expand="0" string="Group By...">
                     <filter string="Repo" domain="[]" context="{'group_by':'repo_id'}"/>
@@ -182,6 +194,7 @@
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">runbot.build</field>
         <field name="view_type">form</field>
+        <field name="view_mode">tree,form,graph</field>
     </record>
     <menuitem id="menu_build" action="action_build" parent="menu_runbot"/>
 
@@ -205,50 +218,50 @@
 
     <!-- Templates -->
     <template id="runbot.build_name">
-        <t t-if="bu.state=='pending'"><i class="text-default fa fa-pause"/> pending</t>
-        <t t-if="bu.state=='testing'"><i class="text-info fa fa-spinner"/> testing <t t-esc="bu.job[4:]"/> <small><t t-esc="s2h(bu.job_time)"/></small></t>
-        <t t-if="bu.result=='ok'"><i class="text-success fa fa-thumbs-up"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="s2h(bu.job_time)"/></small></t>
-        <t t-if="bu.result=='ko'"><i class="text-danger fa fa-thumbs-down"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="s2h(bu.job_time)"/></small></t>
-        <t t-if="bu.result=='warn'"><i class="text-warning fa fa-warning"/><small> age <t t-esc="s2h(bu.job_age)"/> time <t t-esc="s2h(bu.job_time)"/></small></t>
-        <t t-if="bu.result=='skipped'"><i class="text-danger fa fa-ban"/> skipped</t>
-        <t t-if="bu.result=='killed'"><i class="text-danger fa fa-times"/> killed</t>
+        <t t-if="bu['state']=='pending'"><i class="text-default fa fa-pause"/> pending</t>
+        <t t-if="bu['state']=='testing'"><i class="text-info fa fa-spinner"/> testing <t t-esc="bu['job']"/> <small><t t-esc="bu['job_time']"/></small></t>
+        <t t-if="bu['result']=='ok'"><i class="text-success fa fa-thumbs-up"/><small> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
+        <t t-if="bu['result']=='ko'"><i class="text-danger fa fa-thumbs-down"/><small> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
+        <t t-if="bu['result']=='warn'"><i class="text-warning fa fa-warning"/><small> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
+        <t t-if="bu['result']=='skipped'"><i class="text-danger fa fa-ban"/> skipped</t>
+        <t t-if="bu['result']=='killed'"><i class="text-danger fa fa-times"/> killed</t>
     </template>
 
     <template id="runbot.build_button">
         <div t-attf-class="btn-group {{klass}} pull-right">
             <div t-attf-class="btn-group {{klass}}">
-                <a t-if="bu.state=='running'" t-attf-href="http://{{bu.domain}}/?db={{bu.dest}}-all" class="btn btn-primary"><i class="fa fa-sign-in"/></a>
-                <a t-attf-href="/runbot/build/{{bu.id}}" class="btn btn-default"><i class="fa fa-file-text-o"/></a>
-                <a t-attf-href="https://#{bu.repo_id.base}/commit/#{bu.name}" class="btn btn-default"><i class="fa fa-github"/></a>
+                <a t-if="bu['state']=='running'" t-attf-href="http://{{bu['domain']}}/?db={{bu['dest']}}-all" class="btn btn-primary"><i class="fa fa-sign-in"/></a>
+                <a t-attf-href="/runbot/build/{{bu['id']}}" class="btn btn-default"><i class="fa fa-file-text-o"/></a>
+                <a t-attf-href="https://#{repo.base}/commit/#{bu['name']}" class="btn btn-default"><i class="fa fa-github"/></a>
                 <button class="btn btn-default dropdown-toggle" data-toggle="dropdown"><i class="fa fa-cog"/><span class="caret"></span></button>
                 <ul class="dropdown-menu" role="menu">
-                    <li t-if="bu.result=='skipped'">
-                        <a t-attf-href="/runbot/build/{{bu.id}}/force">Force Build<i class="fa fa-level-up"> </i></a>
+                    <li t-if="bu['result']=='skipped'">
+                        <a t-attf-href="/runbot/build/{{bu['id']}}/force">Force Build<i class="fa fa-level-up"> </i></a>
                     </li>
-                    <t t-if="bu.state=='running'">
-                        <li><a t-attf-href="http://{{bu.domain}}/?db={{bu.dest}}-all">Connect all <i class="fa fa-sign-in"></i></a></li>
-                        <li><a t-attf-href="http://{{bu.domain}}/?db={{bu.dest}}-base">Connect base <i class="fa fa-sign-in"></i></a></li>
-                        <li><a t-attf-href="http://{{bu.domain}}/">Connect <i class="fa fa-sign-in"></i></a></li>
+                    <t t-if="bu['state']=='running'">
+                        <li><a t-attf-href="http://{{bu['domain']}}/?db={{bu['real_dest']}}-all">Connect all <i class="fa fa-sign-in"></i></a></li>
+                        <li><a t-attf-href="http://{{bu['domain']}}/?db={{bu['real_dest']}}-base">Connect base <i class="fa fa-sign-in"></i></a></li>
+                        <li><a t-attf-href="http://{{bu['domain']}}/">Connect <i class="fa fa-sign-in"></i></a></li>
                     </t>
-                    <li t-if="bu.state in ['done','running'] and bu_index==0">
-                        <a t-attf-href="/runbot/build/#{bu.id}/force">Rebuild <i class="fa fa-refresh"/></a>
+                    <li t-if="bu['state'] in ['done','running'] and bu_index==0">
+                        <a t-attf-href="/runbot/build/#{bu['id']}/force">Rebuild <i class="fa fa-refresh"/></a>
                     </li>
-                    <li t-if="bu.state!='testing' and bu.state!='pending'" class="divider"></li>
-                    <li><a t-attf-href="/runbot/build/{{bu.id}}">Logs <i class="fa fa-file-text-o"/></a></li>
-                    <li><a t-attf-href="/runbot/static/build/#{bu.dest}/logs/job_10_test_base.txt">Full base logs <i class="fa fa-file-text-o"/></a></li>
-                    <li><a t-attf-href="/runbot/static/build/#{bu.dest}/logs/job_20_test_all.txt">Full all logs <i class="fa fa-file-text-o"/></a></li>
-                    <li t-if="bu.state!='pending'" class="divider"></li>
-                    <li><a t-attf-href="{{bu.branch_id.branch_url}}">Branch or pull <i class="fa fa-github"/></a></li>
-                    <li><a t-attf-href="https://{{bu.repo_id.base}}/commit/{{bu.name}}">Commit <i class="fa fa-github"/></a></li>
-                    <li><a t-attf-href="https://{{bu.repo_id.base}}/compare/{{bu.branch_id.branch_name}}">Compare <i class="fa fa-github"/></a></li>
+                    <li t-if="bu['state']!='testing' and bu['state']!='pending'" class="divider"></li>
+                    <li><a t-attf-href="/runbot/build/{{bu['id']}}">Logs <i class="fa fa-file-text-o"/></a></li>
+                    <li><a t-attf-href="/runbot/static/build/#{bu['real_dest']}/logs/job_10_test_base.txt">Full base logs <i class="fa fa-file-text-o"/></a></li>
+                    <li><a t-attf-href="/runbot/static/build/#{bu['real_dest']}/logs/job_20_test_all.txt">Full all logs <i class="fa fa-file-text-o"/></a></li>
+                    <li t-if="bu['state']!='pending'" class="divider"></li>
+                    <li><a t-attf-href="{{br['branch'].branch_url}}">Branch or pull <i class="fa fa-github"/></a></li>
+                    <li><a t-attf-href="https://{{repo.base}}/commit/{{bu['name']}}">Commit <i class="fa fa-github"/></a></li>
+                    <li><a t-attf-href="https://{{repo.base}}/compare/{{br['branch'].branch_name}}">Compare <i class="fa fa-github"/></a></li>
                     <!-- TODO branch.pull from -->
                     <li class="divider"></li>
-                    <li><a t-attf-href="#" t-attf-onclick="$.post('/runbot/build/{{bu.id}}/label/1')">Toggle RDWIP label</a></li>
-                    <li><a t-attf-href="#" t-attf-onclick="$.post('/runbot/build/{{bu.id}}/label/2')">Toggle OE label</a></li>
+                    <li><a t-attf-href="#" t-attf-onclick="$.post('/runbot/build/{{bu['id']}}/label/1')">Toggle RDWIP label</a></li>
+                    <li><a t-attf-href="#" t-attf-onclick="$.post('/runbot/build/{{bu['id']}}/label/2')">Toggle OE label</a></li>
                     <li class="divider"></li>
-                    <li class="disabled"><a href="#">Runtime: <t t-esc="bu.job_time"/>s</a></li>
-                    <li class="disabled"><a href="#">Port: <t t-esc="bu.port"/></a></li>
-                    <li class="disabled"><a href="#">Age: <t t-esc="s2h(bu.job_age)"/></a></li>
+                    <li class="disabled"><a href="#">Runtime: <t t-esc="bu['job_time']"/>s</a></li>
+                    <li class="disabled"><a href="#">Port: <t t-esc="bu['port']"/></a></li>
+                    <li class="disabled"><a href="#">Age: <t t-esc="bu['job_age']"/></a></li>
                 </ul>
             </div>
         </div>
@@ -347,31 +360,31 @@
                         </tr>
                         <tr t-foreach="branches" t-as="br">
                             <td>
-                                <i t-if="br.sticky" class="fa fa-star"/>
-                                <b t-esc="br.branch_name"/>
-                                <small><t t-esc="s2h(br.builds[0].job_age)"/></small><br/>
+                                <i t-if="br['branch'].sticky" class="fa fa-star"/>
+                                <b t-esc="br['branch'].branch_name"/>
+                                <small><t t-esc="br['builds'][0]['job_age']"/></small><br/>
                                 <div class="btn-group btn-group-xs">
-                                    <a t-attf-href="{{br.branch_url}}" class="btn btn-default btn-xs">Branch or pull <i class="fa fa-github"/></a>
+                                    <a t-attf-href="{{br['branch'].branch_url}}" class="btn btn-default btn-xs">Branch or pull <i class="fa fa-github"/></a>
                                 </div>
                             </td>
-                            <t t-foreach="br.builds" t-as="bu">
-                                <t t-if="bu.state=='pending'"><t t-set="klass">default</t></t>
-                                <t t-if="bu.state=='testing'"><t t-set="klass">info</t></t>
-                                <t t-if="bu.state in ['running','done'] and bu.result == 'ko'"><t t-set="klass">danger</t></t>
-                                <t t-if="bu.state in ['running','done'] and bu.result == 'warn'"><t t-set="klass">warning</t></t>
-                                <t t-if="bu.state in ['running','done'] and bu.result == 'ok'"><t t-set="klass">success</t></t>
-                                <t t-if="bu.state in ['running','done'] and bu.result == 'skipped'"><t t-set="klass">default</t></t>
-                                <t t-if="bu.state in ['running','done'] and bu.result == 'killed'"><t t-set="klass">killed</t></t>
+                            <t t-foreach="br['builds']" t-as="bu">
+                                <t t-if="bu['state']=='pending'"><t t-set="klass">default</t></t>
+                                <t t-if="bu['state']=='testing'"><t t-set="klass">info</t></t>
+                                <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'ko'"><t t-set="klass">danger</t></t>
+                                <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'warn'"><t t-set="klass">warning</t></t>
+                                <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'ok'"><t t-set="klass">success</t></t>
+                                <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'skipped'"><t t-set="klass">default</t></t>
+                                <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'killed'"><t t-set="klass">killed</t></t>
                                 <td t-attf-class="{{klass}}">
                                    <t t-call="runbot.build_button"><t t-set="klass">btn-group-sm</t></t>
-                                   <t t-if="bu.subject">
-                                        <span t-esc="bu.subject[:32] + ('...' if bu.subject[32:] else '') " t-att-title="bu.subject"/>
+                                   <t t-if="bu['subject']">
+                                        <span t-esc="bu['subject'][:32] + ('...' if bu['subject'][32:] else '') " t-att-title="bu['subject']"/>
                                          <br/>
                                     </t>
-                                   <t t-id="bu.author">
-                                        <t t-esc="bu.author"/><br/>
+                                   <t t-id="bu['author']">
+                                        <t t-esc="bu['author']"/><br/>
                                     </t>
-                                    <small><t t-esc="bu.dest"/></small><br/>
+                                    <small><t t-esc="bu['dest']"/></small><br/>
                                     <t t-call="runbot.build_name"/>
                                 </td>
                             </t>
@@ -398,9 +411,9 @@
                                 <span class="icon-bar"></span>
                                 <span class="icon-bar"></span>
                               </button>
-                              <a class="navbar-brand" t-attf-href="/runbot/repo/#{ slug(build.repo_id) }"><b><t t-esc="build.repo_id.base"/></b></a>
-                              <a class="navbar-brand" t-attf-href="/runbot/build/{{build.id}}">
-                                <t t-esc="build.dest"/>
+                              <a class="navbar-brand" t-attf-href="/runbot/repo/#{ slug(repo) }"><b><t t-esc="repo.base"/></b></a>
+                              <a class="navbar-brand" t-attf-href="/runbot/build/{{build['id']}}">
+                                <t t-esc="build['dest']"/>
                                 <t t-call="runbot.build_name">
                                     <t t-set="bu" t-value="build"/>
                                     <t t-set="klass" t-value="''"/>
@@ -450,7 +463,7 @@
                                   </ul>
                                 </li>
                               </ul>
-                              <form class="navbar-form navbar-right" role="search" t-attf-action="/runbot/build/{{build.id}}" method="get">
+                              <form class="navbar-form navbar-right" role="search" t-attf-action="/runbot/build/{{build['id']}}" method="get">
                                 <div class="form-group">
                                   <input type="search" name="search" class="form-control" placeholder="Search" t-att-value="search or ''"/>
                                   <button type="submit" class="btn btn-default">Search</button>
@@ -460,8 +473,8 @@
                           </div>
                         </nav>
                         <p>
-                            Subject: <t t-esc="build.subject"/><br/>
-                            Author: <t t-esc="build.author"/><br/>
+                            Subject: <t t-esc="build['subject']"/><br/>
+                            Author: <t t-esc="build['author']"/><br/>
                         </p>
                         <table class="table table-condensed table-striped">
                         <tr>
@@ -476,7 +489,7 @@
                                 <td><b t-esc="l.level"/></td>
                                 <td><t t-esc="l.type"/></td>
                                 <td>
-                                    <a t-attf-href="https://{{build.repo_id.base}}/blob/{{build.name}}/{{l.path}}#L{{l.line}}"><t t-esc="l.name"/>:<t t-esc="l.line"/></a> <t t-esc="l.func"/>
+                                    <a t-attf-href="https://{{repo.base}}/blob/{{build['name']}}/{{l.path}}#L{{l.line}}"><t t-esc="l.name"/>:<t t-esc="l.line"/></a> <t t-esc="l.func"/>
                                     <t t-if="'\n' not in l.message"><t t-esc="l.message"/></t>
                                     <pre t-if="'\n' in l.message" style="margin:0;padding:0; border: none;"><t t-esc="l.message"/></pre>
                                 </td>

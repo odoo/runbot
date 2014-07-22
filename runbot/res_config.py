@@ -27,7 +27,9 @@ class runbot_config_settings(osv.osv_memory):
     _columns = {
     	'default_workers': fields.integer('Total Number of Workers'),
         'default_running_max': fields.integer('Maximum Number of Running Builds'),
-        'default_timeout': fields.integer('Default timeout (in seconds)'),
+        'default_timeout': fields.integer('Default Timeout (in seconds)'),
+        'default_starting_port': fields.integer('Starting Port for Running Builds'),
+        'default_domain': fields.char('Runbot Domain'),
     }
 
     def get_default_parameters(self, cr, uid, fields, context=None):
@@ -35,9 +37,14 @@ class runbot_config_settings(osv.osv_memory):
         workers = icp.get_param(cr, uid, 'runbot.workers', default=6)
         running_max = icp.get_param(cr, uid, 'runbot.running_max', default=75)
         timeout = icp.get_param(cr, uid, 'runbot.timeout', default=1800)
+        starting_port = icp.get_param(cr, uid, 'runbot.starting_port', default=2000)
+        runbot_domain = icp.get_param(cr, uid, 'runbot.domain', default='runbot.odoo.com')
         return {
         	'default_workers': int(workers),
-        	'default_running_max': int(running_max)
+        	'default_running_max': int(running_max),
+            'default_timeout': int(timeout),
+            'default_starting_port': int(starting_port),
+            'default_domain': runbot_domain,
         }
 
     def set_default_parameters(self, cr, uid, ids, context=None):
@@ -46,12 +53,8 @@ class runbot_config_settings(osv.osv_memory):
         icp.set_param(cr, uid, 'runbot.workers', config.default_workers)
         icp.set_param(cr, uid, 'runbot.running_max', config.default_running_max)
         icp.set_param(cr, uid, 'runbot.timeout', config.default_timeout)
-
-    _defaults = {
-    	'default_workers': 6,
-    	'default_running_max': 75,
-        'default_timeout': 1800,
-    }
+        icp.set_param(cr, uid, 'runbot.starting_port', config.default_starting_port)
+        icp.set_param(cr, uid, 'runbot.domain', config.default_domain)
 
 
 # vim:expandtab:smartindent:tabstop=4:softtabstop=4:shiftwidth=4:
