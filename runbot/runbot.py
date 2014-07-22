@@ -384,11 +384,11 @@ class runbot_branch(osv.osv):
         return r
 
     _columns = {
-        'repo_id': fields.many2one('runbot.repo', 'Repository', required=True, ondelete='cascade'),
+        'repo_id': fields.many2one('runbot.repo', 'Repository', required=True, ondelete='cascade', select=1),
         'name': fields.char('Ref Name', required=True),
         'branch_name': fields.function(_get_branch_name, type='char', string='Branch', readonly=1, store=True),
         'branch_url': fields.function(_get_branch_url, type='char', string='Branch url', readonly=1),
-        'sticky': fields.boolean('Sticky'),
+        'sticky': fields.boolean('Sticky', select=1),
         'coverage': fields.boolean('Coverage'),
         'state': fields.char('Status'),
     }
@@ -435,16 +435,16 @@ class runbot_build(osv.osv):
         return result
 
     _columns = {
-        'branch_id': fields.many2one('runbot.branch', 'Branch', required=True, ondelete='cascade'),
-        'repo_id': fields.related('branch_id', 'repo_id', type="many2one", relation="runbot.repo", string="Repository", readonly=True, store=True, ondelete='cascade'),
-        'name': fields.char('Revno', required=True),
+        'branch_id': fields.many2one('runbot.branch', 'Branch', required=True, ondelete='cascade', select=1),
+        'repo_id': fields.related('branch_id', 'repo_id', type="many2one", relation="runbot.repo", string="Repository", readonly=True, store=True, ondelete='cascade', select=1),
+        'name': fields.char('Revno', required=True, select=1),
         'port': fields.integer('Port'),
         'dest': fields.function(_get_dest, type='char', string='Dest', readonly=1, store=True),
         'domain': fields.function(_get_domain, type='char', string='URL'),
         'date': fields.datetime('Commit date'),
         'author': fields.char('Author'),
         'subject': fields.text('Subject'),
-        'sequence': fields.integer('Sequence'),
+        'sequence': fields.integer('Sequence', select=1),
         'result': fields.char('Result'), # ok, ko, warn, skipped, killed
         'pid': fields.integer('Pid'),
         'state': fields.char('Status'), # pending, testing, running, done, duplicate
