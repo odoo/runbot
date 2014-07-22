@@ -133,6 +133,9 @@ def decode_utf(field):
     except UnicodeDecodeError:
         return ''
 
+def uniq_list(l):
+    return OrderedDict.fromkeys(l).keys()
+
 #----------------------------------------------------------
 # RunBot Models
 #----------------------------------------------------------
@@ -916,20 +919,23 @@ class RunbotController(http.Controller):
             domain = [('repo_id','=',repo.id)]
             domain += [('state', '!=', key) for key, value in filters.iteritems() if value == '0']
             if search:
-                domain += [('dest','ilike',search)]
+                domain += ['|', ('dest', 'ilike', search), ('subject', 'ilike', search)]
 
-            non_sticky_builds = build_obj.search(cr, uid, domain + [('branch_id.sticky','=',False)], limit=int(limit))
-            branch_ids = branch_obj.search(cr, uid, domain + [('sticky', '=', True)])
-            if non_sticky_builds:
+            build_ids = build_obj.search(cr, uid, domain, limit=int(limit))
+            branch_ids = []
+
+            if build_ids:
                 q = """
                 SELECT br.id FROM runbot_branch br INNER JOIN runbot_build bu ON br.id=bu.branch_id WHERE bu.id in %s
                 ORDER BY bu.sequence DESC
                 """
-                cr.execute(q, (tuple(non_sticky_builds),))
-                branch_ids += OrderedDict.fromkeys(br[0] for br in cr.fetchall()).keys()
+                sticky_dom = [('repo_id','=',repo.id), ('sticky', '=', True)]
+                sticky_branch_ids = [] if search else branch_obj.search(cr, uid, sticky_dom)
+                cr.execute(q, (tuple(build_ids),))
+                branch_ids = uniq_list(sticky_branch_ids + [br[0] for br in cr.fetchall()])
 
             branches = branch_obj.browse(cr, uid, branch_ids, context=request.context)
-            build_by_branch_ids = {b: build_obj.search(cr, uid, [('branch_id','=',b)], limit=4) for b in branch_ids}
+            build_by_branch_ids = {b: build_obj.search(cr, uid, domain + [('branch_id','=',b)], limit=4) for b in branch_ids}
             build_ids = flatten(build_by_branch_ids.values())
             build_dict = {build.id: build for build in build_obj.browse(cr, uid, build_ids, context=request.context) }
 
