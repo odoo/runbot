@@ -330,7 +330,7 @@ class runbot_repo(osv.osv):
         Build.terminate(cr, uid, build_ids[running_max:])
         Build.reap(cr, uid, build_ids)
 
-    def nginx(self, cr, uid, context=None):
+    def reload_nginx(self, cr, uid, context=None):
         settings = {}
         settings['port'] = openerp.tools.config['xmlrpc_port']
         nginx_dir = os.path.join(self.root(cr, uid), 'nginx')
@@ -362,7 +362,7 @@ class runbot_repo(osv.osv):
         ids = self.search(cr, uid, [('auto', '=', True)])
         self.update(cr, uid, ids)
         self.scheduler(cr, uid, ids)
-        self.nginx(cr, uid)
+        self.reload_nginx(cr, uid, context=context)
 
 class runbot_branch(osv.osv):
     _name = "runbot.branch"
