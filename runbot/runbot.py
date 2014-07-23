@@ -125,7 +125,7 @@ def s2human(time):
     return str(int(time)) + "s"
 
 def flatten(list_of_lists):
-    return itertools.chain.from_iterable(list_of_lists)
+    return list(itertools.chain.from_iterable(list_of_lists))
 
 def decode_utf(field):
     try:
