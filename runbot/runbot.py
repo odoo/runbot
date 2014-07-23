@@ -922,20 +922,47 @@ class RunbotController(http.Controller):
                 domain += ['|', ('dest', 'ilike', search), ('subject', 'ilike', search)]
 
             build_ids = build_obj.search(cr, uid, domain, limit=int(limit))
-            branch_ids = []
+            branch_ids, build_by_branch_ids = [], {}
 
             if build_ids:
-                q = """
+                branch_query = """
                 SELECT br.id FROM runbot_branch br INNER JOIN runbot_build bu ON br.id=bu.branch_id WHERE bu.id in %s
                 ORDER BY bu.sequence DESC
                 """
                 sticky_dom = [('repo_id','=',repo.id), ('sticky', '=', True)]
                 sticky_branch_ids = [] if search else branch_obj.search(cr, uid, sticky_dom)
-                cr.execute(q, (tuple(build_ids),))
+                cr.execute(branch_query, (tuple(build_ids),))
                 branch_ids = uniq_list(sticky_branch_ids + [br[0] for br in cr.fetchall()])
 
+                build_query = """
+                    SELECT 
+                        branch_id, 
+                        max(case when br_bu.row = 1 then br_bu.build_id end),
+                        max(case when br_bu.row = 2 then br_bu.build_id end),
+                        max(case when br_bu.row = 3 then br_bu.build_id end),
+                        max(case when br_bu.row = 4 then br_bu.build_id end)
+                    FROM (
+                        SELECT 
+                            br.id AS branch_id, 
+                            bu.id AS build_id,
+                            row_number() OVER (PARTITION BY branch_id) AS row
+                        FROM 
+                            runbot_branch br INNER JOIN runbot_build bu ON br.id=bu.branch_id 
+                        WHERE 
+                            br.id in %s
+                        GROUP BY br.id, bu.id
+                        ORDER BY br.id, bu.id DESC
+                    ) AS br_bu
+                    WHERE
+                        row <= 4
+                    GROUP BY br_bu.branch_id;
+                """
+                cr.execute(build_query, (tuple(branch_ids),))
+                build_by_branch_ids = {
+                    rec[0]: [r for r in rec[1:] if r is not None] for rec in cr.fetchall()
+                }
+
             branches = branch_obj.browse(cr, uid, branch_ids, context=request.context)
-            build_by_branch_ids = {b: build_obj.search(cr, uid, domain + [('branch_id','=',b)], limit=4) for b in branch_ids}
             build_ids = flatten(build_by_branch_ids.values())
             build_dict = {build.id: build for build in build_obj.browse(cr, uid, build_ids, context=request.context) }
 
