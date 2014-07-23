@@ -481,6 +481,8 @@ class runbot_build(osv.osv):
         if len(duplicate_ids):
             extra_info.update({'state': 'duplicate', 'duplicate_id': duplicate_ids[0]})
             self.write(cr, uid, [duplicate_ids[0]], {'duplicate_id': build_id})
+            if self.browse(cr, uid, duplicate_ids[0]).state != 'pending':
+                self.github_status(cr, uid, [build_id])
         self.write(cr, uid, [build_id], extra_info, context=context)
 
     def reset(self, cr, uid, ids, context=None):
