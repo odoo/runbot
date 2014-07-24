@@ -586,6 +586,7 @@ class runbot_build(osv.osv):
                 shutil.move(build.path('bin'), build.server())
 
             # fallback for addons-only community/project branches
+            additional_modules = []
             if not os.path.isfile(build.server('__init__.py')):
                 # Use modules to test previously configured in the repository
                 modules_to_test = build.repo_id.modules
@@ -599,13 +600,22 @@ class runbot_build(osv.osv):
                 for extra_repo in build.repo_id.dependency_ids:
                     closest_name = build.get_closest_branch_name(extra_repo.id)
                     extra_repo.git_export(closest_name, build.path())
-                # Finally move all addons to openerp/addons
-                for module in glob.glob(build.path('*/__openerp__.py')):
-                    shutil.move(os.path.dirname(module), build.path('openerp/addons'))
+                # Finally mark all addons to move to openerp/addons
+                additional_modules += [
+                    os.path.dirname(module)
+                    for module in glob.glob(build.path('*/__openerp__.py'))
+                ]
 
             # move all addons to server addons path
-            for i in glob.glob(build.path('addons/*')):
-                shutil.move(i, build.server('addons'))
+            for module in set(glob.glob(build.path('addons/*')) + additional_modules):
+                basename = os.path.basename(module)
+                if not os.path.exists(build.server('addons', basename)):
+                    shutil.move(module, build.server('addons'))
+                else:
+                    build._log(
+                        'Building environment',
+                        'You have duplicate modules in your branches "%s"' % basename
+                    )
 
     def pg_dropdb(self, cr, uid, dbname):
         pid_col = 'pid' if cr._cnx.server_version >= 90200 else 'procpid'
