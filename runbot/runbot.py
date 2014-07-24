@@ -277,6 +277,7 @@ class runbot_repo(osv.osv):
                     'name': sha,
                     'author': author,
                     'subject': subject,
+                    'date': dateutil.parser.parse(date[:19])
                 }
                 Build.create(cr, uid, build_info)
 

@@ -185,6 +185,7 @@
                     <filter string="Status" domain="[]" context="{'group_by':'state'}"/>
                     <filter string="Result" domain="[]" context="{'group_by':'result'}"/>
                     <filter string="Start" domain="[]" context="{'group_by':'job_start'}"/>
+                    <filter string="Create Date" domain="[]" context="{'group_by':'create_date'}"/>
                 </group>
             </search>
         </field>
