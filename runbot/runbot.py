@@ -520,7 +520,7 @@ class runbot_build(osv.osv):
 
         return port
 
-    def get_closest_branch_name(self, cr, uid, ids, target_repo_id, context=None):
+    def get_closest_branch_name(self, cr, uid, ids, target_repo_id, hint_branches, context=None):
         """Return the name of the closest common branch between both repos
         Find common branch names, get merge-base with the branch name and
         return the most recent.
@@ -547,6 +547,9 @@ class runbot_build(osv.osv):
             possible_target_branches = set([i['branch_name'] for i in target_names if i['name'].startswith('refs/heads')])
             possible_branches = possible_repo_branches.intersection(possible_target_branches)
             if name not in possible_branches:
+                hinted_branches = possible_branches.intersection(hint_branches)
+                if hinted_branches:
+                    possible_branches = hinted_branches
                 common_refs = {}
                 for target_branch_name in possible_branches:
                     commit = repo.git(['merge-base', branch.name, target_branch_name]).strip()
@@ -597,8 +600,10 @@ class runbot_build(osv.osv):
                         for a in glob.glob(build.path('*/__openerp__.py'))
                     )
                 build.write({'modules': modules_to_test})
+                hint_branches = set()
                 for extra_repo in build.repo_id.dependency_ids:
-                    closest_name = build.get_closest_branch_name(extra_repo.id)
+                    closest_name = build.get_closest_branch_name(extra_repo.id, hint_branches)
+                    hint_branches.add(closest_name)
                     extra_repo.git_export(closest_name, build.path())
                 # Finally mark all addons to move to openerp/addons
                 additional_modules += [
