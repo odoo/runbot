@@ -4,3 +4,6 @@
 *.py[co]
 # emacs backup files
 *~
+# runbot work files
+runbot/static/build
+runbot/static/repo

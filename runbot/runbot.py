@@ -5,6 +5,7 @@ import fcntl
 import glob
 import hashlib
 import logging
+import operator
 import os
 import re
 import resource
@@ -172,8 +173,12 @@ class runbot_repo(osv.osv):
         'nginx': fields.boolean('Nginx'),
         'auto': fields.boolean('Auto'),
         'duplicate_id': fields.many2one('runbot.repo', 'Repository for finding duplicate builds'),
-        'fallback_id': fields.many2one('runbot.repo', 'Fallback repo'),
-        'modules': fields.char("Modules to Install"),
+        'modules': fields.char("Modules to Install", help="Comma-separated list of modules to install and test."),
+        'dependency_ids': fields.many2many(
+            'runbot.repo', 'runbot_repo_dep_rel',
+            id1='dependant_id', id2='dependency_id',
+            string='Extra dependencies',
+            help="Community addon repos which need to be present to run tests."),
         'token': fields.char("Github token"),
     }
     _defaults = {
@@ -277,7 +282,8 @@ class runbot_repo(osv.osv):
                     'name': sha,
                     'author': author,
                     'subject': subject,
-                    'date': dateutil.parser.parse(date[:19])
+                    'date': dateutil.parser.parse(date[:19]),
+                    'modules': branch.repo_id.modules,
                 }
                 Build.create(cr, uid, build_info)
 
@@ -449,6 +455,7 @@ class runbot_build(osv.osv):
         'author': fields.char('Author'),
         'subject': fields.text('Subject'),
         'sequence': fields.integer('Sequence', select=1),
+        'modules': fields.char("Modules to Install"),
         'result': fields.char('Result'), # ok, ko, warn, skipped, killed
         'pid': fields.integer('Pid'),
         'state': fields.char('Status'), # pending, testing, running, done, duplicate
@@ -513,6 +520,45 @@ class runbot_build(osv.osv):
 
         return port
 
+    def get_closest_branch_name(self, cr, uid, ids, target_repo_id, hint_branches, context=None):
+        """Return the name of the closest common branch between both repos
+        Find common branch names, get merge-base with the branch name and
+        return the most recent.
+        Fallback repos will not have always have the same names for branch
+        names.
+        Pull request branches should not have any association with PR of other
+        repos
+        """
+        branch_pool = self.pool['runbot.branch']
+        for build in self.browse(cr, uid, ids, context=context):
+            branch, repo = build.branch_id, build.repo_id
+            name = branch.branch_name
+            # Use github API to find name of branch on which the PR is made
+            if repo.token and name.startswith('refs/pull/'):
+                pull_number = name[len('refs/pull/'):]
+                pr = repo.github('/repos/:owner/:repo/pulls/%s' % pull_number)
+                name = 'refs/heads/' + pr['base']['ref']
+            # Find common branch names between repo and target repo
+            branch_ids = branch_pool.search(cr, uid, [('repo_id.id', '=', repo.id)])
+            target_ids = branch_pool.search(cr, uid, [('repo_id.id', '=', target_repo_id)])
+            branch_names = branch_pool.read(cr, uid, branch_ids, ['branch_name', 'name'], context=context)
+            target_names = branch_pool.read(cr, uid, target_ids, ['branch_name', 'name'], context=context)
+            possible_repo_branches = set([i['branch_name'] for i in branch_names if i['name'].startswith('refs/heads')])
+            possible_target_branches = set([i['branch_name'] for i in target_names if i['name'].startswith('refs/heads')])
+            possible_branches = possible_repo_branches.intersection(possible_target_branches)
+            if name not in possible_branches:
+                hinted_branches = possible_branches.intersection(hint_branches)
+                if hinted_branches:
+                    possible_branches = hinted_branches
+                common_refs = {}
+                for target_branch_name in possible_branches:
+                    commit = repo.git(['merge-base', branch.name, target_branch_name]).strip()
+                    cmd = ['log', '-1', '--format=%cd', '--date=iso', commit]
+                    common_refs[target_branch_name] = repo.git(cmd).strip()
+                if common_refs:
+                    name = sorted(common_refs.iteritems(), key=operator.itemgetter(1), reverse=True)[0][0]
+            return name
+
     def path(self, cr, uid, ids, *l, **kw):
         for build in self.browse(cr, uid, ids, context=None):
             root = self.pool['runbot.repo'].root(cr, uid)
@@ -542,18 +588,39 @@ class runbot_build(osv.osv):
             if os.path.isdir(build.path('bin/addons')):
                 shutil.move(build.path('bin'), build.server())
 
-            # fallback for addons-only community/projet branches
+            # fallback for addons-only community/project branches
+            additional_modules = []
             if not os.path.isfile(build.server('__init__.py')):
-                l = glob.glob(build.path('*/__openerp__.py'))
-                for i in l:
-                    shutil.move(os.path.dirname(i), build.server('addons'))
-                name = build.branch_id.branch_name.split('-',1)[0]
-                if build.repo_id.fallback_id:
-                    build.repo_id.fallback_id.git_export(name, build.path())
+                # Use modules to test previously configured in the repository
+                modules_to_test = build.repo_id.modules
+                if not modules_to_test:
+                    # Find modules to test from the folder branch
+                    modules_to_test = ','.join(
+                        os.path.basename(os.path.dirname(a))
+                        for a in glob.glob(build.path('*/__openerp__.py'))
+                    )
+                build.write({'modules': modules_to_test})
+                hint_branches = set()
+                for extra_repo in build.repo_id.dependency_ids:
+                    closest_name = build.get_closest_branch_name(extra_repo.id, hint_branches)
+                    hint_branches.add(closest_name)
+                    extra_repo.git_export(closest_name, build.path())
+                # Finally mark all addons to move to openerp/addons
+                additional_modules += [
+                    os.path.dirname(module)
+                    for module in glob.glob(build.path('*/__openerp__.py'))
+                ]
 
             # move all addons to server addons path
-            for i in glob.glob(build.path('addons/*')):
-                shutil.move(i, build.server('addons'))
+            for module in set(glob.glob(build.path('addons/*')) + additional_modules):
+                basename = os.path.basename(module)
+                if not os.path.exists(build.server('addons', basename)):
+                    shutil.move(module, build.server('addons'))
+                else:
+                    build._log(
+                        'Building environment',
+                        'You have duplicate modules in your branches "%s"' % basename
+                    )
 
     def pg_dropdb(self, cr, uid, dbname):
         pid_col = 'pid' if cr._cnx.server_version >= 90200 else 'procpid'
@@ -582,8 +649,8 @@ class runbot_build(osv.osv):
                 server_path = build.path("bin/openerp-server.py")
 
             # modules
-            if build.repo_id.modules:
-                modules = build.repo_id.modules
+            if build.modules:
+                modules = build.modules
             else:
                 l = glob.glob(build.server('addons', '*', '__init__.py'))
                 modules = set(os.path.basename(os.path.dirname(i)) for i in l)

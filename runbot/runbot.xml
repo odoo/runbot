@@ -23,8 +23,10 @@
                         <field name="auto"/>
                         <field name="jobs"/>
                         <field name="nginx"/>
-                        <field name="fallback_id"/>
                         <field name="duplicate_id"/>
+                        <field name="dependency_ids">
+                            <tree><field name="name"/></tree>
+                        </field>
                         <field name="modules"/>
                         <field name="token"/>
                     </group>
