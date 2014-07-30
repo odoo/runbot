@@ -250,14 +250,14 @@ class runbot_repo(osv.osv):
             repo.git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*'])
             repo.git(['fetch', '-p', 'origin', '+refs/pull/*/head:refs/pull/*'])
 
-        fields = ['refname','objectname','committerdate:iso8601','authorname','subject']
+        fields = ['refname','objectname','committerdate:iso8601','authorname','subject','committername']
         fmt = "%00".join(["%("+field+")" for field in fields])
         git_refs = repo.git(['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/heads', 'refs/pull'])
         git_refs = git_refs.strip()
 
         refs = [[decode_utf(field) for field in line.split('\x00')] for line in git_refs.split('\n')]
 
-        for name, sha, date, author, subject in refs:
+        for name, sha, date, author, subject, committer in refs:
             # create or get branch
             branch_ids = Branch.search(cr, uid, [('repo_id', '=', repo.id), ('name', '=', name)])
             if branch_ids:
@@ -281,6 +281,7 @@ class runbot_repo(osv.osv):
                     'branch_id': branch.id,
                     'name': sha,
                     'author': author,
+                    'committer': committer,
                     'subject': subject,
                     'date': dateutil.parser.parse(date[:19]),
                     'modules': branch.repo_id.modules,
@@ -453,6 +454,7 @@ class runbot_build(osv.osv):
         'domain': fields.function(_get_domain, type='char', string='URL'),
         'date': fields.datetime('Commit date'),
         'author': fields.char('Author'),
+        'committer': fields.char('Committer'),
         'subject': fields.text('Subject'),
         'sequence': fields.integer('Sequence', select=1),
         'modules': fields.char("Modules to Install"),
@@ -829,6 +831,7 @@ class runbot_build(osv.osv):
                     'branch_id': build.branch_id.id,
                     'name': build.name,
                     'author': build.author,
+                    'committer': build.committer,
                     'subject': build.subject,
                 }
                 self.create(cr, 1, new_build, context=context)
@@ -1061,6 +1064,7 @@ class RunbotController(http.Controller):
             'result': real_build.result,
             'subject': build.subject,
             'author': build.author,
+            'committer': build.committer,
             'dest': build.dest,
             'real_dest': real_build.dest,
             'job_age': s2human(real_build.job_age),

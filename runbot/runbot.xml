@@ -121,6 +121,7 @@
                         <field name="name"/>
                         <field name="date"/>
                         <field name="author"/>
+                        <field name="committer"/>
                         <field name="subject"/>
                         <field name="port"/>
                         <field name="dest"/>
@@ -146,6 +147,7 @@
                 <field name="dest"/>
                 <field name="date"/>
                 <field name="author"/>
+                <field name="committer"/>
                 <field name="state"/>
                 <field name="port"/>
                 <field name="job"/>
@@ -385,7 +387,11 @@
                                          <br/>
                                     </t>
                                    <t t-id="bu['author']">
-                                        <t t-esc="bu['author']"/><br/>
+                                        <t t-esc="bu['author']"/>
+                                        <t t-if="bu['committer'] and bu['author'] != bu['committer']" t-id="bu['committer']">
+                                            (<span class="glyphicon glyphicon-arrow-right"></span>&amp;nbsp;<t t-esc="bu['committer']"/>)
+                                        </t>
+                                        <br/>
                                     </t>
                                     <small><t t-esc="bu['dest']"/></small><br/>
                                     <t t-call="runbot.build_name"/>
@@ -478,6 +484,7 @@
                         <p>
                             Subject: <t t-esc="build['subject']"/><br/>
                             Author: <t t-esc="build['author']"/><br/>
+                            Committer: <t t-esc="build['committer']"/><br/>
                         </p>
                         <table class="table table-condensed table-striped">
                         <tr>
