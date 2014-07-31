@@ -587,9 +587,9 @@ http {
 }
     </template>
 
-    <template id="runbot.badge_default">
-      <!-- from https://github.com/badges/shields/tree/master/templates -->
-      <svg xmlns="http://www.w3.org/2000/svg" t-attf-width="{{left.width + right.width}}" height="18">
+    <template id="runbot.badge_default">&lt;?xml version="1.0"?&gt;
+      <svg t-attf-xmlns="http://www.w3.org/2000/svg" t-attf-width="{{left.width + right.width}}" height="18">
+        <!-- from https://github.com/badges/shields/tree/master/templates -->
         <linearGradient id="smooth" x2="0" y2="100%">
           <stop offset="0"  stop-color="#fff" stop-opacity=".7"/>
           <stop offset=".1" stop-color="#aaa" stop-opacity=".1"/>
@@ -608,9 +608,9 @@ http {
         </g>
       </svg>
     </template>
-    <template id="runbot.badge_flat">
-      <!-- from https://github.com/badges/shields/tree/master/templates -->
-      <svg xmlns="http://www.w3.org/2000/svg" t-attf-width="{{left.width + right.width}}" height="20">
+    <template id="runbot.badge_flat">&lt;?xml version="1.0"?&gt;
+      <svg t-attf-xmlns="http://www.w3.org/2000/svg" t-attf-width="{{left.width + right.width}}" height="20">
+        <!-- from https://github.com/badges/shields/tree/master/templates -->
         <linearGradient id="smooth" x2="0" y2="100%">
           <stop offset="0"  stop-color="#fff" stop-opacity=".1"/>
           <stop offset=".1" stop-color="#fff" stop-opacity=".1"/>
