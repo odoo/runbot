@@ -222,6 +222,12 @@
     </record>
 
     <!-- Templates -->
+    <template id="assets_frontend" inherit_id="website.assets_frontend" name="runbot.assets.frontend">
+      <xpath expr="." position="inside">
+        <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/octicons/2.0.2/octicons.css"/>
+      </xpath>
+    </template>
+
     <template id="runbot.build_name">
         <t t-if="bu['state']=='pending'"><i class="text-default fa fa-pause"/> pending</t>
         <t t-if="bu['state']=='testing'"><i class="text-info fa fa-spinner"/> testing <t t-esc="bu['job']"/> <small><t t-esc="bu['job_time']"/></small></t>
@@ -389,7 +395,7 @@
                                    <t t-id="bu['author']">
                                         <t t-esc="bu['author']"/>
                                         <t t-if="bu['committer'] and bu['author'] != bu['committer']" t-id="bu['committer']">
-                                            (<span class="glyphicon glyphicon-arrow-right"></span>&amp;nbsp;<t t-esc="bu['committer']"/>)
+                                            (<span class="octicon octicon-arrow-right"></span>&amp;nbsp;<t t-esc="bu['committer']"/>)
                                         </t>
                                         <br/>
                                     </t>
