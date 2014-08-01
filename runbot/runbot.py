@@ -625,9 +625,6 @@ class runbot_build(osv.osv):
                     )
 
     def pg_dropdb(self, cr, uid, dbname):
-        pid_col = 'pid' if cr._cnx.server_version >= 90200 else 'procpid'
-        cr.execute("select pg_terminate_backend(%s) from pg_stat_activity where datname = %%s" % pid_col, (dbname,))
-        time.sleep(1)
         try:
             openerp.service.db.exp_drop(dbname)
         except Exception:
@@ -635,8 +632,17 @@ class runbot_build(osv.osv):
 
     def pg_createdb(self, cr, uid, dbname):
         self.pg_dropdb(cr, uid, dbname)
-        _logger.debug("createdb %s",dbname)
-        openerp.service.db._create_empty_database(dbname)
+        _logger.debug("createdb %s", dbname)
+
+        # we don't use _create_empty_database because we need to enforce database collate to "C"
+        db = openerp.sql_db.db_connect('postgres')
+        with db.cursor() as cr:
+            cr.autocommit(True)     # avoid transaction block
+            cr.execute("""CREATE DATABASE "%s"
+                                 ENCODING 'unicode'
+                               LC_COLLATE = 'C'
+                                 TEMPLATE template0
+                       """ % (dbname,))
 
     def cmd(self, cr, uid, ids, context=None):
         """Return a list describing the command to start the build"""
