@@ -230,10 +230,10 @@
 
     <template id="runbot.build_name">
         <t t-if="bu['state']=='pending'"><i class="text-default fa fa-pause"/> pending</t>
-        <t t-if="bu['state']=='testing'"><i class="text-info fa fa-spinner"/> testing <t t-esc="bu['job']"/> <small><t t-esc="bu['job_time']"/></small></t>
-        <t t-if="bu['result']=='ok'"><i class="text-success fa fa-thumbs-up"/><small> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
-        <t t-if="bu['result']=='ko'"><i class="text-danger fa fa-thumbs-down"/><small> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
-        <t t-if="bu['result']=='warn'"><i class="text-warning fa fa-warning"/><small> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
+        <t t-if="bu['state']=='testing'"><i class="text-info fa fa-spinner"/> testing <t t-esc="bu['job']"/> <small t-if="not hide_time"><t t-esc="bu['job_time']"/></small></t>
+        <t t-if="bu['result']=='ok'"><i class="text-success fa fa-thumbs-up"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
+        <t t-if="bu['result']=='ko'"><i class="text-danger fa fa-thumbs-down"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
+        <t t-if="bu['result']=='warn'"><i class="text-warning fa fa-warning"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
         <t t-if="bu['result']=='skipped'"><i class="text-danger fa fa-ban"/> skipped</t>
         <t t-if="bu['result']=='killed'"><i class="text-danger fa fa-times"/> killed</t>
     </template>
@@ -431,7 +431,6 @@
                                 <t t-esc="build['dest']"/>
                                 <t t-call="runbot.build_name">
                                     <t t-set="bu" t-value="build"/>
-                                    <t t-set="klass" t-value="''"/>
                                 </t>
                               </a>
                             </div>
@@ -473,7 +472,13 @@
                                   <a href="#" class="dropdown-toggle" data-toggle="dropdown">Other builds <b class="caret"></b></a>
                                   <ul class="dropdown-menu">
                                     <t t-foreach='other_builds' t-as='other_build'>
-                                        <li><a t-attf-href="/runbot/build/{{other_build.id}}"><t t-esc='other_build.dest'/></a></li>
+                                      <li><a t-attf-href="/runbot/build/{{other_build.id}}">
+                                        <t t-esc='other_build.dest'/>
+                                        <t t-call="runbot.build_name">
+                                          <t t-set="bu" t-value="other_build"/>
+                                          <t t-set="hide_time" t-value="True"></t>
+                                        </t>
+                                      </a></li>
                                     </t>
                                   </ul>
                                 </li>
