@@ -385,9 +385,9 @@ class runbot_repo(osv.osv):
         Build.reap(cr, uid, build_ids)
 
     def cron(self, cr, uid, ids=None, context=None):
-        ids = self.search(cr, uid, [('auto', '=', True)])
-        self.update(cr, uid, ids)
-        self.scheduler(cr, uid, ids)
+        ids = self.search(cr, uid, [('auto', '=', True)], context=context)
+        self.update(cr, uid, ids, context=context)
+        self.scheduler(cr, uid, ids, context=context)
         self.reload_nginx(cr, uid, context=context)
 
 class runbot_branch(osv.osv):
