@@ -34,6 +34,19 @@ from openerp.addons.website_sale.controllers.main import QueryURL
 _logger = logging.getLogger(__name__)
 
 #----------------------------------------------------------
+# Runbot Const
+#----------------------------------------------------------
+
+_re_error = r'^(?:\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ (?:ERROR|CRITICAL) )|(?:Traceback \(most recent call last\):)$'
+_re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING '
+_re_job = re.compile('job_\d')
+
+LABELS = {
+    1: 'RDWIP',
+    2: 'OE',
+}
+
+#----------------------------------------------------------
 # RunBot helpers
 #----------------------------------------------------------
 
@@ -59,10 +72,6 @@ def grep(filename, string):
     if os.path.isfile(filename):
         return open(filename).read().find(string) != -1
     return False
-
-_re_error = r'^(?:\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ (?:ERROR|CRITICAL) )|(?:Traceback \(most recent call last\):)$'
-_re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING '
-_re_job = re.compile('job_\d')
 
 def rfind(filename, pattern):
     """Determine in something in filename matches the pattern"""
@@ -1234,12 +1243,6 @@ class RunbotController(http.Controller):
             ('ETag', retag),
         ]
         return request.render("runbot.badge_" + theme, data, headers=headers)
-
-
-LABELS = {
-    1: 'RDWIP',
-    2: 'OE',
-}
 
 # kill ` ps faux | grep ./static  | awk '{print $2}' `
 # ps faux| grep Cron | grep -- '-all'  | awk '{print $2}' | xargs kill
