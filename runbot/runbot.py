@@ -4,6 +4,7 @@ import datetime
 import fcntl
 import glob
 import hashlib
+import itertools
 import logging
 import operator
 import os
@@ -12,11 +13,11 @@ import resource
 import shutil
 import signal
 import simplejson
+import socket
 import subprocess
-import time
 import sys
+import time
 from collections import OrderedDict
-import itertools
 
 import dateutil.parser
 import requests
@@ -146,6 +147,9 @@ def decode_utf(field):
 def uniq_list(l):
     return OrderedDict.fromkeys(l).keys()
 
+def fqdn():
+    return socket.gethostname()
+
 #----------------------------------------------------------
 # RunBot Models
 #----------------------------------------------------------
@@ -197,7 +201,7 @@ class runbot_repo(osv.osv):
     }
 
     def domain(self, cr, uid, context=None):
-        domain = self.pool.get('ir.config_parameter').get_param(cr, uid, 'runbot.domain', 'runbot.odoo.com')
+        domain = self.pool.get('ir.config_parameter').get_param(cr, uid, 'runbot.domain', fqdn())
         return domain
 
     def root(self, cr, uid, context=None):
@@ -308,16 +312,18 @@ class runbot_repo(osv.osv):
         icp = self.pool['ir.config_parameter']
         workers = int(icp.get_param(cr, uid, 'runbot.workers', default=6))
         running_max = int(icp.get_param(cr, uid, 'runbot.running_max', default=75))
+        host = fqdn()
 
         Build = self.pool['runbot.build']
         domain = [('repo_id', 'in', ids)]
+        domain_host = domain + [('host', '=', host)]
 
         # schedule jobs (transitions testing -> running, kill jobs, ...)
-        build_ids = Build.search(cr, uid, domain + [('state', 'in', ['testing', 'running'])])
+        build_ids = Build.search(cr, uid, domain_host + [('state', 'in', ['testing', 'running'])])
         Build.schedule(cr, uid, build_ids)
 
         # launch new tests
-        testing = Build.search_count(cr, uid, domain + [('state', '=', 'testing')])
+        testing = Build.search_count(cr, uid, domain_host + [('state', '=', 'testing')])
         pending = Build.search_count(cr, uid, domain + [('state', '=', 'pending')])
 
         while testing < workers and pending > 0:
@@ -331,11 +337,11 @@ class runbot_repo(osv.osv):
             pending_build.schedule()
 
             # compute the number of testing and pending jobs again
-            testing = Build.search_count(cr, uid, domain + [('state', '=', 'testing')])
+            testing = Build.search_count(cr, uid, domain_host + [('state', '=', 'testing')])
             pending = Build.search_count(cr, uid, domain + [('state', '=', 'pending')])
 
         # terminate and reap doomed build
-        build_ids = Build.search(cr, uid, domain + [('state', '=', 'running')])
+        build_ids = Build.search(cr, uid, domain_host + [('state', '=', 'running')])
         # sort builds: the last build of each sticky branch then the rest
         sticky = {}
         non_sticky = []
@@ -458,6 +464,7 @@ class runbot_build(osv.osv):
         'branch_id': fields.many2one('runbot.branch', 'Branch', required=True, ondelete='cascade', select=1),
         'repo_id': fields.related('branch_id', 'repo_id', type="many2one", relation="runbot.repo", string="Repository", readonly=True, store=True, ondelete='cascade', select=1),
         'name': fields.char('Revno', required=True, select=1),
+        'host': fields.char('Host'),
         'port': fields.integer('Port'),
         'dest': fields.function(_get_dest, type='char', string='Dest', readonly=1, store=True),
         'domain': fields.function(_get_domain, type='char', string='URL'),
@@ -862,6 +869,7 @@ class runbot_build(osv.osv):
                 # allocate port and schedule first job
                 port = self.find_port(cr, uid)
                 values = {
+                    'host': fqdn(),
                     'port': port,
                     'state': 'testing',
                     'job': jobs[0],
