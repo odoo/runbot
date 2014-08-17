@@ -641,24 +641,12 @@ class runbot_build(osv.osv):
                     )
 
     def pg_dropdb(self, cr, uid, dbname):
-        try:
-            openerp.service.db.exp_drop(dbname)
-        except Exception:
-            pass
+        run(['dropdb', dbname])
 
     def pg_createdb(self, cr, uid, dbname):
         self.pg_dropdb(cr, uid, dbname)
         _logger.debug("createdb %s", dbname)
-
-        # we don't use _create_empty_database because we need to enforce database collate to "C"
-        db = openerp.sql_db.db_connect('postgres')
-        with db.cursor() as cr:
-            cr.autocommit(True)     # avoid transaction block
-            cr.execute("""CREATE DATABASE "%s"
-                                 ENCODING 'unicode'
-                               LC_COLLATE = 'C'
-                                 TEMPLATE template0
-                       """ % (dbname,))
+        run(['createdb', '--encoding=unicode', '--lc-collate=C', '--template=template0', dbname])
 
     def cmd(self, cr, uid, ids, context=None):
         """Return a list describing the command to start the build"""
