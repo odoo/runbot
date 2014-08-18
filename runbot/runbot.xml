@@ -128,6 +128,7 @@
                         <field name="state"/>
                         <field name="result"/>
                         <field name="pid"/>
+                        <field name="host"/>
                         <field name="job_start"/>
                         <field name="job_end"/>
                         <field name="job_time"/>
@@ -153,6 +154,7 @@
                 <field name="job"/>
                 <field name="result"/>
                 <field name="pid"/>
+                <field name="host"/>
                 <field name="job_start"/>
                 <field name="job_time"/>
                 <field name="job_age"/>
@@ -163,7 +165,7 @@
         <field name="model">runbot.build</field>
         <field name="arch" type="xml">
             <graph string="Builds" type="pivot">
-                <field name="repo_id" type="row"/>
+                <field name="create_date" interval="week" type="row"/>
                 <field name="state" type="col"/>
             </graph>
         </field>
