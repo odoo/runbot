@@ -987,8 +987,6 @@ class RunbotController(http.Controller):
         context = {
             'repos': repos,
             'repo': repo,
-            'workers': icp.get_param(cr, uid, 'runbot.workers', default=6),
-            'running_max': icp.get_param(cr, uid, 'runbot.running_max', default=75),
             'pending_total': build_obj.search_count(cr, uid, [('state','=','pending')]),
             'testing_total': build_obj.search_count(cr, uid, [('state','=','testing')]),
             'running_total': build_obj.search_count(cr, uid, [('state','=','running')]),
