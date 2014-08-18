@@ -455,7 +455,7 @@ class runbot_build(osv.osv):
         domain = self.pool['runbot.repo'].domain(cr, uid)
         for build in self.browse(cr, uid, ids, context=context):
             if build.repo_id.nginx:
-                result[build.id] = "%s.%s" % (build.dest, domain)
+                result[build.id] = "%s.%s" % (build.dest, build.host)
             else:
                 result[build.id] = "%s:%s" % (domain, build.port)
         return result
