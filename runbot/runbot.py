@@ -978,6 +978,7 @@ class RunbotController(http.Controller):
         build_obj = registry['runbot.build']
         icp = registry['ir.config_parameter']
         repo_obj = registry['runbot.repo']
+        count = lambda dom: build_obj.search_count(cr, uid, dom)
 
         repo_ids = repo_obj.search(cr, uid, [], order='id')
         repos = repo_obj.browse(cr, uid, repo_ids)
@@ -987,9 +988,8 @@ class RunbotController(http.Controller):
         context = {
             'repos': repos,
             'repo': repo,
-            'pending_total': build_obj.search_count(cr, uid, [('state','=','pending')]),
-            'testing_total': build_obj.search_count(cr, uid, [('state','=','testing')]),
-            'running_total': build_obj.search_count(cr, uid, [('state','=','running')]),
+            'host_stats': [],
+            'pending_total': count([('state','=','pending')]),
             'limit': limit,
             'search': search,
             'refresh': refresh,
@@ -1055,11 +1055,18 @@ class RunbotController(http.Controller):
 
             context.update({
                 'branches': [branch_info(b) for b in branches],
-                'testing': build_obj.search_count(cr, uid, [('repo_id','=',repo.id), ('state','=','testing')]),
-                'running': build_obj.search_count(cr, uid, [('repo_id','=',repo.id), ('state','=','running')]),
-                'pending': build_obj.search_count(cr, uid, [('repo_id','=',repo.id), ('state','=','pending')]),
+                'testing': count([('repo_id','=',repo.id), ('state','=','testing')]),
+                'running': count([('repo_id','=',repo.id), ('state','=','running')]),
+                'pending': count([('repo_id','=',repo.id), ('state','=','pending')]),
                 'qu': QueryURL('/runbot/repo/'+slug(repo), search=search, limit=limit, refresh=refresh, **filters),
                 'filters': filters,
+            })
+
+        for result in build_obj.read_group(cr, uid, [], ['host'], ['host']):
+            context['host_stats'].append({
+                'host': result['host'],
+                'testing': count([('state', '=', 'testing'), ('host', '=', result['host'])]),
+                'running': count([('state', '=', 'running'), ('host', '=', result['host'])]),
             })
 
         return request.render("runbot.repo", context)
