@@ -1063,11 +1063,12 @@ class RunbotController(http.Controller):
             })
 
         for result in build_obj.read_group(cr, uid, [], ['host'], ['host']):
-            context['host_stats'].append({
-                'host': result['host'],
-                'testing': count([('state', '=', 'testing'), ('host', '=', result['host'])]),
-                'running': count([('state', '=', 'running'), ('host', '=', result['host'])]),
-            })
+            if result['host']:
+                context['host_stats'].append({
+                    'host': result['host'],
+                    'testing': count([('state', '=', 'testing'), ('host', '=', result['host'])]),
+                    'running': count([('state', '=', 'running'), ('host', '=', result['host'])]),
+                })
 
         return request.render("runbot.repo", context)
 
