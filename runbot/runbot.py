@@ -145,7 +145,7 @@ def uniq_list(l):
     return OrderedDict.fromkeys(l).keys()
 
 def fqdn():
-    return socket.gethostname()
+    return socket.getfqdn()
 
 #----------------------------------------------------------
 # RunBot Models
