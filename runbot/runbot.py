@@ -798,7 +798,6 @@ class runbot_build(osv.osv):
             # not sure, to avoid old server to check other dbs
             cmd += ["--max-cron-threads", "0"]
 
-        cmd += ['--log-level=debug']
         cmd += ['-d', "%s-all" % build.dest]
 
         if grep(build.server("tools/config.py"), "db-filter"):
