@@ -29,7 +29,7 @@ import openerp
 from openerp import http
 from openerp.http import request
 from openerp.osv import fields, osv
-from openerp.tools import appdirs
+from openerp.tools import config, appdirs
 from openerp.addons.website.models.website import slug
 from openerp.addons.website_sale.controllers.main import QueryURL
 
@@ -359,7 +359,7 @@ class runbot_repo(osv.osv):
 
     def reload_nginx(self, cr, uid, context=None):
         settings = {}
-        settings['port'] = openerp.tools.config['xmlrpc_port']
+        settings['port'] = config['xmlrpc_port']
         nginx_dir = os.path.join(self.root(cr, uid), 'nginx')
         settings['nginx_dir'] = nginx_dir
         ids = self.search(cr, uid, [('nginx','=',True)], order='id')
@@ -685,7 +685,10 @@ class runbot_build(osv.osv):
             if grep(build.server("tools/config.py"), "no-netrpc"):
                 cmd.append("--no-netrpc")
             if grep(build.server("tools/config.py"), "log-db"):
-                cmd += ["--log-db=%s" % cr.dbname] 
+                logdb = cr.dbname
+                if grep(build.server('openerp/sql_db.py'), 'allow_uri'):
+                    logdb = 'postgres://{cfg.db_user}:{cfg.db_password}@{cfg.db_host}/{db}'.format(cfg=config, db=cr.dbname)
+                cmd += ["--log-db=%s" % logdb]
 
         # coverage
         #coverage_file_path=os.path.join(log_path,'coverage.pickle')
