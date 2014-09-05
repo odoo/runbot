@@ -191,6 +191,7 @@
                     <filter string="Status" domain="[]" context="{'group_by':'state'}"/>
                     <filter string="Result" domain="[]" context="{'group_by':'result'}"/>
                     <filter string="Start" domain="[]" context="{'group_by':'job_start'}"/>
+                    <filter string="Host" domain="[]" context="{'group_by':'host'}"/>
                     <filter string="Create Date" domain="[]" context="{'group_by':'create_date'}"/>
                 </group>
             </search>
@@ -201,7 +202,7 @@
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">runbot.build</field>
         <field name="view_type">form</field>
-        <field name="view_mode">tree,form,graph</field>
+        <field name="view_mode">graph,tree,form</field>
     </record>
     <menuitem id="menu_build" action="action_build" parent="menu_runbot"/>
 
