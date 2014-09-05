@@ -242,7 +242,7 @@
     </template>
 
     <template id="runbot.build_button">
-        <div t-attf-class="btn-group {{klass}} pull-right">
+        <div t-attf-class="pull-right">
             <div t-attf-class="btn-group {{klass}}">
                 <a t-if="bu['state']=='running'" t-attf-href="http://{{bu['domain']}}/?db={{bu['dest']}}-all" class="btn btn-primary"><i class="fa fa-sign-in"/></a>
                 <a t-attf-href="/runbot/build/{{bu['id']}}" class="btn btn-default"><i class="fa fa-file-text-o"/></a>
