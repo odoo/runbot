@@ -29,6 +29,7 @@ import openerp
 from openerp import http
 from openerp.http import request
 from openerp.osv import fields, osv
+from openerp.tools import appdirs
 from openerp.addons.website.models.website import slug
 from openerp.addons.website_sale.controllers.main import QueryURL
 
@@ -642,6 +643,10 @@ class runbot_build(osv.osv):
 
     def pg_dropdb(self, cr, uid, dbname):
         run(['dropdb', dbname])
+        # cleanup filestore
+        datadir = appdirs.user_data_dir()
+        paths = [os.path.join(datadir, pn, 'filestore', dbname) for pn in 'OpenERP Odoo'.split()]
+        run(['rm', '-rf'] + paths)
 
     def pg_createdb(self, cr, uid, dbname):
         self.pg_dropdb(cr, uid, dbname)
