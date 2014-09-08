@@ -686,7 +686,7 @@ class runbot_build(osv.osv):
                 cmd.append("--no-netrpc")
             if grep(build.server("tools/config.py"), "log-db"):
                 logdb = cr.dbname
-                if grep(build.server('openerp/sql_db.py'), 'allow_uri'):
+                if grep(build.server('sql_db.py'), 'allow_uri'):
                     logdb = 'postgres://{cfg.db_user}:{cfg.db_password}@{cfg.db_host}/{db}'.format(cfg=config, db=cr.dbname)
                 cmd += ["--log-db=%s" % logdb]
 
