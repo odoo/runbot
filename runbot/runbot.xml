@@ -270,9 +270,6 @@
                     <li><a t-attf-href="https://{{repo.base}}/compare/{{br['branch'].branch_name}}">Compare <i class="fa fa-github"/></a></li>
                     <!-- TODO branch.pull from -->
                     <li class="divider"></li>
-                    <li><a t-attf-href="#" t-attf-onclick="$.post('/runbot/build/{{bu['id']}}/label/1')">Toggle RDWIP label</a></li>
-                    <li><a t-attf-href="#" t-attf-onclick="$.post('/runbot/build/{{bu['id']}}/label/2')">Toggle OE label</a></li>
-                    <li class="divider"></li>
                     <li class="disabled"><a href="#">Runtime: <t t-esc="bu['job_time']"/>s</a></li>
                     <li class="disabled"><a href="#">Port: <t t-esc="bu['port']"/></a></li>
                     <li class="disabled"><a href="#">Age: <t t-esc="bu['job_age']"/></a></li>

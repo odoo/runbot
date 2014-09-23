@@ -43,10 +43,6 @@ _re_error = r'^(?:\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ (?:ERROR|CRITICAL) )|
 _re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING '
 _re_job = re.compile('job_\d')
 
-LABELS = {
-    1: 'RDWIP',
-    2: 'OE',
-}
 
 #----------------------------------------------------------
 # RunBot helpers
@@ -1140,46 +1136,6 @@ class RunbotController(http.Controller):
         registry, cr, uid, context = request.registry, request.cr, 1, request.context
         repo_id = registry['runbot.build'].force(cr, uid, [int(build_id)])
         return werkzeug.utils.redirect('/runbot/repo/%s' % repo_id)
-
-    @http.route(['/runbot/build/<build_id>/label/<label_id>'], type='http', auth="public", method='POST')
-    def toggle_label(self, build_id=None, label_id=None, search=None, **post):
-        registry, cr, uid, context = request.registry, request.cr, 1, request.context
-
-        build = registry['runbot.build'].browse(cr, uid, [int(build_id)])[0]
-        issue_number = build.branch_id.name.split('/')
-        if len(issue_number) == 3 and issue_number[0] == 'refs' and issue_number[1] == 'pull':
-            issue_number = int(issue_number[2])
-        else:
-            # not a pull request
-            return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id)
-
-        label_id = int(label_id)
-        if label_id not in LABELS:
-            _logger.exception("unknown label")
-        else:
-            label_name = LABELS[label_id]
-            found = False
-            try:
-                res = build.repo_id.github('/repos/:owner/:repo/issues/%s/labels' % issue_number)
-                found = any([label for label in res if label['name'] == label_name])
-            except Exception, e:
-                _logger.exception("github error while fetching labels")
-
-            if found:
-                # removing existing label
-                try:
-                    build.repo_id.github('/repos/:owner/:repo/issues/%s/labels/%s' % (issue_number, label_name), delete=True)
-                    _logger.debug("removed github label %s for %s: %s", (label_name, issue_number))
-                except Exception, e:
-                    _logger.exception("github error while removing label %s" % label_name)
-            else:
-                # adding the label
-                try:
-                    build.repo_id.github('/repos/:owner/:repo/issues/%s/labels' % issue_number, [label_name])
-                    _logger.debug("added github label %s for %s: %s", (label_name, issue_number))
-                except Exception, e:
-                    _logger.exception("github error while adding label %s" % label_name)
-        return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id)
 
     @http.route([
         '/runbot/badge/<model("runbot.repo"):repo>/<branch>.svg',
