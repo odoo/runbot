@@ -1003,7 +1003,7 @@ class RunbotController(http.Controller):
             domain = [('repo_id','=',repo.id)]
             domain += [('state', '!=', key) for key, value in filters.iteritems() if value == '0']
             if search:
-                domain += ['|', ('dest', 'ilike', search), ('subject', 'ilike', search)]
+                domain += ['|', '|', ('dest', 'ilike', search), ('subject', 'ilike', search), ('branch_id.branch_name', 'ilike', search)]
 
             build_ids = build_obj.search(cr, uid, domain, limit=int(limit))
             branch_ids, build_by_branch_ids = [], {}
