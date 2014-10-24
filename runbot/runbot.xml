@@ -228,6 +228,7 @@
     <template id="assets_frontend" inherit_id="website.assets_frontend" name="runbot.assets.frontend">
       <xpath expr="." position="inside">
         <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/octicons/2.0.2/octicons.css"/>
+        <script type="text/javascript" src="/runbot/static/src/js/runbot.js"/>
       </xpath>
     </template>
 
@@ -250,7 +251,7 @@
                 <button class="btn btn-default dropdown-toggle" data-toggle="dropdown"><i class="fa fa-cog"/><span class="caret"></span></button>
                 <ul class="dropdown-menu" role="menu">
                     <li t-if="bu['result']=='skipped'">
-                        <a t-attf-href="#" t-attf-onclick="$.post('/runbot/build/{{bu['id']}}/force')">Force Build<i class="fa fa-level-up"> </i></a>
+                        <a href="#" class="runbot-rebuild" t-att-data-runbot-build="bu['id']">Force Build <i class="fa fa-level-up"></i></a>
                     </li>
                     <t t-if="bu['state']=='running'">
                         <li><a t-attf-href="http://{{bu['domain']}}/?db={{bu['real_dest']}}-all">Connect all <i class="fa fa-sign-in"></i></a></li>
@@ -258,7 +259,7 @@
                         <li><a t-attf-href="http://{{bu['domain']}}/">Connect <i class="fa fa-sign-in"></i></a></li>
                     </t>
                     <li t-if="bu['state'] in ['done','running'] and bu_index==0">
-                        <a t-t-attf-href="#" t-attf-onclick="$.post('/runbot/build/#{bu['id']}/force')">Rebuild <i class="fa fa-refresh"/></a>
+                        <a href="#" class="runbot-rebuild" t-att-data-runbot-build="bu['id']">Rebuild <i class="fa fa-refresh"/></a>
                     </li>
                     <li t-if="bu['state']!='testing' and bu['state']!='pending'" class="divider"></li>
                     <li><a t-attf-href="/runbot/build/{{bu['id']}}">Logs <i class="fa fa-file-text-o"/></a></li>
