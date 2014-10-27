@@ -169,6 +169,7 @@ class runbot_repo(osv.osv):
         result = {}
         for repo in self.browse(cr, uid, ids, context=context):
             name = re.sub('.+@', '', repo.name)
+            name = re.sub('.git$', '', name)
             name = name.replace(':','/')
             result[repo.id] = name
         return result
