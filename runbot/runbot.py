@@ -1105,6 +1105,9 @@ class RunbotController(http.Controller):
         Logging = registry['ir.logging']
 
         build = Build.browse(cr, uid, [int(build_id)])[0]
+        if not build.exists():
+            return request.not_found()
+
         real_build = build.duplicate_id if build.state == 'duplicate' else build
 
         # other builds
@@ -1209,6 +1212,29 @@ class RunbotController(http.Controller):
             ('ETag', retag),
         ]
         return request.render("runbot.badge_" + theme, data, headers=headers)
+
+    @http.route(['/runbot/b/<branch_name>'], type='http', auth="public", website=True)
+    def fast_launch(self, branch_name=False, **post):
+        pool, cr, uid, context = request.registry, request.cr, 1, request.context
+        Build = pool['runbot.build']
+
+        domain = [('branch_id.branch_name', '=', branch_name)]
+        builds = Build.search(cr, uid, domain, order="sequence desc", limit=1, context=context)
+
+        if builds:
+            last_build = Build.browse(cr, uid, builds[0], context=context)
+            if last_build.state == 'duplicate':
+                last_build = last_build.duplicate_id
+            if last_build.state != 'running':
+                url = "/runbot/build/%s?ask_rebuild=1" % last_build.id
+            else:
+                url = ("http://%s/login?db=%s-all&login=admin&key=admin" %
+                            (last_build.domain, last_build.dest))
+        else:
+            return request.not_found()
+        return werkzeug.utils.redirect(url)
+
+
 
 # kill ` ps faux | grep ./static  | awk '{print $2}' `
 # ps faux| grep Cron | grep -- '-all'  | awk '{print $2}' | xargs kill
