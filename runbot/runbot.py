@@ -294,7 +294,7 @@ class runbot_repo(osv.osv):
                     'committer': committer,
                     'subject': subject,
                     'date': dateutil.parser.parse(date[:19]),
-                    'modules': branch.repo_id.modules,
+                    'modules': ','.join(filter(None, [branch.repo_id.modules, branch.modules])),
                 }
                 Build.create(cr, uid, build_info)
 
@@ -414,6 +414,7 @@ class runbot_branch(osv.osv):
         'sticky': fields.boolean('Sticky', select=1),
         'coverage': fields.boolean('Coverage'),
         'state': fields.char('Status'),
+        'modules': fields.char("Modules to Install", help="Comma-separated list of modules to install and test."),
     }
 
 class runbot_build(osv.osv):
@@ -607,7 +608,7 @@ class runbot_build(osv.osv):
             additional_modules = []
             if not os.path.isfile(build.server('__init__.py')):
                 # Use modules to test previously configured in the repository
-                modules_to_test = build.repo_id.modules
+                modules_to_test = build.modules
                 if not modules_to_test:
                     # Find modules to test from the folder branch
                     modules_to_test = ','.join(

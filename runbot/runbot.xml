@@ -66,6 +66,7 @@
                         <field name="branch_url"/>
                         <field name="sticky"/>
                         <field name="state"/>
+                        <field name="modules"/>
                     </group>
                 </sheet>
             </form>
