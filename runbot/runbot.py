@@ -1220,16 +1220,25 @@ class RunbotController(http.Controller):
         Build = pool['runbot.build']
 
         domain = [('branch_id.branch_name', '=', branch_name)]
-        builds = Build.search(cr, uid, domain, order="sequence desc", limit=1, context=context)
+
+        # Take the 10 lasts builds to find at least 1 running... Else no luck
+        builds = Build.search(cr, uid, domain, order="sequence desc", limit=10, context=context)
 
         if builds:
-            last_build = Build.browse(cr, uid, builds[0], context=context)
-            if last_build.state == 'duplicate':
-                last_build = last_build.duplicate_id
+            last_build = False
+            for build in Build.browse(cr, uid, builds, context=context):
+                if build.state in ['duplicate', 'running']:
+                    last_build = build.state == 'running' and build or build.duplicate_id
+                    break;
+
+            if not last_build:
+                # Find the last build regardless the state to propose a rebuild
+                last_build = Build.browse(cr, uid, builds[0], context=context)
+
             if last_build.state != 'running':
                 url = "/runbot/build/%s?ask_rebuild=1" % last_build.id
             else:
-                url = ("http://%s/login?db=%s-all&login=admin&key=admin" %
+                url = ("http://%s/login?db=%s-all&login=admin&key=admin&redirect=/web?debug=1" %
                             (last_build.domain, last_build.dest))
         else:
             return request.not_found()
