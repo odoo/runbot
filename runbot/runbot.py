@@ -1228,8 +1228,8 @@ class RunbotController(http.Controller):
             last_build = False
             for build in Build.browse(cr, uid, builds, context=context):
                 if build.state in ['duplicate', 'running']:
-                    last_build = build.state == 'running' and build or build.duplicate_id
-                    break;
+                    last_build = build if build.state == 'running' else build.duplicate_id
+                    break
 
             if not last_build:
                 # Find the last build regardless the state to propose a rebuild
@@ -1238,8 +1238,8 @@ class RunbotController(http.Controller):
             if last_build.state != 'running':
                 url = "/runbot/build/%s?ask_rebuild=1" % last_build.id
             else:
-                url = ("http://%s/login?db=%s-all&login=admin&key=admin&redirect=/web?debug=1" %
-                            (last_build.domain, last_build.dest))
+                url = ("http://%s/login?db=%s-all&login=admin&key=admin%s" %
+                       (last_build.domain, last_build.dest, "&redirect=/web?debug=1" if not build.branch_id.branch_name.startswith('7.0') else ''))
         else:
             return request.not_found()
         return werkzeug.utils.redirect(url)
