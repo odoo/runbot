@@ -687,6 +687,12 @@ class runbot_build(osv.osv):
                     logdb = 'postgres://{cfg[db_user]}:{cfg[db_password]}@{cfg[db_host]}/{db}'.format(cfg=config, db=cr.dbname)
                 cmd += ["--log-db=%s" % logdb]
 
+            if grep(build.server("tools/config.py"), "data-dir"):
+                datadir = build.path('datadir')
+                if not os.path.exists(datadir):
+                    os.mkdir(datadir)
+                cmd += ["--data-dir", datadir]
+
         # coverage
         #coverage_file_path=os.path.join(log_path,'coverage.pickle')
         #coverage_base_path=os.path.join(log_path,'coverage-base')
