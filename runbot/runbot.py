@@ -257,6 +257,7 @@ class runbot_repo(osv.osv):
         if not os.path.isdir(os.path.join(repo.path, 'refs')):
             run(['git', 'clone', '--bare', repo.name, repo.path])
         else:
+            repo.git(['gc', '--auto', '--prune=all'])
             repo.git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*'])
             repo.git(['fetch', '-p', 'origin', '+refs/pull/*/head:refs/pull/*'])
 
