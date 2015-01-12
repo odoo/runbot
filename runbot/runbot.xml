@@ -473,11 +473,7 @@
                               </form>
 
                               <form class="navbar-form navbar-left form-inline" t-attf-action="/runbot/build/#{build['id']}/force" method='POST' t-if="request.params.get('ask_rebuild')">
-                                <div class="btn-group">
-                                  <button type="submit" class="btn btn-danger">
-                                    Force Rebuild !
-                                  </button>
-                                </div>
+                                <a href='#' class="btn btn-danger runbot-rebuild" t-attf-data-runbot-build="#{build['id']}" > <i class='fa fa-refresh'/> Force Rebuild</a>
                               </form>
 
                               <ul class="nav navbar-nav navbar-right">
