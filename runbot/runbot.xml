@@ -379,6 +379,7 @@
                                 <small><t t-esc="br['builds'][0]['job_age']"/></small><br/>
                                 <div class="btn-group btn-group-xs">
                                     <a t-attf-href="{{br['branch'].branch_url}}" class="btn btn-default btn-xs">Branch or pull <i class="fa fa-github"/></a>
+                                    <a t-attf-href="/runbot/b/#{br['branch'].branch_name}" class="btn btn-default btn-xs"><i class="fa fa-fast-forward" title="Quick Connect"/></a>
                                 </div>
                             </td>
                             <t t-foreach="br['builds']" t-as="bu">
@@ -470,6 +471,15 @@
                                   <button type="button" class="btn btn-default">Expand</button>
                                 </div>
                               </form>
+
+                              <form class="navbar-form navbar-left form-inline" t-attf-action="/runbot/build/#{build['id']}/force" method='POST' t-if="request.params.get('ask_rebuild')">
+                                <div class="btn-group">
+                                  <button type="submit" class="btn btn-danger">
+                                    Force Rebuild !
+                                  </button>
+                                </div>
+                              </form>
+
                               <ul class="nav navbar-nav navbar-right">
                                 <li class="dropdown">
                                   <a href="#" class="dropdown-toggle" data-toggle="dropdown">Other builds <b class="caret"></b></a>
