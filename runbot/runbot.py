@@ -568,9 +568,15 @@ class runbot_build(osv.osv):
                     possible_branches = hinted_branches
                 common_refs = {}
                 for target_branch_name in possible_branches:
-                    commit = repo.git(['merge-base', branch.name, target_branch_name]).strip()
-                    cmd = ['log', '-1', '--format=%cd', '--date=iso', commit]
-                    common_refs[target_branch_name] = repo.git(cmd).strip()
+                    try:
+                        commit = repo.git(['merge-base', branch.name, target_branch_name]).strip()
+                        cmd = ['log', '-1', '--format=%cd', '--date=iso', commit]
+                        common_refs[target_branch_name] = repo.git(cmd).strip()
+                    except subprocess.CalledProcessError:
+                        # If merge-base doesn't find any common ancestor, the command exits with a
+                        # non-zero return code, resulting in subprocess.check_output raising this
+                        # exception. We ignore this branch as there is no common ref between us.
+                        continue
                 if common_refs:
                     name = sorted(common_refs.iteritems(), key=operator.itemgetter(1), reverse=True)[0][0]
             return name
