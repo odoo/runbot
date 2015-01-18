@@ -347,12 +347,12 @@
                                     </ul>
                                   </div>
                                 </form>
-                                <span t-foreach="host_stats" t-as="hs" class="navbar-brand navbar-right">
+                                <small t-foreach="host_stats" t-as="hs" class="navbar-brand navbar-right">
                                     <t t-esc="hs['host']"/>: <t t-esc="hs['testing']"/> testing, <t t-esc="hs['running']"/> running
-                                </span>
-                                <span class="navbar-brand navbar-right">
+                                </small>
+                                <small class="navbar-brand navbar-right">
                                   Pending: <t t-esc="pending_total"/> 
-                                </span>
+                                </small>
                               </t>
                             </div>
                           </div>
