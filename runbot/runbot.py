@@ -538,12 +538,12 @@ class runbot_build(osv.osv):
 
     def get_closest_branch_name(self, cr, uid, ids, target_repo_id, hint_branches, context=None):
         """Return the name of the closest common branch between both repos
-        Find common branch names, get merge-base with the branch name and
-        return the most recent.
-        Fallback repos will not have always have the same names for branch
-        names.
-        Pull request branches should not have any association with PR of other
-        repos
+        Rules priority for choosing the branch from the other repo is:
+        1. Same branch name
+        2. Common ancestors (git merge-base)
+        3. Name splitting on '-' character
+        Note that PR numbers are replaced by the branch name from which the PR is made,
+        to prevent the above rules to mistakenly link PR of different repos together.
         """
         branch_pool = self.pool['runbot.branch']
         for build in self.browse(cr, uid, ids, context=context):
@@ -579,6 +579,9 @@ class runbot_build(osv.osv):
                         continue
                 if common_refs:
                     name = sorted(common_refs.iteritems(), key=operator.itemgetter(1), reverse=True)[0][0]
+                else:
+                    # If all else as failed, fallback on '-' splitting
+                    name = build.branch_id.name.split('-', 1)[0]
             return name
 
     def path(self, cr, uid, ids, *l, **kw):
