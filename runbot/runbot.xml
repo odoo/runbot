@@ -135,6 +135,7 @@
                         <field name="job_time"/>
                         <field name="job_age"/>
                         <field name="duplicate_id"/>
+                        <field name="modules"/>
                     </group>
                 </sheet>
             </form>
