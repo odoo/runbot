@@ -153,7 +153,7 @@ def fqdn():
 
 class runbot_repo(osv.osv):
     _name = "runbot.repo"
-    _order = 'name'
+    _order = 'id'
 
     def _get_path(self, cr, uid, ids, field_name, arg, context=None):
         root = self.root(cr, uid)
@@ -1001,7 +1001,7 @@ class RunbotController(http.Controller):
         repo_obj = registry['runbot.repo']
         count = lambda dom: build_obj.search_count(cr, uid, dom)
 
-        repo_ids = repo_obj.search(cr, uid, [], order='id')
+        repo_ids = repo_obj.search(cr, uid, [])
         repos = repo_obj.browse(cr, uid, repo_ids)
         if not repo and repos:
             repo = repos[0] 
@@ -1231,20 +1231,26 @@ class RunbotController(http.Controller):
         ]
         return request.render("runbot.badge_" + theme, data, headers=headers)
 
-    @http.route(['/runbot/b/<branch_name>'], type='http', auth="public", website=True)
-    def fast_launch(self, branch_name=False, **post):
+    @http.route(['/runbot/b/<branch_name>', '/runbot/<model("runbot.repo"):repo>/<branch_name>'], type='http', auth="public", website=True)
+    def fast_launch(self, branch_name=False, repo=False, **post):
         pool, cr, uid, context = request.registry, request.cr, 1, request.context
         Build = pool['runbot.build']
 
         domain = [('branch_id.branch_name', '=', branch_name)]
 
+        if repo:
+            domain.extend([('branch_id.repo_id', '=', repo.id)])
+            order="sequence desc"
+        else:
+            order = 'repo_id ASC, sequence DESC'
+
         # Take the 10 lasts builds to find at least 1 running... Else no luck
-        builds = Build.search(cr, uid, domain, order="sequence desc", limit=10, context=context)
+        builds = Build.search(cr, uid, domain, order=order, limit=10, context=context)
 
         if builds:
             last_build = False
             for build in Build.browse(cr, uid, builds, context=context):
-                if build.state in ['duplicate', 'running']:
+                if build.state == 'running' or (build.state == 'duplicate' and build.duplicate_id.state == 'running'):
                     last_build = build if build.state == 'running' else build.duplicate_id
                     break
 

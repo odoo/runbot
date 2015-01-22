@@ -380,7 +380,7 @@
                                 <small><t t-esc="br['builds'][0]['job_age']"/></small><br/>
                                 <div class="btn-group btn-group-xs">
                                     <a t-attf-href="{{br['branch'].branch_url}}" class="btn btn-default btn-xs">Branch or pull <i class="fa fa-github"/></a>
-                                    <a t-attf-href="/runbot/b/#{br['branch'].branch_name}" class="btn btn-default btn-xs"><i class="fa fa-fast-forward" title="Quick Connect"/></a>
+                                    <a t-attf-href="/runbot/#{repo.id}/#{br['branch'].branch_name}" class="btn btn-default btn-xs"><i class="fa fa-fast-forward" title="Quick Connect"/></a>
                                 </div>
                             </td>
                             <t t-foreach="br['builds']" t-as="bu">
