@@ -858,6 +858,7 @@ class runbot_build(osv.osv):
                     'author': build.author,
                     'committer': build.committer,
                     'subject': build.subject,
+                    'modules': build.modules,
                 }
                 self.create(cr, 1, new_build, context=context)
             return build.repo_id.id
