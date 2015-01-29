@@ -684,10 +684,11 @@ class runbot_build(osv.osv):
             cmd = [
                 sys.executable,
                 server_path,
-                "--no-xmlrpcs",
                 "--xmlrpc-port=%d" % build.port,
             ]
             # options
+            if grep(build.server("tools/config.py"), "no-xmlrpcs"):
+                cmd.append("--no-xmlrpcs")
             if grep(build.server("tools/config.py"), "no-netrpc"):
                 cmd.append("--no-netrpc")
             if grep(build.server("tools/config.py"), "log-db"):
