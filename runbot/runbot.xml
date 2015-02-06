@@ -24,9 +24,7 @@
                         <field name="jobs"/>
                         <field name="nginx"/>
                         <field name="duplicate_id"/>
-                        <field name="dependency_ids">
-                            <tree><field name="name"/></tree>
-                        </field>
+                        <field name="dependency_ids" widget="many2many_tags"/>
                         <field name="modules"/>
                         <field name="token"/>
                     </group>
@@ -122,7 +120,9 @@
                         <field name="name"/>
                         <field name="date"/>
                         <field name="author"/>
+                        <field name="author_email"/>
                         <field name="committer"/>
+                        <field name="committer_email"/>
                         <field name="subject"/>
                         <field name="port"/>
                         <field name="dest"/>

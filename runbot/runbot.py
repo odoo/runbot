@@ -182,7 +182,7 @@ class runbot_repo(osv.osv):
         'jobs': fields.char('Jobs'),
         'nginx': fields.boolean('Nginx'),
         'auto': fields.boolean('Auto'),
-        'duplicate_id': fields.many2one('runbot.repo', 'Repository for finding duplicate builds'),
+        'duplicate_id': fields.many2one('runbot.repo', 'Duplicate repo', help='Repository for finding duplicate builds'),
         'modules': fields.char("Modules to Install", help="Comma-separated list of modules to install and test."),
         'dependency_ids': fields.many2many(
             'runbot.repo', 'runbot_repo_dep_rel',
@@ -221,26 +221,28 @@ class runbot_repo(osv.osv):
             p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
             p2.communicate()[0]
 
-    def github(self, cr, uid, ids, url, payload=None, delete=False, context=None):
+    def github(self, cr, uid, ids, url, payload=None, ignore_errors=False, context=None):
         """Return a http request to be sent to github"""
         for repo in self.browse(cr, uid, ids, context=context):
-            if not repo.token:
-                raise Exception('Repository does not have a token to authenticate')
-            match_object = re.search('([^/]+)/([^/]+)/([^/.]+(.git)?)', repo.base)
-            if match_object:
-                url = url.replace(':owner', match_object.group(2))
-                url = url.replace(':repo', match_object.group(3))
-                url = 'https://api.%s%s' % (match_object.group(1),url)
-                session = requests.Session()
-                session.auth = (repo.token,'x-oauth-basic')
-                session.headers.update({'Accept': 'application/vnd.github.she-hulk-preview+json'})
-                if payload:
-                    response = session.post(url, data=simplejson.dumps(payload))
-                elif delete:
-                    response = session.delete(url)
+            try:
+                match_object = re.search('([^/]+)/([^/]+)/([^/.]+(.git)?)', repo.base)
+                if match_object:
+                    url = url.replace(':owner', match_object.group(2))
+                    url = url.replace(':repo', match_object.group(3))
+                    url = 'https://api.%s%s' % (match_object.group(1),url)
+                    session = requests.Session()
+                    session.auth = (repo.token,'x-oauth-basic')
+                    session.headers.update({'Accept': 'application/vnd.github.she-hulk-preview+json'})
+                    if payload:
+                        response = session.post(url, data=simplejson.dumps(payload))
+                    else:
+                        response = session.get(url)
+                    return response.json()
+            except Exception:
+                if ignore_errors:
+                    _logger.exception('Ignored github error %s %r', url, payload)
                 else:
-                    response = session.get(url)
-                return response.json()
+                    raise
 
     def update(self, cr, uid, ids, context=None):
         for repo in self.browse(cr, uid, ids, context=context):
@@ -261,14 +263,14 @@ class runbot_repo(osv.osv):
             repo.git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*'])
             repo.git(['fetch', '-p', 'origin', '+refs/pull/*/head:refs/pull/*'])
 
-        fields = ['refname','objectname','committerdate:iso8601','authorname','subject','committername']
+        fields = ['refname','objectname','committerdate:iso8601','authorname','authoremail','subject','committername','committeremail']
         fmt = "%00".join(["%("+field+")" for field in fields])
         git_refs = repo.git(['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/heads', 'refs/pull'])
         git_refs = git_refs.strip()
 
         refs = [[decode_utf(field) for field in line.split('\x00')] for line in git_refs.split('\n')]
 
-        for name, sha, date, author, subject, committer in refs:
+        for name, sha, date, author, author_email, subject, committer, committer_email in refs:
             # create or get branch
             branch_ids = Branch.search(cr, uid, [('repo_id', '=', repo.id), ('name', '=', name)])
             if branch_ids:
@@ -292,7 +294,9 @@ class runbot_repo(osv.osv):
                     'branch_id': branch.id,
                     'name': sha,
                     'author': author,
+                    'author_email': author_email,
                     'committer': committer,
+                    'committer_email': committer_email,
                     'subject': subject,
                     'date': dateutil.parser.parse(date[:19]),
                     'modules': ','.join(filter(None, [branch.repo_id.modules, branch.modules])),
@@ -468,7 +472,9 @@ class runbot_build(osv.osv):
         'domain': fields.function(_get_domain, type='char', string='URL'),
         'date': fields.datetime('Commit date'),
         'author': fields.char('Author'),
+        'author_email': fields.char('Author Email'),
         'committer': fields.char('Committer'),
+        'committer_email': fields.char('Committer Email'),
         'subject': fields.text('Subject'),
         'sequence': fields.integer('Sequence', select=1),
         'modules': fields.char("Modules to Install"),
@@ -505,8 +511,6 @@ class runbot_build(osv.osv):
         if len(duplicate_ids):
             extra_info.update({'state': 'duplicate', 'duplicate_id': duplicate_ids[0]})
             self.write(cr, uid, [duplicate_ids[0]], {'duplicate_id': build_id})
-            if self.browse(cr, uid, duplicate_ids[0]).state != 'pending':
-                self.github_status(cr, uid, [build_id])
         self.write(cr, uid, [build_id], extra_info, context=context)
 
     def reset(self, cr, uid, ids, context=None):
@@ -734,36 +738,27 @@ class runbot_build(osv.osv):
         """Notify github of failed/successful builds"""
         runbot_domain = self.pool['runbot.repo'].domain(cr, uid)
         for build in self.browse(cr, uid, ids, context=context):
-            if build.state != 'duplicate' and build.duplicate_id:
-                self.github_status(cr, uid, [build.duplicate_id.id], context=context)
             desc = "runbot build %s" % (build.dest,)
-            real_build = build.duplicate_id if build.state == 'duplicate' else build
-            if real_build.state == 'testing':
-                state = 'pending'
-            elif real_build.state in ('running', 'done'):
-                state = {
-                    'ok': 'success',
-                    'killed': 'error',
-                }.get(real_build.result, 'failure')
+            if build.state in ('running', 'done'):
+                state = 'error'
+                if build.result == 'ok':
+                    state = 'sucess'
+                if build.result == 'ko':
+                    state = 'failure'
                 desc += " (runtime %ss)" % (real_build.job_time,)
             else:
                 continue
-
             status = {
                 "state": state,
                 "target_url": "http://%s/runbot/build/%s" % (runbot_domain, build.id),
                 "description": desc,
                 "context": "continuous-integration/runbot"
             }
-            try:
-                build.repo_id.github('/repos/:owner/:repo/statuses/%s' % build.name, status)
-                _logger.debug("github status %s update to %s", build.name, state)
-            except Exception:
-                _logger.exception("github status error")
+            _logger.debug("github updating status %s to %s", build.name, state)
+            build.repo_id.github('/repos/:owner/:repo/statuses/%s' % build.name, status, ignore_errors=True)
 
     def job_10_test_base(self, cr, uid, build, lock_path, log_path):
         build._log('test_base', 'Start test base module')
-        build.github_status()
         # checkout source
         build.checkout()
         # run base test
@@ -966,6 +961,7 @@ class runbot_build(osv.osv):
 
     def _log(self, cr, uid, ids, func, message, context=None):
         assert len(ids) == 1
+        _logger.debug("Build %s %s %s", ids[0], func, message)
         self.pool['ir.logging'].create(cr, uid, {
             'build_id': ids[0],
             'level': 'INFO',
@@ -1268,8 +1264,6 @@ class RunbotController(http.Controller):
         else:
             return request.not_found()
         return werkzeug.utils.redirect(url)
-
-
 
 # kill ` ps faux | grep ./static  | awk '{print $2}' `
 # ps faux| grep Cron | grep -- '-all'  | awk '{print $2}' | xargs kill
