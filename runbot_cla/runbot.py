@@ -28,7 +28,7 @@ class runbot_build(openerp.models.Model):
             status = {
                 "state": state,
                 "target_url": "http://www.odoo.com/sign-cla",
-                "description": "Odoo CLA",
+                "description": "%s Odoo CLA signature check" % build.author,
                 "context": "legal/cla"
             }
             build._log('check_cla', 'Check CLA %s' % state)

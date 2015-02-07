@@ -745,14 +745,14 @@ class runbot_build(osv.osv):
                     state = 'sucess'
                 if build.result == 'ko':
                     state = 'failure'
-                desc += " (runtime %ss)" % (real_build.job_time,)
+                desc += " (runtime %ss)" % (build.job_time,)
             else:
                 continue
             status = {
                 "state": state,
                 "target_url": "http://%s/runbot/build/%s" % (runbot_domain, build.id),
                 "description": desc,
-                "context": "continuous-integration/runbot"
+                "context": "ci/runbot"
             }
             _logger.debug("github updating status %s to %s", build.name, state)
             build.repo_id.github('/repos/:owner/:repo/statuses/%s' % build.name, status, ignore_errors=True)
