@@ -310,8 +310,8 @@
                                     <li class="dropdown">
                                       <a href="#" class="dropdown-toggle" data-toggle="dropdown"><b style="font-size: 18px;"><t t-esc="repo.base"/></b><b class="caret"></b></a>
                                       <ul class="dropdown-menu">
-                                        <t t-foreach='repos' t-as='repo'>
-                                            <li><a t-attf-href="/runbot/repo/{{slug(repo)}}"><t t-esc="repo.base"/></a></li>
+                                        <t t-foreach='repos' t-as='re'>
+                                            <li><a t-attf-href="/runbot/repo/{{slug(re)}}"><t t-esc="re.base"/></a></li>
                                         </t>
                                       </ul>
                                     </li>
