@@ -646,7 +646,9 @@ http {
         </g>
       </svg>
     </template>
+</data>
 
+<data noupdate="1">
     <!-- Cron -->
     <record model="ir.cron" id="repo_cron">
         <field name='name'>Runbot Cron</field>
@@ -658,6 +660,6 @@ http {
         <field name="function">cron</field>
         <field name="args">()</field>
     </record>
-
 </data>
+
 </openerp>
