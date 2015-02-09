@@ -742,7 +742,7 @@ class runbot_build(osv.osv):
             if build.state in ('running', 'done'):
                 state = 'error'
                 if build.result == 'ok':
-                    state = 'sucess'
+                    state = 'success'
                 if build.result == 'ko':
                     state = 'failure'
                 desc += " (runtime %ss)" % (build.job_time,)
