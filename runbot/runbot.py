@@ -852,7 +852,9 @@ class runbot_build(osv.osv):
                     'branch_id': build.branch_id.id,
                     'name': build.name,
                     'author': build.author,
+                    'author_email': build.author_email,
                     'committer': build.committer,
+                    'committer_email': build.committer_email,
                     'subject': build.subject,
                     'modules': build.modules,
                 }

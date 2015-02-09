@@ -404,7 +404,7 @@
                                         </t>
                                         <br/>
                                     </t>
-                                    <small><t t-esc="bu['dest']"/></small><br/>
+                                    <small><t t-esc="bu['dest']"/> on <t t-esc="bu['host']"/></small><br/>
                                     <t t-call="runbot.build_name"/>
                                 </td>
                             </t>
