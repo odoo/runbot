@@ -739,7 +739,9 @@ class runbot_build(osv.osv):
         runbot_domain = self.pool['runbot.repo'].domain(cr, uid)
         for build in self.browse(cr, uid, ids, context=context):
             desc = "runbot build %s" % (build.dest,)
-            if build.state in ('running', 'done'):
+            if build.state == 'testing':
+                state = 'pending'
+            elif build.state in ('running', 'done'):
                 state = 'error'
                 if build.result == 'ok':
                     state = 'success'
@@ -759,6 +761,7 @@ class runbot_build(osv.osv):
 
     def job_10_test_base(self, cr, uid, build, lock_path, log_path):
         build._log('test_base', 'Start test base module')
+        build.github_status()
         # checkout source
         build.checkout()
         # run base test
