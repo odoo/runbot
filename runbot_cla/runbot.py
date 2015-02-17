@@ -12,8 +12,6 @@ class runbot_build(openerp.models.Model):
     _inherit = "runbot.build"
 
     def job_05_check_cla(self, cr, uid, build, lock_path, log_path):
-        # notify pending build - avoid confusing users by saying it's all green
-        build.github_status()
         cla_glob = glob.glob(build.path("doc/cla/*/*.md"))
         if cla_glob:
             cla = ''.join(open(f).read() for f in cla_glob)

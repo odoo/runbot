@@ -759,11 +759,15 @@ class runbot_build(osv.osv):
             _logger.debug("github updating status %s to %s", build.name, state)
             build.repo_id.github('/repos/:owner/:repo/statuses/%s' % build.name, status, ignore_errors=True)
 
+    def job_00_init(self, cr, uid, build, lock_path, log_path):
+        build._log('init', 'Init build environment')
+        # notify pending build - avoid confusing users by saying nothing
+        build.github_status()
+        build.checkout()
+        return -2
+
     def job_10_test_base(self, cr, uid, build, lock_path, log_path):
         build._log('test_base', 'Start test base module')
-        build.github_status()
-        # checkout source
-        build.checkout()
         # run base test
         self.pg_createdb(cr, uid, "%s-base" % build.dest)
         cmd, mods = build.cmd()
@@ -911,6 +915,7 @@ class runbot_build(osv.osv):
             build.refresh()
 
             # run job
+            pid = None
             if build.state != 'done':
                 build.logger('running %s', build.job)
                 job_method = getattr(self,build.job)
@@ -920,6 +925,11 @@ class runbot_build(osv.osv):
                 build.write({'pid': pid})
             # needed to prevent losing pids if multiple jobs are started and one them raise an exception
             cr.commit()
+
+            if pid == -2:
+                # no process to wait, directly call next job
+                # FIXME find a better way that this recursive call
+                build.schedule()
 
             # cleanup only needed if it was not killed
             if build.state == 'done':
