@@ -21,7 +21,7 @@ class runbot_build(openerp.models.Model):
             state = "failure"
             if mo:
                 email = mo.group(0).lower()
-                if re.match('.*(odoo|openerp|tinyerp).com$',email):
+                if re.match('.*@(odoo|openerp|tinyerp)\.com$', email):
                     state = "success"
                 if cla.find(email) != -1:
                     state = "success"
@@ -36,4 +36,3 @@ class runbot_build(openerp.models.Model):
             build.repo_id.github('/repos/:owner/:repo/statuses/%s' % build.name, status, ignore_errors=True)
         # 0 is myself, -1 is everybody else, -2 nothing
         return -2
-
