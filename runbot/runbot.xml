@@ -377,7 +377,7 @@
                         </tr>
                         <tr t-foreach="branches" t-as="br">
                             <td>
-                                <i t-if="br['branch'].sticky" class="fa fa-star"/>
+                                <i t-if="br['branch'].sticky" class="fa fa-star" style="color: #f0ad4e" />
                                 <b t-esc="br['branch'].branch_name"/>
                                 <small><t t-esc="br['builds'][0]['job_age']"/></small><br/>
                                 <div class="btn-group btn-group-xs">
