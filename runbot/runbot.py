@@ -26,7 +26,7 @@ from matplotlib.textpath import TextToPath
 import werkzeug
 
 import openerp
-from openerp import http
+from openerp import http, SUPERUSER_ID
 from openerp.http import request
 from openerp.osv import fields, osv
 from openerp.tools import config, appdirs
@@ -190,6 +190,7 @@ class runbot_repo(osv.osv):
             string='Extra dependencies',
             help="Community addon repos which need to be present to run tests."),
         'token': fields.char("Github token"),
+        'group_ids': fields.many2many('res.groups', string='Limited to groups'),
     }
     _defaults = {
         'testing': 1,
@@ -851,7 +852,8 @@ class runbot_build(osv.osv):
 
             # Force it now
             if build.state == 'done' and build.result == 'skipped':
-                build.write({'state': 'pending', 'sequence':sequence, 'result': '' })
+                values = {'state': 'pending', 'sequence':sequence, 'result': ''}
+                self.write(cr, SUPERUSER_ID, [build.id], values, context=context)
             # or duplicate it
             elif build.state in ['running', 'done', 'duplicate']:
                 new_build = {
@@ -865,7 +867,7 @@ class runbot_build(osv.osv):
                     'subject': build.subject,
                     'modules': build.modules,
                 }
-                self.create(cr, 1, new_build, context=context)
+                self.create(cr, SUPERUSER_ID, new_build, context=context)
             return build.repo_id.id
 
     def schedule(self, cr, uid, ids, context=None):
@@ -1006,7 +1008,7 @@ class RunbotController(http.Controller):
 
     @http.route(['/runbot', '/runbot/repo/<model("runbot.repo"):repo>'], type='http', auth="public", website=True)
     def repo(self, repo=None, search='', limit='100', refresh='', **post):
-        registry, cr, uid = request.registry, request.cr, 1
+        registry, cr, uid = request.registry, request.cr, request.uid
 
         branch_obj = registry['runbot.branch']
         build_obj = registry['runbot.build']
@@ -1130,7 +1132,7 @@ class RunbotController(http.Controller):
 
     @http.route(['/runbot/build/<build_id>'], type='http', auth="public", website=True)
     def build(self, build_id=None, search=None, **post):
-        registry, cr, uid, context = request.registry, request.cr, 1, request.context
+        registry, cr, uid, context = request.registry, request.cr, request.uid, request.context
 
         Build = registry['runbot.build']
         Logging = registry['ir.logging']
@@ -1167,7 +1169,7 @@ class RunbotController(http.Controller):
 
     @http.route(['/runbot/build/<build_id>/force'], type='http', auth="public", methods=['POST'])
     def build_force(self, build_id, **post):
-        registry, cr, uid, context = request.registry, request.cr, 1, request.context
+        registry, cr, uid, context = request.registry, request.cr, request.uid, request.context
         repo_id = registry['runbot.build'].force(cr, uid, [int(build_id)])
         return werkzeug.utils.redirect('/runbot/repo/%s' % repo_id)
 
@@ -1246,7 +1248,7 @@ class RunbotController(http.Controller):
 
     @http.route(['/runbot/b/<branch_name>', '/runbot/<model("runbot.repo"):repo>/<branch_name>'], type='http', auth="public", website=True)
     def fast_launch(self, branch_name=False, repo=False, **post):
-        pool, cr, uid, context = request.registry, request.cr, 1, request.context
+        pool, cr, uid, context = request.registry, request.cr, request.uid, request.context
         Build = pool['runbot.build']
 
         domain = [('branch_id.branch_name', '=', branch_name)]

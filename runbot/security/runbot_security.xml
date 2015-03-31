@@ -2,10 +2,23 @@
 <openerp>
   <data>
 
+    <record id="group_user" model="res.groups">
+      <field name="name">Runbot User</field>
+      <field name="category_id" ref="base.module_category_administration"/>
+      <!-- as public user is inactive, it wont be automatically added
+           to this group via implied groups. add it manually -->
+      <field name="user_ids" eval="[(4, ref('base.public_user'))]"/>
+    </record>
+
+    <record id="base.group_public" model="res.groups">
+      <field name="implied_ids" eval="[(4, ref('runbot.group_user'))]"/>
+    </record>
+
     <record id="group_runbot_admin" model="res.groups">
       <field name="name">Runbot Manager</field>
       <field name="category_id" ref="base.module_category_administration"/>
       <field name="users" eval="[(4, ref('base.user_root'))]"/>
+      <field name="implied_ids" eval="[(4, ref('runbot.group_user'))]"/>
     </record>
 
   </data>
