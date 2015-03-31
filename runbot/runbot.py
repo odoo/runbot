@@ -1160,7 +1160,7 @@ class RunbotController(http.Controller):
             'repo': build.repo_id,
             'build': self.build_info(build),
             'br': {'branch': build.branch_id},
-            'logs': Logging.browse(cr, uid, logging_ids),
+            'logs': Logging.browse(cr, SUPERUSER_ID, logging_ids),
             'other_builds': other_builds
         }
         #context['type'] = type
