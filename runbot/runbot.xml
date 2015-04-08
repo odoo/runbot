@@ -13,9 +13,9 @@
                     <div class="oe_title">
                         <label for="name" class="oe_edit_only"/>
                         <h1><field name="name" class="oe_inline"/></h1>
-                        <button name="update" type="object" string="Update"/>
-                        <button name="cron" type="object" string="Cron"/>
-                        <button name="killall" type="object" string="Killall"/>
+                        <button name="update" type="object" string="Update" groups="runbot.group_runbot_admin"/>
+                        <button name="cron" type="object" string="Cron" groups="runbot.group_runbot_admin"/>
+                        <button name="killall" type="object" string="Killall" groups="runbot.group_runbot_admin"/>
                     </div>
                     <group string="Params">
                         <field name="testing"/>
