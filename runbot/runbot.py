@@ -225,6 +225,8 @@ class runbot_repo(osv.osv):
     def github(self, cr, uid, ids, url, payload=None, ignore_errors=False, context=None):
         """Return a http request to be sent to github"""
         for repo in self.browse(cr, uid, ids, context=context):
+            if not repo.token:
+                return
             try:
                 match_object = re.search('([^/]+)/([^/]+)/([^/.]+(.git)?)', repo.base)
                 if match_object:
