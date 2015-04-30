@@ -929,6 +929,7 @@ class runbot_build(osv.osv):
             if build.state != 'done':
                 build.logger('running %s', build.job)
                 job_method = getattr(self,build.job)
+                mkdirs([build.path('logs')])
                 lock_path = build.path('logs', '%s.lock' % build.job)
                 log_path = build.path('logs', '%s.txt' % build.job)
                 pid = job_method(cr, uid, build, lock_path, log_path)
