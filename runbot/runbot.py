@@ -303,8 +303,8 @@ class runbot_repo(osv.osv):
                 }
 
                 if not branch.sticky:
-                    skipped_build_sequences = self.search_read(cr, uid, [('branch_id', '=', branch.id), ('state', '=', 'pending')],
-                                                               fields=['sequence'], order='sequence asc', context=context)
+                    skipped_build_sequences = Build.search_read(cr, uid, [('branch_id', '=', branch.id), ('state', '=', 'pending')],
+                                                                fields=['sequence'], order='sequence asc', context=context)
                     if skipped_build_sequences:
                         to_be_skipped_ids = [build['id'] for build in skipped_build_sequences]
                         Build.skip(cr, uid, to_be_skipped_ids, context=context)
