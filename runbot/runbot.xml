@@ -18,10 +18,7 @@
                         <button name="killall" type="object" string="Killall" groups="runbot.group_runbot_admin"/>
                     </div>
                     <group string="Params">
-                        <field name="testing"/>
-                        <field name="running"/>
                         <field name="auto"/>
-                        <field name="jobs"/>
                         <field name="nginx"/>
                         <field name="duplicate_id"/>
                         <field name="dependency_ids" widget="many2many_tags"/>
@@ -38,8 +35,6 @@
         <field name="arch" type="xml">
             <tree string="repos">
                 <field name="name"/>
-                <field name="testing"/>
-                <field name="running"/>
                 <field name="auto"/>
             </tree>
         </field>

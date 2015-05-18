@@ -178,9 +178,9 @@ class runbot_repo(osv.osv):
         'name': fields.char('Repository', required=True),
         'path': fields.function(_get_path, type='char', string='Directory', readonly=1),
         'base': fields.function(_get_base, type='char', string='Base URL', readonly=1),
-        'testing': fields.integer('Concurrent Testing'),
-        'running': fields.integer('Concurrent Running'),
-        'jobs': fields.char('Jobs'),
+        'testing': fields.integer('Concurrent Testing', deprecated=True),
+        'running': fields.integer('Concurrent Running', deprecated=True),
+        'jobs': fields.char('Jobs', deprecated=True),
         'nginx': fields.boolean('Nginx'),
         'auto': fields.boolean('Auto'),
         'duplicate_id': fields.many2one('runbot.repo', 'Duplicate repo', help='Repository for finding duplicate builds'),
@@ -194,8 +194,6 @@ class runbot_repo(osv.osv):
         'group_ids': fields.many2many('res.groups', string='Limited to groups'),
     }
     _defaults = {
-        'testing': 1,
-        'running': 1,
         'auto': True,
     }
 
