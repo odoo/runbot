@@ -648,15 +648,15 @@ class runbot_build(osv.osv):
                 ]
 
             # move all addons to server addons path
-            for module in set(glob.glob(build.path('addons/*')) + additional_modules):
+            for module in uniq_list(glob.glob(build.path('addons/*')) + additional_modules):
                 basename = os.path.basename(module)
-                if not os.path.exists(build.server('addons', basename)):
-                    shutil.move(module, build.server('addons'))
-                else:
+                if os.path.exists(build.server('addons', basename)):
                     build._log(
                         'Building environment',
                         'You have duplicate modules in your branches "%s"' % basename
                     )
+                    shutil.rmtree(build.server('addons', basename))
+                shutil.move(module, build.server('addons'))
 
     def pg_dropdb(self, cr, uid, dbname):
         run(['dropdb', dbname])
