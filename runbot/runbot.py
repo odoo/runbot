@@ -688,7 +688,8 @@ class runbot_build(osv.osv):
             else:
                 l = glob.glob(build.server('addons', '*', '__init__.py'))
                 modules = set(os.path.basename(os.path.dirname(i)) for i in l)
-                modules = modules - set(['auth_ldap', 'document_ftp', 'hw_escpos', 'hw_proxy', 'hw_scanner', 'base_gengo', 'website_gengo', 'website_instantclick'])
+                modules = modules - set(['auth_ldap', 'document_ftp', 'base_gengo', 'website_gengo', 'website_instantclick'])
+                modules = set(m for m in modules if not m.startswith(('hw_', 'theme_')))
                 modules = ",".join(list(modules))
 
             # commandline
