@@ -184,7 +184,11 @@ class runbot_repo(osv.osv):
         'nginx': fields.boolean('Nginx'),
         'auto': fields.boolean('Auto'),
         'duplicate_id': fields.many2one('runbot.repo', 'Duplicate repo', help='Repository for finding duplicate builds'),
-        'modules': fields.char("Modules to Install", help="Comma-separated list of modules to install and test."),
+        'modules': fields.char("Modules to install", help="Comma-separated list of modules to install and test."),
+        'modules_auto': fields.selection([('none', 'None (only explicit modules list)'),
+                                          ('repo', 'Repository modules (excluding dependencies)'),
+                                          ('all', 'All modules (including dependencies)')],
+                                         string="Other modules to install automatically"),
         'dependency_ids': fields.many2many(
             'runbot.repo', 'runbot_repo_dep_rel',
             id1='dependant_id', id2='dependency_id',
@@ -195,6 +199,7 @@ class runbot_repo(osv.osv):
     }
     _defaults = {
         'auto': True,
+        'modules_auto': 'repo',
     }
 
     def domain(self, cr, uid, context=None):
@@ -606,6 +611,12 @@ class runbot_build(osv.osv):
                 return build.path('odoo', *l)
             return build.path('openerp', *l)
 
+    def filter_modules(self, cr, uid, modules):
+        blacklist_modules = set(['auth_ldap', 'document_ftp', 'base_gengo',
+                                 'website_gengo', 'website_instantclick'])
+        blacklist_filter = lambda m: not m.startswith(('hw_', 'theme_')) and m not in blacklist_modules
+        return uniq_list(filter(blacklist_filter, modules))
+
     def checkout(self, cr, uid, ids, context=None):
         for build in self.browse(cr, uid, ids, context=context):
             # starts from scratch
@@ -618,37 +629,41 @@ class runbot_build(osv.osv):
             # checkout branch
             build.branch_id.repo_id.git_export(build.name, build.path())
 
-            # TODO use git log to get commit message date and author
-
             # v6 rename bin -> openerp
             if os.path.isdir(build.path('bin/addons')):
                 shutil.move(build.path('bin'), build.server())
 
-            # fallback for addons-only community/project branches
-            additional_modules = []
-            if not os.path.isfile(build.server('__init__.py')):
-                # Use modules to test previously configured in the repository
-                modules_to_test = build.modules
-                if not modules_to_test:
-                    # Find modules to test from the folder branch
-                    modules_to_test = ','.join(
+            has_server = os.path.isfile(build.server('__init__.py'))
+
+            # build complete set of modules to install
+            modules_to_move = []
+            modules_to_test = ((build.modules or '') +
+                               (build.branch_id.modules or '') +
+                               (build.repo_id.modules or '')).split(',')
+            _logger.debug("manual modules_to_test for build %s: %s", build.dest, modules_to_test)
+
+            if not has_server:
+                if build.repo_id.modules_auto == 'local':
+                    modules_to_test += [
                         os.path.basename(os.path.dirname(a))
                         for a in glob.glob(build.path('*/__openerp__.py'))
-                    )
-                build.write({'modules': modules_to_test})
+                    ]
+                    _logger.debug("local modules_to_test for build %s: %s", build.dest, modules_to_test)
+
                 hint_branches = set()
                 for extra_repo in build.repo_id.dependency_ids:
                     closest_name = build.get_closest_branch_name(extra_repo.id, hint_branches)
                     hint_branches.add(closest_name)
                     extra_repo.git_export(closest_name, build.path())
+
                 # Finally mark all addons to move to openerp/addons
-                additional_modules += [
+                modules_to_move += [
                     os.path.dirname(module)
                     for module in glob.glob(build.path('*/__openerp__.py'))
                 ]
 
             # move all addons to server addons path
-            for module in uniq_list(glob.glob(build.path('addons/*')) + additional_modules):
+            for module in uniq_list(glob.glob(build.path('addons/*')) + modules_to_move):
                 basename = os.path.basename(module)
                 if os.path.exists(build.server('addons', basename)):
                     build._log(
@@ -657,6 +672,16 @@ class runbot_build(osv.osv):
                     )
                     shutil.rmtree(build.server('addons', basename))
                 shutil.move(module, build.server('addons'))
+
+            if build.repo_id.modules_auto == 'all' or (build.repo_id.modules_auto != 'none' and has_server):
+                modules_to_test += [
+                    os.path.basename(os.path.dirname(a))
+                    for a in glob.glob(build.server('addons/*/__openerp__.py'))
+                ]
+
+            modules_to_test = self.filter_modules(cr, uid, modules_to_test)
+            _logger.debug("modules_to_test for build %s: %s", build.dest, modules_to_test)
+            build.write({'modules': ','.join(modules_to_test)})
 
     def pg_dropdb(self, cr, uid, dbname):
         run(['dropdb', dbname])
@@ -681,16 +706,6 @@ class runbot_build(osv.osv):
             # for 6.0 branches
             if not os.path.isfile(server_path):
                 server_path = build.path("bin/openerp-server.py")
-
-            # modules
-            if build.modules:
-                modules = build.modules
-            else:
-                l = glob.glob(build.server('addons', '*', '__init__.py'))
-                modules = set(os.path.basename(os.path.dirname(i)) for i in l)
-                modules = modules - set(['auth_ldap', 'document_ftp', 'base_gengo', 'website_gengo', 'website_instantclick'])
-                modules = set(m for m in modules if not m.startswith(('hw_', 'theme_')))
-                modules = ",".join(list(modules))
 
             # commandline
             cmd = [
@@ -723,7 +738,7 @@ class runbot_build(osv.osv):
         #self.run_log(cmd, logfile=self.test_all_path)
         #run(["coverage","html","-d",self.coverage_base_path,"--ignore-errors","--include=*.py"],env={'COVERAGE_FILE': self.coverage_file_path})
 
-        return cmd, modules
+        return cmd, build.modules
 
     def spawn(self, cmd, lock_path, log_path, cpu_limit=None, shell=False):
         def preexec_fn():

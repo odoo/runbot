@@ -23,6 +23,7 @@
                         <field name="duplicate_id"/>
                         <field name="dependency_ids" widget="many2many_tags"/>
                         <field name="modules"/>
+                        <field name="modules_auto"/>
                         <field name="token"/>
                         <field name="group_ids" widget="many2many_tags"/>
                     </group>
