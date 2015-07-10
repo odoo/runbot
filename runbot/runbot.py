@@ -1182,12 +1182,12 @@ class RunbotController(http.Controller):
         return werkzeug.utils.redirect('/runbot/repo/%s' % repo_id)
 
     @http.route([
-        '/runbot/badge/<model("runbot.repo"):repo>/<branch>.svg',
-        '/runbot/badge/<any(default,flat):theme>/<model("runbot.repo"):repo>/<branch>.svg',
+        '/runbot/badge/<int:repo_id>/<branch>.svg',
+        '/runbot/badge/<any(default,flat):theme>/<int:repo_id>/<branch>.svg',
     ], type="http", auth="public", methods=['GET', 'HEAD'])
-    def badge(self, repo, branch, theme='default'):
+    def badge(self, repo_id, branch, theme='default'):
 
-        domain = [('repo_id', '=', repo.id),
+        domain = [('repo_id', '=', repo_id),
                   ('branch_id.branch_name', '=', branch),
                   ('branch_id.sticky', '=', True),
                   ('state', 'in', ['testing', 'running', 'done']),
@@ -1196,7 +1196,7 @@ class RunbotController(http.Controller):
 
         last_update = '__last_update'
         builds = request.registry['runbot.build'].search_read(
-            request.cr, request.uid,
+            request.cr, SUPERUSER_ID,
             domain, ['state', 'result', 'job_age', last_update],
             order='id desc', limit=1)
 
