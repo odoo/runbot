@@ -639,7 +639,8 @@ class runbot_build(osv.osv):
             modules_to_move = []
             modules_to_test = ((build.modules or '') +
                                (build.branch_id.modules or '') +
-                               (build.repo_id.modules or '')).split(',')
+                               (build.repo_id.modules or ''))
+            modules_to_test = modules_to_test.split(',') if modules_to_test else []
             _logger.debug("manual modules_to_test for build %s: %s", build.dest, modules_to_test)
 
             if not has_server:
