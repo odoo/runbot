@@ -557,7 +557,7 @@ class runbot_build(osv.osv):
         Rules priority for choosing the branch from the other repo is:
         1. Same branch name
         2. Common ancestors (git merge-base)
-        3. Name splitting on '-' character
+        3. Match a branch which is the dashed-prefix of current branch name
         Note that PR numbers are replaced by the branch name from which the PR is made,
         to prevent the above rules to mistakenly link PR of different repos together.
         """
@@ -596,8 +596,11 @@ class runbot_build(osv.osv):
                 if common_refs:
                     name = sorted(common_refs.iteritems(), key=operator.itemgetter(1), reverse=True)[0][0]
                 else:
-                    # If all else as failed, fallback on '-' splitting
-                    name = build.branch_id.name.split('-', 1)[0]
+                    # find a branch which is a prefix of the current branch name
+                    sorted_target_branches = sorted(possible_target_branches, key=len, reverse=True)
+                    prefixes = [b for b in sorted_target_branches if name.startswith(b + '-')]
+                    if prefixes:
+                        return prefixes[0]
             return name
 
     def path(self, cr, uid, ids, *l, **kw):
