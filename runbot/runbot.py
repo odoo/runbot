@@ -614,11 +614,13 @@ class runbot_build(osv.osv):
                 return build.path('odoo', *l)
             return build.path('openerp', *l)
 
-    def filter_modules(self, cr, uid, modules):
+    def filter_modules(self, cr, uid, modules, available_modules):
         blacklist_modules = set(['auth_ldap', 'document_ftp', 'base_gengo',
                                  'website_gengo', 'website_instantclick'])
-        blacklist_filter = lambda m: not m.startswith(('hw_', 'theme_')) and m not in blacklist_modules
-        return uniq_list(filter(blacklist_filter, modules))
+        mod_filter = lambda m: (not m.startswith(('hw_', 'theme_'))
+                                    and m not in blacklist_modules
+                                        and m in available_modules)
+        return uniq_list(filter(mod_filter, modules))
 
     def checkout(self, cr, uid, ids, context=None):
         for build in self.browse(cr, uid, ids, context=context):
@@ -677,13 +679,14 @@ class runbot_build(osv.osv):
                     shutil.rmtree(build.server('addons', basename))
                 shutil.move(module, build.server('addons'))
 
+            available_modules = [
+                os.path.basename(os.path.dirname(a))
+                for a in glob.glob(build.server('addons/*/__openerp__.py'))
+            ]
             if build.repo_id.modules_auto == 'all' or (build.repo_id.modules_auto != 'none' and has_server):
-                modules_to_test += [
-                    os.path.basename(os.path.dirname(a))
-                    for a in glob.glob(build.server('addons/*/__openerp__.py'))
-                ]
+                modules_to_test += available_modules
 
-            modules_to_test = self.filter_modules(cr, uid, modules_to_test)
+            modules_to_test = self.filter_modules(cr, uid, modules_to_test, set(available_modules))
             _logger.debug("modules_to_test for build %s: %s", build.dest, modules_to_test)
             build.write({'modules': ','.join(modules_to_test)})
 
