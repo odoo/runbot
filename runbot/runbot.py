@@ -413,6 +413,14 @@ class runbot_branch(osv.osv):
             r[branch.id] = branch.name.split('/')[-1]
         return r
 
+    def _get_pull_head_name(self, cr, uid, ids, field_name, arg, context=None):
+        r = dict.fromkeys(ids, False)
+        for bid in ids:
+            pi = self._get_pull_info(cr, uid, [bid], context=context)
+            if pi:
+                r[bid] = pi['head']['ref']
+        return r
+
     def _get_branch_url(self, cr, uid, ids, field_name, arg, context=None):
         r = {}
         for branch in self.browse(cr, uid, ids, context=context):
@@ -427,11 +435,21 @@ class runbot_branch(osv.osv):
         'name': fields.char('Ref Name', required=True),
         'branch_name': fields.function(_get_branch_name, type='char', string='Branch', readonly=1, store=True),
         'branch_url': fields.function(_get_branch_url, type='char', string='Branch url', readonly=1),
+        'pull_head_name': fields.function(_get_pull_head_name, type='char', string='PR HEAD name', readonly=1, store=True),
         'sticky': fields.boolean('Sticky', select=1),
         'coverage': fields.boolean('Coverage'),
         'state': fields.char('Status'),
         'modules': fields.char("Modules to Install", help="Comma-separated list of modules to install and test."),
     }
+
+    def _get_pull_info(self, cr, uid, ids, context=None):
+        assert len(ids) == 1
+        branch = self.browse(cr, uid, ids[0], context=context)
+        repo = branch.repo_id
+        if repo.token and branch.name.startswith('refs/pull/'):
+            pull_number = branch.name[len('refs/pull/'):]
+            return repo.github('/repos/:owner/:repo/pulls/%s' % pull_number)
+        return {}
 
 class runbot_build(osv.osv):
     _name = "runbot.build"
@@ -552,56 +570,85 @@ class runbot_build(osv.osv):
 
         return port
 
-    def get_closest_branch_name(self, cr, uid, ids, target_repo_id, hint_branches, context=None):
+    def _get_closest_branch_name(self, cr, uid, ids, target_repo_id, context=None):
         """Return the name of the closest common branch between both repos
         Rules priority for choosing the branch from the other repo is:
         1. Same branch name
-        2. Common ancestors (git merge-base)
+        2. A PR whose head name match
         3. Match a branch which is the dashed-prefix of current branch name
-        Note that PR numbers are replaced by the branch name from which the PR is made,
+        4. Common ancestors (git merge-base)
+        Note that PR numbers are replaced by the branch name of the PR target
         to prevent the above rules to mistakenly link PR of different repos together.
         """
+        assert len(ids) == 1
         branch_pool = self.pool['runbot.branch']
-        for build in self.browse(cr, uid, ids, context=context):
-            branch, repo = build.branch_id, build.repo_id
-            name = branch.branch_name
-            # Use github API to find name of branch on which the PR is made
-            if repo.token and name.startswith('refs/pull/'):
-                pull_number = name[len('refs/pull/'):]
-                pr = repo.github('/repos/:owner/:repo/pulls/%s' % pull_number)
-                name = 'refs/heads/' + pr['base']['ref']
-            # Find common branch names between repo and target repo
-            branch_ids = branch_pool.search(cr, uid, [('repo_id.id', '=', repo.id)])
-            target_ids = branch_pool.search(cr, uid, [('repo_id.id', '=', target_repo_id)])
-            branch_names = branch_pool.read(cr, uid, branch_ids, ['branch_name', 'name'], context=context)
-            target_names = branch_pool.read(cr, uid, target_ids, ['branch_name', 'name'], context=context)
-            possible_repo_branches = set([i['branch_name'] for i in branch_names if i['name'].startswith('refs/heads')])
-            possible_target_branches = set([i['branch_name'] for i in target_names if i['name'].startswith('refs/heads')])
-            possible_branches = possible_repo_branches.intersection(possible_target_branches)
-            if name not in possible_branches:
-                hinted_branches = possible_branches.intersection(hint_branches)
-                if hinted_branches:
-                    possible_branches = hinted_branches
-                common_refs = {}
-                for target_branch_name in possible_branches:
-                    try:
-                        commit = repo.git(['merge-base', branch.name, target_branch_name]).strip()
-                        cmd = ['log', '-1', '--format=%cd', '--date=iso', commit]
-                        common_refs[target_branch_name] = repo.git(cmd).strip()
-                    except subprocess.CalledProcessError:
-                        # If merge-base doesn't find any common ancestor, the command exits with a
-                        # non-zero return code, resulting in subprocess.check_output raising this
-                        # exception. We ignore this branch as there is no common ref between us.
-                        continue
-                if common_refs:
-                    name = sorted(common_refs.iteritems(), key=operator.itemgetter(1), reverse=True)[0][0]
-                else:
-                    # find a branch which is a prefix of the current branch name
-                    sorted_target_branches = sorted(possible_target_branches, key=len, reverse=True)
-                    prefixes = [b for b in sorted_target_branches if name.startswith(b + '-')]
-                    if prefixes:
-                        return prefixes[0]
-            return name
+
+        build = self.browse(cr, uid, ids[0], context=context)
+        branch, repo = build.branch_id, build.repo_id
+        pi = branch._get_pull_info()
+        name = pi['base']['ref'] if pi else branch.branch_name
+
+        # 1. same name, not a PR
+        domain = [
+            ('repo_id', '=', target_repo_id),
+            ('branch_name', '=', name),
+            ('name', '=like', 'refs/heads/%'),
+        ]
+        targets = branch_pool.search_read(cr, uid, domain, ['name'], order='id DESC',
+                                          limit=1, context=context)
+        if targets:
+            return targets[0]['name']
+
+        # 2. PR with head name equals
+        domain = [
+            ('repo_id', '=', target_repo_id),
+            ('pull_head_name', '=', name),
+            ('name', '=like', 'refs/pull/%'),
+        ]
+        pulls = branch_pool.search_read(cr, uid, domain, ['name'], order='id DESC',
+                                        context=context)
+        for pull in pulls:
+            pi = branch_pool._get_pull_info(cr, uid, [pull['id']], context=context)
+            if pi.get('state') == 'open':
+                return pull['name']
+
+        # 3. Match a branch which is the dashed-prefix of current branch name
+        branches = branch_pool.search_read(
+            cr, uid,
+            [('repo_id', '=', target_repo_id), ('name', '=like', 'refs/heads/%')],
+            ['name', 'branch_name'], order='id DESC', context=context
+        )
+
+        for branch in branches:
+            if name.startswith(branch['branch_name'] + '-'):
+                return branch['name']
+
+        # 4. Common ancestors (git merge-base)
+        common_refs = {}
+        cr.execute("""
+            SELECT b.name
+              FROM runbot_branch b,
+                   runbot_branch t
+             WHERE b.repo_id = %s
+               AND t.repo_id = %s
+               AND b.name = t.name
+               AND b.name LIKE 'refs/heads/%%'
+        """, [repo.id, target_repo_id])
+        for common_name, in cr.fetchall():
+            try:
+                commit = repo.git(['merge-base', branch.name, common_name]).strip()
+                cmd = ['log', '-1', '--format=%cd', '--date=iso', commit]
+                common_refs[common_name] = repo.git(cmd).strip()
+            except subprocess.CalledProcessError:
+                # If merge-base doesn't find any common ancestor, the command exits with a
+                # non-zero return code, resulting in subprocess.check_output raising this
+                # exception. We ignore this branch as there is no common ref between us.
+                continue
+        if common_refs:
+            return sorted(common_refs.iteritems(), key=operator.itemgetter(1), reverse=True)[0][0]
+
+        # 5. last-resort value
+        return 'master'
 
     def path(self, cr, uid, ids, *l, **kw):
         for build in self.browse(cr, uid, ids, context=None):
@@ -656,10 +703,8 @@ class runbot_build(osv.osv):
                     ]
                     _logger.debug("local modules_to_test for build %s: %s", build.dest, modules_to_test)
 
-                hint_branches = set()
                 for extra_repo in build.repo_id.dependency_ids:
-                    closest_name = build.get_closest_branch_name(extra_repo.id, hint_branches)
-                    hint_branches.add(closest_name)
+                    closest_name = build._get_closest_branch_name(extra_repo.id)
                     extra_repo.git_export(closest_name, build.path())
 
                 # Finally mark all addons to move to openerp/addons

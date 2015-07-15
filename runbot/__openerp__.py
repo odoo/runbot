@@ -2,7 +2,7 @@
     'name': 'Runbot',
     'category': 'Website',
     'summary': 'Runbot',
-    'version': '1.1',
+    'version': '1.2',
     'description': "Runbot",
     'author': 'OpenERP SA',
     'depends': ['website'],

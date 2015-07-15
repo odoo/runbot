@@ -59,6 +59,7 @@
                         <field name="name"/>
                         <field name="branch_name"/>
                         <field name="branch_url"/>
+                        <field name="pull_head_name"/>
                         <field name="sticky"/>
                         <field name="state"/>
                         <field name="modules"/>
