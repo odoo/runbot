@@ -302,7 +302,6 @@ class runbot_repo(osv.osv):
                     'committer_email': committer_email,
                     'subject': subject,
                     'date': dateutil.parser.parse(date[:19]),
-                    'modules': ','.join(filter(None, [branch.repo_id.modules, branch.modules])),
                 }
 
                 if not branch.sticky:
@@ -661,12 +660,15 @@ class runbot_build(osv.osv):
                 return build.path('odoo', *l)
             return build.path('openerp', *l)
 
-    def filter_modules(self, cr, uid, modules, available_modules):
+    def filter_modules(self, cr, uid, modules, available_modules, explicit_modules):
         blacklist_modules = set(['auth_ldap', 'document_ftp', 'base_gengo',
                                  'website_gengo', 'website_instantclick'])
-        mod_filter = lambda m: (not m.startswith(('hw_', 'theme_'))
-                                    and m not in blacklist_modules
-                                        and m in available_modules)
+
+        mod_filter = lambda m: (
+            m in available_modules and
+            (m in explicit_modules or (not m.startswith(('hw_', 'theme_'))
+                                       and m not in blacklist_modules))
+        )
         return uniq_list(filter(mod_filter, modules))
 
     def checkout(self, cr, uid, ids, context=None):
@@ -689,10 +691,10 @@ class runbot_build(osv.osv):
 
             # build complete set of modules to install
             modules_to_move = []
-            modules_to_test = ((build.modules or '') + ',' +
-                               (build.branch_id.modules or '') + ',' +
+            modules_to_test = ((build.branch_id.modules or '') + ',' +
                                (build.repo_id.modules or ''))
             modules_to_test = filter(None, modules_to_test.split(','))
+            explicit_modules = set(modules_to_test)
             _logger.debug("manual modules_to_test for build %s: %s", build.dest, modules_to_test)
 
             if not has_server:
@@ -731,7 +733,8 @@ class runbot_build(osv.osv):
             if build.repo_id.modules_auto == 'all' or (build.repo_id.modules_auto != 'none' and has_server):
                 modules_to_test += available_modules
 
-            modules_to_test = self.filter_modules(cr, uid, modules_to_test, set(available_modules))
+            modules_to_test = self.filter_modules(cr, uid, modules_to_test,
+                                                  set(available_modules), explicit_modules)
             _logger.debug("modules_to_test for build %s: %s", build.dest, modules_to_test)
             build.write({'modules': ','.join(modules_to_test)})
 
