@@ -244,6 +244,7 @@ class runbot_repo(osv.osv):
                         response = session.post(url, data=simplejson.dumps(payload))
                     else:
                         response = session.get(url)
+                    response.raise_for_status()
                     return response.json()
             except Exception:
                 if ignore_errors:
@@ -447,7 +448,7 @@ class runbot_branch(osv.osv):
         repo = branch.repo_id
         if repo.token and branch.name.startswith('refs/pull/'):
             pull_number = branch.name[len('refs/pull/'):]
-            return repo.github('/repos/:owner/:repo/pulls/%s' % pull_number)
+            return repo.github('/repos/:owner/:repo/pulls/%s' % pull_number, ignore_errors=True) or {}
         return {}
 
 class runbot_build(osv.osv):
