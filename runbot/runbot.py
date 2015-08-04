@@ -1188,6 +1188,59 @@ class RunbotController(http.Controller):
 
         return request.render("runbot.repo", context)
 
+    @http.route(['/runbot/sticky-dashboard'], type='http', auth="public", website=True)
+    def sticky_dashboard(self, refresh=None):
+        cr = request.cr
+        RB = request.env['runbot.build']
+        repos = request.env['runbot.repo'].search([])   # respect record rules
+
+        cr.execute("""SELECT bu.id
+                        FROM runbot_branch br
+                        JOIN LATERAL (SELECT *
+                                        FROM runbot_build bu
+                                       WHERE bu.branch_id = br.id
+                                    ORDER BY id DESC
+                                       LIMIT 3
+                                     ) bu ON (true)
+                       WHERE br.sticky
+                         AND br.repo_id in %s
+                    ORDER BY br.repo_id, br.branch_name, bu.id DESC
+                   """, [tuple(repos._ids)])
+
+        builds = RB.browse(map(operator.itemgetter(0), cr.fetchall()))
+
+        count = RB.search_count
+        qctx = {
+            'refresh': refresh,
+            'host_stats': [],
+            'pending_total': count([('state', '=', 'pending')]),
+        }
+
+        repos_values = qctx['repo_dict'] = OrderedDict()
+        for build in builds:
+            repo = build.repo_id
+            branch = build.branch_id
+            r = repos_values.setdefault(repo.id, {'branches': OrderedDict()})
+            if 'name' not in r:
+                r.update({
+                    'name': repo.name,
+                    'testing': count([('repo_id', '=', repo.id), ('state', '=', 'testing')]),
+                    'running': count([('repo_id', '=', repo.id), ('state', '=', 'running')]),
+                    'pending': count([('repo_id', '=', repo.id), ('state', '=', 'pending')]),
+                })
+            b = r['branches'].setdefault(branch.id, {'name': branch.branch_name, 'builds': list()})
+            b['builds'].append(self.build_info(build))
+
+        for result in RB.read_group([], ['host'], ['host']):
+            if result['host']:
+                qctx['host_stats'].append({
+                    'host': result['host'],
+                    'testing': count([('state', '=', 'testing'), ('host', '=', result['host'])]),
+                    'running': count([('state', '=', 'running'), ('host', '=', result['host'])]),
+                })
+
+        return request.render("runbot.sticky-dashboard", qctx)
+
     def build_info(self, build):
         real_build = build.duplicate_id if build.state == 'duplicate' else build
         return {
