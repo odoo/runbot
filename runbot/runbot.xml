@@ -473,12 +473,11 @@
                     <t t-esc="repo['pending']"/> pending.
                 </small></h4>
                 <div t-foreach="repo['branches'].values()" t-as="br">
-                  <div class="col-md-2">
-                    <i class="fa fa-star" style="color: #f0ad4e" />
-                    <b t-esc="br['name']"/>
-                    <small><t t-esc="br['builds'][0]['job_age']"/></small><br/>
+                  <div class="col-md-1">
+                    <b t-esc="br['name']"/><br/>
+                    <small><t t-esc="br['builds'][0]['job_age']"/></small>
                   </div>
-                  <div class="col-md-10 r-mb02">
+                  <div class="col-md-11 r-mb02">
                     <t t-foreach="br['builds']" t-as="bu">
                       <t t-if="bu['state']=='pending'"><t t-set="klass">default</t></t>
                       <t t-if="bu['state']=='testing'"><t t-set="klass">info</t></t>
