@@ -1228,6 +1228,7 @@ class RunbotController(http.Controller):
             if 'name' not in r:
                 r.update({
                     'name': repo.name,
+                    'base': repo.base,
                     'testing': count([('repo_id', '=', repo.id), ('state', '=', 'testing')]),
                     'running': count([('repo_id', '=', repo.id), ('state', '=', 'running')]),
                     'pending': count([('repo_id', '=', repo.id), ('state', '=', 'pending')]),

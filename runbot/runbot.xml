@@ -494,9 +494,9 @@
                         </t>
                         <br/>
                         <i class="fa fa-envelope-o"></i>
-                        <span t-esc="bu['subject'][:32] + ('...' if bu['subject'][32:] else '') " t-att-title="bu['subject']"/>
+                        <a t-attf-href="https://#{repo['base']}/commit/#{bu['name']}"><t t-esc="bu['subject'][:32] + ('...' if bu['subject'][32:] else '') " t-att-title="bu['subject']"/></a>
                         <br/>
-                        <t t-call="runbot.build_name"/> — <small><t t-esc="bu['dest']"/> on <t t-esc="bu['host']"/></small>
+                        <t t-call="runbot.build_name"/> — <small><a t-attf-href="/runbot/build/{{bu['id']}}"><t t-esc="bu['dest']"/></a> on <t t-esc="bu['host']"/> <a t-if="bu['state'] == 'running'" t-attf-href="http://{{bu['domain']}}/?db={{bu['dest']}}-all"><i class="fa fa-sign-in"></i></a></small>
                       </div>
                     </t>
                   </div>
