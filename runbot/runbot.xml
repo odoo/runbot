@@ -24,7 +24,6 @@
                         <field name="dependency_ids" widget="many2many_tags"/>
                         <field name="modules"/>
                         <field name="modules_auto"/>
-                        <field name="job_timeout"/>
                         <field name="token"/>
                         <field name="group_ids" widget="many2many_tags"/>
                     </group>
@@ -62,6 +61,7 @@
                         <field name="branch_url"/>
                         <field name="pull_head_name"/>
                         <field name="sticky"/>
+                        <field name="job_timeout"/>
                         <field name="state"/>
                         <field name="modules"/>
                     </group>

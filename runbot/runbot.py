@@ -196,7 +196,6 @@ class runbot_repo(osv.osv):
             help="Community addon repos which need to be present to run tests."),
         'token': fields.char("Github token"),
         'group_ids': fields.many2many('res.groups', string='Limited to groups'),
-        'job_timeout': fields.integer('Job Timeout (minutes)', required=True),
     }
     _defaults = {
         'auto': True,
@@ -442,6 +441,7 @@ class runbot_branch(osv.osv):
         'coverage': fields.boolean('Coverage'),
         'state': fields.char('Status'),
         'modules': fields.char("Modules to Install", help="Comma-separated list of modules to install and test."),
+        'job_timeout': fields.integer('Job Timeout (minutes)', help='For default timeout: Mark it zero'),
     }
 
     def _get_pull_info(self, cr, uid, ids, context=None):
@@ -953,6 +953,10 @@ class runbot_build(osv.osv):
     def schedule(self, cr, uid, ids, context=None):
         jobs = self.list_jobs()
 
+        icp = self.pool['ir.config_parameter']
+        # For retro-compatibility, keep this parameter in seconds
+        default_timeout = int(icp.get_param(cr, uid, 'runbot.timeout', default=1800)) / 60
+
         for build in self.browse(cr, uid, ids, context=context):
             if build.state == 'pending':
                 # allocate port and schedule first job
@@ -972,7 +976,7 @@ class runbot_build(osv.osv):
                 lock_path = build.path('logs', '%s.lock' % build.job)
                 if locked(lock_path):
                     # kill if overpassed
-                    timeout = build.repo_id.job_timeout * 60
+                    timeout = (build.branch_id.job_timeout or default_timeout) * 60
                     if build.job != jobs[-1] and build.job_time > timeout:
                         build.logger('%s time exceded (%ss)', build.job, build.job_time)
                         build.kill(result='killed')
