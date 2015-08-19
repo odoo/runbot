@@ -1031,7 +1031,7 @@ class runbot_build(osv.osv):
         for build in self.browse(cr, uid, ids, context=context):
             self.pg_dropdb(cr, uid, "%s-base" % build.dest)
             self.pg_dropdb(cr, uid, "%s-all" % build.dest)
-            if os.path.isdir(build.path()):
+            if os.path.isdir(build.path()) and build.result != 'killed':
                 shutil.rmtree(build.path())
 
     def kill(self, cr, uid, ids, result=None, context=None):
