@@ -1029,8 +1029,15 @@ class runbot_build(osv.osv):
 
     def cleanup(self, cr, uid, ids, context=None):
         for build in self.browse(cr, uid, ids, context=context):
-            self.pg_dropdb(cr, uid, "%s-base" % build.dest)
-            self.pg_dropdb(cr, uid, "%s-all" % build.dest)
+            cr.execute("""
+                SELECT datname
+                  FROM pg_database
+                 WHERE pg_get_userbyid(datdba) = current_user
+                   AND datname LIKE %s
+            """, [build.dest + '%'])
+            for db, in cr.fetchall():
+                self.pg_dropdb(cr, uid, db)
+
             if os.path.isdir(build.path()) and build.result != 'killed':
                 shutil.rmtree(build.path())
 
