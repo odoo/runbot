@@ -573,7 +573,9 @@ class runbot_build(osv.osv):
         return port
 
     def _get_closest_branch_name(self, cr, uid, ids, target_repo_id, context=None):
-        """Return the name of the closest common branch between both repos
+        """Return (repo, branch name) of the closest common branch between build's branch and
+           any branch of target_repo or its duplicated repos.
+
         Rules priority for choosing the branch from the other repo is:
         1. Same branch name
         2. A PR whose head name match
@@ -590,67 +592,85 @@ class runbot_build(osv.osv):
         pi = branch._get_pull_info()
         name = pi['base']['ref'] if pi else branch.branch_name
 
+        target_repo = self.pool['runbot.repo'].browse(cr, uid, target_repo_id, context=context)
+
+        target_repo_ids = [target_repo.id]
+        r = target_repo.duplicate_id
+        while r:
+            if r.id in target_repo_ids:
+                break
+            target_repo_ids.append(r.id)
+            r = r.duplicate_id
+
+        sort_by_repo = lambda d: (target_repo_ids.index(d['repo_id'][0]), -1 * len(d.get('branch_name', '')), -1 * d['id'])
+        result_for = lambda d: (d['repo_id'][0], d['name'])
+
         # 1. same name, not a PR
         domain = [
-            ('repo_id', '=', target_repo_id),
+            ('repo_id', 'in', target_repo_ids),
             ('branch_name', '=', name),
             ('name', '=like', 'refs/heads/%'),
         ]
-        targets = branch_pool.search_read(cr, uid, domain, ['name'], order='id DESC',
-                                          limit=1, context=context)
+        targets = branch_pool.search_read(cr, uid, domain, ['name', 'repo_id'], order='id DESC',
+                                          context=context)
+        targets = sorted(targets, key=sort_by_repo)
         if targets:
-            return targets[0]['name']
+            return result_for(targets[0])
 
         # 2. PR with head name equals
         domain = [
-            ('repo_id', '=', target_repo_id),
+            ('repo_id', 'in', target_repo_ids),
             ('pull_head_name', '=', name),
             ('name', '=like', 'refs/pull/%'),
         ]
-        pulls = branch_pool.search_read(cr, uid, domain, ['name'], order='id DESC',
+        pulls = branch_pool.search_read(cr, uid, domain, ['name', 'repo_id'], order='id DESC',
                                         context=context)
+        pulls = sorted(pulls, key=sort_by_repo)
         for pull in pulls:
             pi = branch_pool._get_pull_info(cr, uid, [pull['id']], context=context)
             if pi.get('state') == 'open':
-                return pull['name']
+                return result_for(pull)
 
         # 3. Match a branch which is the dashed-prefix of current branch name
         branches = branch_pool.search_read(
             cr, uid,
-            [('repo_id', '=', target_repo_id), ('name', '=like', 'refs/heads/%')],
-            ['name', 'branch_name'], order='id DESC', context=context
+            [('repo_id', 'in', target_repo_ids), ('name', '=like', 'refs/heads/%')],
+            ['name', 'branch_name', 'repo_id'], order='id DESC', context=context
         )
+        branches = sorted(branches, key=sort_by_repo)
 
         for branch in branches:
             if name.startswith(branch['branch_name'] + '-'):
-                return branch['name']
+                return result_for(branch)
 
         # 4. Common ancestors (git merge-base)
-        common_refs = {}
-        cr.execute("""
-            SELECT b.name
-              FROM runbot_branch b,
-                   runbot_branch t
-             WHERE b.repo_id = %s
-               AND t.repo_id = %s
-               AND b.name = t.name
-               AND b.name LIKE 'refs/heads/%%'
-        """, [repo.id, target_repo_id])
-        for common_name, in cr.fetchall():
-            try:
-                commit = repo.git(['merge-base', branch.name, common_name]).strip()
-                cmd = ['log', '-1', '--format=%cd', '--date=iso', commit]
-                common_refs[common_name] = repo.git(cmd).strip()
-            except subprocess.CalledProcessError:
-                # If merge-base doesn't find any common ancestor, the command exits with a
-                # non-zero return code, resulting in subprocess.check_output raising this
-                # exception. We ignore this branch as there is no common ref between us.
-                continue
-        if common_refs:
-            return sorted(common_refs.iteritems(), key=operator.itemgetter(1), reverse=True)[0][0]
+        for target_id in target_repo_ids:
+            common_refs = {}
+            cr.execute("""
+                SELECT b.name
+                  FROM runbot_branch b,
+                       runbot_branch t
+                 WHERE b.repo_id = %s
+                   AND t.repo_id = %s
+                   AND b.name = t.name
+                   AND b.name LIKE 'refs/heads/%%'
+            """, [repo.id, target_id])
+            for common_name, in cr.fetchall():
+                try:
+                    commit = repo.git(['merge-base', branch.name, common_name]).strip()
+                    cmd = ['log', '-1', '--format=%cd', '--date=iso', commit]
+                    common_refs[common_name] = repo.git(cmd).strip()
+                except subprocess.CalledProcessError:
+                    # If merge-base doesn't find any common ancestor, the command exits with a
+                    # non-zero return code, resulting in subprocess.check_output raising this
+                    # exception. We ignore this branch as there is no common ref between us.
+                    continue
+            if common_refs:
+                b = sorted(common_refs.iteritems(), key=operator.itemgetter(1), reverse=True)[0][0]
+                return target_id, b
 
         # 5. last-resort value
-        return 'master'
+        return target_repo_id, 'master'
 
     def path(self, cr, uid, ids, *l, **kw):
         for build in self.browse(cr, uid, ids, context=None):
@@ -709,8 +729,9 @@ class runbot_build(osv.osv):
                     _logger.debug("local modules_to_test for build %s: %s", build.dest, modules_to_test)
 
                 for extra_repo in build.repo_id.dependency_ids:
-                    closest_name = build._get_closest_branch_name(extra_repo.id)
-                    extra_repo.git_export(closest_name, build.path())
+                    repo_id, closest_name = build._get_closest_branch_name(extra_repo.id)
+                    repo = self.pool['runbot.repo'].browse(cr, uid, repo_id, context=context)
+                    repo.git_export(closest_name, build.path())
 
                 # Finally mark all addons to move to openerp/addons
                 modules_to_move += [
