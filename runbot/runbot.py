@@ -721,7 +721,7 @@ class runbot_build(osv.osv):
             _logger.debug("manual modules_to_test for build %s: %s", build.dest, modules_to_test)
 
             if not has_server:
-                if build.repo_id.modules_auto == 'local':
+                if build.repo_id.modules_auto == 'repo':
                     modules_to_test += [
                         os.path.basename(os.path.dirname(a))
                         for a in glob.glob(build.path('*/__openerp__.py'))
