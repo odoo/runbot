@@ -37,7 +37,7 @@
         <field name="arch" type="xml">
             <tree string="repos">
                 <field name="name"/>
-                <field name="auto"/>
+                <field name="mode"/>
             </tree>
         </field>
     </record>

@@ -43,6 +43,8 @@ _re_error = r'^(?:\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ (?:ERROR|CRITICAL) )|
 _re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING '
 _re_job = re.compile('job_\d')
 
+# monkey patch cron system to reduce starvation and improve throughput with many workers
+openerp.service.server.SLEEP_INTERVAL = 4
 
 #----------------------------------------------------------
 # RunBot helpers
@@ -179,11 +181,10 @@ class runbot_repo(osv.osv):
         'path': fields.function(_get_path, type='char', string='Directory', readonly=1),
         'base': fields.function(_get_base, type='char', string='Base URL', readonly=1),
         'nginx': fields.boolean('Nginx'),
-        'auto': fields.boolean('Auto'),
-        'mode': fields.selection([('disabled', 'Dont check for new build'),
-                                  ('poll', 'Poll git repository'),
-                                  ('hook', 'Wait for webhook on /runbot/hook/<id> i.e. github push event')],
-                                  string="Mode"),
+        'mode': fields.selection([('disabled', 'Disabled'),
+                                  ('poll', 'Poll'),
+                                  ('hook', 'Hook')],
+                                  string="Mode", required=True, help="hook: Wait for webhook on /runbot/hook/<id> i.e. github push event"),
         'hook_time': fields.datetime('Last hook time'),
         'duplicate_id': fields.many2one('runbot.repo', 'Duplicate repo', help='Repository for finding duplicate builds'),
         'modules': fields.char("Modules to install", help="Comma-separated list of modules to install and test."),
@@ -273,6 +274,8 @@ class runbot_repo(osv.osv):
         # check for mode == hook
         fetch_time = os.path.getmtime(os.path.join(repo.path, 'FETCH_HEAD'))
         if repo.mode == 'hook' and repo.hook_time and dt2time(repo.hook_time) < fetch_time:
+            t0 = time.time()
+            _logger.debug('repo %s skip hook fetch fetch_time: %ss ago hook_time: %ss ago', repo.name, int(t0 - fetch_time), int(t0 - dt2time(repo.hook_time)))
             return
 
         repo.git(['gc', '--auto', '--prune=all'])
@@ -1227,10 +1230,11 @@ class RunbotController(http.Controller):
 
         return request.render("runbot.repo", context)
 
-    @http.route(['/runbot', '/runbot/hook/<repo_id:int>'], type='http', auth="public", website=True)
-    def repo(self, repo_id=None, **post):
-        repo = request.registry['runbot.repo'].browse(cr, SUPERUSER_ID, [repo_id])
-        repo.hook_time = datetime.now().strftime(DEFAULT_SERVER_DATETIME_FORMAT)
+    @http.route(['/runbot/hook/<int:repo_id>'], type='http', auth="public", website=True)
+    def hook(self, repo_id=None, **post):
+        # TODO if repo_id == None parse the json['repository']['ssh_url'] and find the right repo
+        repo = request.registry['runbot.repo'].browse(request.cr, SUPERUSER_ID, [repo_id])
+        repo.hook_time = datetime.datetime.now().strftime(openerp.tools.DEFAULT_SERVER_DATETIME_FORMAT)
         return ""
 
     @http.route(['/runbot/dashboard'], type='http', auth="public", website=True)
