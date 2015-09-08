@@ -178,11 +178,13 @@ class runbot_repo(osv.osv):
         'name': fields.char('Repository', required=True),
         'path': fields.function(_get_path, type='char', string='Directory', readonly=1),
         'base': fields.function(_get_base, type='char', string='Base URL', readonly=1),
-        'testing': fields.integer('Concurrent Testing', deprecated=True),
-        'running': fields.integer('Concurrent Running', deprecated=True),
-        'jobs': fields.char('Jobs', deprecated=True),
         'nginx': fields.boolean('Nginx'),
         'auto': fields.boolean('Auto'),
+        'mode': fields.selection([('disabled', 'Dont check for new build'),
+                                  ('poll', 'Poll git repository'),
+                                  ('hook', 'Wait for webhook on /runbot/hook/<id> i.e. github push event')],
+                                  string="Mode"),
+        'hook_time': fields.datetime('Last hook time'),
         'duplicate_id': fields.many2one('runbot.repo', 'Duplicate repo', help='Repository for finding duplicate builds'),
         'modules': fields.char("Modules to install", help="Comma-separated list of modules to install and test."),
         'modules_auto': fields.selection([('none', 'None (only explicit modules list)'),
@@ -198,7 +200,7 @@ class runbot_repo(osv.osv):
         'group_ids': fields.many2many('res.groups', string='Limited to groups'),
     }
     _defaults = {
-        'auto': True,
+        'mode': 'poll',
         'modules_auto': 'repo',
         'job_timeout': 30,
     }
@@ -267,10 +269,15 @@ class runbot_repo(osv.osv):
             os.makedirs(repo.path)
         if not os.path.isdir(os.path.join(repo.path, 'refs')):
             run(['git', 'clone', '--bare', repo.name, repo.path])
-        else:
-            repo.git(['gc', '--auto', '--prune=all'])
-            repo.git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*'])
-            repo.git(['fetch', '-p', 'origin', '+refs/pull/*/head:refs/pull/*'])
+
+        # check for mode == hook
+        fetch_time = os.path.getmtime(os.path.join(repo.path, 'FETCH_HEAD'))
+        if repo.mode == 'hook' and repo.hook_time and dt2time(repo.hook_time) < fetch_time:
+            return
+
+        repo.git(['gc', '--auto', '--prune=all'])
+        repo.git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*'])
+        repo.git(['fetch', '-p', 'origin', '+refs/pull/*/head:refs/pull/*'])
 
         fields = ['refname','objectname','committerdate:iso8601','authorname','authoremail','subject','committername','committeremail']
         fmt = "%00".join(["%("+field+")" for field in fields])
@@ -399,7 +406,7 @@ class runbot_repo(osv.osv):
         Build.kill(cr, uid, build_ids)
 
     def cron(self, cr, uid, ids=None, context=None):
-        ids = self.search(cr, uid, [('auto', '=', True)], context=context)
+        ids = self.search(cr, uid, [('mode', '!=', 'disabled')], context=context)
         self.update(cr, uid, ids, context=context)
         self.scheduler(cr, uid, ids, context=context)
         self.reload_nginx(cr, uid, context=context)
@@ -1220,8 +1227,14 @@ class RunbotController(http.Controller):
 
         return request.render("runbot.repo", context)
 
-    @http.route(['/runbot/sticky-dashboard'], type='http', auth="public", website=True)
-    def sticky_dashboard(self, refresh=None):
+    @http.route(['/runbot', '/runbot/hook/<repo_id:int>'], type='http', auth="public", website=True)
+    def repo(self, repo_id=None, **post):
+        repo = request.registry['runbot.repo'].browse(cr, SUPERUSER_ID, [repo_id])
+        repo.hook_time = datetime.now().strftime(DEFAULT_SERVER_DATETIME_FORMAT)
+        return ""
+
+    @http.route(['/runbot/dashboard'], type='http', auth="public", website=True)
+    def dashboard(self, refresh=None):
         cr = request.cr
         RB = request.env['runbot.build']
         repos = request.env['runbot.repo'].search([])   # respect record rules
@@ -1294,7 +1307,6 @@ class RunbotController(http.Controller):
             'port': real_build.port,
             'subject': build.subject,
         }
-
 
     @http.route(['/runbot/build/<build_id>'], type='http', auth="public", website=True)
     def build(self, build_id=None, search=None, **post):

@@ -18,7 +18,7 @@
                         <button name="killall" type="object" string="Killall" groups="runbot.group_runbot_admin"/>
                     </div>
                     <group string="Params">
-                        <field name="auto"/>
+                        <field name="mode"/>
                         <field name="nginx"/>
                         <field name="duplicate_id"/>
                         <field name="dependency_ids" widget="many2many_tags"/>
@@ -26,6 +26,7 @@
                         <field name="modules_auto"/>
                         <field name="token"/>
                         <field name="group_ids" widget="many2many_tags"/>
+                        <field name="hook_time" readonly="1"/>
                     </group>
                 </sheet>
             </form>
