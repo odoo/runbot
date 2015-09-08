@@ -20,6 +20,7 @@ import time
 from collections import OrderedDict
 
 import dateutil.parser
+from dateutil.relativedelta import relativedelta
 import requests
 from matplotlib.font_manager import FontProperties
 from matplotlib.textpath import TextToPath
@@ -43,8 +44,10 @@ _re_error = r'^(?:\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ (?:ERROR|CRITICAL) )|
 _re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING '
 _re_job = re.compile('job_\d')
 
-# monkey patch cron system to reduce starvation and improve throughput with many workers
-openerp.service.server.SLEEP_INTERVAL = 4
+# increase cron frequency from 0.016 Hz to 0.1 Hz to reduce starvation and improve throughput with many workers
+# TODO: find a nicer way than monkey patch to accomplish this
+openerp.service.server.SLEEP_INTERVAL = 10
+openerp.addons.base.ir.ir_cron._intervalTypes['minutes'] = lambda interval: relativedelta(seconds=interval*10)
 
 #----------------------------------------------------------
 # RunBot helpers
