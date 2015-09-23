@@ -532,6 +532,11 @@ class runbot_build(osv.osv):
         'job_time': fields.function(_get_time, type='integer', string='Job time'),
         'job_age': fields.function(_get_age, type='integer', string='Job age'),
         'duplicate_id': fields.many2one('runbot.build', 'Corresponding Build'),
+        'server_match': fields.selection([('builtin', 'This branch includes Odoo server'),
+                                          ('exact', 'PR target or matching name prefix found'),
+                                          ('fuzzy', 'Fuzzy - common ancestor found'),
+                                          ('default', 'No match found - defaults to master')],
+                                        string='Server branch matching')
     }
 
     _defaults = {
@@ -616,7 +621,7 @@ class runbot_build(osv.osv):
             r = r.duplicate_id
 
         sort_by_repo = lambda d: (target_repo_ids.index(d['repo_id'][0]), -1 * len(d.get('branch_name', '')), -1 * d['id'])
-        result_for = lambda d: (d['repo_id'][0], d['name'])
+        result_for = lambda d: (d['repo_id'][0], d['name'], 'exact')
 
         # 1. same name, not a PR
         domain = [
@@ -680,10 +685,10 @@ class runbot_build(osv.osv):
                     continue
             if common_refs:
                 b = sorted(common_refs.iteritems(), key=operator.itemgetter(1), reverse=True)[0][0]
-                return target_id, b
+                return target_id, b, 'fuzzy'
 
         # 5. last-resort value
-        return target_repo_id, 'master'
+        return target_repo_id, 'master', 'default'
 
     def path(self, cr, uid, ids, *l, **kw):
         for build in self.browse(cr, uid, ids, context=None):
@@ -724,6 +729,7 @@ class runbot_build(osv.osv):
                 shutil.move(build.path('bin'), build.server())
 
             has_server = os.path.isfile(build.server('__init__.py'))
+            server_match = 'builtin'
 
             # build complete set of modules to install
             modules_to_move = []
@@ -742,7 +748,7 @@ class runbot_build(osv.osv):
                     _logger.debug("local modules_to_test for build %s: %s", build.dest, modules_to_test)
 
                 for extra_repo in build.repo_id.dependency_ids:
-                    repo_id, closest_name = build._get_closest_branch_name(extra_repo.id)
+                    repo_id, closest_name, server_match = build._get_closest_branch_name(extra_repo.id)
                     repo = self.pool['runbot.repo'].browse(cr, uid, repo_id, context=context)
                     repo.git_export(closest_name, build.path())
 
@@ -773,7 +779,8 @@ class runbot_build(osv.osv):
             modules_to_test = self.filter_modules(cr, uid, modules_to_test,
                                                   set(available_modules), explicit_modules)
             _logger.debug("modules_to_test for build %s: %s", build.dest, modules_to_test)
-            build.write({'modules': ','.join(modules_to_test)})
+            build.write({'server_match': server_match,
+                         'modules': ','.join(modules_to_test)})
 
     def pg_dropdb(self, cr, uid, dbname):
         run(['dropdb', dbname])
@@ -1313,6 +1320,7 @@ class RunbotController(http.Controller):
             'host': real_build.host,
             'port': real_build.port,
             'subject': build.subject,
+            'server_match': real_build.server_match,
         }
 
     @http.route(['/runbot/build/<build_id>'], type='http', auth="public", website=True)

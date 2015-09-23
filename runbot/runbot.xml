@@ -260,6 +260,11 @@
         <t t-if="bu['result']=='warn'"><i class="text-warning fa fa-warning"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
         <t t-if="bu['result']=='skipped'"><i class="text-danger fa fa-ban"/> skipped</t>
         <t t-if="bu['result']=='killed'"><i class="text-danger fa fa-times"/> killed</t>
+
+        <t t-if="bu['server_match'] in ('default', 'fuzzy')">
+            <i class="text-warning fa fa-question-circle fa-fw"
+               title="Server branch cannot be determined exactly. Please use naming convention '9.0-my-branch' to build with '9.0' server branch."/>
+        </t>
     </template>
 
     <template id="runbot.build_button">
