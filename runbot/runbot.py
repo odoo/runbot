@@ -275,11 +275,14 @@ class runbot_repo(osv.osv):
             run(['git', 'clone', '--bare', repo.name, repo.path])
 
         # check for mode == hook
-        fetch_time = os.path.getmtime(os.path.join(repo.path, 'FETCH_HEAD'))
-        if repo.mode == 'hook' and repo.hook_time and dt2time(repo.hook_time) < fetch_time:
-            t0 = time.time()
-            _logger.debug('repo %s skip hook fetch fetch_time: %ss ago hook_time: %ss ago', repo.name, int(t0 - fetch_time), int(t0 - dt2time(repo.hook_time)))
-            return
+        fname_fetch_head = os.path.join(repo.path, 'FETCH_HEAD')
+        if os.path.isfile(fname_fetch_head):
+            fetch_time = os.path.getmtime(fname_fetch_head)
+            if repo.mode == 'hook' and repo.hook_time and dt2time(repo.hook_time) < fetch_time:
+                t0 = time.time()
+                _logger.debug('repo %s skip hook fetch fetch_time: %ss ago hook_time: %ss ago',
+                              repo.name, int(t0 - fetch_time), int(t0 - dt2time(repo.hook_time)))
+                return
 
         repo.git(['gc', '--auto', '--prune=all'])
         repo.git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*'])
