@@ -707,7 +707,7 @@ class runbot_build(osv.osv):
 
         mod_filter = lambda m: (
             m in available_modules and
-            (m in explicit_modules or (not m.startswith(('hw_', 'theme_'))
+            (m in explicit_modules or (not m.startswith(('hw_', 'theme_', 'l10n_'))
                                        and m not in blacklist_modules))
         )
         return uniq_list(filter(mod_filter, modules))
