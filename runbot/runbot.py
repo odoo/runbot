@@ -1363,7 +1363,7 @@ class RunbotController(http.Controller):
         #context['level'] = level
         return request.render("runbot.build", context)
 
-    @http.route(['/runbot/build/<build_id>/force'], type='http', auth="public", methods=['POST'])
+    @http.route(['/runbot/build/<build_id>/force'], type='http', auth="public", methods=['POST'], csrf=False)
     def build_force(self, build_id, **post):
         registry, cr, uid, context = request.registry, request.cr, request.uid, request.context
         repo_id = registry['runbot.build'].force(cr, uid, [int(build_id)])
