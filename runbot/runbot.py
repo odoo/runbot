@@ -512,7 +512,18 @@ class runbot_build(osv.osv):
 
     _columns = {
         'branch_id': fields.many2one('runbot.branch', 'Branch', required=True, ondelete='cascade', select=1),
-        'repo_id': fields.related('branch_id', 'repo_id', type="many2one", relation="runbot.repo", string="Repository", readonly=True, store=True, ondelete='cascade', select=1),
+        'repo_id': fields.related(
+            'branch_id', 'repo_id', type="many2one", relation="runbot.repo",
+            string="Repository", readonly=True, ondelete='cascade', select=1,
+            store={
+                'runbot.build': (lambda s, c, u, ids, ctx: ids, ['branch_id'], 20),
+                'runbot.branch': (
+                    lambda self, cr, uid, ids, ctx: self.pool['runbot.build'].search(
+                        cr, uid, [('branch_id', 'in', ids)]),
+                    ['repo_id'],
+                    10,
+                ),
+            }),
         'name': fields.char('Revno', required=True, select=1),
         'host': fields.char('Host'),
         'port': fields.integer('Port'),
