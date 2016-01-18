@@ -1234,7 +1234,10 @@ class RunbotController(http.Controller):
                 'filters': filters,
             })
 
-        for result in build_obj.read_group(cr, uid, [], ['host'], ['host']):
+        # consider host gone if no build in last 100
+        build_threshold = max(build_ids) - 100
+
+        for result in build_obj.read_group(cr, uid, [('id', '>', build_threshold)], ['host'], ['host']):
             if result['host']:
                 context['host_stats'].append({
                     'host': result['host'],
