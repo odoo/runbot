@@ -1,5 +1,6 @@
 # -*- encoding: utf-8 -*-
 
+import contextlib
 import datetime
 import fcntl
 import glob
@@ -8,6 +9,7 @@ import itertools
 import logging
 import operator
 import os
+import psycopg2
 import re
 import resource
 import shutil
@@ -151,6 +153,16 @@ def uniq_list(l):
 
 def fqdn():
     return socket.getfqdn()
+
+@contextlib.contextmanager
+def local_pgadmin_cursor():
+    cnx = None
+    try:
+        cnx = psycopg2.connect("dbname=postgres")
+        cnx.autocommit = True # required for admin commands
+        yield cnx.cursor()
+    finally:
+        if cnx: cnx.close()
 
 #----------------------------------------------------------
 # RunBot Models
@@ -797,17 +809,19 @@ class runbot_build(osv.osv):
             build.write({'server_match': server_match,
                          'modules': ','.join(modules_to_test)})
 
-    def pg_dropdb(self, cr, uid, dbname):
-        run(['dropdb', dbname])
+    def _local_pg_dropdb(self, cr, uid, dbname):
+        with local_pgadmin_cursor() as local_cr:
+            local_cr.execute('DROP DATABASE IF EXISTS "%s"' % dbname)
         # cleanup filestore
         datadir = appdirs.user_data_dir()
         paths = [os.path.join(datadir, pn, 'filestore', dbname) for pn in 'OpenERP Odoo'.split()]
         run(['rm', '-rf'] + paths)
 
-    def pg_createdb(self, cr, uid, dbname):
-        self.pg_dropdb(cr, uid, dbname)
+    def _local_pg_createdb(self, cr, uid, dbname):
+        self._local_pg_dropdb(cr, uid, dbname)
         _logger.debug("createdb %s", dbname)
-        run(['createdb', '--encoding=unicode', '--lc-collate=C', '--template=template0', dbname])
+        with local_pgadmin_cursor() as local_cr:
+            local_cr.execute("""CREATE DATABASE "%s" TEMPLATE template0 LC_COLLATE 'C' ENCODING 'unicode'""" % dbname)
 
     def cmd(self, cr, uid, ids, context=None):
         """Return a list describing the command to start the build"""
@@ -906,7 +920,7 @@ class runbot_build(osv.osv):
     def job_10_test_base(self, cr, uid, build, lock_path, log_path):
         build._log('test_base', 'Start test base module')
         # run base test
-        self.pg_createdb(cr, uid, "%s-base" % build.dest)
+        self._local_pg_createdb(cr, uid, "%s-base" % build.dest)
         cmd, mods = build.cmd()
         if grep(build.server("tools/config.py"), "test-enable"):
             cmd.append("--test-enable")
@@ -915,7 +929,7 @@ class runbot_build(osv.osv):
 
     def job_20_test_all(self, cr, uid, build, lock_path, log_path):
         build._log('test_all', 'Start test all modules')
-        self.pg_createdb(cr, uid, "%s-all" % build.dest)
+        self._local_pg_createdb(cr, uid, "%s-all" % build.dest)
         cmd, mods = build.cmd()
         if grep(build.server("tools/config.py"), "test-enable"):
             cmd.append("--test-enable")
@@ -1075,7 +1089,7 @@ class runbot_build(osv.osv):
 
             # cleanup only needed if it was not killed
             if build.state == 'done':
-                build.cleanup()
+                build._local_cleanup()
 
     def skip(self, cr, uid, ids, context=None):
         self.write(cr, uid, ids, {'state': 'done', 'result': 'skipped'}, context=context)
@@ -1083,16 +1097,19 @@ class runbot_build(osv.osv):
         if len(to_unduplicate):
             self.force(cr, uid, to_unduplicate, context=context)
 
-    def cleanup(self, cr, uid, ids, context=None):
+    def _local_cleanup(self, cr, uid, ids, context=None):
         for build in self.browse(cr, uid, ids, context=context):
-            cr.execute("""
-                SELECT datname
-                  FROM pg_database
-                 WHERE pg_get_userbyid(datdba) = current_user
-                   AND datname LIKE %s
-            """, [build.dest + '%'])
-            for db, in cr.fetchall():
-                self.pg_dropdb(cr, uid, db)
+            # Cleanup the *local* cluster
+            with local_pgadmin_cursor() as local_cr:
+                local_cr.execute("""
+                    SELECT datname
+                      FROM pg_database
+                     WHERE pg_get_userbyid(datdba) = current_user
+                       AND datname LIKE %s
+                """, [build.dest + '%'])
+                to_delete = local_cr.fetchall()
+            for db, in to_delete:
+                self._local_pg_dropdb(cr, uid, db)
 
             if os.path.isdir(build.path()) and build.result != 'killed':
                 shutil.rmtree(build.path())
@@ -1111,7 +1128,7 @@ class runbot_build(osv.osv):
             build.write(v)
             cr.commit()
             build.github_status()
-            build.cleanup()
+            build._local_cleanup()
 
     def reap(self, cr, uid, ids):
         while True:
