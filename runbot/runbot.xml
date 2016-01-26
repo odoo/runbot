@@ -239,7 +239,7 @@
         <xpath expr="//t[@t-foreach=&quot;website.menu_id.child_id&quot;][@t-as=&quot;submenu&quot;]" position="replace">
             <t t-if="repos" >
                  <t t-foreach="repos[:5]" t-as="re">
-                     <li><a t-attf-href="/runbot/repo/{{slug(re)}}"><i class='fa fa-github' /> <t t-esc="re.name.split(':')[1]"/></a></li>
+                     <li><a t-attf-href="/runbot/repo/{{slug(re)}}?search={{request.params.get('search', '')}}"><i class='fa fa-github' /> <t t-esc="re.name.split(':')[1]"/></a></li>
                  </t>
             </t>
         </xpath>
