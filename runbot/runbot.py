@@ -1195,6 +1195,7 @@ class RunbotController(http.Controller):
             'refresh': refresh,
         }
 
+        build_ids = []
         if repo:
             filters = {key: post.get(key, '1') for key in ['pending', 'testing', 'running', 'done']}
             domain = [('repo_id','=',repo.id)]
@@ -1263,7 +1264,7 @@ class RunbotController(http.Controller):
             })
 
         # consider host gone if no build in last 100
-        build_threshold = max(build_ids) - 100
+        build_threshold = max(build_ids or [0]) - 100
 
         for result in build_obj.read_group(cr, uid, [('id', '>', build_threshold)], ['host'], ['host']):
             if result['host']:
