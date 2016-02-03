@@ -5,6 +5,7 @@ import logging
 import re
 
 import openerp
+from openerp.tools import ustr
 
 _logger = logging.getLogger(__name__)
 
@@ -15,8 +16,7 @@ class runbot_build(openerp.models.Model):
         cla_glob = glob.glob(build.path("doc/cla/*/*.md"))
         if cla_glob:
             cla = ''.join(open(f).read() for f in cla_glob)
-            cla = cla.lower()
-            cla = cla.decode('utf-8')
+            cla = ustr(cla.lower())
             mo = re.search('[^ <@]+@[^ @>]+', build.author_email or '')
             state = "failure"
             if mo:
