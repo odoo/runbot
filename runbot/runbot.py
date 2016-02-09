@@ -1346,7 +1346,9 @@ class RunbotController(http.Controller):
             b = r['branches'].setdefault(branch.id, {'name': branch.branch_name, 'builds': list()})
             b['builds'].append(self.build_info(build))
 
-        for result in RB.read_group([], ['host'], ['host']):
+        # consider host gone if no build in last 100
+        build_threshold = max(builds.ids or [0]) - 100
+        for result in RB.read_group([('id', '>', build_threshold)], ['host'], ['host']):
             if result['host']:
                 qctx['host_stats'].append({
                     'host': result['host'],
