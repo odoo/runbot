@@ -1049,6 +1049,7 @@ class runbot_build(osv.osv):
                     timeout = (build.branch_id.job_timeout or default_timeout) * 60
                     if build.job != jobs[-1] and build.job_time > timeout:
                         build.logger('%s time exceded (%ss)', build.job, build.job_time)
+                        build.write({'job_end': now()})
                         build.kill(result='killed')
                     continue
                 build.logger('%s finished', build.job)
@@ -1111,8 +1112,22 @@ class runbot_build(osv.osv):
             for db, in to_delete:
                 self._local_pg_dropdb(cr, uid, db)
 
-            if os.path.isdir(build.path()) and build.result != 'killed':
-                shutil.rmtree(build.path())
+        # cleanup: find any build older than 7 days.
+        root = self.pool['runbot.repo'].root(cr, uid)
+        build_dir = os.path.join(root, 'build')
+        builds = os.listdir(build_dir)
+        cr.execute("""
+            SELECT dest
+              FROM runbot_build
+             WHERE dest IN %s
+               AND (state != 'done' OR job_end > (now() - interval '7 days'))
+        """, [tuple(builds)])
+        actives = set(b[0] for b in cr.fetchall())
+
+        for b in builds:
+            path = os.path.join(build_dir, b)
+            if b not in actives and os.path.isdir(path):
+                shutil.rmtree(path)
 
     def kill(self, cr, uid, ids, result=None, context=None):
         for build in self.browse(cr, uid, ids, context=context):
