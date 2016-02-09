@@ -777,6 +777,10 @@ class runbot_build(osv.osv):
                 for extra_repo in build.repo_id.dependency_ids:
                     repo_id, closest_name, server_match = build._get_closest_branch_name(extra_repo.id)
                     repo = self.pool['runbot.repo'].browse(cr, uid, repo_id, context=context)
+                    build._log(
+                        'Building environment',
+                        '%s match branch %s of %s' % (server_match, closest_name, repo.name)
+                    )
                     repo.git_export(closest_name, build.path())
 
                 # Finally mark all addons to move to openerp/addons
