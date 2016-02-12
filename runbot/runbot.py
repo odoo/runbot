@@ -418,7 +418,13 @@ class runbot_repo(osv.osv):
                 os.kill(pid, signal.SIGHUP)
             except Exception:
                 _logger.debug('start nginx')
-                run(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf'])
+                if run(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf']):
+                    # obscure nginx bug leaving orphan worker listening on nginx port
+                    if not run(['pkill', '-f', '-P1', 'nginx: worker']):
+                        _logger.debug('failed to start nginx - orphan worker killed, retrying')
+                        run(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf'])
+                    else:
+                        _logger.debug('failed to start nginx - failed to kill orphan worker - oh well')
 
     def killall(self, cr, uid, ids=None, context=None):
         # kill switch
