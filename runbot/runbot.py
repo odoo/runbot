@@ -652,8 +652,12 @@ class runbot_build(osv.osv):
             target_repo_ids.append(r.id)
             r = r.duplicate_id
 
-        sort_by_repo = lambda d: (target_repo_ids.index(d['repo_id'][0]), -1 * len(d.get('branch_name', '')), -1 * d['id'])
+        sort_by_repo = lambda d: (not d['sticky'],      # sticky first
+                                  target_repo_ids.index(d['repo_id'][0]),
+                                  -1 * len(d.get('branch_name', '')),
+                                  -1 * d['id'])
         result_for = lambda d: (d['repo_id'][0], d['name'], 'exact')
+        fields = ['name', 'repo_id', 'sticky']
 
         # 1. same name, not a PR
         domain = [
@@ -661,7 +665,7 @@ class runbot_build(osv.osv):
             ('branch_name', '=', name),
             ('name', '=like', 'refs/heads/%'),
         ]
-        targets = branch_pool.search_read(cr, uid, domain, ['name', 'repo_id'], order='id DESC',
+        targets = branch_pool.search_read(cr, uid, domain, fields, order='id DESC',
                                           context=context)
         targets = sorted(targets, key=sort_by_repo)
         if targets:
@@ -673,7 +677,7 @@ class runbot_build(osv.osv):
             ('pull_head_name', '=', name),
             ('name', '=like', 'refs/pull/%'),
         ]
-        pulls = branch_pool.search_read(cr, uid, domain, ['name', 'repo_id'], order='id DESC',
+        pulls = branch_pool.search_read(cr, uid, domain, fields, order='id DESC',
                                         context=context)
         pulls = sorted(pulls, key=sort_by_repo)
         for pull in pulls:
@@ -685,7 +689,7 @@ class runbot_build(osv.osv):
         branches = branch_pool.search_read(
             cr, uid,
             [('repo_id', 'in', target_repo_ids), ('name', '=like', 'refs/heads/%')],
-            ['name', 'branch_name', 'repo_id'], order='id DESC', context=context
+            fields + ['branch_name'], order='id DESC', context=context
         )
         branches = sorted(branches, key=sort_by_repo)
 
