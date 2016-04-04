@@ -487,6 +487,18 @@ class runbot_branch(osv.osv):
             return repo.github('/repos/:owner/:repo/pulls/%s' % pull_number, ignore_errors=True) or {}
         return {}
 
+    def _is_on_remote(self, cr, uid, ids, context=None):
+        # check that a branch still exists on remote
+        assert len(ids) == 1
+        branch = self.browse(cr, uid, ids[0], context=context)
+        repo = branch.repo_id
+        try:
+            repo.git(['ls-remote', '-q', '--exit-code', repo.name, branch.name])
+        except subprocess.CalledProcessError:
+            return False
+        return True
+
+
 class runbot_build(osv.osv):
     _name = "runbot.build"
     _order = 'id desc'
@@ -657,6 +669,7 @@ class runbot_build(osv.osv):
                                   -1 * len(d.get('branch_name', '')),
                                   -1 * d['id'])
         result_for = lambda d: (d['repo_id'][0], d['name'], 'exact')
+        branch_exists = lambda d: branch_pool._is_on_remote(cr, uid, [d['id']], context=context)
         fields = ['name', 'repo_id', 'sticky']
 
         # 1. same name, not a PR
@@ -668,7 +681,7 @@ class runbot_build(osv.osv):
         targets = branch_pool.search_read(cr, uid, domain, fields, order='id DESC',
                                           context=context)
         targets = sorted(targets, key=sort_by_repo)
-        if targets:
+        if targets and branch_exists(targets[0]):
             return result_for(targets[0])
 
         # 2. PR with head name equals
@@ -694,7 +707,7 @@ class runbot_build(osv.osv):
         branches = sorted(branches, key=sort_by_repo)
 
         for branch in branches:
-            if name.startswith(branch['branch_name'] + '-'):
+            if name.startswith(branch['branch_name'] + '-') and branch_exists(branch):
                 return result_for(branch)
 
         # 4. Common ancestors (git merge-base)
