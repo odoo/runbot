@@ -577,7 +577,8 @@ class runbot_build(osv.osv):
         'job_age': fields.function(_get_age, type='integer', string='Job age'),
         'duplicate_id': fields.many2one('runbot.build', 'Corresponding Build'),
         'server_match': fields.selection([('builtin', 'This branch includes Odoo server'),
-                                          ('exact', 'PR target or matching name prefix found'),
+                                          ('exact', 'branch/PR exact name'),
+                                          ('prefix', 'branch whose name is a prefix of current one'),
                                           ('fuzzy', 'Fuzzy - common ancestor found'),
                                           ('default', 'No match found - defaults to master')],
                                         string='Server branch matching')
@@ -664,11 +665,13 @@ class runbot_build(osv.osv):
             target_repo_ids.append(r.id)
             r = r.duplicate_id
 
+        _logger.debug('Search closest of %s (%s) in repos %r', name, repo.name, target_repo_ids)
+
         sort_by_repo = lambda d: (not d['sticky'],      # sticky first
                                   target_repo_ids.index(d['repo_id'][0]),
                                   -1 * len(d.get('branch_name', '')),
                                   -1 * d['id'])
-        result_for = lambda d: (d['repo_id'][0], d['name'], 'exact')
+        result_for = lambda d, match='exact': (d['repo_id'][0], d['name'], match)
         branch_exists = lambda d: branch_pool._is_on_remote(cr, uid, [d['id']], context=context)
         fields = ['name', 'repo_id', 'sticky']
 
@@ -708,7 +711,7 @@ class runbot_build(osv.osv):
 
         for branch in branches:
             if name.startswith(branch['branch_name'] + '-') and branch_exists(branch):
-                return result_for(branch)
+                return result_for(branch, 'prefix')
 
         # 4. Common ancestors (git merge-base)
         for target_id in target_repo_ids:
@@ -800,6 +803,9 @@ class runbot_build(osv.osv):
                 for extra_repo in build.repo_id.dependency_ids:
                     repo_id, closest_name, server_match = build._get_closest_branch_name(extra_repo.id)
                     repo = self.pool['runbot.repo'].browse(cr, uid, repo_id, context=context)
+                    _logger.debug('branch %s of %s: %s match branch %s of %s',
+                                  build.branch_id.name, build.repo_id.name,
+                                  server_match, closest_name, repo.name)
                     build._log(
                         'Building environment',
                         '%s match branch %s of %s' % (server_match, closest_name, repo.name)
