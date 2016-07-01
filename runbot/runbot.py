@@ -170,7 +170,7 @@ def local_pgadmin_cursor():
 
 class runbot_repo(osv.osv):
     _name = "runbot.repo"
-    _order = 'id'
+    _order = 'sequence, name, id'
 
     def _get_path(self, cr, uid, ids, field_name, arg, context=None):
         root = self.root(cr, uid)
@@ -193,6 +193,7 @@ class runbot_repo(osv.osv):
 
     _columns = {
         'name': fields.char('Repository', required=True),
+        'sequence': fields.integer('Sequence'),
         'path': fields.function(_get_path, type='char', string='Directory', readonly=1),
         'base': fields.function(_get_base, type='char', string='Base URL', readonly=1),
         'nginx': fields.boolean('Nginx'),

@@ -18,6 +18,7 @@
                         <button name="killall" type="object" string="Killall" groups="runbot.group_runbot_admin"/>
                     </div>
                     <group string="Params">
+                        <field name="sequence"/>
                         <field name="mode"/>
                         <field name="nginx"/>
                         <field name="duplicate_id"/>
@@ -36,6 +37,7 @@
         <field name="model">runbot.repo</field>
         <field name="arch" type="xml">
             <tree string="repos">
+                <field name="sequence" widget="handle"/>
                 <field name="name"/>
                 <field name="mode"/>
             </tree>
