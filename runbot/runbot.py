@@ -1073,7 +1073,6 @@ class runbot_build(osv.osv):
                     'job_end': False,
                 }
                 build.write(values)
-                cr.commit()
             else:
                 # check if current job is finished
                 lock_path = build.path('logs', '%s.lock' % build.job)
