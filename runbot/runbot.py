@@ -45,6 +45,7 @@ _logger = logging.getLogger(__name__)
 _re_error = r'^(?:\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ (?:ERROR|CRITICAL) )|(?:Traceback \(most recent call last\):)$'
 _re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING '
 _re_job = re.compile('job_\d')
+_re_coverage = re.compile(r'\bcoverage\b')
 
 # increase cron frequency from 0.016 Hz to 0.1 Hz to reduce starvation and improve throughput with many workers
 # TODO: find a nicer way than monkey patch to accomplish this
@@ -506,6 +507,9 @@ class runbot_branch(osv.osv):
             return False
         return True
 
+    def create(self, cr, uid, values, context=None):
+        values.setdefault('coverage', _re_coverage.search(values.get('name') or '') is not None)
+        return super(runbot_branch, self).create(cr, uid, values, context=context)
 
 class runbot_build(osv.osv):
     _name = "runbot.build"
@@ -903,17 +907,9 @@ class runbot_build(osv.osv):
                     os.mkdir(datadir)
                 cmd += ["--data-dir", datadir]
 
-        # coverage
-        #coverage_file_path=os.path.join(log_path,'coverage.pickle')
-        #coverage_base_path=os.path.join(log_path,'coverage-base')
-        #coverage_all_path=os.path.join(log_path,'coverage-all')
-        #cmd = ["coverage","run","--branch"] + cmd
-        #self.run_log(cmd, logfile=self.test_all_path)
-        #run(["coverage","html","-d",self.coverage_base_path,"--ignore-errors","--include=*.py"],env={'COVERAGE_FILE': self.coverage_file_path})
-
         return cmd, build.modules
 
-    def spawn(self, cmd, lock_path, log_path, cpu_limit=None, shell=False):
+    def spawn(self, cmd, lock_path, log_path, cpu_limit=None, shell=False, env=None):
         def preexec_fn():
             os.setsid()
             if cpu_limit:
@@ -925,9 +921,9 @@ class runbot_build(osv.osv):
             # close parent files
             os.closerange(3, os.sysconf("SC_OPEN_MAX"))
             lock(lock_path)
-        out=open(log_path,"w")
+        out = open(log_path, "w")
         _logger.debug("spawn: %s stdout: %s", ' '.join(cmd), log_path)
-        p=subprocess.Popen(cmd, stdout=out, stderr=out, preexec_fn=preexec_fn, shell=shell)
+        p = subprocess.Popen(cmd, stdout=out, stderr=out, preexec_fn=preexec_fn, shell=shell, env=env)
         return p.pid
 
     def github_status(self, cr, uid, ids, context=None):
@@ -979,9 +975,31 @@ class runbot_build(osv.osv):
         if grep(build.server("tools/config.py"), "test-enable"):
             cmd.append("--test-enable")
         cmd += ['-d', '%s-all' % build.dest, '-i', openerp.tools.ustr(mods), '--stop-after-init', '--log-level=test', '--max-cron-threads=0']
+        env = None
+        if build.branch_id.coverage:
+            env = self._coverage_env(build)
+            available_modules = [
+                os.path.basename(os.path.dirname(a))
+                for a in (glob.glob(build.server('addons/*/__openerp__.py')) +
+                          glob.glob(build.server('addons/*/__manifest__.py')))
+            ]
+            bad_modules = set(available_modules) - set((mods or '').split(','))
+            omit = ['--omit', ','.join(build.server('addons', m) for m in bad_modules)] if bad_modules else []
+            cmd = ['coverage', 'run', '--branch', '--source', build.server()] + omit + cmd
         # reset job_start to an accurate job_20 job_time
         build.write({'job_start': now()})
-        return self.spawn(cmd, lock_path, log_path, cpu_limit=2100)
+        return self.spawn(cmd, lock_path, log_path, cpu_limit=2100, env=env)
+
+    def _coverage_env(self, build):
+        return dict(os.environ, COVERAGE_FILE=build.path('.coverage'))
+
+    def job_21_coverage(self, cr, uid, build, lock_path, log_path):
+        if not build.branch_id.coverage:
+            return
+        cov_path = build.path('coverage')
+        mkdirs([cov_path])
+        cmd = ["coverage", "html", "-d", cov_path, "--ignore-errors"]
+        return self.spawn(cmd, lock_path, log_path, env=self._coverage_env(build))
 
     def job_30_run(self, cr, uid, build, lock_path, log_path):
         # adjust job_end to record an accurate job_20 job_time
