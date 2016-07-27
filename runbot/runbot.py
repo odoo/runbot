@@ -1554,8 +1554,14 @@ class RunbotController(http.Controller):
             if last_build.state != 'running':
                 url = "/runbot/build/%s?ask_rebuild=1" % last_build.id
             else:
-                url = ("http://%s/login?db=%s-all&login=admin&key=admin%s" %
-                       (last_build.domain, last_build.dest, "&redirect=/web?debug=1" if not build.branch_id.branch_name.startswith('7.0') else ''))
+                branch = build.branch_id.branch_name
+                if branch.startswith('7'):
+                    base_url = "http://%s/login?db=%s-all&login=admin&key=admin"
+                elif branch.startswith('8'):
+                    base_url = "http://%s/login?db=%s-all&login=admin&key=admin&redirect=/web?debug=1"
+                else:
+                    base_url = "http://%s/web/login?db=%s-all&login=admin&redirect=/web?debug=1"
+                url = base_url % (last_build.domain, last_build.dest)
         else:
             return request.not_found()
         return werkzeug.utils.redirect(url)
