@@ -307,11 +307,18 @@ class runbot_repo(osv.osv):
 
         refs = [[decode_utf(field) for field in line.split('\x00')] for line in git_refs.split('\n')]
 
+        cr.execute("""
+            WITH t (branch) AS (SELECT unnest(%s))
+          SELECT t.branch, b.id
+            FROM t LEFT JOIN runbot_branch b ON (b.name = t.branch)
+           WHERE b.repo_id = %s;
+        """, ([r[0] for r in refs], repo.id))
+        ref_branches = {r[0]: r[1] for r in cr.fetchall()}
+
         for name, sha, date, author, author_email, subject, committer, committer_email in refs:
             # create or get branch
-            branch_ids = Branch.search(cr, uid, [('repo_id', '=', repo.id), ('name', '=', name)])
-            if branch_ids:
-                branch_id = branch_ids[0]
+            if ref_branches.get(name):
+                branch_id = ref_branches[name]
             else:
                 _logger.debug('repo %s found new branch %s', repo.name, name)
                 branch_id = Branch.create(cr, uid, {'repo_id': repo.id, 'name': name})
