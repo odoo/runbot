@@ -604,6 +604,7 @@
                             Author: <t t-esc="build['author']"/><br/>
                             Committer: <t t-esc="build['committer']"/><br/>
                         </p>
+                        <p t-if="build['duplicate_of']">Duplicate of <a t-attf-href="/runbot/build/#{build['duplicate_of'].id}"><t t-esc="build['duplicate_of'].dest"/></a></p>
                         <table class="table table-condensed table-striped">
                         <tr>
                             <th>Date</th>
