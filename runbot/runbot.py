@@ -803,7 +803,8 @@ class runbot_build(osv.osv):
                 if build.repo_id.modules_auto == 'repo':
                     modules_to_test += [
                         os.path.basename(os.path.dirname(a))
-                        for a in glob.glob(build.path('*/__openerp__.py'))
+                        for a in (glob.glob(build.path('*/__openerp__.py')) +
+                                  glob.glob(build.path('*/__manifest__.py')))
                     ]
                     _logger.debug("local modules_to_test for build %s: %s", build.dest, modules_to_test)
 
@@ -822,7 +823,8 @@ class runbot_build(osv.osv):
                 # Finally mark all addons to move to openerp/addons
                 modules_to_move += [
                     os.path.dirname(module)
-                    for module in glob.glob(build.path('*/__openerp__.py'))
+                    for module in (glob.glob(build.path('*/__openerp__.py')) +
+                                   glob.glob(build.path('*/__manifest__.py')))
                 ]
 
             # move all addons to server addons path
@@ -838,7 +840,8 @@ class runbot_build(osv.osv):
 
             available_modules = [
                 os.path.basename(os.path.dirname(a))
-                for a in glob.glob(build.server('addons/*/__openerp__.py'))
+                for a in (glob.glob(build.server('addons/*/__openerp__.py')) +
+                          glob.glob(build.server('addons/*/__manifest__.py')))
             ]
             if build.repo_id.modules_auto == 'all' or (build.repo_id.modules_auto != 'none' and has_server):
                 modules_to_test += available_modules
