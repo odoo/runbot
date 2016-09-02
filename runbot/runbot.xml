@@ -617,7 +617,7 @@
                                 <td><b t-esc="l.level"/></td>
                                 <td><t t-esc="l.type"/></td>
                                 <td>
-                                    <a t-attf-href="https://{{repo.base}}/blob/{{build['name']}}/{{l.path}}#L{{l.line}}"><t t-esc="l.name"/>:<t t-esc="l.line"/></a> <t t-esc="l.func"/>
+                                    <a t-if="l.type != 'runbot'" t-attf-href="https://{{repo.base}}/blob/{{build['name']}}/{{l.path}}#L{{l.line}}"><t t-esc="l.name"/>:<t t-esc="l.line"/></a> <t t-esc="l.func"/>
                                     <t t-if="'\n' not in l.message"><t t-esc="l.message"/></t>
                                     <pre t-if="'\n' in l.message" style="margin:0;padding:0; border: none;"><t t-esc="l.message"/></pre>
                                 </td>
