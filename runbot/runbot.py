@@ -1171,6 +1171,23 @@ class runbot_build(osv.osv):
             path = os.path.join(build_dir, b)
             if b not in actives and os.path.isdir(path):
                 shutil.rmtree(path)
+        
+        # cleanup old unused databases
+        cr.execute("select id from runbot_build where state in ('testing', 'running')")
+        db_ids = [id[0] for id in cr.fetchall()]
+        if db_ids:
+            with local_pgadmin_cursor() as local_cr:
+                local_cr.execute("""
+                    SELECT datname
+                      FROM pg_database
+                     WHERE pg_get_userbyid(datdba) = current_user
+                       AND datname ~ '^[0-9]+-.*'
+                       AND SUBSTRING(datname, '^([0-9]+)-.*')::int not in %s
+                           
+                """, [tuple(db_ids)])
+                to_delete = local_cr.fetchall()
+            for db, in to_delete:
+                self._local_pg_dropdb(cr, uid, db)
 
     def kill(self, cr, uid, ids, result=None, context=None):
         for build in self.browse(cr, uid, ids, context=context):
