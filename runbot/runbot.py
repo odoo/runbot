@@ -194,7 +194,7 @@ class runbot_repo(osv.osv):
 
     _columns = {
         'name': fields.char('Repository', required=True),
-        'sequence': fields.integer('Sequence'),
+        'sequence': fields.integer('Sequence', select=True),
         'path': fields.function(_get_path, type='char', string='Directory', readonly=1),
         'base': fields.function(_get_base, type='char', string='Base URL', readonly=1),
         'nginx': fields.boolean('Nginx'),
