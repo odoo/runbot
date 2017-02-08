@@ -1391,9 +1391,10 @@ class RunbotController(http.Controller):
                                     ORDER BY id DESC
                                        LIMIT 3
                                      ) bu ON (true)
+                        JOIN runbot_repo r ON (r.id = br.repo_id)
                        WHERE br.sticky
                          AND br.repo_id in %s
-                    ORDER BY br.repo_id, br.branch_name, bu.id DESC
+                    ORDER BY r.sequence, r.name, br.branch_name, bu.id DESC
                    """, [tuple(repos._ids)])
 
         builds = RB.browse(map(operator.itemgetter(0), cr.fetchall()))
