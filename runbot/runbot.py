@@ -985,7 +985,7 @@ class runbot_build(osv.osv):
             ]
             bad_modules = set(available_modules) - set((mods or '').split(','))
             omit = ['--omit', ','.join(build.server('addons', m) for m in bad_modules)] if bad_modules else []
-            cmd = ['coverage', 'run', '--branch', '--source', build.server()] + omit + cmd
+            cmd = ['coverage', 'run', '--branch', '--source', build.server()] + omit + cmd[1:]
         # reset job_start to an accurate job_20 job_time
         build.write({'job_start': now()})
         return self.spawn(cmd, lock_path, log_path, cpu_limit=2100, env=env)
