@@ -473,7 +473,18 @@ class runbot_branch(osv.osv):
             else:
                 r[branch.id] = "https://%s/tree/%s" % (branch.repo_id.base, branch.branch_name)
         return r
-
+        
+    def _get_branch_quickconnect_url(self, cr, uid, ids, fqdn, dest, context=None):
+        r = {}
+        for branch in self.browse(cr, uid, ids, context=context):
+            if branch.branch_name.startswith('7'):
+                r[branch.id] = "http://%s/login?db=%s-all&login=admin&key=admin" % (fqdn, dest)
+            elif branch.name.startswith('8'):
+                r[branch.id] = "http://%s/login?db=%s-all&login=admin&key=admin&redirect=/web?debug=1" % (fqdn, dest)
+            else:
+                r[branch.id] = "http://%s/web/login?db=%s-all&login=admin&redirect=/web?debug=1" % (fqdn, dest)
+        return r
+            
     _columns = {
         'repo_id': fields.many2one('runbot.repo', 'Repository', required=True, ondelete='cascade', select=1),
         'name': fields.char('Ref Name', required=True),
@@ -1603,14 +1614,7 @@ class RunbotController(http.Controller):
             if last_build.state != 'running':
                 url = "/runbot/build/%s?ask_rebuild=1" % last_build.id
             else:
-                branch = build.branch_id.branch_name
-                if branch.startswith('7'):
-                    base_url = "http://%s/login?db=%s-all&login=admin&key=admin"
-                elif branch.startswith('8'):
-                    base_url = "http://%s/login?db=%s-all&login=admin&key=admin&redirect=/web?debug=1"
-                else:
-                    base_url = "http://%s/web/login?db=%s-all&login=admin&redirect=/web?debug=1"
-                url = base_url % (last_build.domain, last_build.dest)
+                url = build.branch_id._get_branch_quickconnect_url(last_build.domain, last_build.dest)[build.branch_id.id]
         else:
             return request.not_found()
         return werkzeug.utils.redirect(url)
