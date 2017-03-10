@@ -776,6 +776,7 @@ class runbot_build(osv.osv):
     def filter_modules(self, cr, uid, modules, available_modules, explicit_modules):
         blacklist_modules = set(['auth_ldap', 'document_ftp', 'base_gengo',
                                  'website_gengo', 'website_instantclick',
+                                 'pad', 'pad_project', 'note_pad',
                                  'pos_cache', 'pos_blackbox_be'])
 
         mod_filter = lambda m: (
