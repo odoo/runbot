@@ -436,10 +436,7 @@ class runbot_repo(osv.osv):
                         _logger.debug('failed to start nginx - failed to kill orphan worker - oh well')
 
     def killall(self, cr, uid, ids=None, context=None):
-        # kill switch
-        Build = self.pool['runbot.build']
-        build_ids = Build.search(cr, uid, [('state', 'not in', ['done', 'pending'])])
-        Build.kill(cr, uid, build_ids)
+        return
 
     def cron(self, cr, uid, ids=None, context=None):
         ids = self.search(cr, uid, [('mode', '!=', 'disabled')], context=context)
@@ -1220,7 +1217,10 @@ class runbot_build(osv.osv):
                 self._local_pg_dropdb(cr, uid, db)
 
     def kill(self, cr, uid, ids, result=None, context=None):
+        host = fqdn()
         for build in self.browse(cr, uid, ids, context=context):
+            if build.host != host:
+                continue
             build._log('kill', 'Kill build %s' % build.dest)
             build.logger('killing %s', build.pid)
             try:
