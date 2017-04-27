@@ -214,7 +214,7 @@ class runbot_repo(osv.osv):
             id1='dependant_id', id2='dependency_id',
             string='Extra dependencies',
             help="Community addon repos which need to be present to run tests."),
-        'token': fields.char("Github token"),
+        'token': fields.char("Github token", groups="runbot.group_runbot_admin"),
         'group_ids': fields.many2many('res.groups', string='Limited to groups'),
     }
     _defaults = {
@@ -457,7 +457,7 @@ class runbot_branch(osv.osv):
     def _get_pull_head_name(self, cr, uid, ids, field_name, arg, context=None):
         r = dict.fromkeys(ids, False)
         for bid in ids:
-            pi = self._get_pull_info(cr, uid, [bid], context=context)
+            pi = self._get_pull_info(cr, SUPERUSER_ID, [bid], context=context)
             if pi:
                 r[bid] = pi['head']['ref']
         return r
