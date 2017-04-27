@@ -757,7 +757,7 @@ http {
         <field name="numbercall">-1</field>
         <field name="doall" eval="False" />
         <field name="model">runbot.repo</field>
-        <field name="function">cron</field>
+        <field name="function">_cron</field>
         <field name="args">()</field>
     </record>
 </data>

@@ -12,8 +12,8 @@ _logger = logging.getLogger(__name__)
 class runbot_build(openerp.models.Model):
     _inherit = "runbot.build"
 
-    def job_05_check_cla(self, cr, uid, build, lock_path, log_path):
-        cla_glob = glob.glob(build.path("doc/cla/*/*.md"))
+    def _job_05_check_cla(self, cr, uid, build, lock_path, log_path):
+        cla_glob = glob.glob(build._path("doc/cla/*/*.md"))
         if cla_glob:
             cla = ''.join(open(f).read() for f in cla_glob)
             cla = ustr(cla.lower())
@@ -33,6 +33,6 @@ class runbot_build(openerp.models.Model):
                 "context": "legal/cla"
             }
             build._log('check_cla', 'CLA %s' % state)
-            build.repo_id.github('/repos/:owner/:repo/statuses/%s' % build.name, status, ignore_errors=True)
+            build.repo_id._github('/repos/:owner/:repo/statuses/%s' % build.name, status, ignore_errors=True)
         # 0 is myself, -1 is everybody else, -2 nothing
         return -2
