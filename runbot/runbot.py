@@ -31,6 +31,7 @@ import werkzeug
 import openerp
 from openerp import http, SUPERUSER_ID
 from openerp.http import request
+from openerp.modules import get_module_resource
 from openerp.osv import fields, osv
 from openerp.tools import config, appdirs
 from openerp.addons.website.models.website import slug
@@ -411,6 +412,7 @@ class runbot_repo(osv.osv):
     def _reload_nginx(self, cr, uid, context=None):
         settings = {}
         settings['port'] = config['xmlrpc_port']
+        settings['runbot_static'] = os.path.join(get_module_resource('runbot', 'static'), '')
         nginx_dir = os.path.join(self._root(cr, uid), 'nginx')
         settings['nginx_dir'] = nginx_dir
         ids = self.search(cr, uid, [('nginx','=',True)], order='id')

@@ -692,6 +692,13 @@ http {
         location / { proxy_pass http://127.0.0.1:<t t-esc="port"/>; }
         location /longpolling/im/poll { return 404; }
         location /longpolling/poll { return 404; }
+        location /runbot/static/ {
+           alias <t t-esc="runbot_static"/>;
+           autoindex off;
+           location ~ /runbot/static/build/[^/]+/logs/ {
+              autoindex on;
+           }
+        }
     }
     <t t-foreach="builds" t-as="build">
     server {
