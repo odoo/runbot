@@ -1160,8 +1160,14 @@ class runbot_build(osv.osv):
                 mkdirs([build._path('logs')])
                 lock_path = build._path('logs', '%s.lock' % build.job)
                 log_path = build._path('logs', '%s.txt' % build.job)
-                pid = job_method(cr, uid, build, lock_path, log_path)
-                build.write({'pid': pid})
+                try:
+                    pid = job_method(cr, uid, build, lock_path, log_path)
+                    build.write({'pid': pid})
+                except Exception:
+                    _logger.exception('%s failed running method %s', build.dest, build.job)
+                    build._log(build.job, "failed running job method, see runbot log")
+                    build._kill(result='ko')
+                    continue
             # needed to prevent losing pids if multiple jobs are started and one them raise an exception
             cr.commit()
 
@@ -1234,11 +1240,12 @@ class runbot_build(osv.osv):
             if build.host != host:
                 continue
             build._log('kill', 'Kill build %s' % build.dest)
-            build._logger('killing %s', build.pid)
-            try:
-                os.killpg(build.pid, signal.SIGKILL)
-            except OSError:
-                pass
+            if build.pid:
+                build._logger('killing %s', build.pid)
+                try:
+                    os.killpg(build.pid, signal.SIGKILL)
+                except OSError:
+                    pass
             v = {'state': 'done', 'job': False}
             if result:
                 v['result'] = result
