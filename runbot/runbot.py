@@ -1015,7 +1015,7 @@ class runbot_build(osv.osv):
 
     def _job_21_coverage(self, cr, uid, build, lock_path, log_path):
         if not build.branch_id.coverage:
-            return
+            return -2
         cov_path = build._path('coverage')
         mkdirs([cov_path])
         cmd = ["coverage", "html", "-d", cov_path, "--ignore-errors"]
