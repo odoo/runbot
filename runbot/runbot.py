@@ -851,12 +851,16 @@ class runbot_build(osv.osv):
             # move all addons to server addons path
             for module in uniq_list(glob.glob(build._path('addons/*')) + modules_to_move):
                 basename = os.path.basename(module)
-                if os.path.exists(build._server('addons', basename)):
+                addon_path = build._server('addons', basename)
+                if os.path.exists(addon_path):
                     build._log(
                         'Building environment',
                         'You have duplicate modules in your branches "%s"' % basename
                     )
-                    shutil.rmtree(build._server('addons', basename))
+                    if os.path.islink(addon_path) or os.path.isfile(addon_path):
+                        os.remove(addon_path)
+                    else:
+                        shutil.rmtree(addon_path)
                 shutil.move(module, build._server('addons'))
 
             available_modules = [
