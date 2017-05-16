@@ -303,7 +303,6 @@ class runbot_repo(osv.osv):
                               repo.name, int(t0 - fetch_time), int(t0 - dt2time(repo.hook_time)))
                 return
 
-        repo._git(['gc', '--auto', '--prune=all'])
         repo._git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*'])
         repo._git(['fetch', '-p', 'origin', '+refs/pull/*/head:refs/pull/*'])
 
