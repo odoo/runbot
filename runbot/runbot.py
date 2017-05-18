@@ -625,6 +625,7 @@ class runbot_build(osv.osv):
         extra_info = {'sequence' : build_id}
 
         # detect duplicate
+        duplicate_id = None
         domain = [
             ('repo_id','=',build.repo_id.duplicate_id.id), 
             ('name', '=', build.name), 
@@ -632,10 +633,17 @@ class runbot_build(osv.osv):
             '|', ('result', '=', False), ('result', '!=', 'skipped')
         ]
         duplicate_ids = self.search(cr, uid, domain, context=context)
-
-        if len(duplicate_ids):
-            extra_info.update({'state': 'duplicate', 'duplicate_id': duplicate_ids[0]})
-            self.write(cr, uid, [duplicate_ids[0]], {'duplicate_id': build_id})
+        for duplicate in self.browse(cr, uid, duplicate_ids, context=context):
+            duplicate_id = duplicate.id
+            # Consider the duplicate if its closest branches are the same than the current build closest branches.
+            for extra_repo in build.repo_id.dependency_ids:
+                build_closest_name = build._get_closest_branch_name(extra_repo.id)[1]
+                duplicate_closest_name = duplicate._get_closest_branch_name(extra_repo.id)[1]
+                if build_closest_name != duplicate_closest_name:
+                    duplicate_id = None
+        if duplicate_id:
+            extra_info.update({'state': 'duplicate', 'duplicate_id': duplicate_id})
+            self.write(cr, uid, [duplicate_id], {'duplicate_id': build_id})
         self.write(cr, uid, [build_id], extra_info, context=context)
 
     def _reset(self, cr, uid, ids, context=None):
