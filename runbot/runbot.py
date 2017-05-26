@@ -1500,6 +1500,7 @@ class RunbotController(http.Controller):
             'subject': build.subject,
             'server_match': real_build.server_match,
             'duplicate_of': build.duplicate_id if build.state == 'duplicate' else False,
+            'coverage': build.branch_id.coverage,
         }
 
     @http.route(['/runbot/build/<build_id>'], type='http', auth="public", website=True)
