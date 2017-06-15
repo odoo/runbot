@@ -645,6 +645,7 @@ class runbot_build(osv.osv):
             extra_info.update({'state': 'duplicate', 'duplicate_id': duplicate_id})
             self.write(cr, uid, [duplicate_id], {'duplicate_id': build_id})
         self.write(cr, uid, [build_id], extra_info, context=context)
+        return build_id
 
     def _reset(self, cr, uid, ids, context=None):
         self.write(cr, uid, ids, { 'state' : 'pending' }, context=context)
@@ -1111,7 +1112,10 @@ class runbot_build(osv.osv):
                     'subject': build.subject,
                     'modules': build.modules,
                 }
-                self.create(cr, SUPERUSER_ID, new_build, context=context)
+                new_build_id = self.create(cr, SUPERUSER_ID, new_build, context=context)
+                build = self.browse(cr, uid, new_build_id, context=context)
+            user = self.pool['res.users'].browse(cr, uid, uid, context=context)
+            build._log('rebuild', 'Rebuild initiated by %s' % user.name)
             return build.repo_id.id
 
     def _schedule(self, cr, uid, ids, context=None):
