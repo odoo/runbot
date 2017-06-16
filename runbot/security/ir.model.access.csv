@@ -5,3 +5,4 @@ access_runbot_build,runbot_build,runbot.model_runbot_build,group_user,1,0,0,0
 access_runbot_repo_admin,runbot_repo_admin,runbot.model_runbot_repo,runbot.group_runbot_admin,1,1,1,1
 access_runbot_branch_admin,runbot_branch_admin,runbot.model_runbot_branch,runbot.group_runbot_admin,1,1,1,1
 access_runbot_build_admin,runbot_build_admin,runbot.model_runbot_build,runbot.group_runbot_admin,1,1,1,1
+access_irlogging,log by runbot users,base.model_ir_logging,group_user,0,0,1,0

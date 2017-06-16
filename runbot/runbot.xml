@@ -276,7 +276,7 @@
                 <a t-attf-href="https://#{repo.base}/commit/#{bu['name']}" class="btn btn-default"><i class="fa fa-github"/></a>
                 <button class="btn btn-default dropdown-toggle" data-toggle="dropdown"><i class="fa fa-cog"/><span class="caret"></span></button>
                 <ul class="dropdown-menu" role="menu">
-                    <li t-if="bu['result']=='skipped'">
+                    <li t-if="bu['result']=='skipped'" groups="runbot.group_runbot_admin">
                         <a href="#" class="runbot-rebuild" t-att-data-runbot-build="bu['id']">Force Build <i class="fa fa-level-up"></i></a>
                     </li>
                     <t t-if="bu['state']=='running'">
@@ -284,7 +284,7 @@
                         <li><a t-attf-href="http://{{bu['domain']}}/?db={{bu['real_dest']}}-base">Connect base <i class="fa fa-sign-in"></i></a></li>
                         <li><a t-attf-href="http://{{bu['domain']}}/">Connect <i class="fa fa-sign-in"></i></a></li>
                     </t>
-                    <li t-if="bu['state'] in ['done','running'] and bu_index==0">
+                    <li t-if="bu['state'] in ['done','running'] and bu_index==0" groups="runbot.group_user">
                         <a href="#" class="runbot-rebuild" t-att-data-runbot-build="bu['id']">Rebuild <i class="fa fa-refresh"/></a>
                     </li>
                     <li t-if="bu['state']!='testing' and bu['state']!='pending'" class="divider"></li>
@@ -572,7 +572,7 @@
                                 </div>
                               </form>
 
-                              <form class="navbar-form navbar-left form-inline" t-attf-action="/runbot/build/#{build['id']}/force" method='POST' t-if="request.params.get('ask_rebuild')">
+                              <form class="navbar-form navbar-left form-inline" t-attf-action="/runbot/build/#{build['id']}/force" method='POST' t-if="request.params.get('ask_rebuild')" groups="runbot.group_user">
                                 <a href='#' class="btn btn-danger runbot-rebuild" t-attf-data-runbot-build="#{build['id']}" > <i class='fa fa-refresh'/> Force Rebuild</a>
                               </form>
 
