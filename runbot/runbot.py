@@ -1543,10 +1543,10 @@ class RunbotController(http.Controller):
         return request.render("runbot.build", context)
 
     @http.route(['/runbot/build/<build_id>/force'], type='http', auth="public", methods=['POST'], csrf=False)
-    def build_force(self, build_id, **post):
-        registry, cr, uid, context = request.registry, request.cr, request.uid, request.context
+    def build_force(self, build_id, search=None, **post):
+        registry, cr, uid = request.registry, request.cr, request.uid
         repo_id = registry['runbot.build']._force(cr, uid, [int(build_id)])
-        return werkzeug.utils.redirect('/runbot/repo/%s' % repo_id)
+        return werkzeug.utils.redirect('/runbot/repo/%s' % repo_id + ('?search=%s' % search if search else ''))
 
     @http.route([
         '/runbot/badge/<int:repo_id>/<branch>.svg',
