@@ -187,6 +187,7 @@
                 <filter string="Running" domain="[('state','=', 'running')]"/>
                 <filter string="Done" domain="[('state','=','done')]"/>
                 <filter string="Duplicate" domain="[('state','=', 'duplicate')]"/>
+                <filter string="Deathrow" domain="[('state','=', 'deathrow')]"/>
                 <separator />
                 <group expand="0" string="Group By...">
                     <filter string="Repo" domain="[]" context="{'group_by':'repo_id'}"/>
@@ -254,6 +255,7 @@
     </template>
 
     <template id="runbot.build_name">
+        <t t-if="bu['state']=='deathrow'"><i class="text-info fa fa-crosshairs"/> killing</t>
         <t t-if="bu['state']=='pending'"><i class="text-default fa fa-pause"/> pending</t>
         <t t-if="bu['state']=='testing'"><i class="text-info fa fa-spinner"/> testing <t t-esc="bu['job']"/> <small t-if="not hide_time"><t t-esc="bu['job_time']"/></small></t>
         <t t-if="bu['result']=='ok'"><i class="text-success fa fa-thumbs-up"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
@@ -261,6 +263,7 @@
         <t t-if="bu['result']=='warn'"><i class="text-warning fa fa-warning"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
         <t t-if="bu['result']=='skipped'"><i class="text-danger fa fa-ban"/> skipped</t>
         <t t-if="bu['result']=='killed'"><i class="text-danger fa fa-times"/> killed</t>
+        <t t-if="bu['result']=='manually_killed'"><i class="text-danger fa fa-times"/> manually killed</t>
 
         <t t-if="bu['server_match'] in ('default', 'fuzzy')">
             <i class="text-warning fa fa-question-circle fa-fw"
@@ -284,8 +287,11 @@
                         <li><a t-attf-href="http://{{bu['domain']}}/?db={{bu['real_dest']}}-base">Connect base <i class="fa fa-sign-in"></i></a></li>
                         <li><a t-attf-href="http://{{bu['domain']}}/">Connect <i class="fa fa-sign-in"></i></a></li>
                     </t>
-                    <li t-if="bu['state'] in ['done','running'] and bu_index==0" groups="runbot.group_user">
+                    <li t-if="bu['state'] in ['done','running','deathrow'] and bu_index==0" groups="runbot.group_user">
                         <a href="#" class="runbot-rebuild" t-att-data-runbot-build="bu['id']">Rebuild <i class="fa fa-refresh"/></a>
+                    </li>
+                    <li t-if="bu['state'] in ['pending','testing','running']" groups="runbot.group_user">
+                        <a href="#" class="runbot-kill" t-att-data-runbot-build="bu['id']">Kill <i class="fa fa-crosshairs"/></a>
                     </li>
                     <li t-if="bu['state']!='testing' and bu['state']!='pending'" class="divider"></li>
                     <li><a t-attf-href="/runbot/build/{{bu['id']}}">Logs <i class="fa fa-file-text-o"/></a></li>
@@ -413,11 +419,12 @@
                             <t t-foreach="br['builds']" t-as="bu">
                                 <t t-if="bu['state']=='pending'"><t t-set="klass">default</t></t>
                                 <t t-if="bu['state']=='testing'"><t t-set="klass">info</t></t>
+                                <t t-if="bu['state']=='deathrow'"><t t-set="klass">default</t></t>
                                 <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'ko'"><t t-set="klass">danger</t></t>
                                 <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'warn'"><t t-set="klass">warning</t></t>
                                 <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'ok'"><t t-set="klass">success</t></t>
                                 <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'skipped'"><t t-set="klass">default</t></t>
-                                <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'killed'"><t t-set="klass">killed</t></t>
+                                <t t-if="bu['state'] in ['running','done'] and bu['result'] in ['killed', 'manually_killed']"><t t-set="klass">killed</t></t>
                                 <td t-attf-class="{{klass}}">
                                    <t t-call="runbot.build_button"><t t-set="klass">btn-group-sm</t></t>
                                    <t t-if="bu['subject']">
@@ -489,11 +496,12 @@
                     <t t-foreach="br['builds']" t-as="bu">
                       <t t-if="bu['state']=='pending'"><t t-set="klass">default</t></t>
                       <t t-if="bu['state']=='testing'"><t t-set="klass">info</t></t>
+                      <t t-if="bu['state']=='deathrow'"><t t-set="klass">default</t></t>
                       <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'ko'"><t t-set="klass">danger</t></t>
                       <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'warn'"><t t-set="klass">warning</t></t>
                       <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'ok'"><t t-set="klass">success</t></t>
                       <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'skipped'"><t t-set="klass">default</t></t>
-                      <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'killed'"><t t-set="klass">killed</t></t>
+                      <t t-if="bu['state'] in ['running','done'] and bu['result'] in ['killed', 'manually_killed']"><t t-set="klass">killed</t></t>
                       <div t-attf-class="bg-{{klass}} col-md-4">
                         <i class="fa fa-at"></i>
                         <t t-esc="bu['author']"/>

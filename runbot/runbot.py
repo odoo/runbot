@@ -375,7 +375,7 @@ class runbot_repo(osv.osv):
         domain_host = domain + [('host', '=', host)]
 
         # schedule jobs (transitions testing -> running, kill jobs, ...)
-        build_ids = Build.search(cr, uid, domain_host + [('state', 'in', ['testing', 'running'])])
+        build_ids = Build.search(cr, uid, domain_host + [('state', 'in', ['testing', 'running', 'deathrow'])])
         Build._schedule(cr, uid, build_ids)
 
         # launch new tests
@@ -598,9 +598,9 @@ class runbot_build(osv.osv):
         'subject': fields.text('Subject'),
         'sequence': fields.integer('Sequence', select=1),
         'modules': fields.char("Modules to Install"),
-        'result': fields.char('Result'), # ok, ko, warn, skipped, killed
+        'result': fields.char('Result'), # ok, ko, warn, skipped, killed, manually_killed
         'pid': fields.integer('Pid'),
-        'state': fields.char('Status'), # pending, testing, running, done, duplicate
+        'state': fields.char('Status'), # pending, testing, running, done, duplicate, deathrow
         'job': fields.char('Job'), # job_*
         'job_start': fields.datetime('Job start'),
         'job_end': fields.datetime('Job end'),
@@ -1128,7 +1128,10 @@ class runbot_build(osv.osv):
         default_timeout = int(icp.get_param(cr, uid, 'runbot.timeout', default=1800)) / 60
 
         for build in self.browse(cr, uid, ids, context=context):
-            if build.state == 'pending':
+            if build.state == 'deathrow':
+                build._kill(result='manually_killed')
+                continue
+            elif build.state == 'pending':
                 # allocate port and schedule first job
                 port = self._find_port(cr, uid)
                 values = {
@@ -1271,6 +1274,16 @@ class runbot_build(osv.osv):
             build._github_status()
             build._local_cleanup()
 
+    def _ask_kill(self, cr, uid, ids, context=None):
+        user = self.pool['res.users'].browse(cr, uid, uid, context=context)
+        for build in self.browse(cr, SUPERUSER_ID, ids, context=context):
+            if build.state == 'pending':
+                build._skip()
+                build.log('_ask_kill', 'Skipping build %s, requested by user %s (%s)' % build.dest, user.name, uid)
+            elif build.state in ['testing', 'running']:
+                build.write({'state': 'deathrow'})
+                build.log('_ask_kill', 'Killing build %s, requested by user %s (%s)' % build.dest, user.name, uid)
+
     def _reap(self, cr, uid, ids):
         while True:
             try:
@@ -1338,7 +1351,7 @@ class RunbotController(http.Controller):
 
         build_ids = []
         if repo:
-            filters = {key: post.get(key, '1') for key in ['pending', 'testing', 'running', 'done']}
+            filters = {key: post.get(key, '1') for key in ['pending', 'testing', 'running', 'done', 'deathrow']}
             domain = [('repo_id','=',repo.id)]
             domain += [('state', '!=', key) for key, value in filters.iteritems() if value == '0']
             if search:
@@ -1548,6 +1561,13 @@ class RunbotController(http.Controller):
         repo_id = registry['runbot.build']._force(cr, uid, [int(build_id)])
         return werkzeug.utils.redirect('/runbot/repo/%s' % repo_id + ('?search=%s' % search if search else ''))
 
+    @http.route(['/runbot/build/<build_id>/kill'], type='http', auth="user", methods=['POST'], csrf=False)
+    def build_ask_kill(self, build_id, search=None, **post):
+        registry, cr, uid = request.registry, request.cr, request.uid
+        build = registry['runbot.build'].browse(cr, uid, build_id)
+        build._ask_kill()
+        return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id + ('?search=%s' % search if search else ''))
+
     @http.route([
         '/runbot/badge/<int:repo_id>/<branch>.svg',
         '/runbot/badge/<any(default,flat):theme>/<int:repo_id>/<branch>.svg',
@@ -1558,7 +1578,7 @@ class RunbotController(http.Controller):
                   ('branch_id.branch_name', '=', branch),
                   ('branch_id.sticky', '=', True),
                   ('state', 'in', ['testing', 'running', 'done']),
-                  ('result', '!=', 'skipped'),
+                  ('result', 'not in', ['skipped', 'manually_killed']),
                   ]
 
         last_update = '__last_update'
