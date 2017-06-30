@@ -418,6 +418,7 @@ class runbot_repo(osv.osv):
         settings['runbot_static'] = os.path.join(get_module_resource('runbot', 'static'), '')
         nginx_dir = os.path.join(self._root(cr, uid), 'nginx')
         settings['nginx_dir'] = nginx_dir
+        settings['re_escape'] = re.escape
         ids = self.search(cr, uid, [('nginx','=',True)], order='id')
         if ids:
             build_ids = self.pool['runbot.build'].search(cr, uid, [('repo_id','in',ids), ('state','=','running')])
