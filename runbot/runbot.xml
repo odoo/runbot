@@ -674,6 +674,7 @@ http {
                     '"$request" $status $body_bytes_sent '
                     '"$http_referer" "$http_user_agent" $request_time';
     access_log <t t-esc="nginx_dir"/>/access.log full;
+    error_log <t t-esc="nginx_dir"/>/error.log;
     client_body_temp_path <t t-esc="nginx_dir"/>;
     fastcgi_temp_path <t t-esc="nginx_dir"/>;
 
