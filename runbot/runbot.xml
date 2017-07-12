@@ -615,7 +615,7 @@
                             <th>Message</th>
                         </tr>
                         <t t-foreach="logs" t-as="l">
-                            <tr>
+                            <tr t-att-class="dict(ERROR='danger', WARNING='warning').get(l.level)">
                                 <td style="white-space: nowrap;"><t t-esc="l.create_date"/></td>
                                 <td><b t-esc="l.level"/></td>
                                 <td><t t-esc="l.type"/></td>
