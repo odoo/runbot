@@ -933,6 +933,8 @@ class runbot_build(osv.osv):
                 if config['db_host'] and grep(build._server('sql_db.py'), 'allow_uri'):
                     logdb = 'postgres://{cfg[db_user]}:{cfg[db_password]}@{cfg[db_host]}/{db}'.format(cfg=config, db=cr.dbname)
                 cmd += ["--log-db=%s" % logdb]
+                if grep(build._server('tools/config.py'), 'log-db-level'):
+                    cmd += ["--log-db-level", '25']
 
             if grep(build._server("tools/config.py"), "data-dir"):
                 datadir = build._path('datadir')
