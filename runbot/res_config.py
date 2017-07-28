@@ -25,7 +25,7 @@ class runbot_config_settings(osv.osv_memory):
     _name = 'runbot.config.settings'
     _inherit = 'res.config.settings'
     _columns = {
-    	'default_workers': fields.integer('Total Number of Workers'),
+        'default_workers': fields.integer('Total Number of Workers'),
         'default_running_max': fields.integer('Maximum Number of Running Builds'),
         'default_timeout': fields.integer('Default Timeout (in seconds)'),
         'default_starting_port': fields.integer('Starting Port for Running Builds'),
@@ -40,8 +40,8 @@ class runbot_config_settings(osv.osv_memory):
         starting_port = icp.get_param(cr, uid, 'runbot.starting_port', default=2000)
         runbot_domain = icp.get_param(cr, uid, 'runbot.domain', default='runbot.odoo.com')
         return {
-        	'default_workers': int(workers),
-        	'default_running_max': int(running_max),
+            'default_workers': int(workers),
+            'default_running_max': int(running_max),
             'default_timeout': int(timeout),
             'default_starting_port': int(starting_port),
             'default_domain': runbot_domain,
