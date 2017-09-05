@@ -919,8 +919,7 @@ class runbot_build(osv.osv):
 
             # commandline
             cmd = [
-                sys.executable,
-                server_path,
+                build._path(server_path),
                 "--xmlrpc-port=%d" % build.port,
             ]
             # options
@@ -1020,7 +1019,7 @@ class runbot_build(osv.osv):
             ]
             bad_modules = set(available_modules) - set((mods or '').split(','))
             omit = ['--omit', ','.join(build._server('addons', m) for m in bad_modules)] if bad_modules else []
-            cmd = ['coverage', 'run', '--branch', '--source', build._server()] + omit + cmd[1:]
+            cmd = ['coverage', 'run', '--branch', '--source', build._server()] + omit + cmd[:]
         # reset job_start to an accurate job_20 job_time
         build.write({'job_start': now()})
         return self._spawn(cmd, lock_path, log_path, cpu_limit=2100, env=env)
