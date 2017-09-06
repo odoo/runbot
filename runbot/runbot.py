@@ -1301,7 +1301,7 @@ class runbot_event(osv.osv):
 
     TYPES = [(t, t.capitalize()) for t in 'client server runbot'.split()]
     _columns = {
-        'build_id': fields.many2one('runbot.build', 'Build'),
+        'build_id': fields.many2one('runbot.build', 'Build', select=True),
         'type': fields.selection(TYPES, string='Type', required=True, select=True),
     }
 
