@@ -1275,14 +1275,14 @@ class runbot_build(osv.osv):
             build._local_cleanup()
 
     def _ask_kill(self, cr, uid, ids, context=None):
-        user = self.pool['res.users'].browse(cr, uid, uid, context=context)
+        user = self.pool['res.users'].browse(cr, SUPERUSER_ID, uid, context=context)
         for build in self.browse(cr, SUPERUSER_ID, ids, context=context):
             if build.state == 'pending':
                 build._skip()
-                build.log('_ask_kill', 'Skipping build %s, requested by user %s (%s)' % build.dest, user.name, uid)
+                build._log('_ask_kill', 'Skipping build %s, requested by %s (user #%s)' % (build.dest, user.name, uid))
             elif build.state in ['testing', 'running']:
                 build.write({'state': 'deathrow'})
-                build.log('_ask_kill', 'Killing build %s, requested by user %s (%s)' % build.dest, user.name, uid)
+                build._log('_ask_kill', 'Killing build %s, requested by %s (user #%s)' % (build.dest, user.name, uid))
 
     def _reap(self, cr, uid, ids):
         while True:
