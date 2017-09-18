@@ -1566,7 +1566,7 @@ class RunbotController(http.Controller):
         registry, cr, uid = request.registry, request.cr, request.uid
         build = registry['runbot.build'].browse(cr, uid, build_id)
         build._ask_kill()
-        return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id + ('?search=%s' % search if search else ''))
+        return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id + ('?search=%s' % search if search else ''))
 
     @http.route([
         '/runbot/badge/<int:repo_id>/<branch>.svg',
