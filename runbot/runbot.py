@@ -1518,14 +1518,14 @@ class RunbotController(http.Controller):
             'coverage': build.branch_id.coverage,
         }
 
-    @http.route(['/runbot/build/<build_id>'], type='http', auth="public", website=True)
-    def build(self, build_id=None, search=None, **post):
+    @http.route(['/runbot/build/<int:build_id>'], type='http', auth="public", website=True)
+    def build(self, build_id, search=None, **post):
         registry, cr, uid, context = request.registry, request.cr, request.uid, request.context
 
         Build = registry['runbot.build']
         Logging = registry['ir.logging']
 
-        build = Build.browse(cr, uid, [int(build_id)])[0]
+        build = Build.browse(cr, uid, [build_id])[0]
         if not build.exists():
             return request.not_found()
 
@@ -1555,13 +1555,13 @@ class RunbotController(http.Controller):
         #context['level'] = level
         return request.render("runbot.build", context)
 
-    @http.route(['/runbot/build/<build_id>/force'], type='http', auth="public", methods=['POST'], csrf=False)
+    @http.route(['/runbot/build/<int:build_id>/force'], type='http', auth="public", methods=['POST'], csrf=False)
     def build_force(self, build_id, search=None, **post):
         registry, cr, uid = request.registry, request.cr, request.uid
-        repo_id = registry['runbot.build']._force(cr, uid, [int(build_id)])
+        repo_id = registry['runbot.build']._force(cr, uid, [build_id])
         return werkzeug.utils.redirect('/runbot/repo/%s' % repo_id + ('?search=%s' % search if search else ''))
 
-    @http.route(['/runbot/build/<build_id>/kill'], type='http', auth="user", methods=['POST'], csrf=False)
+    @http.route(['/runbot/build/<int:build_id>/kill'], type='http', auth="user", methods=['POST'], csrf=False)
     def build_ask_kill(self, build_id, search=None, **post):
         registry, cr, uid = request.registry, request.cr, request.uid
         build = registry['runbot.build'].browse(cr, uid, build_id)
