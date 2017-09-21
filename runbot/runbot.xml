@@ -257,7 +257,10 @@
     <template id="runbot.build_name">
         <t t-if="bu['state']=='deathrow'"><i class="text-info fa fa-crosshairs"/> killing</t>
         <t t-if="bu['state']=='pending'"><i class="text-default fa fa-pause"/> pending</t>
-        <t t-if="bu['state']=='testing'"><i class="text-info fa fa-spinner"/> testing <t t-esc="bu['job']"/> <small t-if="not hide_time"><t t-esc="bu['job_time']"/></small></t>
+        <t t-if="bu['state']=='testing'">
+          <t t-set="textklass" t-value="dict(ko='danger', warn='warning').get(bu['guess_result'], 'info')"/>
+          <span t-attf-class="text-{{textklass}}"><i class="fa fa-spinner fa-spin"/> testing</span> <t t-esc="bu['job']"/> <small t-if="not hide_time"><t t-esc="bu['job_time']"/></small>
+        </t>
         <t t-if="bu['result']=='ok'"><i class="text-success fa fa-thumbs-up"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
         <t t-if="bu['result']=='ko'"><i class="text-danger fa fa-thumbs-down"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
         <t t-if="bu['result']=='warn'"><i class="text-warning fa fa-warning"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>

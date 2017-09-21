@@ -571,6 +571,21 @@ class runbot_build(osv.osv):
                 result[build.id] = "%s:%s" % (domain, build.port)
         return result
 
+    def _guess_result(self, cr, uid, ids, field_nae, arg, context=None):
+        cr.execute("""
+            SELECT b.id,
+                   CASE WHEN b.state != 'testing' THEN b.result
+                        WHEN array_agg(l.level)::text[] && ARRAY['ERROR', 'CRITICAL'] THEN 'ko'
+                        WHEN array_agg(l.level)::text[] && ARRAY['WARNING'] THEN 'warn'
+                        ELSE 'ok'
+                    END
+              FROM runbot_build b
+         LEFT JOIN ir_logging l ON (l.build_id = b.id AND l.level != 'INFO')
+             WHERE b.id IN %s
+          GROUP BY b.id
+        """, [tuple(ids)])
+        return dict(cr.fetchall())
+
     _columns = {
         'branch_id': fields.many2one('runbot.branch', 'Branch', required=True, ondelete='cascade', select=1),
         'repo_id': fields.related(
@@ -599,6 +614,7 @@ class runbot_build(osv.osv):
         'sequence': fields.integer('Sequence', select=1),
         'modules': fields.char("Modules to Install"),
         'result': fields.char('Result'), # ok, ko, warn, skipped, killed, manually_killed
+        'guess_result': fields.function(_guess_result, type='char'),
         'pid': fields.integer('Pid'),
         'state': fields.char('Status'), # pending, testing, running, done, duplicate, deathrow
         'job': fields.char('Job'), # job_*
@@ -1527,6 +1543,7 @@ class RunbotController(http.Controller):
             'name': build.name,
             'state': real_build.state,
             'result': real_build.result,
+            'guess_result': real_build.guess_result,
             'subject': build.subject,
             'author': build.author,
             'committer': build.committer,
@@ -1538,7 +1555,6 @@ class RunbotController(http.Controller):
             'domain': real_build.domain,
             'host': real_build.host,
             'port': real_build.port,
-            'subject': build.subject,
             'server_match': real_build.server_match,
             'duplicate_of': build.duplicate_id if build.state == 'duplicate' else False,
             'coverage': build.branch_id.coverage,
