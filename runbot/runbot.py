@@ -1314,9 +1314,35 @@ class runbot_event(osv.osv):
 
     TYPES = [(t, t.capitalize()) for t in 'client server runbot'.split()]
     _columns = {
-        'build_id': fields.many2one('runbot.build', 'Build', select=True),
+        'build_id': fields.many2one('runbot.build', 'Build', select=True, ondelete='cascade'),
         'type': fields.selection(TYPES, string='Type', required=True, select=True),
     }
+
+    def init(self, cr):
+        super(runbot_event, self).init(cr)
+        cr.execute("""
+CREATE OR REPLACE FUNCTION runbot_set_logging_build() RETURNS TRIGGER AS $$
+BEGIN
+  IF (new.build_id IS NULL AND new.dbname IS NOT NULL AND new.dbname != current_database()) THEN
+    UPDATE ir_logging l
+       SET build_id = split_part(new.dbname, '-', 1)::integer
+     WHERE l.id = new.id;
+  END IF;
+RETURN NULL;
+END;
+$$ language plpgsql;
+
+DO $$
+BEGIN
+    CREATE TRIGGER runbot_new_logging
+    AFTER INSERT ON ir_logging
+    FOR EACH ROW
+    EXECUTE PROCEDURE runbot_set_logging_build();
+EXCEPTION
+    WHEN duplicate_object THEN
+END;
+$$;
+        """)
 
 #----------------------------------------------------------
 # Runbot Controller
@@ -1535,13 +1561,13 @@ class RunbotController(http.Controller):
         build_ids = Build.search(cr, uid, [('branch_id', '=', build.branch_id.id)])
         other_builds = Build.browse(cr, uid, build_ids)
 
-        domain = ['|', ('dbname', '=like', '%s-%%' % real_build.dest), ('build_id', '=', real_build.id)]
+        domain = [('build_id', '=', real_build.id)]
         #if type:
         #    domain.append(('type', '=', type))
         #if level:
         #    domain.append(('level', '=', level))
         if search:
-            domain.append(('name', 'ilike', search))
+            domain.append(('message', 'ilike', search))
         logging_ids = Logging.search(cr, SUPERUSER_ID, domain)
 
         context = {
