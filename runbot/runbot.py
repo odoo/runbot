@@ -1114,11 +1114,12 @@ class runbot_build(osv.osv):
                 sequence = self.search(cr, uid, [], order='id desc', limit=1)[0]
 
             # Force it now
+            rebuild = True
             if build.state == 'done' and build.result == 'skipped':
-                values = {'state': 'pending', 'sequence':sequence, 'result': ''}
+                values = {'state': 'pending', 'sequence': sequence, 'result': ''}
                 self.write(cr, SUPERUSER_ID, [build.id], values, context=context)
             # or duplicate it
-            elif build.state in ['running', 'done', 'duplicate']:
+            elif build.state in ['running', 'done', 'duplicate', 'deathrow']:
                 new_build = {
                     'sequence': sequence,
                     'branch_id': build.branch_id.id,
@@ -1132,8 +1133,11 @@ class runbot_build(osv.osv):
                 }
                 new_build_id = self.create(cr, SUPERUSER_ID, new_build, context=context)
                 build = self.browse(cr, uid, new_build_id, context=context)
-            user = self.pool['res.users'].browse(cr, uid, uid, context=context)
-            build._log('rebuild', 'Rebuild initiated by %s' % user.name)
+            else:
+                rebuild = False
+            if rebuild:
+                user = self.pool['res.users'].browse(cr, uid, uid, context=context)
+                build._log('rebuild', 'Rebuild initiated by %s' % user.name)
             return build.repo_id.id
 
     def _schedule(self, cr, uid, ids, context=None):
