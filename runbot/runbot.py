@@ -1339,7 +1339,10 @@ class runbot_event(osv.osv):
     }
 
     def init(self, cr):
-        super(runbot_event, self).init(cr)
+        parent_class = super(runbot_event, self)
+        if hasattr(parent_class, 'init'):
+            parent_class.init(cr)
+
         cr.execute("""
 CREATE OR REPLACE FUNCTION runbot_set_logging_build() RETURNS TRIGGER AS $$
 BEGIN
