@@ -5,7 +5,7 @@
     'version': '1.3',
     'description': "Runbot",
     'author': 'Odoo SA',
-    'depends': ['website'],
+    'depends': ['website', 'base_setup'],
     'external_dependencies': {
         'python': ['matplotlib'],
     },
