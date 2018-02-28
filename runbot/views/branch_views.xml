@@ -1,0 +1,60 @@
+<odoo>
+  <data>
+    <record id="branch_form" model="ir.ui.view">
+        <field name="name">runbot.branch.form</field>
+        <field name="model">runbot.branch</field>
+        <field name="arch" type="xml">
+          <form>
+            <header>
+            </header>
+            <sheet>
+              <group name="branch_group">
+                <field name="repo_id"/>
+                <field name="name"/>
+                <field name="branch_name"/>
+                <field name="branch_url"/>
+                <field name="pull_head_name"/>
+                <field name="sticky"/>
+                <field name="coverage"/>
+                <field name="state"/>
+                <field name="modules"/>
+                <field name="job_timeout"/>
+                <!-- keep for next version
+                <field name="test_tags"/>
+                -->
+              </group>
+            </sheet>
+          </form>
+        </field>
+    </record>
+          
+    
+    <record id="branch_view_tree" model="ir.ui.view">
+        <field name="name">runbot.branch.tree</field>
+        <field name="model">runbot.branch</field>
+        <field name="arch" type="xml">
+            <tree string="Branches">
+                <field name="repo_id"/>
+                <field name="name"/>
+                <field name="sticky"/>
+                <field name="coverage"/>
+                <field name="state"/>
+            </tree>
+        </field>
+    </record>
+    
+    <record id="open_view_branch_tree" model="ir.actions.act_window">
+        <field name="name">Branches</field>
+        <field name="res_model">runbot.branch</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+    
+    <menuitem
+        name="Branches" 
+        id="runbot_menu_branch_tree"
+        parent="runbot_menu_root"
+        sequence="20"
+        action="open_view_branch_tree"
+        />
+  </data>
+</odoo>

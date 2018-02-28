@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <template id="runbot.build_name">
+        <t t-if="bu['state']=='deathrow'"><i class="text-info fa fa-crosshairs"/> killing</t>
+        <t t-if="bu['state']=='pending'"><i class="text-default fa fa-pause"/> pending</t>
+        <t t-if="bu['state']=='testing'">
+          <t t-set="textklass" t-value="dict(ko='danger', warn='warning').get(bu['guess_result'], 'info')"/>
+          <span t-attf-class="text-{{textklass}}"><i class="fa fa-spinner fa-spin"/> testing</span> <t t-esc="bu['job']"/> <small t-if="not hide_time"><t t-esc="bu['job_time']"/></small>
+        </t>
+        <t t-if="bu['result']=='ok'"><i class="text-success fa fa-thumbs-up"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
+        <t t-if="bu['result']=='ko'"><i class="text-danger fa fa-thumbs-down"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
+        <t t-if="bu['result']=='warn'"><i class="text-warning fa fa-warning"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
+        <t t-if="bu['result']=='skipped'"><i class="text-danger fa fa-ban"/> skipped</t>
+        <t t-if="bu['result']=='killed'"><i class="text-danger fa fa-times"/> killed</t>
+        <t t-if="bu['result']=='manually_killed'"><i class="text-danger fa fa-times"/> manually killed</t>
+
+        <t t-if="bu['server_match'] in ('default', 'fuzzy')">
+            <i class="text-warning fa fa-question-circle fa-fw"
+               title="Server branch cannot be determined exactly. Please use naming convention '9.0-my-branch' to build with '9.0' server branch."/>
+        </t>
+    </template>
+    <template id="runbot.build_button">
+        <div t-attf-class="pull-right">
+            <div t-attf-class="btn-group {{klass}}">
+                <a t-if="bu['state']=='running'" t-attf-href="http://{{bu['domain']}}/?db={{bu['dest']}}-all" class="btn btn-primary"><i class="fa fa-sign-in"/></a>
+                <a t-attf-href="/runbot/build/{{bu['id']}}" class="btn btn-default"><i class="fa fa-file-text-o"/></a>
+                <a t-attf-href="https://#{repo.base}/commit/#{bu['name']}" class="btn btn-default"><i class="fa fa-github"/></a>
+                <button class="btn btn-default dropdown-toggle" data-toggle="dropdown"><i class="fa fa-cog"/><span class="caret"></span></button>
+                <ul class="dropdown-menu" role="menu">
+                    <li t-if="bu['result']=='skipped'" groups="runbot.group_runbot_admin">
+                        <a href="#" class="runbot-rebuild" t-att-data-runbot-build="bu['id']">Force Build <i class="fa fa-level-up"></i></a>
+                    </li>
+                    <t t-if="bu['state']=='running'">
+                        <li><a t-attf-href="http://{{bu['domain']}}/?db={{bu['real_dest']}}-all">Connect all <i class="fa fa-sign-in"></i></a></li>
+                        <li><a t-attf-href="http://{{bu['domain']}}/?db={{bu['real_dest']}}-base">Connect base <i class="fa fa-sign-in"></i></a></li>
+                        <li><a t-attf-href="http://{{bu['domain']}}/">Connect <i class="fa fa-sign-in"></i></a></li>
+                    </t>
+                    <li t-if="bu['state'] in ['done','running','deathrow'] and bu_index==0" groups="runbot.group_user">
+                        <a href="#" class="runbot-rebuild" t-att-data-runbot-build="bu['id']">Rebuild <i class="fa fa-refresh"/></a>
+                    </li>
+                    <li t-if="bu['state'] in ['pending','testing','running']" groups="runbot.group_user">
+                        <a href="#" class="runbot-kill" t-att-data-runbot-build="bu['id']">Kill <i class="fa fa-crosshairs"/></a>
+                    </li>
+                    <li t-if="bu['state']!='testing' and bu['state']!='pending'" class="divider"></li>
+                    <li><a t-attf-href="/runbot/build/{{bu['id']}}">Logs <i class="fa fa-file-text-o"/></a></li>
+                    <li t-if="bu['host']"><a t-attf-href="http://{{bu['host']}}/runbot/static/build/#{bu['real_dest']}/logs/job_10_test_base.txt">Full base logs <i class="fa fa-file-text-o"/></a></li>
+                    <li t-if="bu['host']"><a t-attf-href="http://{{bu['host']}}/runbot/static/build/#{bu['real_dest']}/logs/job_20_test_all.txt">Full all logs <i class="fa fa-file-text-o"/></a></li>
+                    <li t-if="bu['coverage'] and bu['host']"><a t-attf-href="http://{{bu['host']}}/runbot/static/build/#{bu['real_dest']}/coverage/index.html">Coverage <i class="fa fa-file-text-o"/></a></li>
+                    <li t-if="bu['state']!='pending'" class="divider"></li>
+                    <li><a t-attf-href="{{br['branch'].branch_url}}">Branch or pull <i class="fa fa-github"/></a></li>
+                    <li><a t-attf-href="https://{{repo.base}}/commit/{{bu['name']}}">Commit <i class="fa fa-github"/></a></li>
+                    <li><a t-attf-href="https://{{repo.base}}/compare/{{br['branch'].branch_name}}">Compare <i class="fa fa-github"/></a></li>
+                    <!-- TODO branch.pull from -->
+                    <li class="divider"></li>
+                    <li class="disabled"><a href="#">Runtime: <t t-esc="bu['job_time']"/>s</a></li>
+                    <li class="disabled"><a href="#">Port: <t t-esc="bu['port']"/></a></li>
+                    <li class="disabled"><a href="#">Age: <t t-esc="bu['job_age']"/></a></li>
+                </ul>
+            </div>
+        </div>
+    </template>
+    <!-- Event / Logs page -->
+    <template id="runbot.build">
+        <t t-call='website.layout'>
+            <div class="container" style="width: 100%;">
+                <div class="row" >
+                    <div class='col-md-12'>
+                        <nav class="navbar navbar-default" role="navigation">
+                          <div class="container-fluid">
+                            <div class="navbar-header">
+                              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                                <span class="sr-only">Toggle navigation</span>
+                                <span class="icon-bar"></span>
+                                <span class="icon-bar"></span>
+                                <span class="icon-bar"></span>
+                              </button>
+                              <a class="navbar-brand" t-attf-href="/runbot/repo/#{ slug(repo) }"><b><t t-esc="repo.base"/></b></a>
+                              <a class="navbar-brand" t-attf-href="/runbot/build/{{build['id']}}">
+                                <t t-esc="build['dest']"/>
+                                <t t-call="runbot.build_name">
+                                    <t t-set="bu" t-value="build"/>
+                                </t>
+                              </a>
+                            </div>
+                            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                              <form class="navbar-form navbar-left form-inline">
+                                <div class="btn-group">
+                                    <t t-call="runbot.build_button">
+                                        <t t-set="bu" t-value="build"/>
+                                        <t t-set="bu_index" t-value="-1"/>
+                                        <t t-set="klass" t-value="''"/>
+                                    </t>
+                                </div>
+                              </form>
+                              <p class="navbar-text">
+                              </p>
+                              <form class="navbar-form navbar-left form-inline">
+                                <div class="btn-group">
+                                  <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
+                                    Filter <span class="caret"></span>
+                                  </button>
+                                  <ul class="dropdown-menu" role="menu">
+                                    <li role="presentation" class="dropdown-header">Level</li>
+                                    <li><a t-att-href="'?' + keep_query('search', 'type', level='debug')"><i t-if="level == 'debug'" class="fa fa-check"/> Debug</a></li>
+                                    <li><a t-att-href="'?' + keep_query('search', 'type', level='info')"><i t-if="level == 'info'" class="fa fa-check"/> Info</a></li>
+                                    <li><a t-att-href="'?' + keep_query('search', 'type', level='warning')"><i t-if="level == 'warning'" class="fa fa-check"/> Warning</a></li>
+                                    <li><a t-att-href="'?' + keep_query('search', 'type', level='error')"><i t-if="level == 'error'" class="fa fa-check"/> Error</a></li>
+                                    <li role="presentation" class="dropdown-header">Type</li>
+                                    <li><a t-att-href="'?' + keep_query('search', 'level',type='runbot')"><i t-if="type == 'runbot'" class="fa fa-check"/> Runbot</a></li>
+                                    <li><a t-att-href="'?' + keep_query('search', 'level',type='server')"><i t-if="type == 'server'" class="fa fa-check"/> Server</a></li>
+                                    <li><a t-att-href="'?' + keep_query('search', 'level',type='client')"><i t-if="type == 'client'" class="fa fa-check"/> Client</a></li>
+                                  </ul>
+                                </div>
+                                <div class="btn-group">
+                                  <button type="button" class="btn btn-default">Expand</button>
+                                </div>
+                              </form>
+
+                              <form class="navbar-form navbar-left form-inline" t-attf-action="/runbot/build/#{build['id']}/force" method='POST' t-if="request.params.get('ask_rebuild')" groups="runbot.group_user">
+                                <a href='#' class="btn btn-danger runbot-rebuild" t-attf-data-runbot-build="#{build['id']}" > <i class='fa fa-refresh'/> Force Rebuild</a>
+                              </form>
+
+                              <ul class="nav navbar-nav navbar-right">
+                                <li class="dropdown">
+                                  <a href="#" class="dropdown-toggle" data-toggle="dropdown">Other builds <b class="caret"></b></a>
+                                  <ul class="dropdown-menu">
+                                    <t t-foreach='other_builds' t-as='other_build'>
+                                      <li><a t-attf-href="/runbot/build/{{other_build.id}}">
+                                        <t t-esc='other_build.dest'/>
+                                        <t t-call="runbot.build_name">
+                                          <t t-set="bu" t-value="other_build"/>
+                                          <t t-set="hide_time" t-value="True"></t>
+                                        </t>
+                                      </a></li>
+                                    </t>
+                                  </ul>
+                                </li>
+                              </ul>
+                              <form class="navbar-form navbar-right" role="search" t-attf-action="/runbot/build/{{build['id']}}" method="get">
+                                <div class="form-group">
+                                  <input type="search" name="search" class="form-control" placeholder="Search" t-att-value="search or ''"/>
+                                  <button type="submit" class="btn btn-default">Search</button>
+                                </div>
+                              </form>
+                            </div>
+                          </div>
+                        </nav>
+                        <p>
+                            Subject: <t t-esc="build['subject']"/><br/>
+                            Author: <t t-esc="build['author']"/><br/>
+                            Committer: <t t-esc="build['committer']"/><br/>
+                        </p>
+                        <p t-if="build['duplicate_of']">Duplicate of <a t-attf-href="/runbot/build/#{build['duplicate_of'].id}"><t t-esc="build['duplicate_of'].dest"/></a></p>
+                        <table class="table table-condensed table-striped">
+                        <tr>
+                            <th>Date</th>
+                            <th>Level</th>
+                            <th>Type</th>
+                            <th>Message</th>
+                        </tr>
+                        <t t-foreach="logs" t-as="l">
+                            <tr t-att-class="dict(ERROR='danger', WARNING='warning').get(l.level)">
+                                <td style="white-space: nowrap;"><t t-esc="l.create_date"/></td>
+                                <td><b t-esc="l.level"/></td>
+                                <td><t t-esc="l.type"/></td>
+                                <td>
+                                    <a t-if="l.type != 'runbot'" t-attf-href="https://{{repo.base}}/blob/{{build['name']}}/{{l.path}}#L{{l.line}}"><t t-esc="l.name"/>:<t t-esc="l.line"/></a> <t t-esc="l.func"/>
+                                    <t t-if="'\n' not in l.message"><t t-esc="l.message"/></t>
+                                    <pre t-if="'\n' in l.message" style="margin:0;padding:0; border: none;"><t t-esc="l.message"/></pre>
+                                </td>
+                            </tr>
+                        </t>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+  </data>
+</odoo>

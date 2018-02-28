@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+      <template id="runbot.nginx_config">
+pid <t t-esc="nginx_dir"/>/nginx.pid;
+error_log <t t-esc="nginx_dir"/>/error.log;
+worker_processes  1;
+events { worker_connections  1024; }
+http {
+include /etc/nginx/mime.types;
+server_names_hash_max_size 512;
+server_names_hash_bucket_size 256;
+client_max_body_size 10M;
+index index.html;
+log_format full '$remote_addr - $remote_user [$time_local] '
+                '"$request" $status $body_bytes_sent '
+                '"$http_referer" "$http_user_agent" $request_time';
+access_log <t t-esc="nginx_dir"/>/access.log full;
+error_log <t t-esc="nginx_dir"/>/error.log;
+client_body_temp_path <t t-esc="nginx_dir"/>;
+fastcgi_temp_path <t t-esc="nginx_dir"/>;
+
+autoindex on;
+
+gzip on;
+gzip_types text/css text/plain application/xml application/json application/javascript;
+
+proxy_temp_path <t t-esc="nginx_dir"/>;
+proxy_read_timeout 600;
+proxy_connect_timeout 600;
+proxy_set_header X-Forwarded-Host $host;
+proxy_set_header Host $host;
+
+server {
+    listen 8080 default;
+    location / { proxy_pass http://127.0.0.1:<t t-esc="port"/>; }
+    location /longpolling/im/poll { return 404; }
+    location /longpolling/poll { return 404; }
+    location /runbot/static/ {
+       alias <t t-esc="runbot_static"/>;
+       autoindex off;
+       location ~ /runbot/static/build/[^/]+/logs/ {
+          autoindex on;
+       }
+    }
+}
+<t t-foreach="builds" t-as="build">
+server {
+    listen 8080;
+    server_name ~^<t t-raw="re_escape(build.dest)"/>[-.].*$;
+    location / { proxy_pass http://127.0.0.1:<t t-esc="build.port"/>; }
+    location /longpolling { proxy_pass http://127.0.0.1:<t t-esc="build.port + 1"/>; }
+}
+</t>
+}
+      </template>
+    </data>
+</odoo>

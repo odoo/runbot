@@ -1,1 +1,1 @@
-import runbot
+from . import runbot

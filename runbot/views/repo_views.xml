@@ -1,0 +1,59 @@
+<odoo>
+  <data>
+    <menuitem name="Runbot" id="runbot_menu_root"/>
+    
+    <record id="repo_form" model="ir.ui.view">
+        <field name="name">runbot.repo.form</field>
+        <field name="model">runbot.repo</field>
+        <field name="arch" type="xml">
+          <form>
+            <header>
+            </header>
+            <sheet>
+              <group name="repo_group">
+                <field name="sequence"/>
+                <field name="name"/>
+                <field name="mode"/>
+                <field name="nginx"/>
+                <field name="duplicate_id"/>
+                <field name="dependency_ids" widget="many2many_tags"/>
+                <field name="modules"/>
+                <field name="modules_auto"/>
+                <field name="token"/>
+                <field name="group_ids"  widget="many2many_tags"/>
+                <field name="hook_time"/>
+              </group>
+            </sheet>
+          </form>
+        </field>
+    </record>
+          
+    
+    <record id="repo_view_tree" model="ir.ui.view">
+        <field name="name">runbot.repo.tree</field>
+        <field name="model">runbot.repo</field>
+        <field name="arch" type="xml">
+            <tree string="Repositories">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="mode"/>
+            </tree>
+        </field>
+    </record>
+    
+    <record id="open_view_repo_tree" model="ir.actions.act_window">
+        <field name="name">Repositories</field>
+        <field name="res_model">runbot.repo</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+    
+    <menuitem
+        name="Repositories" 
+        id="runbot_menu_repo_tree"
+        parent="runbot_menu_root"
+        sequence="10"
+        action="open_view_repo_tree"
+        />
+    
+  </data>
+</odoo>

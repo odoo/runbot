@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+      <!-- Replace default menu ( Home / Contactus and co...) with 5 first repos) -->
+      <template id="inherits_branch_in_menu" inherit_id="website.layout" name="Inherits Show top 5 branches in menu">
+          <xpath expr="//t[@t-foreach=&quot;website.menu_id.child_id&quot;][@t-as=&quot;submenu&quot;]" position="replace">
+              <t t-if="repos" >
+                   <t t-foreach="repos[:5]" t-as="re">
+                       <li><a t-attf-href="/runbot/repo/{{slug(re)}}?search={{request.params.get('search', '')}}"><i class='fa fa-github' /> <t t-esc="re.name.split(':')[1]"/></a></li>
+                   </t>
+              </t>
+          </xpath>
+      </template>
+
+      <!-- remove black bar with switcher d'apps -->
+      <template id="inherits_no_black_bar" inherit_id="website.user_navbar" name="Inherits No black user_navbar">
+          <xpath expr="//nav[@id='oe_main_menu_navbar']" position="attributes">
+              <attribute name="groups">base.group_website_publisher</attribute>
+          </xpath>
+      </template>
+      <!-- Frontend repository block -->
+      <template id="runbot.repo">
+          <t t-call='website.layout'>
+              <t t-set="head">
+                  <t t-if="refresh">
+                      <meta http-equiv="refresh" t-att-content="refresh"/>
+                  </t>
+                  <style>
+                    .killed {
+                      background-color: #aaa;
+                    }
+                  </style>
+              </t>
+              <div class="container-fluid">
+                  <div class="row">
+                      <div class='col-md-12'>
+                          <nav class="navbar navbar-default" role="navigation">
+                            <div class="container-fluid">
+                              <div class="navbar-header">
+                                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                                  <span class="sr-only">Toggle navigation</span>
+                                  <span class="icon-bar"></span>
+                                  <span class="icon-bar"></span>
+                                  <span class="icon-bar"></span>
+                                </button>
+                                <t t-if="repo">
+                                    <ul class="nav navbar-nav">
+                                      <li class="dropdown">
+                                        <a href="#" class="dropdown-toggle" data-toggle="dropdown"><b style="font-size: 18px;"><t t-esc="repo.base"/></b><b class="caret"></b></a>
+                                        <ul class="dropdown-menu">
+                                          <t t-foreach='repos' t-as='re'>
+                                              <li><a t-attf-href="/runbot/repo/{{slug(re)}}"><t t-esc="re.base"/></a></li>
+                                          </t>
+                                        </ul>
+                                      </li>
+                                    </ul>
+
+                                </t>
+                              </div>
+                              <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                                <t t-if="repo">
+                                  <form class="navbar-form navbar-right" role="search" t-att-action="qu(search='')" method="get">
+                                    <div class="form-group">
+                                      <input type="search" name="search" class="form-control" placeholder="Search" t-att-value="search"/>
+                                      <button type="submit" class="btn btn-default">Search</button>
+                                    </div>
+                                  </form>
+                                  <form class="navbar-form navbar-right form-inline">
+                                    <div class="btn-group" t-if="repo">
+                                      <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
+                                        Filter <span class="caret"></span>
+                                      </button>
+                                      <ul class="dropdown-menu" role="menu">
+                                        <li t-if="filters['pending']=='0'"><a t-att-href="qu(pending=1)">Pending</a></li>
+                                        <li t-if="filters['pending']=='1'"><a t-att-href="qu(pending='0')"><i class="fa fa-check"/> Pending</a></li>
+                                        <li t-if="filters['testing']=='0'"><a t-att-href="qu(testing=1)">Testing</a></li>
+                                        <li t-if="filters['testing']=='1'"><a t-att-href="qu(testing='0')"><i class="fa fa-check"/> Testing</a></li>
+                                        <li t-if="filters['running']=='0'"><a t-att-href="qu(running=1)">Running</a></li>
+                                        <li t-if="filters['running']=='1'"><a t-att-href="qu(running='0')"><i class="fa fa-check"/> Running</a></li>
+                                        <li t-if="filters['done']=='0'"><a t-att-href="qu(done=1)">Done</a></li>
+                                        <li t-if="filters['done']=='1'"><a t-att-href="qu(done='0')"><i class="fa fa-check"/> Done</a></li>
+                                        <li class="divider"></li>
+                                        <li t-att-class="'active' if limit=='100' else ''"><a t-att-href="qu(limit=100)">Show last 100</a></li>
+                                        <li t-att-class="'active' if limit=='1000' else ''"><a t-att-href="qu(limit=1000)">Show last 1000</a></li>
+                                        <li t-att-class="'active' if limit=='10000' else ''"><a t-att-href="qu(limit=10000)">Show last 10000</a></li>
+                                      </ul>
+                                    </div>
+                                  </form>
+                                </t>
+                              </div>
+                              <p class="text-center">
+                                  <t  t-foreach="host_stats" t-as="hs">
+                                  <span class="label label-default">
+                                      <t t-esc="hs['host']"/>: <t t-esc="hs['testing']"/> testing, <t t-esc="hs['running']"/> running
+                                  </span>&amp;nbsp;
+                                  </t>
+                                  <span class="label label-info">Pending: <t t-esc="pending_total"/></span>
+                              </p>
+                            </div>
+                          </nav>
+                          <div t-if="not repo" class="mb32">
+                              <h1>No Repository yet.</h1>
+                          </div>
+
+                          <table t-if="repo" class="table table-condensed table-bordered">
+                          <tr>
+                              <th>Branch</th>
+                              <td colspan="4" class="text-right">
+                                  <t t-esc="repo.base"/>: 
+                                  <t t-esc="testing"/> testing,
+                                  <t t-esc="running"/> running,
+                                  <t t-esc="pending"/> pending.
+                              </td>
+
+                          </tr>
+                          <tr t-foreach="branches" t-as="br">
+                              <td>
+                                  <i t-if="br['branch'].sticky" class="fa fa-star" style="color: #f0ad4e" />
+                                  <b t-esc="br['branch'].branch_name"/>
+                                  <small><t t-esc="br['builds'][0]['job_age']"/></small><br/>
+                                  <div class="btn-group btn-group-xs">
+                                      <a t-attf-href="{{br['branch'].branch_url}}" class="btn btn-default btn-xs">Branch or pull <i class="fa fa-github"/></a>
+                                      <a t-attf-href="/runbot/#{repo.id}/#{br['branch'].branch_name}" class="btn btn-default btn-xs"><i class="fa fa-fast-forward" title="Quick Connect"/></a>
+                                  </div>
+                              </td>
+                              <t t-foreach="br['builds']" t-as="bu">
+                                  <t t-if="bu['state']=='pending'"><t t-set="klass">default</t></t>
+                                  <t t-if="bu['state']=='testing'"><t t-set="klass">info</t></t>
+                                  <t t-if="bu['state']=='deathrow'"><t t-set="klass">default</t></t>
+                                  <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'ko'"><t t-set="klass">danger</t></t>
+                                  <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'warn'"><t t-set="klass">warning</t></t>
+                                  <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'ok'"><t t-set="klass">success</t></t>
+                                  <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'skipped'"><t t-set="klass">default</t></t>
+                                  <t t-if="bu['state'] in ['running','done'] and bu['result'] in ['killed', 'manually_killed']"><t t-set="klass">killed</t></t>
+                                  <td t-attf-class="{{klass}}">
+                                     <t t-call="runbot.build_button"><t t-set="klass">btn-group-sm</t></t>
+                                     <t t-if="bu['subject']">
+                                          <span t-esc="bu['subject'][:32] + ('...' if bu['subject'][32:] else '') " t-att-title="bu['subject']"/>
+                                           <br/>
+                                      </t>
+                                     <t t-id="bu['author']">
+                                          <t t-esc="bu['author']"/>
+                                          <t t-if="bu['committer'] and bu['author'] != bu['committer']" t-id="bu['committer']">
+                                              (<span class="octicon octicon-arrow-right"></span>&amp;nbsp;<t t-esc="bu['committer']"/>)
+                                          </t>
+                                          <br/>
+                                      </t>
+                                      <small><t t-esc="bu['dest']"/> on <t t-esc="bu['host']"/></small><br/>
+                                      <t t-call="runbot.build_name"/>
+                                  </td>
+                              </t>
+                          </tr>
+                          </table>
+                      </div>
+                  </div>
+
+              </div>
+          </t>
+      </template>
+    </data>
+</odoo>
