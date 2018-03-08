@@ -1,16 +1,15 @@
-Odoo "Extra" Repository
+Odoo Runbot Repository
 =======================
 
-> Note: If you are looking for the source code of [Odoo](https://www.odoo.com/), browse [our main repository](https://github.com/odoo/odoo).
-
+This repository contains the source code of Odoo testing bot [runbot.odoo.com](http://runbot.odoo.com/runbot) and related addons.
 
 Runbot
 ------
 
-This repository contains the source code of Odoo testing bot [runbot.odoo.com](http://runbot.odoo.com/runbot). Please have a look in the `runbot/` directory.
+The `runbot/` directory holds the main runbot Odoo addon.
 
-Unsupported addons
+Runbot CLA addon
 ------------------
 
-This repository also holds an archive of Odoo modules that are not maintained anymore by the publisher. Use them at your own risk.
+The `runbot_cla/` directory contains an Odoo addon that checks CLA.
 
