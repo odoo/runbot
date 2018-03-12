@@ -68,7 +68,7 @@ class runbot_repo(models.Model):
     def _get_base_url(self):
         for repo in self:
             name = re.sub('.+@', '', repo.name)
-            name = re.sub('^https://', '', repo.name)  # support https repo style
+            name = re.sub('^https://', '', name)  # support https repo style
             name = re.sub('.git$', '', name)
             name = name.replace(':', '/')
             repo.base = name
