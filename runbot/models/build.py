@@ -60,7 +60,7 @@ class runbot_build(models.Model):
 
     def create(self, vals):
         build_id = super(runbot_build, self).create(vals)
-        extra_info = {'sequence': self.id}
+        extra_info = {'sequence': build_id.id}
 
         # detect duplicate
         duplicate_id = None
