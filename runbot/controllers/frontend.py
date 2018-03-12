@@ -201,14 +201,14 @@ class Runbot(http.Controller):
 
         if builds:
             last_build = False
-            for build in Build.browse(builds):
+            for build in builds:
                 if build.state == 'running' or (build.state == 'duplicate' and build.duplicate_id.state == 'running'):
                     last_build = build if build.state == 'running' else build.duplicate_id
                     break
 
             if not last_build:
                 # Find the last build regardless the state to propose a rebuild
-                last_build = Build.browse(builds[0])
+                last_build = builds[0]
 
             if last_build.state != 'running':
                 url = "/runbot/build/%s?ask_rebuild=1" % last_build.id
