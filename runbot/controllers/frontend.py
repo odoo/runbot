@@ -183,37 +183,37 @@ class Runbot(http.Controller):
         }
         return request.render("runbot.build", context)
 
-        @http.route(['/runbot/b/<branch_name>', '/runbot/<model("runbot.repo"):repo>/<branch_name>'], type='http', auth="public", website=True)
-        def fast_launch(self, branch_name=False, repo=False, **post):
-            """Connect to the running Odoo instance"""
-            Build = request.env['runbot.build']
+    @http.route(['/runbot/b/<branch_name>', '/runbot/<model("runbot.repo"):repo>/<branch_name>'], type='http', auth="public", website=True)
+    def fast_launch(self, branch_name=False, repo=False, **post):
+        """Connect to the running Odoo instance"""
+        Build = request.env['runbot.build']
 
-            domain = [('branch_id.branch_name', '=', branch_name)]
+        domain = [('branch_id.branch_name', '=', branch_name)]
 
-            if repo:
-                domain.extend([('branch_id.repo_id', '=', repo.id)])
-                order = "sequence desc"
+        if repo:
+            domain.extend([('branch_id.repo_id', '=', repo.id)])
+            order = "sequence desc"
+        else:
+            order = 'repo_id ASC, sequence DESC'
+
+        # Take the 10 lasts builds to find at least 1 running... Else no luck
+        builds = Build.search(domain, order=order, limit=10)
+
+        if builds:
+            last_build = False
+            for build in Build.browse(builds):
+                if build.state == 'running' or (build.state == 'duplicate' and build.duplicate_id.state == 'running'):
+                    last_build = build if build.state == 'running' else build.duplicate_id
+                    break
+
+            if not last_build:
+                # Find the last build regardless the state to propose a rebuild
+                last_build = Build.browse(builds[0])
+
+            if last_build.state != 'running':
+                url = "/runbot/build/%s?ask_rebuild=1" % last_build.id
             else:
-                order = 'repo_id ASC, sequence DESC'
-
-            # Take the 10 lasts builds to find at least 1 running... Else no luck
-            builds = Build.search(domain, order=order, limit=10)
-
-            if builds:
-                last_build = False
-                for build in Build.browse(builds):
-                    if build.state == 'running' or (build.state == 'duplicate' and build.duplicate_id.state == 'running'):
-                        last_build = build if build.state == 'running' else build.duplicate_id
-                        break
-
-                if not last_build:
-                    # Find the last build regardless the state to propose a rebuild
-                    last_build = Build.browse(builds[0])
-
-                if last_build.state != 'running':
-                    url = "/runbot/build/%s?ask_rebuild=1" % last_build.id
-                else:
-                    url = build.branch_id._get_branch_quickconnect_url(last_build.domain, last_build.dest)[build.branch_id.id]
-            else:
-                return request.not_found()
-            return werkzeug.utils.redirect(url)
+                url = build.branch_id._get_branch_quickconnect_url(last_build.domain, last_build.dest)[build.branch_id.id]
+        else:
+            return request.not_found()
+        return werkzeug.utils.redirect(url)
