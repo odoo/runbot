@@ -41,15 +41,15 @@ class runbot_build(models.Model):
     subject = fields.Text('Subject')
     sequence = fields.Integer('Sequence')
     modules = fields.Char("Modules to Install")
-    result = fields.Char('Result', default='')  # ok, ko, warn, skipped, killed, manually_killed
+    result = fields.Char('Result', default='', copy=False)  # ok, ko, warn, skipped, killed, manually_killed
     guess_result = fields.Char(compute='_guess_result')
     pid = fields.Integer('Pid')
     state = fields.Char('Status', default='pending')  # pending, testing, running, done, duplicate, deathrow
     job = fields.Char('Job')  # job_*
-    job_start = fields.Datetime('Job start')
-    job_end = fields.Datetime('Job end')
-    job_time = fields.Integer(compute='_get_time', string='Job time')
-    job_age = fields.Integer(compute='_get_age', string='Job age')
+    job_start = fields.Datetime('Job start', copy=False)
+    job_end = fields.Datetime('Job end', copy=False)
+    job_time = fields.Integer(compute='_get_time', string='Job time', copy=False)
+    job_age = fields.Integer(compute='_get_age', string='Job age', copy=False)
     duplicate_id = fields.Many2one('runbot.build', 'Corresponding Build')
     server_match = fields.Selection([('builtin', 'This branch includes Odoo server'),
                                      ('exact', 'branch/PR exact name'),

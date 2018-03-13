@@ -22,7 +22,7 @@ def fqdn():
 
 
 def time2str(t):
-    time.strftime(DEFAULT_SERVER_DATETIME_FORMAT, t)
+    return time.strftime(DEFAULT_SERVER_DATETIME_FORMAT, t)
 
 
 def dt2time(datetime):
