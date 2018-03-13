@@ -21,6 +21,7 @@
         'templates/assets.xml',
         'templates/dashboard.xml',
         'templates/nginx.xml',
+        'templates/badge.xml',
         'data/runbot_cron.xml'
     ],
 }
