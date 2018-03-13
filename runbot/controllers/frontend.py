@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
+import operator
 import werkzeug
+from collections import OrderedDict
 
 from odoo import http
 from odoo.addons.http_routing.models.ir_http import slug
@@ -217,3 +219,60 @@ class Runbot(http.Controller):
         else:
             return request.not_found()
         return werkzeug.utils.redirect(url)
+
+    @http.route(['/runbot/dashboard'], type='http', auth="public", website=True)
+    def dashboard(self, refresh=None):
+        cr = request.cr
+        RB = request.env['runbot.build']
+        repos = request.env['runbot.repo'].search([])   # respect record rules
+
+        cr.execute("""SELECT bu.id
+                        FROM runbot_branch br
+                        JOIN LATERAL (SELECT *
+                                        FROM runbot_build bu
+                                       WHERE bu.branch_id = br.id
+                                    ORDER BY id DESC
+                                       LIMIT 3
+                                     ) bu ON (true)
+                        JOIN runbot_repo r ON (r.id = br.repo_id)
+                       WHERE br.sticky
+                         AND br.repo_id in %s
+                    ORDER BY r.sequence, r.name, br.branch_name, bu.id DESC
+                   """, [tuple(repos._ids)])
+
+        builds = RB.browse(map(operator.itemgetter(0), cr.fetchall()))
+
+        count = RB.search_count
+        qctx = {
+            'refresh': refresh,
+            'host_stats': [],
+            'pending_total': count([('state', '=', 'pending')]),
+        }
+
+        repos_values = qctx['repo_dict'] = OrderedDict()
+        for build in builds:
+            repo = build.repo_id
+            branch = build.branch_id
+            r = repos_values.setdefault(repo.id, {'branches': OrderedDict()})
+            if 'name' not in r:
+                r.update({
+                    'name': repo.name,
+                    'base': repo.base,
+                    'testing': count([('repo_id', '=', repo.id), ('state', '=', 'testing')]),
+                    'running': count([('repo_id', '=', repo.id), ('state', '=', 'running')]),
+                    'pending': count([('repo_id', '=', repo.id), ('state', '=', 'pending')]),
+                })
+            b = r['branches'].setdefault(branch.id, {'name': branch.branch_name, 'builds': list()})
+            b['builds'].append(self.build_info(build))
+
+        # consider host gone if no build in last 100
+        build_threshold = max(builds.ids or [0]) - 100
+        for result in RB.read_group([('id', '>', build_threshold)], ['host'], ['host']):
+            if result['host']:
+                qctx['host_stats'].append({
+                    'host': result['host'],
+                    'testing': count([('state', '=', 'testing'), ('host', '=', result['host'])]),
+                    'running': count([('state', '=', 'running'), ('host', '=', result['host'])]),
+                })
+
+        return request.render("runbot.sticky-dashboard", qctx)
