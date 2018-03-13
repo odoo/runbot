@@ -139,13 +139,13 @@ class Runbot(http.Controller):
 
     @http.route(['/runbot/build/<int:build_id>/kill'], type='http', auth="user", methods=['POST'], csrf=False)
     def build_ask_kill(self, build_id, search=None, **post):
-        build = request.env['runbot.build'].browse(build_id)
+        build = request.env['runbot.build'].sudo().browse(build_id)
         build._ask_kill()
         return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id + ('?search=%s' % search if search else ''))
 
     @http.route(['/runbot/build/<int:build_id>/force'], type='http', auth="public", methods=['POST'], csrf=False)
     def build_force(self, build_id, search=None, **post):
-        build = request.env['runbot.build'].browse(build_id)
+        build = request.env['runbot.build'].sudo().browse(build_id)
         build._force()
         return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id + ('?search=%s' % search if search else ''))
 
