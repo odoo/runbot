@@ -1,6 +1,7 @@
 # -*- encoding: utf-8 -*-
 
 import glob
+import io
 import logging
 import re
 
@@ -24,7 +25,7 @@ class runbot_build(models.Model):
                     state = "success"
                 else:
                     try:
-                        cla = ''.join(open(f).read() for f in cla_glob)
+                        cla = ''.join(io.open(f,encoding='utf-8').read() for f in cla_glob)
                         if cla.lower().find(email) != -1:
                             state = "success"
                     except UnicodeDecodeError:
