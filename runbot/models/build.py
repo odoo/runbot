@@ -12,6 +12,7 @@ import time
 from subprocess import CalledProcessError
 from ..common import dt2time, fqdn, now, locked, grep, time2str, rfind, uniq_list, local_pgadmin_cursor, lock
 from odoo import models, fields, api
+from odoo.exceptions import UserError
 from odoo.tools import config, appdirs
 
 _re_error = r'^(?:\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ (?:ERROR|CRITICAL) )|(?:Traceback \(most recent call last\):)$'
@@ -41,15 +42,15 @@ class runbot_build(models.Model):
     subject = fields.Text('Subject')
     sequence = fields.Integer('Sequence')
     modules = fields.Char("Modules to Install")
-    result = fields.Char('Result', default='', copy=False)  # ok, ko, warn, skipped, killed, manually_killed
+    result = fields.Char('Result', default='')  # ok, ko, warn, skipped, killed, manually_killed
     guess_result = fields.Char(compute='_guess_result')
     pid = fields.Integer('Pid')
     state = fields.Char('Status', default='pending')  # pending, testing, running, done, duplicate, deathrow
     job = fields.Char('Job')  # job_*
-    job_start = fields.Datetime('Job start', copy=False)
-    job_end = fields.Datetime('Job end', copy=False)
-    job_time = fields.Integer(compute='_get_time', string='Job time', copy=False)
-    job_age = fields.Integer(compute='_get_age', string='Job age', copy=False)
+    job_start = fields.Datetime('Job start')
+    job_end = fields.Datetime('Job end')
+    job_time = fields.Integer(compute='_get_time', string='Job time')
+    job_age = fields.Integer(compute='_get_age', string='Job age')
     duplicate_id = fields.Many2one('runbot.build', 'Corresponding Build')
     server_match = fields.Selection([('builtin', 'This branch includes Odoo server'),
                                      ('exact', 'branch/PR exact name'),
@@ -58,9 +59,13 @@ class runbot_build(models.Model):
                                      ('default', 'No match found - defaults to master')],
                                     string='Server branch matching')
 
+    def copy(self, values=None):
+        raise UserError("Cannot duplicate build!")
+
     def create(self, vals):
         build_id = super(runbot_build, self).create(vals)
         extra_info = {'sequence': build_id.id}
+        context = self.env.context
 
         # detect duplicate
         duplicate_id = None
@@ -79,9 +84,8 @@ class runbot_build(models.Model):
                 duplicate_closest_name = duplicate._get_closest_branch_name(extra_repo.id)[1]
                 if build_closest_name != duplicate_closest_name:
                     duplicate_id = None
-        if duplicate_id:
+        if duplicate_id and not context.get('force_rebuild'):
             extra_info.update({'state': 'duplicate', 'duplicate_id': duplicate_id})
-            build_id.write({'duplicate_id': build_id.id})
         build_id.write(extra_info)
         return build_id
 
@@ -257,7 +261,17 @@ class runbot_build(models.Model):
                 build.write({'state': 'pending', 'sequence': sequence, 'result': ''})
             # or duplicate it
             elif build.state in ['running', 'done', 'duplicate', 'deathrow']:
-                new_build = build.copy({'sequence': sequence})
+                new_build = build.with_context(force_rebuild=True).create({
+                    'sequence': sequence,
+                    'branch_id': build.branch_id.id,
+                    'name': build.name,
+                    'author': build.author,
+                    'author_email': build.author_email,
+                    'committer': build.committer,
+                    'committer_email': build.committer_email,
+                    'subject': build.subject,
+                    'modules': build.modules,
+                })
                 build = new_build
             else:
                 rebuild = False
