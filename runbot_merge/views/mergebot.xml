@@ -1,0 +1,196 @@
+<odoo>
+    <record id="runbot_merge_form_project" model="ir.ui.view">
+        <field name="name">Project Form</field>
+        <field name="model">runbot_merge.project</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button type="object" name="sync_prs" string="Sync PRs"
+                            attrs="{'invisible': [['github_token', '=', False]]}"/>
+                </header>
+                <sheet>
+                    <!--
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" name="action_see_attachments" type="object" icon="fa-book" attrs="{'invisible': ['|', ('state', '=', 'confirmed'), ('type', '=', 'routing')]}">
+                            <field string="Attachments" name="mrp_document_count" widget="statinfo"/>
+                        </button>
+                    </div>
+                    -->
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="github_prefix" string="bot name"/>
+                        </group>
+                        <group>
+                            <field name="required_statuses"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="github_token"/>
+                        </group>
+                        <group>
+                            <field name="ci_timeout"/>
+                            <field name="batch_limit"/>
+                        </group>
+                    </group>
+
+                    <field name="repo_ids">
+                        <tree editable="bottom">
+                            <field name="name"/>
+                        </tree>
+                    </field>
+                    <field name="branch_ids">
+                        <tree editable="bottom">
+                            <field name="name"/>
+                        </tree>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="runbot_merge_action_projects" model="ir.actions.act_window">
+        <field name="name">Projects</field>
+        <field name="res_model">runbot_merge.project</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="runbot_merge_action_prs" model="ir.actions.act_window">
+        <field name="name">Pull Requests</field>
+        <field name="res_model">runbot_merge.pull_requests</field>
+        <field name="view_mode">tree,form</field>
+        <field name="context">{'search_default_open': True}</field>
+    </record>
+    <record id="runbot_merge_search_prs" model="ir.ui.view">
+        <field name="name">PR search</field>
+        <field name="model">runbot_merge.pull_requests</field>
+        <field name="arch" type="xml">
+            <search>
+                <filter
+                    name="open" string="Open"
+                    domain="[('state', 'not in', ['merged', 'closed'])]"
+                />
+                <field name="author"/>
+                <field name="label"/>
+                <field name="target"/>
+                <field name="repository"/>
+                <field name="state"/>
+
+                <group>
+                    <filter string="Target" name="target_" context="{'group_by':'target'}"/>
+                    <filter string="Repository" name="repo_" context="{'group_by':'repository'}"/>
+                    <filter string="State" name="state_" context="{'group_by':'state'}"/>
+                    <filter string="Priority" name="priority_" context="{'group_by':'priority'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+    <record id="runbot_merge_tree_prs" model="ir.ui.view">
+        <field name="name">PR tree</field>
+        <field name="model">runbot_merge.pull_requests</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="repository"/>
+                <field name="number"/>
+                <field name="target"/>
+                <field name="state"/>
+            </tree>
+        </field>
+    </record>
+    <record id="runbot_merge_form_prs" model="ir.ui.view">
+        <field name="name">PR form</field>
+        <field name="model">runbot_merge.pull_requests</field>
+        <field name="arch" type="xml">
+            <form>
+                <header/>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="repository"/>#<field name="number"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="target"/>
+                            <field name="state"/>
+                            <field name="author"/>
+                            <field name="priority"/>
+                        </group>
+                        <group>
+                            <field name="label"/>
+                            <field name="squash"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group colspan="4">
+                            <field name="head"/>
+                            <field name="statuses"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group colspan="4" string="Message">
+                            <field name="message" nolabel="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group colspan="4" string="Delegates">
+                            <field name="delegates" nolabel="1">
+                                <tree>
+                                    <field name="name"/>
+                                    <field name="github_login"/>
+                                </tree>
+                            </field>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="runbot_merge_action_stagings" model="ir.actions.act_window">
+        <field name="name">Stagings</field>
+        <field name="res_model">runbot_merge.stagings</field>
+        <field name="view_mode">tree,form</field>
+        <field name="context">{'default_active': True}</field>
+    </record>
+    <record id="runbot_merge_search_stagings" model="ir.ui.view">
+        <field name="name">Stagings Search</field>
+        <field name="model">runbot_merge.stagings</field>
+        <field name="arch" type="xml">
+            <search>
+                <filter string="Active" name="active"
+                        domain="[('heads', '!=', False)]"/>
+                <field name="state"/>
+                <field name="target"/>
+
+                <group>
+                    <filter string="Target" name="target_" context="{'group_by': 'target'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+    <record id="runbot_merge_tree_stagings" model="ir.ui.view">
+        <field name="name">Stagings Tree</field>
+        <field name="model">runbot_merge.stagings</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="target"/>
+                <field name="state"/>
+            </tree>
+        </field>
+    </record>
+
+    <menuitem name="Mergebot" id="runbot_merge_menu"/>
+    <menuitem name="Projects" id="runbot_merge_menu_project"
+              parent="runbot_merge_menu"
+              action="runbot_merge_action_projects"/>
+    <menuitem name="Pull Requests" id="runbot_merge_menu_prs"
+              parent="runbot_merge_menu"
+              action="runbot_merge_action_prs"/>
+    <menuitem name="Stagings" id="runbot_merge_menu_stagings"
+              parent="runbot_merge_menu"
+              action="runbot_merge_action_stagings"/>
+</odoo>

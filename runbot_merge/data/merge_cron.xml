@@ -1,0 +1,12 @@
+<odoo>
+  <record model="ir.cron" id="merge_cron">
+    <field name="name">Check for progress of PRs &amp; Stagings</field>
+    <field name="model_id" ref="model_runbot_merge_project"/>
+    <field name="state">code</field>
+    <field name="code">model._check_progress()</field>
+    <field name="interval_number">1</field>
+    <field name="interval_type">minutes</field>
+    <field name="numbercall">-1</field>
+    <field name="doall" eval="False"/>
+  </record>
+</odoo>
