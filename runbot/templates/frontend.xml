@@ -12,10 +12,13 @@
           </xpath>
       </template>
 
-      <!-- remove black bar with switcher d'apps -->
+      <!-- remove black bar with app switcher -->
       <template id="inherits_no_black_bar" inherit_id="website.user_navbar" name="Inherits No black user_navbar">
           <xpath expr="//nav[@id='oe_main_menu_navbar']" position="attributes">
               <attribute name="groups">base.group_website_publisher</attribute>
+          </xpath>
+          <xpath expr="//t[@t-set='body_classname']" position="attributes">
+              <attribute name="t-value">'o_connected_user' if env['ir.ui.view'].user_has_groups('base.group_website_publisher') else None</attribute>
           </xpath>
       </template>
       <!-- Frontend repository block -->
