@@ -219,7 +219,8 @@ class runbot_build(models.Model):
                 build.domain = "%s:%s" % (domain, build.port)
 
     def _guess_result(self):
-        self.env.cr.execute("""
+        cr = self.env.cr
+        cr.execute("""
             SELECT b.id,
                    CASE WHEN b.state != 'testing' THEN b.result
                         WHEN array_agg(l.level)::text[] && ARRAY['ERROR', 'CRITICAL'] THEN 'ko'
@@ -231,7 +232,9 @@ class runbot_build(models.Model):
              WHERE b.id IN %s
           GROUP BY b.id
         """, [tuple(self.ids)])
-        return dict(self.env.cr.fetchall())
+        result = {row[0]: row[1] for row in cr.fetchall()}
+        for build in self:
+            build.guess_result = result[build.id]
 
     def _get_time(self):
         """Return the time taken by the tests"""
