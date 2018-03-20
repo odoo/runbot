@@ -13,6 +13,7 @@ from subprocess import CalledProcessError
 from ..common import dt2time, fqdn, now, locked, grep, time2str, rfind, uniq_list, local_pgadmin_cursor, lock
 from odoo import models, fields, api
 from odoo.exceptions import UserError
+from odoo.http import request
 from odoo.tools import config, appdirs
 
 _re_error = r'^(?:\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ (?:ERROR|CRITICAL) )|(?:Traceback \(most recent call last\):)$'
@@ -279,7 +280,8 @@ class runbot_build(models.Model):
             else:
                 rebuild = False
             if rebuild:
-                build._log('rebuild', 'Rebuild initiated by %s' % self.env.user.name)
+                user = request.env.user if request else self.env.user
+                build._log('rebuild', 'Rebuild initiated by %s' % user.name)
 
     def _skip(self):
         """Mark builds ids as skipped"""
@@ -614,8 +616,8 @@ class runbot_build(models.Model):
 
     def _ask_kill(self):
         self.ensure_one()
-        user = self.env.user
-        uid = self.env.uid
+        user = request.env.user if request else self.env.user
+        uid = user.id
         if self.state == 'pending':
             self._skip(ids=self.ids)
             self._log('_ask_kill', 'Skipping build %s, requested by %s (user #%s)' % (self.dest, user.name, uid))
