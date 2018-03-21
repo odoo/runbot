@@ -294,9 +294,9 @@ class runbot_repo(models.Model):
                 os.kill(pid, signal.SIGHUP)
             except Exception:
                 _logger.debug('start nginx')
-                if subprocess.check_output(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf']):
+                if subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf']):
                     # obscure nginx bug leaving orphan worker listening on nginx port
-                    if not subprocess.check_output(['pkill', '-f', '-P1', 'nginx: worker']):
+                    if not subprocess.call(['pkill', '-f', '-P1', 'nginx: worker']):
                         _logger.debug('failed to start nginx - orphan worker killed, retrying')
                         subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf'])
                     else:
