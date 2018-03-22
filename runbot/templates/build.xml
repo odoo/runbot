@@ -23,10 +23,10 @@
     <template id="runbot.build_button">
         <div t-attf-class="pull-right">
             <div t-attf-class="btn-group {{klass}}">
-                <a t-if="bu['state']=='running'" t-attf-href="http://{{bu['domain']}}/?db={{bu['dest']}}-all" class="btn btn-primary"><i class="fa fa-sign-in"/></a>
-                <a t-attf-href="/runbot/build/{{bu['id']}}" class="btn btn-default"><i class="fa fa-file-text-o"/></a>
-                <a t-attf-href="https://#{repo.base}/commit/#{bu['name']}" class="btn btn-default"><i class="fa fa-github"/></a>
-                <button class="btn btn-default dropdown-toggle" data-toggle="dropdown"><i class="fa fa-cog"/><span class="caret"></span></button>
+                <a t-if="bu['state']=='running'" t-attf-href="http://{{bu['domain']}}/?db={{bu['dest']}}-all" class="btn btn-primary" aria-label="Sign in on this build"><i class="fa fa-sign-in"/></a>
+                <a t-attf-href="/runbot/build/{{bu['id']}}" class="btn btn-default" aria-label="Build details"><i class="fa fa-file-text-o"/></a>
+                <a t-attf-href="https://#{repo.base}/commit/#{bu['name']}" class="btn btn-default" aria-label="Open commit on GitHub"><i class="fa fa-github"/></a>
+                <button class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-label="Build options" aria-expanded="false"><i class="fa fa-cog"/><span class="caret"></span></button>
                 <ul class="dropdown-menu" role="menu">
                     <li t-if="bu['result']=='skipped'" groups="runbot.group_runbot_admin">
                         <a href="#" class="runbot-rebuild" t-att-data-runbot-build="bu['id']">Force Build <i class="fa fa-level-up"></i></a>
@@ -97,7 +97,7 @@
                               </p>
                               <form class="navbar-form navbar-left form-inline">
                                 <div class="btn-group">
-                                  <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
+                                  <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
                                     Filter <span class="caret"></span>
                                   </button>
                                   <ul class="dropdown-menu" role="menu">
@@ -123,7 +123,7 @@
 
                               <ul class="nav navbar-nav navbar-right">
                                 <li class="dropdown">
-                                  <a href="#" class="dropdown-toggle" data-toggle="dropdown">Other builds <b class="caret"></b></a>
+                                  <a href="#" class="dropdown-toggle" data-toggle="dropdown" aria-expanded="false">Other builds <b class="caret"></b></a>
                                   <ul class="dropdown-menu">
                                     <t t-foreach='other_builds' t-as='other_build'>
                                       <li><a t-attf-href="/runbot/build/{{other_build.id}}">
