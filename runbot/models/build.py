@@ -317,7 +317,7 @@ class runbot_build(models.Model):
 
         for b in builds:
             path = os.path.join(build_dir, b)
-            if b not in actives and os.path.isdir(path) and not os.path.isabs(path):
+            if b not in actives and os.path.isdir(path) and os.path.isabs(path):
                 shutil.rmtree(path)
 
         # cleanup old unused databases
