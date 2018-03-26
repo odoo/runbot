@@ -104,7 +104,7 @@ class Repo(object):
 
     def make_pr(self, title, body, target, ctid, user, label=None):
         assert 'heads/%s' % target in self.refs
-        return PR(self, title, body, target, ctid, user=user, label=label or f'{user}:{target}')
+        return PR(self, title, body, target, ctid, user=user, label=label or '{}:{}'.format(user, target))
 
     def make_ref(self, name, commit, force=False):
         assert isinstance(self.objects[commit], Commit)
@@ -190,7 +190,7 @@ class Repo(object):
             m = re.match(pattern, path)
             if m:
                 return handler(self, request, **m.groupdict())
-        return (404, {'message': f"No match for {request.method} {path}"})
+        return (404, {'message': "No match for {} {}".format(request.method, path)})
 
     def _read_ref(self, r, ref):
         obj = self.refs.get(ref)
@@ -496,12 +496,19 @@ class Commit(object):
 
     def __str__(self):
         parents = '\n'.join('parent {p}' for p in self.parents) + '\n'
-        return f"""commit {self.id}
-tree {self.tree}
-{parents}author {self.author}
-committer {self.committer}
+        return """commit {}
+tree {}
+{}author {}
+committer {}
 
-{self.message}"""
+{}""".format(
+    self.id,
+    self.tree,
+    parents,
+    self.author,
+    self.committer,
+    self.message
+)
 
 class Client(werkzeug.test.Client):
     def __init__(self, application, path):

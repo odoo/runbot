@@ -14,7 +14,7 @@ class GH(object):
         self._url = 'https://api.github.com'
         self._repo = repo
         session = self._session = requests.Session()
-        session.headers['Authorization'] = f'token {token}'
+        session.headers['Authorization'] = 'token {}'.format(token)
 
     def __call__(self, method, path, json=None, check=True):
         """
@@ -22,7 +22,7 @@ class GH(object):
         """
         r = self._session.request(
             method,
-            f'{self._url}/repos/{self._repo}/{path}',
+            '{}/repos/{}/{}'.format(self._url, self._repo, path),
             json=json
         )
         if check:
@@ -34,31 +34,31 @@ class GH(object):
         return r
 
     def head(self, branch):
-        d = self('get', f'git/refs/heads/{branch}').json()
+        d = self('get', 'git/refs/heads/{}'.format(branch)).json()
 
-        assert d['ref'] == f'refs/heads/{branch}'
+        assert d['ref'] == 'refs/heads/{}'.format(branch)
         assert d['object']['type'] == 'commit'
         return d['object']['sha']
 
     def commit(self, sha):
-        return self('GET', f'git/commits/{sha}').json()
+        return self('GET', 'git/commits/{}'.format(sha)).json()
 
     def comment(self, pr, message):
-        self('POST', f'issues/{pr}/comments', json={'body': message})
+        self('POST', 'issues/{}/comments'.format(pr), json={'body': message})
 
     def close(self, pr, message):
         self.comment(pr, message)
-        self('PATCH', f'pulls/{pr}', json={'state': 'closed'})
+        self('PATCH', 'pulls/{}'.format(pr), json={'state': 'closed'})
 
     def fast_forward(self, branch, sha):
         try:
-            self('patch', f'git/refs/heads/{branch}', json={'sha': sha})
+            self('patch', 'git/refs/heads/{}'.format(branch), json={'sha': sha})
         except requests.HTTPError:
             raise exceptions.FastForwardError()
 
     def set_ref(self, branch, sha):
         # force-update ref
-        r = self('patch', f'git/refs/heads/{branch}', json={
+        r = self('patch', 'git/refs/heads/{}'.format(branch), json={
             'sha': sha,
             'force': True,
         }, check=False)
@@ -68,7 +68,7 @@ class GH(object):
         if r.status_code == 404:
             # fallback: create ref
             r = self('post', 'git/refs', json={
-                'ref': f'refs/heads/{branch}',
+                'ref': 'refs/heads/{}'.format(branch),
                 'sha': sha,
             }, check=False)
             if r.status_code == 201:
@@ -102,7 +102,7 @@ class GH(object):
         cursor = None
         owner, name = self._repo.split('/')
         while True:
-            response = self._session.post(f'{self._url}/graphql', json={
+            response = self._session.post('{}/graphql'.format(self._url), json={
                 'query': PR_QUERY,
                 'variables': {
                     'owner': owner,
@@ -117,7 +117,7 @@ class GH(object):
 
                 author = into(pr, 'author.login') or into(pr, 'headRepositoryOwner.login')
                 source = into(pr, 'headRepositoryOwner.login') or into(pr, 'author.login')
-                label = source and f"{source}:{pr['headRefName']}"
+                label = source and "{}:{}".format(source, pr['headRefName'])
                 yield {
                     'number': pr['number'],
                     'title': pr['title'],

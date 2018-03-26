@@ -614,7 +614,7 @@ class TestPRUpdate(object):
         prx.push(c2)
         assert pr.head == c2, "PR should still be updated in case it's reopened"
         assert prx.comments == [
-            ('<insert current user here>', f"This pull request is closed, ignoring the update to {c2}"),
+            ('<insert current user here>', "This pull request is closed, ignoring the update to {}".format(c2)),
         ]
 
     def test_reopen_update(self, env, repo):
@@ -756,8 +756,8 @@ class TestPRUpdate(object):
         assert pr.head == c, "PR should not be updated at all"
         assert prx.comments == [
             ('reviewer', 'hansen r+'),
-            ('<insert current user here>', f'Merged in {h}'),
-            ('<insert current user here>', f"This pull request is closed, ignoring the update to {c2}"),
+            ('<insert current user here>', 'Merged in {}'.format(h)),
+            ('<insert current user here>', "This pull request is closed, ignoring the update to {}".format(c2)),
         ]
     def test_update_error(self, env, repo):
         """ Should cancel the staging & reset PR to approved
@@ -816,13 +816,13 @@ class TestBatching(object):
                       each tree is an update on the "current state" of the tree
         :param target: branch, both the base commit and the PR target
         """
-        base = repo.commit(f'heads/{target}')
+        base = repo.commit('heads/{}'.format(target))
         tree = dict(repo.objects[base.tree])
         c = base.id
         for i, t in enumerate(trees):
             tree.update(t)
-            c = repo.make_commit(c, f'commit_{prefix}_{i:02}', None, tree=dict(tree))
-        pr = repo.make_pr(f'title {prefix}', f'body {prefix}', target=target, ctid=c, user=user, label=f'{user}:{prefix}')
+            c = repo.make_commit(c, 'commit_{}_{:02}'.format(prefix, i), None, tree=dict(tree))
+        pr = repo.make_pr('title {}'.format(prefix), 'body {}'.format(prefix), target=target, ctid=c, user=user, label='{}:{}'.format(user, prefix))
         repo.post_status(c, 'success', 'ci/runbot')
         repo.post_status(c, 'success', 'legal/cla')
         pr.post_comment('hansen r+', 'reviewer')

@@ -94,7 +94,7 @@ class Project(models.Model):
                         prs.write({'state': 'merged'})
                         for pr in prs:
                             # FIXME: this is the staging head rather than the actual merge commit for the PR
-                            gh[pr.repository.name].close(pr.number, f'Merged in {staging_heads[pr.repository.name]}')
+                            gh[pr.repository.name].close(pr.number, 'Merged in {}'.format(staging_heads[pr.repository.name]))
                     finally:
                         staging.batch_ids.unlink()
                         staging.unlink()
@@ -153,7 +153,7 @@ class Project(models.Model):
                     gh = it['gh'] = repo.github()
                     it['head'] = gh.head(branch.name)
                     # create tmp staging branch
-                    gh.set_ref(f'tmp.{branch.name}', it['head'])
+                    gh.set_ref('tmp.{}'.format(branch.name), it['head'])
 
                 batch_limit = project.batch_limit
                 for batch in batches:
@@ -173,7 +173,7 @@ class Project(models.Model):
                     })
                     # create staging branch from tmp
                     for r, it in meta.items():
-                        it['gh'].set_ref(f'staging.{branch.name}', it['head'])
+                        it['gh'].set_ref('staging.{}'.format(branch.name), it['head'])
                     logger.info("Created staging %s", st)
 
     def is_timed_out(self, staging):
@@ -204,7 +204,7 @@ class Project(models.Model):
                 ])
             }
             for i, pr in enumerate(gh.prs()):
-                message = f"{pr['title'].strip()}\n\n{pr['body'].strip()}"
+                message = "{}\n\n{}".format(pr['title'].strip(), pr['body'].strip())
                 existing = prs.get(pr['number'])
                 target = pr['base']['ref']
                 if existing:
@@ -407,7 +407,7 @@ class PullRequests(models.Model):
 
         commands = dict(
             ps
-            for m in re.findall(f'^{self.repository.project_id.github_prefix}:? (.*)$', comment, re.MULTILINE)
+            for m in re.findall('^{}:? (.*)$'.format(self.repository.project_id.github_prefix), comment, re.MULTILINE)
             for c in m.strip().split()
             for ps in [self._parse_command(c)]
             if ps is not None
@@ -462,9 +462,9 @@ class PullRequests(models.Model):
                 author.github_login, author.display_name,
             )
             if ok:
-                applied.append(f'{command}({param})')
+                applied.append('{}({})'.format(command, param))
             else:
-                ignored.append(f'{command}({param})')
+                ignored.append('{}({})'.format(command, param))
         msg = []
         if applied:
             msg.append('applied ' + ' '.join(applied))
@@ -616,7 +616,7 @@ class Stagings(models.Model):
         # single batch => the staging is an unredeemable failure
         if self.state != 'failure':
             # timed out, just mark all PRs (wheee)
-            self.fail(f'timed out (>{self.target.project_id.ci_timeout} minutes)')
+            self.fail('timed out (>{} minutes)'.format(self.target.project_id.ci_timeout))
             return False
 
         # try inferring which PR failed and only mark that one
@@ -694,7 +694,7 @@ class Batch(models.Model):
                 author = commit['author']
 
             try:
-                new_heads[pr] = gh.merge(pr.head, f'tmp.{pr.target.name}', msg, squash=pr.squash, author=author)['sha']
+                new_heads[pr] = gh.merge(pr.head, 'tmp.{}'.format(pr.target.name), msg, squash=pr.squash, author=author)['sha']
             except exceptions.MergeError:
                 _logger.exception("Failed to merge %s:%s into staging branch", pr.repository.name, pr.number)
                 pr.state = 'error'
@@ -703,7 +703,7 @@ class Batch(models.Model):
                 # reset other PRs
                 for to_revert in new_heads.keys():
                     it = meta[to_revert.repository]
-                    it['gh'].set_ref(f'tmp.{to_revert.target.name}', it['head'])
+                    it['gh'].set_ref('tmp.{}'.format(to_revert.target.name), it['head'])
 
                 return self.env['runbot_merge.batch']
 
