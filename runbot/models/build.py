@@ -88,6 +88,8 @@ class runbot_build(models.Model):
         if duplicate_id and not context.get('force_rebuild'):
             extra_info.update({'state': 'duplicate', 'duplicate_id': duplicate_id})
         build_id.write(extra_info)
+        if build_id.state == 'duplicate' and build_id.duplicate_id.state in ('running', 'done'):
+            build_id._github_status()
         return build_id
 
     def _reset(self):
@@ -693,16 +695,17 @@ class runbot_build(models.Model):
         """Notify github of failed/successful builds"""
         runbot_domain = self.env['runbot.repo']._domain()
         for build in self:
+            b = build.duplicate_id if build.state == 'duplicate' else build
             desc = "runbot build %s" % (build.dest,)
-            if build.state == 'testing':
+            if b.state == 'testing':
                 state = 'pending'
-            elif build.state in ('running', 'done'):
+            elif b.state in ('running', 'done'):
                 state = 'error'
-                if build.result == 'ok':
+                if b.result == 'ok':
                     state = 'success'
-                if build.result == 'ko':
+                if b.result == 'ko':
                     state = 'failure'
-                desc += " (runtime %ss)" % (build.job_time,)
+                desc += " (runtime %ss)" % (b.job_time,)
             else:
                 continue
             status = {
@@ -784,8 +787,9 @@ class runbot_build(models.Model):
         else:
             v['result'] = "ko"
         build.write(v)
-        build._github_status()
-
+        # post statuses on duplicate too
+        for b in self.search([('name', '=', build.name)]):
+            b._github_status()
         # run server
         cmd, mods = build._cmd()
         if os.path.exists(build._server('addons/im_livechat')):
