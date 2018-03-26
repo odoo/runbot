@@ -55,15 +55,15 @@ def repo_c(gh, project):
     ])
 
 def make_pr(repo, prefix, trees, target='master', user='user', label=None):
-    base = repo.commit(f'heads/{target}')
+    base = repo.commit('heads/{}'.format(target))
     tree = dict(repo.objects[base.tree])
     c = base.id
     for i, t in enumerate(trees):
         tree.update(t)
-        c = repo.make_commit(c, f'commit_{prefix}_{i:02}', None,
+        c = repo.make_commit(c, 'commit_{}_{:02}'.format(prefix, i), None,
                              tree=dict(tree))
-    pr = repo.make_pr(f'title {prefix}', f'body {prefix}', target=target,
-                      ctid=c, user=user, label=label and f'{user}:{label}')
+    pr = repo.make_pr('title {}'.format(prefix), 'body {}'.format(prefix), target=target,
+                      ctid=c, user=user, label=label and '{}:{}'.format(user, label))
     repo.post_status(c, 'success', 'ci/runbot')
     repo.post_status(c, 'success', 'legal/cla')
     pr.post_comment('hansen r+', 'reviewer')
@@ -281,8 +281,8 @@ def test_batching(env, project, repo_a, repo_b):
     repo_b.make_ref('heads/master', repo_b.make_commit(None, 'initial', None, tree={'b': 'b0'}))
 
     prs = [(
-        a and to_pr(env, make_pr(repo_a, f'A{i}', [{f'a{i}': f'a{i}'}], label=f'batch{i}')),
-        b and to_pr(env, make_pr(repo_b, f'B{i}', [{f'b{i}': f'b{i}'}], label=f'batch{i}'))
+        a and to_pr(env, make_pr(repo_a, 'A{}'.format(i), [{'a{}'.format(i): 'a{}'.format(i)}], label='batch{}'.format(i))),
+        b and to_pr(env, make_pr(repo_b, 'B{}'.format(i), [{'b{}'.format(i): 'b{}'.format(i)}], label='batch{}'.format(i)))
     )
         for i, (a, b) in enumerate([(1, 1), (0, 1), (1, 1), (1, 1), (1, 0)])
     ]
@@ -310,8 +310,8 @@ def test_batching_split(env, repo_a, repo_b):
     repo_b.make_ref('heads/master', repo_b.make_commit(None, 'initial', None, tree={'b': 'b0'}))
 
     prs = [(
-        a and to_pr(env, make_pr(repo_a, f'A{i}', [{f'a{i}': f'a{i}'}], label=f'batch{i}')),
-        b and to_pr(env, make_pr(repo_b, f'B{i}', [{f'b{i}': f'b{i}'}], label=f'batch{i}'))
+        a and to_pr(env, make_pr(repo_a, 'A{}'.format(i), [{'a{}'.format(i): 'a{}'.format(i)}], label='batch{}'.format(i))),
+        b and to_pr(env, make_pr(repo_b, 'B{}'.format(i), [{'b{}'.format(i): 'b{}'.format(i)}], label='batch{}'.format(i)))
     )
         for i, (a, b) in enumerate([(1, 1), (0, 1), (1, 1), (1, 1), (1, 0)])
     ]

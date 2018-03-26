@@ -10,7 +10,7 @@ class MergebotController(Controller):
     def index(self):
         event = request.httprequest.headers['X-Github-Event']
 
-        return EVENTS.get(event, lambda _: f"Unknown event {event}")(request.jsonrequest)
+        return EVENTS.get(event, lambda _: "Unknown event {}".format(event))(request.jsonrequest)
 
 def handle_pr(event):
     if event['action'] in [
@@ -23,7 +23,7 @@ def handle_pr(event):
             event['pull_request']['base']['repo']['full_name'],
             event['pull_request']['number'],
         )
-        return f'Ignoring'
+        return 'Ignoring'
 
     env = request.env(user=1)
     pr = event['pull_request']
@@ -39,7 +39,7 @@ def handle_pr(event):
         # report actual errors to the webhooks listing thing on
         # github (not that we'd be looking at them but it'd be
         # useful for tests)
-        return f"Not configured to handle {r}"
+        return "Not configured to handle {}".format(r)
 
     # PRs to unmanaged branches are not necessarily abnormal and
     # we don't care
@@ -67,7 +67,7 @@ def handle_pr(event):
         if not branch:
             pr = find(source_branch)
             pr.unlink()
-            return f'Retargeted {pr.id} to un-managed branch {b}, deleted'
+            return 'Retargeted {} to un-managed branch {}, deleted'.format(pr.id, b)
 
         # retargeting from un-managed => create
         if not source_branch:
@@ -77,16 +77,16 @@ def handle_pr(event):
         if source_branch != branch:
             updates['target'] = branch.id
         if event['changes'].keys() & {'title', 'body'}:
-            updates['message'] = f"{pr['title'].strip()}\n\n{pr['body'].strip()}"
+            updates['message'] = "{}\n\n{}".format(pr['title'].strip(), pr['body'].strip())
         if updates:
             pr_obj = find(source_branch)
             pr_obj.write(updates)
-            return f'Updated {pr_obj.id}'
-        return f"Nothing to update ({event['changes'].keys()})"
+            return 'Updated {}'.format(pr_obj.id)
+        return "Nothing to update ({})".format(event['changes'].keys())
 
     if not branch:
         _logger.info("Ignoring PR for un-managed branch %s:%s", r, b)
-        return f"Not set up to care about {r}:{b}"
+        return "Not set up to care about {}:{}".format(r, b)
 
     author_name = pr['user']['login']
     author = env['res.partner'].search([('github_login', '=', author_name)], limit=1)
@@ -109,24 +109,24 @@ def handle_pr(event):
             'repository': repo.id,
             'head': pr['head']['sha'],
             'squash': pr['commits'] == 1,
-            'message': f'{title}\n\n{body}',
+            'message': '{}\n\n{}'.format(title, body),
         })
-        return f"Tracking PR as {pr_obj.id}"
+        return "Tracking PR as {}".format(pr_obj.id)
 
     pr_obj = find(branch)
     if not pr_obj:
         _logger.warn("webhook %s on unknown PR %s:%s", event['action'], repo.name, pr['number'])
-        return f"Unknown PR {repo.name}:{pr['number']}"
+        return "Unknown PR {}:{}".format(repo.name, pr['number'])
     if event['action'] == 'synchronize':
         if pr_obj.head == pr['head']['sha']:
-            return f'No update to pr head'
+            return 'No update to pr head'
 
         if pr_obj.state in ('closed', 'merged'):
             pr_obj.repository.github().comment(
-                pr_obj.number, f"This pull request is closed, ignoring the update to {pr['head']['sha']}")
+                pr_obj.number, "This pull request is closed, ignoring the update to {}".format(pr['head']['sha']))
             # actually still update the head of closed (but not merged) PRs
             if pr_obj.state == 'merged':
-                return f'Ignoring update to {pr_obj.id}'
+                return 'Ignoring update to {}'.format(pr_obj.id)
 
         if pr_obj.state == 'validated':
             pr_obj.state = 'opened'
@@ -145,19 +145,19 @@ def handle_pr(event):
 
         # TODO: should we update squash as well? What of explicit squash commands?
         pr_obj.head = pr['head']['sha']
-        return f'Updated {pr_obj.id} to {pr_obj.head}'
+        return 'Updated {} to {}'.format(pr_obj.id, pr_obj.head)
 
     # don't marked merged PRs as closed (!!!)
     if event['action'] == 'closed' and pr_obj.state != 'merged':
         pr_obj.state = 'closed'
-        return f'Closed {pr_obj.id}'
+        return 'Closed {}'.format(pr_obj.id)
 
     if event['action'] == 'reopened' and pr_obj.state == 'closed':
         pr_obj.state = 'opened'
-        return f'Reopened {pr_obj.id}'
+        return 'Reopened {}'.format(pr_obj.id)
 
     _logger.info("Ignoring event %s on PR %s", event['action'], pr['number'])
-    return f"Not handling {event['action']} yet"
+    return "Not handling {} yet".format(event['action'])
 
 def handle_status(event):
     _logger.info(
@@ -197,7 +197,7 @@ def handle_comment(event):
     return pr._parse_commands(partner, event['comment']['body'])
 
 def handle_ping(event):
-    print(f"Got ping! {event['zen']}")
+    print("Got ping! {}".format(event['zen']))
     return "pong"
 
 EVENTS = {
