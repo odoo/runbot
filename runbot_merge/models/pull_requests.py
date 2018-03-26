@@ -271,7 +271,7 @@ class Repository(models.Model):
     def _auto_init(self):
         res = super(Repository, self)._auto_init()
         tools.create_unique_index(
-            self._cr, 'runbot_merge_unique_repo', self._table, ['name', 'project_id'])
+            self._cr, 'runbot_merge_unique_repo', self._table, ['name'])
         return res
 
 class Branch(models.Model):
