@@ -11,8 +11,6 @@ import odoo
 
 import pytest
 
-from fake_github import git
-
 @pytest.fixture
 def project(env):
     env['res.partner'].create({
@@ -54,7 +52,20 @@ def repo_c(gh, project):
         ((odoo.http.root, '/runbot_merge/hooks'), ['pull_request', 'issue_comment', 'status'])
     ])
 
-def make_pr(repo, prefix, trees, target='master', user='user', label=None):
+def make_pr(repo, prefix, trees, *, target='master', user='user', label=None,
+            statuses=(('ci/runbot', 'success'), ('legal/cla', 'success')),
+            reviewer='reviewer'):
+    """
+    :type repo: fake_github.Repo
+    :type prefix: str
+    :type trees: list[dict]
+    :type target: str
+    :type user: str
+    :type label: str | None
+    :type statuses: list[(str, str)]
+    :type reviewer: str | None
+    :rtype: fake_github.PR
+    """
     base = repo.commit('heads/{}'.format(target))
     tree = dict(repo.objects[base.tree])
     c = base.id
@@ -64,9 +75,10 @@ def make_pr(repo, prefix, trees, target='master', user='user', label=None):
                              tree=dict(tree))
     pr = repo.make_pr('title {}'.format(prefix), 'body {}'.format(prefix), target=target,
                       ctid=c, user=user, label=label and '{}:{}'.format(user, label))
-    repo.post_status(c, 'success', 'ci/runbot')
-    repo.post_status(c, 'success', 'legal/cla')
-    pr.post_comment('hansen r+', 'reviewer')
+    for context, result in statuses:
+        repo.post_status(c, result, context)
+    if reviewer:
+        pr.post_comment('hansen r+', reviewer)
     return pr
 def to_pr(env, pr):
     return env['runbot_merge.pull_requests'].search([
@@ -344,3 +356,25 @@ def test_batching_split(env, repo_a, repo_b):
     assert len(st2.batch_ids) == 2
     assert st2.mapped('batch_ids.prs') == \
         prs[0][0] | prs[0][1] | prs[1][1]
+
+def test_urgent(env, repo_a, repo_b):
+    """ Either PR of a co-dependent pair being p=0 leads to the entire pair
+    being prioritized
+    """
+    repo_a.make_ref('heads/master', repo_a.make_commit(None, 'initial', None, tree={'a0': 'a'}))
+    repo_b.make_ref('heads/master', repo_b.make_commit(None, 'initial', None, tree={'b0': 'b'}))
+
+    pr_a = make_pr(repo_a, 'A', [{'a1': 'a'}, {'a2': 'a'}], label='batch', reviewer=None, statuses=[])
+    pr_b = make_pr(repo_b, 'B', [{'b1': 'b'}, {'b2': 'b'}], label='batch', reviewer=None, statuses=[])
+    pr_c = make_pr(repo_a, 'C', [{'c1': 'c', 'c2': 'c'}])
+
+    pr_b.post_comment('hansen p=0', 'reviewer')
+
+    env['runbot_merge.project']._check_progress()
+    # should have batched pr_a and pr_b despite neither being reviewed or
+    # approved
+    p_a, p_b = to_pr(env, pr_a), to_pr(env, pr_b)
+    p_c = to_pr(env, pr_c)
+    assert p_a.batch_id and p_b.batch_id and p_a.batch_id == p_b.batch_id,\
+        "a and b should have been recognised as co-dependent"
+    assert not p_c.staging_id

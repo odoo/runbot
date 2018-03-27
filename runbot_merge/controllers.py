@@ -132,16 +132,11 @@ def handle_pr(event):
             pr_obj.state = 'opened'
         elif pr_obj.state == 'ready':
             pr_obj.state = 'approved'
-            if pr_obj.staging_id:
-                _logger.info(
-                    "Updated PR %s:%s, removing staging %s",
-                    pr_obj.repository.name, pr_obj.number,
-                    pr_obj.staging_id,
-                )
-                # immediately cancel the staging?
-                staging = pr_obj.staging_id
-                staging.batch_ids.unlink()
-                staging.unlink()
+            pr_obj.staging_id.cancel(
+                "Updated PR %s:%s, removing staging %s",
+                pr_obj.repository.name, pr_obj.number,
+                pr_obj.staging_id,
+            )
 
         # TODO: should we update squash as well? What of explicit squash commands?
         pr_obj.head = pr['head']['sha']
