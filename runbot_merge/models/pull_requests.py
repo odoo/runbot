@@ -693,6 +693,8 @@ class Batch(models.Model):
                 msg = commit['message']
                 author = commit['author']
 
+            msg += '\n\ncloses {pr.repository.name}#{pr.number}'.format(pr=pr)
+
             try:
                 new_heads[pr] = gh.merge(pr.head, 'tmp.{}'.format(pr.target.name), msg, squash=pr.squash, author=author)['sha']
             except exceptions.MergeError:
