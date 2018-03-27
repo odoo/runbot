@@ -78,6 +78,7 @@ def test_trivial_flow(env, repo):
         'a': b'some other content',
         'b': b'a second file',
     }
+    assert master.message, "gibberish\n\nblahblah\n\ncloses odoo/odoo#1"
 
 def test_staging_conflict(env, repo):
     # create base branch
