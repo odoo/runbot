@@ -307,18 +307,19 @@ class runbot_build(models.Model):
         root = self.env['runbot.repo']._root()
         build_dir = os.path.join(root, 'build')
         builds = os.listdir(build_dir)
-        self.env.cr.execute("""
-            SELECT dest
-              FROM runbot_build
-             WHERE dest IN %s
-               AND (state != 'done' OR job_end > (now() - interval '7 days'))
-        """, [tuple(builds)])
-        actives = set(b[0] for b in self.env.cr.fetchall())
+        if builds:
+            self.env.cr.execute("""
+                SELECT dest
+                  FROM runbot_build
+                 WHERE dest IN %s
+                   AND (state != 'done' OR job_end > (now() - interval '7 days'))
+            """, [tuple(builds)])
+            actives = set(b[0] for b in self.env.cr.fetchall())
 
-        for b in builds:
-            path = os.path.join(build_dir, b)
-            if b not in actives and os.path.isdir(path) and os.path.isabs(path):
-                shutil.rmtree(path)
+            for b in builds:
+                path = os.path.join(build_dir, b)
+                if b not in actives and os.path.isdir(path) and os.path.isabs(path):
+                    shutil.rmtree(path)
 
         # cleanup old unused databases
         self.env.cr.execute("select id from runbot_build where state in ('testing', 'running')")
