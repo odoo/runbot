@@ -46,7 +46,6 @@ def locked(filename):
     try:
         fd = os.open(filename, os.O_CREAT | os.O_RDWR, 0o600)
     except OSError:
-        os.close(fd)
         return False
     try:
         fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
