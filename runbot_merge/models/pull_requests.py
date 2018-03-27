@@ -113,39 +113,42 @@ class Project(models.Model):
                 if branch.active_staging_id:
                     continue
 
-                # Splits can generate inactive stagings, restage these first
-                if branch.staging_ids:
+                self.env.cr.execute("""
+                SELECT
+                  min(pr.priority) as priority,
+                  array_agg(pr.id) AS match
+                FROM runbot_merge_pull_requests pr
+                WHERE pr.target = %s
+                  AND pr.batch_id IS NULL
+                  -- exclude terminal states (so there's no issue when
+                  -- deleting branches & reusing labels)
+                  AND pr.state != 'merged'
+                  AND pr.state != 'closed'
+                GROUP BY pr.label
+                HAVING bool_or(pr.priority = 0)
+                    OR bool_and(pr.state = 'ready')
+                ORDER BY min(pr.priority), min(pr.id)
+                """, [branch.id])
+                # result: [(priority, [(repo_id, pr_id) for repo in repos]
+                rows = self.env.cr.fetchall()
+                priority = rows[0][0] if rows else -1
+                if priority == 0:
+                    # p=0 take precedence over all else
+                    batches = [
+                        PRs.browse(pr_ids)
+                        for _, pr_ids in takewhile(lambda r: r[0] == priority, rows)
+                    ]
+                elif branch.staging_ids:
+                    # Splits can generate inactive stagings, restage these first
                     staging = branch.staging_ids[0]
                     logger.info("Found inactive staging %s, reactivating", staging)
                     batches = [batch.prs for batch in staging.batch_ids]
                     staging.unlink()
-                else:
-                    self.env.cr.execute("""
-                    SELECT
-                      min(pr.priority) as priority,
-                      array_agg(pr.id) AS match
-                    FROM runbot_merge_pull_requests pr
-                    WHERE pr.target = %s
-                      AND pr.batch_id IS NULL
-                      -- exclude terminal states (so there's no issue when
-                      -- deleting branches & reusing labels)
-                      AND pr.state != 'merged'
-                      AND pr.state != 'closed'
-                    GROUP BY pr.label
-                    HAVING every(pr.state = 'ready')
-                    ORDER BY min(pr.priority), min(pr.id)
-                    """, [branch.id])
-                    # result: [(priority, [(repo_id, pr_id) for repo in repos]
-                    rows = self.env.cr.fetchall()
-                    logger.info(
-                        "Looking for PRs to stage for %s... %s",
-                        branch.name, rows
-                    )
-                    if not rows:
-                        continue
-
-                    priority = rows[0][0]
+                elif rows:
+                    # p=1 or p=2
                     batches = [PRs.browse(pr_ids) for _, pr_ids in takewhile(lambda r: r[0] == priority, rows)]
+                else:
+                    continue
 
                 staged = Batch
                 meta = {repo: {} for repo in project.repo_ids}
@@ -454,6 +457,12 @@ class PullRequests(models.Model):
                 if is_admin:
                     ok = True
                     self.priority = param
+                    self.target.active_staging_id.cancel(
+                        "P=0 on %s:%s by %s, unstaging %s",
+                        self.repository.name, self.number,
+                        author.github_login, self.target.name,
+                    )
+
             _logger.info(
                 "%s %s(%s) on %s:%s by %s (%s)",
                 "applied" if ok else "ignored",
@@ -584,6 +593,14 @@ class Stagings(models.Model):
                     else:
                         assert v == 'success'
             s.state = st
+
+    def cancel(self, reason, *args):
+        if not self:
+            return
+
+        _logger.info(reason, *args)
+        self.batch_ids.unlink()
+        self.unlink()
 
     def fail(self, message, prs=None):
         _logger.error("Staging %s failed: %s", self, message)

@@ -813,13 +813,20 @@ class TestPRUpdate(object):
         assert not env['runbot_merge.pull_requests'].search([('number', '=', prx.number)])
 
 class TestBatching(object):
-    def _pr(self, repo, prefix, trees, target='master', user='user'):
+    def _pr(self, repo, prefix, trees, *,
+            target='master', user='user', reviewer='reviewer',
+            statuses=(('ci/runbot', 'success'), ('legal/cla', 'success'))
+        ):
         """ Helper creating a PR from a series of commits on a base
 
         :param prefix: a prefix used for commit messages, PR title & PR body
         :param trees: a list of dicts symbolising the tree for the corresponding commit.
                       each tree is an update on the "current state" of the tree
         :param target: branch, both the base commit and the PR target
+        :type target: str
+        :type user: str
+        :type reviewer: str | None
+        :type statuses: List[(str, str)]
         """
         base = repo.commit('heads/{}'.format(target))
         tree = dict(repo.objects[base.tree])
@@ -828,9 +835,11 @@ class TestBatching(object):
             tree.update(t)
             c = repo.make_commit(c, 'commit_{}_{:02}'.format(prefix, i), None, tree=dict(tree))
         pr = repo.make_pr('title {}'.format(prefix), 'body {}'.format(prefix), target=target, ctid=c, user=user, label='{}:{}'.format(user, prefix))
-        repo.post_status(c, 'success', 'ci/runbot')
-        repo.post_status(c, 'success', 'legal/cla')
-        pr.post_comment('hansen r+', 'reviewer')
+
+        for context, result in statuses:
+            repo.post_status(c, result, context)
+        if reviewer:
+            pr.post_comment('hansen r+', reviewer)
         return pr
 
     def _get(self, env, number):
@@ -885,10 +894,6 @@ class TestBatching(object):
         assert pr11.staging_id == pr12.staging_id
 
     def test_batching_urgent(self, env, repo):
-        """ "Urgent" PRs should be selected before pressing & normal & batched together (?)
-
-        TODO: should they also ignore validation aka immediately staged?
-        """
         m = repo.make_commit(None, 'initial', None, tree={'a': 'some content'})
         repo.make_ref('heads/master', m)
 
@@ -900,27 +905,64 @@ class TestBatching(object):
         pr11.post_comment('hansen priority=1', 'reviewer')
         pr12.post_comment('hansen priority=1', 'reviewer')
 
-        pr01 = self._pr(repo, 'Urgent 1', [{'n': 'n'}, {'o': 'o'}])
-        pr02 = self._pr(repo, 'Urgent 2', [{'p': 'p'}, {'q': 'q'}])
-        pr01.post_comment('hansen priority=0', 'reviewer')
-        pr02.post_comment('hansen priority=0', 'reviewer')
+        # stage PR1
+        env['runbot_merge.project']._check_progress()
+        p_11, p_12, p_21, p_22 = \
+            [self._get(env, pr.number) for pr in [pr11, pr12, pr21, pr22]]
+        assert not p_21.staging_id or p_22.staging_id
+        assert p_11.staging_id and p_12.staging_id
+        assert p_11.staging_id == p_12.staging_id
+        staging_1 = p_11.staging_id
 
-        pr01, pr02, pr11, pr12, pr21, pr22 = prs = \
-            [self._get(env, pr.number) for pr in [pr01, pr02, pr11, pr12, pr21, pr22]]
-        assert pr01.priority == pr02.priority == 0
-        assert pr11.priority == pr12.priority == 1
-        assert pr21.priority == pr22.priority == 2
+        # no statuses run on PR0s
+        pr01 = self._pr(repo, 'Urgent 1', [{'n': 'n'}, {'o': 'o'}], reviewer=None, statuses=[])
+        pr01.post_comment('hansen priority=0', 'reviewer')
+        p_01 = self._get(env, pr01.number)
+        assert p_01.state == 'opened'
+        assert p_01.priority == 0
 
         env['runbot_merge.project']._check_progress()
+        # first staging should be cancelled and PR0 should be staged
+        # regardless of CI (or lack thereof)
+        assert not staging_1.exists()
+        assert not p_11.staging_id and not p_12.staging_id
+        assert p_01.staging_id
 
-        assert all(pr.state == 'ready' for pr in prs)
-        assert pr01.staging_id
-        assert pr02.staging_id
-        assert pr01.staging_id == pr02.staging_id
-        assert not pr11.staging_id
-        assert not pr12.staging_id
-        assert not pr21.staging_id
-        assert not pr22.staging_id
+    def test_batching_urgenter_than_split(self, env, repo):
+        """ p=0 PRs should take priority over split stagings (processing
+        of a staging having CI-failed and being split into sub-stagings)
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'a': 'some content'})
+        repo.make_ref('heads/master', m)
+
+        pr1 = self._pr(repo, 'PR1', [{'a': 'AAA'}, {'b': 'BBB'}])
+        p_1 = self._get(env, pr1.number)
+        pr2 = self._pr(repo, 'PR2', [{'a': 'some_content', 'c': 'CCC'}, {'d': 'DDD'}])
+        p_2 = self._get(env, pr2.number)
+
+        env['runbot_merge.project']._check_progress()
+        st = env['runbot_merge.stagings'].search([])
+        # both prs should be part of the staging
+        assert st.mapped('batch_ids.prs') == p_1 | p_2
+        # add CI failure
+        repo.post_status('heads/staging.master', 'failure', 'ci/runbot')
+        repo.post_status('heads/staging.master', 'success', 'legal/cla')
+
+        env['runbot_merge.project']._check_progress()
+        # should have staged the first half
+        assert p_1.staging_id.heads
+        assert not p_2.staging_id.heads
+
+        # during restaging of pr1, create urgent PR
+        pr0 = self._pr(repo, 'urgent', [{'a': 'a', 'b': 'b'}], reviewer=None, statuses=[])
+        pr0.post_comment('hansen priority=0', 'reviewer')
+
+        env['runbot_merge.project']._check_progress()
+        # TODO: maybe just deactivate stagings instead of deleting them when canceling?
+        assert not p_1.staging_id
+        assert self._get(env, pr0.number).staging_id
+
+
 
     @pytest.mark.skip(reason="Maybe nothing to do, the PR is just skipped and put in error?")
     def test_batching_merge_failure(self, env, repo):
@@ -932,28 +974,16 @@ class TestBatching(object):
         m = repo.make_commit(None, 'initial', None, tree={'a': 'some content'})
         repo.make_ref('heads/master', m)
 
-        c10 = repo.make_commit(m, 'AAA', None, tree={'a': 'AAA'})
-        c11 = repo.make_commit(c10, 'BBB', None, tree={'a': 'AAA', 'b': 'BBB'})
-        pr1 = repo.make_pr('t1', 'b1', target='master', ctid=c11, user='user', label='user:a')
-        repo.post_status(pr1.head, 'success', 'ci/runbot')
-        repo.post_status(pr1.head, 'success', 'legal/cla')
-        pr1.post_comment('hansen r+', "reviewer")
-
-        c20 = repo.make_commit(m, 'CCC', None, tree={'a': 'some content', 'c': 'CCC'})
-        c21 = repo.make_commit(c20, 'DDD', None, tree={'a': 'some content', 'c': 'CCC', 'd': 'DDD'})
-        pr2 = repo.make_pr('t2', 'b2', target='master', ctid=c21, user='user', label='user:b')
-        repo.post_status(pr2.head, 'success', 'ci/runbot')
-        repo.post_status(pr2.head, 'success', 'legal/cla')
-        pr2.post_comment('hansen r+', "reviewer")
+        pr1 = self._pr(repo, 'PR1', [{'a': 'AAA'}, {'b': 'BBB'}])
+        pr2 = self._pr(repo, 'PR2', [{'a': 'some_content', 'c': 'CCC'}, {'d': 'DDD'}])
 
         env['runbot_merge.project']._check_progress()
         st = env['runbot_merge.stagings'].search([])
         # both prs should be part of the staging
         assert len(st.mapped('batch_ids.prs')) == 2
         # add CI failure
-        h = repo.commit('heads/staging.master').id
-        repo.post_status(h, 'failure', 'ci/runbot')
-        repo.post_status(h, 'success', 'legal/cla')
+        repo.post_status('heads/staging.master', 'failure', 'ci/runbot')
+        repo.post_status('heads/staging.master', 'success', 'legal/cla')
 
         pr1 = env['runbot_merge.pull_requests'].search([('number', '=', pr1.number)])
         pr2 = env['runbot_merge.pull_requests'].search([('number', '=', pr2.number)])
