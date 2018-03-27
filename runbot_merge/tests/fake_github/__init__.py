@@ -327,9 +327,9 @@ class Repo(object):
             pr.base = body.get('base')
 
         if body.get('state') == 'open':
-            self.notify('pull_request', 'reopened', self.name, pr)
+            self.notify('pull_request', 'reopened', pr)
         elif body.get('state') == 'closed':
-            self.notify('pull_request', 'closed', self.name, pr)
+            self.notify('pull_request', 'closed', pr)
 
         return (200, {})
 
@@ -434,20 +434,20 @@ class PR(Issue):
         self.label = label
         self.state = 'open'
 
-        repo.notify('pull_request', 'opened', repo.name, self)
+        repo.notify('pull_request', 'opened', self)
 
     @Issue.title.setter
     def title(self, value):
         old = self.title
         Issue.title.fset(self, value)
-        self.repo.notify('pull_request', 'edited', self.repo.name, self, {
+        self.repo.notify('pull_request', 'edited', self, {
             'title': {'from': old}
         })
     @Issue.body.setter
     def body(self, value):
         old = self.body
         Issue.body.fset(self, value)
-        self.repo.notify('pull_request', 'edited', self.repo.name, self, {
+        self.repo.notify('pull_request', 'edited', self, {
             'body': {'from': old}
         })
     @property
@@ -456,22 +456,22 @@ class PR(Issue):
     @base.setter
     def base(self, value):
         old, self._base = self._base, value
-        self.repo.notify('pull_request', 'edited', self.repo.name, self, {
+        self.repo.notify('pull_request', 'edited', self, {
             'base': {'from': {'ref': old}}
         })
 
     def push(self, sha):
         self.head = sha
-        self.repo.notify('pull_request', 'synchronize', self.repo.name, self)
+        self.repo.notify('pull_request', 'synchronize', self)
 
     def open(self):
         assert self.state == 'closed'
         self.state = 'open'
-        self.repo.notify('pull_request', 'reopened', self.repo.name, self)
+        self.repo.notify('pull_request', 'reopened', self)
 
     def close(self):
         self.state = 'closed'
-        self.repo.notify('pull_request', 'closed', self.repo.name, self)
+        self.repo.notify('pull_request', 'closed', self)
 
     @property
     def commits(self):
@@ -479,6 +479,10 @@ class PR(Issue):
         target = self.repo.commit('heads/%s' % self.base).id
         return len({h for h, _ in git.walk_ancestors(store, self.head, False)}
                    - {h for h, _ in git.walk_ancestors(store, target, False)})
+
+    def post_review(self, state, user, body):
+        self.comments.append((user, "REVIEW %s\n\n%s " % (state, body)))
+        self.repo.notify('pull_request_review', state, self, user, body)
 
 class Commit(object):
     __slots__ = ['tree', 'message', 'author', 'committer', 'parents', 'statuses']
@@ -524,30 +528,36 @@ class Client(werkzeug.test.Client):
             data=json.dumps(data),
         )
 
-    def pull_request(self, action, repository, pr, changes=None):
+    def pull_request(self, action, pr, changes=None):
         assert action in ('opened', 'reopened', 'closed', 'synchronize', 'edited')
         return self.open(self._make_env(
             'pull_request', {
                 'action': action,
-                'pull_request': {
-                    'number': pr.number,
-                    'head': {
-                        'sha': pr.head,
-                        'label': pr.label,
-                    },
-                    'base': {
-                        'ref': pr.base,
-                        'repo': {
-                            'name': repository.split('/')[1],
-                            'full_name': repository,
-                        },
-                    },
-                    'title': pr.title,
-                    'body': pr.body,
-                    'commits': pr.commits,
-                    'user': { 'login': pr.user },
-                },
+                'pull_request': self._pr(pr),
                 **({'changes': changes} if changes else {})
+            }
+        ))
+
+    def pull_request_review(self, action, pr, user, body):
+        """
+        :type action: 'APPROVED' | 'REQUEST_CHANGES' | 'COMMENT'
+        :type pr: PR
+        :type user: str
+        :type body: str
+        """
+        assert action in ('APPROVED', 'REQUEST_CHANGES', 'COMMENT')
+        return self.open(self._make_env(
+            'pull_request_review', {
+                'review': {
+                    'state': action,
+                    'body': body,
+                    'user': {'login': user},
+                },
+                'pull_request': self._pr(pr),
+                'repository': {
+                    'name': pr.repo.name.split('/')[1],
+                    'full_name': pr.repo.name,
+                }
             }
         ))
 
@@ -573,3 +583,26 @@ class Client(werkzeug.test.Client):
         if isinstance(issue, PR):
             contents['issue']['pull_request'] = { 'url': 'fake' }
         return self.open(self._make_env('issue_comment', contents))
+
+    def _pr(self, pr):
+        """
+        :type pr: PR
+        """
+        return {
+            'number': pr.number,
+            'head': {
+                'sha': pr.head,
+                'label': pr.label,
+            },
+            'base': {
+                'ref': pr.base,
+                'repo': {
+                    'name': pr.repo.name.split('/')[1],
+                    'full_name': pr.repo.name,
+                },
+            },
+            'title': pr.title,
+            'body': pr.body,
+            'commits': pr.commits,
+            'user': {'login': pr.user},
+        }

@@ -10,7 +10,11 @@ class MergebotController(Controller):
     def index(self):
         event = request.httprequest.headers['X-Github-Event']
 
-        return EVENTS.get(event, lambda _: "Unknown event {}".format(event))(request.jsonrequest)
+        c = EVENTS.get(event)
+        if c:
+            return c(request.jsonrequest)
+        _logger.warn('Unknown event %s', event)
+        return 'Unknown event {}'.format(event)
 
 def handle_pr(event):
     if event['action'] in [
@@ -191,14 +195,36 @@ def handle_comment(event):
 
     return pr._parse_commands(partner, event['comment']['body'])
 
+def handle_review(event):
+    env = request.env(user=1)
+
+    partner = env['res.partner'].search([('github_login', '=', event['review']['user']['login'])])
+    if not partner:
+        _logger.info('ignoring comment from %s: not in system', event['review']['user']['login'])
+        return 'ignored'
+
+    pr = env['runbot_merge.pull_requests'].search([
+        ('number', '=', event['pull_request']['number']),
+        ('repository.name', '=', event['repository']['full_name'])
+    ])
+
+    firstline = ''
+    state = event['review']['state'].lower()
+    if state == 'approved':
+        firstline = pr.repository.project_id.github_prefix + ' r+\n'
+    elif state == 'request_changes':
+        firstline = pr.repository.project_id.github_prefix + ' r-\n'
+
+    return pr._parse_commands(partner, firstline + event['review']['body'])
+
 def handle_ping(event):
     print("Got ping! {}".format(event['zen']))
     return "pong"
 
 EVENTS = {
-    # TODO: add review?
     'pull_request': handle_pr,
     'status': handle_status,
     'issue_comment': handle_comment,
+    'pull_request_review': handle_review,
     'ping': handle_ping,
 }
