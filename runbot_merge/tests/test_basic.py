@@ -32,7 +32,9 @@ def repo(gh, env):
     })
     # need to create repo & branch in env so hook will allow processing them
     return gh.repo('odoo/odoo', hooks=[
-        ((odoo.http.root, '/runbot_merge/hooks'), ['pull_request', 'issue_comment', 'status'])
+        ((odoo.http.root, '/runbot_merge/hooks'), [
+            'pull_request', 'issue_comment', 'status', 'pull_request_review',
+        ])
     ])
 
 def test_trivial_flow(env, repo):
@@ -1120,3 +1122,23 @@ class TestReviewing(object):
             ('repository.name', '=', 'odoo/odoo'),
             ('number', '=', prx.number)
         ]).state == 'ready'
+
+    def test_actual_review(self, env, repo):
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        m2 = repo.make_commit(m, 'second', None, tree={'m': 'm', 'm2': 'm2'})
+        repo.make_ref('heads/master', m2)
+
+        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
+        prx = repo.make_pr('title', 'body', target='master', ctid=c1, user='user')
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', 'odoo/odoo'),
+            ('number', '=', prx.number)
+        ])
+
+        prx.post_review('COMMENT', 'reviewer', "hansen priority=1")
+        assert pr.priority == 1
+        assert pr.state == 'opened'
+
+        prx.post_review('APPROVED', 'reviewer', "hansen priority=2")
+        assert pr.priority == 2
+        assert pr.state == 'approved'

@@ -35,7 +35,7 @@ def project(env):
 def repo_a(gh, project):
     project.write({'repo_ids': [(0, 0, {'name': "odoo/a"})]})
     return gh.repo('odoo/a', hooks=[
-        ((odoo.http.root, '/runbot_merge/hooks'), ['pull_request', 'issue_comment', 'status'])
+        ((odoo.http.root, '/runbot_merge/hooks'), ['pull_request', 'issue_comment', 'status', 'pull_request_review'])
     ])
 
 @pytest.fixture
