@@ -348,7 +348,7 @@ class runbot_build(models.Model):
 
         # starting port
         icp = self.env['ir.config_parameter']
-        port = int(icp.get_param('runbot.starting_port', default=2000))
+        port = int(icp.get_param('runbot.runbot_starting_port', default=2000))
 
         # find next free port
         while port in ports:
@@ -367,7 +367,7 @@ class runbot_build(models.Model):
 
         icp = self.env['ir.config_parameter']
         # For retro-compatibility, keep this parameter in seconds
-        default_timeout = int(icp.get_param('runbot.timeout', default=1800)) / 60
+        default_timeout = int(icp.get_param('runbot.runbot_timeout', default=1800)) / 60
 
         for build in self:
             if build.state == 'deathrow':

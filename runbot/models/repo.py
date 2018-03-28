@@ -122,7 +122,7 @@ class runbot_repo(models.Model):
         _logger.debug('repo %s updating branches', repo.name)
 
         icp = self.env['ir.config_parameter']
-        max_age = int(icp.get_param('runbot.max_age', default=30))
+        max_age = int(icp.get_param('runbot.runbot_max_age', default=30))
 
         Build = self.env['runbot.build']
         Branch = self.env['runbot.branch']
@@ -209,7 +209,7 @@ class runbot_repo(models.Model):
         # skip old builds (if their sequence number is too low, they will not ever be built)
         skippable_domain = [('repo_id', '=', repo.id), ('state', '=', 'pending')]
         icp = self.env['ir.config_parameter']
-        running_max = int(icp.get_param('runbot.running_max', default=75))
+        running_max = int(icp.get_param('runbot.runbot_running_max', default=75))
         builds_to_be_skipped = Build.search(skippable_domain, order='sequence desc', offset=running_max)
         builds_to_be_skipped._skip()
 
@@ -224,8 +224,8 @@ class runbot_repo(models.Model):
     def _scheduler(self, ids=None):
         """Schedule builds for the repository"""
         icp = self.env['ir.config_parameter']
-        workers = int(icp.get_param('runbot.workers', default=6))
-        running_max = int(icp.get_param('runbot.running_max', default=75))
+        workers = int(icp.get_param('runbot.runbot_workers', default=6))
+        running_max = int(icp.get_param('runbot.runbot_running_max', default=75))
         host = fqdn()
 
         Build = self.env['runbot.build']
