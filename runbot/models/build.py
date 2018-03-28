@@ -197,7 +197,7 @@ class runbot_build(models.Model):
                     # exception. We ignore this branch as there is no common ref between us.
                     continue
             if common_refs:
-                b = sorted(common_refs.iteritems(), key=operator.itemgetter(1), reverse=True)[0][0]
+                b = sorted(common_refs.items(), key=operator.itemgetter(1), reverse=True)[0][0]
                 return target_id, b, 'fuzzy'
 
         # 5. last-resort value
