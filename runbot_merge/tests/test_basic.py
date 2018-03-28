@@ -52,18 +52,24 @@ def test_trivial_flow(env, repo):
         ('number', '=', pr1.number),
     ])
     assert pr.state == 'opened'
+    env['runbot_merge.project']._check_progress()
+    assert pr1.labels == {'seen 🙂'}
     # nothing happened
 
     repo.post_status(c1, 'success', 'legal/cla')
     repo.post_status(c1, 'success', 'ci/runbot')
     assert pr.state == 'validated'
+    env['runbot_merge.project']._check_progress()
+    assert pr1.labels == {'seen 🙂', 'CI 🤖'}
 
     pr1.post_comment('hansen r+', 'reviewer')
     assert pr.state == 'ready'
 
+    # can't check labels here as running the cron will stage it
+
     env['runbot_merge.project']._check_progress()
-    print(pr.read()[0])
     assert pr.staging_id
+    assert pr1.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merging 👷'}
 
     # get head of staging branch
     staging_head = repo.commit('heads/staging.master')
@@ -72,6 +78,7 @@ def test_trivial_flow(env, repo):
 
     env['runbot_merge.project']._check_progress()
     assert pr.state == 'merged'
+    assert pr1.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merged 🎉'}
 
     master = repo.commit('heads/master')
     assert master.parents == [m, pr1.head],\
@@ -109,24 +116,25 @@ def test_staging_conflict(env, repo):
     repo.post_status(c3, 'success', 'ci/runbot')
     pr2.post_comment('hansen r+', "reviewer")
     env['runbot_merge.project']._check_progress()
-    pr2 = env['runbot_merge.pull_requests'].search([
+    p_2 = env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', 'odoo/odoo'),
         ('number', '=', 2)
     ])
-    assert pr2.state == 'ready', "PR2 should not have been staged since there is a pending staging for master"
+    assert p_2.state == 'ready', "PR2 should not have been staged since there is a pending staging for master"
+    assert pr2.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌'}
 
     staging_head = repo.commit('heads/staging.master')
     repo.post_status(staging_head.id, 'success', 'ci/runbot')
     repo.post_status(staging_head.id, 'success', 'legal/cla')
     env['runbot_merge.project']._check_progress()
     assert pr1.state == 'merged'
-    assert pr2.staging_id
+    assert p_2.staging_id
 
     staging_head = repo.commit('heads/staging.master')
     repo.post_status(staging_head.id, 'success', 'ci/runbot')
     repo.post_status(staging_head.id, 'success', 'legal/cla')
     env['runbot_merge.project']._check_progress()
-    assert pr2.state == 'merged'
+    assert p_2.state == 'merged'
 
 def test_staging_concurrent(env, repo):
     """ test staging to different targets, should be picked up together """
@@ -184,6 +192,7 @@ def test_staging_merge_fail(env, repo):
         ('number', '=', prx.number)
     ])
     assert pr1.state == 'error'
+    assert prx.labels == {'seen 🙂', 'error 🙅'}
     assert prx.comments == [
         ('reviewer', 'hansen r+'),
         ('<insert current user here>', 'Unable to stage PR (merge conflict)')
@@ -312,6 +321,8 @@ def test_edit(env, repo):
     # FIXME: should a PR retargeted to an unmanaged branch really be deleted?
     prx.base = '2.0'
     assert not pr.exists()
+    env['runbot_merge.project']._check_progress()
+    assert prx.labels == set()
 
     prx.base = '1.0'
     assert env['runbot_merge.pull_requests'].search([

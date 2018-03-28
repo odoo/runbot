@@ -1,11 +1,11 @@
 import collections
 import io
-import itertools
 import json
 import logging
 import re
 
 import responses
+import werkzeug.urls
 import werkzeug.test
 import werkzeug.wrappers
 
@@ -333,6 +333,31 @@ class Repo(object):
 
         return (200, {})
 
+    def _add_labels(self, r, number):
+        try:
+            pr = self.issues[int(number)]
+        except KeyError:
+            return (404, None)
+
+        pr.labels.update(json.loads(r.body))
+
+        return (200, {})
+
+    def _remove_label(self, r, number, label):
+        print('remove_label', number, label)
+        try:
+            pr = self.issues[int(number)]
+        except KeyError:
+            return (404, None)
+
+        print(pr, pr.labels)
+        try:
+            pr.labels.remove(werkzeug.urls.url_unquote(label))
+        except KeyError:
+            return (404, None)
+        else:
+            return (200, {})
+
     def _do_merge(self, r):
         body = json.loads(r.body) # {base, head, commit_message}
         if not body.get('commit_message'):
@@ -394,6 +419,9 @@ class Repo(object):
         ('POST', r'merges', _do_merge),
 
         ('PATCH', r'pulls/(?P<number>\d+)', _edit_pr),
+
+        ('POST', r'issues/(?P<number>\d+)/labels', _add_labels),
+        ('DELETE', r'issues/(?P<number>\d+)/labels/(?P<label>.+)', _remove_label),
     ]
 
 class Issue(object):
@@ -403,6 +431,7 @@ class Issue(object):
         self._body = body
         self.number = max(repo.issues or [0]) + 1
         self.comments = []
+        self.labels = set()
         repo.issues[self.number] = self
 
     def post_comment(self, body, user):

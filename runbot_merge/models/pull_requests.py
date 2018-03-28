@@ -177,7 +177,52 @@ class Project(models.Model):
                     # create staging branch from tmp
                     for r, it in meta.items():
                         it['gh'].set_ref('staging.{}'.format(branch.name), it['head'])
+
+                    # creating the staging doesn't trigger a write on the prs
+                    # and thus the ->staging taggings, so do that by hand
+                    Tagging = self.env['runbot_merge.pull_requests.tagging']
+                    for pr in st.mapped('batch_ids.prs'):
+                        Tagging.create({
+                            'pull_request': pr.number,
+                            'repository': pr.repository.id,
+                            'state_from': pr._tagstate,
+                            'state_to': 'staged',
+                        })
+
                     logger.info("Created staging %s", st)
+
+        Repos = self.env['runbot_merge.repository']
+        ghs = {}
+        self.env.cr.execute("""
+        SELECT
+            t.repository as repo_id,
+            t.pull_request as pr_number,
+            array_agg(t.id) as ids,
+            (array_agg(t.state_from ORDER BY t.id))[1] as state_from,
+            (array_agg(t.state_to ORDER BY t.id DESC))[1] as state_to
+        FROM runbot_merge_pull_requests_tagging t
+        GROUP BY t.repository, t.pull_request
+        """)
+        to_remove = []
+        for repo_id, pr, ids, from_, to_ in self.env.cr.fetchall():
+            repo = Repos.browse(repo_id)
+            from_tags = _TAGS[from_ or False]
+            to_tags = _TAGS[to_ or False]
+
+            gh = ghs.get(repo)
+            if not gh:
+                gh = ghs[repo] = repo.github()
+
+            try:
+                gh.change_tags(pr, from_tags, to_tags)
+            except Exception:
+                _logger.exception(
+                    "Error while trying to change the tags of %s:%s from %s to %s",
+                    repo.name, pr, from_tags, to_tags,
+                )
+            else:
+                to_remove.extend(ids)
+        self.env['runbot_merge.pull_requests.tagging'].browse(to_remove).unlink()
 
     def is_timed_out(self, staging):
         return fields.Datetime.from_string(staging.staged_at) + datetime.timedelta(minutes=self.ci_timeout) < datetime.datetime.now()
@@ -504,6 +549,99 @@ class PullRequests(models.Model):
         tools.create_unique_index(
             self._cr, 'runbot_merge_unique_pr_per_target', self._table, ['number', 'target', 'repository'])
         return res
+
+    @property
+    def _tagstate(self):
+        if self.state == 'ready' and self.staging_id.heads:
+            return 'staged'
+        return self.state
+
+    @api.model
+    def create(self, vals):
+        pr = super().create(vals)
+        self.env['runbot_merge.pull_requests.tagging'].create({
+            'pull_request': pr.number,
+            'repository': pr.repository.id,
+            'state_from': False,
+            'state_to': pr._tagstate,
+        })
+        return pr
+
+    @api.multi
+    def write(self, vals):
+        oldstate = { pr: pr._tagstate for pr in self }
+        w = super().write(vals)
+        for pr in self:
+            before, after = oldstate[pr], pr._tagstate
+            if after != before:
+                self.env['runbot_merge.pull_requests.tagging'].create({
+                    'pull_request': pr.number,
+                    'repository': pr.repository.id,
+                    'state_from': oldstate[pr],
+                    'state_to': pr._tagstate,
+                })
+        return w
+
+    @api.multi
+    def unlink(self):
+        for pr in self:
+            self.env['runbot_merge.pull_requests.tagging'].create({
+                'pull_request': pr.number,
+                'repository': pr.repository.id,
+                'state_from': pr._tagstate,
+                'state_to': False,
+            })
+        return super().unlink()
+
+
+_TAGS = {
+    False: set(),
+    'opened': {'seen 🙂'},
+}
+_TAGS['validated'] = _TAGS['opened'] | {'CI 🤖'}
+_TAGS['approved'] = _TAGS['opened'] | {'r+ 👌'}
+_TAGS['ready'] = _TAGS['validated'] | _TAGS['approved']
+_TAGS['staged'] = _TAGS['ready'] | {'merging 👷'}
+_TAGS['merged'] = _TAGS['ready'] | {'merged 🎉'}
+_TAGS['error'] = _TAGS['opened'] | {'error 🙅'}
+_TAGS['closed'] = _TAGS['opened'] | {'closed 💔'}
+
+class Tagging(models.Model):
+    """
+    Queue of tag changes to make on PRs.
+
+    Several PR state changes are driven by webhooks, webhooks should return
+    quickly, performing calls to the Github API would *probably* get in the
+    way of that. Instead, queue tagging changes into this table whose
+    execution can be cron-driven.
+    """
+    _name = 'runbot_merge.pull_requests.tagging'
+
+    repository = fields.Many2one('pull_request.repository', required=True)
+    # store the PR number (not id) as we need a Tagging for PR objects
+    # being deleted (retargeted to non-managed branches)
+    pull_request = fields.Integer()
+
+    state_from = fields.Selection([
+        ('opened', 'Opened'),
+        ('closed', 'Closed'),
+        ('validated', 'Validated'),
+        ('approved', 'Approved'),
+        ('ready', 'Ready'),
+        ('staged', 'Staged'),
+        ('merged', 'Merged'),
+        ('error', 'Error'),
+    ])
+    state_to = fields.Selection([
+        ('opened', 'Opened'),
+        ('closed', 'Closed'),
+        ('validated', 'Validated'),
+        ('approved', 'Approved'),
+        ('ready', 'Ready'),
+        ('staged', 'Staged'),
+        ('merged', 'Merged'),
+        ('error', 'Error'),
+    ])
 
 class Commit(models.Model):
     """Represents a commit onto which statuses might be posted,

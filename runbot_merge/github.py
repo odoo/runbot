@@ -50,6 +50,19 @@ class GH(object):
         self.comment(pr, message)
         self('PATCH', 'pulls/{}'.format(pr), json={'state': 'closed'})
 
+    def change_tags(self, pr, from_, to_):
+        to_add, to_remove = to_ - from_, from_ - to_
+        for t in to_remove:
+            r = self('DELETE', 'issues/{}/labels/{}'.format(pr, t), check=False)
+            r.raise_for_status()
+            # successful deletion or attempt to delete a tag which isn't there
+            # is fine, otherwise trigger an error
+            if r.status_code not in (200, 404):
+                r.raise_for_status()
+
+        if to_add:
+            self('POST', 'issues/{}/labels'.format(pr), json=list(to_add))
+
     def fast_forward(self, branch, sha):
         try:
             self('patch', 'git/refs/heads/{}'.format(branch), json={'sha': sha})
