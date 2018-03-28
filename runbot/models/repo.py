@@ -208,10 +208,18 @@ class runbot_repo(models.Model):
                     builds_to_skip = Build.search(
                         [('branch_id', '=', branch.id), ('state', '=', 'pending')],
                         order='sequence asc')
-                    builds_to_skip._skip()
+                    builds_to_skip._skip(reason='New ref found')
                     if builds_to_skip:
                         build_info['sequence'] = builds_to_skip[0].sequence
-                Build.create(build_info)
+                new_build = Build.create(build_info)
+                # create a reverse dependency build if needed
+                if branch.sticky:
+                    for rev_repo in self.search([('dependency_ids', 'in', self.id)]):
+                        # find the latest build with the same branch name
+                        latest_rev_build = Build.search([('repo_id.id', '=', rev_repo.id), ('branch_id.branch_name', '=', branch.branch_name)], order='id desc', limit=1)
+                        if latest_rev_build:
+                            _logger.debug('Reverse dependency build %s forced in repo %s by commit %s', latest_rev_build.dest, rev_repo.name, sha[:6])
+                            new_build.revdep_build_ids += latest_rev_build._force(message='Rebuild from dependency %s commit %s' % (repo.name, sha[:6]))
 
         # skip old builds (if their sequence number is too low, they will not ever be built)
         skippable_domain = [('repo_id', '=', repo.id), ('state', '=', 'pending')]

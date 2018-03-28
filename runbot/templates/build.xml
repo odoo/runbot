@@ -17,7 +17,21 @@
 
         <t t-if="bu['server_match'] in ('default', 'fuzzy')">
             <i class="text-warning fa fa-question-circle fa-fw"
-               title="Server branch cannot be determined exactly. Please use naming convention '9.0-my-branch' to build with '9.0' server branch."/>
+                title="Server branch cannot be determined exactly. Please use naming convention '9.0-my-branch' to build with '9.0' server branch."/>
+        </t>
+        <t t-if="bu['revdep_build_ids']">
+            <small class="pull-right">Dep builds:
+                <t t-foreach="bu['revdep_build_ids']" t-as="rbu">
+                            <a t-attf-href="/runbot/build/{{rbu['id']}}" aria-label="Build details" data-toggle="tooltip" t-attf-title="{{rbu['repo_id']['name']}}">
+                            <t t-if="rbu['result']=='ok'"><i class="text-success fa fa-thumbs-up"/></t>
+                            <t t-if="rbu['result']=='ko'"><i class="text-danger fa fa-thumbs-down"/></t>
+                            <t t-if="rbu['result']=='warn'"><i class="text-warning fa fa-warning"/></t>
+                            <t t-if="rbu['result']=='skipped'"><i class="text-danger fa fa-ban"/></t>
+                            <t t-if="rbu['result']=='killed'"><i class="text-danger fa fa-times"/>&#x1f480;</t>
+                            <t t-if="rbu['result']=='manually_killed'"><i class="text-danger fa fa-times"/>&#x1f52b;</t>
+                            </a>
+                </t>
+            </small>
         </t>
     </template>
     <template id="runbot.build_button">
