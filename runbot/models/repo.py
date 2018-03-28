@@ -78,7 +78,7 @@ class runbot_repo(models.Model):
         for repo in self:
             cmd = ['git', '--git-dir=%s' % repo.path] + cmd
             _logger.info("git command: %s", ' '.join(cmd))
-            return subprocess.check_output(cmd)
+            return subprocess.check_output(cmd).decode('utf-8')
 
     def _git_export(self, treeish, dest):
         """Export a git repo to dest"""
@@ -149,7 +149,7 @@ class runbot_repo(models.Model):
         fields = ['refname', 'objectname', 'committerdate:iso8601', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail']
         fmt = "%00".join(["%(" + field + ")" for field in fields])
         git_refs = repo._git(['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/heads', 'refs/pull'])
-        git_refs = git_refs.decode('utf-8').strip()
+        git_refs = git_refs.strip()
 
         refs = [[field for field in line.split('\x00')] for line in git_refs.split('\n')]
 
