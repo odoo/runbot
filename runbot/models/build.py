@@ -59,6 +59,9 @@ class runbot_build(models.Model):
                                      ('fuzzy', 'Fuzzy - common ancestor found'),
                                      ('default', 'No match found - defaults to master')],
                                     string='Server branch matching')
+    revdep_build_ids = fields.Many2many('runbot.build', 'runbot_rev_dep_builds',
+                                        column1='rev_dep_id', column2='dependent_id',
+                                        string='Builds that depends on this build')
 
     def copy(self, values=None):
         raise UserError("Cannot duplicate build!")
@@ -253,8 +256,9 @@ class runbot_build(models.Model):
             if build.job_start:
                 build.job_age = int(time.time() - dt2time(build.job_start))
 
-    def _force(self):
-        """Force a rebuild"""
+    def _force(self, message=None):
+        """Force a rebuild and return a recordset of forced builds"""
+        forced_builds = self.env['runbot.build']
         for build in self:
             pending_ids = self.search([('state', '=', 'pending')], order='id', limit=1)
             if pending_ids:
@@ -282,11 +286,17 @@ class runbot_build(models.Model):
             else:
                 rebuild = False
             if rebuild:
+                forced_builds |= build
                 user = request.env.user if request else self.env.user
                 build._log('rebuild', 'Rebuild initiated by %s' % user.name)
+                if message:
+                    build._log('rebuild', message)
+        return forced_builds
 
-    def _skip(self):
+    def _skip(self, reason=None):
         """Mark builds ids as skipped"""
+        if reason:
+            self._logger('skip', reason)
         self.write({'state': 'done', 'result': 'skipped'})
         to_unduplicate = self.search([('id', 'in', self.ids), ('duplicate_id', '!=', False)])
         to_unduplicate._force()
