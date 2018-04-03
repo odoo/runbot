@@ -559,12 +559,13 @@ class PullRequests(models.Model):
     @api.model
     def create(self, vals):
         pr = super().create(vals)
-        self.env['runbot_merge.pull_requests.tagging'].create({
-            'pull_request': pr.number,
-            'repository': pr.repository.id,
-            'state_from': False,
-            'state_to': pr._tagstate,
-        })
+        if pr.state not in ('closed', 'merged'):
+            self.env['runbot_merge.pull_requests.tagging'].create({
+                'pull_request': pr.number,
+                'repository': pr.repository.id,
+                'state_from': False,
+                'state_to': pr._tagstate,
+            })
         return pr
 
     @api.multi
