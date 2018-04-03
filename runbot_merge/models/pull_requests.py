@@ -68,8 +68,8 @@ class Project(models.Model):
                     }
                     repo_name = None
                     staging_heads = json.loads(staging.heads)
+                    updated = []
                     try:
-                        updated = []
                         for repo_name, head in staging_heads.items():
                             gh[repo_name].fast_forward(
                                 staging.target.name,
@@ -113,6 +113,7 @@ class Project(models.Model):
                 if branch.active_staging_id:
                     continue
 
+                # noinspection SqlResolve
                 self.env.cr.execute("""
                 SELECT
                   min(pr.priority) as priority,
@@ -193,6 +194,7 @@ class Project(models.Model):
 
         Repos = self.env['runbot_merge.repository']
         ghs = {}
+        # noinspection SqlResolve
         self.env.cr.execute("""
         SELECT
             t.repository as repo_id,
