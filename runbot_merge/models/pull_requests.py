@@ -125,7 +125,7 @@ class Project(models.Model):
                   AND pr.state != 'merged'
                   AND pr.state != 'closed'
                 GROUP BY pr.label
-                HAVING bool_or(pr.priority = 0)
+                HAVING (bool_or(pr.priority = 0) AND NOT bool_or(pr.state = 'error'))
                     OR bool_and(pr.state = 'ready')
                 ORDER BY min(pr.priority), min(pr.id)
                 """, [branch.id])

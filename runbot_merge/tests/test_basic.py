@@ -975,7 +975,25 @@ class TestBatching(object):
         assert not p_1.staging_id
         assert self._get(env, pr0.number).staging_id
 
+    def test_urgent_failed(self, env, repo):
+        """ Ensure pr[p=0,state=failed] don't get picked up
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'a': 'some content'})
+        repo.make_ref('heads/master', m)
 
+        pr21 = self._pr(repo, 'PR1', [{'a': 'AAA'}, {'b': 'BBB'}])
+
+        p_21 = self._get(env, pr21.number)
+
+        # no statuses run on PR0s
+        pr01 = self._pr(repo, 'Urgent 1', [{'n': 'n'}, {'o': 'o'}], reviewer=None, statuses=[])
+        pr01.post_comment('hansen priority=0', 'reviewer')
+        p_01 = self._get(env, pr01.number)
+        p_01.state = 'error'
+
+        env['runbot_merge.project']._check_progress()
+        assert not p_01.staging_id, "p_01 should not be picked up as it's failed"
+        assert p_21.staging_id, "p_21 should have been staged"
 
     @pytest.mark.skip(reason="Maybe nothing to do, the PR is just skipped and put in error?")
     def test_batching_merge_failure(self, env, repo):
