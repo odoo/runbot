@@ -620,7 +620,7 @@ class runbot_build(models.Model):
         user = request.env.user if request else self.env.user
         uid = user.id
         if self.state == 'pending':
-            self._skip(ids=self.ids)
+            self._skip()
             self._log('_ask_kill', 'Skipping build %s, requested by %s (user #%s)' % (self.dest, user.name, uid))
         elif self.state in ['testing', 'running']:
             self.write({'state': 'deathrow'})
