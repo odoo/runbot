@@ -26,6 +26,14 @@ class runbot_branch(models.Model):
     job_timeout = fields.Integer('Job Timeout (minutes)', help='For default timeout: Mark it zero')
     # test_tags = fields.Char("Test tags", help="Tags for the --test-tags params (same syntax)")  # keep for next version
 
+    @api.multi
+    def unlink(self):
+        """ask kill for the builds to avoid zombies and then deletes the repo"""
+        for branch in self:
+            builds_to_kill = self.env['runbot.build'].search([('branch_id', '=', branch.id), ('state', 'in', ['pending', 'running', 'testing'])])
+            builds_to_kill.write({'state': 'deathrow'})
+        return super(runbot_branch, self).unlink()
+
     @api.depends('name')
     def _get_branch_name(self):
         """compute the branch name based on ref name"""

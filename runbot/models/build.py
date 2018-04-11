@@ -10,7 +10,7 @@ import signal
 import subprocess
 import time
 from subprocess import CalledProcessError
-from ..common import dt2time, fqdn, now, locked, grep, time2str, rfind, uniq_list, local_pgadmin_cursor, lock
+from ..common import dt2time, fqdn, now, locked, grep, time2str, rfind, uniq_list, local_pgadmin_cursor, lock, is_port_available
 from odoo import models, fields, api
 from odoo.exceptions import UserError
 from odoo.http import request
@@ -344,7 +344,7 @@ class runbot_build(models.Model):
 
     def _find_port(self):
         # currently used port
-        ids = self.search([('state', 'not in', ['pending', 'done'])])
+        ids = self.search([('state', 'not in', ['pending', 'done']), ('host', '=', fqdn())])
         ports = set(i['port'] for i in ids.read(['port']))
 
         # starting port
@@ -352,7 +352,7 @@ class runbot_build(models.Model):
         port = int(icp.get_param('runbot.runbot_starting_port', default=2000))
 
         # find next free port
-        while port in ports:
+        while port in ports or is_port_available(port):
             port += 2
         return port
 

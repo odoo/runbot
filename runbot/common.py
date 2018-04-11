@@ -21,6 +21,17 @@ def fqdn():
     return socket.getfqdn()
 
 
+def is_port_available(port):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(('localhost', port))
+    except OSError:
+        return False
+    finally:
+        s.close()
+    return True
+
+
 def time2str(t):
     return time.strftime(DEFAULT_SERVER_DATETIME_FORMAT, t)
 

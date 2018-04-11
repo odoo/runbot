@@ -49,6 +49,14 @@ class runbot_repo(models.Model):
     token = fields.Char("Github token", groups="runbot.group_runbot_admin")
     group_ids = fields.Many2many('res.groups', string='Limited to groups')
 
+    @api.multi
+    def unlink(self):
+        """ask kill for the builds to avoid zombies and then deletes the repo"""
+        for repo in self:
+            builds_to_kill = self.env['runbot.build'].search([('repo_id', '=', repo.id), ('state', 'in', ['pending', 'running', 'testing'])])
+            builds_to_kill.write({'state': 'deathrow'})
+        return super(runbot_repo, self).unlink()
+
     def _root(self):
         """Return root directory of repository"""
         default = os.path.join(os.path.dirname(__file__), '../static')
