@@ -158,10 +158,10 @@ class runbot_build(models.Model):
         ]
         pulls = Branch.search_read(domain, fields, order='id DESC')
         pulls = sorted(pulls, key=sort_by_repo)
-        for pull in pulls:
+        for pull in Branch.browse([pu['id'] for pu in pulls]):
             pi = pull._get_pull_info()
             if pi.get('state') == 'open':
-                return result_for(pull)
+                return (pull.repo_id.id, pull.name, 'exact')
 
         # 3. Match a branch which is the dashed-prefix of current branch name
         branches = Branch.search_read(
