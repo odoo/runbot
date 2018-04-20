@@ -10,7 +10,7 @@ import signal
 import subprocess
 import time
 from subprocess import CalledProcessError
-from ..common import dt2time, fqdn, now, locked, grep, time2str, rfind, uniq_list, local_pgadmin_cursor, lock
+from ..common import dt2time, fqdn, now, locked, grep, time2str, rfind, uniq_list, local_pgadmin_cursor, lock, get_py_version
 from odoo import models, fields, api
 from odoo.exceptions import UserError
 from odoo.http import request
@@ -748,6 +748,7 @@ class runbot_build(models.Model):
         cmd += ['-d', '%s-all' % build.dest, '-i', mods, '--stop-after-init', '--log-level=test', '--max-cron-threads=0']
         env = None
         if build.branch_id.coverage:
+            pyversion = get_py_version(build)
             env = self._coverage_env(build)
             available_modules = [
                 os.path.basename(os.path.dirname(a))
@@ -756,7 +757,7 @@ class runbot_build(models.Model):
             ]
             bad_modules = set(available_modules) - set((mods or '').split(','))
             omit = ['--omit', ','.join(build._server('addons', m) for m in bad_modules)] if bad_modules else []
-            cmd = ['coverage', 'run', '--branch', '--source', build._server()] + omit + cmd[:]
+            cmd = [pyversion, '-m', 'coverage', 'run', '--branch', '--source', build._server()] + omit + cmd[:]
         # reset job_start to an accurate job_20 job_time
         build.write({'job_start': now()})
         return self._spawn(cmd, lock_path, log_path, cpu_limit=2100, env=env)
@@ -767,9 +768,10 @@ class runbot_build(models.Model):
     def _job_21_coverage(self, build, lock_path, log_path):
         if not build.branch_id.coverage:
             return -2
+        pyversion = get_py_version(build)
         cov_path = build._path('coverage')
         os.makedirs(cov_path, exist_ok=True)
-        cmd = ["coverage", "html", "-d", cov_path, "--ignore-errors"]
+        cmd = [pyversion, "-m", "coverage", "html", "-d", cov_path, "--ignore-errors"]
         return self._spawn(cmd, lock_path, log_path, env=self._coverage_env(build))
 
     def _job_30_run(self, build, lock_path, log_path):
