@@ -514,6 +514,12 @@ class runbot_build(models.Model):
                         'Building environment',
                         '%s match branch %s of %s' % (server_match, closest_name, repo.name)
                     )
+                    latest_commit = repo._git(['rev-parse', closest_name]).strip()
+                    commit_oneline = repo._git(['show', '--pretty="%H -- %s"', '-s', latest_commit]).strip()
+                    build._log(
+                        'Building environment',
+                        'Server built based on commit %s from %s' % (commit_oneline, closest_name)
+                    )
                     repo._git_export(closest_name, build._path())
 
                 # Finally mark all addons to move to openerp/addons
