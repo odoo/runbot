@@ -23,7 +23,7 @@
     <template id="runbot.build_button">
         <div t-attf-class="pull-right">
             <div t-attf-class="btn-group {{klass}}">
-                <a t-if="bu['state']=='running'" t-attf-href="http://{{bu['domain']}}/?db={{bu['dest']}}-all" class="btn btn-primary" aria-label="Sign in on this build"><i class="fa fa-sign-in"/></a>
+                <a t-if="bu['state']=='running'" t-attf-href="http://{{bu['domain']}}/?db={{bu['real_dest']}}-all" class="btn btn-primary" aria-label="Sign in on this build"><i class="fa fa-sign-in"/></a>
                 <a t-attf-href="/runbot/build/{{bu['id']}}" class="btn btn-default" aria-label="Build details"><i class="fa fa-file-text-o"/></a>
                 <a t-attf-href="https://#{repo.base}/commit/#{bu['name']}" class="btn btn-default" aria-label="Open commit on GitHub"><i class="fa fa-github"/></a>
                 <button class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-label="Build options" aria-expanded="false"><i class="fa fa-cog"/><span class="caret"></span></button>
