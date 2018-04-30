@@ -11,6 +11,12 @@ class TestRunbotSkipBuild(TransactionCase):
     def setUp(self):
         super().setUp()
         self.tmp_dir = tempfile.mkdtemp()
+
+        @self.addCleanup
+        def remove_tmp_dir():
+            if os.path.isdir(self.tmp_dir):
+                shutil.rmtree(self.tmp_dir)
+
         self.work_tree = os.path.join(self.tmp_dir, "git_example")
         self.git_dir = os.path.join(self.work_tree, ".git")
         subprocess.call(["git", "init", self.work_tree])
@@ -18,17 +24,12 @@ class TestRunbotSkipBuild(TransactionCase):
         if os.path.isdir(hooks_dir):
             # Avoid run a hooks for commit commands
             shutil.rmtree(hooks_dir)
-        self.repo = self.env["runbot.repo"]
+        self.repo = self.env["runbot.repo"].create({"name": self.git_dir})
 
-    def tearDown(self):
-        super().tearDown()
-        shutil.rmtree(self.tmp_dir)
-        if self.repo and os.path.isdir(self.repo.path):
-            shutil.rmtree(self.repo.path)
-        for build in self.env["runbot.build"].search([("repo_id", "in", self.repo.ids)]):
-            build_dir = os.path.join(self.repo._root(), build.dest)
-            if os.path.isdir(build_dir):
-                shutil.rmtree(build_dir)
+        @self.addCleanup
+        def remove_clone_dir():
+            if self.repo and os.path.isdir(self.repo.path):
+                shutil.rmtree(self.repo.path)
 
     def git(self, *cmd):
         subprocess.call(["git"] + list(cmd), cwd=self.work_tree)
