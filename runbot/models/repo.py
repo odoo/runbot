@@ -15,6 +15,9 @@ from odoo.modules.module import get_module_resource
 from odoo.tools import config
 from ..common import fqdn, dt2time
 
+SKIP_WORDS = ['[ci skip]', '[skip ci]']
+SKIP_WORDS_RE = re.compile("|".join(map(re.escape, SKIP_WORDS)))
+
 _logger = logging.getLogger(__name__)
 
 
@@ -146,7 +149,7 @@ class runbot_repo(models.Model):
         repo._git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*'])
         repo._git(['fetch', '-p', 'origin', '+refs/pull/*/head:refs/pull/*'])
 
-        fields = ['refname', 'objectname', 'committerdate:iso8601', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail']
+        fields = ['refname', 'objectname', 'committerdate:iso8601', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail', 'body']
         fmt = "%00".join(["%(" + field + ")" for field in fields])
         git_refs = repo._git(['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/heads', 'refs/pull'])
         git_refs = git_refs.strip()
@@ -161,7 +164,7 @@ class runbot_repo(models.Model):
         """, ([r[0] for r in refs], repo.id))
         ref_branches = {r[0]: r[1] for r in self.env.cr.fetchall()}
 
-        for name, sha, date, author, author_email, subject, committer, committer_email in refs:
+        for name, sha, date, author, author_email, subject, committer, committer_email, body in refs:
             # create or get branch
             # branch = repo.branch_ids.search([('name', '=', name), ('repo_id', '=', repo.id)])
             # if not branch:
@@ -170,6 +173,10 @@ class runbot_repo(models.Model):
             #        'repo_id': repo.id,
             #        'name': name})
             # keep for next version with a branch_ids field
+
+            # Skip the build for commit message as "[ci skip]"
+            if SKIP_WORDS_RE.search(subject.lower()) or SKIP_WORDS_RE.search(body.lower()):
+                continue
 
             if ref_branches.get(name):
                 branch_id = ref_branches[name]
