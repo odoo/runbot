@@ -8,9 +8,9 @@
           <t t-set="textklass" t-value="dict(ko='danger', warn='warning').get(bu['guess_result'], 'info')"/>
           <span t-attf-class="text-{{textklass}}"><i class="fa fa-spinner fa-spin"/> testing</span> <t t-esc="bu['job']"/> <small t-if="not hide_time"><t t-esc="bu['job_time']"/></small>
         </t>
-        <t t-if="bu['result']=='ok'"><i class="text-success fa fa-thumbs-up"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
-        <t t-if="bu['result']=='ko'"><i class="text-danger fa fa-thumbs-down"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
-        <t t-if="bu['result']=='warn'"><i class="text-warning fa fa-warning"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
+        <t t-if="bu['result']=='ok'"><i class="text-success fa fa-thumbs-up" title="Success" aria-label="Success"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
+        <t t-if="bu['result']=='ko'"><i class="text-danger fa fa-thumbs-down" title="Failed" aria-label="Failed"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
+        <t t-if="bu['result']=='warn'"><i class="text-warning fa fa-warning" title="Some warnings" aria-label="Some warnings"/><small t-if="not hide_time"> age <t t-esc="bu['job_age']"/> time <t t-esc="bu['job_time']"/></small></t>
         <t t-if="bu['result']=='skipped'"><i class="text-danger fa fa-ban"/> skipped</t>
         <t t-if="bu['result']=='killed'"><i class="text-danger fa fa-times"/> killed</t>
         <t t-if="bu['result']=='manually_killed'"><i class="text-danger fa fa-times"/> manually killed</t>
@@ -23,10 +23,10 @@
     <template id="runbot.build_button">
         <div t-attf-class="pull-right">
             <div t-attf-class="btn-group {{klass}}">
-                <a t-if="bu['state']=='running'" t-attf-href="http://{{bu['domain']}}/?db={{bu['real_dest']}}-all" class="btn btn-primary" aria-label="Sign in on this build"><i class="fa fa-sign-in"/></a>
-                <a t-attf-href="/runbot/build/{{bu['id']}}" class="btn btn-default" aria-label="Build details"><i class="fa fa-file-text-o"/></a>
-                <a t-attf-href="https://#{repo.base}/commit/#{bu['name']}" class="btn btn-default" aria-label="Open commit on GitHub"><i class="fa fa-github"/></a>
-                <button class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-label="Build options" aria-expanded="false"><i class="fa fa-cog"/><span class="caret"></span></button>
+                <a t-if="bu['state']=='running'" t-attf-href="http://{{bu['domain']}}/?db={{bu['real_dest']}}-all" class="btn btn-primary" title="Sign in on this build" aria-label="Sign in on this build"><i class="fa fa-sign-in"/></a>
+                <a t-attf-href="/runbot/build/{{bu['id']}}" class="btn btn-default" title="Build details" aria-label="Build details"><i class="fa fa-file-text-o"/></a>
+                <a t-attf-href="https://#{repo.base}/commit/#{bu['name']}" class="btn btn-default" title="Open commit on GitHub" aria-label="Open commit on GitHub"><i class="fa fa-github"/></a>
+                <button class="btn btn-default dropdown-toggle" data-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false"><i class="fa fa-cog"/><span class="caret"></span></button>
                 <ul class="dropdown-menu" role="menu">
                     <li t-if="bu['result']=='skipped'" groups="runbot.group_runbot_admin">
                         <a href="#" class="runbot-rebuild" t-att-data-runbot-build="bu['id']">Force Build <i class="fa fa-level-up"></i></a>
