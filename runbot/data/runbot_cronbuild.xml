@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding='UTF-8'?>
+<odoo>
+    <data>
+        <record model="ir.cron" id="runbot_cronbuild_daily">
+            <field name="name">Runbot cron daily extra builds</field>
+            <field name="model_id" ref="model_runbot_cronbuild"/>
+            <field name="state">code</field>
+            <field name="code">model._cron()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="doall" eval="False"/>
+            <field name="nextcall" eval="datetime.now().replace(hour=1,minute=0,second=0) + timedelta(days=1)"/>
+        </record>
+    </data>
+</odoo>

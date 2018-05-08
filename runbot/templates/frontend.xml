@@ -125,6 +125,10 @@
                                       <a t-attf-href="{{br['branch'].branch_url}}" class="btn btn-default btn-xs">Branch or pull <i class="fa fa-github"/></a>
                                       <a t-attf-href="/runbot/#{repo.id}/#{br['branch'].branch_name}" class="btn btn-default btn-xs" aria-label="Quick Connect"><i class="fa fa-fast-forward" title="Quick Connect"/></a>
                                   </div>
+                                  <t t-if="br['branch'].sticky">
+                                      <br/>
+                                      <span class="label label-info">cov: <t t-esc="br['branch'].coverage_result"/>%</span>
+                                  </t>
                               </td>
                               <t t-foreach="br['builds']" t-as="bu">
                                   <t t-if="bu['state']=='pending'"><t t-set="klass">default</t></t>

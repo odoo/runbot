@@ -15,6 +15,7 @@
         'views/repo_views.xml',
         'views/branch_views.xml',
         'views/build_views.xml',
+        'views/cronbuild_views.xml',
         'views/res_config_settings_views.xml',
         'templates/frontend.xml',
         'templates/build.xml',
@@ -22,6 +23,7 @@
         'templates/dashboard.xml',
         'templates/nginx.xml',
         'templates/badge.xml',
-        'data/runbot_cron.xml'
+        'data/runbot_cron.xml',
+        'data/runbot_cronbuild.xml'
     ],
 }

@@ -1,0 +1,48 @@
+<odoo>
+  <data>
+    <record id="cronbuild_form" model="ir.ui.view">
+        <field name="name">runbot.cronbuild.form</field>
+        <field name="model">runbot.cronbuild</field>
+        <field name="arch" type="xml">
+          <form>
+            <header>
+            </header>
+            <sheet>
+              <group name="cronbuild_group">
+                <field name="name"/>
+                <field name="branch_id"/>
+                <field name="coverage"/>
+                <field name="extra_params"/>
+              </group>
+            </sheet>
+          </form>
+        </field>
+    </record>
+
+    <record id="cronbuild_view_tree" model="ir.ui.view">
+        <field name="name">runbot.cronbuild.tree</field>
+        <field name="model">runbot.cronbuild</field>
+        <field name="arch" type="xml">
+            <tree string="Cron builds">
+                <field name="name"/>
+                <field name="coverage"/>
+                <field name="branch_id"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="open_view_cronbuild_tree" model="ir.actions.act_window">
+        <field name="name">Cronbuilds</field>
+        <field name="res_model">runbot.cronbuild</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem
+        name="Cron builds"
+        id="runbot_menu_cronbuild_tree"
+        parent="runbot_menu_root"
+        sequence="25"
+        action="open_view_cronbuild_tree"
+        />
+  </data>
+</odoo>
