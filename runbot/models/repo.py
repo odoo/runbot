@@ -205,6 +205,16 @@ class runbot_repo(models.Model):
                     builds_to_skip._skip(reason='New ref found')
                     if builds_to_skip:
                         build_info['sequence'] = builds_to_skip[0].sequence
+                    # testing builds are killed
+                    builds_to_kill = Build.search([
+                        ('branch_id', '=', branch.id),
+                        ('state', '=', 'testing'),
+                        ('committer', '=', committer)
+                    ])
+                    builds_to_kill.write({'state': 'deathrow'})
+                    for btk in builds_to_kill:
+                        btk._log('repo._update_git', 'Build automatically killed, newer build found.')
+
                 new_build = Build.create(build_info)
                 # create a reverse dependency build if needed
                 if branch.sticky:
