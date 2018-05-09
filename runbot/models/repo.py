@@ -150,11 +150,10 @@ class runbot_repo(models.Model):
         repo._git(['fetch', '-p', 'origin', '+refs/pull/*/head:refs/pull/*'])
 
         fields = ['refname', 'objectname', 'committerdate:iso8601', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail', 'body']
-        fmt = "%00".join(["%(" + field + ")" for field in fields])
+        fmt = "%00".join(["%(" + field + ")" for field in fields]) + "%00"
         git_refs = repo._git(['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/heads', 'refs/pull'])
-        git_refs = git_refs.strip()
 
-        refs = [[field for field in line.split('\x00')] for line in git_refs.split('\n')]
+        refs = [[field for field in line.split('\x00')] for line in git_refs.split('\x00\n')[:-1]]
 
         self.env.cr.execute("""
             WITH t (branch) AS (SELECT unnest(%s))
