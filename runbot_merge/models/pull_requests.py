@@ -504,11 +504,12 @@ class PullRequests(models.Model):
                 if is_admin:
                     ok = True
                     self.priority = param
-                    self.target.active_staging_id.cancel(
-                        "P=0 on %s:%s by %s, unstaging %s",
-                        self.repository.name, self.number,
-                        author.github_login, self.target.name,
-                    )
+                    if param == 0:
+                        self.target.active_staging_id.cancel(
+                            "P=0 on %s:%s by %s, unstaging %s",
+                            self.repository.name, self.number,
+                            author.github_login, self.target.name,
+                        )
 
             _logger.info(
                 "%s %s(%s) on %s:%s by %s (%s)",
