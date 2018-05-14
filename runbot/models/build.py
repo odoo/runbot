@@ -270,7 +270,7 @@ class runbot_build(models.Model):
             if build.state == 'done' and build.result == 'skipped':
                 build.write({'state': 'pending', 'sequence': sequence, 'result': ''})
             # or duplicate it
-            elif build.state in ['running', 'done', 'duplicate', 'deathrow']:
+            elif build.state in ['running', 'done', 'duplicate', 'deathrow', 'testing']:
                 new_build = build.with_context(force_rebuild=True).create({
                     'sequence': sequence,
                     'branch_id': build.branch_id.id,
