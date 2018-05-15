@@ -34,7 +34,7 @@ class Runbot(http.Controller):
             'server_match': real_build.server_match,
             'duplicate_of': build.duplicate_id if build.state == 'duplicate' else False,
             'coverage': build.branch_id.coverage,
-            'revdep_build_ids': build.revdep_build_ids,
+            'revdep_build_ids': sorted(build.revdep_build_ids, key=lambda x: x.repo_id.name),
         }
 
     @http.route(['/runbot', '/runbot/repo/<model("runbot.repo"):repo>'], website=True, auth='public', type='http')
