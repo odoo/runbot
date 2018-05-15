@@ -29,6 +29,9 @@
                             <t t-if="rbu['result']=='skipped'"><i class="text-danger fa fa-ban"/></t>
                             <t t-if="rbu['result']=='killed'"><i class="text-danger fa fa-times"/>&#x1f480;</t>
                             <t t-if="rbu['result']=='manually_killed'"><i class="text-danger fa fa-times"/>&#x1f52b;</t>
+                            <t t-if="rbu['state']=='deathrow'"><i class="fa fa-crosshairs" style="color: #666666;"/></t>
+                            <t t-if="rbu['state']=='pending'"><i class="fa fa-pause" style="color: #666666;"/></t>
+                            <t t-if="rbu['state']=='testing'"><i class="fa fa-spinner fa-spin" style="color: #666666;"/></t>
                             </a>
                 </t>
             </small>
