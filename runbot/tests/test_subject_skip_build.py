@@ -50,13 +50,13 @@ class TestRunbotSkipBuild(TransactionCase):
         build = self.build.search([("subject", "=", cimsg)])
         self.assertTrue(build)
 
-        cimsg = "Testing body\n\n[ci skip]"
+        cimsg = "Testing body\n\n[ci skip]\nother line"
         self.git("commit", "--allow-empty", "-m", cimsg)
         self.repo._update_git()
         build = self.build.search([("subject", "=", cimsg.split("\n")[0])])
         self.assertFalse(build)
 
-        cimsg = "Testing body without\n\nci skip"
+        cimsg = "Testing body without\n\nci skip\nother line"
         self.git("commit", "--allow-empty", "-m", cimsg)
         self.repo._update_git()
         build = self.build.search([("subject", "=", cimsg.split("\n")[0])])
