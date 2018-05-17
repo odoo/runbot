@@ -105,7 +105,7 @@
                               <h1>No Repository yet.</h1>
                           </div>
 
-                          <table t-if="repo" class="table table-condensed table-bordered">
+                          <table t-if="repo" class="table table-condensed table-bordered" style="table-layout: initial;">
                           <tr>
                               <th>Branch</th>
                               <td colspan="4" class="text-right">
