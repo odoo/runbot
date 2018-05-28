@@ -21,6 +21,7 @@ class runbot_branch(models.Model):
     pull_head_name = fields.Char(compute='_get_pull_head_name', type='char', string='PR HEAD name', readonly=1, store=True)
     sticky = fields.Boolean('Sticky')
     coverage = fields.Boolean('Coverage')
+    coverage_result = fields.Float(compute='_get_last_coverage', type='Float', string='Last coverage', store=False)
     state = fields.Char('Status')
     modules = fields.Char("Modules to Install", help="Comma-separated list of modules to install and test.")
     job_timeout = fields.Integer('Job Timeout (minutes)', help='For default timeout: Mark it zero')
@@ -79,3 +80,13 @@ class runbot_branch(models.Model):
         r = {}
         r[self.id] = "http://%s/web/login?db=%s-all&login=admin&redirect=/web?debug=1" % (fqdn, dest)
         return r
+
+    def _get_last_coverage(self):
+        """ Return the coverage result of the last build in branch """
+        for branch in self:
+            last_build = self.env['runbot.build'].search([
+                ('branch_id.id', '=', branch.id),
+                ('state', 'in', ['done', 'running']),
+                ('coverage_result', '>=', 0.0),
+            ], order='sequence desc', limit=1)
+            branch.coverage_result = last_build.coverage_result or 0.0

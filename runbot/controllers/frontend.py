@@ -33,7 +33,7 @@ class Runbot(http.Controller):
             'port': real_build.port,
             'server_match': real_build.server_match,
             'duplicate_of': build.duplicate_id if build.state == 'duplicate' else False,
-            'coverage': build.branch_id.coverage,
+            'coverage': build.coverage or build.branch_id.coverage,
             'revdep_build_ids': sorted(build.revdep_build_ids, key=lambda x: x.repo_id.name),
         }
 

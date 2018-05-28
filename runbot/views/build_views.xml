@@ -50,6 +50,7 @@
                 <field name="port"/>
                 <field name="job"/>
                 <field name="result"/>
+                <field name="coverage_result"/>
                 <field name="pid"/>
                 <field name="host"/>
                 <field name="job_start"/>

@@ -195,6 +195,7 @@ class runbot_repo(models.Model):
                     'committer_email': committer_email,
                     'subject': subject,
                     'date': dateutil.parser.parse(date[:19]),
+                    'coverage': branch.coverage,
                 }
                 if not branch.sticky:
                     # pending builds are skipped as we have a new ref

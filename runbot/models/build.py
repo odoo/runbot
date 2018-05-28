@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
+import coverage
 import glob
 import logging
 import operator
 import os
 import re
 import resource
+import shlex
 import shutil
 import signal
 import subprocess
@@ -62,6 +64,9 @@ class runbot_build(models.Model):
     revdep_build_ids = fields.Many2many('runbot.build', 'runbot_rev_dep_builds',
                                         column1='rev_dep_id', column2='dependent_id',
                                         string='Builds that depends on this build')
+    extra_params = fields.Char('Extra cmd args')
+    coverage = fields.Boolean('Enable code coverage')
+    coverage_result = fields.Float('Coverage result', digits=(5, 2))
 
     def copy(self, values=None):
         raise UserError("Cannot duplicate build!")
@@ -749,6 +754,8 @@ class runbot_build(models.Model):
         if grep(build._server("tools/config.py"), "test-enable"):
             cmd.append("--test-enable")
         cmd += ['-d', '%s-base' % build.dest, '-i', 'base', '--stop-after-init', '--log-level=test', '--max-cron-threads=0']
+        if build.extra_params:
+            cmd.extend(shlex.split(build.extra_params))
         return self._spawn(cmd, lock_path, log_path, cpu_limit=300)
 
     def _job_20_test_all(self, build, lock_path, log_path):
@@ -758,8 +765,10 @@ class runbot_build(models.Model):
         if grep(build._server("tools/config.py"), "test-enable"):
             cmd.append("--test-enable")
         cmd += ['-d', '%s-all' % build.dest, '-i', mods, '--stop-after-init', '--log-level=test', '--max-cron-threads=0']
+        if build.extra_params:
+            cmd.extend(build.extra_params.split(' '))
         env = None
-        if build.branch_id.coverage:
+        if build.coverage:
             pyversion = get_py_version(build)
             env = self._coverage_env(build)
             available_modules = [
@@ -777,14 +786,22 @@ class runbot_build(models.Model):
     def _coverage_env(self, build):
         return dict(os.environ, COVERAGE_FILE=build._path('.coverage'))
 
-    def _job_21_coverage(self, build, lock_path, log_path):
-        if not build.branch_id.coverage:
+    def _job_21_coverage_html(self, build, lock_path, log_path):
+        if not build.coverage:
             return -2
         pyversion = get_py_version(build)
         cov_path = build._path('coverage')
         os.makedirs(cov_path, exist_ok=True)
         cmd = [pyversion, "-m", "coverage", "html", "-d", cov_path, "--ignore-errors"]
         return self._spawn(cmd, lock_path, log_path, env=self._coverage_env(build))
+
+    def _job_22_coverage_result(self, build, lock_path, log_path):
+        if not build.coverage:
+            return -2
+        cov = coverage.coverage(data_file=build._path('.coverage'))
+        cov.load()
+        build.coverage_result = cov.report()
+        return -2  # nothing to wait for
 
     def _job_30_run(self, build, lock_path, log_path):
         # adjust job_end to record an accurate job_20 job_time
