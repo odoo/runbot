@@ -164,7 +164,7 @@ class Runbot(http.Controller):
         real_build = build.duplicate_id if build.state == 'duplicate' else build
 
         # other builds
-        build_ids = Build.search([('branch_id', '=', build.branch_id.id)])
+        build_ids = Build.search([('branch_id', '=', build.branch_id.id)], limit=100)
         other_builds = Build.browse(build_ids)
         domain = [('build_id', '=', real_build.id)]
         log_type = request.params.get('type', '')
