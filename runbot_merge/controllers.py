@@ -149,6 +149,11 @@ def handle_pr(event):
     # don't marked merged PRs as closed (!!!)
     if event['action'] == 'closed' and pr_obj.state != 'merged':
         pr_obj.state = 'closed'
+        pr_obj.staging_id.cancel(
+            "Closed PR %s:%s, removing staging %s",
+            pr_obj.repository.name, pr_obj.number,
+            pr_obj.staging_id
+        )
         return 'Closed {}'.format(pr_obj.id)
 
     if event['action'] == 'reopened' and pr_obj.state == 'closed':
