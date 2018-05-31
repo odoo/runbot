@@ -338,10 +338,33 @@ def test_edit_retarget_managed(env, repo):
     """
 @pytest.mark.skip(reason="What do?")
 def test_edit_staged(env, repo):
-    pass
-@pytest.mark.skip(reason="What do?")
+    """
+    What should happen when editing the PR/metadata (not pushing) of a staged PR
+    """
 def test_close_staged(env, repo):
-    pass
+    """
+    When closing a staged PR, cancel the staging
+    """
+    m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+    repo.make_ref('heads/master', m)
+
+    c = repo.make_commit(m, 'fist', None, tree={'m': 'c1'})
+    prx = repo.make_pr('title', 'body', target='master', ctid=c, user='user')
+    repo.post_status(prx.head, 'success', 'legal/cla')
+    repo.post_status(prx.head, 'success', 'ci/runbot')
+    prx.post_comment('hansen r+', user='reviewer')
+    pr = env['runbot_merge.pull_requests'].search([
+        ('repository.name', '=', 'odoo/odoo'),
+        ('number', '=', prx.number),
+    ])
+    env['runbot_merge.project']._check_progress()
+    assert pr.state == 'ready'
+    assert pr.staging_id
+
+    prx.close()
+
+    assert not pr.staging_id
+    assert not env['runbot_merge.stagings'].search([])
 
 class TestRetry:
     @pytest.mark.xfail(reason="This may not be a good idea as it could lead to tons of rebuild spam")
