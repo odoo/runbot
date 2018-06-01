@@ -536,6 +536,47 @@ class TestSquashing(object):
         ]).state == 'merged'
         assert prx.state == 'closed'
 
+    def test_pr_update_unsquash(self, repo, env):
+        """
+        If a PR starts with 1 commit and a second commit is added, the PR
+        should be unflagged as squash
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        m2 = repo.make_commit(m, 'second', None, tree={'m': 'm', 'm2': 'm2'})
+        repo.make_ref('heads/master', m2)
+
+        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
+        prx = repo.make_pr('title', 'body', target='master', ctid=c1, user='user')
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', 'odoo/odoo'),
+            ('number', '=', prx.number),
+        ])
+        assert pr.squash, "a PR with a single commit should be squashed"
+
+        prx.push(repo.make_commit(c1, 'second2', None, tree={'m': 'c2'}))
+        assert not pr.squash, "a PR with a single commit should not be squashed"
+
+    def test_pr_reset_squash(self, repo, env):
+        """
+        If a PR starts at >1 commits and is reset back to 1, the PR should be
+        re-flagged as squash
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        m2 = repo.make_commit(m, 'second', None, tree={'m': 'm', 'm2': 'm2'})
+        repo.make_ref('heads/master', m2)
+
+        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
+        c2 = repo.make_commit(c1, 'second2', None, tree={'m': 'c2'})
+        prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', 'odoo/odoo'),
+            ('number', '=', prx.number),
+        ])
+        assert not pr.squash, "a PR with a single commit should not be squashed"
+
+        prx.push(repo.make_commit(m, 'fixup', None, tree={'m': 'c2'}))
+        assert pr.squash, "a PR with a single commit should be squashed"
+
     @pytest.mark.xfail(reason="removed support for squash+ command")
     def test_force_squash_merge(self, repo, env):
         m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
