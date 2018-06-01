@@ -289,10 +289,10 @@ class runbot_repo(models.Model):
         nginx_dir = os.path.join(self._root(), 'nginx')
         settings['nginx_dir'] = nginx_dir
         settings['re_escape'] = re.escape
+        settings['fqdn'] = fqdn()
         nginx_repos = self.search([('nginx', '=', True)], order='id')
         if nginx_repos:
-            builds = self.env['runbot.build'].search([('repo_id', 'in', nginx_repos.ids), ('state', '=', 'running')])
-            settings['builds'] = self.env['runbot.build'].browse(builds.ids)
+            settings['builds'] = self.env['runbot.build'].search([('repo_id', 'in', nginx_repos.ids), ('state', '=', 'running'), ('host', '=', fqdn())])
 
             nginx_config = self.env['ir.ui.view'].render_template("runbot.nginx_config", settings)
             os.makedirs(nginx_dir, exist_ok=True)
