@@ -142,8 +142,8 @@ def handle_pr(event):
                 pr_obj.staging_id,
             )
 
-        # TODO: should we update squash as well? What of explicit squash commands?
         pr_obj.head = pr['head']['sha']
+        pr_obj.squash = pr['commits'] == 1
         return 'Updated {} to {}'.format(pr_obj.id, pr_obj.head)
 
     # don't marked merged PRs as closed (!!!)

@@ -833,8 +833,6 @@ class Batch(models.Model):
             msg = pr.message
             author=None
             if pr.squash:
-                # FIXME: maybe should be message of the *first* commit of the branch?
-                # TODO: or depend on # of commits in PR instead of squash flag?
                 commit = gh.commit(pr.head)
                 msg = commit['message']
                 author = commit['author']
