@@ -43,7 +43,7 @@ class Project(models.Model):
         required=True,
         default="hanson", # mergebot du bot du bot du~
         help="Prefix (~bot name) used when sending commands from PR "
-             "comments e.g. [hanson retry] or [hanson r+ p=1 squash+]"
+             "comments e.g. [hanson retry] or [hanson r+ p=1]"
     )
 
     batch_limit = fields.Integer(
@@ -407,11 +407,6 @@ class PullRequests(models.Model):
                 return ('review', True)
             elif flag == '-':
                 return ('review', False)
-        elif name == 'squash':
-            if flag == '+':
-                return ('squash', True)
-            elif flag == '-':
-                return ('squash', False)
         elif name == 'delegate':
             if flag == '+':
                 return ('delegate', True)
@@ -432,9 +427,6 @@ class PullRequests(models.Model):
           resets a PR in error mode to ready for staging
         r(eview)+/-
            approves or disapproves a PR (disapproving just cancels an approval)
-        squash+/squash-
-          marks the PR as squash or merge, can override squash inference or a
-          previous squash command
         delegate+/delegate=<users>
           adds either PR author or the specified (github) users as
           authorised reviewers for this PR. ``<users>`` is a
@@ -495,11 +487,6 @@ class PullRequests(models.Model):
                                 'github_login': login,
                             })
                     delegates.write({'delegate_reviewer': [(4, self.id, 0)]})
-
-            elif command == 'squash':
-                if is_admin:
-                    ok = True
-                    self.squash = param
             elif command == 'priority':
                 if is_admin:
                     ok = True
