@@ -7,50 +7,19 @@ are staged concurrently in all repos
 """
 import json
 
-import odoo
-
 import pytest
 
 @pytest.fixture
-def project(env):
-    env['res.partner'].create({
-        'name': "Reviewer",
-        'github_login': 'reviewer',
-        'reviewer': True,
-    })
-    env['res.partner'].create({
-        'name': "Self Reviewer",
-        'github_login': 'self-reviewer',
-        'self_reviewer': True,
-    })
-    return env['runbot_merge.project'].create({
-        'name': 'odoo',
-        'github_token': 'okokok',
-        'github_prefix': 'hansen',
-        'branch_ids': [(0, 0, {'name': 'master'})],
-        'required_statuses': 'legal/cla,ci/runbot',
-    })
+def repo_a(make_repo):
+    return make_repo('a')
 
 @pytest.fixture
-def repo_a(gh, project):
-    project.write({'repo_ids': [(0, 0, {'name': "odoo/a"})]})
-    return gh.repo('odoo/a', hooks=[
-        ((odoo.http.root, '/runbot_merge/hooks'), ['pull_request', 'issue_comment', 'status', 'pull_request_review'])
-    ])
+def repo_b(make_repo):
+    return make_repo('b')
 
 @pytest.fixture
-def repo_b(gh, project):
-    project.write({'repo_ids': [(0, 0, {'name': "odoo/b"})]})
-    return gh.repo('odoo/b', hooks=[
-        ((odoo.http.root, '/runbot_merge/hooks'), ['pull_request', 'issue_comment', 'status'])
-    ])
-
-@pytest.fixture
-def repo_c(gh, project):
-    project.write({'repo_ids': [(0, 0, {'name': "odoo/c"})]})
-    return gh.repo('odoo/c', hooks=[
-        ((odoo.http.root, '/runbot_merge/hooks'), ['pull_request', 'issue_comment', 'status'])
-    ])
+def repo_c(make_repo):
+    return make_repo('c')
 
 def make_pr(repo, prefix, trees, *, target='master', user='user', label=None,
             statuses=(('ci/runbot', 'success'), ('legal/cla', 'success')),
@@ -67,7 +36,7 @@ def make_pr(repo, prefix, trees, *, target='master', user='user', label=None,
     :rtype: fake_github.PR
     """
     base = repo.commit('heads/{}'.format(target))
-    tree = dict(repo.objects[base.tree])
+    tree = repo.read_tree(base)
     c = base.id
     for i, t in enumerate(trees):
         tree.update(t)
@@ -172,9 +141,9 @@ def test_sub_match(env, project, repo_a, repo_b, repo_c):
         "branch-matched PRs should be part of the same staging"
     st = pr_b.staging_id
     assert json.loads(st.heads) == {
-        'odoo/a': repo_a.commit('heads/master').id,
-        'odoo/b': repo_b.commit('heads/staging.master').id,
-        'odoo/c': repo_c.commit('heads/staging.master').id,
+        repo_a.name: repo_a.commit('heads/master').id,
+        repo_b.name: repo_b.commit('heads/staging.master').id,
+        repo_c.name: repo_c.commit('heads/staging.master').id,
     }
 
 def test_merge_fail(env, project, repo_a, repo_b):
