@@ -192,6 +192,12 @@ class Repo(object):
                 return handler(self, request, **m.groupdict())
         return (404, {'message': "No match for {} {}".format(request.method, path)})
 
+    def read_tree(self, commit):
+        return git.read_object(self.objects, commit.tree)
+
+    def is_ancestor(self, sha, of):
+        assert not git.is_ancestor(self.objects, sha, of=of)
+
     def _read_ref(self, r, ref):
         obj = self.refs.get(ref)
         if obj is None:

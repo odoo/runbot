@@ -7,35 +7,8 @@ import odoo
 from fake_github import git
 
 @pytest.fixture
-def repo(gh, env):
-    env['res.partner'].create({
-        'name': "Reviewer",
-        'github_login': 'reviewer',
-        'reviewer': True,
-    })
-    env['res.partner'].create({
-        'name': "Self Reviewer",
-        'github_login': 'self-reviewer',
-        'self_reviewer': True,
-    })
-    env['res.partner'].create({
-        'name': "Other",
-        'github_login': 'other',
-    })
-    env['runbot_merge.project'].create({
-        'name': 'odoo',
-        'github_token': 'okokok',
-        'github_prefix': 'hansen',
-        'repo_ids': [(0, 0, {'name': 'odoo/odoo'})],
-        'branch_ids': [(0, 0, {'name': 'master'})],
-        'required_statuses': 'legal/cla,ci/runbot',
-    })
-    # need to create repo & branch in env so hook will allow processing them
-    return gh.repo('odoo/odoo', hooks=[
-        ((odoo.http.root, '/runbot_merge/hooks'), [
-            'pull_request', 'issue_comment', 'status', 'pull_request_review',
-        ])
-    ])
+def repo(make_repo):
+    return make_repo('repo')
 
 def test_trivial_flow(env, repo):
     # create base branch
@@ -48,7 +21,7 @@ def test_trivial_flow(env, repo):
     pr1 = repo.make_pr("gibberish", "blahblah", target='master', ctid=c1, user='user')
 
     [pr] = env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', 'odoo/odoo'),
+        ('repository.name', '=', repo.name),
         ('number', '=', pr1.number),
     ])
     assert pr.state == 'opened'
@@ -83,7 +56,7 @@ def test_trivial_flow(env, repo):
     master = repo.commit('heads/master')
     assert master.parents == [m, pr1.head],\
         "master's parents should be the old master & the PR head"
-    assert git.read_object(repo.objects, master.tree) == {
+    assert repo.read_tree(master) == {
         'a': b'some other content',
         'b': b'a second file',
     }
@@ -103,7 +76,7 @@ def test_staging_conflict(env, repo):
     pr1.post_comment("hansen r+", "reviewer")
     env['runbot_merge.project']._check_progress()
     pr1 = env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', 'odoo/odoo'),
+        ('repository.name', '=', repo.name),
         ('number', '=', 1)
     ])
     assert pr1.staging_id
@@ -117,7 +90,7 @@ def test_staging_conflict(env, repo):
     pr2.post_comment('hansen r+', "reviewer")
     env['runbot_merge.project']._check_progress()
     p_2 = env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', 'odoo/odoo'),
+        ('repository.name', '=', repo.name),
         ('number', '=', 2)
     ])
     assert p_2.state == 'ready', "PR2 should not have been staged since there is a pending staging for master"
@@ -162,12 +135,12 @@ def test_staging_concurrent(env, repo):
 
     env['runbot_merge.project']._check_progress()
     pr1 = env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', 'odoo/odoo'),
+        ('repository.name', '=', repo.name),
         ('number', '=', pr1.number)
     ])
     assert pr1.staging_id
     pr2 = env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', 'odoo/odoo'),
+        ('repository.name', '=', repo.name),
         ('number', '=', pr2.number)
     ])
     assert pr2.staging_id
@@ -188,7 +161,7 @@ def test_staging_merge_fail(env, repo):
 
     env['runbot_merge.project']._check_progress()
     pr1 = env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', 'odoo/odoo'),
+        ('repository.name', '=', repo.name),
         ('number', '=', prx.number)
     ])
     assert pr1.state == 'error'
@@ -214,7 +187,7 @@ def test_staging_ci_timeout(env, repo):
     env['runbot_merge.project']._check_progress()
 
     pr1 = env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', 'odoo/odoo'),
+        ('repository.name', '=', repo.name),
         ('number', '=', prx.number)
     ])
     assert pr1.staging_id
@@ -238,7 +211,7 @@ def test_staging_ci_failure_single(env, repo):
     prx.post_comment('hansen r+', "reviewer")
     env['runbot_merge.project']._check_progress()
     assert env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', 'odoo/odoo'),
+        ('repository.name', '=', repo.name),
         ('number', '=', prx.number)
     ]).staging_id
 
@@ -247,7 +220,7 @@ def test_staging_ci_failure_single(env, repo):
     repo.post_status(staging_head.id, 'failure', 'ci/runbot') # stable genius
     env['runbot_merge.project']._check_progress()
     assert env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', 'odoo/odoo'),
+        ('repository.name', '=', repo.name),
         ('number', '=', prx.number)
     ]).state == 'error'
 
@@ -269,7 +242,7 @@ def test_ff_failure(env, repo):
     prx.post_comment('hansen r+', "reviewer")
     env['runbot_merge.project']._check_progress()
     assert env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', 'odoo/odoo'),
+        ('repository.name', '=', repo.name),
         ('number', '=', prx.number)
     ]).staging_id
 
@@ -283,7 +256,7 @@ def test_ff_failure(env, repo):
     env['runbot_merge.project']._check_progress()
 
     assert env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', 'odoo/odoo'),
+        ('repository.name', '=', repo.name),
         ('number', '=', prx.number)
     ]).staging_id, "merge should not have succeeded"
     assert repo.commit('heads/staging.master').id != staging.id,\
@@ -310,7 +283,7 @@ def test_edit(env, repo):
     c2 = repo.make_commit(c1, 'second', None, tree={'m': 'c2'})
     prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
     pr = env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', 'odoo/odoo'),
+        ('repository.name', '=', repo.name),
         ('number', '=', prx.number)
     ])
     assert pr.message == 'title\n\nbody'
@@ -326,7 +299,7 @@ def test_edit(env, repo):
 
     prx.base = '1.0'
     assert env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', 'odoo/odoo'),
+        ('repository.name', '=', repo.name),
         ('number', '=', prx.number)
     ]).target == branch_1
 
@@ -355,7 +328,7 @@ def test_close_staged(env, repo):
     repo.post_status(prx.head, 'success', 'ci/runbot')
     prx.post_comment('hansen r+', user='reviewer')
     pr = env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', 'odoo/odoo'),
+        ('repository.name', '=', repo.name),
         ('number', '=', prx.number),
     ])
     env['runbot_merge.project']._check_progress()
@@ -381,7 +354,7 @@ class TestRetry:
         prx.post_comment('hansen r+', "reviewer")
         env['runbot_merge.project']._check_progress()
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).staging_id
 
@@ -390,7 +363,7 @@ class TestRetry:
         repo.post_status(staging_head.id, 'failure', 'ci/runbot')
         env['runbot_merge.project']._check_progress()
         pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ])
         assert pr.state == 'error'
@@ -427,7 +400,7 @@ class TestRetry:
         prx.post_comment('hansen r+ delegate=other', "reviewer")
         env['runbot_merge.project']._check_progress()
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).staging_id
 
@@ -436,13 +409,13 @@ class TestRetry:
         repo.post_status(staging_head.id, 'failure', 'ci/runbot')
         env['runbot_merge.project']._check_progress()
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'error'
 
         prx.post_comment('hansen retry', retrier)
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'ready'
         env['runbot_merge.project']._check_progress()
@@ -453,7 +426,7 @@ class TestRetry:
         repo.post_status(staging_head2.id, 'success', 'ci/runbot')
         env['runbot_merge.project']._check_progress()
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'merged'
 
@@ -470,7 +443,7 @@ class TestRetry:
         prx.post_comment('hansen r+ delegate=other', "reviewer")
         env['runbot_merge.project']._check_progress()
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).staging_id
 
@@ -479,7 +452,7 @@ class TestRetry:
         repo.post_status(staging_head.id, 'failure', 'ci/runbot')
         env['runbot_merge.project']._check_progress()
         pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ])
         assert pr.state == 'error'
@@ -508,22 +481,22 @@ class TestSquashing(object):
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+', "reviewer")
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).squash
 
         env['runbot_merge.project']._check_progress()
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).staging_id
 
         staging = repo.commit('heads/staging.master')
-        assert not git.is_ancestor(repo.objects, prx.head, of=staging.id),\
+        assert not repo.is_ancestor(prx.head, of=staging.id),\
             "the pr head should not be an ancestor of the staging branch in a squash merge"
         assert staging.parents == [m2],\
             "the previous master's tip should be the sole parent of the staging commit"
-        assert git.read_object(repo.objects, staging.tree) == {
+        assert repo.read_tree(staging) == {
             'm': b'c1', 'm2': b'm2',
         }, "the tree should still be correctly merged"
 
@@ -531,7 +504,7 @@ class TestSquashing(object):
         repo.post_status(staging.id, 'success', 'ci/runbot')
         env['runbot_merge.project']._check_progress()
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'merged'
         assert prx.state == 'closed'
@@ -548,7 +521,7 @@ class TestSquashing(object):
         c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
         prx = repo.make_pr('title', 'body', target='master', ctid=c1, user='user')
         pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
         ])
         assert pr.squash, "a PR with a single commit should be squashed"
@@ -569,7 +542,7 @@ class TestSquashing(object):
         c2 = repo.make_commit(c1, 'second2', None, tree={'m': 'c2'})
         prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
         pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
         ])
         assert not pr.squash, "a PR with a single commit should not be squashed"
@@ -590,22 +563,22 @@ class TestSquashing(object):
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+ squash+', "reviewer")
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).squash
 
         env['runbot_merge.project']._check_progress()
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).staging_id
 
         staging = repo.commit('heads/staging.master')
-        assert not git.is_ancestor(repo.objects, prx.head, of=staging.id),\
+        assert not repo.is_ancestor(prx.head, of=staging.id),\
             "the pr head should not be an ancestor of the staging branch in a squash merge"
         assert staging.parents == [m2],\
             "the previous master's tip should be the sole parent of the staging commit"
-        assert git.read_object(repo.objects, staging.tree) == {
+        assert repo.read_tree(staging) == {
             'm': b'c2', 'm2': b'm2',
         }, "the tree should still be correctly merged"
 
@@ -613,7 +586,7 @@ class TestSquashing(object):
         repo.post_status(staging.id, 'success', 'ci/runbot')
         env['runbot_merge.project']._check_progress()
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'merged'
         assert prx.state == 'closed'
@@ -630,20 +603,20 @@ class TestSquashing(object):
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+ squash-', "reviewer")
         assert not env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).squash
 
         env['runbot_merge.project']._check_progress()
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).staging_id
 
         staging = repo.commit('heads/staging.master')
-        assert git.is_ancestor(repo.objects, prx.head, of=staging.id)
+        assert repo.is_ancestor(prx.head, of=staging.id)
         assert staging.parents == [m2, c1]
-        assert git.read_object(repo.objects, staging.tree) == {
+        assert repo.read_tree(staging) == {
             'm': b'c1', 'm2': b'm2',
         }
 
@@ -651,7 +624,7 @@ class TestSquashing(object):
         repo.post_status(staging.id, 'success', 'ci/runbot')
         env['runbot_merge.project']._check_progress()
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'merged'
         assert prx.state == 'closed'
@@ -668,7 +641,7 @@ class TestPRUpdate(object):
         c = repo.make_commit(m, 'fist', None, tree={'m': 'c1'})
         prx = repo.make_pr('title', 'body', target='master', ctid=c, user='user')
         pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
         ])
         assert pr.head == c
@@ -686,7 +659,7 @@ class TestPRUpdate(object):
         c = repo.make_commit(m, 'fist', None, tree={'m': 'c1'})
         prx = repo.make_pr('title', 'body', target='master', ctid=c, user='user')
         pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
         ])
         prx.close()
@@ -707,7 +680,7 @@ class TestPRUpdate(object):
         c = repo.make_commit(m, 'fist', None, tree={'m': 'c1'})
         prx = repo.make_pr('title', 'body', target='master', ctid=c, user='user')
         pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
         ])
         prx.close()
@@ -732,7 +705,7 @@ class TestPRUpdate(object):
         repo.post_status(prx.head, 'success', 'legal/cla')
         repo.post_status(prx.head, 'success', 'ci/runbot')
         pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
         ])
         assert pr.head == c
@@ -751,7 +724,7 @@ class TestPRUpdate(object):
         prx = repo.make_pr('title', 'body', target='master', ctid=c, user='user')
         prx.post_comment('hansen r+', user='reviewer')
         pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
         ])
         assert pr.head == c
@@ -774,7 +747,7 @@ class TestPRUpdate(object):
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+', user='reviewer')
         pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
         ])
         assert pr.head == c
@@ -797,7 +770,7 @@ class TestPRUpdate(object):
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+', user='reviewer')
         pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
         ])
         env['runbot_merge.project']._check_progress()
@@ -825,7 +798,7 @@ class TestPRUpdate(object):
         env['runbot_merge.project']._check_progress()
 
         pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
         ])
         h = repo.commit('heads/staging.master').id
@@ -854,7 +827,7 @@ class TestPRUpdate(object):
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+', user='reviewer')
         pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
         ])
         env['runbot_merge.project']._check_progress()
@@ -897,6 +870,7 @@ class TestBatching(object):
         ):
         """ Helper creating a PR from a series of commits on a base
 
+        :type repo: fake_github.Repo
         :param prefix: a prefix used for commit messages, PR title & PR body
         :param trees: a list of dicts symbolising the tree for the corresponding commit.
                       each tree is an update on the "current state" of the tree
@@ -907,7 +881,7 @@ class TestBatching(object):
         :type statuses: List[(str, str)]
         """
         base = repo.commit('heads/{}'.format(target))
-        tree = dict(repo.objects[base.tree])
+        tree = repo.read_tree(base)
         c = base.id
         for i, t in enumerate(trees):
             tree.update(t)
@@ -920,9 +894,9 @@ class TestBatching(object):
             pr.post_comment('hansen r+', reviewer)
         return pr
 
-    def _get(self, env, number):
+    def _get(self, env, repo, number):
         return env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', number),
         ])
 
@@ -937,9 +911,9 @@ class TestBatching(object):
         pr2 = self._pr(repo, 'PR2', [{'c': 'CCC'}, {'d': 'DDD'}])
 
         env['runbot_merge.project']._check_progress()
-        pr1 = self._get(env, pr1.number)
+        pr1 = self._get(env, repo, pr1.number)
         assert pr1.staging_id
-        pr2 = self._get(env, pr2.number)
+        pr2 = self._get(env, repo, pr2.number)
         assert pr1.staging_id
         assert pr2.staging_id
         assert pr1.staging_id == pr2.staging_id
@@ -958,7 +932,7 @@ class TestBatching(object):
         pr11.post_comment('hansen priority=1', 'reviewer')
         pr12.post_comment('hansen priority=1', 'reviewer')
 
-        pr21, pr22, pr11, pr12 = prs = [self._get(env, pr.number) for pr in [pr21, pr22, pr11, pr12]]
+        pr21, pr22, pr11, pr12 = prs = [self._get(env, repo, pr.number) for pr in [pr21, pr22, pr11, pr12]]
         assert pr21.priority == pr22.priority == 2
         assert pr11.priority == pr12.priority == 1
 
@@ -986,7 +960,7 @@ class TestBatching(object):
         # stage PR1
         env['runbot_merge.project']._check_progress()
         p_11, p_12, p_21, p_22 = \
-            [self._get(env, pr.number) for pr in [pr11, pr12, pr21, pr22]]
+            [self._get(env, repo, pr.number) for pr in [pr11, pr12, pr21, pr22]]
         assert not p_21.staging_id or p_22.staging_id
         assert p_11.staging_id and p_12.staging_id
         assert p_11.staging_id == p_12.staging_id
@@ -995,7 +969,7 @@ class TestBatching(object):
         # no statuses run on PR0s
         pr01 = self._pr(repo, 'Urgent 1', [{'n': 'n'}, {'o': 'o'}], reviewer=None, statuses=[])
         pr01.post_comment('hansen priority=0', 'reviewer')
-        p_01 = self._get(env, pr01.number)
+        p_01 = self._get(env, repo, pr01.number)
         assert p_01.state == 'opened'
         assert p_01.priority == 0
 
@@ -1014,9 +988,9 @@ class TestBatching(object):
         repo.make_ref('heads/master', m)
 
         pr1 = self._pr(repo, 'PR1', [{'a': 'AAA'}, {'b': 'BBB'}])
-        p_1 = self._get(env, pr1.number)
+        p_1 = self._get(env, repo, pr1.number)
         pr2 = self._pr(repo, 'PR2', [{'a': 'some_content', 'c': 'CCC'}, {'d': 'DDD'}])
-        p_2 = self._get(env, pr2.number)
+        p_2 = self._get(env, repo, pr2.number)
 
         env['runbot_merge.project']._check_progress()
         st = env['runbot_merge.stagings'].search([])
@@ -1038,7 +1012,7 @@ class TestBatching(object):
         env['runbot_merge.project']._check_progress()
         # TODO: maybe just deactivate stagings instead of deleting them when canceling?
         assert not p_1.staging_id
-        assert self._get(env, pr0.number).staging_id
+        assert self._get(env, repo, pr0.number).staging_id
 
     def test_urgent_failed(self, env, repo):
         """ Ensure pr[p=0,state=failed] don't get picked up
@@ -1048,12 +1022,12 @@ class TestBatching(object):
 
         pr21 = self._pr(repo, 'PR1', [{'a': 'AAA'}, {'b': 'BBB'}])
 
-        p_21 = self._get(env, pr21.number)
+        p_21 = self._get(env, repo, pr21.number)
 
         # no statuses run on PR0s
         pr01 = self._pr(repo, 'Urgent 1', [{'n': 'n'}, {'o': 'o'}], reviewer=None, statuses=[])
         pr01.post_comment('hansen priority=0', 'reviewer')
-        p_01 = self._get(env, pr01.number)
+        p_01 = self._get(env, repo, pr01.number)
         p_01.state = 'error'
 
         env['runbot_merge.project']._check_progress()
@@ -1122,12 +1096,12 @@ class TestReviewing(object):
         prx.post_comment('hansen r+', user='rando')
 
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'validated'
         prx.post_comment('hansen r+', user='reviewer')
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'ready'
 
@@ -1146,7 +1120,7 @@ class TestReviewing(object):
 
         assert prx.user == 'reviewer'
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'validated'
 
@@ -1165,7 +1139,7 @@ class TestReviewing(object):
 
         assert prx.user == 'self-reviewer'
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'ready'
 
@@ -1186,7 +1160,7 @@ class TestReviewing(object):
 
         assert prx.user == 'user'
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'ready'
 
@@ -1207,13 +1181,13 @@ class TestReviewing(object):
 
         assert prx.user == 'user'
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'validated'
 
         prx.post_comment('hansen r+', user='jimbob')
         assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'ready'
 
@@ -1225,7 +1199,7 @@ class TestReviewing(object):
         c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
         prx = repo.make_pr('title', 'body', target='master', ctid=c1, user='user')
         pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', 'odoo/odoo'),
+            ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ])
 
