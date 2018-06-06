@@ -37,6 +37,14 @@ class Runbot(http.Controller):
             'revdep_build_ids': sorted(build.revdep_build_ids, key=lambda x: x.repo_id.name),
         }
 
+    def _pending(self):
+        ICP = request.env['ir.config_parameter'].sudo().get_param
+        warn = int(ICP('runbot.pending.warning', 5))
+        crit = int(ICP('runbot.pending.critical', 12))
+        count = request.env['runbot.build'].search_count([('state', '=', 'pending')])
+        level = ['info', 'warning', 'danger'][int(count > warn) + int(count > crit)]
+        return count, level
+
     @http.route(['/runbot', '/runbot/repo/<model("runbot.repo"):repo>'], website=True, auth='public', type='http')
     def repo(self, repo=None, search='', limit='100', refresh='', **kwargs):
         branch_obj = request.env['runbot.branch']
@@ -48,11 +56,13 @@ class Runbot(http.Controller):
         if not repo and repos:
             repo = repos[0].id
 
+        pending = self._pending()
         context = {
             'repos': repos.ids,
             'repo': repo,
             'host_stats': [],
-            'pending_total': build_obj.search_count([('state', '=', 'pending')]),
+            'pending_total': pending[0],
+            'pending_level': pending[1],
             'limit': limit,
             'search': search,
             'refresh': refresh,
@@ -244,10 +254,12 @@ class Runbot(http.Controller):
         builds = RB.browse(map(operator.itemgetter(0), cr.fetchall()))
 
         count = RB.search_count
+        pending = self._pending()
         qctx = {
             'refresh': refresh,
             'host_stats': [],
-            'pending_total': count([('state', '=', 'pending')]),
+            'pending_total': pending[0],
+            'pending_level': pending[1],
         }
 
         repos_values = qctx['repo_dict'] = OrderedDict()

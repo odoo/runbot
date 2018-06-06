@@ -97,7 +97,7 @@
                                       <t t-esc="hs['host']"/>: <t t-esc="hs['testing']"/> testing, <t t-esc="hs['running']"/> running
                                   </span>&amp;nbsp;
                                   </t>
-                                  <span class="label label-info">Pending: <t t-esc="pending_total"/></span>
+                                  <span t-attf-class="label label-{{pending_level}}">Pending: <t t-esc="pending_total"/></span>
                               </p>
                             </div>
                           </nav>
