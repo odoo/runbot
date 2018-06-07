@@ -305,11 +305,11 @@ class Repo(object):
         except KeyError:
             return (400, None)
 
-        issue.post_comment(body, "<insert current user here>")
+        issue.post_comment(body, "user")
         return (201, {
             'id': 0,
             'body': body,
-            'user': { 'login': "<insert current user here>" },
+            'user': { 'login': "user" },
         })
 
     def _edit_pr(self, r, number):

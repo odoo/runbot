@@ -44,8 +44,8 @@ def env(registry):
 
         cr.rollback()
 
-@pytest.fixture
-def project(env):
+@pytest.fixture(autouse=True)
+def users(env):
     env['res.partner'].create({
         'name': "Reviewer",
         'github_login': 'reviewer',
@@ -53,13 +53,19 @@ def project(env):
     })
     env['res.partner'].create({
         'name': "Self Reviewer",
-        'github_login': 'self-reviewer',
+        'github_login': 'self_reviewer',
         'self_reviewer': True,
     })
-    env['res.partner'].create({
-        'name': "Other",
-        'github_login': 'other',
-    })
+
+    return {
+        'reviewer': 'reviewer',
+        'self_reviewer': 'self_reviewer',
+        'other': 'other',
+        'user': 'user',
+    }
+
+@pytest.fixture
+def project(env):
     return env['runbot_merge.project'].create({
         'name': 'odoo',
         'github_token': 'okokok',

@@ -146,7 +146,7 @@ def test_sub_match(env, project, repo_a, repo_b, repo_c):
         repo_c.name: repo_c.commit('heads/staging.master').id,
     }
 
-def test_merge_fail(env, project, repo_a, repo_b):
+def test_merge_fail(env, project, repo_a, repo_b, users):
     """ In a matched-branch scenario, if merging in one of the linked repos
     fails it should revert the corresponding merges
     """
@@ -179,8 +179,8 @@ def test_merge_fail(env, project, repo_a, repo_b):
     failed = to_pr(env, pr1b)
     assert failed.state == 'error'
     assert pr1b.comments == [
-        ('reviewer', 'hansen r+'),
-        ('<insert current user here>', 'Unable to stage PR (merge conflict)'),
+        (users['reviewer'], 'hansen r+'),
+        (users['user'], 'Unable to stage PR (merge conflict)'),
     ]
     other = to_pr(env, pr1a)
     assert not other.staging_id

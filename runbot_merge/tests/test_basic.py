@@ -145,7 +145,7 @@ def test_staging_concurrent(env, repo):
     ])
     assert pr2.staging_id
 
-def test_staging_merge_fail(env, repo):
+def test_staging_merge_fail(env, repo, users):
     """ # of staging failure (no CI) before mark & notify?
     """
     m1 = repo.make_commit(None, 'initial', None, tree={'f': 'm1'})
@@ -167,11 +167,11 @@ def test_staging_merge_fail(env, repo):
     assert pr1.state == 'error'
     assert prx.labels == {'seen 🙂', 'error 🙅'}
     assert prx.comments == [
-        ('reviewer', 'hansen r+'),
-        ('<insert current user here>', 'Unable to stage PR (merge conflict)')
+        (users['reviewer'], 'hansen r+'),
+        (users['user'], 'Unable to stage PR (merge conflict)'),
     ]
 
-def test_staging_ci_timeout(env, repo):
+def test_staging_ci_timeout(env, repo, users):
     """If a staging timeouts (~ delay since staged greater than
     configured)... requeue?
     """
@@ -195,9 +195,9 @@ def test_staging_ci_timeout(env, repo):
 
     pr1.staging_id.staged_at = odoo.fields.Datetime.to_string(datetime.datetime.now() - datetime.timedelta(minutes=2*timeout))
     env['runbot_merge.project']._check_progress()
-    assert pr1.state == 'error', "%sth timeout should fail the PR" % (timeout + 1)
+    assert pr1.state == 'error', "timeout should fail the PR"
 
-def test_staging_ci_failure_single(env, repo):
+def test_staging_ci_failure_single(env, repo, users):
     """ on failure of single-PR staging, mark & notify failure
     """
     m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
@@ -225,11 +225,11 @@ def test_staging_ci_failure_single(env, repo):
     ]).state == 'error'
 
     assert prx.comments == [
-        ('reviewer', 'hansen r+'),
-        ('<insert current user here>', 'Staging failed: ci/runbot')
+        (users['reviewer'], 'hansen r+'),
+        (users['user'], 'Staging failed: ci/runbot')
     ]
 
-def test_ff_failure(env, repo):
+def test_ff_failure(env, repo, users):
     """ target updated while the PR is being staged => redo staging """
     m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
     repo.make_ref('heads/master', m)
@@ -385,7 +385,7 @@ class TestRetry:
         assert pr.state == 'merged'
 
     @pytest.mark.parametrize('retrier', ['user', 'other', 'reviewer'])
-    def test_retry_comment(self, env, repo, retrier):
+    def test_retry_comment(self, env, repo, retrier, users):
         """ An accepted but failed PR should be re-tried when the author or a
         reviewer asks for it
         """
@@ -397,7 +397,7 @@ class TestRetry:
         prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
         repo.post_status(prx.head, 'success', 'ci/runbot')
         repo.post_status(prx.head, 'success', 'legal/cla')
-        prx.post_comment('hansen r+ delegate=other', "reviewer")
+        prx.post_comment('hansen r+ delegate=%s' % users['other'], "reviewer")
         env['runbot_merge.project']._check_progress()
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
@@ -431,7 +431,7 @@ class TestRetry:
         ]).state == 'merged'
 
     @pytest.mark.parametrize('disabler', ['user', 'other', 'reviewer'])
-    def test_retry_disable(self, env, repo, disabler):
+    def test_retry_disable(self, env, repo, disabler, users):
         m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
         repo.make_ref('heads/master', m)
 
@@ -440,7 +440,7 @@ class TestRetry:
         prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
         repo.post_status(prx.head, 'success', 'ci/runbot')
         repo.post_status(prx.head, 'success', 'legal/cla')
-        prx.post_comment('hansen r+ delegate=other', "reviewer")
+        prx.post_comment('hansen r+ delegate=%s' % users['other'], "reviewer")
         env['runbot_merge.project']._check_progress()
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
@@ -650,7 +650,7 @@ class TestPRUpdate(object):
         prx.push(c2)
         assert pr.head == c2
 
-    def test_update_closed(self, env, repo):
+    def test_update_closed(self, env, repo, users):
         """ Should warn that the PR is closed & update will be ignored
         """
         m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
@@ -670,7 +670,7 @@ class TestPRUpdate(object):
         prx.push(c2)
         assert pr.head == c2, "PR should still be updated in case it's reopened"
         assert prx.comments == [
-            ('<insert current user here>', "This pull request is closed, ignoring the update to {}".format(c2)),
+            (users['user'], "This pull request is closed, ignoring the update to {}".format(c2)),
         ]
 
     def test_reopen_update(self, env, repo):
@@ -784,7 +784,7 @@ class TestPRUpdate(object):
         assert not pr.staging_id
         assert not env['runbot_merge.stagings'].search([])
 
-    def test_update_merged(self, env, repo):
+    def test_update_merged(self, env, repo, users):
         """ Should warn that the PR is merged & ignore entirely
         """
         m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
@@ -811,9 +811,9 @@ class TestPRUpdate(object):
         prx.push(c2)
         assert pr.head == c, "PR should not be updated at all"
         assert prx.comments == [
-            ('reviewer', 'hansen r+'),
-            ('<insert current user here>', 'Merged in {}'.format(h)),
-            ('<insert current user here>', "This pull request is closed, ignoring the update to {}".format(c2)),
+            (users['reviewer'], 'hansen r+'),
+            (users['user'], 'Merged in {}'.format(h)),
+            (users['user'], "This pull request is closed, ignoring the update to {}".format(c2)),
         ]
     def test_update_error(self, env, repo):
         """ Should cancel the staging & reset PR to approved
@@ -1035,7 +1035,7 @@ class TestBatching(object):
         assert p_21.staging_id, "p_21 should have been staged"
 
     @pytest.mark.skip(reason="Maybe nothing to do, the PR is just skipped and put in error?")
-    def test_batching_merge_failure(self, env, repo):
+    def test_batching_merge_failure(self):
         pass
 
     def test_staging_ci_failure_batch(self, env, repo):
@@ -1093,7 +1093,7 @@ class TestReviewing(object):
         prx = repo.make_pr('title', 'body', target='master', ctid=c1, user='user')
         repo.post_status(prx.head, 'success', 'legal/cla')
         repo.post_status(prx.head, 'success', 'ci/runbot')
-        prx.post_comment('hansen r+', user='rando')
+        prx.post_comment('hansen r+', user='other')
 
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
@@ -1105,7 +1105,7 @@ class TestReviewing(object):
             ('number', '=', prx.number)
         ]).state == 'ready'
 
-    def test_self_review_fail(self, env, repo):
+    def test_self_review_fail(self, env, repo, users):
         """ Normal reviewers can't self-review
         """
         m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
@@ -1118,13 +1118,13 @@ class TestReviewing(object):
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+', user='reviewer')
 
-        assert prx.user == 'reviewer'
+        assert prx.user == users['reviewer']
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'validated'
 
-    def test_self_review_success(self, env, repo):
+    def test_self_review_success(self, env, repo, users):
         """ Some users are allowed to self-review
         """
         m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
@@ -1132,18 +1132,18 @@ class TestReviewing(object):
         repo.make_ref('heads/master', m2)
 
         c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
-        prx = repo.make_pr('title', 'body', target='master', ctid=c1, user='self-reviewer')
+        prx = repo.make_pr('title', 'body', target='master', ctid=c1, user='self_reviewer')
         repo.post_status(prx.head, 'success', 'legal/cla')
         repo.post_status(prx.head, 'success', 'ci/runbot')
-        prx.post_comment('hansen r+', user='self-reviewer')
+        prx.post_comment('hansen r+', user='self_reviewer')
 
-        assert prx.user == 'self-reviewer'
+        assert prx.user == users['self_reviewer']
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'ready'
 
-    def test_delegate_review(self, env, repo):
+    def test_delegate_review(self, env, repo, users):
         """Users should be able to delegate review to either the creator of
         the PR or an other user without review rights
         """
@@ -1158,13 +1158,13 @@ class TestReviewing(object):
         prx.post_comment('hansen delegate+', user='reviewer')
         prx.post_comment('hansen r+', user='user')
 
-        assert prx.user == 'user'
+        assert prx.user == users['user']
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'ready'
 
-    def test_delegate_review_thirdparty(self, env, repo):
+    def test_delegate_review_thirdparty(self, env, repo, users):
         """Users should be able to delegate review to either the creator of
         the PR or an other user without review rights
         """
@@ -1176,16 +1176,16 @@ class TestReviewing(object):
         prx = repo.make_pr('title', 'body', target='master', ctid=c1, user='user')
         repo.post_status(prx.head, 'success', 'legal/cla')
         repo.post_status(prx.head, 'success', 'ci/runbot')
-        prx.post_comment('hansen delegate=jimbob', user='reviewer')
+        prx.post_comment('hansen delegate=%s' % users['other'], user='reviewer')
         prx.post_comment('hansen r+', user='user')
 
-        assert prx.user == 'user'
+        assert prx.user == users['user']
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'validated'
 
-        prx.post_comment('hansen r+', user='jimbob')
+        prx.post_comment('hansen r+', user='other')
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
