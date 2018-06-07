@@ -756,10 +756,11 @@ class runbot_build(models.Model):
         cmd += ['-d', '%s-base' % build.dest, '-i', 'base', '--stop-after-init', '--log-level=test', '--max-cron-threads=0']
         if build.extra_params:
             cmd.extend(shlex.split(build.extra_params))
-        return self._spawn(cmd, lock_path, log_path, cpu_limit=300)
+        return self._spawn(cmd, lock_path, log_path, cpu_limit=600)
 
     def _job_20_test_all(self, build, lock_path, log_path):
         build._log('test_all', 'Start test all modules')
+        cpu_limit = 2400
         self._local_pg_createdb("%s-all" % build.dest)
         cmd, mods = build._cmd()
         if grep(build._server("tools/config.py"), "test-enable"):
@@ -769,6 +770,7 @@ class runbot_build(models.Model):
             cmd.extend(build.extra_params.split(' '))
         env = None
         if build.coverage:
+            cpu_limit *= 1.5
             pyversion = get_py_version(build)
             env = self._coverage_env(build)
             available_modules = [
@@ -781,7 +783,7 @@ class runbot_build(models.Model):
             cmd = [pyversion, '-m', 'coverage', 'run', '--branch', '--source', build._server()] + omit + cmd[:]
         # reset job_start to an accurate job_20 job_time
         build.write({'job_start': now()})
-        return self._spawn(cmd, lock_path, log_path, cpu_limit=2100, env=env)
+        return self._spawn(cmd, lock_path, log_path, cpu_limit=cpu_limit, env=env)
 
     def _coverage_env(self, build):
         return dict(os.environ, COVERAGE_FILE=build._path('.coverage'))
