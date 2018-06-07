@@ -608,7 +608,7 @@ class Tagging(models.Model):
     """
     _name = 'runbot_merge.pull_requests.tagging'
 
-    repository = fields.Many2one('pull_request.repository', required=True)
+    repository = fields.Many2one('runbot_merge.repository', required=True)
     # store the PR number (not id) as we need a Tagging for PR objects
     # being deleted (retargeted to non-managed branches)
     pull_request = fields.Integer()
