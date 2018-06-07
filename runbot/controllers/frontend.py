@@ -35,6 +35,8 @@ class Runbot(http.Controller):
             'duplicate_of': build.duplicate_id if build.state == 'duplicate' else False,
             'coverage': build.coverage or build.branch_id.coverage,
             'revdep_build_ids': sorted(build.revdep_build_ids, key=lambda x: x.repo_id.name),
+            'build_type' : build.build_type,
+            'build_type_label': dict(build.fields_get('build_type', 'selection')['build_type']['selection']).get(build.build_type, build.build_type),
         }
 
     def _pending(self):

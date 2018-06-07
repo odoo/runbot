@@ -66,6 +66,13 @@ class runbot_build(models.Model):
     extra_params = fields.Char('Extra cmd args')
     coverage = fields.Boolean('Enable code coverage')
     coverage_result = fields.Float('Coverage result', digits=(5, 2))
+    build_type = fields.Selection([('scheduled', 'This build was automatically scheduled'),
+                                   ('rebuild', 'This build is a rebuild'),
+                                   ('normal', 'normal build'),
+                                   ('indirect', 'Automatic rebuild'),
+                                   ],
+                                  default='normal',
+                                  string='Build type')
 
     def copy(self, values=None):
         raise UserError("Cannot duplicate build!")
@@ -283,8 +290,9 @@ class runbot_build(models.Model):
                     'author_email': build.author_email,
                     'committer': build.committer,
                     'committer_email': build.committer_email,
-                    'subject': u'♻️ %s' % build.subject,
+                    'subject': build.subject,
                     'modules': build.modules,
+                    'build_type': 'rebuild'
                 })
                 build = new_build
             else:
