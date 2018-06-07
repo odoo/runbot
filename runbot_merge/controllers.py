@@ -100,7 +100,7 @@ def handle_pr(event):
             'github_login': author_name,
         })
 
-    _logger.info("%s: %s:%s (%s)", event['action'], repo.name, pr['number'], author.github_login)
+    _logger.info("%s: %s:%s (%s) (%s)", event['action'], repo.name, pr['number'], pr['title'].strip(), author.github_login)
     if event['action'] == 'opened':
         # some PRs have leading/trailing newlines in body/title (resp)
         title = pr['title'].strip()
@@ -187,6 +187,14 @@ def handle_status(event):
 def handle_comment(event):
     if 'pull_request' not in event['issue']:
         return "issue comment, ignoring"
+
+    _logger.info(
+        'comment: %s %s:%s "%s"',
+        event['sender']['login'],
+        event['repository']['full_name'],
+        event['issue']['number'],
+        event['comment']['body'],
+    )
 
     env = request.env(user=1)
     partner = env['res.partner'].search([('github_login', '=', event['sender']['login']),])
