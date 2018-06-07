@@ -455,6 +455,12 @@ class PullRequests(models.Model):
             if ps is not None
         )
 
+        if not commands:
+            _logger.info("found no commands in comment of %s (%s) (%s%s)", author.github_login, author.display_name,
+                 comment[:50], '...' if len(comment) > 50 else ''
+            )
+            return 'ok'
+
         applied, ignored = [], []
         for command, param in commands.items():
             ok = False
