@@ -62,7 +62,7 @@ def handle_pr(event):
     # is at event['change']['base']['ref'] (if the target changed), so edition
     # handling must occur before the rest of the steps
     if event['action'] == 'edited':
-        source = event['changes'].get('base', {'from': pr['base']})['from']['ref']
+        source = event['changes'].get('base', {'ref': {'from': b}})['ref']['from']
         source_branch = env['runbot_merge.branch'].search([
             ('name', '=', source),
             ('project_id', '=', repo.project_id.id),
