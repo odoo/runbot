@@ -492,7 +492,7 @@ class PR(Issue):
     def base(self, value):
         old, self._base = self._base, value
         self.repo.notify('pull_request', 'edited', self, {
-            'base': {'from': {'ref': old}}
+            'base': {'ref': {'from': old}}
         })
 
     def push(self, sha):
