@@ -78,7 +78,9 @@ class GH(object):
         if r.status_code == 200:
             return
 
-        if r.status_code == 404:
+        # 422 makes no sense but that's what github returns, leaving 404 just
+        # in case
+        if r.status_code in (404, 422):
             # fallback: create ref
             r = self('post', 'git/refs', json={
                 'ref': 'refs/heads/{}'.format(branch),
@@ -86,7 +88,7 @@ class GH(object):
             }, check=False)
             if r.status_code == 201:
                 return
-        r.raise_for_status()
+        raise AssertionError("{}: {}".format(r.status_code, r.json()))
 
     def merge(self, sha, dest, message, squash=False, author=None):
         if not squash:
