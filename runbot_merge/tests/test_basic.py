@@ -935,7 +935,7 @@ class TestBatching(object):
 
         pr1 = self._pr(repo, 'PR1', [{'a': 'AAA'}, {'b': 'BBB'}])
         p_1 = self._get(env, repo, pr1.number)
-        pr2 = self._pr(repo, 'PR2', [{'a': 'some_content', 'c': 'CCC'}, {'d': 'DDD'}])
+        pr2 = self._pr(repo, 'PR2', [{'a': 'some content', 'c': 'CCC'}, {'d': 'DDD'}])
         p_2 = self._get(env, repo, pr2.number)
 
         env['runbot_merge.project']._check_progress()
@@ -991,7 +991,7 @@ class TestBatching(object):
         repo.make_ref('heads/master', m)
 
         pr1 = self._pr(repo, 'PR1', [{'a': 'AAA'}, {'b': 'BBB'}])
-        pr2 = self._pr(repo, 'PR2', [{'a': 'some_content', 'c': 'CCC'}, {'d': 'DDD'}])
+        pr2 = self._pr(repo, 'PR2', [{'a': 'some content', 'c': 'CCC'}, {'d': 'DDD'}])
 
         env['runbot_merge.project']._check_progress()
         st = env['runbot_merge.stagings'].search([])
