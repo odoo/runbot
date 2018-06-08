@@ -104,7 +104,7 @@ class Repo(object):
 
     def make_pr(self, title, body, target, ctid, user, label=None):
         assert 'heads/%s' % target in self.refs
-        return PR(self, title, body, target, ctid, user=user, label=label or '{}:{}'.format(user, target))
+        return PR(self, title, body, target, ctid, user=user, label='{}:{}'.format(user, label or target))
 
     def make_ref(self, name, commit, force=False):
         assert isinstance(self.objects[commit], Commit)

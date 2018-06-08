@@ -44,6 +44,10 @@ def env(registry):
 
         cr.rollback()
 
+@pytest.fixture
+def owner():
+    return 'user'
+
 @pytest.fixture(autouse=True)
 def users(env):
     env['res.partner'].create({
