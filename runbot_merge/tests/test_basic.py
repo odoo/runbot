@@ -650,29 +650,6 @@ class TestPRUpdate(object):
         prx.push(c2)
         assert pr.head == c2
 
-    def test_update_closed(self, env, repo, users):
-        """ Should warn that the PR is closed & update will be ignored
-        """
-        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
-        repo.make_ref('heads/master', m)
-
-        c = repo.make_commit(m, 'fist', None, tree={'m': 'c1'})
-        prx = repo.make_pr('title', 'body', target='master', ctid=c, user='user')
-        pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number),
-        ])
-        prx.close()
-        assert pr.state == 'closed'
-        assert pr.head == c
-
-        c2 = repo.make_commit(c, 'first', None, tree={'m': 'cc'})
-        prx.push(c2)
-        assert pr.head == c2, "PR should still be updated in case it's reopened"
-        assert prx.comments == [
-            (users['user'], "This pull request is closed, ignoring the update to {}".format(c2)),
-        ]
-
     def test_reopen_update(self, env, repo):
         m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
         repo.make_ref('heads/master', m)
@@ -784,37 +761,6 @@ class TestPRUpdate(object):
         assert not pr.staging_id
         assert not env['runbot_merge.stagings'].search([])
 
-    def test_update_merged(self, env, repo, users):
-        """ Should warn that the PR is merged & ignore entirely
-        """
-        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
-        repo.make_ref('heads/master', m)
-
-        c = repo.make_commit(m, 'fist', None, tree={'m': 'c1'})
-        prx = repo.make_pr('title', 'body', target='master', ctid=c, user='user')
-        repo.post_status(prx.head, 'success', 'legal/cla')
-        repo.post_status(prx.head, 'success', 'ci/runbot')
-        prx.post_comment('hansen r+', user='reviewer')
-        env['runbot_merge.project']._check_progress()
-
-        pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number),
-        ])
-        h = repo.commit('heads/staging.master').id
-        repo.post_status(h, 'success', 'legal/cla')
-        repo.post_status(h, 'success', 'ci/runbot')
-        env['runbot_merge.project']._check_progress()
-        assert pr.state == 'merged'
-
-        c2 = repo.make_commit(c, 'first', None, tree={'m': 'cc'})
-        prx.push(c2)
-        assert pr.head == c, "PR should not be updated at all"
-        assert prx.comments == [
-            (users['reviewer'], 'hansen r+'),
-            (users['user'], 'Merged in {}'.format(h)),
-            (users['user'], "This pull request is closed, ignoring the update to {}".format(c2)),
-        ]
     def test_update_error(self, env, repo):
         """ Should cancel the staging & reset PR to approved
         """

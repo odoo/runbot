@@ -126,11 +126,8 @@ def handle_pr(event):
             return 'No update to pr head'
 
         if pr_obj.state in ('closed', 'merged'):
-            pr_obj.repository.github().comment(
-                pr_obj.number, "This pull request is closed, ignoring the update to {}".format(pr['head']['sha']))
-            # actually still update the head of closed (but not merged) PRs
-            if pr_obj.state == 'merged':
-                return 'Ignoring update to {}'.format(pr_obj.id)
+            _logger.error("Tentative sync to closed PR %s:%s", repo.name, pr['number'])
+            return "It's my understanding that closed/merged PRs don't get sync'd"
 
         if pr_obj.state == 'validated':
             pr_obj.state = 'opened'
