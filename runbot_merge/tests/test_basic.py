@@ -1153,6 +1153,6 @@ class TestReviewing(object):
         assert pr.priority == 1
         assert pr.state == 'opened'
 
-        prx.post_review('APPROVED', 'reviewer', "hansen priority=2")
+        prx.post_review('APPROVE', 'reviewer', "hansen priority=2")
         assert pr.priority == 2
         assert pr.state == 'approved'
