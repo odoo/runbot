@@ -575,16 +575,16 @@ class Client(werkzeug.test.Client):
 
     def pull_request_review(self, action, pr, user, body):
         """
-        :type action: 'APPROVED' | 'REQUEST_CHANGES' | 'COMMENT'
+        :type action: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT'
         :type pr: PR
         :type user: str
         :type body: str
         """
-        assert action in ('APPROVED', 'REQUEST_CHANGES', 'COMMENT')
+        assert action in ('APPROVE', 'REQUEST_CHANGES', 'COMMENT')
         return self.open(self._make_env(
             'pull_request_review', {
                 'review': {
-                    'state': action,
+                    'state': 'APPROVED' if action == 'APPROVE' else action,
                     'body': body,
                     'user': {'login': user},
                 },
