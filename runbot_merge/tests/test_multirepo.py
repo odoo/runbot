@@ -42,8 +42,7 @@ def make_pr(repo, prefix, trees, *, target='master', user='user', label=None,
         tree.update(t)
         c = repo.make_commit(c, 'commit_{}_{:02}'.format(prefix, i), None,
                              tree=dict(tree))
-    pr = repo.make_pr('title {}'.format(prefix), 'body {}'.format(prefix), target=target,
-                      ctid=c, user=user, label=label and '{}:{}'.format(user, label))
+    pr = repo.make_pr('title {}'.format(prefix), 'body {}'.format(prefix), target=target, ctid=c, user=user, label=label)
     for context, result in statuses:
         repo.post_status(c, result, context)
     if reviewer:
@@ -221,7 +220,7 @@ def test_ff_fail(env, project, repo_a, repo_b):
     assert len(st) == 1
     assert len(st.batch_ids.prs) == 2
 
-def test_one_failed(env, project, repo_a, repo_b):
+def test_one_failed(env, project, repo_a, repo_b, owner):
     """ If the companion of a ready branch-matched PR is not ready,
     they should not get staged
     """
@@ -236,7 +235,7 @@ def test_one_failed(env, project, repo_a, repo_b):
     c_pr = repo_b.make_commit(c_b, 'pr', None, tree={'a': 'b_1'})
     pr_b = repo_b.make_pr(
         'title', 'body', target='master', ctid=c_pr,
-        user='user', label='user:do-a-thing',
+        user='user', label='do-a-thing',
     )
     repo_b.post_status(c_pr, 'success', 'ci/runbot')
     repo_b.post_status(c_pr, 'success', 'legal/cla')
@@ -245,7 +244,7 @@ def test_one_failed(env, project, repo_a, repo_b):
     pr_b = to_pr(env, pr_b)
     assert pr_a.state == 'ready'
     assert pr_b.state == 'validated'
-    assert pr_a.label == pr_b.label == 'user:do-a-thing'
+    assert pr_a.label == pr_b.label == '{}:do-a-thing'.format(owner)
 
     env['runbot_merge.project']._check_progress()
 

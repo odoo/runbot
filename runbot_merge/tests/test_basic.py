@@ -886,7 +886,7 @@ class TestBatching(object):
         for i, t in enumerate(trees):
             tree.update(t)
             c = repo.make_commit(c, 'commit_{}_{:02}'.format(prefix, i), None, tree=dict(tree))
-        pr = repo.make_pr('title {}'.format(prefix), 'body {}'.format(prefix), target=target, ctid=c, user=user, label='{}:{}'.format(user, prefix))
+        pr = repo.make_pr('title {}'.format(prefix), 'body {}'.format(prefix), target=target, ctid=c, user=user, label=prefix)
 
         for context, result in statuses:
             repo.post_status(c, result, context)
@@ -927,8 +927,8 @@ class TestBatching(object):
         pr21 = self._pr(repo, 'PR1', [{'a': 'AAA'}, {'b': 'BBB'}])
         pr22 = self._pr(repo, 'PR2', [{'c': 'CCC'}, {'d': 'DDD'}])
 
-        pr11 = self._pr(repo, 'Pressing 1', [{'x': 'x'}, {'y': 'y'}])
-        pr12 = self._pr(repo, 'Pressing 2', [{'z': 'z'}, {'zz': 'zz'}])
+        pr11 = self._pr(repo, 'Pressing1', [{'x': 'x'}, {'y': 'y'}])
+        pr12 = self._pr(repo, 'Pressing2', [{'z': 'z'}, {'zz': 'zz'}])
         pr11.post_comment('hansen priority=1', 'reviewer')
         pr12.post_comment('hansen priority=1', 'reviewer')
 
@@ -952,8 +952,8 @@ class TestBatching(object):
         pr21 = self._pr(repo, 'PR1', [{'a': 'AAA'}, {'b': 'BBB'}])
         pr22 = self._pr(repo, 'PR2', [{'c': 'CCC'}, {'d': 'DDD'}])
 
-        pr11 = self._pr(repo, 'Pressing 1', [{'x': 'x'}, {'y': 'y'}])
-        pr12 = self._pr(repo, 'Pressing 2', [{'z': 'z'}, {'zz': 'zz'}])
+        pr11 = self._pr(repo, 'Pressing1', [{'x': 'x'}, {'y': 'y'}])
+        pr12 = self._pr(repo, 'Pressing2', [{'z': 'z'}, {'zz': 'zz'}])
         pr11.post_comment('hansen priority=1', 'reviewer')
         pr12.post_comment('hansen priority=1', 'reviewer')
 
@@ -967,7 +967,7 @@ class TestBatching(object):
         staging_1 = p_11.staging_id
 
         # no statuses run on PR0s
-        pr01 = self._pr(repo, 'Urgent 1', [{'n': 'n'}, {'o': 'o'}], reviewer=None, statuses=[])
+        pr01 = self._pr(repo, 'Urgent1', [{'n': 'n'}, {'o': 'o'}], reviewer=None, statuses=[])
         pr01.post_comment('hansen priority=0', 'reviewer')
         p_01 = self._get(env, repo, pr01.number)
         assert p_01.state == 'opened'
@@ -1025,7 +1025,7 @@ class TestBatching(object):
         p_21 = self._get(env, repo, pr21.number)
 
         # no statuses run on PR0s
-        pr01 = self._pr(repo, 'Urgent 1', [{'n': 'n'}, {'o': 'o'}], reviewer=None, statuses=[])
+        pr01 = self._pr(repo, 'Urgent1', [{'n': 'n'}, {'o': 'o'}], reviewer=None, statuses=[])
         pr01.post_comment('hansen priority=0', 'reviewer')
         p_01 = self._get(env, repo, pr01.number)
         p_01.state = 'error'
