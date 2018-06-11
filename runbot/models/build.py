@@ -778,19 +778,32 @@ class runbot_build(models.Model):
         env = None
         if build.coverage:
             cpu_limit *= 1.5
-            pyversion = get_py_version(build)
             env = self._coverage_env(build)
-            available_modules = [
-                os.path.basename(os.path.dirname(a))
-                for a in (glob.glob(build._server('addons/*/__openerp__.py')) +
-                          glob.glob(build._server('addons/*/__manifest__.py')))
-            ]
-            bad_modules = set(available_modules) - set((mods or '').split(','))
-            omit = ['--omit', ','.join('*addons/%s/*' %m for m in bad_modules) + '*__manifest__.py']
-            cmd = [pyversion, '-m', 'coverage', 'run', '--branch', '--source', build._server()] + omit + cmd[:]
+            cmd = self._coverage_cmd(build) + cmd[:]
         # reset job_start to an accurate job_20 job_time
         build.write({'job_start': now()})
         return self._spawn(cmd, lock_path, log_path, cpu_limit=cpu_limit, env=env)
+
+    def _coverage_cmd(self, build):
+        pyversion = get_py_version(build)
+        omit = self._coverage_omit(build)
+        return [
+            pyversion, '-m', 'coverage', 'run', '--branch',
+            '--source', build._server()
+        ] + omit
+
+    def _coverage_omit(self, build):
+        dummy, mods = build._cmd()
+        available_modules = [
+            os.path.basename(os.path.dirname(a))
+            for a in (glob.glob(build._server('addons/*/__openerp__.py')) +
+                      glob.glob(build._server('addons/*/__manifest__.py')))
+        ]
+        bad_modules = set(available_modules) - set((mods or '').split(','))
+        return [
+            '--omit', ','.join('*addons/%s/*' %m for m in bad_modules) +
+            '*__manifest__.py',
+        ]
 
     def _coverage_env(self, build):
         return dict(os.environ, COVERAGE_FILE=build._path('.coverage'))
@@ -802,7 +815,7 @@ class runbot_build(models.Model):
         pyversion = get_py_version(build)
         cov_path = build._path('coverage')
         os.makedirs(cov_path, exist_ok=True)
-        cmd = [pyversion, "-m", "coverage", "html", "-d", cov_path, "--ignore-errors"]
+        cmd = [pyversion, "-m", "coverage", "html", "-d", cov_path, "--ignore-errors"] + self._coverage_omit(build)
         return self._spawn(cmd, lock_path, log_path, env=self._coverage_env(build))
 
     def _job_22_coverage_result(self, build, lock_path, log_path):
