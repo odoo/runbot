@@ -81,12 +81,17 @@ class runbot_branch(models.Model):
         r[self.id] = "http://%s/web/login?db=%s-all&login=admin&redirect=/web?debug=1" % (fqdn, dest)
         return r
 
-    def _get_last_coverage(self):
-        """ Return the coverage result of the last build in branch """
-        for branch in self:
-            last_build = self.env['runbot.build'].search([
-                ('branch_id.id', '=', branch.id),
+    def _get_last_coverage_build(self):
+        """ Return the last build with a coverage value > 0"""
+        self.ensure_one()
+        return self.env['runbot.build'].search([
+                ('branch_id.id', '=', self.id),
                 ('state', 'in', ['done', 'running']),
                 ('coverage_result', '>=', 0.0),
             ], order='sequence desc', limit=1)
+
+    def _get_last_coverage(self):
+        """ Compute the coverage result of the last build in branch """
+        for branch in self:
+            last_build = branch._get_last_coverage_build()
             branch.coverage_result = last_build.coverage_result or 0.0
