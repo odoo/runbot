@@ -4,8 +4,6 @@ import pytest
 
 import odoo
 
-from fake_github import git
-
 @pytest.fixture
 def repo(make_repo):
     return make_repo('repo')

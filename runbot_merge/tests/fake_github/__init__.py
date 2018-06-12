@@ -198,7 +198,7 @@ class Repo(object):
     def is_ancestor(self, sha, of):
         assert not git.is_ancestor(self.objects, sha, of=of)
 
-    def _read_ref(self, r, ref):
+    def _read_ref(self, _, ref):
         obj = self.refs.get(ref)
         if obj is None:
             return (404, None)
@@ -282,7 +282,7 @@ class Repo(object):
             "tree": {"sha": body['tree']},
             "parents": [{"sha": sha}],
         })
-    def _read_commit(self, r, sha):
+    def _read_commit(self, _, sha):
         c = self.objects.get(sha)
         if not isinstance(c, Commit):
             return (404, None)
@@ -349,7 +349,7 @@ class Repo(object):
 
         return (200, {})
 
-    def _remove_label(self, r, number, label):
+    def _remove_label(self, _, number, label):
         print('remove_label', number, label)
         try:
             pr = self.issues[int(number)]
@@ -384,7 +384,7 @@ class Repo(object):
         # get common ancestor (base) of commits
         try:
             base = git.merge_base(self.objects, target, sha)
-        except Exception as e:
+        except Exception:
             return (400, {'message': "No common ancestor between %(base)s and %(head)s" % body})
         try:
             tid = git.merge_objects(
@@ -534,7 +534,7 @@ class Commit(object):
         return git.make_commit(self.tree, self.message, self.author, self.committer, parents=self.parents)[0]
 
     def __str__(self):
-        parents = '\n'.join('parent {p}' for p in self.parents) + '\n'
+        parents = '\n'.join('parent {}'.format(p) for p in self.parents) + '\n'
         return """commit {}
 tree {}
 {}author {}

@@ -48,7 +48,6 @@ import collections
 import configparser
 import itertools
 import re
-import signal
 import socket
 import subprocess
 import sys
