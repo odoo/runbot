@@ -1,11 +1,9 @@
 import collections
 import functools
 import logging
-import pprint
 
 import requests
 
-from odoo.exceptions import UserError
 from . import exceptions
 
 _logger = logging.getLogger(__name__)

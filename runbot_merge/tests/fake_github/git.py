@@ -40,6 +40,10 @@ def make_commit(tree, message, author, committer=None, parents=()):
 def walk_ancestors(store, commit, exclude_self=True):
     """
     :param store: mapping of hashes to commit objects (w/ a parents attribute)
+    :param str commit: starting commit's hash
+    :param exclude_self: whether the starting commit shoudl be returned as
+                         part of the sequence
+    :rtype: Iterator[(str, int)]
     """
     q = [(commit, 0)]
     while q:
