@@ -127,7 +127,15 @@
                                   </div>
                                   <t t-if="br['branch'].sticky">
                                       <br/>
-                                      <span class="label label-info">cov: <t t-esc="br['branch'].coverage_result"/>%</span>
+                                      <t t-if="br['branch'].coverage_result > 0">
+                                        <t t-set="last_build" t-value="br['branch']._get_last_coverage_build()" />
+                                        <a t-attf-href="http://{{last_build['host']}}/runbot/static/build/#{last_build['dest']}/coverage/index.html">
+                                        <span class="label label-info">cov: <t t-esc="br['branch'].coverage_result"/>%</span>
+                                      </a>
+                                      </t>
+                                      <t t-else="">
+                                        <span class="label label-info">cov: <t t-esc="br['branch'].coverage_result"/>%</span>
+                                      </t>
                                   </t>
                               </td>
                               <t t-foreach="br['builds']" t-as="bu">
