@@ -1,5 +1,9 @@
+import hashlib
+import hmac
 import logging
 import json
+
+import werkzeug.exceptions
 
 from odoo.http import Controller, request, route
 
@@ -8,10 +12,22 @@ _logger = logging.getLogger(__name__)
 class MergebotController(Controller):
     @route('/runbot_merge/hooks', auth='none', type='json', csrf=False, methods=['POST'])
     def index(self):
-        event = request.httprequest.headers['X-Github-Event']
+        req = request.httprequest
+        event = req.headers['X-Github-Event']
 
         c = EVENTS.get(event)
         if c:
+            repo = request.jsonrequest['repository']['full_name']
+            secret = request.env(user=1)['runbot_merge.repository'].search([
+                ('name', '=', repo),
+            ]).project_id.secret
+            if secret:
+                signature = 'sha1=' + hmac.new(secret.encode('ascii'), req.get_data(), hashlib.sha1).hexdigest()
+                if not hmac.compare_digest(signature, req.headers.get('X-Hub-Signature', '')):
+                    _logger.warn("Ignored hook with incorrect signature %s",
+                                 req.headers.get('X-Hub-Signature'))
+                    return werkzeug.exceptions.Forbidden()
+
             return c(request.jsonrequest)
         _logger.warn('Unknown event %s', event)
         return 'Unknown event {}'.format(event)

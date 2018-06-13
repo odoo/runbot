@@ -60,6 +60,53 @@ def test_trivial_flow(env, repo):
     }
     assert master.message, "gibberish\n\nblahblah\n\ncloses odoo/odoo#1"
 
+class TestWebhookSecurity:
+    def test_no_secret(self, env, project, repo):
+        """ Test 1: didn't add a secret to the repo, should be ignored
+        """
+        project.secret = "a secret"
+
+        m = repo.make_commit(None, "initial", None, tree={'a': 'some content'})
+        repo.make_ref('heads/master', m)
+
+        c0 = repo.make_commit(m, 'replace file contents', None, tree={'a': 'some other content'})
+        pr0 = repo.make_pr("gibberish", "blahblah", target='master', ctid=c0, user='user')
+
+        assert not env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', pr0.number),
+        ])
+
+    def test_wrong_secret(self, env, project, repo):
+        repo.set_secret("wrong secret")
+        project.secret = "a secret"
+
+        m = repo.make_commit(None, "initial", None, tree={'a': 'some content'})
+        repo.make_ref('heads/master', m)
+
+        c0 = repo.make_commit(m, 'replace file contents', None, tree={'a': 'some other content'})
+        pr0 = repo.make_pr("gibberish", "blahblah", target='master', ctid=c0, user='user')
+
+        assert not env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', pr0.number),
+        ])
+
+    def test_correct_secret(self, env, project, repo):
+        repo.set_secret("a secret")
+        project.secret = "a secret"
+
+        m = repo.make_commit(None, "initial", None, tree={'a': 'some content'})
+        repo.make_ref('heads/master', m)
+
+        c0 = repo.make_commit(m, 'replace file contents', None, tree={'a': 'some other content'})
+        pr0 = repo.make_pr("gibberish", "blahblah", target='master', ctid=c0, user='user')
+
+        assert env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', pr0.number),
+        ])
+
 def test_staging_conflict(env, repo):
     # create base branch
     m = repo.make_commit(None, 'initial', None, tree={'a': 'some content'})

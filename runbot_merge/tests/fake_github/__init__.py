@@ -1,4 +1,6 @@
 import collections
+import hashlib
+import hmac
 import io
 import json
 import logging
@@ -95,6 +97,11 @@ class Repo(object):
     def notify(self, event_type, *payload):
         for client in self.hooks.get(event_type, []):
             getattr(client, event_type)(*payload)
+
+    def set_secret(self, secret):
+        for clients in self.hooks.values():
+            for client in clients:
+                client.secret = secret
 
     def issue(self, number):
         return self.issues[number]
@@ -552,16 +559,28 @@ committer {}
 class Client(werkzeug.test.Client):
     def __init__(self, application, path):
         self._webhook_path = path
+        self.secret = None
         super(Client, self).__init__(application, werkzeug.wrappers.BaseResponse)
 
     def _make_env(self, event_type, data):
+        headers = [('X-Github-Event', event_type)]
+        body = json.dumps(data).encode('utf-8')
+        if self.secret:
+            sig = hmac.new(self.secret.encode('ascii'), body, hashlib.sha1).hexdigest()
+            headers.append(('X-Hub-Signature', 'sha1=' + sig))
+
         return werkzeug.test.EnvironBuilder(
             path=self._webhook_path,
             method='POST',
-            headers=[('X-Github-Event', event_type)],
+            headers=headers,
             content_type='application/json',
-            data=json.dumps(data),
+            data=body,
         )
+    def _repo(self, name):
+        return {
+            'name': name.split('/')[1],
+            'full_name': name,
+        }
 
     def pull_request(self, action, pr, changes=None):
         assert action in ('opened', 'reopened', 'closed', 'synchronize', 'edited')
@@ -569,6 +588,7 @@ class Client(werkzeug.test.Client):
             'pull_request', {
                 'action': action,
                 'pull_request': self._pr(pr),
+                'repository': self._repo(pr.repo.name),
                 **({'changes': changes} if changes else {})
             }
         ))
@@ -589,10 +609,7 @@ class Client(werkzeug.test.Client):
                     'user': {'login': user},
                 },
                 'pull_request': self._pr(pr),
-                'repository': {
-                    'name': pr.repo.name.split('/')[1],
-                    'full_name': pr.repo.name,
-                }
+                'repository': self._repo(pr.repo.name),
             }
         ))
 
@@ -604,6 +621,7 @@ class Client(werkzeug.test.Client):
                 'context': context,
                 'state': state,
                 'sha': sha,
+                'repository': self._repo(repository),
             }
         ))
 
@@ -611,7 +629,7 @@ class Client(werkzeug.test.Client):
         contents = {
             'action': 'created',
             'issue': { 'number': issue.number },
-            'repository': { 'name': issue.repo.name.split('/')[1], 'full_name': issue.repo.name },
+            'repository': self._repo(issue.repo.name),
             'sender': { 'login': user },
             'comment': { 'body': body },
         }
@@ -631,10 +649,7 @@ class Client(werkzeug.test.Client):
             },
             'base': {
                 'ref': pr.base,
-                'repo': {
-                    'name': pr.repo.name.split('/')[1],
-                    'full_name': pr.repo.name,
-                },
+                'repo': self._repo(pr.repo.name),
             },
             'title': pr.title,
             'body': pr.body,

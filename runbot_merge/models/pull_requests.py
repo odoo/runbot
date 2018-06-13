@@ -49,6 +49,12 @@ class Project(models.Model):
     batch_limit = fields.Integer(
         default=8, help="Maximum number of PRs staged together")
 
+    secret = fields.Char(
+        help="Webhook secret. If set, will be checked against the signature "
+             "of (valid) incoming webhook signatures, failing signatures "
+             "will lead to webhook rejection. Should only use ASCII."
+    )
+
     def _check_progress(self):
         logger = _logger.getChild('cron')
         Batch = self.env['runbot_merge.batch']
