@@ -398,6 +398,18 @@ class Repo:
         self._session = session
         self._tokens = user_tokens
 
+    def set_secret(self, secret):
+        r = self._session.get(
+            'https://api.github.com/repos/{}/hooks'.format(self.name))
+        response = r.json()
+        assert 200 <= r.status_code < 300, response
+        [hook] = response
+
+        r = self._session.patch('https://api.github.com/repos/{}/hooks/{}'.format(self.name, hook['id']), json={
+            'config': {**hook['config'], 'secret': secret},
+        })
+        assert 200 <= r.status_code < 300, r.json()
+
     def get_ref(self, ref):
         if re.match(r'[0-9a-f]{40}', ref):
             return ref
