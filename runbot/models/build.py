@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import coverage
 import glob
 import logging
 import operator
@@ -408,7 +407,7 @@ class runbot_build(models.Model):
                 lock_path = build._path('logs', '%s.lock' % build.job)
                 if locked(lock_path):
                     # kill if overpassed
-                    timeout = (build.branch_id.job_timeout or default_timeout) * 60
+                    timeout = (build.branch_id.job_timeout or default_timeout) * 60 * ( build.coverage and 1.5 or 1)
                     if build.job != jobs[-1] and build.job_time > timeout:
                         build._logger('%s time exceded (%ss)', build.job, build.job_time)
                         build.write({'job_end': now()})
@@ -779,7 +778,7 @@ class runbot_build(models.Model):
                           glob.glob(build._server('addons/*/__manifest__.py')))
             ]
             bad_modules = set(available_modules) - set((mods or '').split(','))
-            omit = ['--omit', ','.join(build._server('addons', m) for m in bad_modules)] if bad_modules else []
+            omit = ['--omit', ','.join('*addons/%s/*' %m for m in bad_modules) + '*__manifest__.py']
             cmd = [pyversion, '-m', 'coverage', 'run', '--branch', '--source', build._server()] + omit + cmd[:]
         # reset job_start to an accurate job_20 job_time
         build.write({'job_start': now()})
@@ -791,6 +790,7 @@ class runbot_build(models.Model):
     def _job_21_coverage_html(self, build, lock_path, log_path):
         if not build.coverage:
             return -2
+        build._log('coverage_html', 'Start generating coverage html')
         pyversion = get_py_version(build)
         cov_path = build._path('coverage')
         os.makedirs(cov_path, exist_ok=True)
@@ -800,9 +800,15 @@ class runbot_build(models.Model):
     def _job_22_coverage_result(self, build, lock_path, log_path):
         if not build.coverage:
             return -2
-        cov = coverage.coverage(data_file=build._path('.coverage'))
-        cov.load()
-        build.coverage_result = cov.report()
+        build._log('coverage_result', 'Start getting coverage result')
+        cov_path = build._path('coverage/index.html')
+        if os.path.exists(cov_path):
+            with open(cov_path,'r') as f:
+                data = f.read()
+                covgrep = re.search(r'pc_cov.>(?P<coverage>\d+)%', data)
+                build.coverage_result = covgrep and covgrep.group('coverage') or False
+        else:
+            build._log('coverage_result', 'Coverage file not found')
         return -2  # nothing to wait for
 
     def _job_30_run(self, build, lock_path, log_path):
