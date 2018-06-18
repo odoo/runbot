@@ -309,7 +309,7 @@ def test_batching_split(env, repo_a, repo_b):
 
     env['runbot_merge.project']._check_progress()
 
-    assert not st0.exists()
+    assert not st0.active
     sts = env['runbot_merge.stagings'].search([])
     assert len(sts) == 2
     st1, st2 = sts

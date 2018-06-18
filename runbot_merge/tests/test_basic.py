@@ -136,7 +136,7 @@ def test_staging_conflict(env, repo):
     env['runbot_merge.project']._check_progress()
     p_2 = env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', repo.name),
-        ('number', '=', 2)
+        ('number', '=', pr2.number)
     ])
     assert p_2.state == 'ready', "PR2 should not have been staged since there is a pending staging for master"
     assert pr2.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌'}
@@ -967,7 +967,7 @@ class TestBatching(object):
         env['runbot_merge.project']._check_progress()
         # first staging should be cancelled and PR0 should be staged
         # regardless of CI (or lack thereof)
-        assert not staging_1.exists()
+        assert not staging_1.active
         assert not p_11.staging_id and not p_12.staging_id
         assert p_01.staging_id
 
