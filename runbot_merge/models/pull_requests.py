@@ -343,6 +343,11 @@ class Branch(models.Model):
     )
     staging_ids = fields.One2many('runbot_merge.stagings', 'target')
 
+    prs = fields.One2many('runbot_merge.pull_requests', 'target', domain=[
+        ('state', '!=', 'closed'),
+        ('state', '!=', 'merged'),
+    ])
+
     def _auto_init(self):
         res = super(Branch, self)._auto_init()
         tools.create_unique_index(
@@ -380,7 +385,7 @@ class PullRequests(models.Model):
     message = fields.Text(required=True)
     squash = fields.Boolean(default=False)
 
-    delegates = fields.Many2many('res.partner', help="Delegate reviewers, not intrisically reviewers but can review this PR")
+    delegates = fields.Many2many('res.partner', help="Delegate reviewers, not intrinsically reviewers but can review this PR")
     priority = fields.Selection([
         (0, 'Urgent'),
         (1, 'Pressing'),

@@ -7,6 +7,8 @@ import werkzeug.exceptions
 
 from odoo.http import Controller, request, route
 
+from . import dashboard
+
 _logger = logging.getLogger(__name__)
 
 class MergebotController(Controller):
