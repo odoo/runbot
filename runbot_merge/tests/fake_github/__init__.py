@@ -357,13 +357,11 @@ class Repo(object):
         return (200, {})
 
     def _remove_label(self, _, number, label):
-        print('remove_label', number, label)
         try:
             pr = self.issues[int(number)]
         except KeyError:
             return (404, None)
 
-        print(pr, pr.labels)
         try:
             pr.labels.remove(werkzeug.urls.url_unquote(label))
         except KeyError:

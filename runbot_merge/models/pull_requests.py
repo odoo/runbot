@@ -102,8 +102,8 @@ class Project(models.Model):
                             # FIXME: this is the staging head rather than the actual merge commit for the PR
                             gh[pr.repository.name].close(pr.number, 'Merged in {}'.format(staging_heads[pr.repository.name]))
                     finally:
-                        staging.batch_ids.unlink()
-                        staging.unlink()
+                        staging.batch_ids.write({'active': False})
+                        staging.write({'active': False})
                 elif staging.state == 'failure' or project.is_timed_out(staging):
                     staging.try_splitting()
                 # else let flow
@@ -111,7 +111,7 @@ class Project(models.Model):
             # check for stageable branches/prs
             for branch in project.branch_ids:
                 logger.info(
-                    "Checking %s (%s) for staging: %s, ignore? %s",
+                    "Checking %s (%s) for staging: %s, skip? %s",
                     branch, branch.name,
                     branch.active_staging_id,
                     bool(branch.active_staging_id)
@@ -125,8 +125,8 @@ class Project(models.Model):
                   min(pr.priority) as priority,
                   array_agg(pr.id) AS match
                 FROM runbot_merge_pull_requests pr
+                LEFT JOIN runbot_merge_batch batch ON pr.batch_id = batch.id AND batch.active
                 WHERE pr.target = %s
-                  AND pr.batch_id IS NULL
                   -- exclude terminal states (so there's no issue when
                   -- deleting branches & reusing labels)
                   AND pr.state != 'merged'
@@ -141,19 +141,21 @@ class Project(models.Model):
                 priority = rows[0][0] if rows else -1
                 if priority == 0:
                     # p=0 take precedence over all else
-                    batches = [
+                    batched_prs = [
                         PRs.browse(pr_ids)
                         for _, pr_ids in takewhile(lambda r: r[0] == priority, rows)
                     ]
                 elif branch.staging_ids:
                     # Splits can generate inactive stagings, restage these first
+                    # FIXME: these are really weird because they're stagings which never actually get staged, they're just used as splits from failed stagings => maybe add splits for this?
                     staging = branch.staging_ids[0]
-                    logger.info("Found inactive staging %s, reactivating", staging)
-                    batches = [batch.prs for batch in staging.batch_ids]
-                    staging.unlink()
+                    logger.info("Found inactive staging of PRs %s, re-staging", staging.mapped('batch_ids.prs'))
+                    batched_prs = [batch.prs for batch in staging.batch_ids]
+                    staging.batch_ids.write({'active': False})
+                    staging.active = False
                 elif rows:
                     # p=1 or p=2
-                    batches = [PRs.browse(pr_ids) for _, pr_ids in takewhile(lambda r: r[0] == priority, rows)]
+                    batched_prs = [PRs.browse(pr_ids) for _, pr_ids in takewhile(lambda r: r[0] == priority, rows)]
                 else:
                     continue
 
@@ -166,7 +168,7 @@ class Project(models.Model):
                     gh.set_ref('tmp.{}'.format(branch.name), it['head'])
 
                 batch_limit = project.batch_limit
-                for batch in batches:
+                for batch in batched_prs:
                     if len(staged) >= batch_limit:
                         break
                     staged |= Batch.stage(meta, batch)
@@ -196,7 +198,7 @@ class Project(models.Model):
                             'state_to': 'staged',
                         })
 
-                    logger.info("Created staging %s", st)
+                    logger.info("Created staging %s (%s)", st, staged)
 
         Repos = self.env['runbot_merge.repository']
         ghs = {}
@@ -268,7 +270,7 @@ class Project(models.Model):
                         _logger.info("PR %d retargeted to non-managed branch %s, deleting", pr['number'],
                                      target)
                         ignored_targets.update([target])
-                        existing.unlink()
+                        existing.write({'active': False})
                     else:
                         if message != existing.message:
                             _logger.info("Updating PR %d ({%s} != {%s})", pr['number'], existing.message, message)
@@ -338,7 +340,7 @@ class Branch(models.Model):
 
     active_staging_id = fields.One2many(
         'runbot_merge.stagings', 'target',
-        domain=[("heads", "!=", False)],
+        domain=[("heads", "!=", False), ('active', '=', True)],
         help="Currently running staging for the branch, there should be only one"
     )
     staging_ids = fields.One2many('runbot_merge.stagings', 'target')
@@ -394,7 +396,8 @@ class PullRequests(models.Model):
 
     statuses = fields.Text(compute='_compute_statuses')
 
-    batch_id = fields.Many2one('runbot_merge.batch')
+    batch_id = fields.Many2one('runbot_merge.batch',compute='_compute_active_batch', store=True)
+    batch_ids = fields.Many2many('runbot_merge.batch')
     staging_id = fields.Many2one(related='batch_id.staging_id', store=True)
 
     @api.depends('head')
@@ -404,6 +407,11 @@ class PullRequests(models.Model):
             c = Commits.search([('sha', '=', s.head)])
             if c and c.statuses:
                 s.statuses = pprint.pformat(json.loads(c.statuses))
+
+    @api.depends('batch_ids.active')
+    def _compute_active_batch(self):
+        for r in self:
+            r.batch_id = r.batch_ids.filtered(lambda b: b.active)[:1]
 
     def _parse_command(self, commandstring):
         m = re.match(r'(\w+)(?:([+-])|=(.*))?', commandstring)
@@ -707,6 +715,7 @@ class Stagings(models.Model):
         ('failure', 'Failure'),
         ('pending', 'Pending'),
     ])
+    active = fields.Boolean(default=True)
 
     staged_at = fields.Datetime(default=fields.Datetime.now)
     restaged = fields.Integer(default=0)
@@ -745,8 +754,8 @@ class Stagings(models.Model):
             return
 
         _logger.info(reason, *args)
-        self.batch_ids.unlink()
-        self.unlink()
+        self.batch_ids.write({'active': False})
+        self.write({'active': False})
 
     def fail(self, message, prs=None):
         _logger.error("Staging %s failed: %s", self, message)
@@ -756,24 +765,26 @@ class Stagings(models.Model):
             pr.repository.github().comment(
                 pr.number, "Staging failed: %s" % message)
 
-        self.batch_ids.unlink()
-        self.unlink()
+        self.batch_ids.write({'active': False})
+        self.write({'active': False})
 
     def try_splitting(self):
         batches = len(self.batch_ids)
         if batches > 1:
             midpoint = batches // 2
             h, t = self.batch_ids[:midpoint], self.batch_ids[midpoint:]
-            self.env['runbot_merge.stagings'].create({
+            sh = self.env['runbot_merge.stagings'].create({
                 'target': self.target.id,
                 'batch_ids': [(4, batch.id, 0) for batch in h],
             })
-            self.env['runbot_merge.stagings'].create({
+            st = self.env['runbot_merge.stagings'].create({
                 'target': self.target.id,
                 'batch_ids': [(4, batch.id, 0) for batch in t],
             })
+            _logger.info("Split %s to %s (%s) and %s (%s)",
+                         self, h, sh, t, st)
             # apoptosis
-            self.unlink()
+            self.active = False
             return True
 
         # single batch => the staging is an unredeemable failure
@@ -820,7 +831,9 @@ class Batch(models.Model):
     target = fields.Many2one('runbot_merge.branch', required=True)
     staging_id = fields.Many2one('runbot_merge.stagings')
 
-    prs = fields.One2many('runbot_merge.pull_requests', 'batch_id')
+    prs = fields.Many2many('runbot_merge.pull_requests')
+
+    active = fields.Boolean(default=True)
 
     @api.constrains('target', 'prs')
     def _check_prs(self):
