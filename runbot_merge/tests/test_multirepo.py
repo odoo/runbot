@@ -302,7 +302,7 @@ def test_batching_split(env, repo_a, repo_b):
     assert len(st0.batch_ids) == 5
     assert len(st0.mapped('batch_ids.prs')) == 8
 
-    # mark b.staging as failed -> should create two new stagings with (0, 1)
+    # mark b.staging as failed -> should create two splits with (0, 1)
     # and (2, 3, 4) and stage the first one
     repo_b.post_status('heads/staging.master', 'success', 'legal/cla')
     repo_b.post_status('heads/staging.master', 'failure', 'ci/runbot')
@@ -310,20 +310,20 @@ def test_batching_split(env, repo_a, repo_b):
     env['runbot_merge.project']._check_progress()
 
     assert not st0.active
-    sts = env['runbot_merge.stagings'].search([])
-    assert len(sts) == 2
-    st1, st2 = sts
-    # a bit oddly st1 is probably the (2,3,4) one: the split staging for
-    # (0, 1) has been "exploded" and a new staging was created for it
-    assert not st1.heads
-    assert len(st1.batch_ids) == 3
-    assert st1.mapped('batch_ids.prs') == \
-        prs[2][0] | prs[2][1] | prs[3][0] | prs[3][1] | prs[4][0]
 
-    assert st2.heads
-    assert len(st2.batch_ids) == 2
-    assert st2.mapped('batch_ids.prs') == \
+    # at this point we have a re-staged split and an unstaged split
+    st = env['runbot_merge.stagings'].search([])
+    sp = env['runbot_merge.split'].search([])
+    assert st
+    assert sp
+
+    assert len(st.batch_ids) == 2
+    assert st.mapped('batch_ids.prs') == \
         prs[0][0] | prs[0][1] | prs[1][1]
+
+    assert len(sp.batch_ids) == 3
+    assert sp.mapped('batch_ids.prs') == \
+        prs[2][0] | prs[2][1] | prs[3][0] | prs[3][1] | prs[4][0]
 
 def test_urgent(env, repo_a, repo_b):
     """ Either PR of a co-dependent pair being p=0 leads to the entire pair
