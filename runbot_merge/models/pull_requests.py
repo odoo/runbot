@@ -145,14 +145,11 @@ class Project(models.Model):
                         PRs.browse(pr_ids)
                         for _, pr_ids in takewhile(lambda r: r[0] == priority, rows)
                     ]
-                elif branch.staging_ids:
-                    # Splits can generate inactive stagings, restage these first
-                    # FIXME: these are really weird because they're stagings which never actually get staged, they're just used as splits from failed stagings => maybe add splits for this?
-                    staging = branch.staging_ids[0]
-                    logger.info("Found inactive staging of PRs %s, re-staging", staging.mapped('batch_ids.prs'))
-                    batched_prs = [batch.prs for batch in staging.batch_ids]
-                    staging.batch_ids.write({'active': False})
-                    staging.active = False
+                elif branch.split_ids:
+                    split_ids = branch.split_ids[0]
+                    logger.info("Found split of PRs %s, re-staging", split_ids.mapped('batch_ids.prs'))
+                    batched_prs = [batch.prs for batch in split_ids.batch_ids]
+                    split_ids.unlink()
                 elif rows:
                     # p=1 or p=2
                     batched_prs = [PRs.browse(pr_ids) for _, pr_ids in takewhile(lambda r: r[0] == priority, rows)]
@@ -338,12 +335,12 @@ class Branch(models.Model):
     name = fields.Char(required=True)
     project_id = fields.Many2one('runbot_merge.project', required=True)
 
-    active_staging_id = fields.One2many(
-        'runbot_merge.stagings', 'target',
-        domain=[("heads", "!=", False), ('active', '=', True)],
-        help="Currently running staging for the branch, there should be only one"
+    active_staging_id = fields.Many2one(
+        'runbot_merge.stagings', compute='_compute_active_staging', store=True,
+        help="Currently running staging for the branch."
     )
     staging_ids = fields.One2many('runbot_merge.stagings', 'target')
+    split_ids = fields.One2many('runbot_merge.split', 'target')
 
     prs = fields.One2many('runbot_merge.pull_requests', 'target', domain=[
         ('state', '!=', 'closed'),
@@ -356,6 +353,11 @@ class Branch(models.Model):
             self._cr, 'runbot_merge_unique_branch_per_repo',
             self._table, ['name', 'project_id'])
         return res
+
+    @api.depends('staging_ids.active')
+    def _compute_active_staging(self):
+        for b in self:
+            b.active_staging_id = b.staging_ids
 
 class PullRequests(models.Model):
     _name = 'runbot_merge.pull_requests'
@@ -720,10 +722,8 @@ class Stagings(models.Model):
     staged_at = fields.Datetime(default=fields.Datetime.now)
     restaged = fields.Integer(default=0)
 
-    # seems simpler than adding yet another indirection through a model and
-    # makes checking for actually staged stagings way easier: just see if
-    # heads is set
-    heads = fields.Char(help="JSON-encoded map of heads, one per repo in the project")
+    # seems simpler than adding yet another indirection through a model
+    heads = fields.Char(required=True, help="JSON-encoded map of heads, one per repo in the project")
 
     def _validate(self):
         Commits = self.env['runbot_merge.commit']
@@ -755,7 +755,7 @@ class Stagings(models.Model):
 
         _logger.info(reason, *args)
         self.batch_ids.write({'active': False})
-        self.write({'active': False})
+        self.active = False
 
     def fail(self, message, prs=None):
         _logger.error("Staging %s failed: %s", self, message)
@@ -766,24 +766,25 @@ class Stagings(models.Model):
                 pr.number, "Staging failed: %s" % message)
 
         self.batch_ids.write({'active': False})
-        self.write({'active': False})
+        self.active = False
 
     def try_splitting(self):
         batches = len(self.batch_ids)
         if batches > 1:
             midpoint = batches // 2
             h, t = self.batch_ids[:midpoint], self.batch_ids[midpoint:]
-            sh = self.env['runbot_merge.stagings'].create({
+            # NB: batches remain attached to their original staging
+            sh = self.env['runbot_merge.split'].create({
                 'target': self.target.id,
                 'batch_ids': [(4, batch.id, 0) for batch in h],
             })
-            st = self.env['runbot_merge.stagings'].create({
+            st = self.env['runbot_merge.split'].create({
                 'target': self.target.id,
                 'batch_ids': [(4, batch.id, 0) for batch in t],
             })
             _logger.info("Split %s to %s (%s) and %s (%s)",
                          self, h, sh, t, st)
-            # apoptosis
+            self.batch_ids.write({'active': False})
             self.active = False
             return True
 
@@ -819,6 +820,12 @@ class Stagings(models.Model):
 
         return False
 
+class Split(models.Model):
+    _name = 'runbot_merge.split'
+
+    target = fields.Many2one('runbot_merge.branch', required=True)
+    batch_ids = fields.One2many('runbot_merge.batch', 'split_id', context={'active_test': False})
+
 class Batch(models.Model):
     """ A batch is a "horizontal" grouping of *codependent* PRs: PRs with
     the same label & target but for different repositories. These are
@@ -830,6 +837,7 @@ class Batch(models.Model):
 
     target = fields.Many2one('runbot_merge.branch', required=True)
     staging_id = fields.Many2one('runbot_merge.stagings')
+    split_id = fields.Many2one('runbot_merge.split')
 
     prs = fields.Many2many('runbot_merge.pull_requests')
 

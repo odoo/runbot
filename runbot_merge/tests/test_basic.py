@@ -1050,12 +1050,14 @@ class TestBatching(object):
         pr2 = env['runbot_merge.pull_requests'].search([('number', '=', pr2.number)])
 
         env['runbot_merge.project']._check_progress()
-        # should have split the existing batch into two
-        assert len(env['runbot_merge.stagings'].search([])) == 2
-        assert pr1.staging_id and pr2.staging_id
-        assert pr1.staging_id != pr2.staging_id
-        assert pr1.staging_id.heads
-        assert not pr2.staging_id.heads
+        # should have split the existing batch into two, with one of the
+        # splits having been immediately restaged
+        st = env['runbot_merge.stagings'].search([])
+        assert len(st) == 1
+        assert pr1.staging_id and pr1.staging_id == st
+
+        sp = env['runbot_merge.split'].search([])
+        assert len(sp) == 1
 
         # This is the failing PR!
         h = repo.commit('heads/staging.master').id
@@ -1063,7 +1065,8 @@ class TestBatching(object):
         repo.post_status(h, 'success', 'legal/cla')
         env['runbot_merge.project']._check_progress()
         assert pr1.state == 'error'
-        assert pr2.staging_id.heads
+
+        assert pr2.staging_id
 
         h = repo.commit('heads/staging.master').id
         repo.post_status(h, 'success', 'ci/runbot')
