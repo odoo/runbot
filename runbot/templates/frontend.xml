@@ -149,6 +149,8 @@
                                   <t t-if="bu['state'] in ['running','done'] and bu['result'] in ['killed', 'manually_killed']"><t t-set="klass">killed</t></t>
                                   <td t-attf-class="{{klass}}">
                                      <t t-call="runbot.build_button"><t t-set="klass">btn-group-sm</t></t>
+                                     <t t-if="bu['build_type']=='scheduled'"><i class="fa fa-clock-o" t-att-title="bu['build_type_label']" t-att-aria-label="bu['build_type_label']"/></t>
+                                     <t t-if="bu['build_type'] in ('rebuild', 'indirect')"><i class="fa fa-recycle" t-att-title="bu['build_type_label']" t-att-aria-label="bu['build_type_label']"/></t>
                                      <t t-if="bu['subject']">
                                           <span t-esc="bu['subject'][:32] + ('...' if bu['subject'][32:] else '') " t-att-title="bu['subject']"/>
                                            <br/>
