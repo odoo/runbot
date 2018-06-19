@@ -4,6 +4,7 @@ import logging
 
 import requests
 
+from odoo.exceptions import UserError
 from . import exceptions
 
 _logger = logging.getLogger(__name__)
@@ -115,14 +116,17 @@ class GH(object):
         cursor = None
         owner, name = self._repo.split('/')
         while True:
-            response = self._session.post('{}/graphql'.format(self._url), json={
+            r = self._session.post('{}/graphql'.format(self._url), json={
                 'query': PR_QUERY,
                 'variables': {
                     'owner': owner,
                     'name': name,
                     'cursor': cursor,
                 }
-            }).json()
+            })
+            response = r.json()
+            if 'data' not in response:
+                raise UserError('\n'.join(e['message'] for e in response.get('errors', map(str, [r.status_code, r.reason, r.text]))))
 
             result = response['data']['repository']['pullRequests']
             for pr in result['nodes']:
