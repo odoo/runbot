@@ -76,5 +76,44 @@
         </div>
       </t>
     </template>
+    <template id="runbot.glances">
+      <t t-call='website.layout'>
+        <t t-set="head">
+          <t t-if="refresh">
+            <meta http-equiv="refresh" t-att-content="refresh"/>
+          </t>
+          <style>
+            .label-killed {
+              background-color: #aaa;
+            }
+            h4 {
+              padding: 3px 0;
+              border-bottom: 1px solid grey;
+            }
+            .r-mb02 { margin-bottom: 0.2em; }
+          </style>
+        </t>
+        <div class="container-fluid">
+          <div class="row">
+            <div class='col-md-12'>
+              <div>
+                <span t-attf-class="label label-{{pending_level}}">Pending: <t t-esc="pending_total"/></span>
+              </div>
+              <t t-foreach="data.keys()" t-as="repo">
+                <h4><t t-esc="repo"/>
+                </h4>
+                <t t-foreach="data[repo]" t-as="br">
+                  <t t-if="br[1] == 'ko'"><t t-set="klass">danger</t></t>
+                  <t t-if="br[1] == 'warn'"><t t-set="klass">warning</t></t>
+                  <t t-if="br[1] == 'ok'"><t t-set="klass">success</t></t>
+                  <t t-if="br[1] == 'killed'"><t t-set="klass">killed</t></t>
+                  <span t-attf-class="label label-{{klass}}"><t t-esc="br[0]"/></span>
+                </t>
+              </t>
+            </div>
+          </div>
+        </div>
+      </t>
+    </template>
   </data>
 </odoo>
