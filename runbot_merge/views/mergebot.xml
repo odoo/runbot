@@ -4,10 +4,6 @@
         <field name="model">runbot_merge.project</field>
         <field name="arch" type="xml">
             <form>
-                <header>
-                    <button type="object" name="sync_prs" string="Sync PRs"
-                            attrs="{'invisible': [['github_token', '=', False]]}"/>
-                </header>
                 <sheet>
                     <!--
                     <div class="oe_button_box" name="button_box">
