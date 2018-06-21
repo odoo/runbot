@@ -161,7 +161,6 @@ def tunnel(request):
         p = subprocess.Popen(['lt', '-p', str(PORT)], stdout=subprocess.PIPE)
         try:
             r = p.stdout.readline()
-            print(r)
             m = re.match(br'your url is: (https://.*\.localtunnel\.me)', r)
             assert m, "could not get the localtunnel URL"
             yield m.group(1).decode('ascii')
@@ -336,9 +335,15 @@ class Model:
 
     def _check_progress(self):
         assert self._model == 'runbot_merge.project'
+        self._run_cron('runbot_merge.merge_cron')
 
-        # FIXME: get via xid instead?
-        [cron_id] = self._env('ir.cron', 'search', [('cron_name', '=', 'Check for progress of PRs & Stagings')])
+    def _check_fetch(self):
+        assert self._model == 'runbot_merge.project'
+        self._run_cron('runbot_merge.fetch_prs_cron')
+
+    def _run_cron(self, xid):
+        _, model, cron_id = self._env('ir.model.data', 'xmlid_lookup', xid)
+        assert model == 'ir.cron', "Expected {} to be a cron, got {}".format(xid, model)
         self._env('ir.cron', 'method_direct_trigger', [cron_id])
         # sleep for some time as a lot of crap may have happened (?)
         wait_for_hook()
@@ -378,7 +383,6 @@ class Model:
             result = Model(self._env, descr['relation'])
             for record in self:
                 result |= getattr(record, field)
-                print(f"{record}[{field}] -> {result}")
 
             return result.mapped(rest[0]) if rest else result
 
@@ -630,7 +634,6 @@ class PR:
     base = base.setter(lambda self, v: self._set_prop('base', v))
 
     def post_comment(self, body, user):
-        print(f"COMMENT ({body}) by {user}", file=sys.stderr)
         r = self._session.post(
             'https://api.github.com/repos/{}/issues/{}/comments'.format(self.repo.name, self.number),
             json={'body': body},

@@ -36,12 +36,12 @@ class APIResponse(responses.BaseResponse):
 
         headers = self.get_headers()
         body = io.BytesIO(b'')
-        if r:
+        if r is not None:
             body = io.BytesIO(json.dumps(r).encode('utf-8'))
 
         return responses.HTTPResponse(
             status=status,
-            reason=r.get('message') if r else "bollocks",
+            reason=r.get('message') if isinstance(r, dict) else "bollocks",
             body=body,
             headers=headers,
             preload_content=False, )
@@ -190,7 +190,8 @@ class Repo(object):
         return self._save_tree(o)
 
     def api(self, path, request):
-        for method, pattern, handler in self._handlers:
+        # a better version would be some sort of longest-match?
+        for method, pattern, handler in sorted(self._handlers, key=lambda t: -len(t[1])):
             if method and request.method != method:
                 continue
 
@@ -302,6 +303,42 @@ class Repo(object):
             "parents": [{"sha": p} for p in c.parents],
         })
 
+    def _read_statuses(self, _, ref):
+        try:
+            c = self.commit(ref)
+        except KeyError:
+            return (404, None)
+
+        return (200, {
+            'sha': c.id,
+            'total_count': len(c.statuses),
+            # TODO: combined?
+            'statuses': [
+                {'context': context, 'state': state}
+                for state, context, _ in reversed(c.statuses)
+            ]
+        })
+
+    def _read_issue(self, r, number):
+        try:
+            issue = self.issues[int(number)]
+        except KeyError:
+            return (404, None)
+        attr = {'pull_request': True} if isinstance(issue, PR) else {}
+        return (200, {'number': issue.number, **attr})
+
+    def _read_issue_comments(self, r, number):
+        try:
+            issue = self.issues[int(number)]
+        except KeyError:
+            return (404, None)
+        return (200, [{
+            'user': {'login': author},
+            'body': body,
+        } for author, body in issue.comments
+          if not body.startswith('REVIEW')
+        ])
+
     def _create_issue_comment(self, r, number):
         try:
             issue = self.issues[int(number)]
@@ -317,6 +354,31 @@ class Repo(object):
             'id': 0,
             'body': body,
             'user': { 'login': "user" },
+        })
+
+    def _read_pr(self, r, number):
+        try:
+            pr = self.issues[int(number)]
+        except KeyError:
+            return (404, None)
+        # FIXME: dedup with Client
+        return (200, {
+            'number': pr.number,
+            'head': {
+                'sha': pr.head,
+                'label': pr.label,
+            },
+            'base': {
+                'ref': pr.base,
+                'repo': {
+                    'name': self.name.split('/')[1],
+                    'full_name': self.name,
+                },
+            },
+            'title': pr.title,
+            'body': pr.body,
+            'commits': pr.commits,
+            'user': {'login': pr.user},
         })
 
     def _edit_pr(self, r, number):
@@ -345,6 +407,21 @@ class Repo(object):
             self.notify('pull_request', 'closed', pr)
 
         return (200, {})
+
+    def _read_pr_reviews(self, _, number):
+        pr = self.issues.get(int(number))
+        if not isinstance(pr, PR):
+            return (404, None)
+
+        return (200, [{
+            'user': {'login': author},
+            'state': r.group(1),
+            'body': r.group(2),
+        }
+            for author, body in pr.comments
+            for r in [re.match(r'REVIEW (\w+)\n\n(.*)', body)]
+            if r
+        ])
 
     def _add_labels(self, r, number):
         try:
@@ -424,12 +501,17 @@ class Repo(object):
         # nb: there's a different commits at /commits with repo-level metadata
         ('GET', r'git/commits/(?P<sha>[0-9A-Fa-f]{40})', _read_commit),
         ('POST', r'git/commits', _create_commit),
+        ('GET', r'commits/(?P<ref>[^/]+)/status', _read_statuses),
 
+        ('GET', r'issues/(?P<number>\d+)', _read_issue),
+        ('GET', r'issues/(?P<number>\d+)/comments', _read_issue_comments),
         ('POST', r'issues/(?P<number>\d+)/comments', _create_issue_comment),
 
         ('POST', r'merges', _do_merge),
 
+        ('GET', r'pulls/(?P<number>\d+)', _read_pr),
         ('PATCH', r'pulls/(?P<number>\d+)', _edit_pr),
+        ('GET', r'pulls/(?P<number>\d+)/reviews', _read_pr_reviews),
 
         ('POST', r'issues/(?P<number>\d+)/labels', _add_labels),
         ('DELETE', r'issues/(?P<number>\d+)/labels/(?P<label>.+)', _remove_label),

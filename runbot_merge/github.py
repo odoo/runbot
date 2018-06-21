@@ -1,10 +1,10 @@
 import collections
 import functools
+import itertools
 import logging
 
 import requests
 
-from odoo.exceptions import UserError
 from . import exceptions
 
 _logger = logging.getLogger(__name__)
@@ -110,113 +110,31 @@ class GH(object):
         self.set_ref(dest, c['sha'])
         return c
 
-    # --
+    # fetch various bits of issues / prs to load them
+    def pr(self, number):
+        return (
+            self('get', 'issues/{}'.format(number)).json(),
+            self('get', 'pulls/{}'.format(number)).json()
+        )
 
-    def prs(self):
-        cursor = None
-        owner, name = self._repo.split('/')
-        while True:
-            r = self._session.post('{}/graphql'.format(self._url), json={
-                'query': PR_QUERY,
-                'variables': {
-                    'owner': owner,
-                    'name': name,
-                    'cursor': cursor,
-                }
-            })
-            response = r.json()
-            if 'data' not in response:
-                raise UserError('\n'.join(e['message'] for e in response.get('errors', map(str, [r.status_code, r.reason, r.text]))))
+    def comments(self, number):
+        for page in itertools.count(1):
+            r = self('get', 'issues/{}/comments?page={}'.format(number, page))
+            yield from r.json()
+            if not r.links.get('next'):
+                return
 
-            result = response['data']['repository']['pullRequests']
-            for pr in result['nodes']:
-                statuses = into(pr, 'headRef.target.status.contexts') or []
+    def reviews(self, number):
+        for page in itertools.count(1):
+            r = self('get', 'pulls/{}/reviews?page={}'.format(number, page))
+            yield from r.json()
+            if not r.links.get('next'):
+                return
 
-                author = into(pr, 'author.login') or into(pr, 'headRepositoryOwner.login')
-                source = into(pr, 'headRepositoryOwner.login') or into(pr, 'author.login')
-                label = source and "{}:{}".format(source, pr['headRefName'])
-                yield {
-                    'number': pr['number'],
-                    'title': pr['title'],
-                    'body': pr['body'],
-                    'head': {
-                        'ref': pr['headRefName'],
-                        'sha': pr['headRefOid'],
-                        # headRef may be null if the pr branch was ?deleted?
-                        # (mostly closed PR concerns?)
-                        'statuses': {
-                            c['context']: c['state']
-                            for c in statuses
-                        },
-                        'label': label,
-                    },
-                    'state': pr['state'].lower(),
-                    'user': {'login': author},
-                    'base': {
-                        'ref': pr['baseRefName'],
-                        'repo': {
-                            'full_name': pr['repository']['nameWithOwner'],
-                        }
-                    },
-                    'commits': pr['commits']['totalCount'],
-                }
-
-            if result['pageInfo']['hasPreviousPage']:
-                cursor = result['pageInfo']['startCursor']
-            else:
-                break
-def into(d, path):
-    return functools.reduce(
-        lambda v, segment: v and v.get(segment),
-        path.split('.'),
-        d
-    )
-
-PR_QUERY = """
-query($owner: String!, $name: String!, $cursor: String) {
-  rateLimit { remaining }
-  repository(owner: $owner, name: $name) {
-    pullRequests(last: 100, before: $cursor) {
-      pageInfo { startCursor hasPreviousPage }
-      nodes {
-        author { # optional
-          login
-        }
-        number
-        title
-        body
-        state
-        repository { nameWithOwner }
-        baseRefName
-        headRefOid
-        headRepositoryOwner { # optional
-          login
-        }
-        headRefName
-        headRef { # optional
-          target {
-            ... on Commit {
-              status {
-                contexts {
-                  context
-                  state
-                }
-              }
-            }
-          }
-        }
-        commits { totalCount }
-        #comments(last: 100) {
-        #  nodes {
-        #    author {
-        #      login
-        #    }
-        #    body
-        #    bodyText
-        #  }
-        #}
-      }
-    }
-  }
-}
-"""
+    def statuses(self, h):
+        r = self('get', 'commits/{}/status'.format(h)).json()
+        return [{
+            'sha': r['sha'],
+            'context': s['context'],
+            'state': s['state'],
+        } for s in r['statuses']]

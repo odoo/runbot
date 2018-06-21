@@ -674,7 +674,6 @@ class TestSquashing(object):
         ]).state == 'merged'
         assert prx.state == 'closed'
 
-
 class TestPRUpdate(object):
     """ Pushing on a PR should update the HEAD except for merged PRs, it
     can have additional effect (see individual tests)
@@ -1204,3 +1203,49 @@ class TestReviewing(object):
         prx.post_review('APPROVE', 'reviewer', "hansen priority=2")
         assert pr.priority == 2
         assert pr.state == 'approved'
+
+class TestUnknownPR:
+    """ Sync PRs initially looked excellent but aside from the v4 API not
+    being stable yet, it seems to have greatly regressed in performances to
+    the extent that it's almost impossible to sync odoo/odoo today: trying to
+    fetch more than 2 PRs per query will fail semi-randomly at one point, so
+    fetching all 15000 PRs takes hours
+
+    => instead, create PRs on the fly when getting notifications related to
+       valid but unknown PRs
+
+    * get statuses if head commit unknown (additional cron?)
+    * assume there are no existing r+ (?)
+    """
+    def test_rplus_unknown(self, repo, env):
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        m2 = repo.make_commit(m, 'second', None, tree={'m': 'm', 'm2': 'm2'})
+        repo.make_ref('heads/master', m2)
+
+        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
+        prx = repo.make_pr('title', 'body', target='master', ctid=c1, user='user')
+        repo.post_status(prx.head, 'success', 'legal/cla')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+        # assume an unknown but ready PR: we don't know the PR or its head commit
+        env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number),
+        ]).unlink()
+        env['runbot_merge.commit'].search([('sha', '=', prx.head)]).unlink()
+
+        # reviewer reviewers
+        prx.post_comment('hansen r+', "reviewer")
+
+        Fetch = env['runbot_merge.fetch_job']
+        assert Fetch.search([('repository', '=', repo.name), ('number', '=', prx.number)])
+        env['runbot_merge.project']._check_fetch()
+        assert not Fetch.search([('repository', '=', repo.name), ('number', '=', prx.number)])
+
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number)
+        ])
+        assert pr.state == 'ready'
+
+        env['runbot_merge.project']._check_progress()
+        assert pr.staging_id

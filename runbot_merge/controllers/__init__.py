@@ -18,23 +18,26 @@ class MergebotController(Controller):
         event = req.headers['X-Github-Event']
 
         c = EVENTS.get(event)
-        if c:
-            repo = request.jsonrequest['repository']['full_name']
-            secret = request.env(user=1)['runbot_merge.repository'].search([
-                ('name', '=', repo),
-            ]).project_id.secret
-            if secret:
-                signature = 'sha1=' + hmac.new(secret.encode('ascii'), req.get_data(), hashlib.sha1).hexdigest()
-                if not hmac.compare_digest(signature, req.headers.get('X-Hub-Signature', '')):
-                    _logger.warn("Ignored hook with incorrect signature %s",
-                                 req.headers.get('X-Hub-Signature'))
-                    return werkzeug.exceptions.Forbidden()
+        if not c:
+            _logger.warn('Unknown event %s', event)
+            return 'Unknown event {}'.format(event)
 
-            return c(request.jsonrequest)
-        _logger.warn('Unknown event %s', event)
-        return 'Unknown event {}'.format(event)
+        repo = request.jsonrequest['repository']['full_name']
+        env = request.env(user=1)
 
-def handle_pr(event):
+        secret = env['runbot_merge.repository'].search([
+            ('name', '=', repo),
+        ]).project_id.secret
+        if secret:
+            signature = 'sha1=' + hmac.new(secret.encode('ascii'), req.get_data(), hashlib.sha1).hexdigest()
+            if not hmac.compare_digest(signature, req.headers.get('X-Hub-Signature', '')):
+                _logger.warn("Ignored hook with incorrect signature %s",
+                             req.headers.get('X-Hub-Signature'))
+                return werkzeug.exceptions.Forbidden()
+
+        return c(env, request.jsonrequest)
+
+def handle_pr(env, event):
     if event['action'] in [
         'assigned', 'unassigned', 'review_requested', 'review_request_removed',
         'labeled', 'unlabeled'
@@ -47,7 +50,6 @@ def handle_pr(event):
         )
         return 'Ignoring'
 
-    env = request.env(user=1)
     pr = event['pull_request']
     r = pr['base']['repo']['full_name']
     b = pr['base']['ref']
@@ -93,7 +95,7 @@ def handle_pr(event):
 
         # retargeting from un-managed => create
         if not source_branch:
-            return handle_pr(dict(event, action='opened'))
+            return handle_pr(env, dict(event, action='opened'))
 
         updates = {}
         if source_branch != branch:
@@ -135,10 +137,10 @@ def handle_pr(event):
         })
         return "Tracking PR as {}".format(pr_obj.id)
 
-    pr_obj = find(branch)
+    pr_obj = env['runbot_merge.pull_requests']._get_or_schedule(r, pr['number'])
     if not pr_obj:
-        _logger.warn("webhook %s on unknown PR %s:%s", event['action'], repo.name, pr['number'])
-        return "Unknown PR {}:{}".format(repo.name, pr['number'])
+        _logger.warn("webhook %s on unknown PR %s:%s, scheduled fetch", event['action'], repo.name, pr['number'])
+        return "Unknown PR {}:{}, scheduling fetch".format(repo.name, pr['number'])
     if event['action'] == 'synchronize':
         if pr_obj.head == pr['head']['sha']:
             return 'No update to pr head'
@@ -178,13 +180,13 @@ def handle_pr(event):
     _logger.info("Ignoring event %s on PR %s", event['action'], pr['number'])
     return "Not handling {} yet".format(event['action'])
 
-def handle_status(event):
+def handle_status(env, event):
     _logger.info(
         'status %s:%s on commit %s',
         event['context'], event['state'],
         event['sha'],
     )
-    Commits = request.env(user=1)['runbot_merge.commit']
+    Commits = env['runbot_merge.commit']
     c = Commits.search([('sha', '=', event['sha'])])
     if c:
         c.statuses = json.dumps({
@@ -199,7 +201,7 @@ def handle_status(event):
 
     return 'ok'
 
-def handle_comment(event):
+def handle_comment(env, event):
     if 'pull_request' not in event['issue']:
         return "issue comment, ignoring"
 
@@ -211,30 +213,31 @@ def handle_comment(event):
         event['comment']['body'],
     )
 
-    env = request.env(user=1)
     partner = env['res.partner'].search([('github_login', '=', event['sender']['login']),])
-    pr = env['runbot_merge.pull_requests'].search([
-        ('number', '=', event['issue']['number']),
-        ('repository.name', '=', event['repository']['full_name']),
-    ])
     if not partner:
         _logger.info("ignoring comment from %s: not in system", event['sender']['login'])
         return 'ignored'
 
+    pr = env['runbot_merge.pull_requests']._get_or_schedule(
+        event['repository']['full_name'],
+        event['issue']['number'],
+    )
+    if not pr:
+        return "Unknown PR, scheduling fetch"
     return pr._parse_commands(partner, event['comment']['body'])
 
-def handle_review(event):
-    env = request.env(user=1)
-
+def handle_review(env, event):
     partner = env['res.partner'].search([('github_login', '=', event['review']['user']['login'])])
     if not partner:
         _logger.info('ignoring comment from %s: not in system', event['review']['user']['login'])
         return 'ignored'
 
-    pr = env['runbot_merge.pull_requests'].search([
-        ('number', '=', event['pull_request']['number']),
-        ('repository.name', '=', event['repository']['full_name'])
-    ])
+    pr = env['runbot_merge.pull_requests']._get_or_schedule(
+        event['repository']['full_name'],
+        event['pull_request']['number'],
+    )
+    if not pr:
+        return "Unknown PR, scheduling fetch"
 
     firstline = ''
     state = event['review']['state'].lower()
@@ -245,7 +248,7 @@ def handle_review(event):
 
     return pr._parse_commands(partner, firstline + event['review']['body'])
 
-def handle_ping(event):
+def handle_ping(env, event):
     print("Got ping! {}".format(event['zen']))
     return "pong"
 

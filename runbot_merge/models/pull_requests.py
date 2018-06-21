@@ -10,7 +10,7 @@ from itertools import takewhile
 from odoo import api, fields, models, tools
 from odoo.exceptions import ValidationError
 
-from .. import github, exceptions
+from .. import github, exceptions, controllers
 
 _logger = logging.getLogger(__name__)
 class Project(models.Model):
@@ -234,85 +234,25 @@ class Project(models.Model):
     def is_timed_out(self, staging):
         return fields.Datetime.from_string(staging.staged_at) + datetime.timedelta(minutes=self.ci_timeout) < datetime.datetime.now()
 
-    def sync_prs(self):
-        _logger.info("Synchronizing PRs for %s", self.name)
-        Commits = self.env['runbot_merge.commit']
-        PRs = self.env['runbot_merge.pull_requests']
-        Partners = self.env['res.partner']
-        branches = {
-            b.name: b
-            for b in self.branch_ids
-        }
-        authors = {
-            p.github_login: p
-            for p in Partners.search([])
-            if p.github_login
-        }
-        for repo in self.repo_ids:
-            gh = repo.github()
-            created = 0
-            ignored_targets = collections.Counter()
-            prs = {
-                pr.number: pr
-                for pr in PRs.search([
-                    ('repository', '=', repo.id),
-                ])
-            }
-            for i, pr in enumerate(gh.prs()):
-                message = "{}\n\n{}".format(pr['title'].strip(), pr['body'].strip())
-                existing = prs.get(pr['number'])
-                target = pr['base']['ref']
-                if existing:
-                    if target not in branches:
-                        _logger.info("PR %d retargeted to non-managed branch %s, deleting", pr['number'],
-                                     target)
-                        ignored_targets.update([target])
-                        existing.write({'active': False})
-                    else:
-                        if message != existing.message:
-                            _logger.info("Updating PR %d ({%s} != {%s})", pr['number'], existing.message, message)
-                            existing.message = message
-                    continue
+    def _check_fetch(self, commit=False):
+        """
+        :param bool commit: commit after each fetch has been executed
+        """
+        while True:
+            f = self.env['runbot_merge.fetch_job'].search([], limit=1)
+            if not f:
+                return
 
-                # not for a selected target => skip
-                if target not in branches:
-                    ignored_targets.update([target])
-                    continue
+            repo = self.env['runbot_merge.repository'].search([('name', '=', f.repository)])
+            if repo:
+                repo._load_pr(f.number)
+            else:
+                _logger.warn("Fetch job for unknown repository %s, disabling & skipping", f.repository)
 
-                # old PR, source repo may have been deleted, ignore
-                if not pr['head']['label']:
-                    _logger.info('ignoring PR %d: no label', pr['number'])
-                    continue
-
-                login = pr['user']['login']
-                # no author on old PRs, account deleted
-                author = authors.get(login, Partners)
-                if login and not author:
-                    author = authors[login] = Partners.create({
-                        'name': login,
-                        'github_login': login,
-                    })
-                head = pr['head']['sha']
-                PRs.create({
-                    'number': pr['number'],
-                    'label': pr['head']['label'],
-                    'author': author.id,
-                    'target': branches[target].id,
-                    'repository': repo.id,
-                    'head': head,
-                    'squash': pr['commits'] == 1,
-                    'message': message,
-                    'state': 'opened' if pr['state'] == 'open'
-                    else 'merged' if pr.get('merged')
-                    else 'closed'
-                })
-                c = Commits.search([('sha', '=', head)]) or Commits.create({'sha': head})
-                c.statuses = json.dumps(pr['head']['statuses'])
-
-                created += 1
-            _logger.info("%d new prs in %s", created, repo.name)
-            _logger.info('%d ignored PRs for un-managed targets: (%s)', sum(ignored_targets.values()), dict(ignored_targets))
-        return False
+            # commit after each fetched PR
+            f.active = False
+            if commit:
+                self.env.cr.commit()
 
 class Repository(models.Model):
     _name = 'runbot_merge.repository'
@@ -328,6 +268,33 @@ class Repository(models.Model):
         tools.create_unique_index(
             self._cr, 'runbot_merge_unique_repo', self._table, ['name'])
         return res
+
+    def _load_pr(self, number):
+        gh = self.github()
+
+        # fetch PR object and handle as *opened*
+        issue, pr = gh.pr(number)
+        controllers.handle_pr(self.env, {
+            'action': 'opened',
+            'pull_request': pr,
+        })
+        for st in gh.statuses(pr['head']['sha']):
+            controllers.handle_status(self.env, st)
+        # get and handle all comments
+        for comment in gh.comments(number):
+            controllers.handle_comment(self.env, {
+                'issue': issue,
+                'sender': comment['user'],
+                'comment': comment,
+                'repository': {'full_name': self.name},
+            })
+        # get and handle all reviews
+        for review in gh.reviews(number):
+            controllers.handle_review(self.env, {
+                'review': review,
+                'pull_request': pr,
+                'repository': {'full_name': self.name},
+            })
 
 class Branch(models.Model):
     _name = 'runbot_merge.branch'
@@ -380,7 +347,7 @@ class PullRequests(models.Model):
 
     number = fields.Integer(required=True, index=True)
     author = fields.Many2one('res.partner')
-    head = fields.Char(required=True, index=True)
+    head = fields.Char(required=True)
     label = fields.Char(
         required=True, index=True,
         help="Label of the source branch (owner:branchname), used for "
@@ -414,6 +381,19 @@ class PullRequests(models.Model):
     def _compute_active_batch(self):
         for r in self:
             r.batch_id = r.batch_ids.filtered(lambda b: b.active)[:1]
+
+    def _get_or_schedule(self, repo_name, number):
+        pr = self.search([
+            ('repository.name', '=', repo_name),
+            ('number', '=', number,)
+        ])
+        if pr:
+            return pr
+
+        Fetch = self.env['runbot_merge.fetch_job']
+        if Fetch.search([('repository', '=', repo_name), ('number', '=', number)]):
+            return
+        Fetch.create({'repository': repo_name, 'number': number})
 
     def _parse_command(self, commandstring):
         m = re.match(r'(\w+)(?:([+-])|=(.*))?', commandstring)
@@ -456,6 +436,8 @@ class PullRequests(models.Model):
           sets the priority to normal (2), pressing (1) or urgent (0).
           Lower-priority PRs are selected first and batched together.
         """
+        assert self, "parsing commands must be executed in an actual PR"
+
         is_admin = (author.reviewer and self.author != author) or (author.self_reviewer and self.author == author)
         is_reviewer = is_admin or self in author.delegate_reviewer
         # TODO: should delegate reviewers be able to retry PRs?
@@ -565,6 +547,9 @@ class PullRequests(models.Model):
         res = super(PullRequests, self)._auto_init()
         tools.create_unique_index(
             self._cr, 'runbot_merge_unique_pr_per_target', self._table, ['number', 'target', 'repository'])
+        self._cr.execute("CREATE INDEX IF NOT EXISTS runbot_merge_pr_head "
+                         "ON runbot_merge_pull_requests "
+                         "USING hash (head)")
         return res
 
     @property
@@ -576,6 +561,10 @@ class PullRequests(models.Model):
     @api.model
     def create(self, vals):
         pr = super().create(vals)
+        c = self.env['runbot_merge.commit'].search([('sha', '=', pr.head)])
+        if c and c.statuses:
+            pr._validate(json.loads(c.statuses))
+
         if pr.state not in ('closed', 'merged'):
             self.env['runbot_merge.pull_requests.tagging'].create({
                 'pull_request': pr.number,
@@ -698,10 +687,17 @@ class Commit(models.Model):
             if stagings:
                 stagings._validate()
 
+    _sql_constraints = [
+        ('unique_sha', 'unique (sha)', 'no duplicated commit'),
+    ]
+
     def _auto_init(self):
         res = super(Commit, self)._auto_init()
-        tools.create_unique_index(
-            self._cr, 'runbot_merge_unique_statuses', self._table, ['sha'])
+        self._cr.execute("""
+            CREATE INDEX IF NOT EXISTS runbot_merge_unique_statuses 
+            ON runbot_merge_commit
+            USING hash (sha)
+        """)
         return res
 
 class Stagings(models.Model):
@@ -900,3 +896,10 @@ class Batch(models.Model):
             'target': prs[0].target.id,
             'prs': [(4, pr.id, 0) for pr in prs],
         })
+
+class FetchJob(models.Model):
+    _name = 'runbot_merge.fetch_job'
+
+    active = fields.Boolean(default=True)
+    repository = fields.Char(index=True)
+    number = fields.Integer(index=True)
