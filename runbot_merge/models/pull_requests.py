@@ -243,16 +243,25 @@ class Project(models.Model):
             if not f:
                 return
 
-            repo = self.env['runbot_merge.repository'].search([('name', '=', f.repository)])
-            if repo:
-                repo._load_pr(f.number)
-            else:
-                _logger.warn("Fetch job for unknown repository %s, disabling & skipping", f.repository)
+            f.repository._load_pr(f.number)
 
             # commit after each fetched PR
             f.active = False
             if commit:
                 self.env.cr.commit()
+
+    def _find_commands(self, comment):
+        return re.findall(
+            '^{}:? (.*)$'.format(self.github_prefix),
+            comment, re.MULTILINE)
+
+    def _has_branch(self, name):
+        self.env.cr.execute("""
+        SELECT 1 FROM runbot_merge_branch
+        WHERE project_id = %s AND name = %s
+        LIMIT 1
+        """, (self.id, name))
+        return bool(self.env.cr.rowcount)
 
 class Repository(models.Model):
     _name = 'runbot_merge.repository'
@@ -274,6 +283,11 @@ class Repository(models.Model):
 
         # fetch PR object and handle as *opened*
         issue, pr = gh.pr(number)
+
+        if not self.project_id._has_branch(pr['base']['ref']):
+            _logger.info("Tasked with loading PR %d for un-managed branch %s, ignoring", pr['number'], pr['base']['ref'])
+            return
+
         controllers.handle_pr(self.env, {
             'action': 'opened',
             'pull_request': pr,
@@ -382,18 +396,28 @@ class PullRequests(models.Model):
         for r in self:
             r.batch_id = r.batch_ids.filtered(lambda b: b.active)[:1]
 
-    def _get_or_schedule(self, repo_name, number):
+    def _get_or_schedule(self, repo_name, number, target=None):
+        repo = self.env['runbot_merge.repository'].search([('name', '=', repo_name)])
+        if not repo:
+            return
+
+        if target and not repo.project_id._has_branch(target):
+            return
+
         pr = self.search([
-            ('repository.name', '=', repo_name),
+            ('repository', '=', repo.id),
             ('number', '=', number,)
         ])
         if pr:
             return pr
 
         Fetch = self.env['runbot_merge.fetch_job']
-        if Fetch.search([('repository', '=', repo_name), ('number', '=', number)]):
+        if Fetch.search([('repository', '=', repo.id), ('number', '=', number)]):
             return
-        Fetch.create({'repository': repo_name, 'number': number})
+        Fetch.create({
+            'repository': repo.id,
+            'number': number,
+        })
 
     def _parse_command(self, commandstring):
         m = re.match(r'(\w+)(?:([+-])|=(.*))?', commandstring)
@@ -452,7 +476,7 @@ class PullRequests(models.Model):
 
         commands = dict(
             ps
-            for m in re.findall('^{}:? (.*)$'.format(self.repository.project_id.github_prefix), comment, re.MULTILINE)
+            for m in self.repository.project_id._find_commands(comment)
             for c in m.strip().split()
             for ps in [self._parse_command(c)]
             if ps is not None
@@ -901,5 +925,5 @@ class FetchJob(models.Model):
     _name = 'runbot_merge.fetch_job'
 
     active = fields.Boolean(default=True)
-    repository = fields.Char(index=True)
-    number = fields.Integer(index=True)
+    repository = fields.Many2one('runbot_merge.repository', index=True, required=True)
+    number = fields.Integer(index=True, required=True)
