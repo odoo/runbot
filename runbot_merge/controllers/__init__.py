@@ -205,26 +205,26 @@ def handle_comment(env, event):
     if 'pull_request' not in event['issue']:
         return "issue comment, ignoring"
 
-    _logger.info(
-        'comment: %s %s:%s "%s"',
-        event['sender']['login'],
-        event['repository']['full_name'],
-        event['issue']['number'],
-        event['comment']['body'],
-    )
+    repo = event['repository']['full_name']
+    issue = event['issue']['number']
+    author = event['sender']['login']
+    comment = event['comment']['body']
+    _logger.info('comment: %s %s:%s "%s"', author, repo, issue, comment)
 
-    partner = env['res.partner'].search([('github_login', '=', event['sender']['login']),])
+    partner = env['res.partner'].search([('github_login', '=', author), ])
     if not partner:
-        _logger.info("ignoring comment from %s: not in system", event['sender']['login'])
+        _logger.info("ignoring comment from %s: not in system", author)
         return 'ignored'
 
-    pr = env['runbot_merge.pull_requests']._get_or_schedule(
-        event['repository']['full_name'],
-        event['issue']['number'],
-    )
+    repository = env['runbot_merge.repository'].search([('name', '=', repo)])
+    if not repository.project_id._find_commands(comment):
+        return "No commands, ignoring"
+
+    pr = env['runbot_merge.pull_requests']._get_or_schedule(repo, issue)
     if not pr:
         return "Unknown PR, scheduling fetch"
-    return pr._parse_commands(partner, event['comment']['body'])
+
+    return pr._parse_commands(partner, comment)
 
 def handle_review(env, event):
     partner = env['res.partner'].search([('github_login', '=', event['review']['user']['login'])])
@@ -235,6 +235,7 @@ def handle_review(env, event):
     pr = env['runbot_merge.pull_requests']._get_or_schedule(
         event['repository']['full_name'],
         event['pull_request']['number'],
+        event['pull_request']['base']['ref']
     )
     if not pr:
         return "Unknown PR, scheduling fetch"
