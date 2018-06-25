@@ -291,3 +291,39 @@ class Runbot(http.Controller):
                 })
 
         return request.render("runbot.sticky-dashboard", qctx)
+
+    @http.route('/runbot/glances', type='http', auth='public', website=True)
+    def glances(self, refresh=None):
+        repos = request.env['runbot.repo'].search([])   # respect record rules
+        query = """
+            SELECT split_part(r.name, ':', 2),
+                   br.branch_name,
+                   (array_agg(coalesce(du.result, bu.result) order by bu.id desc))[1]
+              FROM runbot_build bu
+              JOIN runbot_branch br on (br.id = bu.branch_id)
+              JOIN runbot_repo r on (r.id = br.repo_id)
+         LEFT JOIN runbot_build du on (du.id = bu.duplicate_id and bu.state='duplicate')
+             WHERE br.sticky
+               AND br.repo_id in %s
+               AND (
+                    bu.state in ('running', 'done') or
+                    (bu.state='duplicate' and du.state in ('running', 'done'))
+               )
+               AND coalesce(du.result, bu.result) not in ('skipped', 'manually_killed')
+          GROUP BY 1,2,r.sequence,br.id
+          ORDER BY r.sequence, (br.branch_name='master'), br.id
+        """
+        cr = request.env.cr
+        cr.execute(query, [tuple(repos.ids)])
+        ctx = OrderedDict()
+        for row in cr.fetchall():
+            ctx.setdefault(row[0], []).append(row[1:])
+
+        pending = self._pending()
+        qctx = {
+            'refresh': refresh,
+            'pending_total': pending[0],
+            'pending_level': pending[1],
+            'data': ctx,
+        }
+        return request.render("runbot.glances", qctx)
