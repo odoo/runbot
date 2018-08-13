@@ -61,7 +61,7 @@
                         </t>
                         <br/>
                         <i class="fa fa-envelope-o"></i>
-                        <t t-if="bu['build_type']=='scheduled'"><i class="fa fa-clock-o" t-att-title="bu['build_type_label']" t-att-aria-label="bu['build_type_label']"/></t>
+                        <t t-if="bu['build_type']=='scheduled'"><i class="fa fa-moon-o" t-att-title="bu['build_type_label']" t-att-aria-label="bu['build_type_label']"/></t>
                         <t t-if="bu['build_type'] in ('rebuild', 'redirect')"><i class="fa fa-recycle" t-att-title="bu['build_type_label']" t-att-aria-label="bu['build_type_label']"/></t>
                         <a t-attf-href="https://#{repo['base']}/commit/#{bu['name']}"><t t-esc="bu['subject'][:32] + ('...' if bu['subject'][32:] else '') " t-att-title="bu['subject']"/></a>
                         <br/>
