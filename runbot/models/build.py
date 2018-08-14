@@ -377,7 +377,7 @@ class runbot_build(models.Model):
 
         # find next free port
         while port in ports:
-            port += 2
+            port += 3
         return port
 
     def _logger(self, *l):
