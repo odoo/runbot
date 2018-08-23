@@ -76,7 +76,11 @@ class Runbot(http.Controller):
             domain = [('repo_id', '=', repo.id)]
             domain += [('state', '!=', key) for key, value in iter(filters.items()) if value == '0']
             if search:
-                domain += ['|', '|', ('dest', 'ilike', search), ('subject', 'ilike', search), ('branch_id.branch_name', 'ilike', search)]
+                search_domain = []
+                for to_search in search.split("|"):
+                    search_domain = ['|', '|', '|'] + search_domain
+                    search_domain += [('dest', 'ilike', to_search), ('subject', 'ilike', to_search), ('branch_id.branch_name', 'ilike', to_search)]
+                domain += search_domain[1:]
 
             build_ids = build_obj.search(domain, limit=int(limit))
             branch_ids, build_by_branch_ids = [], {}
