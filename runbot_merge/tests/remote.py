@@ -102,9 +102,12 @@ def wait_for_server(db, timeout=120):
     limit = time.time() + timeout
     while True:
         try:
+            uid = xmlrpc.client.ServerProxy(
+                'http://localhost:{}/xmlrpc/2/common'.format(PORT))\
+                .authenticate(db, 'admin', 'admin', {})
             xmlrpc.client.ServerProxy(
                 'http://localhost:{}/xmlrpc/2/object'.format(PORT)) \
-                .execute_kw(db, 1, 'admin', 'runbot_merge.batch', 'search',
+                .execute_kw(db, uid, 'admin', 'runbot_merge.batch', 'search',
                             [[]], {'limit': 1})
             break
         except ConnectionRefusedError:
@@ -277,12 +280,13 @@ def make_repo(request, config, project, github, tunnel, users, owner):
 
 class Environment:
     def __init__(self, port, db):
+        self._uid = xmlrpc.client.ServerProxy('http://localhost:{}/xmlrpc/2/common'.format(port)).authenticate(db, 'admin', 'admin', {})
         self._object = xmlrpc.client.ServerProxy('http://localhost:{}/xmlrpc/2/object'.format(port))
         self._db = db
 
     def __call__(self, model, method, *args, **kwargs):
         return self._object.execute_kw(
-            self._db, 1, 'admin',
+            self._db, self._uid, 'admin',
             model, method,
             args, kwargs
         )
