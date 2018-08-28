@@ -303,6 +303,10 @@ class Model:
 
         object.__setattr__(self, '_fields', fields or self._env(self._model, 'fields_get', attributes=['type', 'relation']))
 
+    @property
+    def ids(self):
+        return self._ids
+
     def __bool__(self):
         return bool(self._ids)
 

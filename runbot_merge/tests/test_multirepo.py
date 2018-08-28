@@ -172,8 +172,7 @@ def test_merge_fail(env, project, repo_a, repo_b, users):
 
     s2 = to_pr(env, pr2a) | to_pr(env, pr2b)
     st = env['runbot_merge.stagings'].search([])
-    assert st
-    assert st.batch_ids.prs == s2
+    assert set(st.batch_ids.prs.ids) == set(s2.ids)
 
     failed = to_pr(env, pr1b)
     assert failed.state == 'error'
