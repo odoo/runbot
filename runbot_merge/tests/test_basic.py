@@ -52,8 +52,8 @@ def test_trivial_flow(env, repo):
     assert pr1.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merged 🎉'}
 
     master = repo.commit('heads/master')
-    assert master.parents == [m, pr1.head],\
-        "master's parents should be the old master & the PR head"
+    # with default-rebase, only one parent is "known"
+    assert master.parents[0] == m
     assert repo.read_tree(master) == {
         'a': b'some other content',
         'b': b'a second file',
@@ -510,7 +510,7 @@ class TestRetry:
         env['runbot_merge.project']._check_progress()
         assert pr.state == 'validated'
 
-class TestSquashing(object):
+class TestMergeMethod:
     """
     if event['pull_request']['commits'] == 1, "squash" (/rebase); otherwise
     regular merge
@@ -594,6 +594,79 @@ class TestSquashing(object):
 
         prx.push(repo.make_commit(m, 'fixup', None, tree={'m': 'c2'}))
         assert pr.squash, "a PR with a single commit should be squashed"
+
+    def test_pr_rebase_merge(self, repo, env):
+        """ a multi-commit PR should be rebased & merged by default
+
+        left: PR
+        right: post-merge result
+
+                     +------+                   +------+
+                     |  M0  |                   |  M0  |
+                     +--^---+                   +--^---+
+                        |                          |
+                        |                          |
+                     +--+---+                   +--+---+
+                +---->  M1  <--+                |  M1  <--+
+                |    +------+  |                +------+  |
+                |              |                          |
+                |              |                          |
+             +--+---+      +---+---+    +------+      +---+---+
+             |  B0  |      |  M2   |    |  B0  +------>  M2   |
+             +--^---+      +-------+    +--^---+      +---^---+
+                |                          |              |
+             +--+---+                   +--+---+          |
+          PR |  B1  |                   |  B1  |          |
+             +------+                   +--^---+          |
+                                           |          +---+---+
+                                           +----------+ merge |
+                                                      +-------+
+        """
+        m0 = repo.make_commit(None, 'M0', None, tree={'m': '0'})
+        m1 = repo.make_commit(m0, 'M1', None, tree={'m': '1'})
+        m2 = repo.make_commit(m1, 'M2', None, tree={'m': '2'})
+        repo.make_ref('heads/master', m2)
+
+        b0 = repo.make_commit(m1, 'B0', None, tree={'m': '1', 'b': '0'})
+        b1 = repo.make_commit(b0, 'B1', None, tree={'m': '1', 'b': '1'})
+        prx = repo.make_pr('title', 'body', target='master', ctid=b1, user='user')
+        repo.post_status(prx.head, 'success', 'legal/cla')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+        prx.post_comment('hansen r+', "reviewer")
+
+        env['runbot_merge.project']._check_progress()
+
+        # create a dag (msg:str, parents:set) from the log
+        staging = log_to_node(repo.log('heads/staging.master'))
+        # then compare to the dag version of the right graph (nb: parents is
+        # a frozenset otherwise can't put a node in a node as tuples are
+        # only hashable if their contents are)
+        nm2 = ('M2', frozenset([('M1', frozenset([('M0', frozenset())]))]))
+        nb1 = ('B1', frozenset([('B0', frozenset([nm2]))]))
+        expected = (
+            'title\n\nbody\n\ncloses {}#{}'.format(repo.name, prx.number),
+            frozenset([nm2, nb1])
+        )
+        assert staging == expected
+
+        final_tree = repo.read_tree(repo.commit('heads/staging.master'))
+        assert final_tree == {'m': b'2', 'b': b'1'}, "sanity check of final tree"
+
+    @pytest.mark.skip(reason="what do if the PR contains merge commits???")
+    def test_pr_contains_merges(self, repo, env):
+        """
+        """
+
+    def test_pr_unrebase(self, repo, env):
+        """ should be possible to flag a PR as regular-merged
+        """
+        pytest.skip("todo")
+
+    def test_pr_mergehead(self, repo, env):
+        """ if the head of the PR is a merge commit and one of the parents is
+        in the target, replicate the merge commit instead of merging
+        """
+        pytest.skip("todo")
 
     @pytest.mark.xfail(reason="removed support for squash+ command")
     def test_force_squash_merge(self, repo, env):
@@ -1215,7 +1288,7 @@ class TestUnknownPR:
        valid but unknown PRs
 
     * get statuses if head commit unknown (additional cron?)
-    * assume there are no existing r+ (?)
+    * handle any comment & review (existing PRs may enter the system on a review/r+)
     """
     def test_rplus_unknown(self, repo, env):
         m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
@@ -1249,3 +1322,13 @@ class TestUnknownPR:
 
         env['runbot_merge.project']._check_progress()
         assert pr.staging_id
+
+def log_to_node(log):
+    log = list(log)
+    nodes = {}
+    for c in reversed(log):
+        nodes[c['sha']] = (c['commit']['message'], frozenset(
+            nodes[p['sha']]
+            for p in (c['parents'])
+        ))
+    return nodes[log[0]['sha']]

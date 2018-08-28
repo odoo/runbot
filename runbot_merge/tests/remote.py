@@ -564,12 +564,15 @@ class Repo:
         return any(c['sha'] == sha for c in self.log(of))
 
     def log(self, ref_or_sha):
-        r = self._session.get(
-            'https://api.github.com/repos/{}/commits'.format(self.name),
-            params={'sha': ref_or_sha}
-        )
-        assert 200 <= r.status_code < 300, r.json()
-        return r.json()
+        for page in itertools.count(1):
+            r = self._session.get(
+                'https://api.github.com/repos/{}/commits'.format(self.name),
+                params={'sha': ref_or_sha, 'page': page}
+            )
+            assert 200 <= r.status_code < 300, r.json()
+            yield from r.json()
+            if not r.links.get('next'):
+                return
 
 ct = itertools.count()
 

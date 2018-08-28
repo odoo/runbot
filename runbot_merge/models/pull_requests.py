@@ -888,19 +888,22 @@ class Batch(models.Model):
                 "Staging pr %s:%s for target %s; squash=%s",
                 pr.repository.name, pr.number, pr.target.name, pr.squash
             )
-            msg = pr.message
-            author=None
-            if pr.squash:
-                commit = gh.commit(pr.head)
-                msg = commit['message']
-                author = commit['author']
-
-            msg += '\n\ncloses {pr.repository.name}#{pr.number}'.format(pr=pr)
 
             try:
-                new_heads[pr] = gh.merge(pr.head, 'tmp.{}'.format(pr.target.name), msg, squash=pr.squash, author=author)['sha']
-            except exceptions.MergeError:
-                _logger.exception("Failed to merge %s:%s into staging branch", pr.repository.name, pr.number)
+                # FIXME: !rebase
+
+                target = 'tmp.{}'.format(pr.target.name)
+                suffix = '\n\ncloses {pr.repository.name}#{pr.number}'.format(pr=pr)
+                pr_commits = gh.commits(pr.number)
+                if len(pr_commits) == 1:
+                    pr_commits[0]['commit']['message'] += suffix
+                    new_heads[pr] = gh.rebase(pr.number, target, commits=pr_commits)
+                else:
+                    msg = pr.message + suffix
+                    h = gh.rebase(pr.number, target, reset=True, commits=pr_commits)
+                    new_heads[pr] = gh.merge(h, target, msg)['sha']
+            except (exceptions.MergeError, AssertionError) as e:
+                _logger.exception("Failed to merge %s:%s into staging branch (error: %s)", pr.repository.name, pr.number, e)
                 pr.state = 'error'
                 gh.comment(pr.number, "Unable to stage PR (merge conflict)")
 
