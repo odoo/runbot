@@ -130,7 +130,7 @@ class Repo(object):
         while commits:
             c = commits.pop(0)
             commits.extend(self.commit(r) for r in c.parents)
-            yield c
+            yield c.to_json()
 
     def post_status(self, ref, status, context='default', description=""):
         assert status in ('error', 'failure', 'pending', 'success')
@@ -194,7 +194,7 @@ class Repo(object):
         for method, pattern, handler in sorted(self._handlers, key=lambda t: -len(t[1])):
             if method and request.method != method:
                 continue
-
+            # FIXME: remove qs from path & ensure path is entirely matched, maybe finally use proper routing?
             m = re.match(pattern, path)
             if m:
                 return handler(self, request, **m.groupdict())
@@ -377,7 +377,7 @@ class Repo(object):
             },
             'title': pr.title,
             'body': pr.body,
-            'commits': pr.commits,
+            'commits': len(pr.commits),
             'user': {'login': pr.user},
         })
 
@@ -422,6 +422,14 @@ class Repo(object):
             for r in [re.match(r'REVIEW (\w+)\n\n(.*)', body)]
             if r
         ])
+
+    def _read_pr_commits(self, r, number):
+        pr = self.issues.get(int(number))
+        if not isinstance(pr, PR):
+            return (404, None)
+
+        return (200, [c.to_json() for c in pr.commits])
+
 
     def _add_labels(self, r, number):
         try:
@@ -482,16 +490,7 @@ class Repo(object):
         c = Commit(tid, body['commit_message'], author=None, committer=None, parents=[target, sha])
         self.objects[c.id] = c
 
-        return (201, {
-            "sha": c.id,
-            "commit": {
-                "author": c.author,
-                "committer": c.committer,
-                "message": body['commit_message'],
-                "tree": {"sha": tid},
-            },
-            "parents": [{"sha": target}, {"sha": sha}]
-        })
+        return (201, c.to_json())
 
     _handlers = [
         ('POST', r'git/refs', _create_ref),
@@ -512,6 +511,7 @@ class Repo(object):
         ('GET', r'pulls/(?P<number>\d+)', _read_pr),
         ('PATCH', r'pulls/(?P<number>\d+)', _edit_pr),
         ('GET', r'pulls/(?P<number>\d+)/reviews', _read_pr_reviews),
+        ('GET', r'pulls/(?P<number>\d+)/commits', _read_pr_commits),
 
         ('POST', r'issues/(?P<number>\d+)/labels', _add_labels),
         ('DELETE', r'issues/(?P<number>\d+)/labels/(?P<label>.+)', _remove_label),
@@ -599,8 +599,13 @@ class PR(Issue):
     def commits(self):
         store = self.repo.objects
         target = self.repo.commit('heads/%s' % self.base).id
-        return len({h for h, _ in git.walk_ancestors(store, self.head, False)}
-                   - {h for h, _ in git.walk_ancestors(store, target, False)})
+
+        base = {h for h, _ in git.walk_ancestors(store, target, False)}
+        own = [
+            h for h, _ in git.walk_ancestors(store, self.head, False)
+            if h not in base
+        ]
+        return list(map(self.repo.commit, reversed(own)))
 
     def post_review(self, state, user, body):
         self.comments.append((user, "REVIEW %s\n\n%s " % (state, body)))
@@ -619,6 +624,18 @@ class Commit(object):
     @property
     def id(self):
         return git.make_commit(self.tree, self.message, self.author, self.committer, parents=self.parents)[0]
+
+    def to_json(self):
+        return {
+            "sha": self.id,
+            "commit": {
+                "author": self.author,
+                "committer": self.committer,
+                "message": self.message,
+                "tree": {"sha": self.tree},
+            },
+            "parents": [{"sha": p} for p in self.parents]
+        }
 
     def __str__(self):
         parents = '\n'.join('parent {}'.format(p) for p in self.parents) + '\n'
@@ -733,6 +750,6 @@ class Client(werkzeug.test.Client):
             },
             'title': pr.title,
             'body': pr.body,
-            'commits': pr.commits,
+            'commits': len(pr.commits),
             'user': {'login': pr.user},
         }

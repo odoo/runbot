@@ -15,13 +15,14 @@ class GH(object):
         session = self._session = requests.Session()
         session.headers['Authorization'] = 'token {}'.format(token)
 
-    def __call__(self, method, path, json=None, check=True):
+    def __call__(self, method, path, params=None, json=None, check=True):
         """
         :type check: bool | dict[int:Exception]
         """
         r = self._session.request(
             method,
             '{}/repos/{}/{}'.format(self._url, self._repo, path),
+            params=params,
             json=json
         )
         if check:
@@ -89,26 +90,48 @@ class GH(object):
                 return
         raise AssertionError("{}: {}".format(r.status_code, r.json()))
 
-    def merge(self, sha, dest, message, squash=False, author=None):
-        if not squash:
-            r = self('post', 'merges', json={
-                'base': dest,
-                'head': sha,
-                'commit_message': message,
-            }, check={409: exceptions.MergeError})
-            r = r.json()
-            return dict(r['commit'], sha=r['sha'])
+    def merge(self, sha, dest, message):
+        r = self('post', 'merges', json={
+            'base': dest,
+            'head': sha,
+            'commit_message': message,
+        }, check={409: exceptions.MergeError})
+        r = r.json()
+        return dict(r['commit'], sha=r['sha'])
 
-        current_head = self.head(dest)
-        tree = self.merge(sha, dest, "temp")['tree']['sha']
-        c = self('post', 'git/commits', json={
-            'message': message,
-            'tree': tree,
-            'parents': [current_head],
-            'author': author,
-        }, check={409: exceptions.MergeError}).json()
-        self.set_ref(dest, c['sha'])
-        return c
+    def rebase(self, pr, dest, reset=False, commits=None):
+        """ Rebase pr's commits on top of dest, updates dest unless ``reset``
+        is set.
+
+        Returns the hash of the rebased head.
+        """
+        original_head = self.head(dest)
+        if commits is None:
+            commits = self.commits(pr)
+
+        assert commits, "can't rebase a PR with no commits"
+        for c in commits:
+            assert len(c['parents']) == 1, "can't rebase commits with more than one parent"
+            tmp_msg = 'temp rebasing PR %s (%s)' % (pr, c['sha'])
+            c['new_tree'] = self.merge(c['sha'], dest, tmp_msg)['tree']['sha']
+        self.set_ref(dest, original_head)
+
+        prev = original_head
+        for c in commits:
+            copy = self('post', 'git/commits', json={
+                'message': c['commit']['message'],
+                'tree': c['new_tree'],
+                'parents': [prev],
+                'author': c['commit']['author'],
+                'committer': c['commit']['committer'],
+            }, check={409: exceptions.MergeError}).json()
+            prev = copy['sha']
+
+        if reset:
+            self.set_ref(dest, original_head)
+
+        # prev is updated after each copy so it's the rebased PR head
+        return prev
 
     # fetch various bits of issues / prs to load them
     def pr(self, number):
@@ -119,17 +142,25 @@ class GH(object):
 
     def comments(self, number):
         for page in itertools.count(1):
-            r = self('get', 'issues/{}/comments?page={}'.format(number, page))
+            r = self('get', 'issues/{}/comments'.format(number), params={'page': page})
             yield from r.json()
             if not r.links.get('next'):
                 return
 
     def reviews(self, number):
         for page in itertools.count(1):
-            r = self('get', 'pulls/{}/reviews?page={}'.format(number, page))
+            r = self('get', 'pulls/{}/reviews'.format(number), params={'page': page})
             yield from r.json()
             if not r.links.get('next'):
                 return
+
+    def commits(self, pr):
+        """ Returns a PR's commits oldest first (that's what GH does &
+        is what we want)
+        """
+        r = self('get', 'pulls/{}/commits'.format(pr), params={'per_page': PR_COMMITS_MAX})
+        assert not r.links.get('next'), "more than {} commits".format(PR_COMMITS_MAX)
+        return r.json()
 
     def statuses(self, h):
         r = self('get', 'commits/{}/status'.format(h)).json()
@@ -138,3 +169,5 @@ class GH(object):
             'context': s['context'],
             'state': s['state'],
         } for s in r['statuses']]
+
+PR_COMMITS_MAX = 50
