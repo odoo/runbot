@@ -452,11 +452,11 @@ class Repo:
         assert 200 <= r.status_code < 300, r.json()
         wait_for_hook()
 
-    def make_commit(self, ref, message, author, committer=None, tree=None, changes=None):
+    def make_commit(self, ref, message, author, committer=None, tree=None):
         assert tree, "not supporting changes/updates"
         assert not (author or committer)
 
-        if ref is None:
+        if not ref: # None / []
             # apparently github refuses to create trees/commits in empty repos
             # using the regular API...
             [(path, contents)] = tree.items()
@@ -469,7 +469,11 @@ class Repo:
             assert 200 <= r.status_code < 300, r.json()
             return r.json()['commit']['sha']
 
-        parent = self.get_ref(ref)
+        if isinstance(ref, list):
+            refs = ref
+        else:
+            refs = [ref]
+        parents = [self.get_ref(r) for r in refs]
 
         r = self._session.post('https://api.github.com/repos/{}/git/trees'.format(self.name), json={
             'tree': [
@@ -481,7 +485,7 @@ class Repo:
         h = r.json()['sha']
 
         r = self._session.post('https://api.github.com/repos/{}/git/commits'.format(self.name), json={
-            'parents': [parent],
+            'parents': parents,
             'message': message,
             'tree': h,
 
@@ -490,8 +494,9 @@ class Repo:
 
         commit_sha = r.json()['sha']
 
-        if parent != ref:
-            self.update_ref(ref, commit_sha)
+        # if the first parent is an actual ref (rather than a hash) update it
+        if parents[0] != refs[0]:
+            self.update_ref(refs[0], commit_sha)
         else:
             wait_for_hook()
         return commit_sha
