@@ -369,6 +369,7 @@ class PullRequests(models.Model):
     )
     message = fields.Text(required=True)
     squash = fields.Boolean(default=False)
+    rebase = fields.Boolean(default=True)
 
     delegates = fields.Many2many('res.partner', help="Delegate reviewers, not intrinsically reviewers but can review this PR")
     priority = fields.Selection([
@@ -440,6 +441,8 @@ class PullRequests(models.Model):
         elif name in ('p', 'priority'):
             if param in ('0', '1', '2'):
                 return ('priority', int(param))
+        elif name == 'rebase':
+            return ('rebase', flag != '-')
 
         return None
 
@@ -459,6 +462,9 @@ class PullRequests(models.Model):
         p(riority)=2|1|0
           sets the priority to normal (2), pressing (1) or urgent (0).
           Lower-priority PRs are selected first and batched together.
+        rebase+/-
+          Whether the PR should be rebased-and-merged (the default) or just
+          merged normally.
         """
         assert self, "parsing commands must be executed in an actual PR"
 
@@ -530,6 +536,9 @@ class PullRequests(models.Model):
                             self.repository.name, self.number,
                             author.github_login, self.target.name,
                         )
+            elif command == 'rebase':
+                # anyone can rebase- their PR I guess?
+                self.rebase = param
 
             _logger.info(
                 "%s %s(%s) on %s:%s by %s (%s)",
@@ -889,19 +898,52 @@ class Batch(models.Model):
                 pr.repository.name, pr.number, pr.target.name, pr.squash
             )
 
+            target = 'tmp.{}'.format(pr.target.name)
+            suffix = '\n\ncloses {pr.repository.name}#{pr.number}'.format(pr=pr)
             try:
-                # FIXME: !rebase
-
-                target = 'tmp.{}'.format(pr.target.name)
-                suffix = '\n\ncloses {pr.repository.name}#{pr.number}'.format(pr=pr)
+                # nb: pr_commits is oldest to newest so pr.head is pr_commits[-1]
                 pr_commits = gh.commits(pr.number)
-                if len(pr_commits) == 1:
+                rebase_and_merge = pr.rebase
+                squash = rebase_and_merge and len(pr_commits) == 1
+                if squash:
                     pr_commits[0]['commit']['message'] += suffix
                     new_heads[pr] = gh.rebase(pr.number, target, commits=pr_commits)
-                else:
+                elif rebase_and_merge:
                     msg = pr.message + suffix
                     h = gh.rebase(pr.number, target, reset=True, commits=pr_commits)
                     new_heads[pr] = gh.merge(h, target, msg)['sha']
+                else:
+                    pr_head = pr_commits[-1] # pr_commits is oldest to newest
+                    base_commit = None
+                    head_parents = {p['sha'] for p in pr_head['parents']}
+                    if len(head_parents) > 1:
+                        # look for parent(s?) of pr_head not in PR, means it's
+                        # from target (so we merged target in pr)
+                        merge = head_parents - {c['sha'] for c in pr_commits}
+                        assert len(merge) <= 1, \
+                            ">1 parent from base in PR's head is not supported"
+                        if len(merge) == 1:
+                            [base_commit] = merge
+
+                    if base_commit:
+                        # replicate pr_head with base_commit replaced by
+                        # the current head
+                        original_head = gh.head(target)
+                        merge_tree = gh.merge(pr_head['sha'], target, 'temp merge')['tree']['sha']
+                        new_parents = [original_head] + list(head_parents - {base_commit})
+                        copy = gh('post', 'git/commits', json={
+                            'message': pr_head['commit']['message'] + suffix,
+                            'tree': merge_tree,
+                            'author': pr_head['commit']['author'],
+                            'committer': pr_head['commit']['committer'],
+                            'parents': new_parents,
+                        }).json()
+                        gh.set_ref(target, copy['sha'])
+                        new_heads[pr] = copy['sha']
+                    else:
+                        # otherwise do a regular merge
+                        msg = pr.message + suffix
+                        new_heads[pr] = gh.merge(pr.head, target, msg)['sha']
             except (exceptions.MergeError, AssertionError) as e:
                 _logger.exception("Failed to merge %s:%s into staging branch (error: %s)", pr.repository.name, pr.number, e)
                 pr.state = 'error'

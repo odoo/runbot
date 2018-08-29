@@ -202,6 +202,7 @@ def test_ff_fail(env, project, repo_a, repo_b):
 
     # add second commit blocking FF
     cn = repo_b.make_commit('heads/master', 'second', None, tree={'a': 'b_0', 'b': 'other'})
+    assert repo_b.commit('heads/master').id == cn
 
     repo_a.post_status('heads/staging.master', 'success', 'ci/runbot')
     repo_a.post_status('heads/staging.master', 'success', 'legal/cla')

@@ -638,11 +638,9 @@ class TestMergeMethod:
 
         # create a dag (msg:str, parents:set) from the log
         staging = log_to_node(repo.log('heads/staging.master'))
-        # then compare to the dag version of the right graph (nb: parents is
-        # a frozenset otherwise can't put a node in a node as tuples are
-        # only hashable if their contents are)
-        nm2 = ('M2', frozenset([('M1', frozenset([('M0', frozenset())]))]))
-        nb1 = ('B1', frozenset([('B0', frozenset([nm2]))]))
+        # then compare to the dag version of the right graph
+        nm2 = node('M2', node('M1', node('M0')))
+        nb1 = node('B1', node('B0', nm2))
         expected = (
             'title\n\nbody\n\ncloses {}#{}'.format(repo.name, prx.number),
             frozenset([nm2, nb1])
@@ -654,19 +652,125 @@ class TestMergeMethod:
 
     @pytest.mark.skip(reason="what do if the PR contains merge commits???")
     def test_pr_contains_merges(self, repo, env):
-        """
-        """
+        pass
 
     def test_pr_unrebase(self, repo, env):
-        """ should be possible to flag a PR as regular-merged
+        """ should be possible to flag a PR as regular-merged, regardless of
+        its commits count
+
+        M      M<--+
+        ^      ^   |
+        |  ->  |   C0
+        +      |   ^
+        C0     +   |
+               gib-+
         """
-        pytest.skip("todo")
+        m = repo.make_commit(None, "M", None, tree={'a': 'a'})
+        repo.make_ref('heads/master', m)
+
+        c0 = repo.make_commit(m, 'C0', None, tree={'a': 'b'})
+        prx = repo.make_pr("gibberish", "blahblah", target='master', ctid=c0, user='user')
+        env['runbot_merge.project']._check_progress()
+
+        repo.post_status(prx.head, 'success', 'legal/cla')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+        prx.post_comment('hansen r+ rebase-', 'reviewer')
+        env['runbot_merge.project']._check_progress()
+
+        repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+        repo.post_status('heads/staging.master', 'success', 'legal/cla')
+        env['runbot_merge.project']._check_progress()
+
+        master = repo.commit('heads/master')
+        assert master.parents == [m, prx.head], \
+            "master's parents should be the old master & the PR head"
+
+        m = node('M')
+        c0 = node('C0', m)
+        expected = node('gibberish\n\nblahblah\n\ncloses {}#{}'.format(repo.name, prx.number), m, c0)
+        assert log_to_node(repo.log('heads/master')), expected
 
     def test_pr_mergehead(self, repo, env):
         """ if the head of the PR is a merge commit and one of the parents is
         in the target, replicate the merge commit instead of merging
+
+        rankdir="BT"
+        M2 -> M1
+        C0 -> M1
+        C1 -> C0
+        C1 -> M2
+
+        C1 [label = "\\N / MERGE"]
         """
-        pytest.skip("todo")
+        m1 = repo.make_commit(None, "M1", None, tree={'a': '0'})
+        m2 = repo.make_commit(m1, "M2", None, tree={'a': '1'})
+        repo.make_ref('heads/master', m2)
+
+        c0 = repo.make_commit(m1, 'C0', None, tree={'a': '0', 'b': '2'})
+        c1 = repo.make_commit([c0, m2], 'C1', None, tree={'a': '1', 'b': '2'})
+        prx = repo.make_pr("T", "TT", target='master', ctid=c1, user='user')
+        env['runbot_merge.project']._check_progress()
+
+        repo.post_status(prx.head, 'success', 'legal/cla')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+        prx.post_comment('hansen r+ rebase-', 'reviewer')
+        env['runbot_merge.project']._check_progress()
+
+        repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+        repo.post_status('heads/staging.master', 'success', 'legal/cla')
+        env['runbot_merge.project']._check_progress()
+
+        master = repo.commit('heads/master')
+        assert master.parents == [m2, c0]
+        m1 = node('M1')
+        expected = node('C1', node('C0', m1), node('M2', m1))
+        assert log_to_node(repo.log('heads/master')), expected
+
+    def test_pr_mergehead_nonmember(self, repo, env):
+        """ if the head of the PR is a merge commit but none of the parents is
+        in the target, merge normally
+
+        rankdir="BT"
+        M2 -> M1
+        B0 -> M1
+        C0 -> M1
+        C1 -> C0
+        C1 -> B0
+
+        MERGE -> M2
+        MERGE -> C1
+        """
+        m1 = repo.make_commit(None, "M1", None, tree={'a': '0'})
+        m2 = repo.make_commit(m1, "M2", None, tree={'a': '1'})
+        repo.make_ref('heads/master', m2)
+
+        b0 = repo.make_commit(m1, 'B0', None, tree={'a': '0', 'bb': 'bb'})
+
+        c0 = repo.make_commit(m1, 'C0', None, tree={'a': '0', 'b': '2'})
+        c1 = repo.make_commit([c0, b0], 'C1', None, tree={'a': '0', 'b': '2', 'bb': 'bb'})
+        prx = repo.make_pr("T", "TT", target='master', ctid=c1, user='user')
+        env['runbot_merge.project']._check_progress()
+
+        repo.post_status(prx.head, 'success', 'legal/cla')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+        prx.post_comment('hansen r+ rebase-', 'reviewer')
+        env['runbot_merge.project']._check_progress()
+
+        repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+        repo.post_status('heads/staging.master', 'success', 'legal/cla')
+        env['runbot_merge.project']._check_progress()
+
+        master = repo.commit('heads/master')
+        assert master.parents == [m2, c1]
+        assert repo.read_tree(master) == {'a': b'1', 'b': b'2', 'bb': b'bb'}
+
+        m1 = node('M1')
+        expected = node(
+            'T\n\nTT\n\ncloses {}#{}'.format(repo.name, prx.number),
+            node('M2', m1),
+            node('C1', node('C0', m1), node('B0', m1))
+        )
+        assert log_to_node(repo.log('heads/master')), expected
 
     @pytest.mark.xfail(reason="removed support for squash+ command")
     def test_force_squash_merge(self, repo, env):
@@ -1323,6 +1427,9 @@ class TestUnknownPR:
         env['runbot_merge.project']._check_progress()
         assert pr.staging_id
 
+def node(name, *children):
+    assert type(name) is str
+    return name, frozenset(children)
 def log_to_node(log):
     log = list(log)
     nodes = {}

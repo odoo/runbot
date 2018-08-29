@@ -138,25 +138,19 @@ class Repo(object):
         c.statuses.append((status, context, description))
         self.notify('status', self.name, context, status, c.id)
 
-    def make_commit(self, ref, message, author, committer=None, tree=None, changes=None):
-        assert (tree is None) ^ (changes is None), \
-            "a commit must provide either a full tree or changes to the previous tree"
+    def make_commit(self, ref, message, author, committer=None, tree=None):
+        assert tree, "a commit must provide either a full tree"
 
-        branch = False
-        if ref is None:
-            pids = []
-        else:
-            pid = ref
-            if not re.match(r'[0-9a-f]{40}', ref):
-                pid = self.refs[ref]
-                branch = True
-            parent = self.objects[pid]
-            pids = [pid]
+        refs = ref or []
+        if not isinstance(refs, list):
+            refs = [ref]
 
-        if tree is None:
-            # TODO?
-            tid = self._update_tree(parent.tree, changes)
-        elif type(tree) is type(u''):
+        pids = [
+            ref if re.match(r'[0-9a-f]{40}', ref) else self.refs[ref]
+            for ref in refs
+        ]
+
+        if type(tree) is type(u''):
             assert isinstance(self.objects.get(tree), dict)
             tid = tree
         else:
@@ -164,8 +158,8 @@ class Repo(object):
 
         c = Commit(tid, message, author, committer or author, parents=pids)
         self.objects[c.id] = c
-        if branch:
-            self.refs[ref] = c.id
+        if refs and refs[0] != pids[0]:
+            self.refs[refs[0]] = c.id
         return c.id
 
     def _save_tree(self, t):
@@ -268,11 +262,10 @@ class Repo(object):
 
     def _create_commit(self, r):
         body = json.loads(r.body)
-        [parent] = body.get('parents') or [None]
         author = body.get('author') or {'name': 'default', 'email': 'default', 'date': 'Z'}
         try:
             sha = self.make_commit(
-                ref=parent,
+                ref=(body.get('parents')),
                 message=body['message'],
                 author=author,
                 committer=body.get('committer') or author,
