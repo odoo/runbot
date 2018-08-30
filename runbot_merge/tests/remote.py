@@ -77,7 +77,6 @@ def pytest_addoption(parser):
              "queries per minute, free is 40, multi-repo batching tests will "
              "blow through the former); localtunnel has no rate-limiting but "
              "the servers are way less reliable")
-    pass
 
 @pytest.fixture(scope="session")
 def config(pytestconfig):
