@@ -1,0 +1,27 @@
+<odoo>
+    <record id="runbot_merge_form_partner" model="ir.ui.view">
+        <field name="name">Add mergebot/GH info to partners form</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Mergebot">
+                    <group>
+                        <group>
+                            <field name="github_login"/>
+                        </group>
+                        <group>
+                            <field name="reviewer"/>
+                            <field name="self_reviewer"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group colspan="4" string="Delegate On">
+                            <field name="delegate_reviewer" nolabel="1"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

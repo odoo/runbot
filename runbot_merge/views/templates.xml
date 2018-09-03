@@ -1,0 +1,36 @@
+<odoo>
+    <template id="dashboard" name="mergebot dashboard">
+        <t t-call="website.layout">
+            <div id="wrap"><div class="container">
+                <section t-foreach="projects" t-as="project" class="row">
+                    <h1 class="col-md-12"><t t-esc="project.name"/></h1>
+                    <section t-foreach="project.branch_ids" t-as="branch" class="col-md-12">
+                        <h2><t t-esc="branch.name"/></h2>
+                        <t t-call="runbot_merge.stagings"/>
+                    </section>
+                </section>
+            </div></div>
+        </t>
+    </template>
+    <template id="stagings" name="mergebot branch stagings">
+        <ul class="row list-unstyled">
+            <li t-foreach="branch.staging_ids.sorted(lambda s: not s.heads)"
+                t-as="staging"
+                t-attf-class="col-md-3 {{'bg-info' if staging.heads else ''}}">
+                <ul class="list-unstyled">
+                    <li t-foreach="staging.batch_ids" t-as="batch">
+                        <t t-esc="batch.prs[:1].label"/>
+                        <t t-foreach="batch.prs" t-as="pr">
+                            <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
+                               t-att-title="pr.message.split('\n')[0]"
+                            ><t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/></a><t t-if="not pr_last">,</t>
+                        </t>
+                    </li>
+                </ul>
+                <t t-if="staging.heads">
+                    Staged at: <t t-esc="staging.staged_at" t-options="{'widget': 'datetime'}"/>
+                </t>
+            </li>
+        </ul>
+    </template>
+</odoo>

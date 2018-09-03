@@ -1,0 +1,8 @@
+<odoo>
+    <record model="res.groups" id="group_admin">
+        <field name="name">Mergebot Administrator</field>
+    </record>
+    <record model="res.groups" id="base.group_system">
+        <field name="implied_ids" eval="[(4, ref('runbot_merge.group_admin'))]"/>
+    </record>
+</odoo>

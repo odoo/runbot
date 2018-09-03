@@ -1,0 +1,15 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_runbot_merge_project_admin,Admin access to project,model_runbot_merge_project,runbot_merge.group_admin,1,1,1,1
+access_runbot_merge_repository_admin,Admin access to repo,model_runbot_merge_repository,runbot_merge.group_admin,1,1,1,1
+access_runbot_merge_branch_admin,Admin access to branches,model_runbot_merge_branch,runbot_merge.group_admin,1,1,1,1
+access_runbot_merge_pull_requests_admin,Admin access to PR,model_runbot_merge_pull_requests,runbot_merge.group_admin,1,1,1,1
+access_runbot_merge_pull_requests_tagging_admin,Admin access to tagging,model_runbot_merge_pull_requests_tagging,runbot_merge.group_admin,1,1,1,1
+access_runbot_merge_commit_admin,Admin access to commits,model_runbot_merge_commit,runbot_merge.group_admin,1,1,1,1
+access_runbot_merge_stagings_admin,Admin access to stagings,model_runbot_merge_stagings,runbot_merge.group_admin,1,1,1,1
+access_runbot_merge_split_admin,Admin access to splits,model_runbot_merge_split,runbot_merge.group_admin,1,1,1,1
+access_runbot_merge_batch_admin,Admin access to batches,model_runbot_merge_batch,runbot_merge.group_admin,1,1,1,1
+access_runbot_merge_fetch_job_admin,Admin access to fetch jobs,model_runbot_merge_fetch_job,runbot_merge.group_admin,1,1,1,1
+access_runbot_merge_project,User access to project,model_runbot_merge_project,base.group_user,1,0,0,0
+access_runbot_merge_repository,User access to repo,model_runbot_merge_repository,base.group_user,1,0,0,0
+access_runbot_merge_branch,User access to branches,model_runbot_merge_branch,base.group_user,1,0,0,0
+access_runbot_merge_pull_requests,User access to PR,model_runbot_merge_pull_requests,base.group_user,1,0,0,0
