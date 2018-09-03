@@ -149,15 +149,14 @@ def handle_pr(env, event):
             _logger.error("Tentative sync to closed PR %s:%s", repo.name, pr['number'])
             return "It's my understanding that closed/merged PRs don't get sync'd"
 
-        if pr_obj.state == 'validated':
-            pr_obj.state = 'opened'
-        elif pr_obj.state == 'ready':
-            pr_obj.state = 'approved'
+        if pr_obj.state == 'ready':
             pr_obj.staging_id.cancel(
                 "Updated PR %s:%s, removing staging %s",
                 pr_obj.repository.name, pr_obj.number,
                 pr_obj.staging_id,
             )
+        if pr_obj.state != 'error':
+            pr_obj.state = 'opened'
 
         pr_obj.head = pr['head']['sha']
         pr_obj.squash = pr['commits'] == 1

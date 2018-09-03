@@ -931,10 +931,10 @@ class TestPRUpdate(object):
         c2 = repo.make_commit(c, 'first', None, tree={'m': 'cc'})
         prx.push(c2)
         assert pr.head == c2
-        assert pr.state == 'approved'
+        assert pr.state == 'opened'
 
     def test_update_ready(self, env, repo):
-        """ Should reset to approved
+        """ Should reset to opened
         """
         m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
         repo.make_ref('heads/master', m)
@@ -954,10 +954,10 @@ class TestPRUpdate(object):
         c2 = repo.make_commit(c, 'first', None, tree={'m': 'cc'})
         prx.push(c2)
         assert pr.head == c2
-        assert pr.state == 'approved'
+        assert pr.state == 'opened'
 
     def test_update_staged(self, env, repo):
-        """ Should cancel the staging & reset PR to approved
+        """ Should cancel the staging & reset PR to opened
         """
         m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
         repo.make_ref('heads/master', m)
@@ -978,13 +978,11 @@ class TestPRUpdate(object):
         c2 = repo.make_commit(c, 'first', None, tree={'m': 'cc'})
         prx.push(c2)
         assert pr.head == c2
-        assert pr.state == 'approved'
+        assert pr.state == 'opened'
         assert not pr.staging_id
         assert not env['runbot_merge.stagings'].search([])
 
     def test_update_error(self, env, repo):
-        """ Should cancel the staging & reset PR to approved
-        """
         m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
         repo.make_ref('heads/master', m)
 
