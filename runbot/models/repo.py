@@ -143,8 +143,7 @@ class runbot_repo(models.Model):
                               repo.name, int(t0 - fetch_time), int(t0 - dt2time(repo.hook_time)))
                 return
 
-        repo._git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*'])
-        repo._git(['fetch', '-p', 'origin', '+refs/pull/*/head:refs/pull/*'])
+        repo._git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*', '+refs/pull/*/head:refs/pull/*'])
 
         fields = ['refname', 'objectname', 'committerdate:iso8601', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail']
         fmt = "%00".join(["%(" + field + ")" for field in fields])
