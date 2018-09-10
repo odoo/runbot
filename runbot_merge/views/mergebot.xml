@@ -190,7 +190,7 @@
     </record>
     <record id="runbot_merge_search_fetches" model="ir.ui.view">
         <field name="name">Fetches Search</field>
-        <field name="model">runbot_merge.stagings</field>
+        <field name="model">runbot_merge.fetch_job</field>
         <field name="arch" type="xml">
             <search>
                 <filter string="Active" name="active"
