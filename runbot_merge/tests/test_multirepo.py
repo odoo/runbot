@@ -9,6 +9,8 @@ import json
 
 import pytest
 
+from test_utils import re_matches
+
 @pytest.fixture
 def repo_a(make_repo):
     return make_repo('a')
@@ -138,11 +140,17 @@ def test_sub_match(env, project, repo_a, repo_b, repo_c):
     # should be part of the same staging
     assert pr_c.staging_id == pr_b.staging_id, \
         "branch-matched PRs should be part of the same staging"
+
     st = pr_b.staging_id
+    b_staging = repo_b.commit('heads/staging.master')
+    c_staging = repo_c.commit('heads/staging.master')
     assert json.loads(st.heads) == {
-        repo_a.name: repo_a.commit('heads/master').id,
-        repo_b.name: repo_b.commit('heads/staging.master').id,
-        repo_c.name: repo_c.commit('heads/staging.master').id,
+        repo_a.name: repo_a.commit('heads/staging.master').id,
+        repo_a.name + '^': repo_a.commit('heads/master').id,
+        repo_b.name: b_staging.id,
+        repo_b.name + '^': b_staging.parents[0],
+        repo_c.name: c_staging.id,
+        repo_c.name + '^': c_staging.parents[0],
     }
 
 def test_merge_fail(env, project, repo_a, repo_b, users):
@@ -182,8 +190,14 @@ def test_merge_fail(env, project, repo_a, repo_b, users):
     ]
     other = to_pr(env, pr1a)
     assert not other.staging_id
-    assert len(list(repo_a.log('heads/staging.master'))) == 2,\
-        "root commit + squash-merged PR commit"
+    assert [
+        c['commit']['message']
+        for c in repo_a.log('heads/staging.master')
+    ] == [
+        re_matches('^force rebuild'),
+        'commit_A2_00\n\ncloses %s#2' % repo_a.name,
+        'initial'
+    ], "dummy commit + squash-merged PR commit + root commit"
 
 def test_ff_fail(env, project, repo_a, repo_b):
     """ In a matched-branch scenario, fast-forwarding one of the repos fails

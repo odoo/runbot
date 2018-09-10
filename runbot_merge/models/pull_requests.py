@@ -1,7 +1,9 @@
+import base64
 import collections
 import datetime
 import json
 import logging
+import os
 import pprint
 import re
 
@@ -77,9 +79,14 @@ class Project(models.Model):
                     updated = []
                     try:
                         for repo_name, head in staging_heads.items():
+                            if repo_name.endswith('^'):
+                                continue
+
+                            # if the staging has a $repo^ head, merge that,
+                            # otherwise merge the regular (CI'd) head
                             gh[repo_name].fast_forward(
                                 staging.target.name,
-                                head
+                                staging_heads.get(repo_name + '^') or head
                             )
                             updated.append(repo_name)
                     except exceptions.FastForwardError:
@@ -171,18 +178,31 @@ class Project(models.Model):
                     staged |= Batch.stage(meta, batch)
 
                 if staged:
+                    heads = {}
+                    for repo, it in meta.items():
+                        tree = it['gh'].commit(it['head'])['tree']
+                        # ensures staging branches are unique and always
+                        # rebuilt
+                        r = base64.b64encode(os.urandom(12)).decode('ascii')
+                        dummy_head = it['gh']('post', 'git/commits', json={
+                            'message': 'force rebuild\n\nuniquifier: %s' % r,
+                            'tree': tree['sha'],
+                            'parents': [it['head']],
+                        }).json()
+
+                        # $repo is the head to check, $repo^ is the head to merge
+                        heads[repo.name + '^'] = it['head']
+                        heads[repo.name] = dummy_head['sha']
+
                     # create actual staging object
                     st = self.env['runbot_merge.stagings'].create({
                         'target': branch.id,
                         'batch_ids': [(4, batch.id, 0) for batch in staged],
-                        'heads': json.dumps({
-                            repo.name: it['head']
-                            for repo, it in meta.items()
-                        })
+                        'heads': json.dumps(heads)
                     })
                     # create staging branch from tmp
                     for r, it in meta.items():
-                        it['gh'].set_ref('staging.{}'.format(branch.name), it['head'])
+                        it['gh'].set_ref('staging.{}'.format(branch.name), heads[r.name])
 
                     # creating the staging doesn't trigger a write on the prs
                     # and thus the ->staging taggings, so do that by hand
@@ -757,13 +777,13 @@ class Stagings(models.Model):
     def _validate(self):
         Commits = self.env['runbot_merge.commit']
         for s in self:
-            heads = list(json.loads(s.heads).values())
+            heads = [
+                head for repo, head in json.loads(s.heads).items()
+                if not repo.endswith('^')
+            ]
             commits = Commits.search([
                 ('sha', 'in', heads)
             ])
-            if len(commits) < len(heads):
-                s.state = 'pending'
-                continue
 
             reqs = [r.strip() for r in s.target.project_id.required_statuses.split(',')]
             st = 'success'
@@ -776,6 +796,13 @@ class Stagings(models.Model):
                         st = 'pending'
                     else:
                         assert v == 'success'
+
+            # mark failure as soon as we find a failed status, but wait until
+            # all commits are known & not pending to mark a success
+            if st == 'success' and len(commits) < len(heads):
+                s.state = 'pending'
+                continue
+
             s.state = st
 
     def cancel(self, reason, *args):
@@ -825,6 +852,9 @@ class Stagings(models.Model):
 
         # try inferring which PR failed and only mark that one
         for repo, head in json.loads(self.heads).items():
+            if repo.endswith('^'):
+                continue
+
             commit = self.env['runbot_merge.commit'].search([
                 ('sha', '=', head)
             ])
@@ -959,8 +989,6 @@ class Batch(models.Model):
         # update meta to new heads
         for pr, head in new_heads.items():
             meta[pr.repository]['head'] = head
-            if not self.env['runbot_merge.commit'].search([('sha', '=', head)]):
-                self.env['runbot_merge.commit'].create({'sha': head})
         return self.create({
             'target': prs[0].target.id,
             'prs': [(4, pr.id, 0) for pr in prs],

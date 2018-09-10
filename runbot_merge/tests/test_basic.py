@@ -1,8 +1,11 @@
 import datetime
+import re
 
 import pytest
 
 import odoo
+
+from test_utils import re_matches
 
 @pytest.fixture
 def repo(make_repo):
@@ -46,6 +49,7 @@ def test_trivial_flow(env, repo):
     staging_head = repo.commit('heads/staging.master')
     repo.post_status(staging_head.id, 'success', 'ci/runbot')
     repo.post_status(staging_head.id, 'success', 'legal/cla')
+    assert re.match('^force rebuild', staging_head.message)
 
     env['runbot_merge.project']._check_progress()
     assert pr.state == 'merged'
@@ -539,11 +543,14 @@ class TestMergeMethod:
         staging = repo.commit('heads/staging.master')
         assert not repo.is_ancestor(prx.head, of=staging.id),\
             "the pr head should not be an ancestor of the staging branch in a squash merge"
-        assert staging.parents == [m2],\
-            "the previous master's tip should be the sole parent of the staging commit"
+        assert re.match('^force rebuild', staging.message)
         assert repo.read_tree(staging) == {
             'm': b'c1', 'm2': b'm2',
         }, "the tree should still be correctly merged"
+        [actual_sha] = staging.parents
+        actual = repo.commit(actual_sha)
+        assert actual.parents == [m2],\
+            "dummy commit aside, the previous master's tip should be the sole parent of the staging commit"
 
         repo.post_status(staging.id, 'success', 'legal/cla')
         repo.post_status(staging.id, 'success', 'ci/runbot')
@@ -641,13 +648,26 @@ class TestMergeMethod:
         # then compare to the dag version of the right graph
         nm2 = node('M2', node('M1', node('M0')))
         nb1 = node('B1', node('B0', nm2))
-        expected = (
+        merge_head = (
             'title\n\nbody\n\ncloses {}#{}'.format(repo.name, prx.number),
             frozenset([nm2, nb1])
         )
+        expected = (re_matches('^force rebuild'), frozenset([merge_head]))
         assert staging == expected
 
-        final_tree = repo.read_tree(repo.commit('heads/staging.master'))
+        repo.post_status('heads/staging.master', 'success', 'legal/cla')
+        repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+        env['runbot_merge.project']._check_progress()
+
+        assert env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number),
+        ]).state == 'merged'
+
+        # check that the dummy commit is not in the final master
+        master = log_to_node(repo.log('heads/master'))
+        assert master == merge_head
+        final_tree = repo.read_tree(repo.commit('heads/master'))
         assert final_tree == {'m': b'2', 'b': b'1'}, "sanity check of final tree"
 
     @pytest.mark.skip(reason="what do if the PR contains merge commits???")
