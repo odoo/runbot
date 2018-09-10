@@ -1,6 +1,52 @@
 Merge Bot
 =========
 
+Odoo workflow
+-------------
+
+The sticky branches are protected on the github odoo project to restrict
+push for the Merge Bot (MB) only.
+
+The MB only works with PR's using the github API.
+
+1. When a PR is created the github notifies the MB. The MB labels the PR
+   as 'seen 🙂' on github [#]_.
+
+2. Once the PR github statuses are green [#]_ , the MB labels the PR as
+   'CI 🤖'.
+
+3. When a reviewer, known by the MB, approves the PR, the MB labels that
+   PR as 'r+ 👌'.
+
+4. At this moment, MB tries to merge the PR and labels the PR with
+   'merging 👷'.
+
+5. If the merge is successfull, MB labels it 'merged 🎉', removes the
+   label 'merging 👷' and closes the PR. A message from MB gives a link
+   to the merge's commit [#]_.
+
+If an error occurs during the step 4, MB labels the PR with 'error 🙅'
+and adds a message in the conversion stating what kind of error.  For
+example 'Unable to stage PR (merge conflict)'.
+
+If a new commit is pushed in the PR, the process starts again from the
+begining.
+
+It's possible to interact with the MB by the way of github messages
+containing `Commands`_. The message must start with the MB name (for
+instance 'robodoo').
+
+.. [#] Any activity on a PR the MB hasn't seen yet will bring it to the
+   MB's attention. e.g a comment on a PR.
+
+.. [#] At this moment the statuses are: Runbot build is green and CLA is
+   signed if needed.  The expected statuses may change in the future.
+
+.. [#] If a PR contains only one commit, the PR is rebased and the
+   commit is fast forwarded. With more than one commit, the PR is
+   rebased and the commits are merged with a merge commit. When one
+   wants to avoid the rebase, 'rebase-' command should be used.
+
 Setup
 -----
 
@@ -23,7 +69,7 @@ Working Principles
 Useful information (new PRs, CI, comments, ...) is pushed to the MB
 via webhooks. Most of the staging work is performed via a cron job:
 
-1. for each active staging, check if their are done
+1. for each active staging, check if they are done
 
    1. if successful
 
@@ -41,7 +87,7 @@ via webhooks. Most of the staging work is performed via a cron job:
 2. for each branch with no active staging
 
    * if there are inactive stagings, stage one of them
-   * otherwise look for batches targered to that PR (PRs grouped by
+   * otherwise look for batches targeted to that PR (PRs grouped by
      label with branch as target)
    * attempt staging
 
