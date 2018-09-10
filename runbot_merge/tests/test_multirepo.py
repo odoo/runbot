@@ -266,6 +266,39 @@ def test_one_failed(env, project, repo_a, repo_b, owner):
     assert not pr_a.staging_id, \
         "pr_a should not have been staged as companion is not ready"
 
+def test_other_failed(env, project, repo_a, repo_b, owner, users):
+    """ In a non-matched-branch scenario, if the companion staging (copy of
+    targets) fails when built with the PR, it should provide a non-useless
+    message
+    """
+    c_a = repo_a.make_commit(None, 'initial', None, tree={'a': 'a_0'})
+    repo_a.make_ref('heads/master', c_a)
+    # pr_a is born ready
+    pr_a = make_pr(repo_a, 'A', [{'a': 'a_1'}], label='do-a-thing')
+    repo_a.post_status(pr_a.head, 'success', 'ci/runbot')
+    repo_a.post_status(pr_a.head, 'success', 'legal/cla')
+
+    c_b = repo_b.make_commit(None, 'initial', None, tree={'a': 'b_0'})
+    repo_b.make_ref('heads/master', c_b)
+
+    env['runbot_merge.project']._check_progress()
+    pr = to_pr(env, pr_a)
+    assert pr.staging_id
+
+    repo_a.post_status('heads/staging.master', 'success', 'legal/cla')
+    repo_a.post_status('heads/staging.master', 'success', 'ci/runbot')
+    repo_b.post_status('heads/staging.master', 'success', 'legal/cla')
+    repo_b.post_status('heads/staging.master', 'failure', 'ci/runbot')
+    env['runbot_merge.project']._check_progress()
+
+    sth = repo_b.commit('heads/staging.master').id
+    assert not pr.staging_id
+    assert pr.state == 'error'
+    assert pr_a.comments == [
+        (users['reviewer'], 'hansen r+'),
+        (users['user'], 'Staging failed: ci/runbot failed on %s' % sth)
+    ]
+
 def test_batching(env, project, repo_a, repo_b):
     """ If multiple batches (label groups) are ready they should get batched
     together (within the limits of teh project's batch limit)

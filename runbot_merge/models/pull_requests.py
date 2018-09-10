@@ -871,7 +871,9 @@ class Stagings(models.Model):
             ), None)
             if pr:
                 self.fail(reason, pr)
-                return False
+            else:
+                self.fail('%s failed on %s' % (reason, head))
+            return False
 
         # the staging failed but we don't have a specific culprit, fail
         # everything
