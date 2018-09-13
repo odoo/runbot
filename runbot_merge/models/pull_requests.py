@@ -922,6 +922,15 @@ class Batch(models.Model):
 
         :return: () or Batch object (if all prs successfully staged)
         """
+
+        def build_message(message, pr):
+            m = re.search(r'( |{repository})#{pr.number}\b'.format(
+                    pr=pr, repository=pr.repository.name.replace('/', '\\/')),
+                message)
+            if m:
+                return message
+            return message + '\n\ncloses {pr.repository.name}#{pr.number}'.format(pr=pr)
+
         new_heads = {}
         for pr in prs:
             gh = meta[pr.repository]['gh']
@@ -932,17 +941,17 @@ class Batch(models.Model):
             )
 
             target = 'tmp.{}'.format(pr.target.name)
-            suffix = '\n\ncloses {pr.repository.name}#{pr.number}'.format(pr=pr)
             try:
                 # nb: pr_commits is oldest to newest so pr.head is pr_commits[-1]
                 pr_commits = gh.commits(pr.number)
                 rebase_and_merge = pr.rebase
                 squash = rebase_and_merge and len(pr_commits) == 1
                 if squash:
-                    pr_commits[0]['commit']['message'] += suffix
+                    msg = build_message(pr_commits[0]['commit']['message'], pr)
+                    pr_commits[0]['commit']['message'] = msg
                     new_heads[pr] = gh.rebase(pr.number, target, commits=pr_commits)
                 elif rebase_and_merge:
-                    msg = pr.message + suffix
+                    msg = build_message(pr.message, pr)
                     h = gh.rebase(pr.number, target, reset=True, commits=pr_commits)
                     new_heads[pr] = gh.merge(h, target, msg)['sha']
                 else:
@@ -964,8 +973,9 @@ class Batch(models.Model):
                         original_head = gh.head(target)
                         merge_tree = gh.merge(pr_head['sha'], target, 'temp merge')['tree']['sha']
                         new_parents = [original_head] + list(head_parents - {base_commit})
+                        msg = build_message(pr_head['commit']['message'], pr)
                         copy = gh('post', 'git/commits', json={
-                            'message': pr_head['commit']['message'] + suffix,
+                            'message': msg,
                             'tree': merge_tree,
                             'author': pr_head['commit']['author'],
                             'committer': pr_head['commit']['committer'],
@@ -975,7 +985,7 @@ class Batch(models.Model):
                         new_heads[pr] = copy['sha']
                     else:
                         # otherwise do a regular merge
-                        msg = pr.message + suffix
+                        msg = build_message(pr.message, pr)
                         new_heads[pr] = gh.merge(pr.head, target, msg)['sha']
             except (exceptions.MergeError, AssertionError) as e:
                 _logger.exception("Failed to merge %s:%s into staging branch (error: %s)", pr.repository.name, pr.number, e)

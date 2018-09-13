@@ -62,7 +62,96 @@ def test_trivial_flow(env, repo):
         'a': b'some other content',
         'b': b'a second file',
     }
-    assert master.message, "gibberish\n\nblahblah\n\ncloses odoo/odoo#1"
+    assert master.message == "gibberish\n\nblahblah\n\ncloses {repo.name}#1".format(repo=repo)
+
+class TestCommitMessage:
+    def test_commit_simple(self, env, repo, users):
+        """ verify 'closes ...' is correctly added in the commit message
+        """
+        c1 = repo.make_commit(None, 'first!', None, tree={'f': 'm1'})
+        repo.make_ref('heads/master', c1)
+        c2 = repo.make_commit(c1, 'simple commit message', None, tree={'f': 'm2'})
+
+        prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+        repo.post_status(prx.head, 'success', 'legal/cla')
+        prx.post_comment('hansen r+', "reviewer")
+
+        env['runbot_merge.project']._check_progress()
+
+        repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+        repo.post_status('heads/staging.master', 'success', 'legal/cla')
+        env['runbot_merge.project']._check_progress()
+
+        master = repo.commit('heads/master')
+        assert master.message == "simple commit message\n\ncloses {repo.name}#1".format(repo=repo)
+
+    def test_commit_existing(self, env, repo, users):
+        """ verify do not duplicate 'closes' instruction
+        """
+        c1 = repo.make_commit(None, 'first!', None, tree={'f': 'm1'})
+        repo.make_ref('heads/master', c1)
+        c2 = repo.make_commit(c1, 'simple commit message that closes #1', None, tree={'f': 'm2'})
+
+        prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+        repo.post_status(prx.head, 'success', 'legal/cla')
+        prx.post_comment('hansen r+', "reviewer")
+
+        env['runbot_merge.project']._check_progress()
+
+        repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+        repo.post_status('heads/staging.master', 'success', 'legal/cla')
+        env['runbot_merge.project']._check_progress()
+
+        master = repo.commit('heads/master')
+        # closes #1 is already present, should not modify message
+        assert master.message == "simple commit message that closes #1"
+
+    def test_commit_other(self, env, repo, users):
+        """ verify do not duplicate 'closes' instruction
+        """
+        c1 = repo.make_commit(None, 'first!', None, tree={'f': 'm1'})
+        repo.make_ref('heads/master', c1)
+        c2 = repo.make_commit(c1, 'simple commit message that closes odoo/enterprise#1', None, tree={'f': 'm2'})
+
+        prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+        repo.post_status(prx.head, 'success', 'legal/cla')
+        prx.post_comment('hansen r+', "reviewer")
+
+        env['runbot_merge.project']._check_progress()
+
+        repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+        repo.post_status('heads/staging.master', 'success', 'legal/cla')
+        env['runbot_merge.project']._check_progress()
+
+        master = repo.commit('heads/master')
+        # closes on another repositoy, should modify the commit message
+        assert master.message == "simple commit message that closes odoo/enterprise#1\n\ncloses {repo.name}#1".format(repo=repo)
+
+    def test_commit_wrong_number(self, env, repo, users):
+        """ verify do not match on a wrong number
+        """
+        c1 = repo.make_commit(None, 'first!', None, tree={'f': 'm1'})
+        repo.make_ref('heads/master', c1)
+        c2 = repo.make_commit(c1, 'simple commit message that closes #11', None, tree={'f': 'm2'})
+
+        prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+        repo.post_status(prx.head, 'success', 'legal/cla')
+        prx.post_comment('hansen r+', "reviewer")
+
+        env['runbot_merge.project']._check_progress()
+
+        repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+        repo.post_status('heads/staging.master', 'success', 'legal/cla')
+        env['runbot_merge.project']._check_progress()
+
+        master = repo.commit('heads/master')
+        # closes on another repositoy, should modify the commit message
+        assert master.message == "simple commit message that closes #11\n\ncloses {repo.name}#1".format(repo=repo)
+
 
 class TestWebhookSecurity:
     def test_no_secret(self, env, project, repo):
