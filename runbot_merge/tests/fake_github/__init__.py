@@ -132,11 +132,11 @@ class Repo(object):
             commits.extend(self.commit(r) for r in c.parents)
             yield c.to_json()
 
-    def post_status(self, ref, status, context='default', description=""):
-        assert status in ('error', 'failure', 'pending', 'success')
+    def post_status(self, ref, state, context='default', **kw):
+        assert state in ('error', 'failure', 'pending', 'success')
         c = self.commit(ref)
-        c.statuses.append((status, context, description))
-        self.notify('status', self.name, context, status, c.id)
+        c.statuses.append({'state': state, 'context': context, **kw})
+        self.notify('status', self.name, context, state, c.id, kw)
 
     def make_commit(self, ref, message, author, committer=None, tree=None):
         assert tree, "a commit must provide either a full tree"
@@ -307,9 +307,8 @@ class Repo(object):
             'total_count': len(c.statuses),
             # TODO: combined?
             'statuses': [
-                {'context': context, 'state': state}
-                for state, context, _ in reversed(c.statuses)
-            ]
+                {'description': None, 'target_url': None, **st}
+                for st in reversed(c.statuses)]
         })
 
     def _read_issue(self, r, number):
@@ -703,7 +702,7 @@ class Client(werkzeug.test.Client):
             }
         ))
 
-    def status(self, repository, context, state, sha):
+    def status(self, repository, context, state, sha, kw):
         assert state in ('success', 'failure', 'pending')
         return self.open(self._make_env(
             'status', {
@@ -712,6 +711,9 @@ class Client(werkzeug.test.Client):
                 'state': state,
                 'sha': sha,
                 'repository': self._repo(repository),
+                'target_url': None,
+                'description': None,
+                **(kw or {})
             }
         ))
 

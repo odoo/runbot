@@ -181,21 +181,28 @@ def handle_pr(env, event):
 
 def handle_status(env, event):
     _logger.info(
-        'status %s:%s on commit %s',
-        event['context'], event['state'],
-        event['sha'],
+        'status %(context)s:%(state)s on commit %(sha)s (%(target_url)s)',
+        event
     )
     Commits = env['runbot_merge.commit']
     c = Commits.search([('sha', '=', event['sha'])])
     if c:
         c.statuses = json.dumps({
             **json.loads(c.statuses),
-            event['context']: event['state']
+            event['context']: {
+                'state': event['state'],
+                'target_url': event['target_url'],
+                'description': event['description']
+            }
         })
     else:
         Commits.create({
             'sha': event['sha'],
-            'statuses': json.dumps({event['context']: event['state']})
+            'statuses': json.dumps({event['context']: {
+                'state': event['state'],
+                'target_url': event['target_url'],
+                'description': event['description']
+            }})
         })
 
     return 'ok'

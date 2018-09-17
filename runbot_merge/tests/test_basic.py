@@ -1,4 +1,5 @@
 import datetime
+import json
 import re
 
 import pytest
@@ -31,6 +32,10 @@ def test_trivial_flow(env, repo):
     # nothing happened
 
     repo.post_status(c1, 'success', 'legal/cla')
+    # rewrite status payload in old-style to ensure it does not break
+    c = env['runbot_merge.commit'].search([('sha', '=', c1)])
+    c.statuses = json.dumps({k: v['state'] for k, v in json.loads(c.statuses).items()})
+
     repo.post_status(c1, 'success', 'ci/runbot')
     assert pr.state == 'validated'
     env['runbot_merge.project']._check_progress()
@@ -1509,7 +1514,8 @@ class TestUnknownPR:
         c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
         prx = repo.make_pr('title', 'body', target='master', ctid=c1, user='user')
         repo.post_status(prx.head, 'success', 'legal/cla')
-        repo.post_status(prx.head, 'success', 'ci/runbot')
+        repo.post_status(prx.head, 'success', 'ci/runbot', target_url="http://example.org/wheee")
+
         # assume an unknown but ready PR: we don't know the PR or its head commit
         env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
@@ -1524,6 +1530,12 @@ class TestUnknownPR:
         assert Fetch.search([('repository', '=', repo.name), ('number', '=', prx.number)])
         env['runbot_merge.project']._check_fetch()
         assert not Fetch.search([('repository', '=', repo.name), ('number', '=', prx.number)])
+
+        c = env['runbot_merge.commit'].search([('sha', '=', prx.head)])
+        assert json.loads(c.statuses) == {
+            'legal/cla': {'state': 'success', 'target_url': None, 'description': None},
+            'ci/runbot': {'state': 'success', 'target_url': 'http://example.org/wheee', 'description': None}
+        }
 
         pr = env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),

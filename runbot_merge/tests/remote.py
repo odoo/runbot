@@ -518,12 +518,12 @@ class Repo:
         wait_for_hook(2)
         return PR(self, 'heads/' + ref, r.json()['number'])
 
-    def post_status(self, ref, status, context='default', description=""):
+    def post_status(self, ref, status, context='default', **kw):
         assert status in ('error', 'failure', 'pending', 'success')
         r = self._session.post('https://api.github.com/repos/{}/statuses/{}'.format(self.name, self.get_ref(ref)), json={
             'state': status,
             'context': context,
-            'description': description,
+            **kw
         })
         assert 200 <= r.status_code < 300, r.json()
         wait_for_hook()

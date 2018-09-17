@@ -166,8 +166,7 @@ class GH(object):
         r = self('get', 'commits/{}/status'.format(h)).json()
         return [{
             'sha': r['sha'],
-            'context': s['context'],
-            'state': s['state'],
+            **s,
         } for s in r['statuses']]
 
 PR_COMMITS_MAX = 50

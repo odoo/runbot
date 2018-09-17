@@ -286,9 +286,9 @@ def test_other_failed(env, project, repo_a, repo_b, owner, users):
     assert pr.staging_id
 
     repo_a.post_status('heads/staging.master', 'success', 'legal/cla')
-    repo_a.post_status('heads/staging.master', 'success', 'ci/runbot')
+    repo_a.post_status('heads/staging.master', 'success', 'ci/runbot', target_url="http://example.org/a")
     repo_b.post_status('heads/staging.master', 'success', 'legal/cla')
-    repo_b.post_status('heads/staging.master', 'failure', 'ci/runbot')
+    repo_b.post_status('heads/staging.master', 'failure', 'ci/runbot', target_url="http://example.org/b")
     env['runbot_merge.project']._check_progress()
 
     sth = repo_b.commit('heads/staging.master').id
@@ -296,7 +296,7 @@ def test_other_failed(env, project, repo_a, repo_b, owner, users):
     assert pr.state == 'error'
     assert pr_a.comments == [
         (users['reviewer'], 'hansen r+'),
-        (users['user'], 'Staging failed: ci/runbot failed on %s' % sth)
+        (users['user'], 'Staging failed: ci/runbot on %s (view more at http://example.org/b)' % sth)
     ]
 
 def test_batching(env, project, repo_a, repo_b):

@@ -585,7 +585,7 @@ class PullRequests(models.Model):
         # targets
         for pr in self:
             required = pr.repository.project_id.required_statuses.split(',')
-            if all(statuses.get(r.strip()) == 'success' for r in required):
+            if all(state_(statuses, r) == 'success' for r in required):
                 oldstate = pr.state
                 if oldstate == 'opened':
                     pr.state = 'validated'
@@ -790,7 +790,7 @@ class Stagings(models.Model):
             st = 'success'
             for c in commits:
                 statuses = json.loads(c.statuses)
-                for v in map(statuses.get, reqs):
+                for v in map(lambda n: state_(statuses, n), reqs):
                     if st == 'failure' or v in ('error', 'failure'):
                         st = 'failure'
                     elif v in (None, 'pending'):
@@ -859,9 +859,10 @@ class Stagings(models.Model):
             commit = self.env['runbot_merge.commit'].search([
                 ('sha', '=', head)
             ])
+            statuses = json.loads(commit.statuses)
             reason = next((
-                ctx for ctx, result in json.loads(commit.statuses).items()
-                if result in ('error', 'failure')
+                ctx for ctx, result in statuses.items()
+                if to_status(result).get('state') in ('error', 'failure')
             ), None)
             if not reason:
                 continue
@@ -870,10 +871,15 @@ class Stagings(models.Model):
                 pr for pr in self.batch_ids.prs
                 if pr.repository.name == repo
             ), None)
+
+            status = to_status(statuses[reason])
+            viewmore = ''
+            if status.get('target_url'):
+                viewmore = ' (view more at %(target_url)s)' % status
             if pr:
-                self.fail(reason, pr)
+                self.fail("%s%s" % (reason, viewmore), pr)
             else:
-                self.fail('%s failed on %s' % (reason, head))
+                self.fail('%s on %s%s' % (reason, head, viewmore))
             return False
 
         # the staging failed but we don't have a specific culprit, fail
@@ -1013,3 +1019,28 @@ class FetchJob(models.Model):
     active = fields.Boolean(default=True)
     repository = fields.Many2one('runbot_merge.repository', index=True, required=True)
     number = fields.Integer(index=True, required=True)
+
+# The commit (and PR) statuses was originally a map of ``{context:state}``
+# however it turns out to clarify error messages it'd be useful to have
+# a bit more information e.g. a link to the CI's build info on failure and
+# all that. So the db-stored statuses are now becoming a map of
+# ``{ context: {state, target_url, description } }``. The issue here is
+# there's already statuses stored in the db so we need to handle both
+# formats, hence these utility functions)
+def state_(statuses, name):
+    """ Fetches the status state """
+    name = name.strip()
+    v = statuses.get(name)
+    if isinstance(v, dict):
+        return v.get('state')
+    return v
+def to_status(v):
+    """ Converts old-style status values (just a state string) to new-style
+    (``{state, target_url, description}``)
+
+    :type v: str | dict
+    :rtype: dict
+    """
+    if isinstance(v, dict):
+        return v
+    return {'state': v, 'target_url': None, 'description': None}
