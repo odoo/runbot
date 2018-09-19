@@ -953,10 +953,12 @@ class Batch(models.Model):
                 rebase_and_merge = pr.rebase
                 squash = rebase_and_merge and len(pr_commits) == 1
                 if squash:
+                    method = 'squash'
                     msg = build_message(pr_commits[0]['commit']['message'], pr)
                     pr_commits[0]['commit']['message'] = msg
                     new_heads[pr] = gh.rebase(pr.number, target, commits=pr_commits)
                 elif rebase_and_merge:
+                    method = 'rebase & merge'
                     msg = build_message(pr.message, pr)
                     h = gh.rebase(pr.number, target, reset=True, commits=pr_commits)
                     new_heads[pr] = gh.merge(h, target, msg)['sha']
@@ -974,6 +976,7 @@ class Batch(models.Model):
                             [base_commit] = merge
 
                     if base_commit:
+                        method = 'merge/copy'
                         # replicate pr_head with base_commit replaced by
                         # the current head
                         original_head = gh.head(target)
@@ -990,9 +993,11 @@ class Batch(models.Model):
                         gh.set_ref(target, copy['sha'])
                         new_heads[pr] = copy['sha']
                     else:
+                        method = 'merge'
                         # otherwise do a regular merge
                         msg = build_message(pr.message, pr)
                         new_heads[pr] = gh.merge(pr.head, target, msg)['sha']
+                _logger.info("Staged pr %s:%s by %s to %s", pr.repository.name, pr.number, method, new_heads[pr])
             except (exceptions.MergeError, AssertionError) as e:
                 _logger.exception("Failed to merge %s:%s into staging branch (error: %s)", pr.repository.name, pr.number, e)
                 pr.state = 'error'
