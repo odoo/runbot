@@ -1226,6 +1226,60 @@ class TestBatching(object):
         assert pr2.staging_id
         assert pr1.staging_id == pr2.staging_id
 
+        log = list(repo.log('heads/staging.master'))
+        staging = log_to_node(log)
+        p1 = node(
+            'title PR1\n\nbody PR1\n\ncloses {}#{}'.format(repo.name, pr1.number),
+            node('initial'),
+            node('commit_PR1_01', node('commit_PR1_00', node('initial')))
+        )
+        p2 = node(
+            'title PR2\n\nbody PR2\n\ncloses {}#{}'.format(repo.name, pr2.number),
+            p1,
+            node('commit_PR2_01', node('commit_PR2_00', p1))
+        )
+        expected = (re_matches('^force rebuild'), frozenset([p2]))
+        assert staging == expected
+
+    def test_staging_batch_norebase(self, env, repo):
+        """ If multiple PRs are ready for the same target at the same point,
+        they should be staged together
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'a': 'some content'})
+        repo.make_ref('heads/master', m)
+
+        pr1 = self._pr(repo, 'PR1', [{'a': 'AAA'}, {'b': 'BBB'}])
+        pr1.post_comment('hansen rebase-', 'reviewer')
+        pr2 = self._pr(repo, 'PR2', [{'c': 'CCC'}, {'d': 'DDD'}])
+        pr2.post_comment('hansen rebase-', 'reviewer')
+
+        env['runbot_merge.project']._check_progress()
+        pr1 = self._get(env, repo, pr1.number)
+        assert pr1.staging_id
+        assert not pr1.rebase
+        pr2 = self._get(env, repo, pr2.number)
+        assert not pr2.rebase
+        assert pr1.staging_id
+        assert pr2.staging_id
+        assert pr1.staging_id == pr2.staging_id
+
+        log = list(repo.log('heads/staging.master'))
+
+        staging = log_to_node(log)
+
+        p1 = node(
+            'title PR1\n\nbody PR1\n\ncloses {}#{}'.format(repo.name, pr1.number),
+            node('initial'),
+            node('commit_PR1_01', node('commit_PR1_00', node('initial')))
+        )
+        p2 = node(
+            'title PR2\n\nbody PR2\n\ncloses {}#{}'.format(repo.name, pr2.number),
+            p1,
+            node('commit_PR2_01', node('commit_PR2_00', node('initial')))
+        )
+        expected = (re_matches('^force rebuild'), frozenset([p2]))
+        assert staging == expected
+
     def test_batching_pressing(self, env, repo):
         """ "Pressing" PRs should be selected before normal & batched together
         """
@@ -1581,9 +1635,22 @@ def node(name, *children):
 def log_to_node(log):
     log = list(log)
     nodes = {}
-    for c in reversed(log):
-        nodes[c['sha']] = (c['commit']['message'], frozenset(
-            nodes[p['sha']]
-            for p in (c['parents'])
-        ))
+    # check that all parents are present
+    ids = {c['sha'] for c in log}
+    parents = {p['sha'] for c in log for p in c['parents']}
+    missing = parents - ids
+    assert parents, "Didn't find %s in log" % missing
+
+    # github doesn't necessarily log topologically maybe?
+    todo = list(reversed(log))
+    while todo:
+        c = todo.pop(0)
+        if all(p['sha'] in nodes for p in c['parents']):
+            nodes[c['sha']] = (c['commit']['message'], frozenset(
+                nodes[p['sha']]
+                for p in c['parents']
+            ))
+        else:
+            todo.append(c)
+
     return nodes[log[0]['sha']]

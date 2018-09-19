@@ -465,13 +465,13 @@ class Repo(object):
         # merging according to read-tree:
         # get common ancestor (base) of commits
         try:
-            base = git.merge_base(self.objects, target, sha)
+            merge_base = git.merge_base(self.objects, target, sha)
         except Exception:
             return (400, {'message': "No common ancestor between %(base)s and %(head)s" % body})
         try:
             tid = git.merge_objects(
                 self.objects,
-                self.objects[base].tree,
+                self.objects[merge_base].tree,
                 self.objects[target].tree,
                 self.objects[sha].tree,
             )
@@ -481,6 +481,7 @@ class Repo(object):
 
         c = Commit(tid, body['commit_message'], author=None, committer=None, parents=[target, sha])
         self.objects[c.id] = c
+        self.refs[base] = c.id
 
         return (201, c.to_json())
 
