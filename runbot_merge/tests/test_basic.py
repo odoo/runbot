@@ -405,6 +405,67 @@ def test_ff_failure(env, repo, users):
     assert repo.commit('heads/staging.master').id != staging.id,\
         "PR should be staged to a new commit"
 
+def test_ff_failure_batch(env, repo, users):
+    m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+    repo.make_ref('heads/master', m)
+
+    a1 = repo.make_commit(m, 'a1', None, tree={'m': 'm', 'a': '1'})
+    a2 = repo.make_commit(a1, 'a2', None, tree={'m': 'm', 'a': '2'})
+    A = repo.make_pr('A', None, target='master', ctid=a2, user='user', label='A')
+    repo.post_status(A.head, 'success', 'legal/cla')
+    repo.post_status(A.head, 'success', 'ci/runbot')
+    A.post_comment('hansen r+', "reviewer")
+
+    b1 = repo.make_commit(m, 'b1', None, tree={'m': 'm', 'b': '1'})
+    b2 = repo.make_commit(b1, 'b2', None, tree={'m': 'm', 'b': '2'})
+    B = repo.make_pr('B', None, target='master', ctid=b2, user='user', label='B')
+    repo.post_status(B.head, 'success', 'legal/cla')
+    repo.post_status(B.head, 'success', 'ci/runbot')
+    B.post_comment('hansen r+', "reviewer")
+
+    c1 = repo.make_commit(m, 'c1', None, tree={'m': 'm', 'c': '1'})
+    c2 = repo.make_commit(c1, 'c2', None, tree={'m': 'm', 'c': '2'})
+    C = repo.make_pr('C', None, target='master', ctid=c2, user='user', label='C')
+    repo.post_status(C.head, 'success', 'legal/cla')
+    repo.post_status(C.head, 'success', 'ci/runbot')
+    C.post_comment('hansen r+', "reviewer")
+
+    env['runbot_merge.project']._check_progress()
+    messages = [
+        c['commit']['message']
+        for c in repo.log('heads/staging.master')
+    ]
+    assert 'a2' in messages
+    assert 'b2' in messages
+    assert 'c2' in messages
+
+    # block FF
+    m2 = repo.make_commit('heads/master', 'NO!', None, tree={'m': 'm2'})
+
+    old_staging = repo.commit('heads/staging.master')
+    # confirm staging
+    repo.post_status('heads/staging.master', 'success', 'legal/cla')
+    repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+    env['runbot_merge.project']._check_progress()
+    new_staging = repo.commit('heads/staging.master')
+
+    assert new_staging.id != old_staging.id
+
+    # confirm again
+    repo.post_status('heads/staging.master', 'success', 'legal/cla')
+    repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+    env['runbot_merge.project']._check_progress()
+    messages = {
+        c['commit']['message']
+        for c in repo.log('heads/master')
+    }
+    assert messages == {
+        'initial', 'NO!',
+        'a1', 'a2', 'A\n\ncloses {}#{}'.format(repo.name, A.number),
+        'b1', 'b2', 'B\n\ncloses {}#{}'.format(repo.name, B.number),
+        'c1', 'c2', 'C\n\ncloses {}#{}'.format(repo.name, C.number),
+    }
+
 def test_edit(env, repo):
     """ Editing PR:
 
