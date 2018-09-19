@@ -804,6 +804,35 @@ class TestMergeMethod:
         expected = node('gibberish\n\nblahblah\n\ncloses {}#{}'.format(repo.name, prx.number), m, c0)
         assert log_to_node(repo.log('heads/master')), expected
 
+    def test_unrebase_emptymessage(self, repo, env):
+        """ When merging between master branches (e.g. forward port), the PR
+        may have only a title
+        """
+        m = repo.make_commit(None, "M", None, tree={'a': 'a'})
+        repo.make_ref('heads/master', m)
+
+        c0 = repo.make_commit(m, 'C0', None, tree={'a': 'b'})
+        prx = repo.make_pr("gibberish", None, target='master', ctid=c0, user='user')
+        env['runbot_merge.project']._check_progress()
+
+        repo.post_status(prx.head, 'success', 'legal/cla')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+        prx.post_comment('hansen r+ rebase-', 'reviewer')
+        env['runbot_merge.project']._check_progress()
+
+        repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+        repo.post_status('heads/staging.master', 'success', 'legal/cla')
+        env['runbot_merge.project']._check_progress()
+
+        master = repo.commit('heads/master')
+        assert master.parents == [m, prx.head], \
+            "master's parents should be the old master & the PR head"
+
+        m = node('M')
+        c0 = node('C0', m)
+        expected = node('gibberish\n\ncloses {}#{}'.format(repo.name, prx.number), m, c0)
+        assert log_to_node(repo.log('heads/master')), expected
+
     def test_pr_mergehead(self, repo, env):
         """ if the head of the PR is a merge commit and one of the parents is
         in the target, replicate the merge commit instead of merging
