@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <template id="runbot.branch">
+        <t t-call='website.layout'>
+          <div class="container-fluid">
+              <div class="row">
+                  <div class='col-md-12'>
+                        <div class="navbar navbar-default">
+                            <span class="text-center" style="font-size: 18px;">Builds for branch: <t t-esc="builds[0].branch_id.name.split('/')[-1]" /></span>
+                            <span class="pull-right"><t t-call="website.pager" /></span>
+                        </div>
+                    <table class="table table-condensed table-stripped" style="table-layout: initial;">
+                        <thead>
+                            <tr>
+                                <th>Seq</th>
+                                <th>Date</th>
+                                <th>Dest</th>
+                                <th>Subject</th>
+                                <th>Revno</th>
+                                <th>result</th>
+                                <th>state</th>
+                                <th>host</th>
+                                <th>job</th>
+                                <th>duration</th>
+                                <th>type</th>
+                            </tr>
+                        </thead>
+                        <t t-foreach="builds" t-as="build">
+                            <t t-if="build['state'] in ['running','done'] and build['result'] == 'ko'"><t t-set="rowclass">danger</t></t>
+                            <t t-if="build['state'] in ['running','done'] and build['result'] == 'warn'"><t t-set="rowclass">warning</t></t>
+                            <t t-if="build['state'] in ['running','done'] and build['result'] == 'ok'"><t t-set="rowclass">success</t></t>
+                            <t t-if="build['state'] in ['running','done'] and build['result'] == 'skipped'"><t t-set="rowclass">default</t></t>
+                            <t t-if="build['state'] in ['running','done'] and build['result'] in ['killed', 'manually_killed']"><t t-set="rowclass">killed</t></t>
+                            <tr t-attf-class="{{rowclass}}">
+                                <td><t t-esc="build.sequence" /></td>
+                                <td><t t-esc="build.date" /></td>
+                                <td><a t-attf-href="/runbot/build/{{build['id']}}" title="Build details" aria-label="Build details"><t t-esc="build.dest" /></a></td>
+                                <td><t t-esc="build.subject" /></td>
+                                <td><t t-esc="build.name" /></td>
+                                <td><t t-esc="build.result" /></td>
+                                <td><t t-esc="build.state" /></td>
+                                <td><t t-esc="build.host" /></td>
+                                <td><t t-esc="build.job" /></td>
+                                <td><t t-esc="build.job_time" /></td>
+                                <td><t t-esc="build.build_type" /></td>
+                            </tr>
+                        </t>
+                    </table>
+                  </div>
+              </div>
+          </div>
+        </t>
+    </template>
+  </data>
+</odoo>
