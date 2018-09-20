@@ -251,11 +251,12 @@ def handle_review(env, event):
     firstline = ''
     state = event['review']['state'].lower()
     if state == 'approved':
-        firstline = pr.repository.project_id.github_prefix + ' r+\n'
+        firstline = pr.repository.project_id.github_prefix + ' r+'
     elif state == 'request_changes':
-        firstline = pr.repository.project_id.github_prefix + ' r-\n'
+        firstline = pr.repository.project_id.github_prefix + ' r-'
 
-    return pr._parse_commands(partner, firstline + event['review']['body'])
+    body = event['review']['body']
+    return pr._parse_commands(partner, firstline + ('\n' + body) if body else '')
 
 def handle_ping(env, event):
     print("Got ping! {}".format(event['zen']))
