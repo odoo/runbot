@@ -202,7 +202,8 @@ class Project(models.Model):
                         'heads': json.dumps(heads)
                     })
                     # create staging branch from tmp
-                    for r, it in meta.items():
+                    for r in project.repo_ids:
+                        it = meta[r]
                         it['gh'].set_ref('staging.{}'.format(branch.name), heads[r.name])
 
                     # creating the staging doesn't trigger a write on the prs
