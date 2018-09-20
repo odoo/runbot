@@ -38,13 +38,17 @@ class GH(object):
 
         assert d['ref'] == 'refs/heads/{}'.format(branch)
         assert d['object']['type'] == 'commit'
+        _logger.debug("head(%s, %s) -> %s", self._repo, branch, d['object']['sha'])
         return d['object']['sha']
 
     def commit(self, sha):
-        return self('GET', 'git/commits/{}'.format(sha)).json()
+        c = self('GET', 'git/commits/{}'.format(sha)).json()
+        _logger.debug('commit(%s, %s) -> %s', self._repo, sha, shorten(c['message']))
+        return c
 
     def comment(self, pr, message):
         self('POST', 'issues/{}/comments'.format(pr), json={'body': message})
+        _logger.debug('comment(%s, %s, %s)', self._repo, pr, shorten(message))
 
     def close(self, pr, message):
         self.comment(pr, message)
@@ -54,7 +58,6 @@ class GH(object):
         to_add, to_remove = to_ - from_, from_ - to_
         for t in to_remove:
             r = self('DELETE', 'issues/{}/labels/{}'.format(pr, t), check=False)
-            r.raise_for_status()
             # successful deletion or attempt to delete a tag which isn't there
             # is fine, otherwise trigger an error
             if r.status_code not in (200, 404):
@@ -63,10 +66,14 @@ class GH(object):
         if to_add:
             self('POST', 'issues/{}/labels'.format(pr), json=list(to_add))
 
+        _logger.debug('change_tags(%s, %s, remove=%s, add=%s)', self._repo, pr, to_remove, to_add)
+
     def fast_forward(self, branch, sha):
         try:
             self('patch', 'git/refs/heads/{}'.format(branch), json={'sha': sha})
+            _logger.debug('fast_forward(%s, %s, %s) -> OK', self._repo, branch, sha)
         except requests.HTTPError:
+            _logger.debug('fast_forward(%s, %s, %s) -> ERROR', self._repo, branch, sha, exc_info=True)
             raise exceptions.FastForwardError()
 
     def set_ref(self, branch, sha):
@@ -76,6 +83,7 @@ class GH(object):
             'force': True,
         }, check=False)
         if r.status_code == 200:
+            _logger.debug('set_ref(update, %s, %s, %s) -> OK', self._repo, branch, sha)
             return
 
         # 422 makes no sense but that's what github returns, leaving 404 just
@@ -87,6 +95,7 @@ class GH(object):
                 'sha': sha,
             }, check=False)
             if r.status_code == 201:
+                _logger.debug('set_ref(create, %s, %s, %s) -> OK', self._repo, branch, sha)
                 return
         raise AssertionError("{}: {}".format(r.status_code, r.json()))
 
@@ -97,6 +106,7 @@ class GH(object):
             'commit_message': message,
         }, check={409: exceptions.MergeError})
         r = r.json()
+        _logger.debug("merge(%s, %s, %s) -> %s", self._repo, dest, shorten(message), r['sha'])
         return dict(r['commit'], sha=r['sha'])
 
     def rebase(self, pr, dest, reset=False, commits=None):
@@ -130,6 +140,9 @@ class GH(object):
         if reset:
             self.set_ref(dest, original_head)
 
+        _logger.debug('%s, %s, %s, reset=%s, commits=%s) -> %s',
+                      self._repo, pr, dest, reset, commits and len(commits),
+                      prev)
         # prev is updated after each copy so it's the rebased PR head
         return prev
 
@@ -170,3 +183,12 @@ class GH(object):
         } for s in r['statuses']]
 
 PR_COMMITS_MAX = 50
+def shorten(s):
+    if not s:
+        return s
+
+    line1 = s.split('\n', 1)[0]
+    if len(line1) < 50:
+        return line1
+
+    return line1[:47] + '...'
