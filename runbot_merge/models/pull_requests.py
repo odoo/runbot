@@ -6,6 +6,7 @@ import logging
 import os
 import pprint
 import re
+import time
 
 from itertools import takewhile
 
@@ -204,7 +205,16 @@ class Project(models.Model):
                     # create staging branch from tmp
                     for r in project.repo_ids:
                         it = meta[r]
+                        _logger.info(
+                            "%s: create staging for %s:%s at %s",
+                            project.name, r.name, branch.name,
+                            heads[r.name]
+                        )
                         it['gh'].set_ref('staging.{}'.format(branch.name), heads[r.name])
+                        # temp hack: add a delay between staging repositories
+                        # in case there's a race when quickly pushing a repo
+                        # then its dependency
+                        time.sleep(20)
 
                     # creating the staging doesn't trigger a write on the prs
                     # and thus the ->staging taggings, so do that by hand
