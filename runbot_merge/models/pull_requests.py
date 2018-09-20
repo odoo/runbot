@@ -947,6 +947,7 @@ class Batch(models.Model):
             )
 
             target = 'tmp.{}'.format(pr.target.name)
+            original_head = gh.head(target)
             try:
                 # nb: pr_commits is oldest to newest so pr.head is pr_commits[-1]
                 pr_commits = gh.commits(pr.number)
@@ -997,7 +998,12 @@ class Batch(models.Model):
                         # otherwise do a regular merge
                         msg = build_message(pr.message, pr)
                         new_heads[pr] = gh.merge(pr.head, target, msg)['sha']
-                _logger.info("Staged pr %s:%s by %s to %s", pr.repository.name, pr.number, method, new_heads[pr])
+                new_head = gh.head(target)
+                _logger.info(
+                    "Staged pr %s:%s by %s to %s; %s %s -> %s",
+                    pr.repository.name, pr.number, method, new_heads[pr],
+                    target, original_head, new_head
+                )
             except (exceptions.MergeError, AssertionError) as e:
                 _logger.exception("Failed to merge %s:%s into staging branch (error: %s)", pr.repository.name, pr.number, e)
                 pr.state = 'error'
