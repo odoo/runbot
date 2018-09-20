@@ -139,6 +139,8 @@ class GH(object):
 
         if reset:
             self.set_ref(dest, original_head)
+        else:
+            self.set_ref(dest, prev)
 
         _logger.debug('%s, %s, %s, reset=%s, commits=%s) -> %s',
                       self._repo, pr, dest, reset, commits and len(commits),
