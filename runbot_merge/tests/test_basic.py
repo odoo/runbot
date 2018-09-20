@@ -1341,6 +1341,34 @@ class TestBatching(object):
         expected = (re_matches('^force rebuild'), frozenset([p2]))
         assert staging == expected
 
+    def test_staging_batch_squash(self, env, repo):
+        """ If multiple PRs are ready for the same target at the same point,
+        they should be staged together
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'a': 'some content'})
+        repo.make_ref('heads/master', m)
+
+        pr1 = self._pr(repo, 'PR1', [{'a': 'AAA'}])
+        pr2 = self._pr(repo, 'PR2', [{'c': 'CCC'}])
+
+        env['runbot_merge.project']._check_progress()
+        pr1 = self._get(env, repo, pr1.number)
+        assert pr1.staging_id
+        pr2 = self._get(env, repo, pr2.number)
+        assert pr1.staging_id
+        assert pr2.staging_id
+        assert pr1.staging_id == pr2.staging_id
+
+        log = list(repo.log('heads/staging.master'))
+
+        staging = log_to_node(log)
+        expected = node(
+            re_matches('^force rebuild'),
+            node('commit_PR2_00\n\ncloses {}#{}'.format(repo.name, pr2.number),
+                 node('commit_PR1_00\n\ncloses {}#{}'.format(repo.name, pr1.number),
+                      node('initial'))))
+        assert staging == expected
+
     def test_batching_pressing(self, env, repo):
         """ "Pressing" PRs should be selected before normal & batched together
         """
@@ -1691,7 +1719,7 @@ class TestUnknownPR:
         assert pr.staging_id
 
 def node(name, *children):
-    assert type(name) is str
+    assert type(name) in (str, re_matches)
     return name, frozenset(children)
 def log_to_node(log):
     log = list(log)
