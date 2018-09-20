@@ -256,7 +256,7 @@ def handle_review(env, event):
         firstline = pr.repository.project_id.github_prefix + ' r-'
 
     body = event['review']['body']
-    return pr._parse_commands(partner, firstline + ('\n' + body) if body else '')
+    return pr._parse_commands(partner, firstline + (('\n' + body) if body else ''))
 
 def handle_ping(env, event):
     print("Got ping! {}".format(event['zen']))
