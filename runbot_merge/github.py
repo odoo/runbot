@@ -169,13 +169,18 @@ class GH(object):
             if not r.links.get('next'):
                 return
 
+    def commits_lazy(self, pr):
+        for page in itertools.count(1):
+            r = self('get', 'pulls/{}/commits'.format(pr), params={'page': page})
+            yield from r.json()
+            if not r.links.get('next'):
+                return
+
     def commits(self, pr):
         """ Returns a PR's commits oldest first (that's what GH does &
         is what we want)
         """
-        r = self('get', 'pulls/{}/commits'.format(pr), params={'per_page': PR_COMMITS_MAX})
-        assert not r.links.get('next'), "more than {} commits".format(PR_COMMITS_MAX)
-        return r.json()
+        return list(self.commits_lazy(pr))
 
     def statuses(self, h):
         r = self('get', 'commits/{}/status'.format(h)).json()
@@ -184,7 +189,6 @@ class GH(object):
             **s,
         } for s in r['statuses']]
 
-PR_COMMITS_MAX = 50
 def shorten(s):
     if not s:
         return s

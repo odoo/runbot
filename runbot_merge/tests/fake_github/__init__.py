@@ -10,6 +10,7 @@ import responses
 import werkzeug.urls
 import werkzeug.test
 import werkzeug.wrappers
+from werkzeug.urls import url_parse, url_encode
 
 from . import git
 
@@ -32,8 +33,11 @@ class APIResponse(responses.BaseResponse):
     def get_response(self, request):
         m = self.url.match(request.url)
 
-        (status, r) = self.sim.repos[m.group('repo')].api(m.group('path'), request)
+        r = self.sim.repos[m.group('repo')].api(m.group('path'), request)
+        if isinstance(r, responses.HTTPResponse):
+            return r
 
+        (status, r) = r
         headers = self.get_headers()
         body = io.BytesIO(b'')
         if r is not None:
@@ -138,7 +142,7 @@ class Repo(object):
         c.statuses.append({'state': state, 'context': context, **kw})
         self.notify('status', self.name, context, state, c.id, kw)
 
-    def make_commit(self, ref, message, author, committer=None, tree=None):
+    def make_commit(self, ref, message, author, committer=None, tree=None, wait=True):
         assert tree, "a commit must provide either a full tree"
 
         refs = ref or []
@@ -420,8 +424,27 @@ class Repo(object):
         if not isinstance(pr, PR):
             return (404, None)
 
-        return (200, [c.to_json() for c in pr.commits])
+        url = url_parse(r.url)
+        qs = url.decode_query()
+        # github pages are 1-indexeds
+        page = int(qs.get('page') or 1) - 1
+        per_page = int(qs.get('per_page') or 100)
 
+        offset = page * per_page
+        limit = page + 1 * per_page
+        headers = {'Content-Type': 'application/json'}
+        if len(pr.commits) > limit:
+            nextlink = url.replace(query=url_encode(dict(qs, page=page+1)))
+            headers['Link'] = '<%s>; rel="next"' % str(nextlink)
+
+        commits = [c.to_json() for c in pr.commits[offset:limit]]
+        body = io.BytesIO(json.dumps(commits).encode('utf-8'))
+
+        return responses.HTTPResponse(
+            status=200, reason="OK",
+            headers=headers,
+            body=body, preload_content=False,
+        )
 
     def _add_labels(self, r, number):
         try:

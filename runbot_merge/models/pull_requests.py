@@ -950,9 +950,14 @@ class Batch(models.Model):
             original_head = gh.head(target)
             try:
                 # nb: pr_commits is oldest to newest so pr.head is pr_commits[-1]
+                _, prdict = gh.pr(pr.number)
+                commits = prdict['commits']
+                assert commits < 50 or not pr.rebase, \
+                    "rebasing a PR or more than 50 commits is a tad excessive"
+                assert commits < 250, "merging PRs of 250+ commits is not supported (https://developer.github.com/v3/pulls/#list-commits-on-a-pull-request)"
                 pr_commits = gh.commits(pr.number)
                 rebase_and_merge = pr.rebase
-                squash = rebase_and_merge and len(pr_commits) == 1
+                squash = rebase_and_merge and commits == 1
                 if squash:
                     method = 'squash'
                     msg = build_message(pr_commits[0]['commit']['message'], pr)
@@ -1007,7 +1012,7 @@ class Batch(models.Model):
             except (exceptions.MergeError, AssertionError) as e:
                 _logger.exception("Failed to merge %s:%s into staging branch (error: %s)", pr.repository.name, pr.number, e)
                 pr.state = 'error'
-                gh.comment(pr.number, "Unable to stage PR (merge conflict)")
+                gh.comment(pr.number, "Unable to stage PR (%s)" % e)
 
                 # reset other PRs
                 for to_revert in new_heads.keys():

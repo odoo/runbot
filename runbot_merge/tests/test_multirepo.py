@@ -186,7 +186,7 @@ def test_merge_fail(env, project, repo_a, repo_b, users):
     assert failed.state == 'error'
     assert pr1b.comments == [
         (users['reviewer'], 'hansen r+'),
-        (users['user'], 'Unable to stage PR (merge conflict)'),
+        (users['user'], re_matches('^Unable to stage PR')),
     ]
     other = to_pr(env, pr1a)
     assert not other.staging_id

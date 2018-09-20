@@ -451,7 +451,7 @@ class Repo:
         assert 200 <= r.status_code < 300, r.json()
         wait_for_hook()
 
-    def make_commit(self, ref, message, author, committer=None, tree=None):
+    def make_commit(self, ref, message, author, committer=None, tree=None, wait=True):
         assert tree, "not supporting changes/updates"
         assert not (author or committer)
 
@@ -496,7 +496,7 @@ class Repo:
         # if the first parent is an actual ref (rather than a hash) update it
         if parents[0] != refs[0]:
             self.update_ref(refs[0], commit_sha)
-        else:
+        elif wait:
             wait_for_hook()
         return commit_sha
 

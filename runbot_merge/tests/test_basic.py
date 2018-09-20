@@ -1,6 +1,7 @@
 import datetime
 import json
 import re
+import time
 
 import pytest
 
@@ -311,7 +312,7 @@ def test_staging_merge_fail(env, repo, users):
     assert prx.labels == {'seen 🙂', 'error 🙅'}
     assert prx.comments == [
         (users['reviewer'], 'hansen r+'),
-        (users['user'], 'Unable to stage PR (merge conflict)'),
+        (users['user'], re_matches('^Unable to stage PR')),
     ]
 
 def test_staging_ci_timeout(env, repo, users):
@@ -543,6 +544,34 @@ def test_close_staged(env, repo):
 
     assert not pr.staging_id
     assert not env['runbot_merge.stagings'].search([])
+
+def test_forward_port(env, repo):
+    m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+    repo.make_ref('heads/master', m)
+
+    head = m
+    for i in range(110):
+        head = repo.make_commit(head, 'c_%03d' % i, None, tree={'m': 'm', 'f': str(i)}, wait=False)
+    # for remote since we're not waiting in commit creation
+    time.sleep(10)
+    pr = repo.make_pr('PR', None, target='master', ctid=head, user='user')
+    repo.post_status(pr.head, 'success', 'legal/cla')
+    repo.post_status(pr.head, 'success', 'ci/runbot')
+    pr.post_comment('hansen rebase- r+', "reviewer")
+    env['runbot_merge.project']._check_progress()
+
+    st = repo.commit('heads/staging.master')
+    assert st.message.startswith('force rebuild')
+
+    repo.post_status(st.id, 'success', 'legal/cla')
+    repo.post_status(st.id, 'success', 'ci/runbot')
+    env['runbot_merge.project']._check_progress()
+
+    h = repo.commit('heads/master')
+    assert set(st.parents) == {h.id}
+    assert set(h.parents) == {m, pr.head}
+    commits = {c['sha'] for c in repo.log('heads/master')}
+    assert len(commits) == 112
 
 class TestRetry:
     @pytest.mark.xfail(reason="This may not be a good idea as it could lead to tons of rebuild spam")
