@@ -1747,6 +1747,28 @@ class TestUnknownPR:
         env['runbot_merge.project']._check_progress()
         assert pr.staging_id
 
+class TestComments:
+    def test_address_method(self, repo, env):
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        repo.make_ref('heads/master', m)
+
+        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
+        prx = repo.make_pr('title', 'body', target='master', ctid=c1, user='user')
+
+        repo.post_status(prx.head, 'success', 'legal/cla')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+        prx.post_comment('hansen delegate=foo', user='reviewer')
+        prx.post_comment('@hansen delegate=bar', user='reviewer')
+        prx.post_comment('#hansen delegate=baz', user='reviewer')
+
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number)
+        ])
+
+        assert {p.github_login for p in pr.delegates} \
+            == {'foo', 'bar', 'baz'}
+
 def node(name, *children):
     assert type(name) in (str, re_matches)
     return name, frozenset(children)

@@ -214,7 +214,7 @@ class Project(models.Model):
                         # temp hack: add a delay between staging repositories
                         # in case there's a race when quickly pushing a repo
                         # then its dependency
-                        time.sleep(20)
+                        # time.sleep(20)
 
                     # creating the staging doesn't trigger a write on the prs
                     # and thus the ->staging taggings, so do that by hand
@@ -284,7 +284,7 @@ class Project(models.Model):
 
     def _find_commands(self, comment):
         return re.findall(
-            '^{}:? (.*)$'.format(self.github_prefix),
+            '^[@|#]?{}:? (.*)$'.format(self.github_prefix),
             comment, re.MULTILINE)
 
     def _has_branch(self, name):
