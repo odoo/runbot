@@ -331,3 +331,19 @@ class Runbot(http.Controller):
             'data': ctx,
         }
         return request.render("runbot.glances", qctx)
+
+    @http.route(['/runbot/branch/<int:branch_id>', '/runbot/branch/<int:branch_id>/page/<int:page>'], website=True, auth='public', type='http')
+    def branch_builds(self, branch_id=None, search='', page=1, limit=50, refresh='', **kwargs):
+        """ list builds of a runbot branch """
+        builds_count = request.env['runbot.build'].search_count([('branch_id','=',branch_id)])
+        pager = request.website.pager(
+            url='/runbot/branch/%s' % branch_id,
+            total=builds_count,
+            page=page,
+            step=50
+        )
+        builds = request.env['runbot.build'].search([('branch_id','=',branch_id)], limit=limit, offset=pager.get('offset',0))
+
+        context = {'pager': pager, 'builds': builds}
+        return request.render("runbot.branch", context)
+

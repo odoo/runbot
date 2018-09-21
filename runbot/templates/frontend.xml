@@ -119,7 +119,7 @@
                           <tr t-foreach="branches" t-as="br">
                               <td>
                                   <i t-if="br['branch'].sticky" class="fa fa-star" style="color: #f0ad4e" />
-                                  <b t-esc="br['branch'].branch_name"/>
+                                  <a t-attf-href="/runbot/branch/#{br['branch'].id}"><b t-esc="br['branch'].branch_name"/></a>
                                   <small><t t-esc="br['builds'] and br['builds'][0]['job_age']"/></small><br/>
                                   <div class="btn-group btn-group-xs">
                                       <a t-attf-href="{{br['branch'].branch_url}}" class="btn btn-default btn-xs">Branch or pull <i class="fa fa-github"/></a>

@@ -22,6 +22,7 @@
         'templates/dashboard.xml',
         'templates/nginx.xml',
         'templates/badge.xml',
+        'templates/branch.xml',
         'data/runbot_cron.xml'
     ],
 }
