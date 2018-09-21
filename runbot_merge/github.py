@@ -124,7 +124,6 @@ class GH(object):
             assert len(c['parents']) == 1, "can't rebase commits with more than one parent"
             tmp_msg = 'temp rebasing PR %s (%s)' % (pr, c['sha'])
             c['new_tree'] = self.merge(c['sha'], dest, tmp_msg)['tree']['sha']
-        self.set_ref(dest, original_head)
 
         prev = original_head
         for c in commits:
