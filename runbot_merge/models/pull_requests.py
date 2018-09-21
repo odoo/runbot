@@ -15,6 +15,9 @@ from odoo.exceptions import ValidationError
 
 from .. import github, exceptions, controllers
 
+STAGING_SLEEP = 20
+"temp hack: add a delay between staging repositories in case there's a race when quickly pushing a repo then its dependency"
+
 _logger = logging.getLogger(__name__)
 class Project(models.Model):
     _name = 'runbot_merge.project'
@@ -211,10 +214,7 @@ class Project(models.Model):
                             heads[r.name]
                         )
                         it['gh'].set_ref('staging.{}'.format(branch.name), heads[r.name])
-                        # temp hack: add a delay between staging repositories
-                        # in case there's a race when quickly pushing a repo
-                        # then its dependency
-                        # time.sleep(20)
+                        time.sleep(STAGING_SLEEP)
 
                     # creating the staging doesn't trigger a write on the prs
                     # and thus the ->staging taggings, so do that by hand

@@ -31,6 +31,8 @@ def registry(request):
             [mod] = env['ir.module.module'].search([('name', '=', 'runbot_merge')])
             mod.button_immediate_install()
 
+        from odoo.addons.runbot_merge.models import pull_requests
+        pull_requests.STAGING_SLEEP = 0
         yield odoo.registry(db)
 
 @pytest.fixture
