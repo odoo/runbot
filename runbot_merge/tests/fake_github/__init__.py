@@ -702,6 +702,7 @@ class Client(werkzeug.test.Client):
                 'action': action,
                 'pull_request': self._pr(pr),
                 'repository': self._repo(pr.repo.name),
+                'sender': {'login': '<>'},
                 **({'changes': changes} if changes else {})
             }
         ))

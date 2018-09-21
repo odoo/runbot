@@ -153,9 +153,9 @@ def handle_pr(env, event):
 
         if pr_obj.state == 'ready':
             pr_obj.staging_id.cancel(
-                "Updated PR %s:%s, removing staging %s",
+                "PR %s:%s updated by %s",
                 pr_obj.repository.name, pr_obj.number,
-                pr_obj.staging_id,
+                event['sender']['login']
             )
         if pr_obj.state != 'error':
             pr_obj.state = 'opened'
@@ -168,9 +168,9 @@ def handle_pr(env, event):
     if event['action'] == 'closed' and pr_obj.state != 'merged':
         pr_obj.state = 'closed'
         pr_obj.staging_id.cancel(
-            "Closed PR %s:%s, removing staging %s",
+            "PR %s:%s closed by %s",
             pr_obj.repository.name, pr_obj.number,
-            pr_obj.staging_id
+            event['sender']['login']
         )
         return 'Closed {}'.format(pr_obj.id)
 

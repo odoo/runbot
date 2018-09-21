@@ -564,7 +564,7 @@ class PullRequests(models.Model):
                     self.priority = param
                     if param == 0:
                         self.target.active_staging_id.cancel(
-                            "P=0 on %s:%s by %s, unstaging %s",
+                            "P=0 on %s:%s by %s, unstaging target %s",
                             self.repository.name, self.number,
                             author.github_login, self.target.name,
                         )
@@ -821,7 +821,7 @@ class Stagings(models.Model):
         if not self:
             return
 
-        _logger.info(reason, *args)
+        _logger.info("Cancelling staging %s: " + reason, self, *args)
         self.batch_ids.write({'active': False})
         self.active = False
 
