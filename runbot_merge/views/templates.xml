@@ -1,9 +1,46 @@
 <odoo>
     <template id="dashboard" name="mergebot dashboard">
+        <t t-set="styles">
+            <style>
+            .stagings {
+                display: flex;
+                align-items: stretch;
+                overflow: hidden;
+            }
+            .stagings > li {
+                /* 4 to 6 stagings displayed, avoid stretching */
+                flex: 1;
+                min-width: 16%;
+                max-width: 25%;
+
+                padding: 0.1em;
+                padding-left: 0.5em;
+            }
+            .stagings > li:not(:last-child) {
+                border-right: 1px solid lightgray;
+            }
+            .batch:not(:last-child) {
+                border-bottom: 1px solid lightgray;
+            }
+            .batch a:not(:last-of-type) a:after {
+                content: ",";
+            }
+            </style>
+        </t>
         <t t-call="website.layout">
-            <div id="wrap"><div class="container">
-                <section t-foreach="projects" t-as="project" class="row">
+            <t t-set="head" t-value="(head or '') + styles"/>
+            <div id="wrap"><div class="container-fluid">
+                <section t-foreach="projects.with_context(active_test=False)" t-as="project" class="row">
                     <h1 class="col-md-12"><t t-esc="project.name"/></h1>
+                    <div class="col-md-12">
+                        key:
+                        <ul class="list-inline">
+                            <li class="bg-success">success (hopefully merged)</li>
+                            <li class="bg-info">ongoing</li>
+                            <li class="bg-danger">failure</li>
+                            <li class="bg-gray-lighter">cancelled</li>
+                        </ul>
+                    </div>
                     <section t-foreach="project.branch_ids" t-as="branch" class="col-md-12">
                         <h2><t t-esc="branch.name"/></h2>
                         <t t-call="runbot_merge.stagings"/>
@@ -13,24 +50,32 @@
         </t>
     </template>
     <template id="stagings" name="mergebot branch stagings">
-        <ul class="row list-unstyled">
-            <li t-foreach="branch.staging_ids.sorted(lambda s: not s.heads)"
-                t-as="staging"
-                t-attf-class="col-md-3 {{'bg-info' if staging.heads else ''}}">
-                <ul class="list-unstyled">
-                    <li t-foreach="staging.batch_ids" t-as="batch">
-                        <t t-esc="batch.prs[:1].label"/>
-                        <t t-foreach="batch.prs" t-as="pr">
-                            <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
-                               t-att-title="pr.message.split('\n')[0]"
-                            ><t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/></a><t t-if="not pr_last">,</t>
-                        </t>
-                    </li>
-                </ul>
-                <t t-if="staging.heads">
-                    Staged at: <t t-esc="staging.staged_at" t-options="{'widget': 'datetime'}"/>
+        <ul class="list-unstyled stagings">
+            <t t-foreach="branch.staging_ids.sorted(lambda s: s.staged_at, reverse=True)[:6]" t-as="staging">
+                <t t-set="stateclass">
+                    <t t-if="staging.state == 'success'">bg-success</t>
+                    <t t-if="staging.state == 'failure'">bg-danger</t>
+                    <t t-if="staging.state == 'pending' and staging.active">bg-info</t>
+                    <t t-if="staging.state == 'pending' and not staging.active">bg-gray-lighter</t>
                 </t>
-            </li>
+                <t t-set="decorationclass">
+                    <t t-if="staging_index >= 4">visible-lg-block</t>
+                </t>
+                <li t-attf-class="{{stateclass}} {{decorationclass}}">
+                    <ul class="list-unstyled">
+                        <li t-foreach="staging.batch_ids" t-as="batch" class="batch">
+                            <t t-esc="batch.prs[:1].label"/>
+                            <t t-foreach="batch.prs" t-as="pr">
+                                <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
+                                   t-att-title="pr.message.split('\n')[0]"><t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/></a>
+                            </t>
+                        </li>
+                    </ul>
+                    <t t-if="staging.heads">
+                        Staged <span t-field="staging.staged_at" t-options="{'widget': 'relative'}"/>
+                    </t>
+                </li>
+            </t>
         </ul>
     </template>
 </odoo>
