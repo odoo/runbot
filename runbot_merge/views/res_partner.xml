@@ -5,7 +5,7 @@
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
             <xpath expr="//notebook" position="inside">
-                <page string="Mergebot">
+                <page string="Mergebot" groups="runbot_merge.group_admin">
                     <group>
                         <group>
                             <field name="github_login"/>
