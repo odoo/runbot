@@ -747,8 +747,7 @@ class Client(werkzeug.test.Client):
             'action': 'created',
             'issue': { 'number': issue.number },
             'repository': self._repo(issue.repo.name),
-            'sender': { 'login': user },
-            'comment': { 'body': body },
+            'comment': { 'body': body, 'user': {'login': user } },
         }
         if isinstance(issue, PR):
             contents['issue']['pull_request'] = { 'url': 'fake' }

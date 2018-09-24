@@ -215,7 +215,7 @@ def handle_comment(env, event):
 
     repo = event['repository']['full_name']
     issue = event['issue']['number']
-    author = event['sender']['login']
+    author = event['comment']['user']['login']
     comment = event['comment']['body']
     _logger.info('comment: %s %s:%s "%s"', author, repo, issue, comment)
 
