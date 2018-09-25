@@ -7,6 +7,7 @@ from odoo import http
 from odoo.addons.http_routing.models.ir_http import slug
 from odoo.addons.website.controllers.main import QueryURL
 from odoo.http import request
+from odoo.osv import expression
 from ..common import uniq_list, flatten, s2human
 
 
@@ -333,17 +334,26 @@ class Runbot(http.Controller):
         return request.render("runbot.glances", qctx)
 
     @http.route(['/runbot/branch/<int:branch_id>', '/runbot/branch/<int:branch_id>/page/<int:page>'], website=True, auth='public', type='http')
-    def branch_builds(self, branch_id=None, search='', page=1, limit=50, refresh='', **kwargs):
+    def branch_builds(self, branch_id=None, search='', sorting='sequence', sortdir='desc', page=1, limit=50, refresh='', **kwargs):
         """ list builds of a runbot branch """
-        builds_count = request.env['runbot.build'].search_count([('branch_id','=',branch_id)])
+        limit = limit if limit <= 200 else 200
+        sortable_fields = ('sequence', 'date', 'dest', 'host', 'coverage_result')
+        domain = [('branch_id', '=', branch_id)]
+        if search:
+            searchable_domains = [[(x, 'ilike', search)] for x in ('name', 'host', 'dest', 'author', 'author_email', 'committer', 'committer_email', 'subject')]
+            domain += expression.OR(searchable_domains)
+        builds_count = request.env['runbot.build'].search_count(domain)
         pager = request.website.pager(
             url='/runbot/branch/%s' % branch_id,
+            url_args={'search': search, 'sorting': sorting, 'sortdir': sortdir},
             total=builds_count,
             page=page,
-            step=50
+            step=limit
         )
-        builds = request.env['runbot.build'].search([('branch_id','=',branch_id)], limit=limit, offset=pager.get('offset',0))
-
-        context = {'pager': pager, 'builds': builds}
+        order = None
+        if sorting in sortable_fields:
+            order = '%s %s' % (sorting, sortdir) if sortdir else sorting
+        builds = request.env['runbot.build'].search(domain, limit=limit, offset=pager.get('offset', 0), order=order)
+        context = {'pager': pager, 'builds': builds, 'sortdir': sortdir, 'argskeep' : {'sorting' : sorting, 'sortdir': sortdir, 'search': search}, 'search': search}
         return request.render("runbot.branch", context)
 

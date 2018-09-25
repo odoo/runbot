@@ -3,52 +3,79 @@
   <data>
     <template id="runbot.branch">
         <t t-call='website.layout'>
-          <div class="container-fluid">
-              <div class="row">
-                  <div class='col-md-12'>
-                        <div class="navbar navbar-default">
-                            <span class="text-center" style="font-size: 18px;">Builds for branch: <t t-esc="builds[0].branch_id.name.split('/')[-1]" /></span>
-                            <span class="pull-right"><t t-call="website.pager" /></span>
+            <div class="container-fluid">
+                <t t-if="builds">
+                    <div class="row">
+                        <div class='col-md-12'>
+                            <div class="container" style="width: 100%;">
+                                <div class="navbar navbar-default">
+                                    <div class="col-md-4">
+                                        <span class="text-center" style="font-size: 18px;">Builds for branch: <t t-esc="builds[0].repo_id.base" />/<t t-esc="builds[0].branch_id.name.split('/')[-1]" /></span>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <form method="get">
+                                            <t t-call="website.website_search_box">
+                                                <t t-set="search" t-value="search" />
+                                            </t>
+                                        </form>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <span class="pull-right"><t t-call="website.pager" /></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <table class="table table-condensed table-stripped" style="table-layout: initial;">
+                                <thead>
+                                    <tr>
+                                        <th><a t-attf-href="?sorting=sequence&amp;sortdir={{ 'desc' if sortdir == '' else '' }}&amp;search={{ search if search else '' }}">Seq</a></th>
+                                        <th><a t-attf-href="?sorting=date&amp;sortdir={{ 'desc' if sortdir == '' else '' }}&amp;search={{ search if search else '' }}">Date</a></th>
+                                        <th><a t-attf-href="?sorting=dest&amp;sortdir={{ 'desc' if sortdir == '' else '' }}&amp;search={{ search if search else '' }}">Dest</a></th>
+                                        <th>Subject</th>
+                                        <th>Author</th>
+                                        <th>Revno</th>
+                                        <th>Result</th>
+                                        <th>State</th>
+                                        <th><a t-attf-href="?sorting=host&amp;sortdir={{ 'desc' if sortdir == '' else '' }}&amp;search={{ search if search else '' }}">Host</a></th>
+                                        <th><a t-attf-href="?sorting=coverage-result&amp;sortdir={{ 'desc' if sortdir == '' else '' }}&amp;search={{ search if search else '' }}">Coverage</a></th>
+                                        <th>Duration</th>
+                                        <th>Type</th>
+                                    </tr>
+                                </thead>
+                                <t t-foreach="builds" t-as="build">
+                                    <t t-set="rowclass">default</t>
+                                    <t t-if="build['state'] in ['running','done'] and build['result'] == 'ko'"><t t-set="rowclass">danger</t></t>
+                                    <t t-if="build['state'] in ['running','done'] and build['result'] == 'warn'"><t t-set="rowclass">warning</t></t>
+                                    <t t-if="build['state'] in ['running','done'] and build['result'] == 'ok'"><t t-set="rowclass">success</t></t>
+                                    <t t-if="build['state'] in ['running','done'] and build['result'] == 'skipped'"><t t-set="rowclass">default</t></t>
+                                    <t t-if="build['state'] in ['running','done'] and build['result'] in ['killed', 'manually_killed']"><t t-set="rowclass">killed</t></t>
+                                    <tr t-attf-class="{{rowclass}}">
+                                        <td><t t-esc="build.sequence" /></td>
+                                        <td><t t-esc="build.date" /></td>
+                                        <td><a t-attf-href="/runbot/build/{{build['id']}}" title="Build details" aria-label="Build details"><t t-esc="build.dest" /></a></td>
+                                        <td><t t-esc="build.subject[:45] + ('...' if build['subject'][45:] else '')" t-att-title="build['subject']"/></td>
+                                        <td><t t-esc="build.author" />
+                                            <t t-if="build['committer'] and build['author'] != build['committer']" t-id="build['committer']">
+                                                (<span class="octicon octicon-arrow-right"></span>&amp;nbsp;<t t-esc="build['committer']"/>)
+                                            </t>
+                                        </td>
+                                        <td><t t-esc="build.name" /></td>
+                                        <td><t t-esc="build.result" /></td>
+                                        <td><t t-esc="build.state" /></td>
+                                        <td><t t-esc="build.host" /></td>
+                                        <td><t t-esc="build.coverage_result" /></td>
+                                        <td><t t-esc="build.job_time" /></td>
+                                        <td><t t-esc="build.build_type" /></td>
+                                    </tr>
+                                </t>
+                            </table>
                         </div>
-                    <table class="table table-condensed table-stripped" style="table-layout: initial;">
-                        <thead>
-                            <tr>
-                                <th>Seq</th>
-                                <th>Date</th>
-                                <th>Dest</th>
-                                <th>Subject</th>
-                                <th>Revno</th>
-                                <th>result</th>
-                                <th>state</th>
-                                <th>host</th>
-                                <th>job</th>
-                                <th>duration</th>
-                                <th>type</th>
-                            </tr>
-                        </thead>
-                        <t t-foreach="builds" t-as="build">
-                            <t t-if="build['state'] in ['running','done'] and build['result'] == 'ko'"><t t-set="rowclass">danger</t></t>
-                            <t t-if="build['state'] in ['running','done'] and build['result'] == 'warn'"><t t-set="rowclass">warning</t></t>
-                            <t t-if="build['state'] in ['running','done'] and build['result'] == 'ok'"><t t-set="rowclass">success</t></t>
-                            <t t-if="build['state'] in ['running','done'] and build['result'] == 'skipped'"><t t-set="rowclass">default</t></t>
-                            <t t-if="build['state'] in ['running','done'] and build['result'] in ['killed', 'manually_killed']"><t t-set="rowclass">killed</t></t>
-                            <tr t-attf-class="{{rowclass}}">
-                                <td><t t-esc="build.sequence" /></td>
-                                <td><t t-esc="build.date" /></td>
-                                <td><a t-attf-href="/runbot/build/{{build['id']}}" title="Build details" aria-label="Build details"><t t-esc="build.dest" /></a></td>
-                                <td><t t-esc="build.subject" /></td>
-                                <td><t t-esc="build.name" /></td>
-                                <td><t t-esc="build.result" /></td>
-                                <td><t t-esc="build.state" /></td>
-                                <td><t t-esc="build.host" /></td>
-                                <td><t t-esc="build.job" /></td>
-                                <td><t t-esc="build.job_time" /></td>
-                                <td><t t-esc="build.build_type" /></td>
-                            </tr>
-                        </t>
-                    </table>
-                  </div>
-              </div>
+                    </div>
+                </t>
+                <t t-if="not builds">
+                    <div class="text-center">
+                        <h3>No builds found</h3>
+                    </div>
+                </t>
           </div>
         </t>
     </template>
