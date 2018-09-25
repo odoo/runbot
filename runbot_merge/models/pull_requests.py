@@ -469,7 +469,10 @@ class PullRequests(models.Model):
             if flag == '+':
                 return ('delegate', True)
             elif param:
-                return ('delegate', param.split(','))
+                return ('delegate', [
+                    p.lstrip('#@')
+                    for p in param.split(',')
+                ])
         elif name in ('p', 'priority'):
             if param in ('0', '1', '2'):
                 return ('priority', int(param))

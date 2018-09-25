@@ -1674,6 +1674,22 @@ class TestReviewing(object):
             ('number', '=', prx.number)
         ]).state == 'ready'
 
+    def test_delegate_prefixes(self, env, repo):
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        repo.make_ref('heads/master', m)
+
+        c = repo.make_commit(m, 'first', None, tree={'m': 'c'})
+        prx = repo.make_pr('title', None, target='master', ctid=c, user='user')
+        prx.post_comment('hansen delegate=foo,@bar,#baz', user='reviewer')
+
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number)
+        ])
+
+        assert {d.github_login for d in pr.delegates} == {'foo', 'bar', 'baz'}
+
+
     def test_actual_review(self, env, repo):
         """ treat github reviews as regular comments
         """
