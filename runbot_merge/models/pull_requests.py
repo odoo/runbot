@@ -535,16 +535,20 @@ class PullRequests(models.Model):
                     self.state = 'ready'
             elif command == 'review':
                 if param and is_reviewer:
-                    if self.state == 'opened':
+                    newstate = RPLUS.get(self.state)
+                    if newstate:
+                        self.state = newstate
                         ok = True
-                        self.state = 'approved'
-                    elif self.state == 'validated':
+                elif not param and is_author:
+                    newstate = RMINUS.get(self.state)
+                    if newstate:
+                        self.state = newstate
+                        if self.staging_id:
+                            self.staging_id.cancel(
+                                "unreview (r-) by %s",
+                                author.github_login
+                            )
                         ok = True
-                        self.state = 'ready'
-                elif not param and is_author and self.state == 'error':
-                    # TODO: r- on something which isn't in error?
-                    ok = True
-                    self.state = 'validated'
             elif command == 'delegate':
                 if is_reviewer:
                     ok = True
@@ -665,6 +669,16 @@ class PullRequests(models.Model):
             })
         return super().unlink()
 
+# state changes on reviews
+RPLUS = {
+    'opened': 'approved',
+    'validated': 'ready',
+}
+RMINUS = {
+    'approved': 'opened',
+    'ready': 'validated',
+    'error': 'validated',
+}
 
 _TAGS = {
     False: set(),

@@ -1758,6 +1758,116 @@ class TestUnknownPR:
         env['runbot_merge.project']._check_progress()
         assert pr.staging_id
 
+class TestRMinus:
+    def test_rminus_approved(self, repo, env):
+        """ approved -> r- -> opened
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        repo.make_ref('heads/master', m)
+
+        c = repo.make_commit(m, 'first', None, tree={'m': 'c'})
+        prx = repo.make_pr('title', None, target='master', ctid=c, user='user')
+
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number),
+        ])
+        assert pr.state == 'opened'
+
+        prx.post_comment('hansen r+', 'reviewer')
+        assert pr.state == 'approved'
+
+        prx.post_comment('hansen r-', 'user')
+        assert pr.state == 'opened'
+        prx.post_comment('hansen r+', 'reviewer')
+        assert pr.state == 'approved'
+
+        prx.post_comment('hansen r-', 'other')
+        assert pr.state == 'approved'
+
+        prx.post_comment('hansen r-', 'reviewer')
+        assert pr.state == 'opened'
+
+    def test_rminus_ready(self, repo, env):
+        """ ready -> r- -> validated
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        repo.make_ref('heads/master', m)
+
+        c = repo.make_commit(m, 'first', None, tree={'m': 'c'})
+        prx = repo.make_pr('title', None, target='master', ctid=c, user='user')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+        repo.post_status(prx.head, 'success', 'legal/cla')
+
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number),
+        ])
+        assert pr.state == 'validated'
+
+        prx.post_comment('hansen r+', 'reviewer')
+        assert pr.state == 'ready'
+
+        prx.post_comment('hansen r-', 'user')
+        assert pr.state == 'validated'
+        prx.post_comment('hansen r+', 'reviewer')
+        assert pr.state == 'ready'
+
+        prx.post_comment('hansen r-', 'other')
+        assert pr.state == 'ready'
+
+        prx.post_comment('hansen r-', 'reviewer')
+        assert pr.state == 'validated'
+
+    def test_rminus_staged(self, repo, env):
+        """ staged -> r- -> validated
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        repo.make_ref('heads/master', m)
+
+        c = repo.make_commit(m, 'first', None, tree={'m': 'c'})
+        prx = repo.make_pr('title', None, target='master', ctid=c, user='user')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+        repo.post_status(prx.head, 'success', 'legal/cla')
+
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number),
+        ])
+
+        # if reviewer unreviews, cancel staging & unreview
+        prx.post_comment('hansen r+', 'reviewer')
+        env['runbot_merge.project']._check_progress()
+        st = pr.staging_id
+        assert st
+
+        prx.post_comment('hansen r-', 'reviewer')
+        assert not st.active
+        assert not pr.staging_id
+        assert pr.state == 'validated'
+
+        # if author unreviews, cancel staging & unreview
+        prx.post_comment('hansen r+', 'reviewer')
+        env['runbot_merge.project']._check_progress()
+        st = pr.staging_id
+        assert st
+
+        prx.post_comment('hansen r-', 'user')
+        assert not st.active
+        assert not pr.staging_id
+        assert pr.state == 'validated'
+
+        # if rando unreviews, ignore
+        prx.post_comment('hansen r+', 'reviewer')
+        env['runbot_merge.project']._check_progress()
+        st = pr.staging_id
+        assert st
+
+        prx.post_comment('hansen r-', 'other')
+        assert pr.staging_id == st
+        assert pr.state == 'ready'
+
+
 class TestComments:
     def test_address_method(self, repo, env):
         m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
