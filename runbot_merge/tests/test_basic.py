@@ -1675,6 +1675,8 @@ class TestReviewing(object):
         ]).state == 'ready'
 
     def test_actual_review(self, env, repo):
+        """ treat github reviews as regular comments
+        """
         m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
         m2 = repo.make_commit(m, 'second', None, tree={'m': 'm', 'm2': 'm2'})
         repo.make_ref('heads/master', m2)
@@ -1692,6 +1694,15 @@ class TestReviewing(object):
 
         prx.post_review('APPROVE', 'reviewer', "hansen priority=2")
         assert pr.priority == 2
+        assert pr.state == 'opened'
+
+        prx.post_review('REQUEST_CHANGES', 'reviewer', 'hansen priority=1')
+        assert pr.priority == 1
+        assert pr.state == 'opened'
+
+
+        prx.post_review('COMMENT', 'reviewer', 'hansen r+')
+        assert pr.priority == 1
         assert pr.state == 'approved'
 
 class TestUnknownPR:

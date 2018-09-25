@@ -235,28 +235,27 @@ def handle_comment(env, event):
     return pr._parse_commands(partner, comment)
 
 def handle_review(env, event):
-    partner = env['res.partner'].search([('github_login', '=', event['review']['user']['login'])])
+    repo = event['repository']['full_name']
+    comment = event['review']['body'] or ''
+    author = event['review']['user']['login']
+
+    partner = env['res.partner'].search([('github_login', '=', author)])
     if not partner:
-        _logger.info('ignoring comment from %s: not in system', event['review']['user']['login'])
+        _logger.info('ignoring comment from %s: not in system', author)
         return 'ignored'
 
+    repository = env['runbot_merge.repository'].search([('name', '=', repo)])
+    if not repository.project_id._find_commands(comment):
+        return "No commands, ignoring"
+
     pr = env['runbot_merge.pull_requests']._get_or_schedule(
-        event['repository']['full_name'],
-        event['pull_request']['number'],
+        repo, event['pull_request']['number'],
         event['pull_request']['base']['ref']
     )
     if not pr:
         return "Unknown PR, scheduling fetch"
 
-    firstline = ''
-    state = event['review']['state'].lower()
-    if state == 'approved':
-        firstline = pr.repository.project_id.github_prefix + ' r+'
-    elif state == 'request_changes':
-        firstline = pr.repository.project_id.github_prefix + ' r-'
-
-    body = event['review']['body']
-    return pr._parse_commands(partner, firstline + (('\n' + body) if body else ''))
+    return pr._parse_commands(partner, comment)
 
 def handle_ping(env, event):
     print("Got ping! {}".format(event['zen']))
