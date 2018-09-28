@@ -93,7 +93,7 @@ class Project(models.Model):
                                 staging_heads.get(repo_name + '^') or head
                             )
                             updated.append(repo_name)
-                    except exceptions.FastForwardError:
+                    except exceptions.FastForwardError as e:
                         logger.warning(
                             "Could not fast-forward successful staging on %s:%s, reverting updated repos %s and re-staging",
                             repo_name, staging.target.name,
@@ -102,6 +102,10 @@ class Project(models.Model):
                         )
                         for name in reversed(updated):
                             gh[name].set_ref(staging.target.name, old_heads[name])
+                        staging.write({
+                            'state': 'ff_failed',
+                            'reason': str(e.__cause__ or e.__context__ or '')
+                        })
                     else:
                         prs = staging.mapped('batch_ids.prs')
                         logger.info(
@@ -794,11 +798,13 @@ class Stagings(models.Model):
         ('success', 'Success'),
         ('failure', 'Failure'),
         ('pending', 'Pending'),
+        ('cancelled', "Cancelled"),
+        ('ff_failed', "Fast forward failed")
     ])
     active = fields.Boolean(default=True)
 
     staged_at = fields.Datetime(default=fields.Datetime.now)
-    restaged = fields.Integer(default=0)
+    reason = fields.Text("Reason for final state (if any)")
 
     # seems simpler than adding yet another indirection through a model
     heads = fields.Char(required=True, help="JSON-encoded map of heads, one per repo in the project")
@@ -806,6 +812,9 @@ class Stagings(models.Model):
     def _validate(self):
         Commits = self.env['runbot_merge.commit']
         for s in self:
+            if s.state in ('cancelled', 'ff_failed'):
+                continue
+
             heads = [
                 head for repo, head in json.loads(s.heads).items()
                 if not repo.endswith('^')
@@ -840,7 +849,11 @@ class Stagings(models.Model):
 
         _logger.info("Cancelling staging %s: " + reason, self, *args)
         self.batch_ids.write({'active': False})
-        self.active = False
+        self.write({
+            'active': False,
+            'state': 'cancelled',
+            'reason': reason,
+        })
 
     def fail(self, message, prs=None):
         _logger.error("Staging %s failed: %s", self, message)
@@ -851,7 +864,11 @@ class Stagings(models.Model):
                 pr.number, "Staging failed: %s" % message)
 
         self.batch_ids.write({'active': False})
-        self.active = False
+        self.write({
+            'active': False,
+            'state': 'failure',
+            'reason': message,
+        })
 
     def try_splitting(self):
         batches = len(self.batch_ids)
@@ -870,7 +887,11 @@ class Stagings(models.Model):
             _logger.info("Split %s to %s (%s) and %s (%s)",
                          self, h, sh, t, st)
             self.batch_ids.write({'active': False})
-            self.active = False
+            self.write({
+                'active': False,
+                'state': 'failure',
+                'reason': self.reason if self.state == 'failure' else 'timed out'
+            })
             return True
 
         # single batch => the staging is an unredeemable failure
