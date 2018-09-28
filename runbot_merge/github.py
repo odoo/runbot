@@ -1,6 +1,6 @@
 import collections
-import functools
 import itertools
+import json as json_
 import logging
 
 import requests
@@ -30,6 +30,15 @@ class GH(object):
                 exc = check.get(r.status_code)
                 if exc:
                     raise exc(r.content)
+            if r.status_code == 422:
+                # dump & format body if it's a 422 as GH's HTTP Reason is
+                # completely useless (only states
+                # "Unprocessable Entity for URL: <endpoint>" which is not
+                # exactly great for debugging what went wrong
+                raise requests.HTTPError(
+                    json_.dumps(r.json(), indent=4),
+                    response=r
+                )
             r.raise_for_status()
         return r
 
