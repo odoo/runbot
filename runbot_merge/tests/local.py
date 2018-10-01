@@ -17,6 +17,7 @@ def registry(request):
     odoo.tools.config.parse_config(['--addons-path', addons, '-d', db, '--db-filter', db])
     try:
         odoo.service.db._create_empty_database(db)
+        odoo.service.db._initialize_db(None, db, False, False, 'admin')
     except odoo.service.db.DatabaseExists:
         pass
 

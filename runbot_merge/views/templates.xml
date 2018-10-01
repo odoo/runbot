@@ -52,16 +52,23 @@
     <template id="stagings" name="mergebot branch stagings">
         <ul class="list-unstyled stagings">
             <t t-foreach="branch.staging_ids.sorted(lambda s: s.staged_at, reverse=True)[:6]" t-as="staging">
+                <t t-set="success" t-value="staging.state == 'success'"/>
+                <t t-set="failure" t-value="staging.state == 'failure'"/>
+                <t t-set="pending" t-value="staging.state == 'pending' and staging.active"/>
                 <t t-set="stateclass">
-                    <t t-if="staging.state == 'success'">bg-success</t>
-                    <t t-if="staging.state == 'failure'">bg-danger</t>
-                    <t t-if="staging.state == 'pending' and staging.active">bg-info</t>
-                    <t t-if="staging.state == 'pending' and not staging.active">bg-gray-lighter</t>
+                    <t t-if="success">bg-success</t>
+                    <t t-if="failure">bg-danger</t>
+                    <t t-if="pending">bg-info</t>
+                    <t t-if="not (success or failure or pending)">bg-gray-lighter</t>
                 </t>
                 <t t-set="decorationclass">
                     <t t-if="staging_index >= 4">visible-lg-block</t>
                 </t>
-                <li t-attf-class="{{stateclass}} {{decorationclass}}">
+                <t t-set="title">
+                    <t t-if="staging.state == 'canceled'">Cancelled: <t t-esc="staging.reason"/></t>
+                    <t t-if="staging.state == 'ff_failed'">Fast Forward Failed</t>
+                </t>
+                <li t-attf-class="{{stateclass}} {{decorationclass}}" t-att-title="title">
                     <ul class="list-unstyled">
                         <li t-foreach="staging.batch_ids" t-as="batch" class="batch">
                             <t t-esc="batch.prs[:1].label"/>
