@@ -852,7 +852,7 @@ class Stagings(models.Model):
         self.write({
             'active': False,
             'state': 'cancelled',
-            'reason': reason,
+            'reason': reason % args,
         })
 
     def fail(self, message, prs=None):
