@@ -166,12 +166,18 @@ def handle_pr(env, event):
 
     # don't marked merged PRs as closed (!!!)
     if event['action'] == 'closed' and pr_obj.state != 'merged':
-        pr_obj.state = 'closed'
-        pr_obj.staging_id.cancel(
-            "PR %s:%s closed by %s",
-            pr_obj.repository.name, pr_obj.number,
-            event['sender']['login']
-        )
+        env.cr.execute('''
+        UPDATE runbot_merge_pull_requests
+        SET state = 'closed'
+        WHERE id = %s AND state != 'merged'
+        ''', [pr_obj.id])
+        env.cr.commit()
+        if env.cr.rowcount:
+            pr_obj.staging_id.cancel(
+                "PR %s:%s closed by %s",
+                pr_obj.repository.name, pr_obj.number,
+                event['sender']['login']
+            )
         return 'Closed {}'.format(pr_obj.id)
 
     if event['action'] == 'reopened' and pr_obj.state == 'closed':
