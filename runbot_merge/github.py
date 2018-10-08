@@ -114,7 +114,10 @@ class GH(object):
             'head': sha,
             'commit_message': message,
         }, check={409: exceptions.MergeError})
-        r = r.json()
+        try:
+            r = r.json()
+        except Exception:
+            raise exceptions.MergeError("Got non-JSON reponse from github: %s %s (%s)" % (r.status_code, r.reason, r.content.decode('iso-8859-1')))
         _logger.debug("merge(%s, %s, %s) -> %s", self._repo, dest, shorten(message), r['sha'])
         return dict(r['commit'], sha=r['sha'])
 
