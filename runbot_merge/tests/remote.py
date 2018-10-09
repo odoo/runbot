@@ -453,7 +453,6 @@ class Repo:
 
     def make_commit(self, ref, message, author, committer=None, tree=None, wait=True):
         assert tree, "not supporting changes/updates"
-        assert not (author or committer)
 
         if not ref: # None / []
             # apparently github refuses to create trees/commits in empty repos
@@ -483,12 +482,17 @@ class Repo:
         assert 200 <= r.status_code < 300, r.json()
         h = r.json()['sha']
 
-        r = self._session.post('https://api.github.com/repos/{}/git/commits'.format(self.name), json={
+        data = {
             'parents': parents,
             'message': message,
             'tree': h,
+        }
+        if author:
+            data['author'] = author
+        if committer:
+            data['committer'] = committer
 
-        })
+        r = self._session.post('https://api.github.com/repos/{}/git/commits'.format(self.name), json=data)
         assert 200 <= r.status_code < 300, r.json()
 
         commit_sha = r.json()['sha']

@@ -2,6 +2,7 @@ import datetime
 import json
 import re
 import time
+import requests
 
 import pytest
 
@@ -818,8 +819,14 @@ class TestMergeMethod:
         m2 = repo.make_commit(m1, 'M2', None, tree={'m': '2'})
         repo.make_ref('heads/master', m2)
 
-        b0 = repo.make_commit(m1, 'B0', None, tree={'m': '1', 'b': '0'})
-        b1 = repo.make_commit(b0, 'B1', None, tree={'m': '1', 'b': '1'})
+        # test commit ordering issue while at it: github sorts commits on
+        # author.date instead of doing so topologically which is absolutely
+        # not what we want
+        committer = {'name': 'a', 'email': 'a', 'date': '2018-10-08T11:48:43Z'}
+        author0 = {'name': 'a', 'email': 'a', 'date': '2018-10-01T14:58:38Z'}
+        author1 = {'name': 'a', 'email': 'a', 'date': '2015-10-01T14:58:38Z'}
+        b0 = repo.make_commit(m1, 'B0', author=author0, committer=committer, tree={'m': '1', 'b': '0'})
+        b1 = repo.make_commit(b0, 'B1', author=author1, committer=committer, tree={'m': '1', 'b': '1'})
         prx = repo.make_pr('title', 'body', target='master', ctid=b1, user='user')
         repo.post_status(prx.head, 'success', 'legal/cla')
         repo.post_status(prx.head, 'success', 'ci/runbot')

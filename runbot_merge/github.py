@@ -5,6 +5,7 @@ import logging
 
 import requests
 
+from odoo.tools import topological_sort
 from . import exceptions
 
 _logger = logging.getLogger(__name__)
@@ -191,7 +192,16 @@ class GH(object):
         """ Returns a PR's commits oldest first (that's what GH does &
         is what we want)
         """
-        return list(self.commits_lazy(pr))
+        commits = list(self.commits_lazy(pr))
+        # map shas to the position the commit *should* have
+        idx =  {
+            c: i
+            for i, c in enumerate(topological_sort({
+                c['sha']: [p['sha'] for p in c['parents']]
+                for c in commits
+            }))
+        }
+        return sorted(commits, key=lambda c: idx[c['sha']])
 
     def statuses(self, h):
         r = self('get', 'commits/{}/status'.format(h)).json()

@@ -1,4 +1,5 @@
 import collections
+import datetime
 import hashlib
 import hmac
 import io
@@ -266,35 +267,29 @@ class Repo(object):
 
     def _create_commit(self, r):
         body = json.loads(r.body)
-        author = body.get('author') or {'name': 'default', 'email': 'default', 'date': 'Z'}
+        author = body.get('author')
         try:
             sha = self.make_commit(
-                ref=(body.get('parents')),
+                ref=body.get('parents'),
                 message=body['message'],
                 author=author,
-                committer=body.get('committer') or author,
+                committer=body.get('committer'),
                 tree=body['tree']
             )
         except (KeyError, AssertionError):
             # either couldn't find the parent or couldn't find the tree
             return (404, None)
 
-        return (201, {
-            "sha": sha,
-            "author": author,
-            "committer": body.get('committer') or author,
-            "message": body['message'],
-            "tree": {"sha": body['tree']},
-            "parents": [{"sha": sha}],
-        })
+        return (201, self._read_commit(r, sha)[1])
+
     def _read_commit(self, _, sha):
         c = self.objects.get(sha)
         if not isinstance(c, Commit):
             return (404, None)
         return (200, {
             "sha": sha,
-            "author": c.author,
-            "committer": c.committer,
+            "author": c.author.to_json(),
+            "committer": c.committer.to_json(),
             "message": c.message,
             "tree": {"sha": c.tree},
             "parents": [{"sha": p} for p in c.parents],
@@ -437,7 +432,13 @@ class Repo(object):
             nextlink = url.replace(query=url_encode(dict(qs, page=page+1)))
             headers['Link'] = '<%s>; rel="next"' % str(nextlink)
 
-        commits = [c.to_json() for c in pr.commits[offset:limit]]
+        commits = [
+            c.to_json()
+            for c in sorted(
+                pr.commits,
+                key=lambda c: (c.author.date, c.committer.date)
+            )[offset:limit]
+        ]
         body = io.BytesIO(json.dumps(commits).encode('utf-8'))
 
         return responses.HTTPResponse(
@@ -627,13 +628,42 @@ class PR(Issue):
         self.comments.append((user, "REVIEW %s\n\n%s " % (state, body)))
         self.repo.notify('pull_request_review', state, self, user, body)
 
+FMT = '%Y-%m-%dT%H:%M:%SZ'
+class Author(object):
+    __slots__ = ['name', 'email', 'date']
+
+    def __init__(self, name, email, date):
+        self.name = name
+        self.email = email
+        self.date = date or datetime.datetime.now().strftime(FMT)
+
+    @classmethod
+    def from_(cls, d):
+        if not d:
+            return None
+        return Author(**d)
+
+    def to_json(self):
+        return {
+            'name': self.name,
+            'email': self.email,
+            'date': self.date,
+        }
+
+    def __str__(self):
+        return '%s <%s> %d Z' % (
+            self.name,
+            self.email,
+            int(datetime.datetime.strptime(self.date, FMT).timestamp())
+        )
+
 class Commit(object):
     __slots__ = ['tree', 'message', 'author', 'committer', 'parents', 'statuses']
     def __init__(self, tree, message, author, committer, parents):
         self.tree = tree
         self.message = message
-        self.author = author
-        self.committer = committer or author
+        self.author = Author.from_(author) or Author('', '', '')
+        self.committer = Author.from_(committer) or self.author
         self.parents = parents
         self.statuses = []
 
@@ -645,8 +675,8 @@ class Commit(object):
         return {
             "sha": self.id,
             "commit": {
-                "author": self.author,
-                "committer": self.committer,
+                "author": self.author.to_json(),
+                "committer": self.committer.to_json(),
                 "message": self.message,
                 "tree": {"sha": self.tree},
             },
