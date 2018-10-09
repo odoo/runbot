@@ -15,6 +15,7 @@
                 <field name="branch_url"/>
                 <field name="pull_head_name"/>
                 <field name="sticky"/>
+                <field name="priority"/>
                 <field name="coverage"/>
                 <field name="state"/>
                 <field name="modules"/>
@@ -37,6 +38,7 @@
                 <field name="repo_id"/>
                 <field name="name"/>
                 <field name="sticky"/>
+                <field name="priority"/>
                 <field name="coverage"/>
                 <field name="state"/>
             </tree>
