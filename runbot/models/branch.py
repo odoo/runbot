@@ -25,7 +25,7 @@ class runbot_branch(models.Model):
     state = fields.Char('Status')
     modules = fields.Char("Modules to Install", help="Comma-separated list of modules to install and test.")
     job_timeout = fields.Integer('Job Timeout (minutes)', help='For default timeout: Mark it zero')
-    # test_tags = fields.Char("Test tags", help="Tags for the --test-tags params (same syntax)")  # keep for next version
+    priority = fields.Boolean('Build priority', default=False)
 
     @api.depends('name')
     def _get_branch_name(self):

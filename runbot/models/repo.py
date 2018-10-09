@@ -261,9 +261,9 @@ class runbot_repo(models.Model):
 
         while testing < workers and pending > 0:
 
-            # find sticky pending build if any, otherwise, last pending (by id, not by sequence) will do the job
+            # find sticky / priority pending build if any, otherwise, last pending (by id, not by sequence) will do the job
 
-            pending_ids = Build.search(domain + [('state', '=', 'pending'), ('branch_id.sticky', '=', True)], limit=1)
+            pending_ids = Build.search(domain + [('state', '=', 'pending'), '|', ('branch_id.sticky', '=', True), ('branch_id.priority', '=', True)], limit=1)
             if not pending_ids:
                 pending_ids = Build.search(domain + [('state', '=', 'pending')], order="sequence", limit=1)
 
