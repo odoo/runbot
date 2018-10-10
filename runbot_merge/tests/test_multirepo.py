@@ -64,12 +64,14 @@ def test_stage_one(env, project, repo_a, repo_b):
         'heads/master',
         repo_a.make_commit(None, 'initial', None, tree={'a': 'a_0'})
     )
+    repo_a.protect('master')
     pr_a = make_pr(repo_a, 'A', [{'a': 'a_1'}], label='do-a-thing')
 
     repo_b.make_ref(
         'heads/master',
         repo_b.make_commit(None, 'initial', None, tree={'a': 'b_0'})
     )
+    repo_b.protect('master')
     pr_b = make_pr(repo_b, 'B', [{'a': 'b_1'}], label='do-other-thing')
 
     env['runbot_merge.project']._check_progress()
@@ -87,12 +89,14 @@ def test_stage_match(env, project, repo_a, repo_b):
         'heads/master',
         repo_a.make_commit(None, 'initial', None, tree={'a': 'a_0'})
     )
+    repo_a.protect('master')
     pr_a = make_pr(repo_a, 'A', [{'a': 'a_1'}], label='do-a-thing')
 
     repo_b.make_ref(
         'heads/master',
         repo_b.make_commit(None, 'initial', None, tree={'a': 'b_0'})
     )
+    repo_b.protect('master')
     pr_b = make_pr(repo_b, 'B', [{'a': 'b_1'}], label='do-a-thing')
 
     env['runbot_merge.project']._check_progress()
@@ -115,18 +119,21 @@ def test_sub_match(env, project, repo_a, repo_b, repo_c):
         'heads/master',
         repo_a.make_commit(None, 'initial', None, tree={'a': 'a_0'})
     )
+    repo_a.protect('master')
     # no pr here
 
     repo_b.make_ref(
         'heads/master',
         repo_b.make_commit(None, 'initial', None, tree={'a': 'b_0'})
     )
+    repo_b.protect('master')
     pr_b = make_pr(repo_b, 'B', [{'a': 'b_1'}], label='do-a-thing')
 
     repo_c.make_ref(
         'heads/master',
         repo_c.make_commit(None, 'initial', None, tree={'a': 'c_0'})
     )
+    repo_c.protect('master')
     pr_c = make_pr(repo_c, 'C', [{'a': 'c_1'}], label='do-a-thing')
 
     env['runbot_merge.project']._check_progress()
@@ -161,8 +168,10 @@ def test_merge_fail(env, project, repo_a, repo_b, users):
 
     root_a = repo_a.make_commit(None, 'initial', None, tree={'a': 'a_0'})
     repo_a.make_ref('heads/master', root_a)
+    repo_a.protect('master')
     root_b = repo_b.make_commit(None, 'initial', None, tree={'a': 'b_0'})
     repo_b.make_ref('heads/master', root_b)
+    repo_b.protect('master')
 
     # first set of matched PRs
     pr1a = make_pr(repo_a, 'A', [{'a': 'a_1'}], label='do-a-thing')
@@ -206,10 +215,12 @@ def test_ff_fail(env, project, repo_a, repo_b):
     project.batch_limit = 1
     root_a = repo_a.make_commit(None, 'initial', None, tree={'a': 'a_0'})
     repo_a.make_ref('heads/master', root_a)
+    repo_a.protect('master')
     make_pr(repo_a, 'A', [{'a': 'a_1'}], label='do-a-thing')
 
     root_b = repo_b.make_commit(None, 'initial', None, tree={'a': 'b_0'})
     repo_b.make_ref('heads/master', root_b)
+    repo_b.protect('master')
     make_pr(repo_b, 'B', [{'a': 'b_1'}], label='do-a-thing')
 
     env['runbot_merge.project']._check_progress()
@@ -241,11 +252,13 @@ def test_one_failed(env, project, repo_a, repo_b, owner):
     project.batch_limit = 1
     c_a = repo_a.make_commit(None, 'initial', None, tree={'a': 'a_0'})
     repo_a.make_ref('heads/master', c_a)
+    repo_a.protect('master')
     # pr_a is born ready
     pr_a = make_pr(repo_a, 'A', [{'a': 'a_1'}], label='do-a-thing')
 
     c_b = repo_b.make_commit(None, 'initial', None, tree={'a': 'b_0'})
     repo_b.make_ref('heads/master', c_b)
+    repo_b.protect('master')
     c_pr = repo_b.make_commit(c_b, 'pr', None, tree={'a': 'b_1'})
     pr_b = repo_b.make_pr(
         'title', 'body', target='master', ctid=c_pr,
@@ -273,6 +286,7 @@ def test_other_failed(env, project, repo_a, repo_b, owner, users):
     """
     c_a = repo_a.make_commit(None, 'initial', None, tree={'a': 'a_0'})
     repo_a.make_ref('heads/master', c_a)
+    repo_a.protect('master')
     # pr_a is born ready
     pr_a = make_pr(repo_a, 'A', [{'a': 'a_1'}], label='do-a-thing')
     repo_a.post_status(pr_a.head, 'success', 'ci/runbot')
@@ -280,6 +294,7 @@ def test_other_failed(env, project, repo_a, repo_b, owner, users):
 
     c_b = repo_b.make_commit(None, 'initial', None, tree={'a': 'b_0'})
     repo_b.make_ref('heads/master', c_b)
+    repo_b.protect('master')
 
     env['runbot_merge.project']._check_progress()
     pr = to_pr(env, pr_a)
@@ -305,7 +320,9 @@ def test_batching(env, project, repo_a, repo_b):
     """
     project.batch_limit = 3
     repo_a.make_ref('heads/master', repo_a.make_commit(None, 'initial', None, tree={'a': 'a0'}))
+    repo_a.protect('master')
     repo_b.make_ref('heads/master', repo_b.make_commit(None, 'initial', None, tree={'b': 'b0'}))
+    repo_b.protect('master')
 
     prs = [(
         a and to_pr(env, make_pr(repo_a, 'A{}'.format(i), [{'a{}'.format(i): 'a{}'.format(i)}], label='batch{}'.format(i))),
@@ -334,7 +351,9 @@ def test_batching_split(env, repo_a, repo_b):
     """ If a staging fails, it should get split properly across repos
     """
     repo_a.make_ref('heads/master', repo_a.make_commit(None, 'initial', None, tree={'a': 'a0'}))
+    repo_a.protect('master')
     repo_b.make_ref('heads/master', repo_b.make_commit(None, 'initial', None, tree={'b': 'b0'}))
+    repo_b.protect('master')
 
     prs = [(
         a and to_pr(env, make_pr(repo_a, 'A{}'.format(i), [{'a{}'.format(i): 'a{}'.format(i)}], label='batch{}'.format(i))),
@@ -377,7 +396,9 @@ def test_urgent(env, repo_a, repo_b):
     being prioritized
     """
     repo_a.make_ref('heads/master', repo_a.make_commit(None, 'initial', None, tree={'a0': 'a'}))
+    repo_a.protect('master')
     repo_b.make_ref('heads/master', repo_b.make_commit(None, 'initial', None, tree={'b0': 'b'}))
+    repo_b.protect('master')
 
     pr_a = make_pr(repo_a, 'A', [{'a1': 'a'}, {'a2': 'a'}], label='batch', reviewer=None, statuses=[])
     pr_b = make_pr(repo_b, 'B', [{'b1': 'b'}, {'b2': 'b'}], label='batch', reviewer=None, statuses=[])

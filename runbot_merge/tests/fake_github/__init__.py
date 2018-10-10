@@ -94,6 +94,7 @@ class Repo(object):
         self.refs = {}
         # {event: (wsgi_app, url)}
         self.hooks = collections.defaultdict(list)
+        self.protected = set()
 
     def hook(self, hook, events):
         for event in events:
@@ -118,11 +119,33 @@ class Repo(object):
         assert 'heads/%s' % target in self.refs
         return PR(self, title, body, target, ctid, user=user, label='{}:{}'.format(user, label or target))
 
+    def get_ref(self, ref):
+        if re.match(r'[0-9a-f]{40}', ref):
+            return ref
+
+        sha = self.refs.get(ref)
+        assert sha, "no ref %s" % ref
+        return sha
+
     def make_ref(self, name, commit, force=False):
         assert isinstance(self.objects[commit], Commit)
         if not force and name in self.refs:
             raise ValueError("ref %s already exists" % name)
         self.refs[name] = commit
+
+    def protect(self, branch):
+        ref = 'heads/%s' % branch
+        assert ref in self.refs
+        self.protected.add(ref)
+
+    def update_ref(self, name, commit, force=False):
+        current = self.refs.get(name)
+        assert current is not None
+
+        assert name not in self.protected and force or git.is_ancestor(
+            self.objects, current, commit)
+
+        self.make_ref(name, commit, force=True)
 
     def commit(self, ref):
         sha = self.refs.get(ref) or ref
@@ -252,11 +275,11 @@ class Repo(object):
         if sha not in self.objects:
             return (404, None)
 
-        if not body.get('force'):
-            if not git.is_ancestor(self.objects, current, sha):
-                return (400, None)
+        try:
+            self.update_ref(ref, sha, body.get('force') or False)
+        except AssertionError:
+            return (400, None)
 
-        self.make_ref(ref, sha, force=True)
         return (200, {
             "ref": "refs/%s" % ref,
             "object": {

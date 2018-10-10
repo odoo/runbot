@@ -31,11 +31,7 @@ class GH(object):
                 exc = check.get(r.status_code)
                 if exc:
                     raise exc(r.content)
-            if r.status_code == 422:
-                # dump & format body if it's a 422 as GH's HTTP Reason is
-                # completely useless (only states
-                # "Unprocessable Entity for URL: <endpoint>" which is not
-                # exactly great for debugging what went wrong
+            if r.status_code >= 400 and r.headers.get('content-type', '').startswith('application/javascript'):
                 raise requests.HTTPError(
                     json_.dumps(r.json(), indent=4),
                     response=r

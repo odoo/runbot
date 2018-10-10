@@ -446,6 +446,16 @@ class Repo:
         assert 200 <= r.status_code < 300, r.json()
         wait_for_hook()
 
+    def protect(self, branch):
+        r = self._session.put('https://api.github.com/repos/{}/branches/{}/protection'.format(self.name, branch), json={
+            'required_status_checks': None,
+            'enforce_admins': True,
+            'required_pull_request_reviews': None,
+            'restrictions': None,
+        })
+        assert 200 <= r.status_code < 300, r.json()
+        wait_for_hook()
+
     def update_ref(self, name, commit, force=False):
         r = self._session.patch('https://api.github.com/repos/{}/git/refs/{}'.format(self.name, name), json={'sha': commit, 'force': force})
         assert 200 <= r.status_code < 300, r.json()

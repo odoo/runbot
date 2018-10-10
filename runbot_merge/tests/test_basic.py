@@ -5,6 +5,7 @@ import time
 import requests
 
 import pytest
+from requests import HTTPError
 
 import odoo
 
@@ -1912,6 +1913,20 @@ class TestComments:
 
         assert {p.github_login for p in pr.delegates} \
             == {'foo', 'bar', 'baz'}
+
+class TestInfrastructure:
+    def test_protection(self, repo):
+        """ force-pushing on a protected ref should fail
+        """
+        m0 = repo.make_commit(None, 'initial', None, tree={'m': 'm0'})
+        m1 = repo.make_commit(m0, 'first', None, tree={'m': 'm1'})
+        repo.make_ref('heads/master', m1)
+        repo.protect('master')
+
+        c1 = repo.make_commit(m0, 'other', None, tree={'m': 'c1'})
+        with pytest.raises(AssertionError):
+            repo.update_ref('heads/master', c1, force=True)
+        assert repo.get_ref('heads/master') == m1
 
 def node(name, *children):
     assert type(name) in (str, re_matches)

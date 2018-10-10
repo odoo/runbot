@@ -74,14 +74,28 @@ class Project(models.Model):
                     staging, staging.state
                 )
                 if staging.state == 'success':
-                    old_heads = {
-                        n: g.head(staging.target.name)
-                        for n, g in gh.items()
-                    }
                     repo_name = None
                     staging_heads = json.loads(staging.heads)
-                    updated = []
                     try:
+                        # reverting updates doesn't work if the branches are
+                        # protected (because a revert is basically a force
+                        # push), instead use the tmp branch as a dry-run
+                        tmp_target = 'tmp.' + staging.target.name
+                        # first force-push the current targets to all tmps
+                        for repo_name in staging_heads.keys():
+                            if repo_name.endswith('^'):
+                                continue
+                            g = gh[repo_name]
+                            g.set_ref(tmp_target, g.head(staging.target.name))
+
+                        # then attempt to FF the tmp to the staging
+                        for repo_name, head in staging_heads.items():
+                            if repo_name.endswith('^'):
+                                continue
+                            gh[repo_name].fast_forward(tmp_target, staging_heads.get(repo_name + '^') or head)
+
+                        # there is still a race condition here, but it's way
+                        # lower than "the entire staging duration"...
                         for repo_name, head in staging_heads.items():
                             if repo_name.endswith('^'):
                                 continue
@@ -92,16 +106,12 @@ class Project(models.Model):
                                 staging.target.name,
                                 staging_heads.get(repo_name + '^') or head
                             )
-                            updated.append(repo_name)
                     except exceptions.FastForwardError as e:
                         logger.warning(
-                            "Could not fast-forward successful staging on %s:%s, reverting updated repos %s and re-staging",
+                            "Could not fast-forward successful staging on %s:%s",
                             repo_name, staging.target.name,
-                            ', '.join(updated),
                             exc_info=True
                         )
-                        for name in reversed(updated):
-                            gh[name].set_ref(staging.target.name, old_heads[name])
                         staging.write({
                             'state': 'ff_failed',
                             'reason': str(e.__cause__ or e.__context__ or '')
