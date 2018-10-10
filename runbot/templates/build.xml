@@ -105,7 +105,6 @@
                                 <div class="btn-group">
                                     <t t-call="runbot.build_button">
                                         <t t-set="bu" t-value="build"/>
-                                        <t t-set="bu_index" t-value="-1"/>
                                         <t t-set="klass" t-value="''"/>
                                     </t>
                                 </div>
@@ -167,6 +166,7 @@
                             Subject: <t t-esc="build['subject']"/><br/>
                             Author: <t t-esc="build['author']"/><br/>
                             Committer: <t t-esc="build['committer']"/><br/>
+                            Build host: <t t-esc="build['host']"/><br/>
                         </p>
                         <p t-if="build['duplicate_of']">Duplicate of <a t-attf-href="/runbot/build/#{build['duplicate_of'].id}"><t t-esc="build['duplicate_of'].dest"/></a></p>
                         <table class="table table-condensed table-striped">

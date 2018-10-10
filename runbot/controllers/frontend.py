@@ -198,7 +198,8 @@ class Runbot(http.Controller):
             'build': self.build_info(build),
             'br': {'branch': build.branch_id},
             'logs': Logging.sudo().browse(logging_ids).ids,
-            'other_builds': other_builds.ids
+            'other_builds': other_builds.ids,
+            'bu_index': 0 if build == build_ids[0] else -1
         }
         return request.render("runbot.build", context)
 
