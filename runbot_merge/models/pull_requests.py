@@ -242,7 +242,12 @@ class Project(models.Model):
                         })
 
                     logger.info("Created staging %s (%s)", st, staged)
+        # I have no idea why this is necessary for tests to pass, the only
+        # DB update done not through the ORM is when receiving a notification
+        # that a PR has been closed
+        self.invalidate_cache()
 
+    def _send_feedback(self):
         Repos = self.env['runbot_merge.repository']
         ghs = {}
         # noinspection SqlResolve

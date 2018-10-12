@@ -9,7 +9,17 @@
     <field name="numbercall">-1</field>
     <field name="doall" eval="False"/>
   </record>
-    <record model="ir.cron" id="fetch_prs_cron">
+  <record model="ir.cron" id="feedback_cron">
+    <field name="name">Send feedback to PR</field>
+    <field name="model_id" ref="model_runbot_merge_project"/>
+    <field name="state">code</field>
+    <field name="code">model._send_feedback()</field>
+    <field name="interval_number">1</field>
+    <field name="interval_type">minutes</field>
+    <field name="numbercall">-1</field>
+    <field name="doall" eval="False"/>
+  </record>
+  <record model="ir.cron" id="fetch_prs_cron">
     <field name="name">Check for PRs to fetch</field>
     <field name="model_id" ref="model_runbot_merge_project"/>
     <field name="state">code</field>

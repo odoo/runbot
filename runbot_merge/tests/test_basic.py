@@ -31,6 +31,7 @@ def test_trivial_flow(env, repo):
     ])
     assert pr.state == 'opened'
     env['runbot_merge.project']._check_progress()
+    env['runbot_merge.project']._send_feedback()
     assert pr1.labels == {'seen 🙂'}
     # nothing happened
 
@@ -42,6 +43,7 @@ def test_trivial_flow(env, repo):
     repo.post_status(c1, 'success', 'ci/runbot')
     assert pr.state == 'validated'
     env['runbot_merge.project']._check_progress()
+    env['runbot_merge.project']._send_feedback()
     assert pr1.labels == {'seen 🙂', 'CI 🤖'}
 
     pr1.post_comment('hansen r+', 'reviewer')
@@ -50,6 +52,7 @@ def test_trivial_flow(env, repo):
     # can't check labels here as running the cron will stage it
 
     env['runbot_merge.project']._check_progress()
+    env['runbot_merge.project']._send_feedback()
     assert pr.staging_id
     assert pr1.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merging 👷'}
 
@@ -60,6 +63,7 @@ def test_trivial_flow(env, repo):
     assert re.match('^force rebuild', staging_head.message)
 
     env['runbot_merge.project']._check_progress()
+    env['runbot_merge.project']._send_feedback()
     assert pr.state == 'merged'
     assert pr1.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merged 🎉'}
 
@@ -235,6 +239,7 @@ def test_staging_conflict(env, repo):
     repo.post_status(c3, 'success', 'ci/runbot')
     pr2.post_comment('hansen r+', "reviewer")
     env['runbot_merge.project']._check_progress()
+    env['runbot_merge.project']._send_feedback()
     p_2 = env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', repo.name),
         ('number', '=', pr2.number)
@@ -306,6 +311,7 @@ def test_staging_merge_fail(env, repo, users):
     prx.post_comment('hansen r+', "reviewer")
 
     env['runbot_merge.project']._check_progress()
+    env['runbot_merge.project']._send_feedback()
     pr1 = env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', repo.name),
         ('number', '=', prx.number)
@@ -502,6 +508,7 @@ def test_edit(env, repo):
     prx.base = '2.0'
     assert not pr.exists()
     env['runbot_merge.project']._check_progress()
+    env['runbot_merge.project']._send_feedback()
     assert prx.labels == set()
 
     prx.base = '1.0'
