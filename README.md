@@ -13,3 +13,4 @@ Runbot CLA addon
 
 The `runbot_cla/` directory contains an Odoo addon that checks CLA.
 
+bnxbxbb
