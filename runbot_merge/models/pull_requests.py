@@ -964,9 +964,7 @@ class Stagings(models.Model):
                 )
                 prs.write({'state': 'merged'})
                 for pr in prs:
-                    # FIXME: this is the staging head rather than the actual merge commit for the PR
-                    staging_head = staging_heads.get(pr.repository.name + '^') or staging_heads[pr.repository.name]
-                    gh[pr.repository.name].close(pr.number, 'Merged in {}'.format(staging_head))
+                    gh[pr.repository.name].close(pr.number, 'Merged, thanks!')
             finally:
                 self.batch_ids.write({'active': False})
                 self.write({'active': False})
