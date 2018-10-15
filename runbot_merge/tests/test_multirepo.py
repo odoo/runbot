@@ -55,23 +55,22 @@ def to_pr(env, pr):
         ('repository.name', '=', pr.repo.name),
         ('number', '=', pr.number),
     ])
+def make_branch(repo, name, message, tree, protect=True):
+    c = repo.make_commit(None, message, None, tree=tree)
+    repo.make_ref('heads/%s' % name, c)
+    if protect:
+        repo.protect(name)
+    return c
+
 def test_stage_one(env, project, repo_a, repo_b):
     """ First PR is non-matched from A => should not select PR from B
     """
     project.batch_limit = 1
 
-    repo_a.make_ref(
-        'heads/master',
-        repo_a.make_commit(None, 'initial', None, tree={'a': 'a_0'})
-    )
-    repo_a.protect('master')
+    make_branch(repo_a, 'master', 'initial', {'a': 'a_0'})
     pr_a = make_pr(repo_a, 'A', [{'a': 'a_1'}], label='do-a-thing')
 
-    repo_b.make_ref(
-        'heads/master',
-        repo_b.make_commit(None, 'initial', None, tree={'a': 'b_0'})
-    )
-    repo_b.protect('master')
+    make_branch(repo_b, 'master', 'initial', {'a': 'b_0'})
     pr_b = make_pr(repo_b, 'B', [{'a': 'b_1'}], label='do-other-thing')
 
     env['runbot_merge.project']._check_progress()
@@ -85,18 +84,10 @@ def test_stage_match(env, project, repo_a, repo_b):
     """ First PR is matched from A,  => should select matched PR from B
     """
     project.batch_limit = 1
-    repo_a.make_ref(
-        'heads/master',
-        repo_a.make_commit(None, 'initial', None, tree={'a': 'a_0'})
-    )
-    repo_a.protect('master')
+    make_branch(repo_a, 'master', 'initial', {'a': 'a_0'})
     pr_a = make_pr(repo_a, 'A', [{'a': 'a_1'}], label='do-a-thing')
 
-    repo_b.make_ref(
-        'heads/master',
-        repo_b.make_commit(None, 'initial', None, tree={'a': 'b_0'})
-    )
-    repo_b.protect('master')
+    make_branch(repo_b, 'master', 'initial', {'a': 'b_0'})
     pr_b = make_pr(repo_b, 'B', [{'a': 'b_1'}], label='do-a-thing')
 
     env['runbot_merge.project']._check_progress()
@@ -115,25 +106,13 @@ def test_sub_match(env, project, repo_a, repo_b, repo_c):
     """ Branch-matching should work on a subset of repositories
     """
     project.batch_limit = 1
-    repo_a.make_ref(
-        'heads/master',
-        repo_a.make_commit(None, 'initial', None, tree={'a': 'a_0'})
-    )
-    repo_a.protect('master')
+    make_branch(repo_a, 'master', 'initial', {'a': 'a_0'})
     # no pr here
 
-    repo_b.make_ref(
-        'heads/master',
-        repo_b.make_commit(None, 'initial', None, tree={'a': 'b_0'})
-    )
-    repo_b.protect('master')
+    make_branch(repo_b, 'master', 'initial', {'a': 'b_0'})
     pr_b = make_pr(repo_b, 'B', [{'a': 'b_1'}], label='do-a-thing')
 
-    repo_c.make_ref(
-        'heads/master',
-        repo_c.make_commit(None, 'initial', None, tree={'a': 'c_0'})
-    )
-    repo_c.protect('master')
+    make_branch(repo_c, 'master', 'initial', {'a': 'c_0'})
     pr_c = make_pr(repo_c, 'C', [{'a': 'c_1'}], label='do-a-thing')
 
     env['runbot_merge.project']._check_progress()
@@ -166,12 +145,8 @@ def test_merge_fail(env, project, repo_a, repo_b, users):
     """
     project.batch_limit = 1
 
-    root_a = repo_a.make_commit(None, 'initial', None, tree={'a': 'a_0'})
-    repo_a.make_ref('heads/master', root_a)
-    repo_a.protect('master')
-    root_b = repo_b.make_commit(None, 'initial', None, tree={'a': 'b_0'})
-    repo_b.make_ref('heads/master', root_b)
-    repo_b.protect('master')
+    make_branch(repo_a, 'master', 'initial', {'a': 'a_0'})
+    make_branch(repo_b, 'master', 'initial', {'a': 'b_0'})
 
     # first set of matched PRs
     pr1a = make_pr(repo_a, 'A', [{'a': 'a_1'}], label='do-a-thing')
@@ -213,14 +188,10 @@ def test_ff_fail(env, project, repo_a, repo_b):
     the entire thing should be rolled back
     """
     project.batch_limit = 1
-    root_a = repo_a.make_commit(None, 'initial', None, tree={'a': 'a_0'})
-    repo_a.make_ref('heads/master', root_a)
-    repo_a.protect('master')
+    root_a = make_branch(repo_a, 'master', 'initial', {'a': 'a_0'})
     make_pr(repo_a, 'A', [{'a': 'a_1'}], label='do-a-thing')
 
-    root_b = repo_b.make_commit(None, 'initial', None, tree={'a': 'b_0'})
-    repo_b.make_ref('heads/master', root_b)
-    repo_b.protect('master')
+    make_branch(repo_b, 'master', 'initial', {'a': 'b_0'})
     make_pr(repo_b, 'B', [{'a': 'b_1'}], label='do-a-thing')
 
     env['runbot_merge.project']._check_progress()
@@ -284,17 +255,11 @@ def test_other_failed(env, project, repo_a, repo_b, owner, users):
     targets) fails when built with the PR, it should provide a non-useless
     message
     """
-    c_a = repo_a.make_commit(None, 'initial', None, tree={'a': 'a_0'})
-    repo_a.make_ref('heads/master', c_a)
-    repo_a.protect('master')
+    make_branch(repo_a, 'master', 'initial', {'a': 'a_0'})
     # pr_a is born ready
     pr_a = make_pr(repo_a, 'A', [{'a': 'a_1'}], label='do-a-thing')
-    repo_a.post_status(pr_a.head, 'success', 'ci/runbot')
-    repo_a.post_status(pr_a.head, 'success', 'legal/cla')
 
-    c_b = repo_b.make_commit(None, 'initial', None, tree={'a': 'b_0'})
-    repo_b.make_ref('heads/master', c_b)
-    repo_b.protect('master')
+    make_branch(repo_b, 'master', 'initial', {'a': 'b_0'})
 
     env['runbot_merge.project']._check_progress()
     pr = to_pr(env, pr_a)
@@ -314,91 +279,86 @@ def test_other_failed(env, project, repo_a, repo_b, owner, users):
         (users['user'], 'Staging failed: ci/runbot on %s (view more at http://example.org/b)' % sth)
     ]
 
-def test_batching(env, project, repo_a, repo_b):
-    """ If multiple batches (label groups) are ready they should get batched
-    together (within the limits of teh project's batch limit)
-    """
-    project.batch_limit = 3
-    repo_a.make_ref('heads/master', repo_a.make_commit(None, 'initial', None, tree={'a': 'a0'}))
-    repo_a.protect('master')
-    repo_b.make_ref('heads/master', repo_b.make_commit(None, 'initial', None, tree={'b': 'b0'}))
-    repo_b.protect('master')
+class TestMultiBatches:
+    def test_batching(self, env, project, repo_a, repo_b):
+        """ If multiple batches (label groups) are ready they should get batched
+        together (within the limits of teh project's batch limit)
+        """
+        project.batch_limit = 3
+        make_branch(repo_a, 'master', 'initial', {'a': 'a0'})
+        make_branch(repo_b, 'master', 'initial', {'b': 'b0'})
 
-    prs = [(
-        a and to_pr(env, make_pr(repo_a, 'A{}'.format(i), [{'a{}'.format(i): 'a{}'.format(i)}], label='batch{}'.format(i))),
-        b and to_pr(env, make_pr(repo_b, 'B{}'.format(i), [{'b{}'.format(i): 'b{}'.format(i)}], label='batch{}'.format(i)))
-    )
-        for i, (a, b) in enumerate([(1, 1), (0, 1), (1, 1), (1, 1), (1, 0)])
-    ]
+        prs = [(
+            a and to_pr(env, make_pr(repo_a, 'A{}'.format(i), [{'a{}'.format(i): 'a{}'.format(i)}], label='batch{}'.format(i))),
+            b and to_pr(env, make_pr(repo_b, 'B{}'.format(i), [{'b{}'.format(i): 'b{}'.format(i)}], label='batch{}'.format(i)))
+        )
+            for i, (a, b) in enumerate([(1, 1), (0, 1), (1, 1), (1, 1), (1, 0)])
+        ]
 
-    env['runbot_merge.project']._check_progress()
+        env['runbot_merge.project']._check_progress()
 
-    st = env['runbot_merge.stagings'].search([])
-    assert st
-    assert len(st.batch_ids) == 3,\
-        "Should have batched the first <batch_limit> batches"
-    assert st.mapped('batch_ids.prs') == (
-        prs[0][0] | prs[0][1]
-      | prs[1][1]
-      | prs[2][0] | prs[2][1]
-    )
+        st = env['runbot_merge.stagings'].search([])
+        assert st
+        assert len(st.batch_ids) == 3,\
+            "Should have batched the first <batch_limit> batches"
+        assert st.mapped('batch_ids.prs') == (
+            prs[0][0] | prs[0][1]
+          | prs[1][1]
+          | prs[2][0] | prs[2][1]
+        )
 
-    assert not prs[3][0].staging_id
-    assert not prs[3][1].staging_id
-    assert not prs[4][0].staging_id
+        assert not prs[3][0].staging_id
+        assert not prs[3][1].staging_id
+        assert not prs[4][0].staging_id
 
-def test_batching_split(env, repo_a, repo_b):
-    """ If a staging fails, it should get split properly across repos
-    """
-    repo_a.make_ref('heads/master', repo_a.make_commit(None, 'initial', None, tree={'a': 'a0'}))
-    repo_a.protect('master')
-    repo_b.make_ref('heads/master', repo_b.make_commit(None, 'initial', None, tree={'b': 'b0'}))
-    repo_b.protect('master')
+    def test_batching_split(self, env, repo_a, repo_b):
+        """ If a staging fails, it should get split properly across repos
+        """
+        make_branch(repo_a, 'master', 'initial', {'a': 'a0'})
+        make_branch(repo_b, 'master', 'initial', {'b': 'b0'})
 
-    prs = [(
-        a and to_pr(env, make_pr(repo_a, 'A{}'.format(i), [{'a{}'.format(i): 'a{}'.format(i)}], label='batch{}'.format(i))),
-        b and to_pr(env, make_pr(repo_b, 'B{}'.format(i), [{'b{}'.format(i): 'b{}'.format(i)}], label='batch{}'.format(i)))
-    )
-        for i, (a, b) in enumerate([(1, 1), (0, 1), (1, 1), (1, 1), (1, 0)])
-    ]
+        prs = [(
+            a and to_pr(env, make_pr(repo_a, 'A{}'.format(i), [{'a{}'.format(i): 'a{}'.format(i)}], label='batch{}'.format(i))),
+            b and to_pr(env, make_pr(repo_b, 'B{}'.format(i), [{'b{}'.format(i): 'b{}'.format(i)}], label='batch{}'.format(i)))
+        )
+            for i, (a, b) in enumerate([(1, 1), (0, 1), (1, 1), (1, 1), (1, 0)])
+        ]
 
-    env['runbot_merge.project']._check_progress()
+        env['runbot_merge.project']._check_progress()
 
-    st0 = env['runbot_merge.stagings'].search([])
-    assert len(st0.batch_ids) == 5
-    assert len(st0.mapped('batch_ids.prs')) == 8
+        st0 = env['runbot_merge.stagings'].search([])
+        assert len(st0.batch_ids) == 5
+        assert len(st0.mapped('batch_ids.prs')) == 8
 
-    # mark b.staging as failed -> should create two splits with (0, 1)
-    # and (2, 3, 4) and stage the first one
-    repo_b.post_status('heads/staging.master', 'success', 'legal/cla')
-    repo_b.post_status('heads/staging.master', 'failure', 'ci/runbot')
+        # mark b.staging as failed -> should create two splits with (0, 1)
+        # and (2, 3, 4) and stage the first one
+        repo_b.post_status('heads/staging.master', 'success', 'legal/cla')
+        repo_b.post_status('heads/staging.master', 'failure', 'ci/runbot')
 
-    env['runbot_merge.project']._check_progress()
+        env['runbot_merge.project']._check_progress()
 
-    assert not st0.active
+        assert not st0.active
 
-    # at this point we have a re-staged split and an unstaged split
-    st = env['runbot_merge.stagings'].search([])
-    sp = env['runbot_merge.split'].search([])
-    assert st
-    assert sp
+        # at this point we have a re-staged split and an unstaged split
+        st = env['runbot_merge.stagings'].search([])
+        sp = env['runbot_merge.split'].search([])
+        assert st
+        assert sp
 
-    assert len(st.batch_ids) == 2
-    assert st.mapped('batch_ids.prs') == \
-        prs[0][0] | prs[0][1] | prs[1][1]
+        assert len(st.batch_ids) == 2
+        assert st.mapped('batch_ids.prs') == \
+            prs[0][0] | prs[0][1] | prs[1][1]
 
-    assert len(sp.batch_ids) == 3
-    assert sp.mapped('batch_ids.prs') == \
-        prs[2][0] | prs[2][1] | prs[3][0] | prs[3][1] | prs[4][0]
+        assert len(sp.batch_ids) == 3
+        assert sp.mapped('batch_ids.prs') == \
+            prs[2][0] | prs[2][1] | prs[3][0] | prs[3][1] | prs[4][0]
 
 def test_urgent(env, repo_a, repo_b):
     """ Either PR of a co-dependent pair being p=0 leads to the entire pair
     being prioritized
     """
-    repo_a.make_ref('heads/master', repo_a.make_commit(None, 'initial', None, tree={'a0': 'a'}))
-    repo_a.protect('master')
-    repo_b.make_ref('heads/master', repo_b.make_commit(None, 'initial', None, tree={'b0': 'b'}))
-    repo_b.protect('master')
+    make_branch(repo_a, 'master', 'initial', {'a0': 'a'})
+    make_branch(repo_b, 'master', 'initial', {'b0': 'b'})
 
     pr_a = make_pr(repo_a, 'A', [{'a1': 'a'}, {'a2': 'a'}], label='batch', reviewer=None, statuses=[])
     pr_b = make_pr(repo_b, 'B', [{'b1': 'b'}, {'b2': 'b'}], label='batch', reviewer=None, statuses=[])
