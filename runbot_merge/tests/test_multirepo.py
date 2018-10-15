@@ -216,39 +216,98 @@ def test_ff_fail(env, project, repo_a, repo_b):
     assert len(st) == 1
     assert len(st.batch_ids.prs) == 2
 
-def test_one_failed(env, project, repo_a, repo_b, owner):
-    """ If the companion of a ready branch-matched PR is not ready,
-    they should not get staged
-    """
-    project.batch_limit = 1
-    c_a = repo_a.make_commit(None, 'initial', None, tree={'a': 'a_0'})
-    repo_a.make_ref('heads/master', c_a)
-    repo_a.protect('master')
-    # pr_a is born ready
-    pr_a = make_pr(repo_a, 'A', [{'a': 'a_1'}], label='do-a-thing')
+class TestCompanionsNotReady:
+    def test_one_pair(self, env, project, repo_a, repo_b, owner, users):
+        """ If the companion of a ready branch-matched PR is not ready,
+        they should not get staged
+        """
+        project.batch_limit = 1
+        make_branch(repo_a, 'master', 'initial', {'a': 'a_0'})
+        # pr_a is born ready
+        p_a = make_pr(repo_a, 'A', [{'a': 'a_1'}], label='do-a-thing')
 
-    c_b = repo_b.make_commit(None, 'initial', None, tree={'a': 'b_0'})
-    repo_b.make_ref('heads/master', c_b)
-    repo_b.protect('master')
-    c_pr = repo_b.make_commit(c_b, 'pr', None, tree={'a': 'b_1'})
-    pr_b = repo_b.make_pr(
-        'title', 'body', target='master', ctid=c_pr,
-        user='user', label='do-a-thing',
-    )
-    repo_b.post_status(c_pr, 'success', 'ci/runbot')
-    repo_b.post_status(c_pr, 'success', 'legal/cla')
+        make_branch(repo_b, 'master', 'initial', {'a': 'b_0'})
+        p_b = make_pr(repo_b, 'B', [{'a': 'b_1'}], label='do-a-thing', reviewer=None)
 
-    pr_a = to_pr(env, pr_a)
-    pr_b = to_pr(env, pr_b)
-    assert pr_a.state == 'ready'
-    assert pr_b.state == 'validated'
-    assert pr_a.label == pr_b.label == '{}:do-a-thing'.format(owner)
+        pr_a = to_pr(env, p_a)
+        pr_b = to_pr(env, p_b)
+        assert pr_a.state == 'ready'
+        assert pr_b.state == 'validated'
+        assert pr_a.label == pr_b.label == '{}:do-a-thing'.format(owner)
 
-    env['runbot_merge.project']._check_progress()
+        env['runbot_merge.project']._check_progress()
 
-    assert not pr_b.staging_id
-    assert not pr_a.staging_id, \
-        "pr_a should not have been staged as companion is not ready"
+        assert not pr_b.staging_id
+        assert not pr_a.staging_id, \
+            "pr_a should not have been staged as companion is not ready"
+
+        env['runbot_merge.pull_requests']._check_linked_prs_statuses()
+        assert p_a.comments == [
+            (users['reviewer'], 'hansen r+'),
+            (users['user'], "Linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (repo_b.name, p_b.number)),
+        ]
+        # ensure the message is only sent once per PR
+        env['runbot_merge.pull_requests']._check_linked_prs_statuses()
+        assert p_a.comments == [
+            (users['reviewer'], 'hansen r+'),
+            (users['user'], "Linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (repo_b.name, p_b.number)),
+        ]
+        assert p_b.comments == []
+
+    def test_two_of_three_unready(self, env, project, repo_a, repo_b, repo_c, owner, users):
+        """ In a 3-batch, if two of the PRs are not ready both should be
+        linked by the first one
+        """
+        project.batch_limit = 1
+        make_branch(repo_a, 'master', 'initial', {'f': 'a0'})
+        pr_a = make_pr(repo_a, 'A', [{'f': 'a1'}], label='a-thing', reviewer=None)
+
+        make_branch(repo_b, 'master', 'initial', {'f': 'b0'})
+        pr_b = make_pr(repo_b, 'B', [{'f': 'b1'}], label='a-thing')
+
+        make_branch(repo_c, 'master', 'initial', {'f': 'c0'})
+        pr_c = make_pr(repo_c, 'C', [{'f': 'c1'}], label='a-thing', reviewer=None)
+
+        env['runbot_merge.pull_requests']._check_linked_prs_statuses()
+        assert pr_a.comments == []
+        assert pr_b.comments == [
+            (users['reviewer'], 'hansen r+'),
+            (users['user'], "Linked pull request(s) %s#%d, %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
+                repo_a.name, pr_a.number,
+                repo_c.name, pr_c.number
+            ))
+        ]
+        assert pr_c.comments == []
+
+    def test_one_of_three_unready(self, env, project, repo_a, repo_b, repo_c, owner, users):
+        """ In a 3-batch, if one PR is not ready it should be linked on the
+        other two
+        """
+        project.batch_limit = 1
+        make_branch(repo_a, 'master', 'initial', {'f': 'a0'})
+        pr_a = make_pr(repo_a, 'A', [{'f': 'a1'}], label='a-thing', reviewer=None)
+
+        make_branch(repo_b, 'master', 'initial', {'f': 'b0'})
+        pr_b = make_pr(repo_b, 'B', [{'f': 'b1'}], label='a-thing')
+
+        make_branch(repo_c, 'master', 'initial', {'f': 'c0'})
+        pr_c = make_pr(repo_c, 'C', [{'f': 'c1'}], label='a-thing')
+
+        env['runbot_merge.pull_requests']._check_linked_prs_statuses()
+        assert pr_a.comments == []
+        assert pr_b.comments == [
+            (users['reviewer'], 'hansen r+'),
+            (users['user'], "Linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
+                repo_a.name, pr_a.number
+            ))
+        ]
+        assert pr_c.comments == [
+            (users['reviewer'], 'hansen r+'),
+            (users['user'],
+             "Linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
+                 repo_a.name, pr_a.number
+             ))
+        ]
 
 def test_other_failed(env, project, repo_a, repo_b, owner, users):
     """ In a non-matched-branch scenario, if the companion staging (copy of

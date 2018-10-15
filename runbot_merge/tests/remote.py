@@ -348,6 +348,10 @@ class Model:
         assert self._model == 'runbot_merge.project'
         self._run_cron('runbot_merge.fetch_prs_cron')
 
+    def _check_linked_prs_statuses(self):
+        assert self._model == 'runbot_merge.pull_requests'
+        self._run_cron('runbot_merge.check_linked_prs_status')
+
     def _run_cron(self, xid):
         _, model, cron_id = self._env('ir.model.data', 'xmlid_lookup', xid)
         assert model == 'ir.cron', "Expected {} to be a cron, got {}".format(xid, model)

@@ -29,4 +29,14 @@
     <field name="numbercall">-1</field>
     <field name="doall" eval="False"/>
   </record>
+  <record model="ir.cron" id="check_linked_prs_status">
+    <field name="name">Warn on linked PRs where only one is ready</field>
+    <field name="model_id" ref="model_runbot_merge_pull_requests"/>
+    <field name="state">code</field>
+    <field name="code">model._check_linked_prs_statuses(True)</field>
+    <field name="interval_number">1</field>
+    <field name="interval_type">hours</field>
+    <field name="numbercall">-1</field>
+    <field name="doall" eval="False"/>
+  </record>
 </odoo>

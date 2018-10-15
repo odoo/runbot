@@ -352,7 +352,7 @@ class PullRequests(models.Model):
         # staged?
         ('merged', 'Merged'),
         ('error', 'Error'),
-    ], default='opened')
+    ], default='opened', index=True)
 
     number = fields.Integer(required=True, index=True)
     author = fields.Many2one('res.partner')
@@ -378,6 +378,11 @@ class PullRequests(models.Model):
     batch_id = fields.Many2one('runbot_merge.batch',compute='_compute_active_batch', store=True)
     batch_ids = fields.Many2many('runbot_merge.batch')
     staging_id = fields.Many2one(related='batch_id.staging_id', store=True)
+
+    link_warned = fields.Boolean(
+        default=False, help="Whether we've already warned that this (ready)"
+                            " PR is linked to an other non-ready PR"
+    )
 
     @api.depends('head')
     def _compute_statuses(self):
@@ -634,6 +639,50 @@ class PullRequests(models.Model):
                 'state_to': False,
             })
         return super().unlink()
+
+    def _check_linked_prs_statuses(self, commit=False):
+        """ Looks for linked PRs where at least one of the PRs is in a ready
+        state and the others are not, notifies the other PRs.
+
+        :param bool commit: whether to commit the tnx after each comment
+        """
+        # similar to Branch.try_staging's query as it's a subset of that
+        # other query's behaviour
+        self.env.cr.execute("""
+        SELECT
+          array_agg(pr.id) AS match
+        FROM runbot_merge_pull_requests pr
+        WHERE
+          -- exclude terminal states (so there's no issue when
+          -- deleting branches & reusing labels)
+              pr.state != 'merged'
+          AND pr.state != 'closed'
+        GROUP BY pr.label
+        HAVING
+          -- one of the batch's PRs should be ready & not marked
+              bool_or(pr.state = 'ready' AND NOT pr.link_warned)
+          -- one of the others should be unready
+          AND bool_or(pr.state != 'ready')
+          -- but ignore batches with one of the prs at p-
+          AND bool_and(pr.priority != 0)
+        """)
+        for [ids] in self.env.cr.fetchall():
+            prs = self.browse(ids)
+            ready = prs.filtered(lambda p: p.state == 'ready')
+            unready = prs - ready
+
+            for r in ready:
+                r.repository.github().comment(
+                    r.number, "Linked pull request(s) {} not ready. Linked PRs are not staged until all of them are ready.".format(
+                        ', '.join(map(
+                            '{0.repository.name}#{0.number}'.format,
+                            unready
+                        ))
+                    )
+                )
+                r.link_warned = True
+                if commit:
+                    self.env.cr.commit()
 
 # state changes on reviews
 RPLUS = {
