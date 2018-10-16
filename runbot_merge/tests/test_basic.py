@@ -672,6 +672,25 @@ class TestRetry:
             ('number', '=', prx.number)
         ]).state == 'merged'
 
+    def test_retry_ignored(self, env, repo, users):
+        """ Check feedback in case of ignored retry command on a non-error PR.
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        repo.make_ref('heads/master', m)
+
+        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
+        c2 = repo.make_commit(c1, 'second', None, tree={'m': 'c2'})
+        prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
+        prx.post_comment('hansen r+', 'reviewer')
+        prx.post_comment('hansen retry', 'reviewer')
+
+        env['runbot_merge.project']._send_feedback()
+        assert prx.comments == [
+            (users['reviewer'], 'hansen r+'),
+            (users['reviewer'], 'hansen retry'),
+            (users['user'], "I'm sorry, @{}. Retry makes no sense when the PR is not in error.".format(users['reviewer'])),
+        ]
+
     @pytest.mark.parametrize('disabler', ['user', 'other', 'reviewer'])
     def test_retry_disable(self, env, repo, disabler, users):
         m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
@@ -1579,7 +1598,7 @@ class TestBatching(object):
         assert pr2.state == 'merged'
 
 class TestReviewing(object):
-    def test_reviewer_rights(self, env, repo):
+    def test_reviewer_rights(self, env, repo, users):
         """Only users with review rights will have their r+ (and other
         attributes) taken in account
         """
@@ -1603,6 +1622,13 @@ class TestReviewing(object):
             ('number', '=', prx.number)
         ]).state == 'ready'
 
+        env['runbot_merge.project']._send_feedback()
+        assert prx.comments == [
+            (users['other'], 'hansen r+'),
+            (users['reviewer'], 'hansen r+'),
+            (users['user'], "I'm sorry, @{}. I'm afraid I can't do that.".format(users['other'])),
+        ]
+
     def test_self_review_fail(self, env, repo, users):
         """ Normal reviewers can't self-review
         """
@@ -1621,6 +1647,12 @@ class TestReviewing(object):
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'validated'
+
+        env['runbot_merge.project']._send_feedback()
+        assert prx.comments == [
+            (users['reviewer'], 'hansen r+'),
+            (users['user'], "I'm sorry, @{}. You can't review+.".format(users['reviewer'])),
+        ]
 
     def test_self_review_success(self, env, repo, users):
         """ Some users are allowed to self-review
@@ -1788,6 +1820,50 @@ class TestUnknownPR:
 
         env['runbot_merge.project']._check_progress()
         assert pr.staging_id
+
+    def test_rplus_unmanaged(self, env, repo, users):
+        """ r+ on an unmanaged target should notify about
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        m2 = repo.make_commit(m, 'second', None, tree={'m': 'm', 'm2': 'm2'})
+        repo.make_ref('heads/branch', m2)
+
+        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
+        prx = repo.make_pr('title', 'body', target='branch', ctid=c1, user='user')
+        repo.post_status(prx.head, 'success', 'legal/cla')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+
+        prx.post_comment('hansen r+', "reviewer")
+
+        env['runbot_merge.project']._check_fetch()
+        env['runbot_merge.project']._send_feedback()
+
+        assert prx.comments == [
+            (users['reviewer'], 'hansen r+'),
+            (users['user'], "I'm sorry. Branch `branch` is not within my remit."),
+        ]
+
+    def test_rplus_review_unmanaged(self, env, repo, users):
+        """ r+ reviews can take a different path than comments
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        m2 = repo.make_commit(m, 'second', None, tree={'m': 'm', 'm2': 'm2'})
+        repo.make_ref('heads/branch', m2)
+
+        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
+        prx = repo.make_pr('title', 'body', target='branch', ctid=c1, user='user')
+        repo.post_status(prx.head, 'success', 'legal/cla')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+
+        prx.post_review('APPROVE', "reviewer", 'hansen r+')
+
+        env['runbot_merge.project']._check_fetch()
+        env['runbot_merge.project']._send_feedback()
+
+        # FIXME: either split out reviews in local or merge reviews & comments in remote
+        assert prx.comments[-1:] == [
+            (users['user'], "I'm sorry. Branch `branch` is not within my remit."),
+        ]
 
 class TestRMinus:
     def test_rminus_approved(self, repo, env):

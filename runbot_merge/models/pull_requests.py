@@ -109,6 +109,25 @@ class Project(models.Model):
                 to_remove.extend(ids)
         self.env['runbot_merge.pull_requests.tagging'].browse(to_remove).unlink()
 
+        to_remove = []
+        for f in self.env['runbot_merge.pull_requests.feedback'].search([]):
+            repo = f.repository
+            gh = ghs.get(repo)
+            if not gh:
+                gh = ghs[repo] = repo.github()
+
+            try:
+                gh.comment(f.pull_request, f.message)
+            except Exception:
+                _logger.exception(
+                    "Error while trying to send a comment to %s:%s (%s)",
+                    repo.name, f.pull_request,
+                    f.message and f.message[:200]
+                )
+            else:
+                to_remove.append(f.id)
+        self.env['runbot_merge.pull_requests.feedback'].browse(to_remove).unlink()
+
     def is_timed_out(self, staging):
         return fields.Datetime.from_string(staging.staged_at) + datetime.timedelta(minutes=self.ci_timeout) < datetime.datetime.now()
 
@@ -164,6 +183,11 @@ class Repository(models.Model):
 
         if not self.project_id._has_branch(pr['base']['ref']):
             _logger.info("Tasked with loading PR %d for un-managed branch %s, ignoring", pr['number'], pr['base']['ref'])
+            self.env['runbot_merge.pull_requests.feedback'].create({
+                'repository': self.id,
+                'pull_request': number,
+                'message': "I'm sorry. Branch `{}` is not within my remit.".format(pr['base']['ref']),
+            })
             return
 
         controllers.handle_pr(self.env, {
@@ -403,6 +427,11 @@ class PullRequests(models.Model):
             return
 
         if target and not repo.project_id._has_branch(target):
+            self.env['runbot_merge.pull_requests.feedback'].create({
+                'repository': repo.id,
+                'pull_request': number,
+                'message': "I'm sorry. Branch `{}` is not within my remit.".format(target),
+            })
             return
 
         pr = self.search([
@@ -427,7 +456,7 @@ class PullRequests(models.Model):
 
         name, flag, param = m.groups()
         if name == 'retry':
-            return ('retry', True)
+            return ('retry', None)
         elif name in ('r', 'review'):
             if flag == '+':
                 return ('review', True)
@@ -449,7 +478,7 @@ class PullRequests(models.Model):
 
         return None
 
-    def _parse_commands(self, author, comment):
+    def _parse_commands(self, author, comment, login):
         """Parses a command string prefixed by Project::github_prefix.
 
         A command string can contain any number of space-separated commands:
@@ -471,17 +500,12 @@ class PullRequests(models.Model):
         """
         assert self, "parsing commands must be executed in an actual PR"
 
+        (login, name) = (author.github_login, author.display_name) if author else (login, 'not in system')
+
         is_admin = (author.reviewer and self.author != author) or (author.self_reviewer and self.author == author)
         is_reviewer = is_admin or self in author.delegate_reviewer
         # TODO: should delegate reviewers be able to retry PRs?
         is_author = is_reviewer or self.author == author
-
-        if not is_author:
-            # no point even parsing commands
-            _logger.info("ignoring comment of %s (%s): no ACL to %s:%s",
-                          author.github_login, author.display_name,
-                          self.repository.name, self.number)
-            return 'ignored'
 
         commands = dict(
             ps
@@ -497,13 +521,42 @@ class PullRequests(models.Model):
             )
             return 'ok'
 
+        Feedback = self.env['runbot_merge.pull_requests.feedback']
+        if not is_author:
+            # no point even parsing commands
+            _logger.info("ignoring comment of %s (%s): no ACL to %s:%s",
+                          login, name,
+                          self.repository.name, self.number)
+            Feedback.create({
+                'repository': self.repository.id,
+                'pull_request': self.number,
+                'message': "I'm sorry, @{}. I'm afraid I can't do that.".format(login)
+            })
+            return 'ignored'
+
         applied, ignored = [], []
+        def reformat(command, param):
+            if param is None:
+                pstr = ''
+            elif isinstance(param, bool):
+                pstr = '+' if param else '-'
+            elif isinstance(param, list):
+                pstr = '=' + ','.join(param)
+            else:
+                pstr = '={}'.format(param)
+
+            return '%s%s' % (command, pstr)
+        msgs = []
         for command, param in commands.items():
             ok = False
+            msg = []
             if command == 'retry':
-                if is_author and self.state == 'error':
-                    ok = True
-                    self.state = 'ready'
+                if is_author:
+                    if self.state == 'error':
+                        ok = True
+                        self.state = 'ready'
+                    else:
+                        msg = "Retry makes no sense when the PR is not in error."
             elif command == 'review':
                 if param and is_reviewer:
                     newstate = RPLUS.get(self.state)
@@ -520,6 +573,8 @@ class PullRequests(models.Model):
                                 author.github_login
                             )
                         ok = True
+                    else:
+                        msg = "r- makes no sense in the current PR state."
             elif command == 'delegate':
                 if is_reviewer:
                     ok = True
@@ -546,6 +601,7 @@ class PullRequests(models.Model):
             elif command == 'rebase':
                 # anyone can rebase- their PR I guess?
                 self.rebase = param
+                ok = True
 
             _logger.info(
                 "%s %s(%s) on %s:%s by %s (%s)",
@@ -555,14 +611,24 @@ class PullRequests(models.Model):
                 author.github_login, author.display_name,
             )
             if ok:
-                applied.append('{}({})'.format(command, param))
+                applied.append(reformat(command, param))
             else:
-                ignored.append('{}({})'.format(command, param))
+                ignored.append(reformat(command, param))
+                msgs.append(msg or "You can't {}.".format(reformat(command, param)))
         msg = []
         if applied:
             msg.append('applied ' + ' '.join(applied))
         if ignored:
-            msg.append('ignored ' + ' '.join(ignored))
+            ignoredstr = ' '.join(ignored)
+            msg.append('ignored ' + ignoredstr)
+
+        if msgs:
+            msgs.insert(0, "I'm sorry, @{}.".format(login))
+            Feedback.create({
+                'repository': self.repository.id,
+                'pull_request': self.number,
+                'message': ' '.join(msgs),
+            })
         return '\n'.join(msg)
 
     def _validate(self, statuses):
@@ -743,6 +809,17 @@ class Tagging(models.Model):
         ('merged', 'Merged'),
         ('error', 'Error'),
     ])
+
+class Feedback(models.Model):
+    """ Queue of feedback comments to send to PR users
+    """
+    _name = 'runbot_merge.pull_requests.feedback'
+
+    repository = fields.Many2one('runbot_merge.repository', required=True)
+    # store the PR number (not id) as we may want to send feedback to PR
+    # objects on non-handled branches
+    pull_request = fields.Integer()
+    message = fields.Char()
 
 class Commit(models.Model):
     """Represents a commit onto which statuses might be posted,

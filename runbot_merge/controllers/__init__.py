@@ -225,43 +225,18 @@ def handle_comment(env, event):
     comment = event['comment']['body']
     _logger.info('comment: %s %s:%s "%s"', author, repo, issue, comment)
 
-    partner = env['res.partner'].search([('github_login', '=', author), ])
-    if not partner:
-        _logger.info("ignoring comment from %s: not in system", author)
-        return 'ignored'
-
-    repository = env['runbot_merge.repository'].search([('name', '=', repo)])
-    if not repository.project_id._find_commands(comment):
-        return "No commands, ignoring"
-
-    pr = env['runbot_merge.pull_requests']._get_or_schedule(repo, issue)
-    if not pr:
-        return "Unknown PR, scheduling fetch"
-
-    return pr._parse_commands(partner, comment)
+    return _handle_comment(env, repo, issue, author, comment)
 
 def handle_review(env, event):
     repo = event['repository']['full_name']
-    comment = event['review']['body'] or ''
+    pr = event['pull_request']['number']
     author = event['review']['user']['login']
+    comment = event['review']['body'] or ''
+    _logger.info('review: %s %s:%s "%s"', author, repo, pr, comment)
 
-    partner = env['res.partner'].search([('github_login', '=', author)])
-    if not partner:
-        _logger.info('ignoring comment from %s: not in system', author)
-        return 'ignored'
-
-    repository = env['runbot_merge.repository'].search([('name', '=', repo)])
-    if not repository.project_id._find_commands(comment):
-        return "No commands, ignoring"
-
-    pr = env['runbot_merge.pull_requests']._get_or_schedule(
-        repo, event['pull_request']['number'],
-        event['pull_request']['base']['ref']
-    )
-    if not pr:
-        return "Unknown PR, scheduling fetch"
-
-    return pr._parse_commands(partner, comment)
+    return _handle_comment(
+        env, repo, pr, author, comment,
+        target=event['pull_request']['base']['ref'])
 
 def handle_ping(env, event):
     print("Got ping! {}".format(event['zen']))
@@ -274,3 +249,15 @@ EVENTS = {
     'pull_request_review': handle_review,
     'ping': handle_ping,
 }
+
+def _handle_comment(env, repo, issue, author, comment, target=None):
+    repository = env['runbot_merge.repository'].search([('name', '=', repo)])
+    if not repository.project_id._find_commands(comment):
+        return "No commands, ignoring"
+
+    pr = env['runbot_merge.pull_requests']._get_or_schedule(repo, issue, target=target)
+    if not pr:
+        return "Unknown PR, scheduling fetch"
+
+    partner = env['res.partner'].search([('github_login', '=', author), ])
+    return pr._parse_commands(partner, comment, author)
