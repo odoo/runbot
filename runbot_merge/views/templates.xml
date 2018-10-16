@@ -44,6 +44,25 @@
                     <section t-foreach="project.branch_ids" t-as="branch" class="col-md-12">
                         <h2><t t-esc="branch.name"/></h2>
                         <t t-call="runbot_merge.stagings"/>
+                        <t t-set="ready_unstaged" t-value="
+                            project.env['runbot_merge.pull_requests'].search([
+                                ('target', '=', branch.id),
+                                ('state', '=', 'ready'),
+                                ('staging_id', '=', False),
+                            ])
+                        "/>
+                        <t t-if="ready_unstaged">
+                            <h5 style="display: inline-block;">Awaiting</h5>
+                            <ul class="list-inline" style="display: inline-block;">
+                                <li t-foreach="ready_unstaged" t-as="pr">
+                                    <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
+                                       t-att-title="pr.message.split('\n')[0]">
+                                        <t t-esc="pr.repository.name"/>#
+                                        <t t-esc="pr.number"/>
+                                    </a>
+                                </li>
+                            </ul>
+                        </t>
                     </section>
                 </section>
             </div></div>
