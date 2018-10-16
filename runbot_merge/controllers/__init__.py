@@ -166,6 +166,16 @@ def handle_pr(env, event):
 
     # don't marked merged PRs as closed (!!!)
     if event['action'] == 'closed' and pr_obj.state != 'merged':
+        # ignore if the PR is already being updated in a separate transaction
+        # (most likely being merged?)
+        env.cr.execute('''
+        SELECT id FROM runbot_merge_pull_requests
+        WHERE id = %s AND state != 'merged'
+        FOR UPDATE SKIP LOCKED;
+        ''', [pr_obj.id])
+        if not env.cr.fetchall():
+            return 'Ignored: could not lock rows (probably being merged)'
+
         env.cr.execute('''
         UPDATE runbot_merge_pull_requests
         SET state = 'closed'

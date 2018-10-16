@@ -61,13 +61,17 @@ class Project(models.Model):
              "will lead to webhook rejection. Should only use ASCII."
     )
 
-    def _check_progress(self):
+    def _check_progress(self, commit=False):
         for project in self.search([]):
             for staging in project.mapped('branch_ids.active_staging_id'):
                 staging.check_status()
+                if commit:
+                    self.env.cr.commit()
 
             for branch in project.branch_ids:
                 branch.try_staging()
+                if commit:
+                    self.env.cr.commit()
 
         # I have no idea why this is necessary for tests to pass, the only
         # DB update done not through the ORM is when receiving a notification
