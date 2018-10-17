@@ -356,7 +356,7 @@ class Branch(models.Model):
             Tagging.create({
                 'pull_request': pr.number,
                 'repository': pr.repository.id,
-                'state_from': pr._tagstate,
+                'state_from': 'ready',
                 'state_to': 'staged',
             })
 
