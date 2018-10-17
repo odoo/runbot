@@ -86,8 +86,9 @@
                 <t t-set="title">
                     <t t-if="staging.state == 'canceled'">Cancelled: <t t-esc="staging.reason"/></t>
                     <t t-if="staging.state == 'ff_failed'">Fast Forward Failed</t>
+                    <t t-if="staging.state == 'failure'"><t t-esc="staging.reason"/></t>
                 </t>
-                <li t-attf-class="{{stateclass}} {{decorationclass}}" t-att-title="title">
+                <li t-attf-class="{{stateclass}} {{decorationclass}}" t-att-title="title.strip() or None">
                     <ul class="list-unstyled">
                         <li t-foreach="staging.batch_ids" t-as="batch" class="batch">
                             <t t-esc="batch.prs[:1].label"/>
