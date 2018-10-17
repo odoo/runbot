@@ -6,7 +6,7 @@ from odoo import models, fields, api
 
 _logger = logging.getLogger(__name__)
 _re_coverage = re.compile(r'\bcoverage\b')
-
+_re_patch = re.compile(r'.*patch-\d+$')
 
 class runbot_branch(models.Model):
 
@@ -72,8 +72,9 @@ class runbot_branch(models.Model):
         """compute pull head name"""
         for branch in self:
             pi = self._get_pull_info()
-            if pi:
-                branch.pull_head_name = pi['head']['ref']
+            if pi and not _re_patch.match(pi['head']['label']):
+                # label is used to disambiguate PR with same branch name
+                branch.pull_head_name = pi['head']['label']
 
     def _get_branch_quickconnect_url(self, fqdn, dest):
         self.ensure_one()

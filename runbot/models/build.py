@@ -133,8 +133,7 @@ class runbot_build(models.Model):
 
         build = self
         branch, repo = build.branch_id, build.repo_id
-        pi = branch._get_pull_info()
-        name = pi['base']['ref'] if pi else branch.branch_name
+        name = branch.pull_head_name or branch.branch_name
 
         target_repo = self.env['runbot.repo'].browse(target_repo_id)
 
