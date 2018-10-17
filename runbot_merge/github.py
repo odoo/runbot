@@ -30,7 +30,7 @@ class GH(object):
             if isinstance(check, collections.Mapping):
                 exc = check.get(r.status_code)
                 if exc:
-                    raise exc(r.content)
+                    raise exc(r.text)
             if r.status_code >= 400 and r.headers.get('content-type', '').startswith('application/javascript'):
                 raise requests.HTTPError(
                     json_.dumps(r.json(), indent=4),
@@ -88,22 +88,35 @@ class GH(object):
             'sha': sha,
             'force': True,
         }, check=False)
-        if r.status_code == 200:
-            _logger.debug('set_ref(update, %s, %s, %s) -> OK', self._repo, branch, sha)
+
+        status0 = r.status_code
+        _logger.debug(
+            'set_ref(update, %s, %s, %s -> %s (%s)',
+            self._repo, branch, sha, status0,
+            'OK' if status0 == 200 else r.text or r.reason
+        )
+        if status0 == 200:
             return
 
         # 422 makes no sense but that's what github returns, leaving 404 just
         # in case
-        if r.status_code in (404, 422):
+        status1 = None
+        if status0 in (404, 422):
             # fallback: create ref
             r = self('post', 'git/refs', json={
                 'ref': 'refs/heads/{}'.format(branch),
                 'sha': sha,
             }, check=False)
-            if r.status_code == 201:
-                _logger.debug('set_ref(create, %s, %s, %s) -> OK', self._repo, branch, sha)
+            status1 = r.status_code
+            _logger.debug(
+                'set_ref(create, %s, %s, %s) -> %s (%s)',
+                self._repo, branch, sha, status1,
+                'OK' if status1 == 201 else r.text or r.reason
+            )
+            if status1 == 201:
                 return
-        raise AssertionError("{}: {}".format(r.status_code, r.json()))
+
+        raise AssertionError("set_ref failed(%s, %s)" % (status0, status1))
 
     def merge(self, sha, dest, message):
         r = self('post', 'merges', json={
@@ -114,7 +127,7 @@ class GH(object):
         try:
             r = r.json()
         except Exception:
-            raise exceptions.MergeError("Got non-JSON reponse from github: %s %s (%s)" % (r.status_code, r.reason, r.content.decode('iso-8859-1')))
+            raise exceptions.MergeError("Got non-JSON reponse from github: %s %s (%s)" % (r.status_code, r.reason, r.text))
         _logger.debug("merge(%s, %s, %s) -> %s", self._repo, dest, shorten(message), r['sha'])
         return dict(r['commit'], sha=r['sha'])
 
