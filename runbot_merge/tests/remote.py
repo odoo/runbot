@@ -113,6 +113,10 @@ def wait_for_server(db, timeout=120):
             if time.time() > limit:
                 raise socket.timeout()
 
+@pytest.fixture(scope='session')
+def remote_p():
+    return True
+
 @pytest.fixture
 def env(request):
     """

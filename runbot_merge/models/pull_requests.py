@@ -1227,7 +1227,10 @@ class Batch(models.Model):
                 pr.state = 'error'
                 gh.comment(pr.number, "Unable to stage PR (%s)" % e)
 
-                # reset other PRs
+                # reset the head which failed, as rebase() may have partially
+                # updated it (despite later steps failing)
+                gh.set_ref(target, original_head)
+                # then reset every previous update
                 for to_revert in new_heads.keys():
                     it = meta[to_revert.repository]
                     it['gh'].set_ref('tmp.{}'.format(to_revert.target.name), it['head'])

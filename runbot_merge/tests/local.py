@@ -3,6 +3,10 @@ import odoo
 import pytest
 import fake_github
 
+@pytest.fixture(scope='session')
+def remote_p():
+    return False
+
 @pytest.fixture
 def gh():
     with fake_github.Github() as gh:

@@ -1,11 +1,11 @@
 import datetime
+import itertools
 import json
 import re
 import time
-import requests
+from unittest import mock
 
 import pytest
-from requests import HTTPError
 
 import odoo
 
@@ -581,6 +581,68 @@ def test_forward_port(env, repo):
     assert set(h.parents) == {m, pr.head}
     commits = {c['sha'] for c in repo.log('heads/master')}
     assert len(commits) == 112
+
+def test_rebase_failure(env, repo, users, remote_p):
+    """ It looks like gh.rebase() can fail in the final ref-setting after
+    the merging & commits creation has been performed. At this point, the
+    staging will fail (yay) but the target branch (tmp) would not get reset,
+    leading to the next PR being staged *on top* of the one being staged
+    right there, and pretty much integrating it, leading to very, very
+    strange results if the entire thing passes staging.
+
+    Seen: https://github.com/odoo/odoo/pull/27835#issuecomment-430505429
+    PR 27835 was merged to tmp at df0ae6c00e085dbaabcfec821208c9ace2f4b02d
+    then the set_ref failed, following which PR 27840 is merged to tmp at
+    819b5414c27a92031a9ce3f159a8f466a4fd698c note that the first (left)
+    parent is the merge commit from PR 27835. The set_ref of PR 27840
+    succeeded resulting in PR 27835 being integrated into the squashing of
+    27840 (without any renaming or anything, just the content), following
+    which PR 27835 was merged and squashed as a "no-content" commit.
+
+    Problem: I need to make try_staging > stage > rebase > set_ref fail
+    but only the first time, and not the set_ref in try_staging itself, and
+    that call is performed *in a subprocess* when running <remote> tests.
+    """
+    # FIXME: remote mode
+    if remote_p:
+        pytest.skip("Needs to find a way to make set_ref fail on *second* call in remote mode.")
+
+    m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+    repo.make_ref('heads/master', m)
+
+    commit_a = repo.make_commit(m, 'A', None, tree={'m': 'm', 'a': 'a'})
+    pr_a = repo.make_pr('A', None, target='master', ctid=commit_a, user='user', label='a')
+    repo.post_status(pr_a.head, 'success', 'ci/runbot')
+    repo.post_status(pr_a.head, 'success', 'legal/cla')
+    pr_a.post_comment('hansen r+', 'reviewer')
+
+    commit_b = repo.make_commit(m, 'B', None, tree={'m': 'm', 'b': 'b'})
+    pr_b = repo.make_pr('B', None, target='master', ctid=commit_b, user='user', label='b')
+    repo.post_status(pr_b.head, 'success', 'ci/runbot')
+    repo.post_status(pr_b.head, 'success', 'legal/cla')
+    pr_b.post_comment('hansen r+', 'reviewer')
+
+    from odoo.addons.runbot_merge.github import GH
+    original = GH.set_ref
+    counter = itertools.count(start=1)
+    def wrapper(*args):
+        assert next(counter) != 2, "make it seem like updating the branch post-rebase fails"
+        return original(*args)
+
+    with mock.patch.object(GH, 'set_ref', autospec=True, side_effect=wrapper) as m:
+        env['runbot_merge.project']._check_progress()
+
+    assert pr_a.comments == [
+        (users['reviewer'], 'hansen r+'),
+        (users['user'], re_matches(r'^Unable to stage PR')),
+    ]
+    assert pr_b.comments == [
+        (users['reviewer'], 'hansen r+'),
+    ]
+    assert repo.read_tree(repo.commit('heads/staging.master')) == {
+        'm': b'm',
+        'b': b'b',
+    }
 
 class TestRetry:
     @pytest.mark.xfail(reason="This may not be a good idea as it could lead to tons of rebuild spam")
