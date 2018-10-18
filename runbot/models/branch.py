@@ -73,7 +73,7 @@ class runbot_branch(models.Model):
         for branch in self:
             pi = self._get_pull_info()
             if pi:
-                self.pull_head_name = pi['head']['ref']
+                branch.pull_head_name = pi['head']['ref']
 
     def _get_branch_quickconnect_url(self, fqdn, dest):
         self.ensure_one()
