@@ -5,7 +5,6 @@
             .stagings {
                 display: flex;
                 align-items: stretch;
-                overflow: hidden;
             }
             .stagings > li {
                 /* 4 to 6 stagings displayed, avoid stretching */
@@ -86,9 +85,9 @@
                 <t t-set="title">
                     <t t-if="staging.state == 'canceled'">Cancelled: <t t-esc="staging.reason"/></t>
                     <t t-if="staging.state == 'ff_failed'">Fast Forward Failed</t>
-                    <t t-if="staging.state == 'failure'"><t t-esc="staging.reason"/></t>
+                    <t t-if="staging.state not in ('canceled', 'ff_failed')"><t t-esc="staging.reason"/></t>
                 </t>
-                <li t-attf-class="{{stateclass}} {{decorationclass}}" t-att-title="title.strip() or None">
+                <li t-attf-class="staging {{stateclass}} {{decorationclass}}" t-att-title="title.strip() or None">
                     <ul class="list-unstyled">
                         <li t-foreach="staging.batch_ids" t-as="batch" class="batch">
                             <t t-esc="batch.prs[:1].label"/>
@@ -99,7 +98,29 @@
                         </li>
                     </ul>
                     <t t-if="staging.heads">
-                        Staged <span t-field="staging.staged_at" t-options="{'widget': 'relative'}"/>
+                        <div class="dropdown">
+                            <button class="btn btn-link dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                                Staged <span t-field="staging.staged_at" t-options="{'widget': 'relative'}"/>
+                                <span class="caret"></span>
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li groups="runbot_merge.group_admin">
+                                    <a t-attf-href="/web#id={{staging.id}}&amp;view_type=form&amp;model=runbot_merge.stagings" target="new">
+                                        Open Staging
+                                    </a>
+                                </li>
+                                <li t-foreach="staging.statuses" t-as="st" t-if="st[3]"
+                                    t-att-class="
+                                        'bg-success' if st[2] == 'success'
+                                   else 'bg-danger' if st[2] in ('error', 'failure')
+                                   else 'bg-info'"
+                                >
+                                    <a t-att-href="st[3]" target="new">
+                                        <t t-esc="st[0]"/>: <t t-esc="st[1]"/>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
                     </t>
                 </li>
             </t>

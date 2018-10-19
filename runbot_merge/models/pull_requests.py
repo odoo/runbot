@@ -900,6 +900,32 @@ class Stagings(models.Model):
     # seems simpler than adding yet another indirection through a model
     heads = fields.Char(required=True, help="JSON-encoded map of heads, one per repo in the project")
 
+    statuses = fields.Binary(compute='_compute_statuses')
+
+    @api.depends('heads')
+    def _compute_statuses(self):
+        """ Fetches statuses associated with the various heads, returned as
+        (repo, context, state, url)
+        """
+        Commits = self.env['runbot_merge.commit']
+        for st in self:
+            heads = {
+                head: repo for repo, head in json.loads(st.heads).items()
+                if not repo.endswith('^')
+            }
+            commits = Commits.search([('sha', 'in', list(heads.keys()))])
+            st.statuses = [
+                (
+                    heads[commit.sha],
+                    context,
+                    status.get('state') or 'pending',
+                    status.get('target_url') or ''
+                )
+                for commit in commits
+                for context, st in json.loads(commit.statuses).items()
+                for status in [to_status(st)]
+            ]
+
     def _validate(self):
         Commits = self.env['runbot_merge.commit']
         for s in self:

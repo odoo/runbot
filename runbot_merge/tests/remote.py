@@ -93,6 +93,15 @@ def wait_for_hook(n=1):
     # TODO: find better way to wait for roundtrip of actions which can trigger webhooks
     time.sleep(10 * n)
 
+@pytest.fixture
+def page():
+    s = requests.Session()
+    def get(url):
+        r = s.get('http://localhost:{}{}'.format(PORT, url))
+        r.raise_for_status()
+        return r.content
+    return get
+
 def wait_for_server(db, timeout=120):
     """ Polls for server to be response & have installed our module.
 

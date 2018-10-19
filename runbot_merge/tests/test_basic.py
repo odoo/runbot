@@ -6,6 +6,7 @@ import time
 from unittest import mock
 
 import pytest
+from lxml import html
 
 import odoo
 
@@ -15,7 +16,7 @@ from test_utils import re_matches
 def repo(make_repo):
     return make_repo('repo')
 
-def test_trivial_flow(env, repo):
+def test_trivial_flow(env, repo, page):
     # create base branch
     m = repo.make_commit(None, "initial", None, tree={'a': 'some content'})
     repo.make_ref('heads/master', m)
@@ -58,8 +59,24 @@ def test_trivial_flow(env, repo):
 
     # get head of staging branch
     staging_head = repo.commit('heads/staging.master')
-    repo.post_status(staging_head.id, 'success', 'ci/runbot')
+    repo.post_status(staging_head.id, 'success', 'ci/runbot', target_url='http://foo.com/pog')
     repo.post_status(staging_head.id, 'success', 'legal/cla')
+    # the should not block the merge because it's not part of the requirements
+    repo.post_status(staging_head.id, 'failure', 'ci/lint', target_url='http://ignored.com/whocares')
+
+    assert set(tuple(t) for t in pr.staging_id.statuses) == {
+        (repo.name, 'legal/cla', 'success', ''),
+        (repo.name, 'ci/runbot', 'success', 'http://foo.com/pog'),
+        (repo.name, 'ci/lint', 'failure', 'http://ignored.com/whocares'),
+    }
+    p = html.fromstring(page('/runbot_merge'))
+    s = p.cssselect('.staging div.dropdown li')
+    assert len(s) == 2
+    assert s[0].get('class') == 'bg-success'
+    assert s[0][0].text.strip() == '{}: ci/runbot'.format(repo.name)
+    assert s[1].get('class') == 'bg-danger'
+    assert s[1][0].text.strip() == '{}: ci/lint'.format(repo.name)
+
     assert re.match('^force rebuild', staging_head.message)
 
     env['runbot_merge.project']._check_progress()

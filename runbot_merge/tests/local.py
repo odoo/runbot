@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
-import odoo
+
 import pytest
+import werkzeug.test, werkzeug.wrappers
+
+import odoo
+
 import fake_github
 
 @pytest.fixture(scope='session')
@@ -96,6 +100,16 @@ def make_repo(gh, project):
             ])
         ])
     return make_repo
+
+@pytest.fixture
+def page():
+    c = werkzeug.test.Client(odoo.http.root, werkzeug.wrappers.BaseResponse)
+    def get(url):
+        r = c.get(url)
+        assert r.status_code == 200
+        return r.data
+    return get
+
 # TODO: project fixture
 # TODO: repos (indirect/parameterize?) w/ WS hook
 # + repo proxy object
