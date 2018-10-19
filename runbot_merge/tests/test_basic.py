@@ -1683,12 +1683,17 @@ class TestReviewing(object):
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'ready'
+        # second r+ to check warning
+        prx.post_comment('hansen r+', user='reviewer')
 
         env['runbot_merge.project']._send_feedback()
         assert prx.comments == [
             (users['other'], 'hansen r+'),
             (users['reviewer'], 'hansen r+'),
+            (users['reviewer'], 'hansen r+'),
             (users['user'], "I'm sorry, @{}. I'm afraid I can't do that.".format(users['other'])),
+            (users['user'], "I'm sorry, @{}. This PR is already reviewed, reviewing it again is useless.".format(
+                 users['reviewer'])),
         ]
 
     def test_self_review_fail(self, env, repo, users):

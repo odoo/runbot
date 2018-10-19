@@ -567,6 +567,8 @@ class PullRequests(models.Model):
                     if newstate:
                         self.state = newstate
                         ok = True
+                    else:
+                        msg = "This PR is already reviewed, reviewing it again is useless."
                 elif not param and is_author:
                     newstate = RMINUS.get(self.state)
                     if newstate:
