@@ -276,7 +276,12 @@ class Branch(models.Model):
           -- deleting branches & reusing labels)
           AND pr.state != 'merged'
           AND pr.state != 'closed'
-        GROUP BY pr.label
+        GROUP BY
+            CASE
+                WHEN pr.label SIMILAR TO '%%:patch-[[:digit:]]+'
+                    THEN pr.id::text
+                ELSE pr.label
+            END
         HAVING (bool_or(pr.priority = 0) AND NOT bool_or(pr.state = 'error'))
             OR bool_and(pr.state = 'ready')
         ORDER BY min(pr.priority), min(pr.id)
@@ -729,7 +734,12 @@ class PullRequests(models.Model):
           -- deleting branches & reusing labels)
               pr.state != 'merged'
           AND pr.state != 'closed'
-        GROUP BY pr.label
+        GROUP BY
+            CASE
+                WHEN pr.label SIMILAR TO '%%:patch-[[:digit:]]+'
+                    THEN pr.id::text
+                ELSE pr.label
+            END
         HAVING
           -- one of the batch's PRs should be ready & not marked
               bool_or(pr.state = 'ready' AND NOT pr.link_warned)

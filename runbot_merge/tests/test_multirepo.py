@@ -102,6 +102,34 @@ def test_stage_match(env, project, repo_a, repo_b):
     assert pr_a.staging_id == pr_b.staging_id, \
         "branch-matched PRs should be part of the same staging"
 
+def test_unmatch_patch(env, project, repo_a, repo_b):
+    """ When editing files via the UI for a project you don't have write
+    access to, a branch called patch-XXX is automatically created in your
+    profile to hold the change.
+
+    This means it's possible to create a:patch-1 and b:patch-1 without
+    intending them to be related in any way, and more likely than the opposite
+    since there is no user control over the branch names (save by actually
+    creating/renaming branches afterwards before creating the PR).
+
+    -> PRs with a branch name of patch-* should not be label-matched
+    """
+    project.batch_limit = 1
+    make_branch(repo_a, 'master', 'initial', {'a': 'a_0'})
+    pr_a = make_pr(repo_a, 'A', [{'a': 'a_1'}], label='patch-1')
+
+    make_branch(repo_b, 'master', 'initial', {'a': 'b_0'})
+    pr_b = make_pr(repo_b, 'B', [{'a': 'b_1'}], label='patch-1')
+
+    env['runbot_merge.project']._check_progress()
+
+    pr_a = to_pr(env, pr_a)
+    pr_b = to_pr(env, pr_b)
+    assert pr_a.state == 'ready'
+    assert pr_a.staging_id
+    assert pr_b.state == 'ready'
+    assert not pr_b.staging_id, 'patch-* PRs should not be branch-matched'
+
 def test_sub_match(env, project, repo_a, repo_b, repo_c):
     """ Branch-matching should work on a subset of repositories
     """
