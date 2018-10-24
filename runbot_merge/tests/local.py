@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import inspect
 
 import pytest
 import werkzeug.test, werkzeug.wrappers
@@ -45,15 +46,26 @@ def registry(request):
         yield odoo.registry(db)
 
 @pytest.fixture
-def env(registry):
-    with registry.cursor() as cr:
-        env = odoo.api.Environment(cr, odoo.SUPERUSER_ID, {})
-        ctx = env['res.users'].context_get()
-        registry.enter_test_mode(cr)
-        yield env(context=ctx)
+def cr(registry):
+    # in v12, enter_test_mode flags an existing cursor while in v11 it sets one up
+    if inspect.signature(registry.enter_test_mode).parameters:
+        with registry.cursor() as cr:
+            registry.enter_test_mode(cr)
+            yield cr
+            registry.leave_test_mode()
+            cr.rollback()
+    else:
+        registry.enter_test_mode()
+        with registry.cursor() as cr:
+            yield cr
+            cr.rollback()
         registry.leave_test_mode()
 
-        cr.rollback()
+@pytest.fixture
+def env(cr):
+    env = odoo.api.Environment(cr, odoo.SUPERUSER_ID, {})
+    ctx = env['res.users'].context_get()
+    yield env(context=ctx)
 
 @pytest.fixture
 def owner():
