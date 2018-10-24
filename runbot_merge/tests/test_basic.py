@@ -846,6 +846,7 @@ class TestMergeMethod:
         repo.post_status(staging.id, 'success', 'legal/cla')
         repo.post_status(staging.id, 'success', 'ci/runbot')
         env['runbot_merge.project']._check_progress()
+        env['runbot_merge.project']._send_feedback()
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)

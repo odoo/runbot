@@ -121,10 +121,14 @@ class Project(models.Model):
                 gh = ghs[repo] = repo.github()
 
             try:
-                gh.comment(f.pull_request, f.message)
+                if f.close:
+                    gh.close(f.pull_request, f.message)
+                else:
+                    gh.comment(f.pull_request, f.message)
             except Exception:
                 _logger.exception(
-                    "Error while trying to send a comment to %s:%s (%s)",
+                    "Error while trying to %s %s:%s (%s)",
+                    'close' if f.close else 'send a comment to',
                     repo.name, f.pull_request,
                     f.message and f.message[:200]
                 )
@@ -836,6 +840,7 @@ class Feedback(models.Model):
     # objects on non-handled branches
     pull_request = fields.Integer()
     message = fields.Char()
+    close = fields.Boolean()
 
 class Commit(models.Model):
     """Represents a commit onto which statuses might be posted,
@@ -1132,7 +1137,12 @@ class Stagings(models.Model):
                 )
                 prs.write({'state': 'merged'})
                 for pr in prs:
-                    gh[pr.repository.name].close(pr.number, 'Merged, thanks!')
+                    self.env['runbot_merge.pull_requests.feedback'].create({
+                        'repository': pr.repository.id,
+                        'pull_request': pr.number,
+                        'message': "Merged, thanks!",
+                        'close': True,
+                    })
             finally:
                 self.batch_ids.write({'active': False})
                 self.write({'active': False})
