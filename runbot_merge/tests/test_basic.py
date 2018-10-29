@@ -10,7 +10,7 @@ from lxml import html
 
 import odoo
 
-from test_utils import re_matches
+from test_utils import re_matches, run_crons
 
 @pytest.fixture
 def repo(make_repo):
@@ -387,7 +387,7 @@ def test_staging_ci_failure_single(env, repo, users):
     staging_head = repo.commit('heads/staging.master')
     repo.post_status(staging_head.id, 'success', 'legal/cla')
     repo.post_status(staging_head.id, 'failure', 'ci/runbot') # stable genius
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
     assert env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', repo.name),
         ('number', '=', prx.number)

@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from test_utils import re_matches
+from test_utils import re_matches, run_crons
 
 @pytest.fixture
 def repo_a(make_repo):
@@ -263,13 +263,12 @@ class TestCompanionsNotReady:
         assert pr_b.state == 'validated'
         assert pr_a.label == pr_b.label == '{}:do-a-thing'.format(owner)
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         assert not pr_b.staging_id
         assert not pr_a.staging_id, \
             "pr_a should not have been staged as companion is not ready"
 
-        env['runbot_merge.pull_requests']._check_linked_prs_statuses()
         assert p_a.comments == [
             (users['reviewer'], 'hansen r+'),
             (users['user'], "Linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (repo_b.name, p_b.number)),
@@ -296,7 +295,7 @@ class TestCompanionsNotReady:
         make_branch(repo_c, 'master', 'initial', {'f': 'c0'})
         pr_c = make_pr(repo_c, 'C', [{'f': 'c1'}], label='a-thing', reviewer=None)
 
-        env['runbot_merge.pull_requests']._check_linked_prs_statuses()
+        run_crons(env)
         assert pr_a.comments == []
         assert pr_b.comments == [
             (users['reviewer'], 'hansen r+'),
@@ -321,7 +320,7 @@ class TestCompanionsNotReady:
         make_branch(repo_c, 'master', 'initial', {'f': 'c0'})
         pr_c = make_pr(repo_c, 'C', [{'f': 'c1'}], label='a-thing')
 
-        env['runbot_merge.pull_requests']._check_linked_prs_statuses()
+        run_crons(env)
         assert pr_a.comments == []
         assert pr_b.comments == [
             (users['reviewer'], 'hansen r+'),
@@ -356,7 +355,7 @@ def test_other_failed(env, project, repo_a, repo_b, owner, users):
     repo_a.post_status('heads/staging.master', 'success', 'ci/runbot', target_url="http://example.org/a")
     repo_b.post_status('heads/staging.master', 'success', 'legal/cla')
     repo_b.post_status('heads/staging.master', 'failure', 'ci/runbot', target_url="http://example.org/b")
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
 
     sth = repo_b.commit('heads/staging.master').id
     assert not pr.staging_id

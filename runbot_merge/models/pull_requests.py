@@ -758,14 +758,16 @@ class PullRequests(models.Model):
             unready = prs - ready
 
             for r in ready:
-                r.repository.github().comment(
-                    r.number, "Linked pull request(s) {} not ready. Linked PRs are not staged until all of them are ready.".format(
+                self.env['runbot_merge.pull_requests.feedback'].create({
+                    'repository': r.repository.id,
+                    'pull_request': r.number,
+                    'message': "Linked pull request(s) {} not ready. Linked PRs are not staged until all of them are ready.".format(
                         ', '.join(map(
                             '{0.repository.name}#{0.number}'.format,
                             unready
                         ))
                     )
-                )
+                })
                 r.link_warned = True
                 if commit:
                     self.env.cr.commit()
@@ -992,8 +994,11 @@ class Stagings(models.Model):
         prs = prs or self.batch_ids.prs
         prs.write({'state': 'error'})
         for pr in prs:
-            pr.repository.github().comment(
-                pr.number, "Staging failed: %s" % message)
+            self.env['runbot_merge.pull_requests.feedback'].create({
+                'repository': pr.repository.id,
+                'pull_request': pr.number,
+                'message':"Staging failed: %s" % message
+            })
 
         self.batch_ids.write({'active': False})
         self.write({
