@@ -34,28 +34,6 @@ def now():
     return time.strftime(DEFAULT_SERVER_DATETIME_FORMAT)
 
 
-def lock(filename):
-    fd = os.open(filename, os.O_CREAT | os.O_RDWR, 0o600)
-    if hasattr(os, 'set_inheritable'):
-        os.set_inheritable(fd, True)  # needed since pep-446
-    fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-
-
-def locked(filename):
-    result = False
-    try:
-        fd = os.open(filename, os.O_CREAT | os.O_RDWR, 0o600)
-    except OSError:
-        return False
-    try:
-        fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:  # since pep-3151 fcntl raises OSError and IOError is now an alias of OSError
-        result = True
-    finally:
-        os.close(fd)
-    return result
-
-
 def grep(filename, string):
     if os.path.isfile(filename):
         return open(filename).read().find(string) != -1

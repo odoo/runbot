@@ -11,7 +11,8 @@ import signal
 import subprocess
 import time
 from subprocess import CalledProcessError
-from ..common import dt2time, fqdn, now, locked, grep, time2str, rfind, uniq_list, local_pgadmin_cursor, lock, get_py_version
+from ..common import dt2time, fqdn, now, grep, time2str, rfind, uniq_list, local_pgadmin_cursor, get_py_version
+from ..container import docker_build, docker_run, docker_stop, docker_is_running
 from odoo import models, fields, api
 from odoo.exceptions import UserError
 from odoo.http import request
@@ -386,6 +387,10 @@ class runbot_build(models.Model):
             l[0] = "%s %s" % (build.dest, l[0])
             _logger.debug(*l)
 
+    def _get_docker_name(self):
+        self.ensure_one()
+        return '%s_%s' % (self.dest, self.job)
+
     def _schedule(self):
         """schedule the build"""
         jobs = self._list_jobs()
@@ -412,8 +417,7 @@ class runbot_build(models.Model):
                 build.write(values)
             else:
                 # check if current job is finished
-                lock_path = build._path('logs', '%s.lock' % build.job)
-                if locked(lock_path):
+                if docker_is_running(build._get_docker_name()):
                     # kill if overpassed
                     timeout = (build.branch_id.job_timeout or default_timeout) * 60 * ( build.coverage and 1.5 or 1)
                     if build.job != jobs[-1] and build.job_time > timeout:
@@ -444,10 +448,10 @@ class runbot_build(models.Model):
                 build._logger('running %s', build.job)
                 job_method = getattr(self, '_' + build.job)  # compute the job method to run
                 os.makedirs(build._path('logs'), exist_ok=True)
-                lock_path = build._path('logs', '%s.lock' % build.job)
+                os.makedirs(build._path('datadir'), exist_ok=True)
                 log_path = build._path('logs', '%s.txt' % build.job)
                 try:
-                    pid = job_method(build, lock_path, log_path)
+                    pid = job_method(build, log_path)
                     build.write({'pid': pid})
                 except Exception:
                     _logger.exception('%s failed running method %s', build.dest, build.job)
@@ -630,12 +634,7 @@ class runbot_build(models.Model):
             if build.host != host:
                 continue
             build._log('kill', 'Kill build %s' % build.dest)
-            if build.pid:
-                build._logger('killing %s', build.pid)
-                try:
-                    os.killpg(build.pid, signal.SIGKILL)
-                except OSError:
-                    pass
+            docker_stop(build._get_docker_name())
             v = {'state': 'done', 'job': False}
             if result:
                 v['result'] = result
@@ -668,15 +667,12 @@ class runbot_build(models.Model):
             'openerp-server.py',        # 7.0
             'bin/openerp-server.py',    # < 7.0
         ]
-        for server_path in map(build._path, bins):
-            if os.path.isfile(server_path):
+        for odoo_bin in bins:
+            if os.path.isfile(build._path(odoo_bin)):
                 break
 
         # commandline
-        cmd = [
-            build._path(server_path),
-            "--xmlrpc-port=%d" % build.port,
-        ]
+        cmd = [ os.path.join('/data/build', odoo_bin), ]
         # options
         if grep(build._server("tools/config.py"), "no-xmlrpcs"):
             cmd.append("--no-xmlrpcs")
@@ -694,29 +690,13 @@ class runbot_build(models.Model):
             datadir = build._path('datadir')
             if not os.path.exists(datadir):
                 os.mkdir(datadir)
-            cmd += ["--data-dir", datadir]
+            cmd += ["--data-dir", '/data/build/datadir']
 
         # if build.branch_id.test_tags:
         #    cmd.extend(['--test_tags', "'%s'" % build.branch_id.test_tags])  # keep for next version
 
         return cmd, build.modules
 
-    def _spawn(self, cmd, lock_path, log_path, cpu_limit=None, shell=False, env=None):
-        def preexec_fn():
-            os.setsid()
-            if cpu_limit:
-                # set soft cpulimit
-                soft, hard = resource.getrlimit(resource.RLIMIT_CPU)
-                r = resource.getrusage(resource.RUSAGE_SELF)
-                cpu_time = r.ru_utime + r.ru_stime
-                resource.setrlimit(resource.RLIMIT_CPU, (cpu_time + cpu_limit, hard))
-            # close parent files
-            os.closerange(3, os.sysconf("SC_OPEN_MAX"))
-            lock(lock_path)
-        out = open(log_path, "w")
-        _logger.debug("spawn: %s stdout: %s", ' '.join(cmd), log_path)
-        p = subprocess.Popen(cmd, stdout=out, stderr=out, preexec_fn=preexec_fn, shell=shell, env=env, close_fds=False)
-        return p.pid
 
     def _github_status_notify_all(self, status):
         """Notify each repo with a status"""
@@ -751,15 +731,21 @@ class runbot_build(models.Model):
             build._github_status_notify_all(status)
 
     # Jobs definitions
-    # They all need "build, lock_pathn log_path" parameters
-    def _job_00_init(self, build, lock_path, log_path):
+    # They all need "build log_path" parameters
+    def _job_00_init(self, build, log_path):
         build._log('init', 'Init build environment')
         # notify pending build - avoid confusing users by saying nothing
         build._github_status()
         build._checkout()
         return -2
 
-    def _job_10_test_base(self, build, lock_path, log_path):
+    def _job_02_docker_build(self, build, log_path):
+        """Build the docker image"""
+        build._log('docker_build', 'Building docker image')
+        docker_build(log_path, build._path())
+        return -2
+
+    def _job_10_test_base(self, build, log_path):
         build._log('test_base', 'Start test base module')
         # run base test
         self._local_pg_createdb("%s-base" % build.dest)
@@ -769,9 +755,9 @@ class runbot_build(models.Model):
         cmd += ['-d', '%s-base' % build.dest, '-i', 'base', '--stop-after-init', '--log-level=test', '--max-cron-threads=0']
         if build.extra_params:
             cmd.extend(shlex.split(build.extra_params))
-        return self._spawn(cmd, lock_path, log_path, cpu_limit=600)
+        return docker_run(cmd, log_path, build._path(), build._get_docker_name(), cpu_limit=600)
 
-    def _job_20_test_all(self, build, lock_path, log_path):
+    def _job_20_test_all(self, build, log_path):
         build._log('test_all', 'Start test all modules')
         cpu_limit = 2400
         self._local_pg_createdb("%s-all" % build.dest)
@@ -781,11 +767,8 @@ class runbot_build(models.Model):
         cmd += ['-d', '%s-all' % build.dest, '-i', mods, '--stop-after-init', '--log-level=test', '--max-cron-threads=0']
         if build.extra_params:
             cmd.extend(build.extra_params.split(' '))
-        env = None
         if build.coverage:
             cpu_limit *= 1.5
-            pyversion = get_py_version(build)
-            env = self._coverage_env(build)
             available_modules = [
                 os.path.basename(os.path.dirname(a))
                 for a in (glob.glob(build._server('addons/*/__openerp__.py')) +
@@ -793,25 +776,21 @@ class runbot_build(models.Model):
             ]
             bad_modules = set(available_modules) - set((mods or '').split(','))
             omit = ['--omit', ','.join('*addons/%s/*' %m for m in bad_modules) + '*__manifest__.py']
-            cmd = [pyversion, '-m', 'coverage', 'run', '--branch', '--source', build._server()] + omit + cmd[:]
+            cmd = [ get_py_version(build), '-m', 'coverage', 'run', '--branch', '--source', '/data/build'] + omit + cmd
         # reset job_start to an accurate job_20 job_time
         build.write({'job_start': now()})
-        return self._spawn(cmd, lock_path, log_path, cpu_limit=cpu_limit, env=env)
+        return docker_run(cmd, log_path, build._path(), build._get_docker_name(), cpu_limit=cpu_limit)
 
-    def _coverage_env(self, build):
-        return dict(os.environ, COVERAGE_FILE=build._path('.coverage'))
-
-    def _job_21_coverage_html(self, build, lock_path, log_path):
+    def _job_21_coverage_html(self, build, log_path):
         if not build.coverage:
             return -2
         build._log('coverage_html', 'Start generating coverage html')
-        pyversion = get_py_version(build)
         cov_path = build._path('coverage')
         os.makedirs(cov_path, exist_ok=True)
-        cmd = [pyversion, "-m", "coverage", "html", "-d", cov_path, "--ignore-errors"]
-        return self._spawn(cmd, lock_path, log_path, env=self._coverage_env(build))
+        cmd = [ get_py_version(build), "-m", "coverage", "html", "-d", "/data/build/coverage", "--ignore-errors"]
+        return docker_run(cmd, log_path, build._path(), build._get_docker_name())
 
-    def _job_22_coverage_result(self, build, lock_path, log_path):
+    def _job_22_coverage_result(self, build, log_path):
         if not build.coverage:
             return -2
         build._log('coverage_result', 'Start getting coverage result')
@@ -825,7 +804,7 @@ class runbot_build(models.Model):
             build._log('coverage_result', 'Coverage file not found')
         return -2  # nothing to wait for
 
-    def _job_30_run(self, build, lock_path, log_path):
+    def _job_30_run(self, build, log_path):
         # adjust job_end to record an accurate job_20 job_time
         build._log('run', 'Start running build %s' % build.dest)
         log_all = build._path('logs', 'job_20_test_all.txt')
@@ -848,17 +827,17 @@ class runbot_build(models.Model):
         cmd, mods = build._cmd()
         if os.path.exists(build._server('addons/im_livechat')):
             cmd += ["--workers", "2"]
-            cmd += ["--longpolling-port", "%d" % (build.port + 1)]
+            cmd += ["--longpolling-port", "8070"]
             cmd += ["--max-cron-threads", "1"]
         else:
             # not sure, to avoid old server to check other dbs
             cmd += ["--max-cron-threads", "0"]
 
-        cmd += ['-d', "%s-all" % build.dest]
+        cmd += ['-d', '%s-all' % build.dest]
 
         if grep(build._server("tools/config.py"), "db-filter"):
             if build.repo_id.nginx:
                 cmd += ['--db-filter', '%d.*$']
             else:
                 cmd += ['--db-filter', '%s.*$' % build.dest]
-        return self._spawn(cmd, lock_path, log_path, cpu_limit=None)
+        return docker_run(cmd, log_path, build._path(), build._get_docker_name(), exposed_ports = [build.port, build.port + 1])

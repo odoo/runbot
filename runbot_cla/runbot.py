@@ -13,7 +13,7 @@ _logger = logging.getLogger(__name__)
 class runbot_build(models.Model):
     _inherit = "runbot.build"
 
-    def _job_05_check_cla(self, build, lock_path, log_path):
+    def _job_05_check_cla(self, build, log_path):
         cla_glob = glob.glob(build._path("doc/cla/*/*.md"))
         if cla_glob:
             description = "%s Odoo CLA signature check" % build.author
