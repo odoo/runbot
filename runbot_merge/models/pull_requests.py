@@ -8,6 +8,7 @@ import pprint
 import re
 import time
 
+from email.utils import formataddr
 from itertools import takewhile
 
 from odoo import api, fields, models, tools
@@ -415,6 +416,7 @@ class PullRequests(models.Model):
     ], default=False)
     method_warned = fields.Boolean(default=False)
 
+    reviewed_by = fields.Many2one('res.partner')
     delegates = fields.Many2many('res.partner', help="Delegate reviewers, not intrinsically reviewers but can review this PR")
     priority = fields.Selection([
         (0, 'Urgent'),
@@ -583,6 +585,7 @@ class PullRequests(models.Model):
                     newstate = RPLUS.get(self.state)
                     if newstate:
                         self.state = newstate
+                        self.reviewed_by = author
                         ok = True
                     else:
                         msg = "This PR is already reviewed, reviewing it again is useless."
@@ -811,9 +814,13 @@ class PullRequests(models.Model):
             pr=self,
             repository=self.repository.name.replace('/', '\\/')
         ), message)
-        if m:
-            return message
-        return message + '\n\ncloses {pr.repository.name}#{pr.number}'.format(pr=self)
+        if not m:
+            message += '\n\ncloses {pr.repository.name}#{pr.number}'.format(pr=self)
+        if self.reviewed_by:
+            email = self.reviewed_by.email or '%s@users.noreply.github.com' % self.reviewed_by.github_login
+            reviewer = formataddr((self.reviewed_by.name, email))
+            message += '\n\nSigned-off-by: {}'.format(reviewer)
+        return message
 
     def _stage(self, gh, target):
         # nb: pr_commits is oldest to newest so pr.head is pr_commits[-1]

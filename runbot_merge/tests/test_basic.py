@@ -91,7 +91,8 @@ def test_trivial_flow(env, repo, page):
         'a': b'some other content',
         'b': b'a second file',
     }
-    assert master.message == "gibberish\n\nblahblah\n\ncloses {repo.name}#1".format(repo=repo)
+    assert master.message == "gibberish\n\nblahblah\n\ncloses {repo.name}#1"\
+                             "\n\nSigned-off-by: Reviewer <reviewer@example.com>".format(repo=repo)
 
 class TestCommitMessage:
     def test_commit_simple(self, env, repo, users):
@@ -113,7 +114,8 @@ class TestCommitMessage:
         env['runbot_merge.project']._check_progress()
 
         master = repo.commit('heads/master')
-        assert master.message == "simple commit message\n\ncloses {repo.name}#1".format(repo=repo)
+        assert master.message == "simple commit message\n\ncloses {repo.name}#1"\
+                                 "\n\nSigned-off-by: Reviewer <reviewer@example.com>".format(repo=repo)
 
     def test_commit_existing(self, env, repo, users):
         """ verify do not duplicate 'closes' instruction
@@ -135,7 +137,8 @@ class TestCommitMessage:
 
         master = repo.commit('heads/master')
         # closes #1 is already present, should not modify message
-        assert master.message == "simple commit message that closes #1"
+        assert master.message == "simple commit message that closes #1"\
+                                 "\n\nSigned-off-by: Reviewer <reviewer@example.com>"
 
     def test_commit_other(self, env, repo, users):
         """ verify do not duplicate 'closes' instruction
@@ -157,7 +160,8 @@ class TestCommitMessage:
 
         master = repo.commit('heads/master')
         # closes on another repositoy, should modify the commit message
-        assert master.message == "simple commit message that closes odoo/enterprise#1\n\ncloses {repo.name}#1".format(repo=repo)
+        assert master.message == "simple commit message that closes odoo/enterprise#1\n\ncloses {repo.name}#1"\
+                                 "\n\nSigned-off-by: Reviewer <reviewer@example.com>".format(repo=repo)
 
     def test_commit_wrong_number(self, env, repo, users):
         """ verify do not match on a wrong number
@@ -179,7 +183,31 @@ class TestCommitMessage:
 
         master = repo.commit('heads/master')
         # closes on another repositoy, should modify the commit message
-        assert master.message == "simple commit message that closes #11\n\ncloses {repo.name}#1".format(repo=repo)
+        assert master.message == "simple commit message that closes #11\n\ncloses {repo.name}#1"\
+                                 "\n\nSigned-off-by: Reviewer <reviewer@example.com>".format(repo=repo)
+
+    def test_commit_delegate(self, env, repo, users):
+        """ verify 'signed-off-by ...' is correctly added in the commit message for delegated review
+        """
+        c1 = repo.make_commit(None, 'first!', None, tree={'f': 'm1'})
+        repo.make_ref('heads/master', c1)
+        c2 = repo.make_commit(c1, 'simple commit message', None, tree={'f': 'm2'})
+
+        prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+        repo.post_status(prx.head, 'success', 'legal/cla')
+        prx.post_comment('hansen delegate=%s' % users['other'], "reviewer")
+        prx.post_comment('hansen r+', user='other')
+
+        env['runbot_merge.project']._check_progress()
+
+        repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+        repo.post_status('heads/staging.master', 'success', 'legal/cla')
+        env['runbot_merge.project']._check_progress()
+
+        master = repo.commit('heads/master')
+        assert master.message == "simple commit message\n\ncloses {repo.name}#1"\
+                                 "\n\nSigned-off-by: other <other@users.noreply.github.com>".format(repo=repo)
 
 
 class TestWebhookSecurity:
@@ -489,9 +517,9 @@ def test_ff_failure_batch(env, repo, users):
     }
     assert messages == {
         'initial', 'NO!',
-        'a1', 'a2', 'A\n\ncloses {}#{}'.format(repo.name, A.number),
-        'b1', 'b2', 'B\n\ncloses {}#{}'.format(repo.name, B.number),
-        'c1', 'c2', 'C\n\ncloses {}#{}'.format(repo.name, C.number),
+        'a1', 'a2', 'A\n\ncloses {}#{}\n\nSigned-off-by: Reviewer <reviewer@example.com>'.format(repo.name, A.number),
+        'b1', 'b2', 'B\n\ncloses {}#{}\n\nSigned-off-by: Reviewer <reviewer@example.com>'.format(repo.name, B.number),
+        'c1', 'c2', 'C\n\ncloses {}#{}\n\nSigned-off-by: Reviewer <reviewer@example.com>'.format(repo.name, C.number),
     }
 
 def test_edit(env, repo):
@@ -1027,7 +1055,7 @@ class TestMergeMethod:
         nm2 = node('M2', node('M1', node('M0')))
         nb1 = node('B1', node('B0', nm2))
         merge_head = (
-            'title\n\nbody\n\ncloses {}#{}'.format(repo.name, prx.number),
+            'title\n\nbody\n\ncloses {}#{}\n\nSigned-off-by: Reviewer <reviewer@example.com>'.format(repo.name, prx.number),
             frozenset([nm2, nb1])
         )
         expected = (re_matches('^force rebuild'), frozenset([merge_head]))
@@ -1090,7 +1118,8 @@ class TestMergeMethod:
         staging = log_to_node(repo.log('heads/staging.master'))
         # then compare to the dag version of the right graph
         nm2 = node('M2', node('M1', node('M0')))
-        nb1 = node('B1\n\ncloses {}#{}'.format(repo.name, prx.number), node('B0', nm2))
+        nb1 = node('B1\n\ncloses {}#{}\n\nSigned-off-by: Reviewer <reviewer@example.com>'.format(
+            repo.name, prx.number), node('B0', nm2))
         expected = node(re_matches('^force rebuild'), nb1)
         assert staging == expected
 
@@ -1146,7 +1175,8 @@ class TestMergeMethod:
 
         m = node('M')
         c0 = node('C0', m)
-        expected = node('gibberish\n\nblahblah\n\ncloses {}#{}'.format(repo.name, prx.number), m, c0)
+        expected = node('gibberish\n\nblahblah\n\ncloses {}#{}'
+                        '\n\nSigned-off-by: Reviewer <reviewer@example.com>'.format(repo.name, prx.number), m, c0)
         assert log_to_node(repo.log('heads/master')), expected
 
     def test_unrebase_emptymessage(self, repo, env):
@@ -1175,7 +1205,8 @@ class TestMergeMethod:
 
         m = node('M')
         c0 = node('C0', m)
-        expected = node('gibberish\n\ncloses {}#{}'.format(repo.name, prx.number), m, c0)
+        expected = node('gibberish\n\ncloses {}#{}'
+                        '\n\nSigned-off-by: Reviewer <reviewer@example.com>'.format(repo.name, prx.number), m, c0)
         assert log_to_node(repo.log('heads/master')), expected
 
     def test_pr_mergehead(self, repo, env):
@@ -1254,7 +1285,7 @@ class TestMergeMethod:
 
         m1 = node('M1')
         expected = node(
-            'T\n\nTT\n\ncloses {}#{}'.format(repo.name, prx.number),
+            'T\n\nTT\n\ncloses {}#{}\n\nSigned-off-by: Reviewer <reviewer@example.com>'.format(repo.name, prx.number),
             node('M2', m1),
             node('C1', node('C0', m1), node('B0', m1))
         )
@@ -1577,12 +1608,12 @@ class TestBatching(object):
         log = list(repo.log('heads/staging.master'))
         staging = log_to_node(log)
         p1 = node(
-            'title PR1\n\nbody PR1\n\ncloses {}#{}'.format(repo.name, pr1.number),
+            'title PR1\n\nbody PR1\n\ncloses {}#{}\n\nSigned-off-by: Reviewer <reviewer@example.com>'.format(repo.name, pr1.number),
             node('initial'),
             node('commit_PR1_01', node('commit_PR1_00', node('initial')))
         )
         p2 = node(
-            'title PR2\n\nbody PR2\n\ncloses {}#{}'.format(repo.name, pr2.number),
+            'title PR2\n\nbody PR2\n\ncloses {}#{}\n\nSigned-off-by: Reviewer <reviewer@example.com>'.format(repo.name, pr2.number),
             p1,
             node('commit_PR2_01', node('commit_PR2_00', p1))
         )
@@ -1616,12 +1647,12 @@ class TestBatching(object):
         staging = log_to_node(log)
 
         p1 = node(
-            'title PR1\n\nbody PR1\n\ncloses {}#{}'.format(repo.name, pr1.number),
+            'title PR1\n\nbody PR1\n\ncloses {}#{}\n\nSigned-off-by: Reviewer <reviewer@example.com>'.format(repo.name, pr1.number),
             node('initial'),
             node('commit_PR1_01', node('commit_PR1_00', node('initial')))
         )
         p2 = node(
-            'title PR2\n\nbody PR2\n\ncloses {}#{}'.format(repo.name, pr2.number),
+            'title PR2\n\nbody PR2\n\ncloses {}#{}\n\nSigned-off-by: Reviewer <reviewer@example.com>'.format(repo.name, pr2.number),
             p1,
             node('commit_PR2_01', node('commit_PR2_00', node('initial')))
         )
@@ -1651,8 +1682,8 @@ class TestBatching(object):
         staging = log_to_node(log)
         expected = node(
             re_matches('^force rebuild'),
-            node('commit_PR2_00\n\ncloses {}#{}'.format(repo.name, pr2.number),
-                 node('commit_PR1_00\n\ncloses {}#{}'.format(repo.name, pr1.number),
+            node('commit_PR2_00\n\ncloses {}#{}\n\nSigned-off-by: Reviewer <reviewer@example.com>'.format(repo.name, pr2.number),
+                 node('commit_PR1_00\n\ncloses {}#{}\n\nSigned-off-by: Reviewer <reviewer@example.com>'.format(repo.name, pr1.number),
                       node('initial'))))
         assert staging == expected
 

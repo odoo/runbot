@@ -207,7 +207,7 @@ def test_merge_fail(env, project, repo_a, repo_b, users):
         for c in repo_a.log('heads/staging.master')
     ] == [
         re_matches('^force rebuild'),
-        'commit_A2_00\n\ncloses %s#2' % repo_a.name,
+        'commit_A2_00\n\ncloses %s#2\n\nSigned-off-by: Reviewer <reviewer@example.com>' % repo_a.name,
         'initial'
     ], "dummy commit + squash-merged PR commit + root commit"
 

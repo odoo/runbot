@@ -77,6 +77,7 @@ def users(env):
         'name': "Reviewer",
         'github_login': 'reviewer',
         'reviewer': True,
+        'email': "reviewer@example.com",
     })
     env['res.partner'].create({
         'name': "Self Reviewer",
