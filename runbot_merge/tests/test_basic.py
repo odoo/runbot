@@ -207,7 +207,7 @@ class TestCommitMessage:
 
         master = repo.commit('heads/master')
         assert master.message == "simple commit message\n\ncloses {repo.name}#1"\
-                                 "\n\nSigned-off-by: other <other@users.noreply.github.com>".format(repo=repo)
+                                 "\n\nSigned-off-by: Other <other@users.noreply.github.com>".format(repo=repo)
 
 
 class TestWebhookSecurity:

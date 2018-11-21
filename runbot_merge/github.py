@@ -39,6 +39,11 @@ class GH(object):
             r.raise_for_status()
         return r
 
+    def user(self, username):
+        r = self._session.get("{}/users/{}".format(self._url, username))
+        r.raise_for_status()
+        return r.json()
+
     def head(self, branch):
         d = self('get', 'git/refs/heads/{}'.format(branch)).json()
 

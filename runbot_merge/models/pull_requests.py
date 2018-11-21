@@ -832,6 +832,12 @@ class PullRequests(models.Model):
         assert commits < 250, "merging PRs of 250+ commits is not supported (https://developer.github.com/v3/pulls/#list-commits-on-a-pull-request)"
         pr_commits = gh.commits(self.number)
 
+        if self.reviewed_by and self.reviewed_by.name == self.reviewed_by.github_login:
+            # XXX: find other trigger(s) to sync github name?
+            gh_name = gh.user(self.reviewed_by.github_login)['name']
+            if gh_name:
+                self.reviewed_by.name = gh_name
+
         # NOTE: lost merge v merge/copy distinction (head being
         #       a merge commit reused instead of being re-merged)
         return method, getattr(self, '_stage_' + method.replace('-', '_'))(gh, target, pr_commits)
