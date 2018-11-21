@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from test_utils import re_matches, run_crons
+from test_utils import re_matches, run_crons, get_partner
 
 @pytest.fixture
 def repo_a(make_repo):
@@ -201,13 +201,14 @@ def test_merge_fail(env, project, repo_a, repo_b, users):
         (users['user'], re_matches('^Unable to stage PR')),
     ]
     other = to_pr(env, pr1a)
+    reviewer = get_partner(env, users["reviewer"]).formatted_email
     assert not other.staging_id
     assert [
         c['commit']['message']
         for c in repo_a.log('heads/staging.master')
     ] == [
         re_matches('^force rebuild'),
-        'commit_A2_00\n\ncloses %s#2' % repo_a.name,
+        'commit_A2_00\n\ncloses %s#2\n\nSigned-off-by: %s' % (repo_a.name, reviewer),
         'initial'
     ], "dummy commit + squash-merged PR commit + root commit"
 

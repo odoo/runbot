@@ -415,6 +415,7 @@ class PullRequests(models.Model):
     ], default=False)
     method_warned = fields.Boolean(default=False)
 
+    reviewed_by = fields.Many2one('res.partner')
     delegates = fields.Many2many('res.partner', help="Delegate reviewers, not intrinsically reviewers but can review this PR")
     priority = fields.Selection([
         (0, 'Urgent'),
@@ -583,6 +584,7 @@ class PullRequests(models.Model):
                     newstate = RPLUS.get(self.state)
                     if newstate:
                         self.state = newstate
+                        self.reviewed_by = author
                         ok = True
                     else:
                         msg = "This PR is already reviewed, reviewing it again is useless."
@@ -807,13 +809,33 @@ class PullRequests(models.Model):
                 self.env.cr.commit()
 
     def _build_merge_message(self, message):
+        # handle co-authored commits (https://help.github.com/articles/creating-a-commit-with-multiple-authors/)
+        lines = message.splitlines()
+        coauthors = []
+        for idx, line in enumerate(reversed(lines)):
+            if line.startswith('Co-authored-by:'):
+                coauthors.append(line)
+                continue
+            if not line.strip():
+                continue
+
+            if idx:
+                del lines[-idx:]
+            break
+
         m = re.search(r'( |{repository})#{pr.number}\b'.format(
             pr=self,
             repository=self.repository.name.replace('/', '\\/')
         ), message)
-        if m:
-            return message
-        return message + '\n\ncloses {pr.repository.name}#{pr.number}'.format(pr=self)
+        if not m:
+            lines.extend(['', 'closes {pr.repository.name}#{pr.number}'.format(pr=self)])
+        if self.reviewed_by:
+            lines.extend(['', 'Signed-off-by: {}'.format(self.reviewed_by.formatted_email)])
+
+        if coauthors:
+            lines.extend(['', ''])
+            lines.extend(reversed(coauthors))
+        return '\n'.join(lines)
 
     def _stage(self, gh, target):
         # nb: pr_commits is oldest to newest so pr.head is pr_commits[-1]
@@ -824,6 +846,12 @@ class PullRequests(models.Model):
             "rebasing a PR or more than 50 commits is a tad excessive"
         assert commits < 250, "merging PRs of 250+ commits is not supported (https://developer.github.com/v3/pulls/#list-commits-on-a-pull-request)"
         pr_commits = gh.commits(self.number)
+
+        if self.reviewed_by and self.reviewed_by.name == self.reviewed_by.github_login:
+            # XXX: find other trigger(s) to sync github name?
+            gh_name = gh.user(self.reviewed_by.github_login)['name']
+            if gh_name:
+                self.reviewed_by.name = gh_name
 
         # NOTE: lost merge v merge/copy distinction (head being
         #       a merge commit reused instead of being re-merged)

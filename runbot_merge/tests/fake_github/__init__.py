@@ -16,14 +16,18 @@ from werkzeug.urls import url_parse, url_encode
 
 from . import git
 
-API_PATTERN = re.compile(
+REPOS_API_PATTERN = re.compile(
     r'https://api.github.com/repos/(?P<repo>\w+/\w+)/(?P<path>.+)'
 )
+USERS_API_PATTERN = re.compile(
+    r"https://api.github.com/users/(?P<user>\w+)"
+)
+
 class APIResponse(responses.BaseResponse):
-    def __init__(self, sim):
+    def __init__(self, sim, url):
         super(APIResponse, self).__init__(
             method=None,
-            url=API_PATTERN
+            url=url
         )
         self.sim = sim
         self.content_type = 'application/json'
@@ -35,7 +39,7 @@ class APIResponse(responses.BaseResponse):
     def get_response(self, request):
         m = self.url.match(request.url)
 
-        r = self.sim.repos[m.group('repo')].api(m.group('path'), request)
+        r = self.dispatch(request, m)
         if isinstance(r, responses.HTTPResponse):
             return r
 
@@ -51,6 +55,21 @@ class APIResponse(responses.BaseResponse):
             body=body,
             headers=headers,
             preload_content=False, )
+
+class ReposAPIResponse(APIResponse):
+    def __init__(self, sim):
+        super().__init__(sim, REPOS_API_PATTERN)
+
+    def dispatch(self, request, match):
+        return self.sim.repos[match.group('repo')].api(match.group('path'), request)
+
+class UsersAPIResponse(APIResponse):
+    def __init__(self, sim):
+        super().__init__(sim, url=USERS_API_PATTERN)
+
+    def dispatch(self, request, match):
+        return self.sim._read_user(request, match.group('user'))
+
 
 class Github(object):
     """ Github simulator
@@ -74,11 +93,21 @@ class Github(object):
     def __enter__(self):
         # otherwise swallows errors from within the test
         self._requests = responses.RequestsMock(assert_all_requests_are_fired=False).__enter__()
-        self._requests.add(APIResponse(self))
+        self._requests.add(ReposAPIResponse(self))
+        self._requests.add(UsersAPIResponse(self))
         return self
 
     def __exit__(self, *args):
         return self._requests.__exit__(*args)
+
+    def _read_user(self, _, user):
+        return (200, {
+            'id': id(user),
+            'type': 'User',
+            'login': user,
+            'name': user.capitalize(),
+        })
+
 
 class Repo(object):
     def __init__(self, name):

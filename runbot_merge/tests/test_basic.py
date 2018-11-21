@@ -10,13 +10,13 @@ from lxml import html
 
 import odoo
 
-from test_utils import re_matches, run_crons
+from test_utils import re_matches, run_crons, get_partner
 
 @pytest.fixture
 def repo(make_repo):
     return make_repo('repo')
 
-def test_trivial_flow(env, repo, page):
+def test_trivial_flow(env, repo, page, users):
     # create base branch
     m = repo.make_commit(None, "initial", None, tree={'a': 'some content'})
     repo.make_ref('heads/master', m)
@@ -91,7 +91,9 @@ def test_trivial_flow(env, repo, page):
         'a': b'some other content',
         'b': b'a second file',
     }
-    assert master.message == "gibberish\n\nblahblah\n\ncloses {repo.name}#1".format(repo=repo)
+    assert master.message == "gibberish\n\nblahblah\n\ncloses {repo.name}#1"\
+                             "\n\nSigned-off-by: {reviewer.formatted_email}"\
+                             .format(repo=repo, reviewer=get_partner(env, users['reviewer']))
 
 class TestCommitMessage:
     def test_commit_simple(self, env, repo, users):
@@ -113,7 +115,9 @@ class TestCommitMessage:
         env['runbot_merge.project']._check_progress()
 
         master = repo.commit('heads/master')
-        assert master.message == "simple commit message\n\ncloses {repo.name}#1".format(repo=repo)
+        assert master.message == "simple commit message\n\ncloses {repo.name}#1"\
+                                 "\n\nSigned-off-by: {reviewer.formatted_email}"\
+                                 .format(repo=repo, reviewer=get_partner(env, users['reviewer']))
 
     def test_commit_existing(self, env, repo, users):
         """ verify do not duplicate 'closes' instruction
@@ -135,7 +139,9 @@ class TestCommitMessage:
 
         master = repo.commit('heads/master')
         # closes #1 is already present, should not modify message
-        assert master.message == "simple commit message that closes #1"
+        assert master.message == "simple commit message that closes #1"\
+                                 "\n\nSigned-off-by: {reviewer.formatted_email}"\
+                                 .format(reviewer=get_partner(env, users['reviewer']))
 
     def test_commit_other(self, env, repo, users):
         """ verify do not duplicate 'closes' instruction
@@ -157,7 +163,9 @@ class TestCommitMessage:
 
         master = repo.commit('heads/master')
         # closes on another repositoy, should modify the commit message
-        assert master.message == "simple commit message that closes odoo/enterprise#1\n\ncloses {repo.name}#1".format(repo=repo)
+        assert master.message == "simple commit message that closes odoo/enterprise#1\n\ncloses {repo.name}#1"\
+                                 "\n\nSigned-off-by: {reviewer.formatted_email}"\
+                                 .format(repo=repo, reviewer=get_partner(env, users['reviewer']))
 
     def test_commit_wrong_number(self, env, repo, users):
         """ verify do not match on a wrong number
@@ -179,8 +187,57 @@ class TestCommitMessage:
 
         master = repo.commit('heads/master')
         # closes on another repositoy, should modify the commit message
-        assert master.message == "simple commit message that closes #11\n\ncloses {repo.name}#1".format(repo=repo)
+        assert master.message == "simple commit message that closes #11\n\ncloses {repo.name}#1"\
+                                 "\n\nSigned-off-by: {reviewer.formatted_email}"\
+                                 .format(repo=repo, reviewer=get_partner(env, users['reviewer']))
 
+    def test_commit_delegate(self, env, repo, users):
+        """ verify 'signed-off-by ...' is correctly added in the commit message for delegated review
+        """
+        c1 = repo.make_commit(None, 'first!', None, tree={'f': 'm1'})
+        repo.make_ref('heads/master', c1)
+        c2 = repo.make_commit(c1, 'simple commit message', None, tree={'f': 'm2'})
+
+        prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+        repo.post_status(prx.head, 'success', 'legal/cla')
+        prx.post_comment('hansen delegate=%s' % users['other'], "reviewer")
+        prx.post_comment('hansen r+', user='other')
+
+        env['runbot_merge.project']._check_progress()
+
+        repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+        repo.post_status('heads/staging.master', 'success', 'legal/cla')
+        env['runbot_merge.project']._check_progress()
+
+        master = repo.commit('heads/master')
+        assert master.message == "simple commit message\n\ncloses {repo.name}#1"\
+                                 "\n\nSigned-off-by: {reviewer.formatted_email}"\
+                                 .format(repo=repo, reviewer=get_partner(env, users['other']))
+
+    def test_commit_coauthored(self, env, repo, users):
+        """ verify 'closes ...' and 'Signed-off-by' are added before co-authored-by tags.
+        """
+        c1 = repo.make_commit(None, 'first!', None, tree={'f': 'm1'})
+        repo.make_ref('heads/master', c1)
+        c2 = repo.make_commit(c1, 'simple commit message\n\n\nCo-authored-by: Bob <bob@example.com>', None, tree={'f': 'm2'})
+
+        prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+        repo.post_status(prx.head, 'success', 'legal/cla')
+        prx.post_comment('hansen r+', "reviewer")
+
+        env['runbot_merge.project']._check_progress()
+
+        repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+        repo.post_status('heads/staging.master', 'success', 'legal/cla')
+        env['runbot_merge.project']._check_progress()
+
+        master = repo.commit('heads/master')
+        assert master.message == "simple commit message\n\ncloses {repo.name}#1"\
+                                 "\n\nSigned-off-by: {reviewer.formatted_email}"\
+                                 "\n\n\nCo-authored-by: Bob <bob@example.com>"\
+                                 .format(repo=repo, reviewer=get_partner(env, users['reviewer']))
 
 class TestWebhookSecurity:
     def test_no_secret(self, env, project, repo):
@@ -487,11 +544,12 @@ def test_ff_failure_batch(env, repo, users):
         c['commit']['message']
         for c in repo.log('heads/master')
     }
+    reviewer = get_partner(env, users["reviewer"]).formatted_email
     assert messages == {
         'initial', 'NO!',
-        'a1', 'a2', 'A\n\ncloses {}#{}'.format(repo.name, A.number),
-        'b1', 'b2', 'B\n\ncloses {}#{}'.format(repo.name, B.number),
-        'c1', 'c2', 'C\n\ncloses {}#{}'.format(repo.name, C.number),
+        'a1', 'a2', 'A\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, A.number, reviewer),
+        'b1', 'b2', 'B\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, B.number, reviewer),
+        'c1', 'c2', 'C\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, C.number, reviewer),
     }
 
 def test_edit(env, repo):
@@ -974,7 +1032,7 @@ class TestMergeMethod:
             (users['user'], "Merge method set to rebase and fast-forward"),
         ]
 
-    def test_pr_rebase_merge(self, repo, env):
+    def test_pr_rebase_merge(self, repo, env, users):
         """ test result on rebase-merge
 
         left: PR
@@ -1026,8 +1084,9 @@ class TestMergeMethod:
         # then compare to the dag version of the right graph
         nm2 = node('M2', node('M1', node('M0')))
         nb1 = node('B1', node('B0', nm2))
+        reviewer = get_partner(env, users["reviewer"]).formatted_email
         merge_head = (
-            'title\n\nbody\n\ncloses {}#{}'.format(repo.name, prx.number),
+            'title\n\nbody\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, prx.number, reviewer),
             frozenset([nm2, nb1])
         )
         expected = (re_matches('^force rebuild'), frozenset([merge_head]))
@@ -1048,7 +1107,7 @@ class TestMergeMethod:
         final_tree = repo.read_tree(repo.commit('heads/master'))
         assert final_tree == {'m': b'2', 'b': b'1'}, "sanity check of final tree"
 
-    def test_pr_rebase_ff(self, repo, env):
+    def test_pr_rebase_ff(self, repo, env, users):
         """ test result on rebase-merge
 
         left: PR
@@ -1090,7 +1149,9 @@ class TestMergeMethod:
         staging = log_to_node(repo.log('heads/staging.master'))
         # then compare to the dag version of the right graph
         nm2 = node('M2', node('M1', node('M0')))
-        nb1 = node('B1\n\ncloses {}#{}'.format(repo.name, prx.number), node('B0', nm2))
+        reviewer = get_partner(env, users["reviewer"]).formatted_email
+        nb1 = node('B1\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, prx.number, reviewer),
+                   node('B0', nm2))
         expected = node(re_matches('^force rebuild'), nb1)
         assert staging == expected
 
@@ -1113,7 +1174,7 @@ class TestMergeMethod:
     def test_pr_contains_merges(self, repo, env):
         pass
 
-    def test_pr_force_merge_single_commit(self, repo, env):
+    def test_pr_force_merge_single_commit(self, repo, env, users):
         """ should be possible to flag a PR as regular-merged, regardless of
         its commits count
 
@@ -1146,10 +1207,12 @@ class TestMergeMethod:
 
         m = node('M')
         c0 = node('C0', m)
-        expected = node('gibberish\n\nblahblah\n\ncloses {}#{}'.format(repo.name, prx.number), m, c0)
+        reviewer = get_partner(env, users["reviewer"]).formatted_email
+        expected = node('gibberish\n\nblahblah\n\ncloses {}#{}'
+                        '\n\nSigned-off-by: {}'.format(repo.name, prx.number, reviewer), m, c0)
         assert log_to_node(repo.log('heads/master')), expected
 
-    def test_unrebase_emptymessage(self, repo, env):
+    def test_unrebase_emptymessage(self, repo, env, users):
         """ When merging between master branches (e.g. forward port), the PR
         may have only a title
         """
@@ -1175,7 +1238,9 @@ class TestMergeMethod:
 
         m = node('M')
         c0 = node('C0', m)
-        expected = node('gibberish\n\ncloses {}#{}'.format(repo.name, prx.number), m, c0)
+        reviewer = get_partner(env, users["reviewer"]).formatted_email
+        expected = node('gibberish\n\ncloses {}#{}'
+                        '\n\nSigned-off-by: {}'.format(repo.name, prx.number, reviewer), m, c0)
         assert log_to_node(repo.log('heads/master')), expected
 
     def test_pr_mergehead(self, repo, env):
@@ -1214,7 +1279,7 @@ class TestMergeMethod:
         expected = node('C1', node('C0', m1), node('M2', m1))
         assert log_to_node(repo.log('heads/master')), expected
 
-    def test_pr_mergehead_nonmember(self, repo, env):
+    def test_pr_mergehead_nonmember(self, repo, env, users):
         """ if the head of the PR is a merge commit but none of the parents is
         in the target, merge normally
 
@@ -1253,8 +1318,9 @@ class TestMergeMethod:
         assert repo.read_tree(master) == {'a': b'1', 'b': b'2', 'bb': b'bb'}
 
         m1 = node('M1')
+        reviewer = get_partner(env, users["reviewer"]).formatted_email
         expected = node(
-            'T\n\nTT\n\ncloses {}#{}'.format(repo.name, prx.number),
+            'T\n\nTT\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, prx.number, reviewer),
             node('M2', m1),
             node('C1', node('C0', m1), node('B0', m1))
         )
@@ -1556,7 +1622,7 @@ class TestBatching(object):
             ('number', '=', number),
         ])
 
-    def test_staging_batch(self, env, repo):
+    def test_staging_batch(self, env, repo, users):
         """ If multiple PRs are ready for the same target at the same point,
         they should be staged together
         """
@@ -1576,20 +1642,21 @@ class TestBatching(object):
 
         log = list(repo.log('heads/staging.master'))
         staging = log_to_node(log)
+        reviewer = get_partner(env, users["reviewer"]).formatted_email
         p1 = node(
-            'title PR1\n\nbody PR1\n\ncloses {}#{}'.format(repo.name, pr1.number),
+            'title PR1\n\nbody PR1\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, pr1.number, reviewer),
             node('initial'),
             node('commit_PR1_01', node('commit_PR1_00', node('initial')))
         )
         p2 = node(
-            'title PR2\n\nbody PR2\n\ncloses {}#{}'.format(repo.name, pr2.number),
+            'title PR2\n\nbody PR2\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, pr2.number, reviewer),
             p1,
             node('commit_PR2_01', node('commit_PR2_00', p1))
         )
         expected = (re_matches('^force rebuild'), frozenset([p2]))
         assert staging == expected
 
-    def test_staging_batch_norebase(self, env, repo):
+    def test_staging_batch_norebase(self, env, repo, users):
         """ If multiple PRs are ready for the same target at the same point,
         they should be staged together
         """
@@ -1614,21 +1681,22 @@ class TestBatching(object):
         log = list(repo.log('heads/staging.master'))
 
         staging = log_to_node(log)
+        reviewer = get_partner(env, users["reviewer"]).formatted_email
 
         p1 = node(
-            'title PR1\n\nbody PR1\n\ncloses {}#{}'.format(repo.name, pr1.number),
+            'title PR1\n\nbody PR1\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, pr1.number, reviewer),
             node('initial'),
             node('commit_PR1_01', node('commit_PR1_00', node('initial')))
         )
         p2 = node(
-            'title PR2\n\nbody PR2\n\ncloses {}#{}'.format(repo.name, pr2.number),
+            'title PR2\n\nbody PR2\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, pr2.number, reviewer),
             p1,
             node('commit_PR2_01', node('commit_PR2_00', node('initial')))
         )
         expected = (re_matches('^force rebuild'), frozenset([p2]))
         assert staging == expected
 
-    def test_staging_batch_squash(self, env, repo):
+    def test_staging_batch_squash(self, env, repo, users):
         """ If multiple PRs are ready for the same target at the same point,
         they should be staged together
         """
@@ -1649,10 +1717,11 @@ class TestBatching(object):
         log = list(repo.log('heads/staging.master'))
 
         staging = log_to_node(log)
+        reviewer = get_partner(env, users["reviewer"]).formatted_email
         expected = node(
             re_matches('^force rebuild'),
-            node('commit_PR2_00\n\ncloses {}#{}'.format(repo.name, pr2.number),
-                 node('commit_PR1_00\n\ncloses {}#{}'.format(repo.name, pr1.number),
+            node('commit_PR2_00\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, pr2.number, reviewer),
+                 node('commit_PR1_00\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, pr1.number, reviewer),
                       node('initial'))))
         assert staging == expected
 
@@ -2307,3 +2376,18 @@ def log_to_node(log):
             todo.append(c)
 
     return nodes[log[0]['sha']]
+
+class TestEmailFormatting:
+    def test_simple(self, env):
+        p1 = env['res.partner'].create({
+            'name': 'Bob',
+            'email': 'bob@example.com',
+        })
+        assert p1.formatted_email == 'Bob <bob@example.com>'
+
+    def test_noemail(self, env):
+        p1 = env['res.partner'].create({
+            'name': 'Shultz',
+            'github_login': 'Osmose99',
+        })
+        assert p1.formatted_email == 'Shultz <Osmose99@users.noreply.github.com>'
