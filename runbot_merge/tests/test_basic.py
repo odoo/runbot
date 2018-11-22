@@ -209,6 +209,29 @@ class TestCommitMessage:
         assert master.message == "simple commit message\n\ncloses {repo.name}#1"\
                                  "\n\nSigned-off-by: Other <other@users.noreply.github.com>".format(repo=repo)
 
+    def test_commit_coauthored(self, env, repo, users):
+        """ verify 'closes ...' and 'Signed-off-by' are added before co-authored-by tags.
+        """
+        c1 = repo.make_commit(None, 'first!', None, tree={'f': 'm1'})
+        repo.make_ref('heads/master', c1)
+        c2 = repo.make_commit(c1, 'simple commit message\n\n\nCo-authored-by: Bob <bob@example.com>', None, tree={'f': 'm2'})
+
+        prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
+        repo.post_status(prx.head, 'success', 'ci/runbot')
+        repo.post_status(prx.head, 'success', 'legal/cla')
+        prx.post_comment('hansen r+', "reviewer")
+
+        env['runbot_merge.project']._check_progress()
+
+        repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+        repo.post_status('heads/staging.master', 'success', 'legal/cla')
+        env['runbot_merge.project']._check_progress()
+
+        master = repo.commit('heads/master')
+        assert master.message == "simple commit message\n\ncloses {repo.name}#1"\
+                                 "\n\nSigned-off-by: Reviewer <reviewer@example.com>"\
+                                 "\n\n\nCo-authored-by: Bob <bob@example.com>"\
+                                 .format(repo=repo)
 
 class TestWebhookSecurity:
     def test_no_secret(self, env, project, repo):

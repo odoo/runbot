@@ -810,17 +810,35 @@ class PullRequests(models.Model):
                 self.env.cr.commit()
 
     def _build_merge_message(self, message):
+        # handle co-authored commits (https://help.github.com/articles/creating-a-commit-with-multiple-authors/)
+        lines = message.splitlines()
+        coauthors = []
+        for idx, line in enumerate(reversed(lines)):
+            if line.startswith('Co-authored-by:'):
+                coauthors.append(line)
+                continue
+            if not line.strip():
+                continue
+
+            if idx:
+                del lines[-idx:]
+            break
+
         m = re.search(r'( |{repository})#{pr.number}\b'.format(
             pr=self,
             repository=self.repository.name.replace('/', '\\/')
         ), message)
         if not m:
-            message += '\n\ncloses {pr.repository.name}#{pr.number}'.format(pr=self)
+            lines.extend(['', 'closes {pr.repository.name}#{pr.number}'.format(pr=self)])
         if self.reviewed_by:
             email = self.reviewed_by.email or '%s@users.noreply.github.com' % self.reviewed_by.github_login
             reviewer = formataddr((self.reviewed_by.name, email))
-            message += '\n\nSigned-off-by: {}'.format(reviewer)
-        return message
+            lines.extend(['', 'Signed-off-by: {}'.format(reviewer)])
+
+        if coauthors:
+            lines.extend(['', ''])
+            lines.extend(reversed(coauthors))
+        return '\n'.join(lines)
 
     def _stage(self, gh, target):
         # nb: pr_commits is oldest to newest so pr.head is pr_commits[-1]
