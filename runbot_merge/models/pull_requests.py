@@ -207,6 +207,7 @@ class Repository(models.Model):
         # get and handle all comments
         for comment in gh.comments(number):
             controllers.handle_comment(self.env, {
+                'action': 'created',
                 'issue': issue,
                 'sender': comment['user'],
                 'comment': comment,
@@ -215,6 +216,7 @@ class Repository(models.Model):
         # get and handle all reviews
         for review in gh.reviews(number):
             controllers.handle_review(self.env, {
+                'action': 'submitted',
                 'review': review,
                 'pull_request': pr,
                 'repository': {'full_name': self.name},

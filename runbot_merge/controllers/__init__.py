@@ -233,7 +233,9 @@ def handle_comment(env, event):
     issue = event['issue']['number']
     author = event['comment']['user']['login']
     comment = event['comment']['body']
-    _logger.info('comment: %s %s:%s "%s"', author, repo, issue, comment)
+    _logger.info('comment[%s]: %s %s:%s "%s"', event['action'], author, repo, issue, comment)
+    if event['action'] != 'created':
+        return "Ignored: action (%r) is not 'created'" % event['action']
 
     return _handle_comment(env, repo, issue, author, comment)
 
@@ -242,7 +244,10 @@ def handle_review(env, event):
     pr = event['pull_request']['number']
     author = event['review']['user']['login']
     comment = event['review']['body'] or ''
-    _logger.info('review: %s %s:%s "%s"', author, repo, pr, comment)
+
+    _logger.info('review[%s]: %s %s:%s "%s"', event['action'], author, repo, pr, comment)
+    if event['action'] != 'submitted':
+        return "Ignored: action (%r) is not 'submitted'" % event['action']
 
     return _handle_comment(
         env, repo, pr, author, comment,

@@ -691,6 +691,24 @@ class PR:
         )
         assert 200 <= r.status_code < 300, r.json()
         wait_for_hook()
+        return r.json()['id']
+
+    def edit_comment(self, cid, body, user):
+        r = self._session.patch(
+            'https://api.github.com/repos/{}/issues/comments/{}'.format(self.repo.name, cid),
+            json={'body': body},
+            headers={'Authorization': 'token {}'.format(self.repo._tokens[user])}
+        )
+        assert 200 <= r.status_code < 300, r.json()
+        wait_for_hook()
+
+    def delete_comment(self, cid, user):
+        r = self._session.delete(
+            'https://api.github.com/repos/{}/issues/comments/{}'.format(self.repo.name, cid),
+            headers={'Authorization': 'token {}'.format(self.repo._tokens[user])}
+        )
+        assert r.status_code == 204, r.json()
+        wait_for_hook()
 
     def open(self):
         self._set_prop('state', 'open')
