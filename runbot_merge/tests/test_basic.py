@@ -567,9 +567,12 @@ def test_close_staged(env, repo):
     assert pr.staging_id
 
     prx.close()
+    env['runbot_merge.project']._send_feedback()
 
     assert not pr.staging_id
     assert not env['runbot_merge.stagings'].search([])
+    assert pr.state == 'closed'
+    assert prx.labels == {'seen 🙂', 'closed 💔'}
 
 def test_forward_port(env, repo):
     m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})

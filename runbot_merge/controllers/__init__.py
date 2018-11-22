@@ -169,11 +169,12 @@ def handle_pr(env, event):
         # ignore if the PR is already being updated in a separate transaction
         # (most likely being merged?)
         env.cr.execute('''
-        SELECT id FROM runbot_merge_pull_requests
+        SELECT id, state FROM runbot_merge_pull_requests
         WHERE id = %s AND state != 'merged'
         FOR UPDATE SKIP LOCKED;
         ''', [pr_obj.id])
-        if not env.cr.fetchall():
+        res = env.cr.fetchone()
+        if not res:
             return 'Ignored: could not lock rows (probably being merged)'
 
         env.cr.execute('''
@@ -183,6 +184,12 @@ def handle_pr(env, event):
         ''', [pr_obj.id])
         env.cr.commit()
         if env.cr.rowcount:
+            env['runbot_merge.pull_requests.tagging'].create({
+                'pull_request': pr_obj.number,
+                'repository': repo.id,
+                'state_from': res[1],
+                'state_to': 'closed',
+            })
             pr_obj.staging_id.cancel(
                 "PR %s:%s closed by %s",
                 pr_obj.repository.name, pr_obj.number,
