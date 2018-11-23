@@ -450,7 +450,8 @@ def test_urgent(env, repo_a, repo_b):
     pr_b = make_pr(repo_b, 'B', [{'b1': 'b'}, {'b2': 'b'}], label='batch', reviewer=None, statuses=[])
     pr_c = make_pr(repo_a, 'C', [{'c1': 'c', 'c2': 'c'}])
 
-    pr_b.post_comment('hansen p=0', 'reviewer')
+    pr_a.post_comment('hansen rebase-merge', 'reviewer')
+    pr_b.post_comment('hansen rebase-merge p=0', 'reviewer')
 
     env['runbot_merge.project']._check_progress()
     # should have batched pr_a and pr_b despite neither being reviewed or
