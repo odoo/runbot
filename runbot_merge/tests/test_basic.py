@@ -2210,6 +2210,48 @@ class TestComments:
         assert {p.github_login for p in pr.delegates} \
             == {'foo', 'bar', 'baz'}
 
+    def test_delete(self, repo, env):
+        """ Comments being deleted should be ignored
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        repo.make_ref('heads/master', m)
+
+        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
+        prx = repo.make_pr('title', 'body', target='master', ctid=c1, user='user')
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number)
+        ])
+
+        cid = prx.post_comment('hansen r+', user='reviewer')
+        # unreview by pushing a new commit
+        prx.push(repo.make_commit(c1, 'second', None, tree={'m': 'c2'}))
+        assert pr.state == 'opened'
+        prx.delete_comment(cid, 'reviewer')
+        # check that PR is still unreviewed
+        assert pr.state == 'opened'
+
+    def test_edit(self, repo, env):
+        """ Comments being edited should be ignored
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        repo.make_ref('heads/master', m)
+
+        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
+        prx = repo.make_pr('title', 'body', target='master', ctid=c1, user='user')
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number)
+        ])
+
+        cid = prx.post_comment('hansen r+', user='reviewer')
+        # unreview by pushing a new commit
+        prx.push(repo.make_commit(c1, 'second', None, tree={'m': 'c2'}))
+        assert pr.state == 'opened'
+        prx.edit_comment(cid, 'hansen r+ edited', 'reviewer')
+        # check that PR is still unreviewed
+        assert pr.state == 'opened'
+
 class TestInfrastructure:
     def test_protection(self, repo):
         """ force-pushing on a protected ref should fail

@@ -3,6 +3,7 @@ import datetime
 import hashlib
 import hmac
 import io
+import itertools
 import json
 import logging
 import re
@@ -563,13 +564,29 @@ class Issue(object):
         self._title = title
         self._body = body
         self.number = max(repo.issues or [0]) + 1
-        self.comments = []
+        self._comments = []
         self.labels = set()
         repo.issues[self.number] = self
 
+    @property
+    def comments(self):
+        return [(c.user, c.body) for c in self._comments]
+
     def post_comment(self, body, user):
-        self.comments.append((user, body))
-        self.repo.notify('issue_comment', self, user, body)
+        c = Comment(user, body)
+        self._comments.append(c)
+        self.repo.notify('issue_comment', self, 'created', c)
+        return c.id
+
+    def edit_comment(self, cid, newbody, user):
+        c = next(c for c in self._comments if c.id == cid)
+        c.body = newbody
+        self.repo.notify('issue_comment', self, 'edited', c)
+
+    def delete_comment(self, cid, user):
+        c = next(c for c in self._comments if c.id == cid)
+        self._comments.remove(c)
+        self.repo.notify('issue_comment', self, 'deleted', c)
 
     @property
     def title(self):
@@ -584,6 +601,12 @@ class Issue(object):
     @body.setter
     def body(self, value):
         self._body = value
+class Comment:
+    _cseq = itertools.count()
+    def __init__(self, user, body, id=None):
+        self.user = user
+        self.body = body
+        self.id = id or next(self._cseq)
 
 class PR(Issue):
     def __init__(self, repo, title, body, target, ctid, user, label):
@@ -770,6 +793,7 @@ class Client(werkzeug.test.Client):
         assert action in ('APPROVE', 'REQUEST_CHANGES', 'COMMENT')
         return self.open(self._make_env(
             'pull_request_review', {
+                'action': 'submitted',
                 'review': {
                     'state': 'APPROVED' if action == 'APPROVE' else action,
                     'body': body,
@@ -795,12 +819,13 @@ class Client(werkzeug.test.Client):
             }
         ))
 
-    def issue_comment(self, issue, user, body):
+    def issue_comment(self, issue, action, comment):
+        assert action in ('created', 'edited', 'deleted')
         contents = {
-            'action': 'created',
+            'action': action,
             'issue': { 'number': issue.number },
             'repository': self._repo(issue.repo.name),
-            'comment': { 'body': body, 'user': {'login': user } },
+            'comment': { 'id': comment.id, 'body': comment.body, 'user': {'login': comment.user } },
         }
         if isinstance(issue, PR):
             contents['issue']['pull_request'] = { 'url': 'fake' }
