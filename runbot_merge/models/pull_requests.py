@@ -286,8 +286,13 @@ class Branch(models.Model):
                     THEN pr.id::text
                 ELSE pr.label
             END
-        HAVING (bool_or(pr.priority = 0) AND NOT bool_or(pr.state = 'error'))
-            OR bool_and(pr.state = 'ready')
+        HAVING
+            -- all PRs in a group need to specify their merge method
+            bool_and(pr.squash or pr.merge_method IS NOT NULL)
+            AND (
+                (bool_or(pr.priority = 0) AND NOT bool_or(pr.state = 'error'))
+                OR bool_and(pr.state = 'ready')
+            )
         ORDER BY min(pr.priority), min(pr.id)
         """, [self.id])
         # result: [(priority, [(repo_id, pr_id) for repo in repos]
@@ -401,7 +406,12 @@ class PullRequests(models.Model):
     )
     message = fields.Text(required=True)
     squash = fields.Boolean(default=False)
-    rebase = fields.Boolean(default=True)
+    merge_method = fields.Selection([
+        ('merge', "merge directly, using the PR as merge commit message"),
+        ('rebase-merge', "rebase and merge, using the PR as merge commit message"),
+        ('rebase-ff', "rebase and fast-forward"),
+    ], default=False)
+    method_warned = fields.Boolean(default=False)
 
     delegates = fields.Many2many('res.partner', help="Delegate reviewers, not intrinsically reviewers but can review this PR")
     priority = fields.Selection([
@@ -463,33 +473,31 @@ class PullRequests(models.Model):
         })
 
     def _parse_command(self, commandstring):
-        m = re.match(r'(\w+)(?:([+-])|=(.*))?', commandstring)
-        if not m:
-            return None
-
-        name, flag, param = m.groups()
-        if name == 'retry':
-            return ('retry', None)
-        elif name in ('r', 'review'):
-            if flag == '+':
-                return ('review', True)
-            elif flag == '-':
-                return ('review', False)
-        elif name == 'delegate':
-            if flag == '+':
-                return ('delegate', True)
-            elif param:
-                return ('delegate', [
-                    p.lstrip('#@')
-                    for p in param.split(',')
-                ])
-        elif name in ('p', 'priority'):
-            if param in ('0', '1', '2'):
-                return ('priority', int(param))
-        elif name == 'rebase':
-            return ('rebase', flag != '-')
-
-        return None
+        for m in re.finditer(
+            r'(\S+?)(?:([+-])|=(\S*))?(?:\s|$)',
+            commandstring,
+        ):
+            name, flag, param = m.groups()
+            if name == 'retry':
+                yield ('retry', None)
+            elif name in ('r', 'review'):
+                if flag == '+':
+                    yield ('review', True)
+                elif flag == '-':
+                    yield ('review', False)
+            elif name == 'delegate':
+                if flag == '+':
+                    yield ('delegate', True)
+                elif param:
+                    yield ('delegate', [
+                        p.lstrip('#@')
+                        for p in param.split(',')
+                    ])
+            elif name in ('p', 'priority'):
+                if param in ('0', '1', '2'):
+                    yield ('priority', int(param))
+            elif any(name == k for k, _ in type(self).merge_method.selection):
+                yield ('method', name)
 
     def _parse_commands(self, author, comment, login):
         """Parses a command string prefixed by Project::github_prefix.
@@ -523,9 +531,7 @@ class PullRequests(models.Model):
         commands = dict(
             ps
             for m in self.repository.project_id._find_commands(comment)
-            for c in m.strip().split()
-            for ps in [self._parse_command(c)]
-            if ps is not None
+            for ps in self._parse_command(m)
         )
 
         if not commands:
@@ -613,10 +619,10 @@ class PullRequests(models.Model):
                             self.repository.name, self.number,
                             author.github_login, self.target.name,
                         )
-            elif command == 'rebase':
-                # anyone can rebase- their PR I guess?
-                self.rebase = param
-                ok = True
+            elif command == 'method':
+                if is_admin:
+                    self.merge_method = param
+                    ok = True
 
             _logger.info(
                 "%s %s(%s) on %s:%s by %s (%s)",
@@ -771,6 +777,95 @@ class PullRequests(models.Model):
                 r.link_warned = True
                 if commit:
                     self.env.cr.commit()
+
+        # send feedback for multi-commit PRs without a merge_method (which
+        # we've not warned yet)
+        for r in self.search([
+            ('state', '=', 'ready'),
+            ('squash', '=', False),
+            ('merge_method', '=', False),
+            ('method_warned', '=', False),
+        ]):
+            self.env['runbot_merge.pull_requests.feedback'].create({
+                'repository': r.repository.id,
+                'pull_request': r.number,
+                'message': "Because this PR has multiple commits, I need to know how to merge it:\n\n" + ''.join(
+                    '* `%s` to %s\n' % pair
+                    for pair in type(self).merge_method.selection
+                )
+            })
+            r.method_warned = True
+            if commit:
+                self.env.cr.commit()
+
+    def _build_merge_message(self, message):
+        m = re.search(r'( |{repository})#{pr.number}\b'.format(
+            pr=self,
+            repository=self.repository.name.replace('/', '\\/')
+        ), message)
+        if m:
+            return message
+        return message + '\n\ncloses {pr.repository.name}#{pr.number}'.format(pr=self)
+
+    def _stage(self, gh, target):
+        # nb: pr_commits is oldest to newest so pr.head is pr_commits[-1]
+        _, prdict = gh.pr(self.number)
+        commits = prdict['commits']
+        method = self.merge_method or ('rebase-ff' if commits == 1 else None)
+        assert commits < 50 or not method.startswith('rebase'), \
+            "rebasing a PR or more than 50 commits is a tad excessive"
+        assert commits < 250, "merging PRs of 250+ commits is not supported (https://developer.github.com/v3/pulls/#list-commits-on-a-pull-request)"
+        pr_commits = gh.commits(self.number)
+
+        # NOTE: lost merge v merge/copy distinction (head being
+        #       a merge commit reused instead of being re-merged)
+        return method, getattr(self, '_stage_' + method.replace('-', '_'))(gh, target, pr_commits)
+
+    def _stage_rebase_ff(self, gh, target, commits):
+        # updates head commit with PR number (if necessary) then rebases
+        # on top of target
+        msg = self._build_merge_message(commits[-1]['commit']['message'])
+        commits[-1]['commit']['message'] = msg
+        return gh.rebase(self.number, target, commits=commits)
+
+    def _stage_rebase_merge(self, gh, target, commits):
+        msg = self._build_merge_message(self.message)
+        h = gh.rebase(self.number, target, reset=True, commits=commits)
+        return gh.merge(h, target, msg)['sha']
+
+    def _stage_merge(self, gh, target, commits):
+        pr_head = commits[-1] # oldest to newest
+        base_commit = None
+        head_parents = {p['sha'] for p in pr_head['parents']}
+        if len(head_parents) > 1:
+            # look for parent(s?) of pr_head not in PR, means it's
+            # from target (so we merged target in pr)
+            merge = head_parents - {c['sha'] for c in commits}
+            assert len(merge) <= 1, \
+                ">1 parent from base in PR's head is not supported"
+            if len(merge) == 1:
+                [base_commit] = merge
+
+        if base_commit:
+            # replicate pr_head with base_commit replaced by
+            # the current head
+            original_head = gh.head(target)
+            merge_tree = gh.merge(pr_head['sha'], target, 'temp merge')['tree']['sha']
+            new_parents = [original_head] + list(head_parents - {base_commit})
+            msg = self._build_merge_message(pr_head['commit']['message'])
+            copy = gh('post', 'git/commits', json={
+                'message': msg,
+                'tree': merge_tree,
+                'author': pr_head['commit']['author'],
+                'committer': pr_head['commit']['committer'],
+                'parents': new_parents,
+            }).json()
+            gh.set_ref(target, copy['sha'])
+            return copy['sha']
+        else:
+            # otherwise do a regular merge
+            msg = self._build_merge_message(self.message)
+            return gh.merge(self.head, target, msg)['sha']
 
 # state changes on reviews
 RPLUS = {
@@ -1194,15 +1289,6 @@ class Batch(models.Model):
 
         :return: () or Batch object (if all prs successfully staged)
         """
-
-        def build_message(message, pr):
-            m = re.search(r'( |{repository})#{pr.number}\b'.format(
-                    pr=pr, repository=pr.repository.name.replace('/', '\\/')),
-                message)
-            if m:
-                return message
-            return message + '\n\ncloses {pr.repository.name}#{pr.number}'.format(pr=pr)
-
         new_heads = {}
         for pr in prs:
             gh = meta[pr.repository]['gh']
@@ -1215,65 +1301,12 @@ class Batch(models.Model):
             target = 'tmp.{}'.format(pr.target.name)
             original_head = gh.head(target)
             try:
-                # nb: pr_commits is oldest to newest so pr.head is pr_commits[-1]
-                _, prdict = gh.pr(pr.number)
-                commits = prdict['commits']
-                assert commits < 50 or not pr.rebase, \
-                    "rebasing a PR or more than 50 commits is a tad excessive"
-                assert commits < 250, "merging PRs of 250+ commits is not supported (https://developer.github.com/v3/pulls/#list-commits-on-a-pull-request)"
-                pr_commits = gh.commits(pr.number)
-                rebase_and_merge = pr.rebase
-                squash = rebase_and_merge and commits == 1
-                if squash:
-                    method = 'squash'
-                    msg = build_message(pr_commits[0]['commit']['message'], pr)
-                    pr_commits[0]['commit']['message'] = msg
-                    new_heads[pr] = gh.rebase(pr.number, target, commits=pr_commits)
-                elif rebase_and_merge:
-                    method = 'rebase & merge'
-                    msg = build_message(pr.message, pr)
-                    h = gh.rebase(pr.number, target, reset=True, commits=pr_commits)
-                    new_heads[pr] = gh.merge(h, target, msg)['sha']
-                else:
-                    pr_head = pr_commits[-1] # pr_commits is oldest to newest
-                    base_commit = None
-                    head_parents = {p['sha'] for p in pr_head['parents']}
-                    if len(head_parents) > 1:
-                        # look for parent(s?) of pr_head not in PR, means it's
-                        # from target (so we merged target in pr)
-                        merge = head_parents - {c['sha'] for c in pr_commits}
-                        assert len(merge) <= 1, \
-                            ">1 parent from base in PR's head is not supported"
-                        if len(merge) == 1:
-                            [base_commit] = merge
-
-                    if base_commit:
-                        method = 'merge/copy'
-                        # replicate pr_head with base_commit replaced by
-                        # the current head
-                        original_head = gh.head(target)
-                        merge_tree = gh.merge(pr_head['sha'], target, 'temp merge')['tree']['sha']
-                        new_parents = [original_head] + list(head_parents - {base_commit})
-                        msg = build_message(pr_head['commit']['message'], pr)
-                        copy = gh('post', 'git/commits', json={
-                            'message': msg,
-                            'tree': merge_tree,
-                            'author': pr_head['commit']['author'],
-                            'committer': pr_head['commit']['committer'],
-                            'parents': new_parents,
-                        }).json()
-                        gh.set_ref(target, copy['sha'])
-                        new_heads[pr] = copy['sha']
-                    else:
-                        method = 'merge'
-                        # otherwise do a regular merge
-                        msg = build_message(pr.message, pr)
-                        new_heads[pr] = gh.merge(pr.head, target, msg)['sha']
-                new_head = gh.head(target)
+                method, new_heads[pr] = pr._stage(gh, target)
                 _logger.info(
-                    "Staged pr %s:%s by %s to %s; %s %s -> %s",
-                    pr.repository.name, pr.number, method, new_heads[pr],
-                    target, original_head, new_head
+                    "Staged pr %s:%s to %s by %s: %s -> %s",
+                    pr.repository.name, pr.number,
+                    pr.target.name, method,
+                    original_head, new_heads[pr]
                 )
             except (exceptions.MergeError, AssertionError) as e:
                 _logger.exception("Failed to merge %s:%s into staging branch (error: %s)", pr.repository.name, pr.number, e)
