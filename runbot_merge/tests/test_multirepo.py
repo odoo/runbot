@@ -188,7 +188,7 @@ def test_merge_fail(env, project, repo_a, repo_b, users):
     pr2a = make_pr(repo_a, 'A2', [{'b': 'ok'}], label='do-b-thing')
     pr2b = make_pr(repo_b, 'B2', [{'b': 'ok'}], label='do-b-thing')
 
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
 
     s2 = to_pr(env, pr2a) | to_pr(env, pr2b)
     st = env['runbot_merge.stagings'].search([])

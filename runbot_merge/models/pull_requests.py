@@ -1313,7 +1313,11 @@ class Batch(models.Model):
             except (exceptions.MergeError, AssertionError) as e:
                 _logger.exception("Failed to merge %s:%s into staging branch (error: %s)", pr.repository.name, pr.number, e)
                 pr.state = 'error'
-                gh.comment(pr.number, "Unable to stage PR (%s)" % e)
+                self.env['runbot_merge.pull_requests.feedback'].create({
+                    'repository': pr.repository.id,
+                    'pull_request': pr.number,
+                    'message': "Unable to stage PR (%s)" % e,
+                })
 
                 # reset the head which failed, as rebase() may have partially
                 # updated it (despite later steps failing)

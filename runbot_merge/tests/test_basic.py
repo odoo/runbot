@@ -652,6 +652,8 @@ def test_rebase_failure(env, repo, users, remote_p):
     with mock.patch.object(GH, 'set_ref', autospec=True, side_effect=wrapper) as m:
         env['runbot_merge.project']._check_progress()
 
+    env['runbot_merge.project']._send_feedback()
+
     assert pr_a.comments == [
         (users['reviewer'], 'hansen r+'),
         (users['user'], re_matches(r'^Unable to stage PR')),
