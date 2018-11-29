@@ -38,7 +38,7 @@ class runbot_branch(models.Model):
                     branch.branch_url = "https://%s/pull/%s" % (branch.repo_id.base, branch.branch_name)
                 else:
                     branch.branch_url = "https://%s/tree/%s" % (branch.repo_id.base, branch.branch_name)
-                pi = self._get_pull_info()
+                pi = branch._get_pull_info()
                 if pi:
                     branch.target_branch_name = pi['base']['ref']
                     if not _re_patch.match(pi['head']['label']):
