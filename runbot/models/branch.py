@@ -41,7 +41,7 @@ class runbot_branch(models.Model):
                         # label is used to disambiguate PR with same branch name
                         branch.pull_head_name = pi['head']['label']
 
-    @api_depends('branch_name')
+    @api.depends('branch_name')
     def _get_branch_url(self):
         """compute the branch url based on branch_name"""
         for branch in self:
