@@ -134,6 +134,7 @@ class runbot_build(models.Model):
         build = self
         branch, repo = build.branch_id, build.repo_id
         name = branch.pull_head_name or branch.branch_name
+        target_branch = branch.target_branch_name or 'master'
 
         target_repo = self.env['runbot.repo'].browse(target_repo_id)
 
@@ -216,7 +217,7 @@ class runbot_build(models.Model):
                 return target_id, b, 'fuzzy'
 
         # 5. last-resort value
-        return target_repo_id, 'master', 'default'
+        return target_repo_id, target_branch, 'default'
 
     @api.depends('name', 'branch_id.name')
     def _get_dest(self):

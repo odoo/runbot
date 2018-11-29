@@ -16,9 +16,10 @@ class runbot_branch(models.Model):
 
     repo_id = fields.Many2one('runbot.repo', 'Repository', required=True, ondelete='cascade')
     name = fields.Char('Ref Name', required=True)
-    branch_name = fields.Char(compute='_get_branch_name', type='char', string='Branch', readonly=1, store=True)
-    branch_url = fields.Char(compute='_get_branch_url', type='char', string='Branch url', readonly=1)
-    pull_head_name = fields.Char(compute='_get_pull_head_name', type='char', string='PR HEAD name', readonly=1, store=True)
+    branch_name = fields.Char(compute='_get_branch_infos', string='Branch', readonly=1, store=True)
+    branch_url = fields.Char(compute='_get_branch_infos', string='Branch url', readonly=1)
+    pull_head_name = fields.Char(compute='_get_branch_infos', string='PR HEAD name', readonly=1, store=True)
+    target_branch_name = fields.Char(compute='_get_branch_infos', string='PR target branch', readonly=1, store=True)
     sticky = fields.Boolean('Sticky')
     coverage = fields.Boolean('Coverage')
     coverage_result = fields.Float(compute='_get_last_coverage', type='Float', string='Last coverage', store=False)
@@ -28,21 +29,21 @@ class runbot_branch(models.Model):
     priority = fields.Boolean('Build priority', default=False)
 
     @api.depends('name')
-    def _get_branch_name(self):
-        """compute the branch name based on ref name"""
+    def _get_branch_infos(self):
+        """compute branch_name, branch_url, pull_head_name and target_branch_name based on name"""
         for branch in self:
             if branch.name:
                 branch.branch_name = branch.name.split('/')[-1]
-
-    @api.depends('branch_name')
-    def _get_branch_url(self):
-        """compute the branch url based on branch_name"""
-        for branch in self:
-            if branch.name:
                 if re.match('^[0-9]+$', branch.branch_name):
                     branch.branch_url = "https://%s/pull/%s" % (branch.repo_id.base, branch.branch_name)
                 else:
                     branch.branch_url = "https://%s/tree/%s" % (branch.repo_id.base, branch.branch_name)
+                pi = self._get_pull_info()
+                if pi:
+                    branch.target_branch_name = pi['base']['ref']
+                    if not _re_patch.match(pi['head']['label']):
+                        # label is used to disambiguate PR with same branch name
+                        branch.pull_head_name = pi['head']['label']
 
     def _get_pull_info(self):
         self.ensure_one()
@@ -66,15 +67,6 @@ class runbot_branch(models.Model):
     def create(self, vals):
         vals.setdefault('coverage', _re_coverage.search(vals.get('name') or '') is not None)
         return super(runbot_branch, self).create(vals)
-
-    @api.depends('branch_name')
-    def _get_pull_head_name(self):
-        """compute pull head name"""
-        for branch in self:
-            pi = self._get_pull_info()
-            if pi and not _re_patch.match(pi['head']['label']):
-                # label is used to disambiguate PR with same branch name
-                branch.pull_head_name = pi['head']['label']
 
     def _get_branch_quickconnect_url(self, fqdn, dest):
         self.ensure_one()
