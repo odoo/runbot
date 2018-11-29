@@ -17,7 +17,7 @@ class runbot_branch(models.Model):
     repo_id = fields.Many2one('runbot.repo', 'Repository', required=True, ondelete='cascade')
     name = fields.Char('Ref Name', required=True)
     branch_name = fields.Char(compute='_get_branch_infos', string='Branch', readonly=1, store=True)
-    branch_url = fields.Char(compute='_get_branch_infos', string='Branch url', readonly=1)
+    branch_url = fields.Char(compute='_get_branch_url', string='Branch url', readonly=1)
     pull_head_name = fields.Char(compute='_get_branch_infos', string='PR HEAD name', readonly=1, store=True)
     target_branch_name = fields.Char(compute='_get_branch_infos', string='PR target branch', readonly=1, store=True)
     sticky = fields.Boolean('Sticky')
@@ -34,16 +34,22 @@ class runbot_branch(models.Model):
         for branch in self:
             if branch.name:
                 branch.branch_name = branch.name.split('/')[-1]
-                if re.match('^[0-9]+$', branch.branch_name):
-                    branch.branch_url = "https://%s/pull/%s" % (branch.repo_id.base, branch.branch_name)
-                else:
-                    branch.branch_url = "https://%s/tree/%s" % (branch.repo_id.base, branch.branch_name)
                 pi = branch._get_pull_info()
                 if pi:
                     branch.target_branch_name = pi['base']['ref']
                     if not _re_patch.match(pi['head']['label']):
                         # label is used to disambiguate PR with same branch name
                         branch.pull_head_name = pi['head']['label']
+
+    @api_depends('branch_name')
+    def _get_branch_url(self):
+        """compute the branch url based on branch_name"""
+        for branch in self:
+            if branch.name:
+                if re.match('^[0-9]+$', branch.branch_name):
+                    branch.branch_url = "https://%s/pull/%s" % (branch.repo_id.base, branch.branch_name)
+                else:
+                    branch.branch_url = "https://%s/tree/%s" % (branch.repo_id.base, branch.branch_name)
 
     def _get_pull_info(self):
         self.ensure_one()
