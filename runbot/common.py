@@ -86,4 +86,3 @@ def get_py_version(build):
                 if f.readline().strip().endswith('python3'):
                     return 'python3'
     return 'python'
-
