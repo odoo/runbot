@@ -722,27 +722,28 @@ class runbot_build(models.Model):
         """Notify github of failed/successful builds"""
         runbot_domain = self.env['runbot.repo']._domain()
         for build in self:
-            b = build.duplicate_id if build.state == 'duplicate' else build
             desc = "runbot build %s" % (build.dest,)
-            if b.state == 'testing':
+            if build.state == 'testing':
                 state = 'pending'
-            elif b.state in ('running', 'done'):
+            elif build.state in ('running', 'done'):
                 state = 'error'
-                if b.result == 'ok':
+                if build.result == 'ok':
                     state = 'success'
-                if b.result == 'ko':
+                if build.result == 'ko':
                     state = 'failure'
-                desc += " (runtime %ss)" % (b.job_time,)
+                desc += " (runtime %ss)" % (build.job_time,)
             else:
                 continue
-            status = {
-                "state": state,
-                "target_url": "http://%s/runbot/build/%s" % (runbot_domain, build.id),
-                "description": desc,
-                "context": "ci/runbot"
-            }
-            _logger.debug("github updating status %s to %s", build.name, state)
-            build.repo_id._github('/repos/:owner/:repo/statuses/%s' % build.name, status, ignore_errors=True)
+            commits = {(b.repo_id, b.name) for b in self.search([('name', '=', build.name)])}
+            for repo, commit_hash in commits:
+                status = {
+                    "state": state,
+                    "target_url": "http://%s/runbot/build/%s" % (runbot_domain, build.id),
+                    "description": desc,
+                    "context": "ci/runbot"
+                }
+                _logger.debug("github updating status %s to %s", build.name, state)
+                repo._github('/repos/:owner/:repo/statuses/%s' % commit_hash, status, ignore_errors=True)
 
     # Jobs definitions
     # They all need "build, lock_pathn log_path" parameters
@@ -837,9 +838,7 @@ class runbot_build(models.Model):
         else:
             v['result'] = "ko"
         build.write(v)
-        # post statuses on duplicate too
-        for b in self.search([('name', '=', build.name)]):
-            b._github_status()
+        build._github_status()
         # run server
         cmd, mods = build._cmd()
         if os.path.exists(build._server('addons/im_livechat')):
