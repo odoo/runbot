@@ -718,6 +718,14 @@ class runbot_build(models.Model):
         p = subprocess.Popen(cmd, stdout=out, stderr=out, preexec_fn=preexec_fn, shell=shell, env=env, close_fds=False)
         return p.pid
 
+    def _github_status_notify_all(self, status):
+        """Notify each repo with a status"""
+        self.ensure_one()
+        commits = {(b.repo_id, b.name) for b in self.search([('name', '=', self.name)])}
+        for repo, commit_hash in commits:
+            _logger.debug("github updating %s status %s to %s in repo %s", status['context'], commit_hash, status['state'], repo.name)
+            repo._github('/repos/:owner/:repo/statuses/%s' % commit_hash, status, ignore_errors=True)
+
     def _github_status(self):
         """Notify github of failed/successful builds"""
         runbot_domain = self.env['runbot.repo']._domain()
@@ -734,16 +742,13 @@ class runbot_build(models.Model):
                 desc += " (runtime %ss)" % (build.job_time,)
             else:
                 continue
-            commits = {(b.repo_id, b.name) for b in self.search([('name', '=', build.name)])}
-            for repo, commit_hash in commits:
-                status = {
-                    "state": state,
-                    "target_url": "http://%s/runbot/build/%s" % (runbot_domain, build.id),
-                    "description": desc,
-                    "context": "ci/runbot"
-                }
-                _logger.debug("github updating status %s to %s", build.name, state)
-                repo._github('/repos/:owner/:repo/statuses/%s' % commit_hash, status, ignore_errors=True)
+            status = {
+                "state": state,
+                "target_url": "http://%s/runbot/build/%s" % (runbot_domain, build.id),
+                "description": desc,
+                "context": "ci/runbot"
+            }
+            build._github_status_notify_all(status)
 
     # Jobs definitions
     # They all need "build, lock_pathn log_path" parameters
