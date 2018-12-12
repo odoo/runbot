@@ -625,6 +625,11 @@ class PullRequests(models.Model):
                 if is_admin:
                     self.merge_method = param
                     ok = True
+                    Feedback.create({
+                        'repository': self.repository.id,
+                        'pull_request': self.number,
+                        'message':"Merge method set to %s" % param
+                    })
 
             _logger.info(
                 "%s %s(%s) on %s:%s by %s (%s)",
