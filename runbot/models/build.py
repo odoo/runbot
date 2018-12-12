@@ -186,8 +186,10 @@ class runbot_build(models.Model):
         )
         branches = sorted(branches, key=sort_by_repo)
 
+        # for prefix matching we remove the pull request prefix (project_name:) from the pull_head_name
+        name_for_prefix_match = branch.pull_head_name and branch.pull_head_name.split(':', 1)[-1] or branch.branch_name
         for branch in branches:
-            if name.startswith(branch['branch_name'] + '-') and self._branch_exists(branch['id']):
+            if name_for_prefix_match.startswith(branch['branch_name'] + '-') and self._branch_exists(branch['id']):
                 return result_for(branch, 'prefix')
 
         # 4. Common ancestors (git merge-base)
