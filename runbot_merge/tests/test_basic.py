@@ -337,6 +337,7 @@ def test_staging_merge_fail(env, repo, users):
     assert prx.labels == {'seen 🙂', 'error 🙅'}
     assert prx.comments == [
         (users['reviewer'], 'hansen r+ rebase-merge'),
+        (users['user'], 'Merge method set to rebase and merge, using the PR as merge commit message'),
         (users['user'], re_matches('^Unable to stage PR')),
     ]
 
@@ -395,6 +396,7 @@ def test_staging_ci_failure_single(env, repo, users):
 
     assert prx.comments == [
         (users['reviewer'], 'hansen r+ rebase-merge'),
+        (users['user'], "Merge method set to rebase and merge, using the PR as merge commit message"),
         (users['user'], 'Staging failed: ci/runbot')
     ]
 
@@ -933,7 +935,7 @@ class TestMergeMethod:
 """),
         ]
 
-    def test_pr_method_no_review(self, repo, env):
+    def test_pr_method_no_review(self, repo, env, users):
         """ Configuring the method should be idependent from the review
         """
         m0 = repo.make_commit(None, 'M0', None, tree={'m': '0'})
@@ -953,12 +955,24 @@ class TestMergeMethod:
 
         prx.post_comment('hansen rebase-merge', "reviewer")
         assert pr.merge_method == 'rebase-merge'
+        run_crons(env)
 
         prx.post_comment('hansen merge', "reviewer")
         assert pr.merge_method == 'merge'
+        run_crons(env)
 
         prx.post_comment('hansen rebase-ff', "reviewer")
         assert pr.merge_method == 'rebase-ff'
+        run_crons(env)
+
+        assert prx.comments == [
+            (users['reviewer'], 'hansen rebase-merge'),
+            (users['user'], "Merge method set to rebase and merge, using the PR as merge commit message"),
+            (users['reviewer'], 'hansen merge'),
+            (users['user'], "Merge method set to merge directly, using the PR as merge commit message"),
+            (users['reviewer'], 'hansen rebase-ff'),
+            (users['user'], "Merge method set to rebase and fast-forward"),
+        ]
 
     def test_pr_rebase_merge(self, repo, env):
         """ test result on rebase-merge
