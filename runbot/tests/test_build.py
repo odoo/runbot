@@ -112,6 +112,33 @@ class Test_Build(common.TransactionCase):
         self.assertEqual(dev_build.state, 'duplicate')
         self.assertEqual(dev_build.duplicate_id.id, pr_build.id)
 
+    def test_build_job_type_from_branch_default(self):
+        """test build job_type is computed from branch default job_type"""
+        build = self.Build.create({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+        })
+        self.assertEqual(build.job_type, 'all', "job_type should be the same as the branch")
+
+    def test_build_job_type_from_branch_none(self):
+        """test build job_type is computed from branch"""
+        self.branch.job_type = 'none'
+        build = self.Build.create({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+        })
+        self.assertEqual(build.job_type, 'none', "job_type should be the same as the branch")
+
+    def test_build_job_type_can_be_set(self):
+        """test build job_type can be set to something different than the one on the branch"""
+        self.branch.job_type = 'running'
+        build = self.Build.create({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'job_type': 'testing'
+        })
+        self.assertEqual(build.job_type, 'testing', "job_type should be the one set on the build")
+
     @patch('odoo.addons.runbot.models.branch.runbot_branch._is_on_remote')
     def test_closest_branch_01(self, mock_is_on_remote):
         """ test find a matching branch in a target repo based on branch name """

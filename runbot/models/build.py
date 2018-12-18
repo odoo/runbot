@@ -25,6 +25,19 @@ re_job = re.compile('_job_\d')
 _logger = logging.getLogger(__name__)
 
 
+def runbot_job(*accepted_job_types):
+    """ Decorator for runbot_build _job_x methods to filter build jobs """
+    accepted_job_types += ('all', )
+
+    def job_decorator(func):
+        def wrapper(self, build, log_path):
+            if build.job_type == 'none' or build.job_type not in accepted_job_types:
+                build._log(func.__name__, 'Skipping job')
+                return -2
+            return func(self, build, log_path)
+        return wrapper
+    return job_decorator
+
 class runbot_build(models.Model):
 
     _name = "runbot.build"
@@ -74,6 +87,13 @@ class runbot_build(models.Model):
                                    ],
                                   default='normal',
                                   string='Build type')
+    job_type = fields.Selection([
+        ('testing', 'Testing jobs only'),
+        ('running', 'Running job only'),
+        ('all', 'All jobs'),
+        ('none', 'Do not execute jobs'),
+        ],
+    )
 
     def copy(self, values=None):
         raise UserError("Cannot duplicate build!")
@@ -81,6 +101,8 @@ class runbot_build(models.Model):
     def create(self, vals):
         build_id = super(runbot_build, self).create(vals)
         extra_info = {'sequence': build_id.id}
+        job_type = vals['job_type'] if 'job_type' in vals else build_id.branch_id.job_type
+        extra_info.update({'job_type': job_type})
         context = self.env.context
 
         # detect duplicate
@@ -733,6 +755,7 @@ class runbot_build(models.Model):
 
     # Jobs definitions
     # They all need "build log_path" parameters
+    @runbot_job('testing', 'running')
     def _job_00_init(self, build, log_path):
         build._log('init', 'Init build environment')
         # notify pending build - avoid confusing users by saying nothing
@@ -740,12 +763,14 @@ class runbot_build(models.Model):
         build._checkout()
         return -2
 
+    @runbot_job('testing', 'running')
     def _job_02_docker_build(self, build, log_path):
         """Build the docker image"""
         build._log('docker_build', 'Building docker image')
         docker_build(log_path, build._path())
         return -2
 
+    @runbot_job('testing')
     def _job_10_test_base(self, build, log_path):
         build._log('test_base', 'Start test base module')
         # run base test
@@ -758,14 +783,18 @@ class runbot_build(models.Model):
             cmd.extend(shlex.split(build.extra_params))
         return docker_run(cmd, log_path, build._path(), build._get_docker_name(), cpu_limit=600)
 
+    @runbot_job('testing', 'running')
     def _job_20_test_all(self, build, log_path):
-        build._log('test_all', 'Start test all modules')
+
         cpu_limit = 2400
         self._local_pg_createdb("%s-all" % build.dest)
         cmd, mods = build._cmd()
-        if grep(build._server("tools/config.py"), "test-enable"):
-            cmd.append("--test-enable")
-        cmd += ['-d', '%s-all' % build.dest, '-i', mods, '--stop-after-init', '--log-level=test', '--max-cron-threads=0']
+        build._log('test_all', 'Start test all modules')
+        if grep(build._server("tools/config.py"), "test-enable") and build.job_type in ('testing', 'all'):
+            cmd.extend(['--test-enable', '--log-level=test'])
+        else: 
+            build._log('test_all', 'Installing modules without testing')
+        cmd += ['-d', '%s-all' % build.dest, '-i', mods, '--stop-after-init', '--max-cron-threads=0']
         if build.extra_params:
             cmd.extend(build.extra_params.split(' '))
         if build.coverage:
@@ -782,6 +811,7 @@ class runbot_build(models.Model):
         build.write({'job_start': now()})
         return docker_run(cmd, log_path, build._path(), build._get_docker_name(), cpu_limit=cpu_limit)
 
+    @runbot_job('testing')
     def _job_21_coverage_html(self, build, log_path):
         if not build.coverage:
             return -2
@@ -791,6 +821,7 @@ class runbot_build(models.Model):
         cmd = [ get_py_version(build), "-m", "coverage", "html", "-d", "/data/build/coverage", "--ignore-errors"]
         return docker_run(cmd, log_path, build._path(), build._get_docker_name())
 
+    @runbot_job('testing')
     def _job_22_coverage_result(self, build, log_path):
         if not build.coverage:
             return -2
@@ -805,6 +836,7 @@ class runbot_build(models.Model):
             build._log('coverage_result', 'Coverage file not found')
         return -2  # nothing to wait for
 
+    @runbot_job('running')
     def _job_30_run(self, build, log_path):
         # adjust job_end to record an accurate job_20 job_time
         build._log('run', 'Start running build %s' % build.dest)

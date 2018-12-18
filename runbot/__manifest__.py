@@ -6,7 +6,7 @@
     'author': "Odoo SA",
     'website': "http://runbot.odoo.com",
     'category': 'Website',
-    'version': '2.5',
+    'version': '2.6',
     'depends': ['website', 'base'],
     'data': [
         'security/runbot_security.xml',
