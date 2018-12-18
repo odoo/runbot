@@ -248,7 +248,7 @@ class runbot_repo(models.Model):
         host = fqdn()
 
         Build = self.env['runbot.build']
-        domain = [('repo_id', 'in', ids)]
+        domain = [('repo_id', 'in', ids), ('branch_id.job_type', '!=', 'none')]
         domain_host = domain + [('host', '=', host)]
 
         # schedule jobs (transitions testing -> running, kill jobs, ...)

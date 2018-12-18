@@ -16,6 +16,7 @@
                 <field name="pull_head_name"/>
                 <field name="sticky"/>
                 <field name="priority"/>
+                <field name="job_type"/>
                 <field name="coverage"/>
                 <field name="state"/>
                 <field name="modules"/>
@@ -39,6 +40,7 @@
                 <field name="name"/>
                 <field name="sticky"/>
                 <field name="priority"/>
+                <field name="job_type"/>
                 <field name="coverage"/>
                 <field name="state"/>
             </tree>

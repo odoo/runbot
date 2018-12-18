@@ -5,6 +5,7 @@ import io
 import logging
 import re
 
+from odoo.addons.runbot.models.build import runbot_job
 from odoo import models
 
 _logger = logging.getLogger(__name__)
@@ -13,6 +14,7 @@ _logger = logging.getLogger(__name__)
 class runbot_build(models.Model):
     _inherit = "runbot.build"
 
+    @runbot_job('testing')
     def _job_05_check_cla(self, build, log_path):
         cla_glob = glob.glob(build._path("doc/cla/*/*.md"))
         if cla_glob:
