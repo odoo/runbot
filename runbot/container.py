@@ -72,6 +72,11 @@ def docker_run(odoo_cmd, log_path, build_dir, container_name, exposed_ports=None
         '--shm-size=128m',
         '--init',
     ]
+    serverrc_path = os.path.expanduser('~/.openerp_serverrc')
+    odoorc_path = os.path.expanduser('~/.odoorc')
+    final_rc = odoorc_path if os.path.exists(odoorc_path) else serverrc_path if os.path.exists(serverrc_path) else None
+    if final_rc:
+        docker_command.extend(['--volume=%s:/home/odoo/.odoorc:ro' % final_rc])
     if exposed_ports:
         for dp,hp in enumerate(exposed_ports, start=8069):
             docker_command.extend(['-p', '127.0.0.1:%s:%s' % (hp, dp)])
