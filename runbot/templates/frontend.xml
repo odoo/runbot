@@ -82,10 +82,6 @@
                                         <li t-if="filters['running']=='1'"><a t-att-href="qu(running='0')"><i class="fa fa-check"/> Running</a></li>
                                         <li t-if="filters['done']=='0'"><a t-att-href="qu(done=1)">Done</a></li>
                                         <li t-if="filters['done']=='1'"><a t-att-href="qu(done='0')"><i class="fa fa-check"/> Done</a></li>
-                                        <li class="divider"></li>
-                                        <li t-att-class="'active' if limit=='100' else ''"><a t-att-href="qu(limit=100)">Show last 100</a></li>
-                                        <li t-att-class="'active' if limit=='1000' else ''"><a t-att-href="qu(limit=1000)">Show last 1000</a></li>
-                                        <li t-att-class="'active' if limit=='10000' else ''"><a t-att-href="qu(limit=10000)">Show last 10000</a></li>
                                       </ul>
                                     </div>
                                   </form>

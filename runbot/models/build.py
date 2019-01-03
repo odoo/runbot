@@ -262,19 +262,18 @@ class runbot_build(models.Model):
         cr = self.env.cr
         cr.execute("""
             SELECT b.id,
-                   CASE WHEN b.state != 'testing' THEN b.result
-                        WHEN array_agg(l.level)::text[] && ARRAY['ERROR', 'CRITICAL'] THEN 'ko'
+                   CASE WHEN array_agg(l.level)::text[] && ARRAY['ERROR', 'CRITICAL'] THEN 'ko'
                         WHEN array_agg(l.level)::text[] && ARRAY['WARNING'] THEN 'warn'
                         ELSE 'ok'
                     END
               FROM runbot_build b
          LEFT JOIN ir_logging l ON (l.build_id = b.id AND l.level != 'INFO')
-             WHERE b.id IN %s
+             WHERE b.id = ANY(%s)
           GROUP BY b.id
-        """, [tuple(self.ids)])
+        """, [list(self.filtered(lambda b: b.state == 'testing').ids)])
         result = {row[0]: row[1] for row in cr.fetchall()}
         for build in self:
-            build.guess_result = result[build.id]
+            build.guess_result = result.get(build.id, build.result)
 
     def _get_time(self):
         """Return the time taken by the tests"""

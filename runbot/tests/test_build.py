@@ -45,6 +45,36 @@ class Test_Build(common.TransactionCase):
         build._get_domain()
         self.assertEqual(build.domain, 'runbot99.example.org:1234')
 
+    @patch('odoo.addons.runbot.models.build.fqdn')
+    def test_guess_result(self, mock_fqdn):
+        build = self.Build.create({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'port': '1234',
+        })
+        # Testing the guess_result computed field
+        self.assertEqual(build.guess_result, '', 'A pending build guess_result should be empty')
+
+        build.write({'state': 'done', 'result': 'ko'})
+        build.invalidate_cache()
+        self.assertEqual(build.guess_result, 'ko', 'A finished build should return the same as result')
+
+        build.write({'state': 'testing'})
+        build.invalidate_cache()
+        self.assertEqual(build.guess_result, 'ok', 'A testing build without logs should be ok')
+
+        self.env.cr.execute("""
+            INSERT INTO ir_logging(name, type, path, func, line, build_id, level, message)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""", ('testing', 'server', 'somewhere', 'test', 0, build.id, 'WARNING', 'blabla'))
+        build.invalidate_cache()
+        self.assertEqual(build.guess_result, 'warn', 'A testing build with warnings should be warn')
+
+        self.env.cr.execute("""
+            INSERT INTO ir_logging(name, type, path, func, line, build_id, level, message)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""", ('testing', 'server', 'somewhere', 'test', 0, build.id, 'ERROR', 'blabla'))
+        build.invalidate_cache()
+        self.assertEqual(build.guess_result, 'ko', 'A testing build with errors should be ko')
+
     @patch('odoo.addons.runbot.models.build.os.mkdir')
     @patch('odoo.addons.runbot.models.build.grep')
     def test_build_cmd_log_db(self, mock_grep, mock_mkdir):

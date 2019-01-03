@@ -47,7 +47,8 @@ class Runbot(Controller):
         return count, level
 
     @route(['/runbot', '/runbot/repo/<model("runbot.repo"):repo>'], website=True, auth='public', type='http')
-    def repo(self, repo=None, search='', limit='100', refresh='', **kwargs):
+    def repo(self, repo=None, search='', refresh='', **kwargs):
+        search = search if len(search) < 60 else search[:60]
         branch_obj = request.env['runbot.branch']
         build_obj = request.env['runbot.build']
         repo_obj = request.env['runbot.repo']
@@ -64,7 +65,6 @@ class Runbot(Controller):
             'host_stats': [],
             'pending_total': pending[0],
             'pending_level': pending[1],
-            'limit': limit,
             'search': search,
             'refresh': refresh,
         }
@@ -81,7 +81,7 @@ class Runbot(Controller):
                     search_domain += [('dest', 'ilike', to_search), ('subject', 'ilike', to_search), ('branch_id.branch_name', 'ilike', to_search)]
                 domain += search_domain[1:]
 
-            build_ids = build_obj.search(domain, limit=int(limit))
+            build_ids = build_obj.search(domain, limit=100)
             branch_ids, build_by_branch_ids = [], {}
 
             if build_ids:
@@ -137,7 +137,7 @@ class Runbot(Controller):
                 'testing': build_obj.search_count([('repo_id', '=', repo.id), ('state', '=', 'testing')]),
                 'running': build_obj.search_count([('repo_id', '=', repo.id), ('state', '=', 'running')]),
                 'pending': build_obj.search_count([('repo_id', '=', repo.id), ('state', '=', 'pending')]),
-                'qu': QueryURL('/runbot/repo/' + slug(repo), search=search, limit=limit, refresh=refresh, **filters),
+                'qu': QueryURL('/runbot/repo/' + slug(repo), search=search, refresh=refresh, **filters),
                 'filters': filters,
             })
 
