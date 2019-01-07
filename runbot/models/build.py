@@ -547,6 +547,9 @@ class runbot_build(models.Model):
                         'Building environment',
                         'Server built based on commit %s from %s' % (commit_oneline, closest_name)
                     )
+                    # move transifex config before it gets overwritten by the one from community
+                    if os.path.isdir(build._path('.tx')):
+                        shutil.move(build._path('.tx'), build._server('addons'))
                     repo._git_export(closest_name, build._path())
 
                 # Finally mark all addons to move to openerp/addons
