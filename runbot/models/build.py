@@ -506,7 +506,6 @@ class runbot_build(models.Model):
 
             # runbot log path
             os.makedirs(build._path("logs"), exist_ok=True)
-            os.makedirs(build._server('addons'), exist_ok=True)
 
             # checkout branch
             build.branch_id.repo_id._git_export(build.name, build._path())
@@ -547,6 +546,10 @@ class runbot_build(models.Model):
                         'Building environment',
                         'Server built based on commit %s from %s' % (commit_oneline, closest_name)
                     )
+                    # move transifex config before it gets overwritten by the one from community
+                    if os.path.isdir(build._path('.tx')):
+                        os.makedir(build._path('odoo/addons'), exist_ok=True)
+                        shutil.move(build._path('.tx'), build._path('odoo/addons'))
                     repo._git_export(closest_name, build._path())
 
                 # Finally mark all addons to move to openerp/addons
