@@ -10,6 +10,7 @@ When testing this file:
 """
 import argparse
 import datetime
+import json
 import logging
 import os
 import shutil
@@ -97,6 +98,17 @@ def docker_is_running(container_name):
     dinspect = subprocess.run(['docker', 'container', 'inspect', container_name], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
     return True if dinspect.returncode == 0 else False
 
+def docker_get_gateway_ip():
+    """Return the host ip of the docker default bridge gateway"""
+    docker_net_inspect = subprocess.run(['docker', 'network', 'inspect', 'bridge'], stdout=subprocess.PIPE)
+    if docker_net_inspect.returncode != 0:
+        return None
+    if docker_net_inspect.stdout:
+        try:
+            return json.loads(docker_net_inspect.stdout)[0]['IPAM']['Config'][0]['Gateway']
+        except KeyError:
+            return None
+
 def build(args):
     """Build container from CLI"""
     _logger.info('Building the base image container')
@@ -157,6 +169,9 @@ def tests(args):
             '-r %s' % os.getlogin(), '-i', 'web',  '--max-cron-threads=1',
             '--data-dir', '/data/build/datadir', '--workers', '2',
             '--longpolling-port', '8070']
+        smtp_host = docker_get_gateway_ip()
+        if smtp_host:
+            odoo_cmd.extend(['--smtp', smtp_host])
         container_name = 'odoo-container-test-%s' % datetime.datetime.now().microsecond
         docker_run(odoo_cmd, logfile, args.build_dir, container_name, exposed_ports=[args.odoo_port, args.odoo_port + 1], cpu_limit=300)
 

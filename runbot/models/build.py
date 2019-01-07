@@ -12,7 +12,7 @@ import subprocess
 import time
 from subprocess import CalledProcessError
 from ..common import dt2time, fqdn, now, grep, time2str, rfind, uniq_list, local_pgadmin_cursor, get_py_version
-from ..container import docker_build, docker_run, docker_stop, docker_is_running
+from ..container import docker_build, docker_run, docker_stop, docker_is_running, docker_get_gateway_ip
 from odoo import models, fields, api
 from odoo.exceptions import UserError
 from odoo.http import request
@@ -840,4 +840,7 @@ class runbot_build(models.Model):
                 cmd += ['--db-filter', '%d.*$']
             else:
                 cmd += ['--db-filter', '%s.*$' % build.dest]
+        smtp_host = docker_get_gateway_ip()
+        if smtp_host:
+            cmd += ['--smtp', smtp_host]
         return docker_run(cmd, log_path, build._path(), build._get_docker_name(), exposed_ports = [build.port, build.port + 1])
