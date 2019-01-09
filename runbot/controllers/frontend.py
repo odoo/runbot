@@ -3,14 +3,13 @@ import operator
 import werkzeug
 from collections import OrderedDict
 
-from odoo import http
 from odoo.addons.http_routing.models.ir_http import slug
 from odoo.addons.website.controllers.main import QueryURL
-from odoo.http import request
+from odoo.http import Controller, request, route
 from ..common import uniq_list, flatten, s2human
 
 
-class Runbot(http.Controller):
+class Runbot(Controller):
 
     def build_info(self, build):
         real_build = build.duplicate_id if build.state == 'duplicate' else build
@@ -47,7 +46,7 @@ class Runbot(http.Controller):
         level = ['info', 'warning', 'danger'][int(count > warn) + int(count > crit)]
         return count, level
 
-    @http.route(['/runbot', '/runbot/repo/<model("runbot.repo"):repo>'], website=True, auth='public', type='http')
+    @route(['/runbot', '/runbot/repo/<model("runbot.repo"):repo>'], website=True, auth='public', type='http')
     def repo(self, repo=None, search='', limit='100', refresh='', **kwargs):
         branch_obj = request.env['runbot.branch']
         build_obj = request.env['runbot.build']
@@ -152,21 +151,21 @@ class Runbot(http.Controller):
                     'testing': build_obj.search_count([('state', '=', 'testing'), ('host', '=', result['host'])]),
                     'running': build_obj.search_count([('state', '=', 'running'), ('host', '=', result['host'])]),
                 })
-        return http.request.render('runbot.repo', context)
+        return request.render('runbot.repo', context)
 
-    @http.route(['/runbot/build/<int:build_id>/kill'], type='http', auth="user", methods=['POST'], csrf=False)
+    @route(['/runbot/build/<int:build_id>/kill'], type='http', auth="user", methods=['POST'], csrf=False)
     def build_ask_kill(self, build_id, search=None, **post):
         build = request.env['runbot.build'].sudo().browse(build_id)
         build._ask_kill()
         return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id + ('?search=%s' % search if search else ''))
 
-    @http.route(['/runbot/build/<int:build_id>/force'], type='http', auth="public", methods=['POST'], csrf=False)
+    @route(['/runbot/build/<int:build_id>/force'], type='http', auth="public", methods=['POST'], csrf=False)
     def build_force(self, build_id, search=None, **post):
         build = request.env['runbot.build'].sudo().browse(build_id)
         build._force()
         return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id + ('?search=%s' % search if search else ''))
 
-    @http.route(['/runbot/build/<int:build_id>'], type='http', auth="public", website=True)
+    @route(['/runbot/build/<int:build_id>'], type='http', auth="public", website=True)
     def build(self, build_id, search=None, **post):
         """Events/Logs"""
 
@@ -203,7 +202,7 @@ class Runbot(http.Controller):
         }
         return request.render("runbot.build", context)
 
-    @http.route(['/runbot/b/<branch_name>', '/runbot/<model("runbot.repo"):repo>/<branch_name>'], type='http', auth="public", website=True)
+    @route(['/runbot/b/<branch_name>', '/runbot/<model("runbot.repo"):repo>/<branch_name>'], type='http', auth="public", website=True)
     def fast_launch(self, branch_name=False, repo=False, **post):
         """Connect to the running Odoo instance"""
         Build = request.env['runbot.build']
@@ -238,7 +237,7 @@ class Runbot(http.Controller):
             return request.not_found()
         return werkzeug.utils.redirect(url)
 
-    @http.route(['/runbot/dashboard'], type='http', auth="public", website=True)
+    @route(['/runbot/dashboard'], type='http', auth="public", website=True)
     def dashboard(self, refresh=None):
         cr = request.cr
         RB = request.env['runbot.build']
@@ -297,7 +296,7 @@ class Runbot(http.Controller):
 
         return request.render("runbot.sticky-dashboard", qctx)
 
-    @http.route('/runbot/glances', type='http', auth='public', website=True)
+    @route('/runbot/glances', type='http', auth='public', website=True)
     def glances(self, refresh=None):
         repos = request.env['runbot.repo'].search([])   # respect record rules
         query = """
@@ -333,7 +332,7 @@ class Runbot(http.Controller):
         }
         return request.render("runbot.glances", qctx)
 
-    @http.route(['/runbot/branch/<int:branch_id>', '/runbot/branch/<int:branch_id>/page/<int:page>'], website=True, auth='public', type='http')
+    @route(['/runbot/branch/<int:branch_id>', '/runbot/branch/<int:branch_id>/page/<int:page>'], website=True, auth='public', type='http')
     def branch_builds(self, branch_id=None, search='', page=1, limit=50, refresh='', **kwargs):
         """ list builds of a runbot branch """
         builds_count = request.env['runbot.build'].search_count([('branch_id','=',branch_id)])
