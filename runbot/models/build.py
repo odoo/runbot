@@ -679,9 +679,10 @@ class runbot_build(models.Model):
         if grep(build._server("tools/config.py"), "no-netrpc"):
             cmd.append("--no-netrpc")
         if grep(build._server("tools/config.py"), "log-db"):
+            logdb_uri = self.env['ir.config_parameter'].get_param('runbot.runbot_logdb_uri')
             logdb = self.env.cr.dbname
-            if config['db_host'] and grep(build._server('sql_db.py'), 'allow_uri'):
-                logdb = 'postgres://{cfg[db_user]}:{cfg[db_password]}@{cfg[db_host]}/{db}'.format(cfg=config, db=self.env.cr.dbname)
+            if logdb_uri and grep(build._server('sql_db.py'), 'allow_uri'):
+                logdb = '%s' % logdb_uri
             cmd += ["--log-db=%s" % logdb]
             if grep(build._server('tools/config.py'), 'log-db-level'):
                 cmd += ["--log-db-level", '25']

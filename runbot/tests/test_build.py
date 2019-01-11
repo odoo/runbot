@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from unittest.mock import patch
+from odoo.tools.config import configmanager
 from odoo.tests import common
 
 class Test_Build(common.TransactionCase):
@@ -42,6 +43,20 @@ class Test_Build(common.TransactionCase):
         self.env['ir.config_parameter'].set_param('runbot.runbot_domain', 'runbot99.example.org')
         build._get_domain()
         self.assertEqual(build.domain, 'runbot99.example.org:1234')
+
+    @patch('odoo.addons.runbot.models.build.os.mkdir')
+    @patch('odoo.addons.runbot.models.build.grep')
+    def test_build_cmd_log_db(self, mock_grep, mock_mkdir):
+        """ test that the logdb connection URI is taken from the .odoorc file """
+        uri = 'postgres://someone:pass@somewhere.com/db'
+        self.env['ir.config_parameter'].sudo().set_param("runbot.runbot_logdb_uri", uri)
+        build = self.Build.create({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'port': '1234',
+        })
+        cmd = build._cmd()[0]
+        self.assertIn('--log-db=%s' % uri, cmd)
 
     def test_pr_is_duplicate(self):
         """ test PR is a duplicate of a dev branch build """

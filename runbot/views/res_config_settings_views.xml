@@ -42,6 +42,10 @@
                                   <label for="runbot_max_age" class="col-xs-3 o_light_label" style="width: 60%;"/>
                                   <field name="runbot_max_age" style="width: 30%;"/>
                                 </div>
+                                <div class="mt-16 row">
+                                  <label for="runbot_logdb_uri" class="col-xs-3 o_light_label" style="width: 60%;"/>
+                                  <field name="runbot_logdb_uri" style="width: 30%;"/>
+                                </div>
                             </div>
                         </div>
                       </div>
