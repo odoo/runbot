@@ -19,6 +19,7 @@ class Test_Jobs(common.TransactionCase):
         })
         self.Build = self.env['runbot.build']
 
+    @patch('odoo.addons.runbot.models.build.docker_get_gateway_ip')
     @patch('odoo.addons.runbot.models.repo.runbot_repo._domain')
     @patch('odoo.addons.runbot.models.repo.runbot_repo._github')
     @patch('odoo.addons.runbot.models.build.runbot_build._cmd')
@@ -26,7 +27,7 @@ class Test_Jobs(common.TransactionCase):
     @patch('odoo.addons.runbot.models.build.time.localtime')
     @patch('odoo.addons.runbot.models.build.docker_run')
     @patch('odoo.addons.runbot.models.build.grep')
-    def test_job_30_failed(self, mock_grep, mock_docker_run, mock_localtime, mock_getmtime, mock_cmd, mock_github, mock_domain):
+    def test_job_30_failed(self, mock_grep, mock_docker_run, mock_localtime, mock_getmtime, mock_cmd, mock_github, mock_domain, mock_docker_get_gateway):
         """ Test that a failed build sets the failure state on github """
         a_time = datetime.datetime.now().strftime(DEFAULT_SERVER_DATETIME_FORMAT)
         mock_grep.return_value = False
