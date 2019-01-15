@@ -11,6 +11,7 @@ import subprocess
 import time
 
 from odoo import models, fields, api
+from odoo.exceptions import ValidationError
 from odoo.modules.module import get_module_resource
 from odoo.tools import config
 from ..common import fqdn, dt2time
@@ -48,6 +49,11 @@ class runbot_repo(models.Model):
         help="Community addon repos which need to be present to run tests.")
     token = fields.Char("Github token", groups="runbot.group_runbot_admin")
     group_ids = fields.Many2many('res.groups', string='Limited to groups')
+
+    @api.constrains('duplicate_id')
+    def _check_000_duplicate_repo(self):
+        if not self._check_recursion(parent='duplicate_id'):
+            raise ValidationError('You cannot create recursive duplicated repos')
 
     def _root(self):
         """Return root directory of repository"""

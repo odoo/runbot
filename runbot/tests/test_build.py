@@ -47,7 +47,6 @@ class Test_Build(common.TransactionCase):
         """ test PR is a duplicate of a dev branch build """
         dup_repo = self.Repo.create({
             'name': 'bla@example.com:foo-dev/bar',
-            'duplicate_id': self.repo.id
         })
         self.repo.duplicate_id = dup_repo.id
         dev_branch = self.Branch.create({
@@ -74,7 +73,6 @@ class Test_Build(common.TransactionCase):
         """ test dev branch build is a duplicate of a PR """
         dup_repo = self.Repo.create({
             'name': 'bla@example.com:foo-dev/bar',
-            'duplicate_id': self.repo.id
         })
         self.repo.duplicate_id = dup_repo.id
         dev_branch = self.Branch.create({
@@ -86,16 +84,17 @@ class Test_Build(common.TransactionCase):
             'name': 'refs/pull/12345'
         })
 
-        pr_build = self.Build.create({
-            'branch_id': pr.id,
-            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
-        })
         dev_build = self.Build.create({
             'branch_id': dev_branch.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
         })
-        self.assertEqual(dev_build.state, 'duplicate')
-        self.assertEqual(dev_build.duplicate_id.id, pr_build.id)
+
+        pr_build = self.Build.create({
+            'branch_id': pr.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+        })
+        self.assertEqual(pr_build.state, 'duplicate')
+        self.assertEqual(pr_build.duplicate_id.id, dev_build.id)
 
     @patch('odoo.addons.runbot.models.branch.runbot_branch._is_on_remote')
     def test_closest_branch_01(self, mock_is_on_remote):
