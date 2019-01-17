@@ -8,7 +8,6 @@ import pprint
 import re
 import time
 
-from email.utils import formataddr
 from itertools import takewhile
 
 from odoo import api, fields, models, tools
@@ -831,9 +830,7 @@ class PullRequests(models.Model):
         if not m:
             lines.extend(['', 'closes {pr.repository.name}#{pr.number}'.format(pr=self)])
         if self.reviewed_by:
-            email = self.reviewed_by.email or '%s@users.noreply.github.com' % self.reviewed_by.github_login
-            reviewer = formataddr((self.reviewed_by.name, email))
-            lines.extend(['', 'Signed-off-by: {}'.format(reviewer)])
+            lines.extend(['', 'Signed-off-by: {}'.format(self.reviewed_by.formatted_email)])
 
         if coauthors:
             lines.extend(['', ''])

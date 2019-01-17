@@ -17,3 +17,6 @@ def run_crons(env):
     env['runbot_merge.project']._check_progress()
     env['runbot_merge.pull_requests']._check_linked_prs_statuses()
     env['runbot_merge.project']._send_feedback()
+
+def get_partner(env, gh_login):
+    return env['res.partner'].search([('github_login', '=', gh_login)])
