@@ -839,10 +839,9 @@ class runbot_build(models.Model):
             build._log('coverage_result', 'Coverage file not found')
         return -2  # nothing to wait for
 
-    @runbot_job('running')
-    def _job_30_run(self, build, log_path):
-        # adjust job_end to record an accurate job_20 job_time
-        build._log('run', 'Start running build %s' % build.dest)
+    @runbot_job('testing', 'running')
+    def _job_29_results(self, build, log_path):
+        build._log('run', 'Getting results for build %s' % build.dest)
         log_all = build._path('logs', 'job_20_test_all.txt')
         log_time = time.localtime(os.path.getmtime(log_all))
         v = {
@@ -859,6 +858,12 @@ class runbot_build(models.Model):
             v['result'] = "ko"
         build.write(v)
         build._github_status()
+        return -2
+
+    @runbot_job('running')
+    def _job_30_run(self, build, log_path):
+        # adjust job_end to record an accurate job_20 job_time
+        build._log('run', 'Start running build %s' % build.dest)
         # run server
         cmd, mods = build._cmd()
         if os.path.exists(build._server('addons/im_livechat')):
