@@ -99,6 +99,9 @@ class runbot_build(models.Model):
         raise UserError("Cannot duplicate build!")
 
     def create(self, vals):
+        branch = self.env['runbot.branch'].search([('id', '=', vals.get('branch_id', False))])
+        if branch.job_type == 'none' or vals.get('job_type', '') == 'none':
+            return self.env['runbot.build']
         build_id = super(runbot_build, self).create(vals)
         extra_info = {'sequence': build_id.id}
         job_type = vals['job_type'] if 'job_type' in vals else build_id.branch_id.job_type
