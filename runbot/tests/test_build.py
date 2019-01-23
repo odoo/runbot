@@ -120,14 +120,23 @@ class Test_Build(common.TransactionCase):
         })
         self.assertEqual(build.job_type, 'all', "job_type should be the same as the branch")
 
-    def test_build_job_type_from_branch_none(self):
+    def test_build_job_type_from_branch_testing(self):
         """test build job_type is computed from branch"""
+        self.branch.job_type = 'testing'
+        build = self.Build.create({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+        })
+        self.assertEqual(build.job_type, 'testing', "job_type should be the same as the branch")
+
+    def test_build_job_type_from_branch_none(self):
+        """test build is not even created when branch job_type is none"""
         self.branch.job_type = 'none'
         build = self.Build.create({
             'branch_id': self.branch.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
         })
-        self.assertEqual(build.job_type, 'none', "job_type should be the same as the branch")
+        self.assertEqual(build, self.Build, "build should be an empty recordset")
 
     def test_build_job_type_can_be_set(self):
         """test build job_type can be set to something different than the one on the branch"""
@@ -138,6 +147,16 @@ class Test_Build(common.TransactionCase):
             'job_type': 'testing'
         })
         self.assertEqual(build.job_type, 'testing', "job_type should be the one set on the build")
+
+    def test_build_job_type_none(self):
+        """test build job_type set to none does not create a build"""
+        self.branch.job_type = 'running'
+        build = self.Build.create({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'job_type': 'none'
+        })
+        self.assertEqual(build, self.Build, "build should be an empty recordset")
 
     @patch('odoo.addons.runbot.models.branch.runbot_branch._is_on_remote')
     def test_closest_branch_01(self, mock_is_on_remote):
