@@ -741,13 +741,13 @@ class runbot_build(models.Model):
                 state = 'pending'
             elif build.state in ('running', 'done'):
                 state = 'error'
-                if build.result == 'ok':
-                    state = 'success'
-                if build.result == 'ko':
-                    state = 'failure'
                 desc += " (runtime %ss)" % (build.job_time,)
             else:
                 continue
+            if build.result == 'ok':
+                state = 'success'
+            if build.result == 'ko':
+                state = 'failure'
             status = {
                 "state": state,
                 "target_url": "http://%s/runbot/build/%s" % (runbot_domain, build.id),
