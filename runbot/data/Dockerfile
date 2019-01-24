@@ -9,6 +9,8 @@ RUN set -x ; \
     build-essential \
     ca-certificates \
     curl \
+    fonts-freefont-ttf \
+    fonts-noto-cjk \
     gawk \
     gnupg \
     libldap2-dev \
