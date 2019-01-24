@@ -19,6 +19,32 @@ class Test_Jobs(common.TransactionCase):
         })
         self.Build = self.env['runbot.build']
 
+    @patch('odoo.addons.runbot.models.repo.runbot_repo._domain')
+    @patch('odoo.addons.runbot.models.repo.runbot_repo._github')
+    @patch('odoo.addons.runbot.models.build.runbot_build._checkout')
+    def test_job_00_set_pending(self, mock_checkout, mock_github, mock_domain):
+        """Test that job_00_init sets the pending status on github"""
+        mock_domain.return_value = 'runbotxx.somewhere.com'
+        build = self.Build.create({
+            'branch_id': self.branch_master.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'host': 'runbotxx',
+            'port': '1234',
+            'state': 'testing',
+            'job': 'job_00_init',
+            'job_start': datetime.datetime.now(),
+            'job_end': False,
+        })
+        res = self.Build._job_00_init(build, '/tmp/x.log')
+        self.assertEqual(res, -2)
+        expected_status = {
+            'state': 'pending',
+            'target_url': 'http://runbotxx.somewhere.com/runbot/build/%s' % build.id,
+            'description': 'runbot build %s (runtime 0s)' % build.dest,
+            'context': 'ci/runbot'
+        }
+        mock_github.assert_called_with('/repos/:owner/:repo/statuses/d0d0caca0000ffffffffffffffffffffffffffff', expected_status, ignore_errors=True)
+
     @patch('odoo.addons.runbot.models.build.docker_get_gateway_ip')
     @patch('odoo.addons.runbot.models.repo.runbot_repo._domain')
     @patch('odoo.addons.runbot.models.repo.runbot_repo._github')
@@ -41,7 +67,7 @@ class Test_Jobs(common.TransactionCase):
             'branch_id': self.branch_master.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'port' : '1234',
-            'state': 'done',
+            'state': 'testing',
             'job_start': a_time,
             'job_end': a_time
         })

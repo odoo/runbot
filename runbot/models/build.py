@@ -741,9 +741,9 @@ class runbot_build(models.Model):
                 state = 'pending'
             elif build.state in ('running', 'done'):
                 state = 'error'
-                desc += " (runtime %ss)" % (build.job_time,)
             else:
                 continue
+            desc += " (runtime %ss)" % (build.job_time,)
             if build.result == 'ok':
                 state = 'success'
             if build.result == 'ko':

@@ -37,6 +37,7 @@ class TestSchedule(common.TransactionCase):
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'port': '1234',
             'host': 'runbotxx',
+            'job_start': datetime.datetime.now(),
             'job_type': 'testing',
             'job': 'job_20_test_all'
         })
