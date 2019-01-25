@@ -137,9 +137,13 @@ class GH(object):
 
         Returns the hash of the rebased head.
         """
+        logger = _logger.getChild('rebase')
         original_head = self.head(dest)
         if commits is None:
             commits = self.commits(pr)
+
+        logger.debug("rebasing %s, %s on %s (reset=%s, commits=%s)",
+                     self._repo, pr, dest, reset, len(commits))
 
         assert commits, "can't rebase a PR with no commits"
         for c in commits:
@@ -156,6 +160,7 @@ class GH(object):
                 'author': c['commit']['author'],
                 'committer': c['commit']['committer'],
             }, check={409: exceptions.MergeError}).json()
+            logger.debug('copied %s to %s (parent: %s)', c['sha'], copy['sha'], prev)
             prev = copy['sha']
 
         if reset:
@@ -163,8 +168,8 @@ class GH(object):
         else:
             self.set_ref(dest, prev)
 
-        _logger.debug('%s, %s, %s, reset=%s, commits=%s) -> %s',
-                      self._repo, pr, dest, reset, commits and len(commits),
+        logger.debug('rebased %s, %s on %s (reset=%s, commits=%s) -> %s',
+                      self._repo, pr, dest, reset, len(commits),
                       prev)
         # prev is updated after each copy so it's the rebased PR head
         return prev
