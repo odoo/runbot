@@ -72,6 +72,7 @@
                     name="open" string="Open"
                     domain="[('state', 'not in', ['merged', 'closed'])]"
                 />
+                <field name="number"/>
                 <field name="author"/>
                 <field name="label"/>
                 <field name="target"/>
