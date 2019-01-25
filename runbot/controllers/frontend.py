@@ -90,7 +90,7 @@ class Runbot(Controller):
                 ORDER BY bu.sequence DESC
                 """
                 sticky_dom = [('repo_id', '=', repo.id), ('sticky', '=', True)]
-                sticky_branch_ids = [] if search else branch_obj.search(sticky_dom).ids
+                sticky_branch_ids = [] if search else branch_obj.search(sticky_dom).sorted(key=lambda b: (b.branch_name == 'master', b.id), reverse=True).ids
                 request._cr.execute(branch_query, (tuple(build_ids.ids),))
                 branch_ids = uniq_list(sticky_branch_ids + [br[0] for br in request._cr.fetchall()])
 
