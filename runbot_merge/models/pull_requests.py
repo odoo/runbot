@@ -769,7 +769,7 @@ class PullRequests(models.Model):
         for [ids] in self.env.cr.fetchall():
             prs = self.browse(ids)
             ready = prs.filtered(lambda p: p.state == 'ready')
-            unready = (prs - ready).sorted()
+            unready = (prs - ready).sorted(key=lambda p: (p.repository.name, p.number))
 
             for r in ready:
                 self.env['runbot_merge.pull_requests.feedback'].create({
