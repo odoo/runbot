@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
+import psycopg2
+import uuid
 from unittest.mock import patch
-from odoo.tools.config import configmanager
 from odoo.tests import common
 
 
@@ -88,6 +89,23 @@ class Test_Build(common.TransactionCase):
         })
         cmd = build._cmd()[0]
         self.assertIn('--log-db=%s' % uri, cmd)
+
+    def test_build_local_pg(self):
+        """ test create and drop of a local database even with an open cursor"""
+        dbname = str(uuid.uuid4())
+        self.Build._local_pg_createdb(dbname)
+        cnx = psycopg2.connect("dbname=%s" % dbname)
+        cur = cnx.cursor()
+        cur.execute("CREATE TABLE test (id serial PRIMARY KEY, foo varchar);")
+        cur.execute("INSERT INTO test (foo) VALUES ('bar')")
+        failure = False
+        try:
+            self.Build._local_pg_dropdb(dbname)
+        except psycopg2.OperationalError:
+            cnx.close()
+            self.Build._local_pg_dropdb(dbname)
+            failure = True
+        self.assertFalse(failure, "_local_pg_dropdb failed when a cursor is still using DB")
 
     def test_build_job_type_from_branch_default(self):
         """test build job_type is computed from branch default job_type"""
