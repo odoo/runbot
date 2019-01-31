@@ -612,7 +612,7 @@ class runbot_build(models.Model):
 
     def _local_pg_dropdb(self, dbname):
         with local_pgadmin_cursor() as local_cr:
-            pid_col = 'pid' if local_cr._cnx.server_version >= 90200 else 'procpid'
+            pid_col = 'pid' if local_cr.connection.server_version >= 90200 else 'procpid'
             query = 'SELECT pg_terminate_backend({}) FROM pg_stat_activity WHERE datname=%s'.format(pid_col)
             local_cr.execute(query, [dbname])
             local_cr.execute('DROP DATABASE IF EXISTS "%s"' % dbname)
