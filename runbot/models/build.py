@@ -753,11 +753,8 @@ class runbot_build(models.Model):
     @runbot_job('testing')
     def _job_10_test_base(self, build, log_path):
         build._log('test_base', 'Start test base module')
-        # run base test
         self._local_pg_createdb("%s-base" % build.dest)
         cmd, mods = build._cmd()
-        if grep(build._server("tools/config.py"), "test-enable"):
-            cmd.append("--test-enable")
         cmd += ['-d', '%s-base' % build.dest, '-i', 'base', '--stop-after-init', '--log-level=test', '--max-cron-threads=0']
         if build.extra_params:
             cmd.extend(shlex.split(build.extra_params))
