@@ -14,6 +14,7 @@ class ResConfigSettings(models.TransientModel):
     runbot_domain = fields.Char('Runbot domain')
     runbot_max_age = fields.Integer('Max branch age (in days)')
     runbot_logdb_uri = fields.Char('Runbot URI for build logs')
+    runbot_update_frequency = fields.Integer('Update frequency (in seconds)')
 
     @api.model
     def get_values(self):
@@ -26,6 +27,7 @@ class ResConfigSettings(models.TransientModel):
                    runbot_domain=get_param('runbot.runbot_domain', default=common.fqdn()),
                    runbot_max_age=int(get_param('runbot.runbot_max_age', default=30)),
                    runbot_logdb_uri=get_param('runbot.runbot_logdb_uri', default=False),
+                   runbot_update_frequency=get_param('runbot.runbot_update_frequency', default=10),
                    )
         return res
 
@@ -40,3 +42,4 @@ class ResConfigSettings(models.TransientModel):
         set_param("runbot.runbot_domain", self.runbot_domain)
         set_param("runbot.runbot_max_age", self.runbot_max_age)
         set_param("runbot.runbot_logdb_uri", self.runbot_logdb_uri)
+        set_param('runbot.runbot_update_frequency', self.runbot_update_frequency)
