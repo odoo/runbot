@@ -813,7 +813,13 @@ class PullRequests(models.Model):
         ), message)
         if m:
             return message
-        return message + '\n\ncloses {pr.repository.name}#{pr.number}'.format(pr=self)
+        message_lines = message.split('\n')
+        index = len(message_lines) - 1
+        while message_lines[index].lower().startswith("co-authored-by"):
+            index -= 1
+        return '\n'.join(message_lines[:index]) + \
+            '\n\ncloses {pr.repository.name}#{pr.number}\n'.format(pr=self) + \
+            '\n'.join(message_lines[index+1:])
 
     def _stage(self, gh, target):
         # nb: pr_commits is oldest to newest so pr.head is pr_commits[-1]
