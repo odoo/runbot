@@ -216,33 +216,7 @@ class runbot_build(models.Model):
             if name.startswith(branch['branch_name'] + '-') and self._branch_exists(branch['id']):
                 return result_for(branch, 'prefix')
 
-        # 4. Common ancestors (git merge-base)
-        for target_id in target_repo_ids:
-            common_refs = {}
-            self.env.cr.execute("""
-                SELECT b.name
-                  FROM runbot_branch b,
-                       runbot_branch t
-                 WHERE b.repo_id = %s
-                   AND t.repo_id = %s
-                   AND b.name = t.name
-                   AND b.name LIKE 'refs/heads/%%'
-            """, [repo.id, target_id])
-            for common_name, in self.env.cr.fetchall():
-                try:
-                    commit = repo._git(['merge-base', branch['name'], common_name]).strip()
-                    cmd = ['log', '-1', '--format=%cd', '--date=iso', commit]
-                    common_refs[common_name] = repo._git(cmd).strip()
-                except CalledProcessError:
-                    # If merge-base doesn't find any common ancestor, the command exits with a
-                    # non-zero return code, resulting in subprocess.check_output raising this
-                    # exception. We ignore this branch as there is no common ref between us.
-                    continue
-            if common_refs:
-                b = sorted(common_refs.items(), key=operator.itemgetter(1), reverse=True)[0][0]
-                return target_id, b, 'fuzzy'
-
-        # 5. last-resort value
+        # 4. last-resort value
         return target_repo_id, target_branch, 'default'
 
     @api.depends('name', 'branch_id.name')
