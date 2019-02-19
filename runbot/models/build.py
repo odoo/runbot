@@ -423,6 +423,11 @@ class runbot_build(models.Model):
                         build._logger('%s time exceded (%ss)', build.job, build.job_time)
                         build.write({'job_end': now()})
                         build._kill(result='killed')
+                    else:
+                        # failfast
+                        if not build.result and build.guess_result in ('ko', 'warn'):
+                            build.result = build.guess_result
+                            build._github_status()
                     continue
                 build._logger('%s finished', build.job)
                 # schedule
