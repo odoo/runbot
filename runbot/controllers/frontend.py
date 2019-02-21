@@ -190,7 +190,7 @@ class Runbot(Controller):
             domain.append(('level', '=', level.upper()))
         if search:
             domain.append(('message', 'ilike', search))
-        logging_ids = Logging.sudo().search(domain)
+        logging_ids = Logging.sudo().search(domain, limit=10000)
 
         context = {
             'repo': build.repo_id,
