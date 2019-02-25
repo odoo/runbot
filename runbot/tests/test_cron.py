@@ -42,21 +42,19 @@ class Test_Cron(common.TransactionCase):
         self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_update_frequency', 1)
         ret = self.Repo._cron_fetch_and_schedule('runbotx.foo.com')
         self.assertEqual(None, ret)
-        mock_update.assert_called_with(self.Repo)
+        mock_update.assert_called_with(self.Repo, force=False)
         mock_create.assert_called_with(self.Repo)
 
     @patch('odoo.addons.runbot.models.repo.runbot_repo._get_cron_period')
     @patch('odoo.addons.runbot.models.repo.runbot_repo._reload_nginx')
     @patch('odoo.addons.runbot.models.repo.runbot_repo._scheduler')
-    @patch('odoo.addons.runbot.models.repo.runbot_repo._update')
     @patch('odoo.addons.runbot.models.repo.fqdn')
-    def test_cron_build(self, mock_fqdn, mock_update, mock_scheduler, mock_reload, mock_cron_period):
+    def test_cron_build(self, mock_fqdn, mock_scheduler, mock_reload, mock_cron_period):
         """ test that cron_fetch_and_build do its work """
         mock_fqdn.return_value = 'runbotx.foo.com'
         mock_cron_period.return_value = 2
         self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_update_frequency', 1)
         ret = self.Repo._cron_fetch_and_build('runbotx.foo.com')
         self.assertEqual(None, ret)
-        mock_update.assert_called_with(self.Repo)
         mock_scheduler.assert_called_with([])
         self.assertTrue(mock_reload.called)
