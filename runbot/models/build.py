@@ -510,6 +510,10 @@ class runbot_build(models.Model):
             os.makedirs(build._path("logs"), exist_ok=True)
             os.makedirs(build._server('addons'), exist_ok=True)
 
+            # update repo if needed
+            if not build.repo_id._hash_exists(build.name):
+                build.repo_id._update(build.repo_id)
+
             # checkout branch
             build.branch_id.repo_id._git_export(build.name, build._path())
 

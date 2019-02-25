@@ -90,6 +90,15 @@ class runbot_repo(models.Model):
         p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
         p2.communicate()[0]
 
+    def _hash_exists(self, commit_hash):
+        """ Verify that a commit hash exists in the repo """
+        self.ensure_one()
+        try:
+            self._git(['cat-file', '-e', commit_hash])
+        except subprocess.CalledProcessError:
+            return False
+        return True
+
     def _github(self, url, payload=None, ignore_errors=False):
         """Return a http request to be sent to github"""
         for repo in self:
@@ -219,7 +228,7 @@ class runbot_repo(models.Model):
             _logger.info("Cloning repository '%s' in '%s'" % (repo.name, repo.path))
             subprocess.call(['git', 'clone', '--bare', repo.name, repo.path])
 
-    def _update_git(self):
+    def _update_git(self, force):
         """ Update the git repo on FS """
         self.ensure_one()
         repo = self
@@ -231,7 +240,7 @@ class runbot_repo(models.Model):
 
         # check for mode == hook
         fname_fetch_head = os.path.join(repo.path, 'FETCH_HEAD')
-        if os.path.isfile(fname_fetch_head):
+        if not force and os.path.isfile(fname_fetch_head):
             fetch_time = os.path.getmtime(fname_fetch_head)
             if repo.mode == 'hook' and repo.hook_time and dt2time(repo.hook_time) < fetch_time:
                 t0 = time.time()
@@ -241,11 +250,11 @@ class runbot_repo(models.Model):
 
         repo._git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*', '+refs/pull/*/head:refs/pull/*'])
 
-    def _update(self, repos):
+    def _update(self, repos, force=True):
         """ Update the physical git reposotories on FS"""
         for repo in repos:
             try:
-                repo._update_git()
+                repo._update_git(force)
             except Exception:
                 _logger.exception('Fail to update repo %s', repo.name)
 
@@ -371,7 +380,7 @@ class runbot_repo(models.Model):
         update_frequency = int(icp.get_param('runbot.runbot_update_frequency', default=10))
         while time.time() - start_time < timeout:
             repos = self.search([('mode', '!=', 'disabled')])
-            self._update(repos)
+            self._update(repos, force=False)
             self._create_pending_builds(repos)
             self.env.cr.commit()
             time.sleep(update_frequency)
@@ -388,8 +397,9 @@ class runbot_repo(models.Model):
         update_frequency = int(icp.get_param('runbot.runbot_update_frequency', default=10))
         while time.time() - start_time < timeout:
             repos = self.search([('mode', '!=', 'disabled')])
-            self._update(repos)
             self._scheduler(repos.ids)
             self.env.cr.commit()
+            self.env.reset()
+            self = self.env()[self._name]
             self._reload_nginx()
             time.sleep(update_frequency)
