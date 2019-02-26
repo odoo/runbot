@@ -117,7 +117,7 @@ class runbot_build(models.Model):
             '|', ('result', '=', False), ('result', '!=', 'skipped')
         ]
 
-        for duplicate in self.search(domain):
+        for duplicate in self.search(domain, limit=1):
             duplicate_id = duplicate.id
             # Consider the duplicate if its closest branches are the same than the current build closest branches.
             for extra_repo in build_id.repo_id.dependency_ids:
