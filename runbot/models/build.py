@@ -553,6 +553,7 @@ class runbot_build(models.Model):
                         'Building environment',
                         'Server built based on commit %s from %s' % (commit_oneline, closest_name)
                     )
+                    repo._update_git(force=True)
                     repo._git_export(closest_name, build._path())
 
                 # Finally mark all addons to move to openerp/addons
