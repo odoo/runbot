@@ -308,7 +308,7 @@ class runbot_build(models.Model):
     def _skip(self, reason=None):
         """Mark builds ids as skipped"""
         if reason:
-            self._logger('skip', reason)
+            self._logger('skip %s', reason)
         self.write({'state': 'done', 'result': 'skipped'})
         to_unduplicate = self.search([('id', 'in', self.ids), ('duplicate_id', '!=', False)])
         to_unduplicate._force()

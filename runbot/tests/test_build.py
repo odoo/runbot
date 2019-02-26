@@ -158,6 +158,29 @@ class Test_Build(common.TransactionCase):
         })
         self.assertEqual(build, self.Build, "build should be an empty recordset")
 
+    @patch('odoo.addons.runbot.models.build._logger')
+    def test_build_skip(self, mock_logger):
+        """test build is skipped"""
+        build = self.Build.create({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'port': '1234',
+        })
+        build._skip()
+        self.assertEqual(build.state, 'done')
+        self.assertEqual(build.result, 'skipped')
+
+        other_build = self.Build.create({
+            'branch_id': self.branch.id,
+            'name': 'deadbeef0000ffffffffffffffffffffffffffff',
+            'port': '1234',
+        })
+        other_build._skip(reason='A good reason')
+        self.assertEqual(other_build.state, 'done')
+        self.assertEqual(other_build.result, 'skipped')
+        log_first_part = '%s skip %%s' % (other_build.dest)
+        mock_logger.debug.assert_called_with(log_first_part, 'A good reason')
+
     @patch('odoo.addons.runbot.models.branch.runbot_branch._is_on_remote')
     def test_closest_branch_01(self, mock_is_on_remote):
         """ test find a matching branch in a target repo based on branch name """
