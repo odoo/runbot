@@ -245,6 +245,17 @@ def make_repo(request, config, project, github, tunnel, users, owner):
     repos = []
     def repomaker(name):
         fullname = '{}/{}'.format(owner, name)
+        repo_url = 'https://api.github.com/repos/{}'.format(fullname)
+        if request.config.getoption('--no-delete'):
+            if github.head(repo_url).ok:
+                pytest.skip("Repository {} already exists".format(fullname))
+        else:
+            # just try to delete the repo, we don't really care
+            if github.delete(repo_url).ok:
+                # if we did delete a repo, wait a bit as gh might need to
+                # propagate the thing?
+                time.sleep(30)
+
         # create repo
         r = github.post(endpoint, json={
             'name': name,
@@ -260,12 +271,12 @@ def make_repo(request, config, project, github, tunnel, users, owner):
         r.raise_for_status()
         repos.append(fullname)
         # unwatch repo
-        github.put('https://api.github.com/repos/{}/subscription'.format(fullname), json={
+        github.put('{}/subscription'.format(repo_url), json={
             'subscribed': False,
             'ignored': True,
         })
         # create webhook
-        github.post('https://api.github.com/repos/{}/hooks'.format(fullname), json={
+        github.post('{}/hooks'.format(repo_url), json={
             'name': 'web',
             'config': {
                 'url': '{}/runbot_merge/hooks'.format(tunnel),
