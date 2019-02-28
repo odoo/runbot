@@ -19,7 +19,7 @@ class MergebotController(Controller):
 
         c = EVENTS.get(event)
         if not c:
-            _logger.warn('Unknown event %s', event)
+            _logger.warning('Unknown event %s', event)
             return 'Unknown event {}'.format(event)
 
         repo = request.jsonrequest['repository']['full_name']
@@ -31,7 +31,7 @@ class MergebotController(Controller):
         if secret:
             signature = 'sha1=' + hmac.new(secret.encode('ascii'), req.get_data(), hashlib.sha1).hexdigest()
             if not hmac.compare_digest(signature, req.headers.get('X-Hub-Signature', '')):
-                _logger.warn("Ignored hook with incorrect signature %s",
+                _logger.warning("Ignored hook with incorrect signature %s",
                              req.headers.get('X-Hub-Signature'))
                 return werkzeug.exceptions.Forbidden()
 
@@ -141,7 +141,7 @@ def handle_pr(env, event):
 
     pr_obj = env['runbot_merge.pull_requests']._get_or_schedule(r, pr['number'])
     if not pr_obj:
-        _logger.warn("webhook %s on unknown PR %s:%s, scheduled fetch", event['action'], repo.name, pr['number'])
+        _logger.warning("webhook %s on unknown PR %s:%s, scheduled fetch", event['action'], repo.name, pr['number'])
         return "Unknown PR {}:{}, scheduling fetch".format(repo.name, pr['number'])
     if event['action'] == 'synchronize':
         if pr_obj.head == pr['head']['sha']:
