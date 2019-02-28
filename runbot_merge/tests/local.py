@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import inspect
+import logging
 
 import pytest
 import werkzeug.test, werkzeug.wrappers
@@ -7,6 +8,10 @@ import werkzeug.test, werkzeug.wrappers
 import odoo
 
 import fake_github
+
+@pytest.fixture(autouse=True)
+def debuglog(caplog):
+    caplog.set_level(logging.DEBUG, logger='odoo')
 
 @pytest.fixture(scope='session')
 def remote_p():

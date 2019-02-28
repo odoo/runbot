@@ -13,7 +13,7 @@ from itertools import takewhile
 from odoo import api, fields, models, tools
 from odoo.exceptions import ValidationError
 
-from .. import github, exceptions, controllers
+from .. import github, exceptions, controllers, utils
 
 STAGING_SLEEP = 20
 "temp hack: add a delay between staging repositories in case there's a race when quickly pushing a repo then its dependency"
@@ -130,7 +130,7 @@ class Project(models.Model):
                     "Error while trying to %s %s:%s (%s)",
                     'close' if f.close else 'send a comment to',
                     repo.name, f.pull_request,
-                    f.message and f.message[:200]
+                    utils.shorten(f.message, 200)
                 )
             else:
                 to_remove.append(f.id)
@@ -538,8 +538,8 @@ class PullRequests(models.Model):
         )
 
         if not commands:
-            _logger.info("found no commands in comment of %s (%s) (%s%s)", author.github_login, author.display_name,
-                 comment[:50], '...' if len(comment) > 50 else ''
+            _logger.info("found no commands in comment of %s (%s) (%s)", author.github_login, author.display_name,
+                 utils.shorten(comment, 50)
             )
             return 'ok'
 

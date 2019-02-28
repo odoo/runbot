@@ -6,7 +6,7 @@ import logging
 import requests
 
 from odoo.tools import topological_sort
-from . import exceptions
+from . import exceptions, utils
 
 _logger = logging.getLogger(__name__)
 class GH(object):
@@ -31,11 +31,29 @@ class GH(object):
                 exc = check.get(r.status_code)
                 if exc:
                     raise exc(r.text)
-            if r.status_code >= 400 and r.headers.get('content-type', '').startswith('application/javascript'):
-                raise requests.HTTPError(
-                    json_.dumps(r.json(), indent=4),
-                    response=r
-                )
+            if r.status_code >= 400:
+                headers = '\n'.join('\t%s: %s' % (h, v) for h, v in r.headers.items())
+                if r.headers.get('content-type', '').startswith(('application/json', 'application/javascript')):
+                    body = r.json()
+                elif r.encoding is not None:
+                    body = utils.shorten(r.text, 200)
+                else:
+                    body = utils.shorten(r.content, 200)
+
+                _logger.error("%(method)s /%(repo)s/%(path)s\n=> %(status)d %(reason)s\n%(headers)s\n\n\t%(body)r\n====================", {
+                    'status': r.status_code,
+                    'reason': r.reason,
+                    'method': method,
+                    'repo': self._repo,
+                    'path': path,
+                    'headers': headers,
+                    'body': body
+                })
+                if not isinstance(body, (bytes, str)):
+                    raise requests.HTTPError(
+                        json_.dumps(body, indent=4),
+                        response=r
+                    )
             r.raise_for_status()
         return r
 

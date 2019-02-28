@@ -45,8 +45,10 @@ class APIResponse(responses.BaseResponse):
 
         (status, r) = r
         headers = self.get_headers()
-        body = io.BytesIO(b'')
-        if r is not None:
+        if r is None:
+            body = io.BytesIO(b'')
+            headers['Content-Type'] = 'text/plain'
+        else:
             body = io.BytesIO(json.dumps(r).encode('utf-8'))
 
         return responses.HTTPResponse(
