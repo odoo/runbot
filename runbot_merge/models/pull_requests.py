@@ -1226,35 +1226,7 @@ class Stagings(models.Model):
             repo_name = None
             staging_heads = json.loads(self.heads)
             try:
-                # reverting updates doesn't work if the branches are
-                # protected (because a revert is basically a force
-                # push), instead use the tmp branch as a dry-run
-                tmp_target = 'tmp.' + self.target.name
-                # first force-push the current targets to all tmps
-                for repo_name in staging_heads.keys():
-                    if repo_name.endswith('^'):
-                        continue
-                    g = gh[repo_name]
-                    g.set_ref(tmp_target, g.head(self.target.name))
-
-                # then attempt to FF the tmp to the staging
-                for repo_name, head in staging_heads.items():
-                    if repo_name.endswith('^'):
-                        continue
-                    gh[repo_name].fast_forward(tmp_target, staging_heads.get(repo_name + '^') or head)
-
-                # there is still a race condition here, but it's way
-                # lower than "the entire staging duration"...
-                for repo_name, head in staging_heads.items():
-                    if repo_name.endswith('^'):
-                        continue
-
-                    # if the staging has a $repo^ head, merge that,
-                    # otherwise merge the regular (CI'd) head
-                    gh[repo_name].fast_forward(
-                        self.target.name,
-                        staging_heads.get(repo_name + '^') or head
-                    )
+                repo_name = self._safety_dance(gh, staging_heads)
             except exceptions.FastForwardError as e:
                 logger.warning(
                     "Could not fast-forward successful staging on %s:%s",
@@ -1284,6 +1256,67 @@ class Stagings(models.Model):
                 self.write({'active': False})
         elif self.state == 'failure' or project.is_timed_out(self):
             self.try_splitting()
+
+    def _safety_dance(self, gh, staging_heads):
+        """ Reverting updates doesn't work if the branches are protected
+        (because a revert is basically a force push). So we can update
+        REPO_A, then fail to update REPO_B for some reason, and we're hosed.
+
+        To try and make this issue less likely, do the safety dance:
+
+        * First, perform a dry run using the tmp branches (which can be
+          force-pushed and sacrificed), that way if somebody pushed directly
+          to REPO_B during the staging we catch it. If we're really unlucky
+          they could still push after the dry run but...
+        * An other issue then is that the github call sometimes fails for no
+          noticeable reason (e.g. network failure or whatnot), if it fails
+          on REPO_B when REPO_A has already been updated things get pretty
+          bad. In that case, wait a bit and retry for now. A more complex
+          strategy (including disabling the branch entirely until somebody
+          has looked at and fixed the issue) might be necessary.
+
+        :returns: the last repo it tried to update (probably the one on which
+                  it failed, if it failed)
+        """
+        # FIXME: would make sense for FFE to be richer, and contain the repo name
+        repo_name = None
+        tmp_target = 'tmp.' + self.target.name
+        # first force-push the current targets to all tmps
+        for repo_name in staging_heads.keys():
+            if repo_name.endswith('^'):
+                continue
+            g = gh[repo_name]
+            g.set_ref(tmp_target, g.head(self.target.name))
+        # then attempt to FF the tmp to the staging
+        for repo_name, head in staging_heads.items():
+            if repo_name.endswith('^'):
+                continue
+            gh[repo_name].fast_forward(tmp_target, staging_heads.get(repo_name + '^') or head)
+        # there is still a race condition here, but it's way
+        # lower than "the entire staging duration"...
+        first = True
+        for repo_name, head in staging_heads.items():
+            if repo_name.endswith('^'):
+                continue
+
+            for pause in [0.1, 0.3, 0.5, 0.9, 0]: # last one must be 0/falsy of we lose the exception
+                try:
+                    # if the staging has a $repo^ head, merge that,
+                    # otherwise merge the regular (CI'd) head
+                    gh[repo_name].fast_forward(
+                        self.target.name,
+                        staging_heads.get(repo_name + '^') or head
+                    )
+                except exceptions.FastForwardError:
+                    # The GH API regularly fails us. If the failure does not
+                    # occur on the first repository, retry a few times with a
+                    # little pause.
+                    if not first and pause:
+                        time.sleep(pause)
+                        continue
+                    raise
+            first = False
+        return repo_name
 
 class Split(models.Model):
     _name = 'runbot_merge.split'
