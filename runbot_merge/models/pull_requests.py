@@ -148,7 +148,13 @@ class Project(models.Model):
             if not f:
                 return
 
-            f.repository._load_pr(f.number)
+            self.env.cr.execute("SAVEPOINT runbot_merge_before_fetch")
+            try:
+                f.repository._load_pr(f.number)
+            except Exception:
+                self.env.cr.execute("ROLLBACK TO SAVEPOINT runbot_merge_before_fetch")
+                _logger.exception("Failed to load pr %s, skipping it", f.number)
+            self.env.cr.execute("RELEASE SAVEPOINT runbot_merge_before_fetch")
 
             # commit after each fetched PR
             f.active = False
