@@ -182,6 +182,37 @@
             </tree>
         </field>
     </record>
+    <record id="runbot_merge_form_stagings" model="ir.ui.view">
+        <field name="name">Stagings Form</field>
+        <field name="model">runbot_merge.stagings</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button type="object" name="cancel" string="Cancel" class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="target"/>
+                            <field name="state"/>
+                            <field name="reason"/>
+                        </group>
+                        <group>
+                            <field name="staged_at"/>
+                            <field name="statuses"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="batch_ids" colspan="4">
+                            <tree>
+                                <field name="prs"/>
+                            </tree>
+                        </field>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
 
     <record id="runbot_merge_action_fetches" model="ir.actions.act_window">
         <field name="name">PRs to fetch</field>

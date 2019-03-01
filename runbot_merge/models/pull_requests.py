@@ -1114,10 +1114,14 @@ class Stagings(models.Model):
 
             s.state = st
 
-    def cancel(self, reason, *args):
+    @api.multi
+    def cancel(self, reason=None, *args):
         if not self:
             return
 
+        if reason is None:
+            reason = "explicitly cancelled by %s"
+            args = [self.env.user.display_name]
         _logger.info("Cancelling staging %s: " + reason, self, *args)
         self.batch_ids.write({'active': False})
         self.write({
