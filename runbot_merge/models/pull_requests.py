@@ -1231,6 +1231,11 @@ class Stagings(models.Model):
             gh = {repo.name: repo.github() for repo in project.repo_ids}
             repo_name = None
             staging_heads = json.loads(self.heads)
+            self.env.cr.execute('''
+            SELECT 1 FROM runbot_merge_pull_requests
+            WHERE id in %s
+            FOR UPDATE
+            ''', [tuple(self.mapped('batch_ids.prs.id'))])
             try:
                 repo_name = self._safety_dance(gh, staging_heads)
             except exceptions.FastForwardError as e:

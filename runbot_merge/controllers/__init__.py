@@ -174,6 +174,7 @@ def handle_pr(env, event):
         FOR UPDATE SKIP LOCKED;
         ''', [pr_obj.id])
         res = env.cr.fetchone()
+        # FIXME: store some sort of "try to close it later" if the merge fails?
         if not res:
             return 'Ignored: could not lock rows (probably being merged)'
 
