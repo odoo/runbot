@@ -731,7 +731,7 @@ class runbot_build(models.Model):
             desc += " (runtime %ss)" % (build.job_time,)
             if build.result == 'ok':
                 state = 'success'
-            if build.result == 'ko':
+            if build.result in ('ko', 'warn'):
                 state = 'failure'
             status = {
                 "state": state,

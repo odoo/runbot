@@ -81,3 +81,46 @@ class Test_Jobs(common.TransactionCase):
             'context': 'ci/runbot'
         }
         mock_github.assert_called_with('/repos/:owner/:repo/statuses/d0d0caca0000ffffffffffffffffffffffffffff', expected_status, ignore_errors=True)
+
+    @patch('odoo.addons.runbot.models.build.rfind')
+    @patch('odoo.addons.runbot.models.build.docker_get_gateway_ip')
+    @patch('odoo.addons.runbot.models.repo.runbot_repo._domain')
+    @patch('odoo.addons.runbot.models.repo.runbot_repo._github')
+    @patch('odoo.addons.runbot.models.build.runbot_build._cmd')
+    @patch('odoo.addons.runbot.models.build.os.path.getmtime')
+    @patch('odoo.addons.runbot.models.build.time.localtime')
+    @patch('odoo.addons.runbot.models.build.docker_run')
+    @patch('odoo.addons.runbot.models.build.grep')
+    def test_job_29_warned(self, mock_grep, mock_docker_run, mock_localtime, mock_getmtime, mock_cmd, mock_github, mock_domain, mock_docker_get_gateway, mock_rfind):
+        """ Test that a warn build sets the failure state on github """
+
+        def rfind_side_effect(logfile, regex):
+            return True if 'WARNING' in regex else False
+
+        a_time = datetime.datetime.now().strftime(DEFAULT_SERVER_DATETIME_FORMAT)
+        mock_rfind.side_effect = rfind_side_effect
+        mock_grep.return_value = True
+        mock_docker_run.return_value = 2
+        now = localtime()
+        mock_localtime.return_value = now
+        mock_getmtime.return_value = None
+        mock_cmd.return_value = ([], [])
+        mock_domain.return_value = 'runbotxx.somewhere.com'
+        build = self.Build.create({
+            'branch_id': self.branch_master.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'port': '1234',
+            'state': 'testing',
+            'job_start': a_time,
+            'job_end': a_time
+        })
+        self.assertFalse(build.result)
+        self.Build._job_29_results(build, '/tmp/x.log')
+        self.assertEqual(build.result, 'warn')
+        expected_status = {
+            'state': 'failure',
+            'target_url': 'http://runbotxx.somewhere.com/runbot/build/%s' % build.id,
+            'description': 'runbot build %s (runtime 0s)' % build.dest,
+            'context': 'ci/runbot'
+        }
+        mock_github.assert_called_with('/repos/:owner/:repo/statuses/d0d0caca0000ffffffffffffffffffffffffffff', expected_status, ignore_errors=True)
