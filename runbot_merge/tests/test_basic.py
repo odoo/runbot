@@ -1563,7 +1563,7 @@ class TestPRUpdate(object):
         c2 = repo.make_commit(c, 'first', None, tree={'m': 'cc'})
         prx.push(c2)
         assert pr.head == c2
-        assert pr.state == 'error'
+        assert pr.state == 'opened'
 
     def test_unknown_pr(self, env, repo):
         m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})

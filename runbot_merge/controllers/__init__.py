@@ -157,11 +157,19 @@ def handle_pr(env, event):
                 pr_obj.repository.name, pr_obj.number,
                 event['sender']['login']
             )
-        if pr_obj.state != 'error':
-            pr_obj.state = 'opened'
 
-        pr_obj.head = pr['head']['sha']
-        pr_obj.squash = pr['commits'] == 1
+        _logger.info(
+            "PR %s:%s updated to %s by %s, resetting to 'open' and squash=%s",
+            pr_obj.repository.name, pr_obj.number,
+            pr['head']['sha'], event['sender']['login'],
+            pr['commits'] == 1
+        )
+
+        pr_obj.write({
+            'state': 'opened',
+            'head': pr['head']['sha'],
+            'squash': pr['commits'] == 1,
+        })
         return 'Updated {} to {}'.format(pr_obj.id, pr_obj.head)
 
     # don't marked merged PRs as closed (!!!)
