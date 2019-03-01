@@ -56,8 +56,7 @@
                                 <li t-foreach="ready_unstaged" t-as="pr">
                                     <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
                                        t-att-title="pr.message.split('\n')[0]">
-                                        <t t-esc="pr.repository.name"/>#
-                                        <t t-esc="pr.number"/>
+                                        <t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/>
                                     </a>
                                 </li>
                             </ul>
