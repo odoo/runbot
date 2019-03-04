@@ -100,6 +100,7 @@ def handle_pr(env, event):
         updates = {}
         if source_branch != branch:
             updates['target'] = branch.id
+            updates['squash'] = pr['commits'] == 1
         if event['changes'].keys() & {'title', 'body'}:
             updates['message'] = "{}\n\n{}".format(pr['title'].strip(), pr['body'].strip())
         if updates:

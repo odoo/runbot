@@ -594,6 +594,38 @@ def test_edit(env, repo):
         ('number', '=', prx.number)
     ]).target == branch_1
 
+def test_retarget_update_commits(env, repo):
+    """ Retargeting a PR should update its commits count
+    """
+    branch_1 = env['runbot_merge.branch'].create({
+        'name': '1.0',
+        'project_id': env['runbot_merge.project'].search([]).id,
+    })
+    master = env['runbot_merge.branch'].search([('name', '=', 'master')])
+
+    # master is 1 commit in advance of 1.0
+    m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+    m2 = repo.make_commit(m, 'second', None, tree={'m': 'm2'})
+    repo.make_ref('heads/master', m2)
+    repo.make_ref('heads/1.0', m)
+
+    # the PR builds on master, but is errorneously targeted to 1.0
+    c = repo.make_commit(m2, 'first', None, tree={'m': 'm3'})
+    prx = repo.make_pr('title', 'body', target='1.0', ctid=c, user='user')
+    pr = env['runbot_merge.pull_requests'].search([
+        ('repository.name', '=', repo.name),
+        ('number', '=', prx.number)
+    ])
+    assert not pr.squash
+
+    prx.base = 'master'
+    assert pr.target == master
+    assert pr.squash
+
+    prx.base = '1.0'
+    assert pr.target == branch_1
+    assert not pr.squash
+
 @pytest.mark.skip(reason="what do?")
 def test_edit_retarget_managed(env, repo):
     """ A PR targeted to an un-managed branch is ignored but if the PR
