@@ -1614,6 +1614,30 @@ class TestPRUpdate(object):
 
         assert not env['runbot_merge.pull_requests'].search([('number', '=', prx.number)])
 
+    def test_update_to_ci(self, env, repo):
+        """ If a PR is updated to a known-valid commit, it should be
+        validated
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        repo.make_ref('heads/master', m)
+
+        c = repo.make_commit(m, 'fist', None, tree={'m': 'c1'})
+        c2 = repo.make_commit(m, 'first', None, tree={'m': 'cc'})
+        repo.post_status(c2, 'success', 'legal/cla')
+        repo.post_status(c2, 'success', 'ci/runbot')
+
+        prx = repo.make_pr('title', 'body', target='master', ctid=c, user='user')
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number),
+        ])
+        assert pr.head == c
+        assert pr.state == 'opened'
+
+        prx.push(c2)
+        assert pr.head == c2
+        assert pr.state == 'validated'
+
 class TestBatching(object):
     def _pr(self, repo, prefix, trees, *,
             target='master', user='user', reviewer='reviewer',

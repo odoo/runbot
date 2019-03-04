@@ -720,7 +720,15 @@ class PullRequests(models.Model):
     @api.multi
     def write(self, vals):
         oldstate = { pr: pr._tagstate for pr in self }
+
         w = super().write(vals)
+
+        newhead = vals.get('head')
+        if newhead:
+            c = self.env['runbot_merge.commit'].search([('sha', '=', newhead)])
+            if c.statuses:
+                self._validate(json.loads(c.statuses))
+
         for pr in self:
             before, after = oldstate[pr], pr._tagstate
             if after != before:
