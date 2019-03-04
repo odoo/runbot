@@ -1,4 +1,4 @@
-from email.utils import parseaddr, formataddr
+from email.utils import parseaddr
 from odoo import fields, models, tools, api
 
 class Partner(models.Model):
@@ -16,9 +16,8 @@ class Partner(models.Model):
             self._cr, 'runbot_merge_unique_gh_login', self._table, ['github_login'])
         return res
 
-    @api.multi
+    @api.depends('name', 'email', 'github_login')
     def _rfc5322_formatted(self):
-        # format partner's email according to RFC5322 section 3.4
         for partner in self:
             if partner.email:
                 email = parseaddr(partner.email)[1]
@@ -26,4 +25,4 @@ class Partner(models.Model):
                 email = '%s@users.noreply.github.com' % partner.github_login
             else:
                 email = ''
-            partner.formatted_email = formataddr((partner.name, email))
+            partner.formatted_email = '%s <%s>' % (partner.name, email)
