@@ -53,7 +53,16 @@
                         <t t-if="ready_unstaged">
                             <h5 style="display: inline-block;">Awaiting</h5>
                             <ul class="list-inline" style="display: inline-block;">
-                                <li t-foreach="ready_unstaged" t-as="pr">
+                                <li t-foreach="ready_unstaged" t-as="pr" t-if="not pr.blocked">
+                                    <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
+                                       t-att-title="pr.message.split('\n')[0]">
+                                        <t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/>
+                                    </a>
+                                </li>
+                            </ul>
+                            <h5 style="display: inline-block;">Blocked</h5>
+                            <ul class="list-inline" style="display: inline-block;">
+                                <li t-foreach="ready_unstaged" t-as="pr" t-if="pr.blocked">
                                     <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
                                        t-att-title="pr.message.split('\n')[0]">
                                         <t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/>
@@ -71,7 +80,7 @@
             <t t-foreach="branch.staging_ids.sorted(lambda s: s.staged_at, reverse=True)[:6]" t-as="staging">
                 <t t-set="success" t-value="staging.state == 'success'"/>
                 <t t-set="failure" t-value="staging.state == 'failure'"/>
-                <t t-set="pending" t-value="staging.state == 'pending' and staging.active"/>
+                <t t-set="pending" t-value="staging.active and (not staging.state or staging.state == 'pending')"/>
                 <t t-set="stateclass">
                     <t t-if="success">bg-success</t>
                     <t t-if="failure">bg-danger</t>
