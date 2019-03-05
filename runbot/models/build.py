@@ -72,6 +72,8 @@ class runbot_build(models.Model):
                                      ('exact', 'branch/PR exact name'),
                                      ('prefix', 'branch whose name is a prefix of current one'),
                                      ('fuzzy', 'Fuzzy - common ancestor found'),
+                                     ('exact PR', 'Exact match between two PR'),
+                                     ('no PR', 'PR matching a branch without PR'),
                                      ('default', 'No match found - defaults to master')],
                                     string='Server branch matching')
     revdep_build_ids = fields.Many2many('runbot.build', 'runbot_rev_dep_builds',
@@ -108,25 +110,28 @@ class runbot_build(models.Model):
         extra_info.update({'job_type': job_type})
         context = self.env.context
 
-        # detect duplicate
-        duplicate_id = None
-        domain = [
-            ('repo_id', '=', build_id.repo_id.duplicate_id.id),
-            ('name', '=', build_id.name),
-            ('duplicate_id', '=', False),
-            '|', ('result', '=', False), ('result', '!=', 'skipped')
-        ]
+        if not context.get('force_rebuild'):
+            # detect duplicate
+            duplicate_id = None
+            domain = [
+                ('repo_id', '=', build_id.repo_id.duplicate_id.id),
+                ('name', '=', build_id.name),
+                ('duplicate_id', '=', False),
+                '|', ('result', '=', False), ('result', '!=', 'skipped')
+            ]
+            # TODO xdo extract build_id._get_closest_branch_name(extra_repo.id) here
+            for duplicate in self.search(domain, limit=10):
+                duplicate_id = duplicate.id
+                # Consider the duplicate if its closest branches are the same than the current build closest branches.
+                for extra_repo in build_id.repo_id.dependency_ids:
+                    build_closest_name = build_id._get_closest_branch_name(extra_repo.id)[1]
+                    duplicate_closest_name = duplicate._get_closest_branch_name(extra_repo.id)[1]
+                    if build_closest_name != duplicate_closest_name:
+                        duplicate_id = None
+                if duplicate_id:
+                    extra_info.update({'state': 'duplicate', 'duplicate_id': duplicate_id})
+                    break
 
-        for duplicate in self.search(domain, limit=1):
-            duplicate_id = duplicate.id
-            # Consider the duplicate if its closest branches are the same than the current build closest branches.
-            for extra_repo in build_id.repo_id.dependency_ids:
-                build_closest_name = build_id._get_closest_branch_name(extra_repo.id)[1]
-                duplicate_closest_name = duplicate._get_closest_branch_name(extra_repo.id)[1]
-                if build_closest_name != duplicate_closest_name:
-                    duplicate_id = None
-        if duplicate_id and not context.get('force_rebuild'):
-            extra_info.update({'state': 'duplicate', 'duplicate_id': duplicate_id})
         build_id.write(extra_info)
         if build_id.state == 'duplicate' and build_id.duplicate_id.state in ('running', 'done'):
             build_id._github_status()
@@ -203,7 +208,11 @@ class runbot_build(models.Model):
         for pull in Branch.browse([pu['id'] for pu in pulls]):
             pi = pull._get_pull_info()
             if pi.get('state') == 'open':
-                return (pull.repo_id.id, pull.name, 'exact')
+                if ':' in name:  # we assume that branch exists if we got pull info
+                    pr_branch_name = name.split(':')[1]
+                    return (pull.repo_id.duplicate_id.id, 'refs/heads/%s' % pr_branch_name, 'exact PR')
+                else:
+                    return (pull.repo_id.id, pull.name, 'exact PR')
 
         # 3. Match a branch which is the dashed-prefix of current branch name
         branches = Branch.search_read(
@@ -216,8 +225,22 @@ class runbot_build(models.Model):
             if name.startswith(branch['branch_name'] + '-') and self._branch_exists(branch['id']):
                 return result_for(branch, 'prefix')
 
-        # 4. last-resort value
-        return target_repo_id, target_branch, 'default'
+        # 4.Match a PR in enterprise without community PR
+        if build.branch_id.name.startswith('refs/pull') and ':' in name:
+            pr_branch_name = name.split(':')[1]
+            duplicate_branch_name = 'refs/heads/%s' % pr_branch_name
+            domain = [
+                ('repo_id', 'in', target_repo_ids),  # target_repo_ids should contain the target duplicate repo
+                ('branch_name', '=', pr_branch_name),
+                ('pull_head_name', '=', False),
+            ]
+            targets = Branch.search_read(domain, fields, order='id DESC')
+            targets = sorted(targets, key=sort_by_repo)
+            if targets and self._branch_exists(targets[0]['id']):
+                return result_for(targets[0], 'no PR')
+
+        # 5. last-resort value
+        return target_repo_id, 'refs/heads/%s' % target_branch, 'default'
 
     @api.depends('name', 'branch_id.name')
     def _get_dest(self):
