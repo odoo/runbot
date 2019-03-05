@@ -10,7 +10,7 @@ from lxml import html
 
 import odoo
 
-from test_utils import re_matches, run_crons, get_partner
+from test_utils import re_matches, run_crons, get_partner, _simple_init
 
 @pytest.fixture
 def repo(make_repo):
@@ -759,15 +759,29 @@ def test_rebase_failure(env, repo, users, remote_p):
         'b': b'b',
     }
 
+def test_ci_failure_after_review(env, repo, users):
+    """ If a PR is r+'d but the CI ends up failing afterwards, ping the user
+    so they're aware. This is useful for the more "fire and forget" approach
+    especially small / simple PRs where you assume they're going to pass and
+    just r+ immediately.
+    """
+    prx = _simple_init(repo)
+    prx.post_comment('hansen r+', "reviewer")
+    run_crons(env)
+
+    repo.post_status(prx.head, 'failure', 'ci/runbot')
+    repo.post_status(prx.head, 'success', 'legal/cla')
+    run_crons(env)
+
+    assert prx.comments == [
+        (users['reviewer'], 'hansen r+'),
+        (users['user'], "'ci/runbot' failed on this reviewed PR.".format_map(users)),
+    ]
+
 class TestRetry:
     @pytest.mark.xfail(reason="This may not be a good idea as it could lead to tons of rebuild spam")
     def test_auto_retry_push(self, env, repo):
-        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
-        repo.make_ref('heads/master', m)
-
-        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
-        c2 = repo.make_commit(c1, 'second', None, tree={'m': 'c2'})
-        prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
+        prx = _simple_init(repo)
         repo.post_status(prx.head, 'success', 'ci/runbot')
         repo.post_status(prx.head, 'success', 'legal/cla')
         prx.post_comment('hansen r+', "reviewer")
@@ -787,7 +801,7 @@ class TestRetry:
         ])
         assert pr.state == 'error'
 
-        prx.push(repo.make_commit(c2, 'third', None, tree={'m': 'c3'}))
+        prx.push(repo.make_commit(prx.head, 'third', None, tree={'m': 'c3'}))
         assert pr.state == 'approved'
         env['runbot_merge.project']._check_progress()
         assert pr.state == 'approved'
@@ -808,12 +822,7 @@ class TestRetry:
         """ An accepted but failed PR should be re-tried when the author or a
         reviewer asks for it
         """
-        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
-        repo.make_ref('heads/master', m)
-
-        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
-        c2 = repo.make_commit(c1, 'second', None, tree={'m': 'c2'})
-        prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
+        prx = _simple_init(repo)
         repo.post_status(prx.head, 'success', 'ci/runbot')
         repo.post_status(prx.head, 'success', 'legal/cla')
         prx.post_comment('hansen r+ delegate=%s rebase-merge' % users['other'], "reviewer")
@@ -852,12 +861,7 @@ class TestRetry:
     def test_retry_ignored(self, env, repo, users):
         """ Check feedback in case of ignored retry command on a non-error PR.
         """
-        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
-        repo.make_ref('heads/master', m)
-
-        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
-        c2 = repo.make_commit(c1, 'second', None, tree={'m': 'c2'})
-        prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
+        prx = _simple_init(repo)
         prx.post_comment('hansen r+', 'reviewer')
         prx.post_comment('hansen retry', 'reviewer')
 
@@ -870,12 +874,7 @@ class TestRetry:
 
     @pytest.mark.parametrize('disabler', ['user', 'other', 'reviewer'])
     def test_retry_disable(self, env, repo, disabler, users):
-        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
-        repo.make_ref('heads/master', m)
-
-        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
-        c2 = repo.make_commit(c1, 'second', None, tree={'m': 'c2'})
-        prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
+        prx = _simple_init(repo)
         repo.post_status(prx.head, 'success', 'ci/runbot')
         repo.post_status(prx.head, 'success', 'legal/cla')
         prx.post_comment('hansen r+ delegate=%s rebase-merge' % users['other'], "reviewer")
@@ -897,7 +896,7 @@ class TestRetry:
 
         prx.post_comment('hansen r-', user=disabler)
         assert pr.state == 'validated'
-        prx.push(repo.make_commit(c2, 'third', None, tree={'m': 'c3'}))
+        prx.push(repo.make_commit(prx.head, 'third', None, tree={'m': 'c3'}))
         repo.post_status(prx.head, 'success', 'ci/runbot')
         repo.post_status(prx.head, 'success', 'legal/cla')
         run_crons(env)

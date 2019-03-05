@@ -692,17 +692,26 @@ class PullRequests(models.Model):
         # targets
         for pr in self:
             required = pr.repository.project_id.required_statuses.split(',')
-            if all(state_(statuses, r) == 'success' for r in required):
+
+            for ci in required:
+                st = state_(statuses, ci) or 'pending'
+                if st == 'success':
+                    continue
+
+                # only report an issue of the PR is already approved (r+'d)
+                if st in ('error', 'failure') and pr.state == 'approved':
+                    self.env['runbot_merge.pull_requests.feedback'].create({
+                        'repository': pr.repository.id,
+                        'pull_request': pr.number,
+                        'message': "%r failed on this reviewed PR." % ci,
+                    })
+                break
+            else: # all success (no break)
                 oldstate = pr.state
                 if oldstate == 'opened':
                     pr.state = 'validated'
                 elif oldstate == 'approved':
                     pr.state = 'ready'
-
-            #     _logger.info("CI+ (%s) for PR %s:%s: %s -> %s",
-            #                  statuses, pr.repository.name, pr.number, oldstate, pr.state)
-            # else:
-            #     _logger.info("CI- (%s) for PR %s:%s", statuses, pr.repository.name, pr.number)
 
     def _auto_init(self):
         res = super(PullRequests, self)._auto_init()
