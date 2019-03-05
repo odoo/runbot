@@ -304,6 +304,15 @@ class TestClosestBranch(common.TransactionCase):
             'state': 'open'
         }
 
+        # update to avoid test to break. we asume that bar_branch exists.
+        # we may want to modify the branch creation to ensure that
+        # -> first make all branches
+        # -> then make all builds
+        community_branch = self.Branch.create({
+            'repo_id': self.community_dev_repo.id,
+            'name': 'refs/heads/bar_branch'
+        })
+
         # Create PR in community
         community_pr = self.Branch.create({
             'repo_id': self.community_repo.id,
@@ -321,7 +330,7 @@ class TestClosestBranch(common.TransactionCase):
         self.assertEqual((self.community_dev_repo.id, 'refs/heads/bar_branch', 'exact PR'), enterprise_build._get_closest_branch_name(self.community_repo.id))
 
     @patch('odoo.addons.runbot.models.repo.runbot_repo._github')
-    @patch('odoo.addons.runbot.models.build.runbot_build._branch_exists')
+    @patch('odoo.addons.runbot.models.branch.runbot_branch._branch_exists')
     def test_closest_branch_02_improved(self, mock_branch_exists, mock_github):
         """ test that a PR in enterprise with a matching PR in Community
         uses the matching one"""
@@ -374,7 +383,7 @@ class TestClosestBranch(common.TransactionCase):
             (self.community_dev_repo.id, 'refs/heads/saas-12.2-blabla', 'exact PR')
         )
 
-    @patch('odoo.addons.runbot.models.build.runbot_build._branch_exists')
+    @patch('odoo.addons.runbot.models.branch.runbot_branch._branch_exists')
     def test_closest_branch_03(self, mock_branch_exists):
         """ test find a branch based on dashed prefix"""
         mock_branch_exists.return_value = True
@@ -389,7 +398,7 @@ class TestClosestBranch(common.TransactionCase):
         self.assertEqual((self.community_repo.id, 'refs/heads/10.0', 'prefix'), addons_build._get_closest_branch_name(self.community_repo.id))
 
     @patch('odoo.addons.runbot.models.repo.runbot_repo._github')
-    @patch('odoo.addons.runbot.models.build.runbot_build._branch_exists')
+    @patch('odoo.addons.runbot.models.branch.runbot_branch._branch_exists')
     def test_closest_branch_03_05(self, mock_branch_exists, mock_github):
         """ test that a PR in enterprise without a matching PR in Community
         and no branch in community"""
@@ -438,7 +447,7 @@ class TestClosestBranch(common.TransactionCase):
         )
 
     @patch('odoo.addons.runbot.models.repo.runbot_repo._github')
-    @patch('odoo.addons.runbot.models.build.runbot_build._branch_exists')
+    @patch('odoo.addons.runbot.models.branch.runbot_branch._branch_exists')
     def test_closest_branch_04(self, mock_branch_exists, mock_github):
         """ test that a PR in enterprise without a matching PR in Community
         uses the corresponding exact branch in community"""

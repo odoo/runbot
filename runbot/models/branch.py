@@ -100,3 +100,97 @@ class runbot_branch(models.Model):
         for branch in self:
             last_build = branch._get_last_coverage_build()
             branch.coverage_result = last_build.coverage_result or 0.0
+
+    def _get_closest_branch_name(self, target_repo_id):
+        """Return (repo, branch name) of the closest common branch between build's branch and
+           any branch of target_repo or its duplicated repos.
+            to prevent the above rules to mistakenly link PR of different repos together.
+        """
+        self.ensure_one()
+        Branch = self.env['runbot.branch']
+
+        branch, repo = self, self.repo_id
+        name = branch.pull_head_name or branch.branch_name
+        target_branch = branch.target_branch_name or 'master'
+
+        target_repo = self.env['runbot.repo'].browse(target_repo_id)
+
+        target_repo_ids = [target_repo.id]
+        r = target_repo.duplicate_id
+        while r:
+            if r.id in target_repo_ids:
+                break
+            target_repo_ids.append(r.id)
+            r = r.duplicate_id
+
+        _logger.debug('Search closest of %s (%s) in repos %r', name, repo.name, target_repo_ids)
+
+        sort_by_repo = lambda d: (not d['sticky'],      # sticky first
+                                  target_repo_ids.index(d['repo_id'][0]),
+                                  -1 * len(d.get('branch_name', '')),
+                                  -1 * d['id'])
+        result_for = lambda d, match='exact': (d['repo_id'][0], d['name'], match)
+        fields = ['name', 'repo_id', 'sticky']
+
+        # 1. same name, not a PR
+        domain = [
+            ('repo_id', 'in', target_repo_ids),
+            ('branch_name', '=', name),
+            ('name', '=like', 'refs/heads/%'),
+        ]
+        targets = Branch.search_read(domain, fields, order='id DESC')
+        targets = sorted(targets, key=sort_by_repo)
+        if targets and self._branch_exists(targets[0]['id']):
+            return result_for(targets[0])
+
+        # 2. PR with head name equals
+        domain = [
+            ('repo_id', 'in', target_repo_ids),
+            ('pull_head_name', '=', name),
+            ('name', '=like', 'refs/pull/%'),
+        ]
+        pulls = Branch.search_read(domain, fields, order='id DESC')
+        pulls = sorted(pulls, key=sort_by_repo)
+        for pull in Branch.browse([pu['id'] for pu in pulls]):
+            pi = pull._get_pull_info()
+            if pi.get('state') == 'open':
+                if ':' in name:  # we assume that branch exists if we got pull info
+                    pr_branch_name = name.split(':')[1]
+                    return (pull.repo_id.duplicate_id.id, 'refs/heads/%s' % pr_branch_name, 'exact PR')
+                else:
+                    return (pull.repo_id.id, pull.name, 'exact PR')
+
+        # 3. Match a branch which is the dashed-prefix of current branch name
+        branches = Branch.search_read(
+            [('repo_id', 'in', target_repo_ids), ('name', '=like', 'refs/heads/%')],
+            fields + ['branch_name'], order='id DESC',
+        )
+        branches = sorted(branches, key=sort_by_repo)
+
+        for branch in branches:
+            if name.startswith(branch['branch_name'] + '-') and self._branch_exists(branch['id']):
+                return result_for(branch, 'prefix')
+
+        # 4.Match a PR in enterprise without community PR
+        if self.name.startswith('refs/pull') and ':' in name:
+            pr_branch_name = name.split(':')[1]
+            duplicate_branch_name = 'refs/heads/%s' % pr_branch_name
+            domain = [
+                ('repo_id', 'in', target_repo_ids),  # target_repo_ids should contain the target duplicate repo
+                ('branch_name', '=', pr_branch_name),
+                ('pull_head_name', '=', False),
+            ]
+            targets = Branch.search_read(domain, fields, order='id DESC')
+            targets = sorted(targets, key=sort_by_repo)
+            if targets and self._branch_exists(targets[0]['id']):
+                return result_for(targets[0], 'no PR')
+
+        # 5. last-resort value
+        return target_repo_id, 'refs/heads/%s' % target_branch, 'default'
+
+    def _branch_exists(self, branch_id):
+        Branch = self.env['runbot.branch']
+        branch = Branch.search([('id', '=', branch_id)])
+        if branch and branch[0]._is_on_remote():
+            return True
+        return False
