@@ -197,7 +197,7 @@ def handle_pr(env, event):
             env['runbot_merge.pull_requests.tagging'].create({
                 'pull_request': pr_obj.number,
                 'repository': repo.id,
-                'state_from': res[1],
+                'state_from': res[1] if not pr_obj.staging_id else 'staged',
                 'state_to': 'closed',
             })
             pr_obj.staging_id.cancel(

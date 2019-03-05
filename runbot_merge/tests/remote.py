@@ -380,6 +380,10 @@ class Model:
         assert self._model == 'runbot_merge.pull_requests'
         self._run_cron('runbot_merge.check_linked_prs_status')
 
+    def _notify(self):
+        assert self._model == 'runbot_merge.commit'
+        self._run_cron('runbot_merge.process_updated_commits')
+
     def _run_cron(self, xid):
         _, model, cron_id = self._env('ir.model.data', 'xmlid_lookup', xid)
         assert model == 'ir.cron', "Expected {} to be a cron, got {}".format(xid, model)

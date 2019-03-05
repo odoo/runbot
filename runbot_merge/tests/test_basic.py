@@ -31,8 +31,7 @@ def test_trivial_flow(env, repo, page, users):
         ('number', '=', pr1.number),
     ])
     assert pr.state == 'opened'
-    env['runbot_merge.project']._check_progress()
-    env['runbot_merge.project']._send_feedback()
+    run_crons(env)
     assert pr1.labels == {'seen 🙂'}
     # nothing happened
 
@@ -42,9 +41,10 @@ def test_trivial_flow(env, repo, page, users):
     c.statuses = json.dumps({k: v['state'] for k, v in json.loads(c.statuses).items()})
 
     repo.post_status(c1, 'success', 'ci/runbot')
+
+    run_crons(env)
     assert pr.state == 'validated'
-    env['runbot_merge.project']._check_progress()
-    env['runbot_merge.project']._send_feedback()
+
     assert pr1.labels == {'seen 🙂', 'CI 🤖'}
 
     pr1.post_comment('hansen r+ rebase-merge', 'reviewer')
@@ -52,8 +52,7 @@ def test_trivial_flow(env, repo, page, users):
 
     # can't check labels here as running the cron will stage it
 
-    env['runbot_merge.project']._check_progress()
-    env['runbot_merge.project']._send_feedback()
+    run_crons(env)
     assert pr.staging_id
     assert pr1.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merging 👷'}
 
@@ -63,12 +62,17 @@ def test_trivial_flow(env, repo, page, users):
     repo.post_status(staging_head.id, 'success', 'legal/cla')
     # the should not block the merge because it's not part of the requirements
     repo.post_status(staging_head.id, 'failure', 'ci/lint', target_url='http://ignored.com/whocares')
+    # need to store this because after the crons have run the staging will
+    # have succeeded and been disabled
+    st = pr.staging_id
+    run_crons(env)
 
-    assert set(tuple(t) for t in pr.staging_id.statuses) == {
+    assert set(tuple(t) for t in st.statuses) == {
         (repo.name, 'legal/cla', 'success', ''),
         (repo.name, 'ci/runbot', 'success', 'http://foo.com/pog'),
         (repo.name, 'ci/lint', 'failure', 'http://ignored.com/whocares'),
     }
+
     p = html.fromstring(page('/runbot_merge'))
     s = p.cssselect('.staging div.dropdown li')
     assert len(s) == 2
@@ -79,8 +83,7 @@ def test_trivial_flow(env, repo, page, users):
 
     assert re.match('^force rebuild', staging_head.message)
 
-    env['runbot_merge.project']._check_progress()
-    env['runbot_merge.project']._send_feedback()
+    assert st.state == 'success'
     assert pr.state == 'merged'
     assert pr1.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merged 🎉'}
 
@@ -108,11 +111,11 @@ class TestCommitMessage:
         repo.post_status(prx.head, 'success', 'legal/cla')
         prx.post_comment('hansen r+', "reviewer")
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         repo.post_status('heads/staging.master', 'success', 'ci/runbot')
         repo.post_status('heads/staging.master', 'success', 'legal/cla')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         master = repo.commit('heads/master')
         assert master.message == "simple commit message\n\ncloses {repo.name}#1"\
@@ -131,11 +134,11 @@ class TestCommitMessage:
         repo.post_status(prx.head, 'success', 'legal/cla')
         prx.post_comment('hansen r+', "reviewer")
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         repo.post_status('heads/staging.master', 'success', 'ci/runbot')
         repo.post_status('heads/staging.master', 'success', 'legal/cla')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         master = repo.commit('heads/master')
         # closes #1 is already present, should not modify message
@@ -155,11 +158,11 @@ class TestCommitMessage:
         repo.post_status(prx.head, 'success', 'legal/cla')
         prx.post_comment('hansen r+', "reviewer")
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         repo.post_status('heads/staging.master', 'success', 'ci/runbot')
         repo.post_status('heads/staging.master', 'success', 'legal/cla')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         master = repo.commit('heads/master')
         # closes on another repositoy, should modify the commit message
@@ -179,11 +182,11 @@ class TestCommitMessage:
         repo.post_status(prx.head, 'success', 'legal/cla')
         prx.post_comment('hansen r+', "reviewer")
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         repo.post_status('heads/staging.master', 'success', 'ci/runbot')
         repo.post_status('heads/staging.master', 'success', 'legal/cla')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         master = repo.commit('heads/master')
         # closes on another repositoy, should modify the commit message
@@ -204,11 +207,11 @@ class TestCommitMessage:
         prx.post_comment('hansen delegate=%s' % users['other'], "reviewer")
         prx.post_comment('hansen r+', user='other')
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         repo.post_status('heads/staging.master', 'success', 'ci/runbot')
         repo.post_status('heads/staging.master', 'success', 'legal/cla')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         master = repo.commit('heads/master')
         assert master.message == "simple commit message\n\ncloses {repo.name}#1"\
@@ -227,11 +230,11 @@ class TestCommitMessage:
         repo.post_status(prx.head, 'success', 'legal/cla')
         prx.post_comment('hansen r+', "reviewer")
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         repo.post_status('heads/staging.master', 'success', 'ci/runbot')
         repo.post_status('heads/staging.master', 'success', 'legal/cla')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         master = repo.commit('heads/master')
         assert master.message == "simple commit message\n\ncloses {repo.name}#1"\
@@ -298,7 +301,7 @@ def test_staging_conflict(env, repo):
     repo.post_status(c1, 'success', 'legal/cla')
     repo.post_status(c1, 'success', 'ci/runbot')
     pr1.post_comment("hansen r+ rebase-merge", "reviewer")
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
     pr1 = env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', repo.name),
         ('number', '=', 1)
@@ -312,8 +315,7 @@ def test_staging_conflict(env, repo):
     repo.post_status(c3, 'success', 'legal/cla')
     repo.post_status(c3, 'success', 'ci/runbot')
     pr2.post_comment('hansen r+ rebase-merge', "reviewer")
-    env['runbot_merge.project']._check_progress()
-    env['runbot_merge.project']._send_feedback()
+    run_crons(env)
     p_2 = env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', repo.name),
         ('number', '=', pr2.number)
@@ -324,14 +326,14 @@ def test_staging_conflict(env, repo):
     staging_head = repo.commit('heads/staging.master')
     repo.post_status(staging_head.id, 'success', 'ci/runbot')
     repo.post_status(staging_head.id, 'success', 'legal/cla')
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
     assert pr1.state == 'merged'
     assert p_2.staging_id
 
     staging_head = repo.commit('heads/staging.master')
     repo.post_status(staging_head.id, 'success', 'ci/runbot')
     repo.post_status(staging_head.id, 'success', 'legal/cla')
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
     assert p_2.state == 'merged'
 
 def test_staging_concurrent(env, repo):
@@ -358,7 +360,7 @@ def test_staging_concurrent(env, repo):
     repo.post_status(pr2.head, 'success', 'legal/cla')
     pr2.post_comment('hansen r+ rebase-merge', "reviewer")
 
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
     pr1 = env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', repo.name),
         ('number', '=', pr1.number)
@@ -384,8 +386,7 @@ def test_staging_merge_fail(env, repo, users):
     repo.post_status(prx.head, 'success', 'legal/cla')
     prx.post_comment('hansen r+ rebase-merge', "reviewer")
 
-    env['runbot_merge.project']._check_progress()
-    env['runbot_merge.project']._send_feedback()
+    run_crons(env)
     pr1 = env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', repo.name),
         ('number', '=', prx.number)
@@ -411,7 +412,7 @@ def test_staging_ci_timeout(env, repo, users):
     repo.post_status(prx.head, 'success', 'ci/runbot')
     repo.post_status(prx.head, 'success', 'legal/cla')
     prx.post_comment('hansen r+ rebase-merge', "reviewer")
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
 
     pr1 = env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', repo.name),
@@ -436,7 +437,7 @@ def test_staging_ci_failure_single(env, repo, users):
     repo.post_status(prx.head, 'success', 'ci/runbot')
     repo.post_status(prx.head, 'success', 'legal/cla')
     prx.post_comment('hansen r+ rebase-merge', "reviewer")
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
     assert env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', repo.name),
         ('number', '=', prx.number)
@@ -468,7 +469,7 @@ def test_ff_failure(env, repo, users):
     repo.post_status(prx.head, 'success', 'legal/cla')
     repo.post_status(prx.head, 'success', 'ci/runbot')
     prx.post_comment('hansen r+ rebase-merge', "reviewer")
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
     assert env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', repo.name),
         ('number', '=', prx.number)
@@ -481,7 +482,7 @@ def test_ff_failure(env, repo, users):
     staging = repo.commit('heads/staging.master')
     repo.post_status(staging.id, 'success', 'legal/cla')
     repo.post_status(staging.id, 'success', 'ci/runbot')
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
 
     assert env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', repo.name),
@@ -515,7 +516,7 @@ def test_ff_failure_batch(env, repo, users):
     repo.post_status(C.head, 'success', 'ci/runbot')
     C.post_comment('hansen r+ rebase-merge', "reviewer")
 
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
     messages = [
         c['commit']['message']
         for c in repo.log('heads/staging.master')
@@ -531,7 +532,7 @@ def test_ff_failure_batch(env, repo, users):
     # confirm staging
     repo.post_status('heads/staging.master', 'success', 'legal/cla')
     repo.post_status('heads/staging.master', 'success', 'ci/runbot')
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
     new_staging = repo.commit('heads/staging.master')
 
     assert new_staging.id != old_staging.id
@@ -539,7 +540,7 @@ def test_ff_failure_batch(env, repo, users):
     # confirm again
     repo.post_status('heads/staging.master', 'success', 'legal/cla')
     repo.post_status('heads/staging.master', 'success', 'ci/runbot')
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
     messages = {
         c['commit']['message']
         for c in repo.log('heads/master')
@@ -584,8 +585,7 @@ def test_edit(env, repo):
     # FIXME: should a PR retargeted to an unmanaged branch really be deleted?
     prx.base = '2.0'
     assert not pr.exists()
-    env['runbot_merge.project']._check_progress()
-    env['runbot_merge.project']._send_feedback()
+    run_crons(env)
     assert prx.labels == set()
 
     prx.base = '1.0'
@@ -654,12 +654,12 @@ def test_close_staged(env, repo):
         ('repository.name', '=', repo.name),
         ('number', '=', prx.number),
     ])
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
     assert pr.state == 'ready'
     assert pr.staging_id
 
     prx.close()
-    env['runbot_merge.project']._send_feedback()
+    run_crons(env)
 
     assert not pr.staging_id
     assert not env['runbot_merge.stagings'].search([])
@@ -679,14 +679,14 @@ def test_forward_port(env, repo):
     repo.post_status(pr.head, 'success', 'legal/cla')
     repo.post_status(pr.head, 'success', 'ci/runbot')
     pr.post_comment('hansen r+ merge', "reviewer")
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
 
     st = repo.commit('heads/staging.master')
     assert st.message.startswith('force rebuild')
 
     repo.post_status(st.id, 'success', 'legal/cla')
     repo.post_status(st.id, 'success', 'ci/runbot')
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
 
     h = repo.commit('heads/master')
     assert set(st.parents) == {h.id}
@@ -741,6 +741,7 @@ def test_rebase_failure(env, repo, users, remote_p):
         assert next(counter) != 2, "make it seem like updating the branch post-rebase fails"
         return original(*args)
 
+    env['runbot_merge.commit']._notify()
     with mock.patch.object(GH, 'set_ref', autospec=True, side_effect=wrapper) as m:
         env['runbot_merge.project']._check_progress()
 
@@ -770,7 +771,7 @@ class TestRetry:
         repo.post_status(prx.head, 'success', 'ci/runbot')
         repo.post_status(prx.head, 'success', 'legal/cla')
         prx.post_comment('hansen r+', "reviewer")
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
@@ -779,7 +780,7 @@ class TestRetry:
         staging_head = repo.commit('heads/staging.master')
         repo.post_status(staging_head.id, 'success', 'legal/cla')
         repo.post_status(staging_head.id, 'failure', 'ci/runbot')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         pr = env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
@@ -792,14 +793,14 @@ class TestRetry:
         assert pr.state == 'approved'
         repo.post_status(prx.head, 'success', 'ci/runbot')
         repo.post_status(prx.head, 'success', 'legal/cla')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert pr.state == 'ready'
 
         staging_head2 = repo.commit('heads/staging.master')
         assert staging_head2 != staging_head
         repo.post_status(staging_head2.id, 'success', 'legal/cla')
         repo.post_status(staging_head2.id, 'success', 'ci/runbot')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert pr.state == 'merged'
 
     @pytest.mark.parametrize('retrier', ['user', 'other', 'reviewer'])
@@ -816,7 +817,7 @@ class TestRetry:
         repo.post_status(prx.head, 'success', 'ci/runbot')
         repo.post_status(prx.head, 'success', 'legal/cla')
         prx.post_comment('hansen r+ delegate=%s rebase-merge' % users['other'], "reviewer")
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
@@ -825,7 +826,7 @@ class TestRetry:
         staging_head = repo.commit('heads/staging.master')
         repo.post_status(staging_head.id, 'success', 'legal/cla')
         repo.post_status(staging_head.id, 'failure', 'ci/runbot')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
@@ -842,7 +843,7 @@ class TestRetry:
         assert staging_head2 != staging_head
         repo.post_status(staging_head2.id, 'success', 'legal/cla')
         repo.post_status(staging_head2.id, 'success', 'ci/runbot')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
@@ -860,7 +861,7 @@ class TestRetry:
         prx.post_comment('hansen r+', 'reviewer')
         prx.post_comment('hansen retry', 'reviewer')
 
-        env['runbot_merge.project']._send_feedback()
+        run_crons(env)
         assert prx.comments == [
             (users['reviewer'], 'hansen r+'),
             (users['reviewer'], 'hansen retry'),
@@ -878,7 +879,7 @@ class TestRetry:
         repo.post_status(prx.head, 'success', 'ci/runbot')
         repo.post_status(prx.head, 'success', 'legal/cla')
         prx.post_comment('hansen r+ delegate=%s rebase-merge' % users['other'], "reviewer")
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
@@ -887,7 +888,7 @@ class TestRetry:
         staging_head = repo.commit('heads/staging.master')
         repo.post_status(staging_head.id, 'success', 'legal/cla')
         repo.post_status(staging_head.id, 'failure', 'ci/runbot')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         pr = env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
@@ -899,7 +900,7 @@ class TestRetry:
         prx.push(repo.make_commit(c2, 'third', None, tree={'m': 'c3'}))
         repo.post_status(prx.head, 'success', 'ci/runbot')
         repo.post_status(prx.head, 'success', 'legal/cla')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert pr.state == 'validated'
 
 class TestMergeMethod:
@@ -924,7 +925,7 @@ class TestMergeMethod:
             ('number', '=', prx.number)
         ]).squash
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
@@ -944,8 +945,7 @@ class TestMergeMethod:
 
         repo.post_status(staging.id, 'success', 'legal/cla')
         repo.post_status(staging.id, 'success', 'ci/runbot')
-        env['runbot_merge.project']._check_progress()
-        env['runbot_merge.project']._send_feedback()
+        run_crons(env)
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
@@ -1109,7 +1109,7 @@ class TestMergeMethod:
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+ rebase-merge', "reviewer")
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         # create a dag (msg:str, parents:set) from the log
         staging = log_to_node(repo.log('heads/staging.master'))
@@ -1126,7 +1126,7 @@ class TestMergeMethod:
 
         repo.post_status('heads/staging.master', 'success', 'legal/cla')
         repo.post_status('heads/staging.master', 'success', 'ci/runbot')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
@@ -1175,7 +1175,7 @@ class TestMergeMethod:
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+ rebase-ff', "reviewer")
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         # create a dag (msg:str, parents:set) from the log
         staging = log_to_node(repo.log('heads/staging.master'))
@@ -1189,7 +1189,7 @@ class TestMergeMethod:
 
         repo.post_status('heads/staging.master', 'success', 'legal/cla')
         repo.post_status('heads/staging.master', 'success', 'ci/runbot')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
@@ -1227,11 +1227,11 @@ class TestMergeMethod:
         repo.post_status(prx.head, 'success', 'legal/cla')
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+ merge', 'reviewer')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         repo.post_status('heads/staging.master', 'success', 'ci/runbot')
         repo.post_status('heads/staging.master', 'success', 'legal/cla')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         master = repo.commit('heads/master')
         assert master.parents == [m, prx.head], \
@@ -1258,11 +1258,11 @@ class TestMergeMethod:
         repo.post_status(prx.head, 'success', 'legal/cla')
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+ merge', 'reviewer')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         repo.post_status('heads/staging.master', 'success', 'ci/runbot')
         repo.post_status('heads/staging.master', 'success', 'legal/cla')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         master = repo.commit('heads/master')
         assert master.parents == [m, prx.head], \
@@ -1294,16 +1294,16 @@ class TestMergeMethod:
         c0 = repo.make_commit(m1, 'C0', None, tree={'a': '0', 'b': '2'})
         c1 = repo.make_commit([c0, m2], 'C1', None, tree={'a': '1', 'b': '2'})
         prx = repo.make_pr("T", "TT", target='master', ctid=c1, user='user')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         repo.post_status(prx.head, 'success', 'legal/cla')
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+ merge', 'reviewer')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         repo.post_status('heads/staging.master', 'success', 'ci/runbot')
         repo.post_status('heads/staging.master', 'success', 'legal/cla')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         master = repo.commit('heads/master')
         assert master.parents == [m2, c0]
@@ -1334,16 +1334,16 @@ class TestMergeMethod:
         c0 = repo.make_commit(m1, 'C0', None, tree={'a': '0', 'b': '2'})
         c1 = repo.make_commit([c0, b0], 'C1', None, tree={'a': '0', 'b': '2', 'bb': 'bb'})
         prx = repo.make_pr("T", "TT", target='master', ctid=c1, user='user')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         repo.post_status(prx.head, 'success', 'legal/cla')
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+ merge', 'reviewer')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         repo.post_status('heads/staging.master', 'success', 'ci/runbot')
         repo.post_status('heads/staging.master', 'success', 'legal/cla')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         master = repo.commit('heads/master')
         assert master.parents == [m2, c1]
@@ -1375,7 +1375,7 @@ class TestMergeMethod:
             ('number', '=', prx.number)
         ]).squash
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
@@ -1392,7 +1392,7 @@ class TestMergeMethod:
 
         repo.post_status(staging.id, 'success', 'legal/cla')
         repo.post_status(staging.id, 'success', 'ci/runbot')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
@@ -1415,7 +1415,7 @@ class TestMergeMethod:
             ('number', '=', prx.number)
         ]).squash
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
@@ -1430,7 +1430,7 @@ class TestMergeMethod:
 
         repo.post_status(staging.id, 'success', 'legal/cla')
         repo.post_status(staging.id, 'success', 'ci/runbot')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
@@ -1488,6 +1488,7 @@ class TestPRUpdate(object):
         prx = repo.make_pr('title', 'body', target='master', ctid=c, user='user')
         repo.post_status(prx.head, 'success', 'legal/cla')
         repo.post_status(prx.head, 'success', 'ci/runbot')
+        run_crons(env)
         pr = env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
@@ -1530,6 +1531,7 @@ class TestPRUpdate(object):
         repo.post_status(prx.head, 'success', 'legal/cla')
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+', user='reviewer')
+        run_crons(env)
         pr = env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
@@ -1557,7 +1559,7 @@ class TestPRUpdate(object):
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
         ])
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert pr.state == 'ready'
         assert pr.staging_id
 
@@ -1581,14 +1583,14 @@ class TestPRUpdate(object):
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
         ])
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert pr.state == 'ready'
         assert pr.staging_id
 
         h = repo.commit('heads/staging.master').id
         repo.post_status(h, 'success', 'legal/cla')
         repo.post_status(h, 'failure', 'ci/runbot')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert not pr.staging_id
         assert pr.state == 'error'
 
@@ -1625,6 +1627,7 @@ class TestPRUpdate(object):
         c2 = repo.make_commit(m, 'first', None, tree={'m': 'cc'})
         repo.post_status(c2, 'success', 'legal/cla')
         repo.post_status(c2, 'success', 'ci/runbot')
+        run_crons(env)
 
         prx = repo.make_pr('title', 'body', target='master', ctid=c, user='user')
         pr = env['runbot_merge.pull_requests'].search([
@@ -1688,7 +1691,7 @@ class TestBatching(object):
         pr1 = self._pr(repo, 'PR1', [{'a': 'AAA'}, {'b': 'BBB'}])
         pr2 = self._pr(repo, 'PR2', [{'c': 'CCC'}, {'d': 'DDD'}])
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         pr1 = self._get(env, repo, pr1.number)
         assert pr1.staging_id
         pr2 = self._get(env, repo, pr2.number)
@@ -1724,7 +1727,7 @@ class TestBatching(object):
         pr2 = self._pr(repo, 'PR2', [{'c': 'CCC'}, {'d': 'DDD'}])
         pr2.post_comment('hansen merge', 'reviewer')
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         pr1 = self._get(env, repo, pr1.number)
         assert pr1.staging_id
         assert pr1.merge_method == 'merge'
@@ -1762,7 +1765,7 @@ class TestBatching(object):
         pr1 = self._pr(repo, 'PR1', [{'a': 'AAA'}])
         pr2 = self._pr(repo, 'PR2', [{'c': 'CCC'}])
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         pr1 = self._get(env, repo, pr1.number)
         assert pr1.staging_id
         pr2 = self._get(env, repo, pr2.number)
@@ -1799,7 +1802,7 @@ class TestBatching(object):
         assert pr21.priority == pr22.priority == 2
         assert pr11.priority == pr12.priority == 1
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         assert all(pr.state == 'ready' for pr in prs)
         assert not pr21.staging_id
@@ -1821,7 +1824,7 @@ class TestBatching(object):
         pr12.post_comment('hansen priority=1', 'reviewer')
 
         # stage PR1
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         p_11, p_12, p_21, p_22 = \
             [self._get(env, repo, pr.number) for pr in [pr11, pr12, pr21, pr22]]
         assert not p_21.staging_id or p_22.staging_id
@@ -1836,7 +1839,7 @@ class TestBatching(object):
         assert p_01.state == 'opened'
         assert p_01.priority == 0
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         # first staging should be cancelled and PR0 should be staged
         # regardless of CI (or lack thereof)
         assert not staging_1.active
@@ -1855,7 +1858,7 @@ class TestBatching(object):
         pr2 = self._pr(repo, 'PR2', [{'a': 'some content', 'c': 'CCC'}, {'d': 'DDD'}])
         p_2 = self._get(env, repo, pr2.number)
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         st = env['runbot_merge.stagings'].search([])
         # both prs should be part of the staging
         assert st.mapped('batch_ids.prs') == p_1 | p_2
@@ -1863,7 +1866,7 @@ class TestBatching(object):
         repo.post_status('heads/staging.master', 'failure', 'ci/runbot')
         repo.post_status('heads/staging.master', 'success', 'legal/cla')
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         # should have staged the first half
         assert p_1.staging_id.heads
         assert not p_2.staging_id.heads
@@ -1872,7 +1875,7 @@ class TestBatching(object):
         pr0 = self._pr(repo, 'urgent', [{'a': 'a', 'b': 'b'}], reviewer=None, statuses=[])
         pr0.post_comment('hansen priority=0', 'reviewer')
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         # TODO: maybe just deactivate stagings instead of deleting them when canceling?
         assert not p_1.staging_id
         assert self._get(env, repo, pr0.number).staging_id
@@ -1893,7 +1896,7 @@ class TestBatching(object):
         p_01 = self._get(env, repo, pr01.number)
         p_01.state = 'error'
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert not p_01.staging_id, "p_01 should not be picked up as it's failed"
         assert p_21.staging_id, "p_21 should have been staged"
 
@@ -1910,7 +1913,7 @@ class TestBatching(object):
         pr1 = self._pr(repo, 'PR1', [{'a': 'AAA'}, {'b': 'BBB'}])
         pr2 = self._pr(repo, 'PR2', [{'a': 'some content', 'c': 'CCC'}, {'d': 'DDD'}])
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         st = env['runbot_merge.stagings'].search([])
         # both prs should be part of the staging
         assert len(st.mapped('batch_ids.prs')) == 2
@@ -1921,7 +1924,7 @@ class TestBatching(object):
         pr1 = env['runbot_merge.pull_requests'].search([('number', '=', pr1.number)])
         pr2 = env['runbot_merge.pull_requests'].search([('number', '=', pr2.number)])
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         # should have split the existing batch into two, with one of the
         # splits having been immediately restaged
         st = env['runbot_merge.stagings'].search([])
@@ -1935,7 +1938,7 @@ class TestBatching(object):
         h = repo.commit('heads/staging.master').id
         repo.post_status(h, 'failure', 'ci/runbot')
         repo.post_status(h, 'success', 'legal/cla')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         assert pr1.state == 'error'
 
         assert pr2.staging_id
@@ -1943,6 +1946,7 @@ class TestBatching(object):
         h = repo.commit('heads/staging.master').id
         repo.post_status(h, 'success', 'ci/runbot')
         repo.post_status(h, 'success', 'legal/cla')
+        env['runbot_merge.commit']._notify()
         env['runbot_merge.project']._check_progress()
         assert pr2.state == 'merged'
 
@@ -1960,6 +1964,7 @@ class TestReviewing(object):
         repo.post_status(prx.head, 'success', 'legal/cla')
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+', user='other')
+        run_crons(env)
 
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
@@ -1973,12 +1978,12 @@ class TestReviewing(object):
         # second r+ to check warning
         prx.post_comment('hansen r+', user='reviewer')
 
-        env['runbot_merge.project']._send_feedback()
+        run_crons(env)
         assert prx.comments == [
             (users['other'], 'hansen r+'),
-            (users['reviewer'], 'hansen r+'),
-            (users['reviewer'], 'hansen r+'),
             (users['user'], "I'm sorry, @{}. I'm afraid I can't do that.".format(users['other'])),
+            (users['reviewer'], 'hansen r+'),
+            (users['reviewer'], 'hansen r+'),
             (users['user'], "I'm sorry, @{}. This PR is already reviewed, reviewing it again is useless.".format(
                  users['reviewer'])),
         ]
@@ -1995,6 +2000,7 @@ class TestReviewing(object):
         repo.post_status(prx.head, 'success', 'legal/cla')
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+', user='reviewer')
+        run_crons(env)
 
         assert prx.user == users['reviewer']
         assert env['runbot_merge.pull_requests'].search([
@@ -2002,7 +2008,7 @@ class TestReviewing(object):
             ('number', '=', prx.number)
         ]).state == 'validated'
 
-        env['runbot_merge.project']._send_feedback()
+        run_crons(env)
         assert prx.comments == [
             (users['reviewer'], 'hansen r+'),
             (users['user'], "I'm sorry, @{}. You can't review+.".format(users['reviewer'])),
@@ -2020,6 +2026,7 @@ class TestReviewing(object):
         repo.post_status(prx.head, 'success', 'legal/cla')
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+', user='self_reviewer')
+        run_crons(env)
 
         assert prx.user == users['self_reviewer']
         assert env['runbot_merge.pull_requests'].search([
@@ -2041,6 +2048,7 @@ class TestReviewing(object):
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen delegate+', user='reviewer')
         prx.post_comment('hansen r+', user='user')
+        run_crons(env)
 
         assert prx.user == users['user']
         assert env['runbot_merge.pull_requests'].search([
@@ -2063,6 +2071,7 @@ class TestReviewing(object):
         prx.post_comment('hansen delegate=%s' % users['other'], user='reviewer')
         prx.post_comment('hansen r+', user='user')
 
+        run_crons(env)
         assert prx.user == users['user']
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
@@ -2144,6 +2153,7 @@ class TestUnknownPR:
         prx = repo.make_pr('title', 'body', target='master', ctid=c1, user='user')
         repo.post_status(prx.head, 'success', 'legal/cla')
         repo.post_status(prx.head, 'success', 'ci/runbot', target_url="http://example.org/wheee")
+        run_crons(env)
 
         # assume an unknown but ready PR: we don't know the PR or its head commit
         env['runbot_merge.pull_requests'].search([
@@ -2158,6 +2168,7 @@ class TestUnknownPR:
         Fetch = env['runbot_merge.fetch_job']
         assert Fetch.search([('repository', '=', repo.name), ('number', '=', prx.number)])
         env['runbot_merge.project']._check_fetch()
+        run_crons(env)
         assert not Fetch.search([('repository', '=', repo.name), ('number', '=', prx.number)])
 
         c = env['runbot_merge.commit'].search([('sha', '=', prx.head)])
@@ -2259,6 +2270,7 @@ class TestRMinus:
         prx = repo.make_pr('title', None, target='master', ctid=c, user='user')
         repo.post_status(prx.head, 'success', 'ci/runbot')
         repo.post_status(prx.head, 'success', 'legal/cla')
+        run_crons(env)
 
         pr = env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
@@ -2290,6 +2302,7 @@ class TestRMinus:
         prx = repo.make_pr('title', None, target='master', ctid=c, user='user')
         repo.post_status(prx.head, 'success', 'ci/runbot')
         repo.post_status(prx.head, 'success', 'legal/cla')
+        run_crons(env)
 
         pr = env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
@@ -2298,7 +2311,7 @@ class TestRMinus:
 
         # if reviewer unreviews, cancel staging & unreview
         prx.post_comment('hansen r+', 'reviewer')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         st = pr.staging_id
         assert st
 
@@ -2309,7 +2322,7 @@ class TestRMinus:
 
         # if author unreviews, cancel staging & unreview
         prx.post_comment('hansen r+', 'reviewer')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         st = pr.staging_id
         assert st
 
@@ -2320,7 +2333,7 @@ class TestRMinus:
 
         # if rando unreviews, ignore
         prx.post_comment('hansen r+', 'reviewer')
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
         st = pr.staging_id
         assert st
 

@@ -73,7 +73,7 @@ def test_stage_one(env, project, repo_a, repo_b):
     make_branch(repo_b, 'master', 'initial', {'a': 'b_0'})
     pr_b = make_pr(repo_b, 'B', [{'a': 'b_1'}], label='do-other-thing')
 
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
 
     assert to_pr(env, pr_a).state == 'ready'
     assert to_pr(env, pr_a).staging_id
@@ -90,7 +90,7 @@ def test_stage_match(env, project, repo_a, repo_b):
     make_branch(repo_b, 'master', 'initial', {'a': 'b_0'})
     pr_b = make_pr(repo_b, 'B', [{'a': 'b_1'}], label='do-a-thing')
 
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
 
     pr_a = to_pr(env, pr_a)
     pr_b = to_pr(env, pr_b)
@@ -121,7 +121,7 @@ def test_unmatch_patch(env, project, repo_a, repo_b):
     make_branch(repo_b, 'master', 'initial', {'a': 'b_0'})
     pr_b = make_pr(repo_b, 'B', [{'a': 'b_1'}], label='patch-1')
 
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
 
     pr_a = to_pr(env, pr_a)
     pr_b = to_pr(env, pr_b)
@@ -143,7 +143,7 @@ def test_sub_match(env, project, repo_a, repo_b, repo_c):
     make_branch(repo_c, 'master', 'initial', {'a': 'c_0'})
     pr_c = make_pr(repo_c, 'C', [{'a': 'c_1'}], label='do-a-thing')
 
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
 
     pr_b = to_pr(env, pr_b)
     pr_c = to_pr(env, pr_c)
@@ -223,7 +223,7 @@ def test_ff_fail(env, project, repo_a, repo_b):
     make_branch(repo_b, 'master', 'initial', {'a': 'b_0'})
     make_pr(repo_b, 'B', [{'a': 'b_1'}], label='do-a-thing')
 
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
 
     # add second commit blocking FF
     cn = repo_b.make_commit('heads/master', 'second', None, tree={'a': 'b_0', 'b': 'other'})
@@ -260,12 +260,12 @@ class TestCompanionsNotReady:
 
         pr_a = to_pr(env, p_a)
         pr_b = to_pr(env, p_b)
-        assert pr_a.state == 'ready'
-        assert pr_b.state == 'validated'
         assert pr_a.label == pr_b.label == '{}:do-a-thing'.format(owner)
 
         run_crons(env)
 
+        assert pr_a.state == 'ready'
+        assert pr_b.state == 'validated'
         assert not pr_b.staging_id
         assert not pr_a.staging_id, \
             "pr_a should not have been staged as companion is not ready"
@@ -348,7 +348,7 @@ def test_other_failed(env, project, repo_a, repo_b, owner, users):
 
     make_branch(repo_b, 'master', 'initial', {'a': 'b_0'})
 
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
     pr = to_pr(env, pr_a)
     assert pr.staging_id
 
@@ -382,7 +382,7 @@ class TestMultiBatches:
             for i, (a, b) in enumerate([(1, 1), (0, 1), (1, 1), (1, 1), (1, 0)])
         ]
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         st = env['runbot_merge.stagings'].search([])
         assert st
@@ -411,7 +411,7 @@ class TestMultiBatches:
             for i, (a, b) in enumerate([(1, 1), (0, 1), (1, 1), (1, 1), (1, 0)])
         ]
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         st0 = env['runbot_merge.stagings'].search([])
         assert len(st0.batch_ids) == 5
@@ -422,7 +422,7 @@ class TestMultiBatches:
         repo_b.post_status('heads/staging.master', 'success', 'legal/cla')
         repo_b.post_status('heads/staging.master', 'failure', 'ci/runbot')
 
-        env['runbot_merge.project']._check_progress()
+        run_crons(env)
 
         assert not st0.active
 
@@ -454,7 +454,7 @@ def test_urgent(env, repo_a, repo_b):
     pr_a.post_comment('hansen rebase-merge', 'reviewer')
     pr_b.post_comment('hansen rebase-merge p=0', 'reviewer')
 
-    env['runbot_merge.project']._check_progress()
+    run_crons(env)
     # should have batched pr_a and pr_b despite neither being reviewed or
     # approved
     p_a, p_b = to_pr(env, pr_a), to_pr(env, pr_b)

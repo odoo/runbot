@@ -14,6 +14,7 @@ class re_matches:
 
 def run_crons(env):
     "Helper to run all crons (in a relevant order) except for the fetch PR one"
+    env['runbot_merge.commit']._notify()
     env['runbot_merge.project']._check_progress()
     env['runbot_merge.pull_requests']._check_linked_prs_statuses()
     env['runbot_merge.project']._send_feedback()
