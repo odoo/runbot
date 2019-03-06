@@ -884,7 +884,7 @@ class PullRequests(models.Model):
         commits = prdict['commits']
         method = self.merge_method or ('rebase-ff' if commits == 1 else None)
         assert commits < 50 or not method.startswith('rebase'), \
-            "rebasing a PR or more than 50 commits is a tad excessive"
+            "rebasing a PR of more than 50 commits is a tad excessive"
         assert commits < 250, "merging PRs of 250+ commits is not supported (https://developer.github.com/v3/pulls/#list-commits-on-a-pull-request)"
         pr_commits = gh.commits(self.number)
 
