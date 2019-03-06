@@ -24,6 +24,9 @@
             .batch a:not(:last-of-type) a:after {
                 content: ",";
             }
+            .pr-listing > * { display: inline-block; }
+            .pr-awaiting { opacity: 0.8; }
+            .pr-blocked { opacity: 0.6; }
             </style>
         </t>
         <t t-call="website.layout">
@@ -50,26 +53,30 @@
                                 ('staging_id', '=', False),
                             ])
                         "/>
-                        <t t-if="ready_unstaged">
-                            <h5 style="display: inline-block;">Awaiting</h5>
-                            <ul class="list-inline" style="display: inline-block;">
-                                <li t-foreach="ready_unstaged" t-as="pr" t-if="not pr.blocked">
+                        <t t-set="ready" t-value="ready_unstaged.filtered(lambda p: not p.blocked)"/>
+                        <t t-set="blocked" t-value="ready_unstaged.filtered(lambda p. p.blocked"/>
+                        <div t-if="ready" class="pr-listing pr-awaiting bg-warning">
+                            <h5>Awaiting</h5>
+                            <ul class="list-inline">
+                                <li t-foreach="ready" t-as="pr">
                                     <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
                                        t-att-title="pr.message.split('\n')[0]">
                                         <t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/>
                                     </a>
                                 </li>
                             </ul>
-                            <h5 style="display: inline-block;">Blocked</h5>
-                            <ul class="list-inline" style="display: inline-block;">
-                                <li t-foreach="ready_unstaged" t-as="pr" t-if="pr.blocked">
+                        </div>
+                        <div t-if="blocked" class="pr-listing pr-blocked bg-info">
+                            <h5>Blocked</h5>
+                            <ul class="list-inline">
+                                <li t-foreach="blocked" t-as="pr">
                                     <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
                                        t-att-title="pr.message.split('\n')[0]">
                                         <t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/>
                                     </a>
                                 </li>
                             </ul>
-                        </t>
+                        </div>
                     </section>
                 </section>
             </div></div>
