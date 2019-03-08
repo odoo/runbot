@@ -37,7 +37,8 @@ class Test_Frontend(common.HttpCase):
         names = ['deadbeef', 'd0d0caca', 'deadface', 'cacafeed']
         # create 5 builds in each branch
         for i, state, branch, name in zip(range(10), cycle(states), cycle(branches), cycle(names)):
-            self.Build.create({
+            name = '%s%s' % (name, i)
+            build = self.Build.create({
                 'branch_id': branch.id,
                 'name': '%s0000ffffffffffffffffffffffffffff' % name,
                 'port': '1234',
