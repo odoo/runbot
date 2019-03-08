@@ -69,11 +69,7 @@ class runbot_build(models.Model):
     job_age = fields.Integer(compute='_get_age', string='Job age')
     duplicate_id = fields.Many2one('runbot.build', 'Corresponding Build')
     server_match = fields.Selection([('builtin', 'This branch includes Odoo server'),
-                                     ('exact', 'branch/PR exact name'),
-                                     ('prefix', 'branch whose name is a prefix of current one'),
-                                     ('fuzzy', 'Fuzzy - common ancestor found'),
-                                     ('exact PR', 'Exact match between two PR'),
-                                     ('no PR', 'PR matching a branch without PR'),
+                                     ('match', 'This branch includes Odoo server'),
                                      ('default', 'No match found - defaults to master')],
                                     string='Server branch matching')
     revdep_build_ids = fields.Many2many('runbot.build', 'runbot_rev_dep_builds',
@@ -94,8 +90,8 @@ class runbot_build(models.Model):
         ('running', 'Running job only'),
         ('all', 'All jobs'),
         ('none', 'Do not execute jobs'),
-        ],
-    )
+    ])
+    dependency_ids = fields.One2many('runbot.build.dependency', 'build_id')
 
     def copy(self, values=None):
         raise UserError("Cannot duplicate build!")
@@ -104,33 +100,75 @@ class runbot_build(models.Model):
         branch = self.env['runbot.branch'].search([('id', '=', vals.get('branch_id', False))])
         if branch.job_type == 'none' or vals.get('job_type', '') == 'none':
             return self.env['runbot.build']
+        vals['job_type'] = vals['job_type'] if 'job_type' in vals else branch.job_type
         build_id = super(runbot_build, self).create(vals)
         extra_info = {'sequence': build_id.id if not build_id.sequence else build_id.sequence}
-        job_type = vals['job_type'] if 'job_type' in vals else build_id.branch_id.job_type
-        extra_info.update({'job_type': job_type})
         context = self.env.context
 
-        if not context.get('force_rebuild'):
+        # compute dependencies
+        repo = build_id.repo_id
+        dep_create_vals = []
+        nb_deps = len(repo.dependency_ids)
+        for extra_repo in repo.dependency_ids:
+            (build_closets_branch, match_type) = build_id.branch_id._get_closest_branch(extra_repo.id)
+            closest_name = build_closets_branch.name
+            closest_branch_repo = build_closets_branch.repo_id
+            last_commit = closest_branch_repo._git_rev_parse(closest_name)
+            dep_create_vals.append({
+                'build_id': build_id.id,
+                'dependecy_repo_id': extra_repo.id,
+                'closest_branch_id': build_closets_branch.id,
+                'dependency_hash': last_commit,
+                'match_type': match_type,
+            })
+
+        for dep_vals in dep_create_vals:
+            self.env['runbot.build.dependency'].sudo().create(dep_vals)
+
+        if not context.get('force_rebuild'):  # not vals.get('build_type') == rebuild': could be enough, but some cron on runbot are using this ctx key, to do later
             # detect duplicate
             duplicate_id = None
             domain = [
-                ('repo_id', '=', build_id.repo_id.duplicate_id.id),
+                ('repo_id', 'in', (build_id.repo_id.duplicate_id.id, build_id.repo_id.id)), # before, was only looking in repo.duplicate_id looks a little better to search in both
+                ('id', '!=', build_id.id),
                 ('name', '=', build_id.name),
                 ('duplicate_id', '=', False),
-                '|', ('result', '=', False), ('result', '!=', 'skipped')
+                # ('build_type', '!=', 'indirect'),  # in case of performance issue, this little fix may improve performance a little but less duplicate will be detected when pushing an empty branch on repo with duplicates
+                ('result', '!=', 'skipped'),
+                ('job_type', '=', build_id.job_type),
             ]
+            candidates = self.search(domain)
+            if candidates and nb_deps:
+                # check that all depedencies are matching.
 
-            for duplicate in self.search(domain, limit=10):
-                duplicate_id = duplicate.id
-                # Consider the duplicate if its closest branches are the same than the current build closest branches.
-                for extra_repo in build_id.repo_id.dependency_ids:
-                    build_closest_name = build_id._get_closest_branch_name(extra_repo.id)[1]
-                    duplicate_closest_name = duplicate._get_closest_branch_name(extra_repo.id)[1]
-                    if build_closest_name != duplicate_closest_name:
-                        duplicate_id = None
-                if duplicate_id:
-                    extra_info.update({'state': 'duplicate', 'duplicate_id': duplicate_id})
-                    break
+                # Note: We avoid to compare closest_branch_id, because the same hash could be found on
+                # 2 different branches (pr + branch). 
+                # But we may want to ensure that the hash is comming from the right repo, we dont want to compare community
+                # hash with enterprise hash.
+                # this is unlikely to happen so branch comparaison is disabled
+                self.env.cr.execute("""
+                    SELECT DUPLIDEPS.build_id
+                    FROM runbot_build_dependency as DUPLIDEPS
+                    JOIN runbot_build_dependency as BUILDDEPS
+                    ON BUILDDEPS.dependency_hash = DUPLIDEPS.dependency_hash
+                    --AND BUILDDEPS.closest_branch_id = DUPLIDEPS.closest_branch_id -- only usefull if we are affraid of hash collision in different branches
+                    AND BUILDDEPS.build_id = %s
+                    AND DUPLIDEPS.build_id in %s
+                    GROUP BY DUPLIDEPS.build_id
+                    HAVING COUNT(DUPLIDEPS.*) = %s
+                    ORDER BY DUPLIDEPS.build_id  -- remove this in case of performance issue, not so usefull
+                    LIMIT 1
+                """, (build_id.id, tuple(candidates.ids), nb_deps))
+                filtered_candidates_ids = self.env.cr.fetchall()
+
+                if filtered_candidates_ids:
+                    duplicate_id = filtered_candidates_ids[0]
+            else:
+                duplicate_id = candidates[0].id if candidates else False
+
+            if duplicate_id:
+                extra_info.update({'state': 'duplicate', 'duplicate_id': duplicate_id})
+                # maybe update duplicate priority if needed
 
         build_id.write(extra_info)
         if build_id.state == 'duplicate' and build_id.duplicate_id.state in ('running', 'done'):
@@ -139,21 +177,6 @@ class runbot_build(models.Model):
 
     def _reset(self):
         self.write({'state': 'pending'})
-
-    def _get_closest_branch_name(self, target_repo_id):
-        """Return (repo, branch name) of the closest common branch between build's branch and
-           any branch of target_repo or its duplicated repos.
-
-        Rules priority for choosing the branch from the other repo is:
-        1. Same branch name
-        2. A PR whose head name match
-        3. Match a branch which is the dashed-prefix of current branch name
-        4. Common ancestors (git merge-base)
-        Note that PR numbers are replaced by the branch name of the PR target
-        to prevent the above rules to mistakenly link PR of different repos together.
-        """
-        self.ensure_one()
-        return self.branch_id._get_closest_branch_name(target_repo_id)
 
     @api.depends('name', 'branch_id.name')
     def _get_dest(self):
@@ -436,96 +459,108 @@ class runbot_build(models.Model):
         return uniq_list(filter(mod_filter, modules))
 
     def _checkout(self):
-        for build in self:
-            # starts from scratch
-            if os.path.isdir(build._path()):
-                shutil.rmtree(build._path())
+        self.ensure_one() # will raise exception if hash not found, we don't want to fail for all build.
+        # starts from scratch
+        build = self
+        if os.path.isdir(build._path()):
+            shutil.rmtree(build._path())
 
-            # runbot log path
-            os.makedirs(build._path("logs"), exist_ok=True)
-            os.makedirs(build._server('addons'), exist_ok=True)
+        # runbot log path
+        os.makedirs(build._path("logs"), exist_ok=True)
+        os.makedirs(build._server('addons'), exist_ok=True)
 
-            # update repo if needed
-            if not build.repo_id._hash_exists(build.name):
-                build.repo_id._update(build.repo_id)
+        # update repo if needed
+        if not build.repo_id._hash_exists(build.name):
+            build.repo_id._update(build.repo_id)
 
-            # checkout branch
-            build.branch_id.repo_id._git_export(build.name, build._path())
+        # checkout branch
+        build.branch_id.repo_id._git_export(build.name, build._path())
 
-            has_server = os.path.isfile(build._server('__init__.py'))
-            server_match = 'builtin'
+        has_server = os.path.isfile(build._server('__init__.py'))
+        server_match = 'builtin'
 
-            # build complete set of modules to install
-            modules_to_move = []
-            modules_to_test = ((build.branch_id.modules or '') + ',' +
-                               (build.repo_id.modules or ''))
-            modules_to_test = list(filter(None, modules_to_test.split(',')))  # ???
-            explicit_modules = set(modules_to_test)
-            _logger.debug("manual modules_to_test for build %s: %s", build.dest, modules_to_test)
+        # build complete set of modules to install
+        modules_to_move = []
+        modules_to_test = ((build.branch_id.modules or '') + ',' +
+                            (build.repo_id.modules or ''))
+        modules_to_test = list(filter(None, modules_to_test.split(',')))  # ???
+        explicit_modules = set(modules_to_test)
+        _logger.debug("manual modules_to_test for build %s: %s", build.dest, modules_to_test)
 
-            if not has_server:
-                if build.repo_id.modules_auto == 'repo':
-                    modules_to_test += [
-                        os.path.basename(os.path.dirname(a))
-                        for a in (glob.glob(build._path('*/__openerp__.py')) +
-                                  glob.glob(build._path('*/__manifest__.py')))
-                    ]
-                    _logger.debug("local modules_to_test for build %s: %s", build.dest, modules_to_test)
-
-                for extra_repo in build.repo_id.dependency_ids:
-                    repo_id, closest_name, server_match = build._get_closest_branch_name(extra_repo.id)
-                    repo = self.env['runbot.repo'].browse(repo_id)
-                    _logger.debug('branch %s of %s: %s match branch %s of %s',
-                                  build.branch_id.name, build.repo_id.name,
-                                  server_match, closest_name, repo.name)
-                    build._log(
-                        'Building environment',
-                        '%s match branch %s of %s' % (server_match, closest_name, repo.name)
-                    )
-                    repo._update_git(force=True)
-                    latest_commit = repo._git(['rev-parse', closest_name]).strip()
-                    commit_oneline = repo._git(['show', '--pretty="%H -- %s"', '-s', latest_commit]).strip()
-                    build._log(
-                        'Building environment',
-                        'Server built based on commit %s from %s' % (commit_oneline, closest_name)
-                    )
-                    repo._git_export(closest_name, build._path())
-
-                # Finally mark all addons to move to openerp/addons
-                modules_to_move += [
-                    os.path.dirname(module)
-                    for module in (glob.glob(build._path('*/__openerp__.py')) +
-                                   glob.glob(build._path('*/__manifest__.py')))
+        if not has_server:
+            if build.repo_id.modules_auto == 'repo':
+                modules_to_test += [
+                    os.path.basename(os.path.dirname(a))
+                    for a in (glob.glob(build._path('*/__openerp__.py')) +
+                                glob.glob(build._path('*/__manifest__.py')))
                 ]
+                _logger.debug("local modules_to_test for build %s: %s", build.dest, modules_to_test)
 
-            # move all addons to server addons path
-            for module in uniq_list(glob.glob(build._path('addons/*')) + modules_to_move):
-                basename = os.path.basename(module)
-                addon_path = build._server('addons', basename)
-                if os.path.exists(addon_path):
-                    build._log(
-                        'Building environment',
-                        'You have duplicate modules in your branches "%s"' % basename
-                    )
-                    if os.path.islink(addon_path) or os.path.isfile(addon_path):
-                        os.remove(addon_path)
-                    else:
-                        shutil.rmtree(addon_path)
-                shutil.move(module, build._server('addons'))
+            # todo make it backward compatible, or create migration script?
+            for build_dependency in build.dependency_ids:
+                closest_branch = build_dependency.closest_branch_id
+                latest_commit = build_dependency.dependency_hash
+                repo = closest_branch.repo_id
+                closest_name = closest_branch.name
+                if build_dependency.match_type == 'default':
+                    server_match = 'default'
+                elif server_match != 'default':
+                    server_match = 'match'
 
-            available_modules = [
-                os.path.basename(os.path.dirname(a))
-                for a in (glob.glob(build._server('addons/*/__openerp__.py')) +
-                          glob.glob(build._server('addons/*/__manifest__.py')))
+                build._log(
+                    'Building environment',
+                    '%s match branch %s of %s' % (build_dependency.match_type, closest_name, repo.name)
+                )
+                if not repo._hash_exists(latest_commit):
+                    repo._update(force=True)
+                if not repo._hash_exists(latest_commit):
+                    repo._git(['fetch', 'origin', latest_commit])
+                if not repo._hash_exists(latest_commit):
+                    build._log('_checkout',"Dependency commit %s in repo %s is unreachable" % (latest_commit, repo.name))
+                    raise Exception
+
+                commit_oneline = repo._git(['show', '--pretty="%H -- %s"', '-s', latest_commit]).strip()
+                build._log(
+                    'Building environment',
+                    'Server built based on commit %s from %s' % (commit_oneline, closest_name)
+                )
+                repo._git_export(latest_commit, build._path())
+
+            # Finally mark all addons to move to openerp/addons
+            modules_to_move += [
+                os.path.dirname(module)
+                for module in (glob.glob(build._path('*/__openerp__.py')) +
+                                glob.glob(build._path('*/__manifest__.py')))
             ]
-            if build.repo_id.modules_auto == 'all' or (build.repo_id.modules_auto != 'none' and has_server):
-                modules_to_test += available_modules
 
-            modules_to_test = self._filter_modules(modules_to_test,
-                                                   set(available_modules), explicit_modules)
-            _logger.debug("modules_to_test for build %s: %s", build.dest, modules_to_test)
-            build.write({'server_match': server_match,
-                         'modules': ','.join(modules_to_test)})
+        # move all addons to server addons path
+        for module in uniq_list(glob.glob(build._path('addons/*')) + modules_to_move):
+            basename = os.path.basename(module)
+            addon_path = build._server('addons', basename)
+            if os.path.exists(addon_path):
+                build._log(
+                    'Building environment',
+                    'You have duplicate modules in your branches "%s"' % basename
+                )
+                if os.path.islink(addon_path) or os.path.isfile(addon_path):
+                    os.remove(addon_path)
+                else:
+                    shutil.rmtree(addon_path)
+            shutil.move(module, build._server('addons'))
+
+        available_modules = [
+            os.path.basename(os.path.dirname(a))
+            for a in (glob.glob(build._server('addons/*/__openerp__.py')) +
+                        glob.glob(build._server('addons/*/__manifest__.py')))
+        ]
+        if build.repo_id.modules_auto == 'all' or (build.repo_id.modules_auto != 'none' and has_server):
+            modules_to_test += available_modules
+
+        modules_to_test = self._filter_modules(modules_to_test,
+                                                set(available_modules), explicit_modules)
+        _logger.debug("modules_to_test for build %s: %s", build.dest, modules_to_test)
+        build.write({'server_match': server_match,
+                        'modules': ','.join(modules_to_test)})
 
     def _local_pg_dropdb(self, dbname):
         with local_pgadmin_cursor() as local_cr:

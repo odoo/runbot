@@ -86,6 +86,9 @@ class runbot_repo(models.Model):
             _logger.info("git command: %s", ' '.join(cmd))
             return subprocess.check_output(cmd).decode('utf-8')
 
+    def _git_rev_parse(self, branch_name):
+        return self._git(['rev-parse', branch_name]).strip()
+
     def _git_export(self, treeish, dest):
         """Export a git repo to dest"""
         self.ensure_one()
@@ -130,7 +133,7 @@ class runbot_repo(models.Model):
                 else:
                     raise
 
-    def _find_new_commits(self, repo):
+    def _find_new_commits(self):
         """ Find new commits in bare repo """
         self.ensure_one()
         Branch = self.env['runbot.branch']
@@ -140,7 +143,7 @@ class runbot_repo(models.Model):
 
         fields = ['refname', 'objectname', 'committerdate:iso8601', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail']
         fmt = "%00".join(["%(" + field + ")" for field in fields])
-        git_refs = repo._git(['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/heads', 'refs/pull'])
+        git_refs = self._git(['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/heads', 'refs/pull'])
         git_refs = git_refs.strip()
 
         refs = [[field for field in line.split('\x00')] for line in git_refs.split('\n')]
@@ -150,7 +153,7 @@ class runbot_repo(models.Model):
           SELECT t.branch, b.id
             FROM t LEFT JOIN runbot_branch b ON (b.name = t.branch)
            WHERE b.repo_id = %s;
-        """, ([r[0] for r in refs], repo.id))
+        """, ([r[0] for r in refs], self.id))
         ref_branches = {r[0]: r[1] for r in self.env.cr.fetchall()}
 
         for name, sha, date, author, author_email, subject, committer, committer_email in refs:
@@ -158,8 +161,8 @@ class runbot_repo(models.Model):
             if ref_branches.get(name):
                 branch_id = ref_branches[name]
             else:
-                _logger.debug('repo %s found new branch %s', repo.name, name)
-                branch_id = Branch.create({'repo_id': repo.id, 'name': name}).id
+                _logger.debug('repo %s found new branch %s', self.name, name)
+                branch_id = Branch.create({'repo_id': self.id, 'name': name}).id
             branch = Branch.browse([branch_id])[0]
 
             # skip the build for old branches (Could be checked before creating the branch in DB ?)
@@ -208,10 +211,10 @@ class runbot_repo(models.Model):
                         if latest_rev_build:
                             _logger.debug('Reverse dependency build %s forced in repo %s by commit %s', latest_rev_build.dest, rev_repo.name, sha[:6])
                             latest_rev_build.build_type = 'indirect'
-                            new_build.revdep_build_ids += latest_rev_build._force(message='Rebuild from dependency %s commit %s' % (repo.name, sha[:6]))
+                            new_build.revdep_build_ids += latest_rev_build._force(message='Rebuild from dependency %s commit %s' % (self.name, sha[:6]))
 
         # skip old builds (if their sequence number is too low, they will not ever be built)
-        skippable_domain = [('repo_id', '=', repo.id), ('state', '=', 'pending')]
+        skippable_domain = [('repo_id', '=', self.id), ('state', '=', 'pending')]
         icp = self.env['ir.config_parameter']
         running_max = int(icp.get_param('runbot.runbot_running_max', default=75))
         builds_to_be_skipped = Build.search(skippable_domain, order='sequence desc', offset=running_max)
@@ -221,7 +224,7 @@ class runbot_repo(models.Model):
         """ Find new commits in physical repos"""
         for repo in repos:
             try:
-                repo._find_new_commits(repo)
+                repo._find_new_commits()
             except Exception:
                 _logger.exception('Fail to find new commits in repo %s', repo.name)
 
@@ -388,6 +391,7 @@ class runbot_repo(models.Model):
             repos = self.search([('mode', '!=', 'disabled')])
             self._update(repos, force=False)
             self._create_pending_builds(repos)
+
             self.env.cr.commit()
             self.invalidate_cache()
             time.sleep(update_frequency)
