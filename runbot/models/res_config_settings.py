@@ -27,7 +27,7 @@ class ResConfigSettings(models.TransientModel):
                    runbot_domain=get_param('runbot.runbot_domain', default=common.fqdn()),
                    runbot_max_age=int(get_param('runbot.runbot_max_age', default=30)),
                    runbot_logdb_uri=get_param('runbot.runbot_logdb_uri', default=False),
-                   runbot_update_frequency=get_param('runbot.runbot_update_frequency', default=10),
+                   runbot_update_frequency=int(get_param('runbot.runbot_update_frequency', default=10)),
                    )
         return res
 
