@@ -220,7 +220,8 @@ def handle_status(env, event):
         event
     )
     Commits = env['runbot_merge.commit']
-    c = Commits.search([('sha', '=', event['sha'])])
+    env.cr.execute('SELECT id FROM runbot_merge_commit WHERE sha=%s FOR UPDATE', [event['sha']])
+    c = Commits.browse(env.cr.fetchone())
     if c:
         c.statuses = json.dumps({
             **json.loads(c.statuses),
