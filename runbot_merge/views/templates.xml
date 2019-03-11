@@ -54,7 +54,7 @@
                             ])
                         "/>
                         <t t-set="ready" t-value="ready_unstaged.filtered(lambda p: not p.blocked)"/>
-                        <t t-set="blocked" t-value="ready_unstaged.filtered(lambda p. p.blocked"/>
+                        <t t-set="blocked" t-value="ready_unstaged.filtered(lambda p: p.blocked)"/>
                         <div t-if="ready" class="pr-listing pr-awaiting bg-warning">
                             <h5>Awaiting</h5>
                             <ul class="list-inline">
