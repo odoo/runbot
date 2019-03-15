@@ -383,6 +383,7 @@ class runbot_repo(models.Model):
             self._update(repos, force=False)
             self._create_pending_builds(repos)
             self.env.cr.commit()
+            self.invalidate_cache()
             time.sleep(update_frequency)
 
     def _cron_fetch_and_build(self, hostname):
