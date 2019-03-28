@@ -679,12 +679,13 @@ class runbot_build(models.Model):
         self.ensure_one()
         user = request.env.user if request else self.env.user
         uid = user.id
-        if self.state == 'pending':
-            self._skip()
-            self._log('_ask_kill', 'Skipping build %s, requested by %s (user #%s)' % (self.dest, user.name, uid))
-        elif self.state in ['testing', 'running']:
-            self.write({'state': 'deathrow'})
-            self._log('_ask_kill', 'Killing build %s, requested by %s (user #%s)' % (self.dest, user.name, uid))
+        build = self.duplicate_id if self.state == 'duplicate' else self
+        if build.state == 'pending':
+            build._skip()
+            build._log('_ask_kill', 'Skipping build %s, requested by %s (user #%s)' % (build.dest, user.name, uid))
+        elif build.state in ['testing', 'running']:
+            build.write({'state': 'deathrow'})
+            build._log('_ask_kill', 'Killing build %s, requested by %s (user #%s)' % (build.dest, user.name, uid))
 
     def _cmd(self):
         """Return a tuple describing the command to start the build
