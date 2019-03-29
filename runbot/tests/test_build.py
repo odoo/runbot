@@ -174,6 +174,7 @@ class TestClosestBranch(common.TransactionCase):
         Test that the creation of a build on branch1 and branch2 detects duplicate, no matter the order.
         Also test that build on branch1 closest_branch_name result is b1_closest if given
         Also test that build on branch2 closest_branch_name result is b2_closest if given
+        Test that the _ask_kill method works on duplicate
         """
         closest = {
             branch1: b1_closest,
@@ -199,6 +200,11 @@ class TestClosestBranch(common.TransactionCase):
 
             self.assertEqual(build2.duplicate_id.id, build1.id, "build on %s wasn't detected as duplicate of build on %s" % (self.branch_description(b2), self.branch_description(b1)))
             self.assertEqual(build2.state, 'duplicate')
+
+            self.assertEqual(build1.state, 'pending')
+            build2._ask_kill()
+            self.assertEqual(build1.state, 'done', 'A killed pending duplicate build should mark the real build as done')
+            self.assertEqual(build1.result, 'skipped', 'A killed pending duplicate build should mark the real build as skipped')
 
     def setUp(self):
         """ Setup repositories that mimick the Odoo repos """
