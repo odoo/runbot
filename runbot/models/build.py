@@ -12,7 +12,7 @@ import subprocess
 import time
 from subprocess import CalledProcessError
 from ..common import dt2time, fqdn, now, grep, time2str, rfind, uniq_list, local_pgadmin_cursor, get_py_version
-from ..container import docker_build, docker_run, docker_stop, docker_is_running, docker_get_gateway_ip
+from ..container import docker_build, docker_run, docker_stop, docker_is_running, docker_get_gateway_ip, build_odoo_cmd
 from odoo import models, fields, api
 from odoo.exceptions import UserError
 from odoo.http import request
@@ -789,7 +789,7 @@ class runbot_build(models.Model):
         cmd += ['-d', '%s-base' % build.dest, '-i', 'base', '--stop-after-init', '--log-level=test', '--max-cron-threads=0']
         if build.extra_params:
             cmd.extend(shlex.split(build.extra_params))
-        return docker_run(cmd, log_path, build._path(), build._get_docker_name(), cpu_limit=600)
+        return docker_run(build_odoo_cmd(cmd), log_path, build._path(), build._get_docker_name(), cpu_limit=600)
 
     @runbot_job('testing', 'running')
     def _job_20_test_all(self, build, log_path):
@@ -817,7 +817,7 @@ class runbot_build(models.Model):
             cmd = [ get_py_version(build), '-m', 'coverage', 'run', '--branch', '--source', '/data/build'] + omit + cmd
         # reset job_start to an accurate job_20 job_time
         build.write({'job_start': now()})
-        return docker_run(cmd, log_path, build._path(), build._get_docker_name(), cpu_limit=cpu_limit)
+        return docker_run(build_odoo_cmd(cmd), log_path, build._path(), build._get_docker_name(), cpu_limit=cpu_limit)
 
     @runbot_job('testing')
     def _job_21_coverage_html(self, build, log_path):
@@ -827,7 +827,7 @@ class runbot_build(models.Model):
         cov_path = build._path('coverage')
         os.makedirs(cov_path, exist_ok=True)
         cmd = [ get_py_version(build), "-m", "coverage", "html", "-d", "/data/build/coverage", "--ignore-errors"]
-        return docker_run(cmd, log_path, build._path(), build._get_docker_name())
+        return docker_run(build_odoo_cmd(cmd), log_path, build._path(), build._get_docker_name())
 
     @runbot_job('testing')
     def _job_22_coverage_result(self, build, log_path):
@@ -889,4 +889,4 @@ class runbot_build(models.Model):
         smtp_host = docker_get_gateway_ip()
         if smtp_host:
             cmd += ['--smtp', smtp_host]
-        return docker_run(cmd, log_path, build._path(), build._get_docker_name(), exposed_ports = [build.port, build.port + 1])
+        return docker_run(build_odoo_cmd(cmd), log_path, build._path(), build._get_docker_name(), exposed_ports = [build.port, build.port + 1])
