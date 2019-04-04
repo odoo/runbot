@@ -30,6 +30,20 @@ USER odoo
 ENV COVERAGE_FILE /data/build/.coverage
 """ % {'group_id': os.getgid(), 'user_id': os.getuid()}
 
+
+def build_odoo_cmd(odoo_cmd):
+    """ returns the chain of commands necessary to run odoo inside the container
+        : param odoo_cmd: odoo command as a list
+        : returns: a string with the command chain to execute in the docker container
+    """
+    # build cmd
+    cmd_chain = []
+    cmd_chain.append('cd /data/build')
+    cmd_chain.append('head -1 odoo-bin | grep -q python3 && sudo pip3 install -r requirements.txt || sudo pip install -r requirements.txt')
+    cmd_chain.append(' '.join(odoo_cmd))
+    return ' && '.join(cmd_chain)
+
+
 def docker_build(log_path, build_dir):
     """Build the docker image
     :param log_path: path to the logfile that will contain odoo stdout and stderr
@@ -46,21 +60,15 @@ def docker_build(log_path, build_dir):
     dbuild = subprocess.Popen(['docker', 'build', '--tag', 'odoo:runbot_tests', '.'], stdout=logs, stderr=logs, cwd=docker_dir)
     dbuild.wait()
 
-def docker_run(odoo_cmd, log_path, build_dir, container_name, exposed_ports=None, cpu_limit=None, preexec_fn=None):
+def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None, cpu_limit=None, preexec_fn=None):
     """Run tests in a docker container
-    :param odoo_cmd: command that starts odoo
+    :param run_cmd: command string to run in container
     :param log_path: path to the logfile that will contain odoo stdout and stderr
     :param build_dir: the build directory that contains the Odoo sources to build.
                       This directory is shared as a volume with the container
     :param container_name: used to give a name to the container for later reference
     :param exposed_ports: if not None, starting at 8069, ports will be exposed as exposed_ports numbers
     """
-    # build cmd
-    cmd_chain = []
-    cmd_chain.append('cd /data/build')
-    cmd_chain.append('head -1 odoo-bin | grep -q python3 && sudo pip3 install -r requirements.txt || sudo pip install -r requirements.txt')
-    cmd_chain.append(' '.join(odoo_cmd))
-    run_cmd = ' && '.join(cmd_chain)
     _logger.debug('Docker run command: %s', run_cmd)
     logs = open(log_path, 'w')
 
@@ -138,7 +146,7 @@ def tests(args):
     if args.kill:
         logfile = os.path.join(args.build_dir, 'logs', 'logs-partial.txt')
         container_name = 'odoo-container-test-%s' % datetime.datetime.now().microsecond
-        docker_run(odoo_cmd, logfile, args.build_dir, container_name)
+        docker_run(build_odoo_cmd(odoo_cmd), logfile, args.build_dir, container_name)
         # Test stopping the container
         _logger.info('Waiting 30 sec before killing the build')
         time.sleep(30)
@@ -153,12 +161,23 @@ def tests(args):
         with open(os.path.join(args.build_dir, 'odoo-bin'), 'r') as exfile:
             pyversion = 'python3' if 'python3' in exfile.readline() else 'python'
         odoo_cmd = [ pyversion, '-m', 'coverage', 'run', '--branch', '--source', '/data/build'] + omit + odoo_cmd
-    docker_run(odoo_cmd, logfile, args.build_dir, container_name)
+    docker_run(build_odoo_cmd(odoo_cmd), logfile, args.build_dir, container_name)
     time.sleep(1)  # give time for the container to start
 
     while docker_is_running(container_name):
         time.sleep(10)
         _logger.info("Waiting for %s to stop", container_name)
+
+    if args.dump:
+        _logger.info("Testing pg_dump")
+        logfile = os.path.join(args.build_dir, 'logs', 'logs-pg_dump.txt')
+        container_name = 'odoo-container-test-pg_dump-%s' % datetime.datetime.now().microsecond
+        docker_pg_dump_cmd = 'cd /data/build/datadir && pg_dump -U %s -f db_export.sql %s' % (os.getlogin(), args.db_name)
+        docker_run(docker_pg_dump_cmd, logfile, args.build_dir, container_name)
+        time.sleep(1)
+        while docker_is_running(container_name):
+            time.sleep(10)
+            _logger.info("Waiting for %s to stop", container_name)
 
     if args.run:
         # Test running
@@ -173,7 +192,7 @@ def tests(args):
         if smtp_host:
             odoo_cmd.extend(['--smtp', smtp_host])
         container_name = 'odoo-container-test-%s' % datetime.datetime.now().microsecond
-        docker_run(odoo_cmd, logfile, args.build_dir, container_name, exposed_ports=[args.odoo_port, args.odoo_port + 1], cpu_limit=300)
+        docker_run(build_odoo_cmd(odoo_cmd), logfile, args.build_dir, container_name, exposed_ports=[args.odoo_port, args.odoo_port + 1], cpu_limit=300)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
@@ -190,6 +209,7 @@ if __name__ == '__main__':
     p_test.add_argument('--coverage', action='store_true', help= 'test a build with coverage')
     p_test.add_argument('-i', dest='odoo_modules', default='web', help='Comma separated list of modules')
     p_test.add_argument('--kill', action='store_true', default=False, help='Also test container kill')
+    p_test.add_argument('--dump', action='store_true', default=False, help='Test database export with pg_dump')
     p_test.add_argument('--run', action='store_true', default=False, help='Also test running (Warning: the container survives exit)')
     args = parser.parse_args()
     args.func(args)
