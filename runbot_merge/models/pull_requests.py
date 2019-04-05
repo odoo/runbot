@@ -258,24 +258,7 @@ class Branch(models.Model):
         for b in self:
             b.active_staging_id = b.staging_ids
 
-    def try_staging(self):
-        """ Tries to create a staging if the current branch does not already
-        have one. Returns None if the branch already has a staging or there
-        is nothing to stage, the newly created staging otherwise.
-        """
-        logger = _logger.getChild('cron')
-
-        logger.info(
-            "Checking %s (%s) for staging: %s, skip? %s",
-            self, self.name,
-            self.active_staging_id,
-            bool(self.active_staging_id)
-        )
-        if self.active_staging_id:
-            return
-
-        PRs = self.env['runbot_merge.pull_requests']
-
+    def _stageable(self):
         # noinspection SqlResolve
         self.env.cr.execute("""
         SELECT
@@ -283,7 +266,7 @@ class Branch(models.Model):
           array_agg(pr.id) AS match
         FROM runbot_merge_pull_requests pr
         LEFT JOIN runbot_merge_batch batch ON pr.batch_id = batch.id AND batch.active
-        WHERE pr.target = %s
+        WHERE pr.target = any(%s)
           -- exclude terminal states (so there's no issue when
           -- deleting branches & reusing labels)
           AND pr.state != 'merged'
@@ -302,9 +285,29 @@ class Branch(models.Model):
                 OR bool_and(pr.state = 'ready')
             )
         ORDER BY min(pr.priority), min(pr.id)
-        """, [self.id])
-        # result: [(priority, [(repo_id, pr_id) for repo in repos]
-        rows = self.env.cr.fetchall()
+        """, [self.ids])
+        # result: [(priority, [pr_id for repo in repos])]
+        return self.env.cr.fetchall()
+
+    def try_staging(self):
+        """ Tries to create a staging if the current branch does not already
+        have one. Returns None if the branch already has a staging or there
+        is nothing to stage, the newly created staging otherwise.
+        """
+        logger = _logger.getChild('cron')
+
+        logger.info(
+            "Checking %s (%s) for staging: %s, skip? %s",
+            self, self.name,
+            self.active_staging_id,
+            bool(self.active_staging_id)
+        )
+        if self.active_staging_id:
+            return
+
+        PRs = self.env['runbot_merge.pull_requests']
+
+        rows = self._stageable()
         priority = rows[0][0] if rows else -1
         if priority == 0:
             # p=0 take precedence over all else
@@ -440,23 +443,21 @@ class PullRequests(models.Model):
                             " PR is linked to an other non-ready PR"
     )
 
-    @property
-    def blocked(self):
-        if self.state not in ('ready', 'merged', 'closed'):
-            return True
-        if not (self.squash or self.merge_method):
-            return True
+    blocked = fields.Boolean(
+        compute='_compute_is_blocked',
+        help="PR is not currently stageable for some reason (mostly an issue if status is ready)"
+    )
 
-        # can't be blocked on a co-dependent PR if it's a patch-*
-        if re.search(r':patch-\d+$', self.label):
-            return False
-
-        return bool(self.search_count([
-            ('id', '!=', self.id),
-            ('label', '=', self.label),
-            ('state', '!=', 'ready'),
-            ('priority', '!=', 0),
-        ]))
+    # missing link to other PRs
+    @api.depends('priority', 'state', 'squash', 'merge_method', 'batch_id.active', 'label')
+    def _compute_is_blocked(self):
+        stageable = {
+            pr_id
+            for _, pr_ids in self.mapped('target')._stageable()
+            for pr_id in pr_ids
+        }
+        for pr in self:
+            pr.blocked = pr.id not in stageable
 
     @api.depends('head')
     def _compute_statuses(self):

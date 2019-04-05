@@ -438,6 +438,9 @@ class Model:
 
         return Model(self._env, self._model, {*self._ids, *other._ids}, fields=self._fields)
 
+    def invalidate_cache(self, fnames=None, ids=None):
+        pass # not a concern when every access is an RPC call
+
 class Repo:
     __slots__ = ['name', '_session', '_tokens']
     def __init__(self, session, name, user_tokens):

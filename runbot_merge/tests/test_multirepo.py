@@ -462,3 +462,81 @@ def test_urgent(env, repo_a, repo_b):
     assert p_a.batch_id and p_b.batch_id and p_a.batch_id == p_b.batch_id,\
         "a and b should have been recognised as co-dependent"
     assert not p_c.staging_id
+
+class TestBlocked:
+    def test_merge_method(self, env, repo_a):
+        make_branch(repo_a, 'master', 'initial', {'a0': 'a'})
+
+        pr = make_pr(repo_a, 'A', [{'a1': 'a'}, {'a2': 'a'}])
+
+        run_crons(env)
+
+        p = to_pr(env, pr)
+        assert p.state == 'ready'
+        print(p.id, p.squash, p.merge_method)
+        assert p.blocked
+
+        pr.post_comment('hansen rebase-merge', 'reviewer')
+        assert not p.blocked
+
+    def test_linked_closed(self, env, repo_a, repo_b):
+        make_branch(repo_a, 'master', 'initial', {'a0': 'a'})
+        make_branch(repo_b, 'master', 'initial', {'b0': 'b'})
+
+        pr = make_pr(repo_a, 'A', [{'a1': 'a'}], label='xxx')
+        b = make_pr(repo_b, 'B', [{'b1': 'b'}], label='xxx', statuses=[])
+        run_crons(env)
+
+        p = to_pr(env, pr)
+        assert p.blocked
+        b.close()
+        # FIXME: find a way for PR.blocked to depend on linked PR somehow so this isn't needed
+        p.invalidate_cache(['blocked'], [p.id])
+        assert not p.blocked
+
+    def test_linked_merged(self, env, repo_a, repo_b):
+        make_branch(repo_a, 'master', 'initial', {'a0': 'a'})
+        make_branch(repo_b, 'master', 'initial', {'b0': 'b'})
+
+        b = make_pr(repo_b, 'B', [{'b1': 'b'}], label='xxx')
+
+        run_crons(env) # stage b and c
+
+        repo_a.post_status('heads/staging.master', 'success', 'legal/cla')
+        repo_a.post_status('heads/staging.master', 'success', 'ci/runbot')
+        repo_b.post_status('heads/staging.master', 'success', 'legal/cla')
+        repo_b.post_status('heads/staging.master', 'success', 'ci/runbot')
+
+        run_crons(env) # merge b and c
+        assert to_pr(env, b).state == 'merged'
+
+        pr = make_pr(repo_a, 'A', [{'a1': 'a'}], label='xxx')
+        run_crons(env) # merge b and c
+
+        p = to_pr(env, pr)
+        assert not p.blocked
+
+    def test_linked_unready(self, env, repo_a, repo_b):
+        """ Create a PR A linked to a non-ready PR B,
+        * A is blocked by default
+        * A is not blocked if A.p=0
+        * A is not blocked if B.p=0
+        """
+        make_branch(repo_a, 'master', 'initial', {'a0': 'a'})
+        make_branch(repo_b, 'master', 'initial', {'b0': 'b'})
+
+        a = make_pr(repo_a, 'A', [{'a1': 'a'}], label='xxx')
+        b = make_pr(repo_b, 'B', [{'b1': 'b'}], label='xxx', statuses=[])
+        run_crons(env)
+
+        pr_a = to_pr(env, a)
+        assert pr_a.blocked
+
+        a.post_comment('hansen p=0', 'reviewer')
+        assert not pr_a.blocked
+
+        a.post_comment('hansen p=2', 'reviewer')
+        assert pr_a.blocked
+
+        b.post_comment('hansen p=0', 'reviewer')
+        assert not pr_a.blocked
