@@ -306,6 +306,7 @@ class runbot_repo(models.Model):
                             ORDER BY
                                 runbot_branch.sticky DESC,
                                 runbot_branch.priority DESC,
+                                array_position(array['normal','rebuild','indirect','scheduled']::varchar[], runbot_build.build_type) ASC,
                                 runbot_build.sequence ASC
                             FOR UPDATE OF runbot_build SKIP LOCKED
                         LIMIT %(available_slots)s)"""
