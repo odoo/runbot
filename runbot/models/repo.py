@@ -24,7 +24,7 @@ class runbot_repo(models.Model):
     _name = "runbot.repo"
 
     name = fields.Char('Repository', required=True)
-    # branch_ids = fields.One2many('runbot.branch', inverse_name='repo_id') # keep for next version
+    short_name = fields.Char('Repository', compute='_compute_short_name', store=False, readonly=True)
     sequence = fields.Integer('Sequence')
     path = fields.Char(compute='_get_path', string='Directory', readonly=True)
     base = fields.Char(compute='_get_base_url', string='Base URL', readonly=True)  # Could be renamed to a more explicit name like base_url
@@ -73,6 +73,11 @@ class runbot_repo(models.Model):
             name = re.sub('.git$', '', name)
             name = name.replace(':', '/')
             repo.base = name
+
+    @api.depends('name', 'base')
+    def _compute_short_name(self):
+        for repo in self:
+            repo.short_name = '/'.join(repo.base.split('/')[-2:])
 
     def _git(self, cmd):
         """Execute a git command 'cmd'"""
