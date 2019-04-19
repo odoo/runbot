@@ -15,3 +15,10 @@ class Test_Repo(common.TransactionCase):
         self.assertEqual(repo.path, '/tmp/static/repo/bla_example.com_foo_bar')
 
         self.assertEqual(repo.base, 'example.com/foo/bar')
+        self.assertEqual(repo.short_name, 'foo/bar')
+
+        https_repo = self.Repo.create({'name': 'https://bla@example.com/user/rep.git'})
+        self.assertEqual(https_repo.short_name, 'user/rep')
+
+        local_repo = self.Repo.create({'name': '/path/somewhere/rep.git'})
+        self.assertEqual(local_repo.short_name, 'somewhere/rep')
