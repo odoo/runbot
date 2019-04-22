@@ -40,40 +40,11 @@ class Test_Build(common.TransactionCase):
 
         # Test domain compute with fqdn and ir.config_parameter
         mock_fqdn.return_value = 'runbot98.nowhere.org'
+        self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_domain', False)
         self.assertEqual(build.domain, 'runbot98.nowhere.org:1234')
         self.env['ir.config_parameter'].set_param('runbot.runbot_domain', 'runbot99.example.org')
-        build._get_domain()
+        build._compute_domain()
         self.assertEqual(build.domain, 'runbot99.example.org:1234')
-
-    @patch('odoo.addons.runbot.models.build.fqdn')
-    def test_guess_result(self, mock_fqdn):
-        build = self.Build.create({
-            'branch_id': self.branch.id,
-            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
-            'port': '1234',
-        })
-        # Testing the guess_result computed field
-        self.assertEqual(build.guess_result, '', 'A pending build guess_result should be empty')
-
-        build.write({'state': 'done', 'result': 'ko'})
-        build.invalidate_cache()
-        self.assertEqual(build.guess_result, 'ko', 'A finished build should return the same as result')
-
-        build.write({'state': 'testing'})
-        build.invalidate_cache()
-        self.assertEqual(build.guess_result, 'ok', 'A testing build without logs should be ok')
-
-        self.env.cr.execute("""
-            INSERT INTO ir_logging(name, type, path, func, line, build_id, level, message)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""", ('testing', 'server', 'somewhere', 'test', 0, build.id, 'WARNING', 'blabla'))
-        build.invalidate_cache()
-        self.assertEqual(build.guess_result, 'warn', 'A testing build with warnings should be warn')
-
-        self.env.cr.execute("""
-            INSERT INTO ir_logging(name, type, path, func, line, build_id, level, message)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""", ('testing', 'server', 'somewhere', 'test', 0, build.id, 'ERROR', 'blabla'))
-        build.invalidate_cache()
-        self.assertEqual(build.guess_result, 'ko', 'A testing build with errors should be ko')
 
     @patch('odoo.addons.runbot.models.build.os.mkdir')
     @patch('odoo.addons.runbot.models.build.grep')
@@ -89,52 +60,6 @@ class Test_Build(common.TransactionCase):
         cmd = build._cmd()[0]
         self.assertIn('--log-db=%s' % uri, cmd)
 
-    def test_build_job_type_from_branch_default(self):
-        """test build job_type is computed from branch default job_type"""
-        build = self.Build.create({
-            'branch_id': self.branch.id,
-            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
-        })
-        self.assertEqual(build.job_type, 'all', "job_type should be the same as the branch")
-
-    def test_build_job_type_from_branch_testing(self):
-        """test build job_type is computed from branch"""
-        self.branch.job_type = 'testing'
-        build = self.Build.create({
-            'branch_id': self.branch.id,
-            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
-        })
-        self.assertEqual(build.job_type, 'testing', "job_type should be the same as the branch")
-
-    def test_build_job_type_from_branch_none(self):
-        """test build is not even created when branch job_type is none"""
-        self.branch.job_type = 'none'
-        build = self.Build.create({
-            'branch_id': self.branch.id,
-            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
-        })
-        self.assertEqual(build, self.Build, "build should be an empty recordset")
-
-    def test_build_job_type_can_be_set(self):
-        """test build job_type can be set to something different than the one on the branch"""
-        self.branch.job_type = 'running'
-        build = self.Build.create({
-            'branch_id': self.branch.id,
-            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
-            'job_type': 'testing'
-        })
-        self.assertEqual(build.job_type, 'testing', "job_type should be the one set on the build")
-
-    def test_build_job_type_none(self):
-        """test build job_type set to none does not create a build"""
-        self.branch.job_type = 'running'
-        build = self.Build.create({
-            'branch_id': self.branch.id,
-            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
-            'job_type': 'none'
-        })
-        self.assertEqual(build, self.Build, "build should be an empty recordset")
-
     @patch('odoo.addons.runbot.models.build._logger')
     def test_build_skip(self, mock_logger):
         """test build is skipped"""
@@ -144,8 +69,8 @@ class Test_Build(common.TransactionCase):
             'port': '1234',
         })
         build._skip()
-        self.assertEqual(build.state, 'done')
-        self.assertEqual(build.result, 'skipped')
+        self.assertEqual(build.local_state, 'done')
+        self.assertEqual(build.local_result, 'skipped')
 
         other_build = self.Build.create({
             'branch_id': self.branch.id,
@@ -153,8 +78,8 @@ class Test_Build(common.TransactionCase):
             'port': '1234',
         })
         other_build._skip(reason='A good reason')
-        self.assertEqual(other_build.state, 'done')
-        self.assertEqual(other_build.result, 'skipped')
+        self.assertEqual(other_build.local_state, 'done')
+        self.assertEqual(other_build.local_result, 'skipped')
         log_first_part = '%s skip %%s' % (other_build.dest)
         mock_logger.debug.assert_called_with(log_first_part, 'A good reason')
 
@@ -170,12 +95,12 @@ class Test_Build(common.TransactionCase):
             'branch_id': self.branch_10.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
         })
-        build2.write({'state': 'duplicate', 'duplicate_id': build1.id}) # this may not be usefull if we detect duplicate in same repo.
+        build2.write({'local_state': 'duplicate', 'duplicate_id': build1.id}) # this may not be usefull if we detect duplicate in same repo.
 
-        self.assertEqual(build1.state, 'pending')
+        self.assertEqual(build1.local_state, 'pending')
         build2._ask_kill()
-        self.assertEqual(build1.state, 'done', 'A killed pending duplicate build should mark the real build as done')
-        self.assertEqual(build1.result, 'skipped', 'A killed pending duplicate build should mark the real build as skipped')
+        self.assertEqual(build1.local_state, 'done', 'A killed pending duplicate build should mark the real build as done')
+        self.assertEqual(build1.local_result, 'skipped', 'A killed pending duplicate build should mark the real build as skipped')
 
 
 def rev_parse(repo, branch_name):
@@ -226,11 +151,11 @@ class TestClosestBranch(common.TransactionCase):
             if b2_closest:
                 self.assertClosest(b2, closest[b2])
             if noDuplicate:
-                self.assertNotEqual(build2.state, 'duplicate')
+                self.assertNotEqual(build2.local_state, 'duplicate')
                 self.assertFalse(build2.duplicate_id, "build on %s was detected as duplicate of build %s" % (self.branch_description(b2), build2.duplicate_id))
             else:
                 self.assertEqual(build2.duplicate_id.id, build1.id, "build on %s wasn't detected as duplicate of build on %s" % (self.branch_description(b2), self.branch_description(b1)))
-                self.assertEqual(build2.state, 'duplicate')
+                self.assertEqual(build2.local_state, 'duplicate')
 
     def assertNoDuplicate(self, branch1, branch2, b1_closest=None, b2_closest=None):
         self.assertDuplicate(branch1, branch2, b1_closest=b1_closest, b2_closest=b2_closest, noDuplicate=True)

@@ -22,7 +22,7 @@ class Test_Branch(common.TransactionCase):
 
         self.assertEqual(branch.branch_name, 'master')
         self.assertEqual(branch.branch_url, 'https://example.com/foo/bar/tree/master')
-        self.assertEqual(branch.job_type, 'all')
+        #self.assertEqual(branch.job_type, 'all') # todo make check on config
 
     @patch('odoo.addons.runbot.models.repo.runbot_repo._github')
     def test_pull_request(self, mock_github):
@@ -45,9 +45,9 @@ class Test_Branch(common.TransactionCase):
             'repo_id': self.repo.id,
             'name': 'refs/head/foo-branch-bar'
         })
-        self.assertFalse(branch.coverage)
+        self.assertEqual(branch.run_config_id, self.env.ref('runbot.runbot_build_config_default'))
         cov_branch = self.Branch.create({
             'repo_id': self.repo.id,
-            'name': 'refs/head/foo-coverage-branch-bar'
+            'name': 'refs/head/foo-use-coverage-branch-bar'
         })
-        self.assertTrue(cov_branch.coverage)
+        self.assertEqual(cov_branch.run_config_id, self.env.ref('runbot.runbot_build_config_test_coverage'))

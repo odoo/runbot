@@ -12,9 +12,11 @@
         'security/runbot_security.xml',
         'security/ir.model.access.csv',
         'security/ir.rule.csv',
+        'views/assets.xml',
         'views/repo_views.xml',
         'views/branch_views.xml',
         'views/build_views.xml',
+        'views/config_views.xml',
         'views/res_config_settings_views.xml',
         'templates/frontend.xml',
         'templates/build.xml',
@@ -23,5 +25,6 @@
         'templates/nginx.xml',
         'templates/badge.xml',
         'templates/branch.xml',
+        'data/runbot_build_config_data.xml',
     ],
 }

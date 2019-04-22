@@ -4,14 +4,10 @@
         <field name="model">runbot.build</field>
         <field name="arch" type="xml">
             <form string="Build">
-                <header>
-                     <button name="reset" type="object" string="Reset"/>
-                </header>
                 <sheet>
                     <group>
                         <field name="repo_id"/>
                         <field name="branch_id"/>
-                        <field name="sequence"/>
                         <field name="name"/>
                         <field name="date"/>
                         <field name="author"/>
@@ -21,16 +17,25 @@
                         <field name="subject"/>
                         <field name="port"/>
                         <field name="dest"/>
-                        <field name="state"/>
-                        <field name="result"/>
+                        <field name="local_state"/>
+                        <field name="global_state"/>
+                        <field name="local_result"/>
+                        <field name="global_result"/>
+                        <field name="triggered_result" groups="base.group_no_one"/>
                         <field name="pid"/>
                         <field name="host"/>
-                        <field name="job_start"/>
-                        <field name="job_end"/>
-                        <field name="job_time"/>
-                        <field name="job_age"/>
+                        <field name="job_start" groups="base.group_no_one"/>
+                        <field name="job_end" groups="base.group_no_one"/>
+                        <field name="job_time" groups="base.group_no_one"/>
+                        <field name="build_start"/>
+                        <field name="build_end"/>
+                        <field name="build_time"/>
+                        <field name="build_age"/>
                         <field name="duplicate_id"/>
                         <field name="modules"/>
+                        <field name="build_type" groups="base.group_no_one"/>
+                        <field name="run_config_id" readonly="1"/>
+                        <field name="run_config_id" groups="base.group_no_one"/>
                     </group>
                 </sheet>
             </form>
@@ -40,22 +45,20 @@
         <field name="model">runbot.build</field>
         <field name="arch" type="xml">
             <tree string="Builds">
-                <field name="sequence"/>
                 <field name="repo_id"/>
                 <field name="dest"/>
                 <field name="date"/>
                 <field name="author"/>
                 <field name="committer"/>
-                <field name="state"/>
+                <field name="global_state"/>
+                <field name="global_result"/>
                 <field name="port"/>
                 <field name="job"/>
-                <field name="result"/>
                 <field name="coverage_result"/>
                 <field name="pid"/>
                 <field name="host"/>
-                <field name="job_start"/>
-                <field name="job_time"/>
-                <field name="job_age"/>
+                <field name="build_time"/>
+                <field name="build_age"/>
             </tree>
         </field>
     </record>
@@ -65,7 +68,7 @@
         <field name="arch" type="xml">
             <pivot string="Builds analysis">
                 <field name="create_date" interval="week" type="row"/>
-                <field name="state" type="col"/>
+                <field name="global_state" type="col"/>
             </pivot>
         </field>
     </record>
@@ -75,21 +78,21 @@
             <search string="Search builds">
                 <field name="branch_id"/>
                 <field name="name"/>
-                <field name="state"/>
+                <field name="global_state"/>
                 <field name="dest"/>
                 <separator/>
-                <filter string="Pending" domain="[('state','=', 'pending')]"/>
-                <filter string="Testing" domain="[('state','=', 'testing')]"/>
-                <filter string="Running" domain="[('state','=', 'running')]"/>
-                <filter string="Done" domain="[('state','=','done')]"/>
-                <filter string="Duplicate" domain="[('state','=', 'duplicate')]"/>
-                <filter string="Deathrow" domain="[('state','=', 'deathrow')]"/>
+                <filter string="Pending" domain="[('global_state','=', 'pending')]"/>
+                <filter string="Testing" domain="[('global_state','in', ('testing', 'waiting'))]"/>
+                <filter string="Running" domain="[('global_state','=', 'running')]"/>
+                <filter string="Done" domain="[('global_state','=','done')]"/>
+                <filter string="Duplicate" domain="[('global_state','=', 'duplicate')]"/>
+                <filter string="Deathrow" domain="[('global_state','=', 'deathrow')]"/>
                 <separator />
                 <group expand="0" string="Group By...">
                     <filter string="Repo" domain="[]" context="{'group_by':'repo_id'}"/>
                     <filter string="Branch" domain="[]" context="{'group_by':'branch_id'}"/>
-                    <filter string="Status" domain="[]" context="{'group_by':'state'}"/>
-                    <filter string="Result" domain="[]" context="{'group_by':'result'}"/>
+                    <filter string="Status" domain="[]" context="{'group_by':'global_state'}"/>
+                    <filter string="Result" domain="[]" context="{'group_by':'global_result'}"/>
                     <filter string="Start" domain="[]" context="{'group_by':'job_start'}"/>
                     <filter string="Host" domain="[]" context="{'group_by':'host'}"/>
                     <filter string="Create Date" domain="[]" context="{'group_by':'create_date'}"/>

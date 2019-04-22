@@ -5,7 +5,6 @@ from subprocess import CalledProcessError
 from odoo import models, fields, api
 
 _logger = logging.getLogger(__name__)
-_re_coverage = re.compile(r'\bcoverage\b')
 _re_patch = re.compile(r'.*patch-\d+$')
 
 class runbot_branch(models.Model):
@@ -21,18 +20,26 @@ class runbot_branch(models.Model):
     pull_head_name = fields.Char(compute='_get_branch_infos', string='PR HEAD name', readonly=1, store=True)
     target_branch_name = fields.Char(compute='_get_branch_infos', string='PR target branch', readonly=1, store=True)
     sticky = fields.Boolean('Sticky')
-    coverage = fields.Boolean('Coverage')
-    coverage_result = fields.Float(compute='_get_last_coverage', type='Float', string='Last coverage', store=False)
+    coverage_result = fields.Float(compute='_compute_coverage_result', type='Float', string='Last coverage', store=False) # non optimal search in loop, could we store this result ? or optimise
     state = fields.Char('Status')
     modules = fields.Char("Modules to Install", help="Comma-separated list of modules to install and test.")
-    job_timeout = fields.Integer('Job Timeout (minutes)', help='For default timeout: Mark it zero')
     priority = fields.Boolean('Build priority', default=False)
-    job_type = fields.Selection([
-        ('testing', 'Testing jobs only'),
-        ('running', 'Running job only'),
-        ('all', 'All jobs'),
-        ('none', 'Do not execute jobs')
-    ], required=True, default='all')
+    no_build = fields.Boolean("Forbid creation of build on this branch", default=False)
+    no_auto_build = fields.Boolean("Don't automatically build commit on this branch", default=False)
+
+    branch_run_config_id = fields.Many2one('runbot.build.config', 'Run Config')
+    run_config_id = fields.Many2one('runbot.build.config', 'Run Config', compute='_compute_run_config_id', inverse='_inverse_run_config_id')
+
+    def _compute_run_config_id(self):
+        for branch in self:
+            if branch.branch_run_config_id:
+                branch.run_config_id = branch.branch_run_config_id
+            else:
+                branch.run_config_id = branch.repo_id.run_config_id
+
+    def _inverse_run_config_id(self):
+        for branch in self:
+            branch.branch_run_config_id = branch.run_config_id
 
     @api.depends('name')
     def _get_branch_infos(self):
@@ -76,8 +83,13 @@ class runbot_branch(models.Model):
             return False
         return True
 
+    @api.model
     def create(self, vals):
-        vals.setdefault('coverage', _re_coverage.search(vals.get('name') or '') is not None)
+        if not vals.get('run_config_id') and ('use-coverage' in (vals.get('name') or '')):
+            coverage_config = self.env.ref('runbot.runbot_build_config_test_coverage', raise_if_not_found=False)
+            if coverage_config:
+                vals['run_config_id'] = coverage_config
+
         return super(runbot_branch, self).create(vals)
 
     def _get_branch_quickconnect_url(self, fqdn, dest):
@@ -88,14 +100,14 @@ class runbot_branch(models.Model):
 
     def _get_last_coverage_build(self):
         """ Return the last build with a coverage value > 0"""
-        self.ensure_one()
+        self.ensure_one() 
         return self.env['runbot.build'].search([
                 ('branch_id.id', '=', self.id),
-                ('state', 'in', ['done', 'running']),
+                ('local_state', 'in', ['done', 'running']),
                 ('coverage_result', '>=', 0.0),
             ], order='sequence desc', limit=1)
 
-    def _get_last_coverage(self):
+    def _compute_coverage_result(self):
         """ Compute the coverage result of the last build in branch """
         for branch in self:
             last_build = branch._get_last_coverage_build()

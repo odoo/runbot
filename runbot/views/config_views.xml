@@ -1,0 +1,100 @@
+<odoo>
+  <data>
+
+    <record id="config_form" model="ir.ui.view">
+        <field name="model">runbot.build.config</field>
+        <field name="arch" type="xml">
+            <form string="Build config">
+                <sheet>
+                    <div attrs="{'invisible': [('protected', '=', False)]}">
+                        <i class="fa fa-warning text-warning"/>This record is protected and can only be edited by config administrator.
+                    </div> 
+                    <group>
+                        <field name="name"/>
+                        <field name="description"/>
+                        <field name="step_order_ids">
+                            <tree string="Step list" editable="bottom">
+                                <field name="step_id"/>
+                                <field name="sequence" groups="base.group_no_one"/>
+                                <field name="sequence" widget="handle"/>
+                            </tree>
+                        </field>
+                        <field name="update_github_state" readonly='1'/>
+                        <field name="update_github_state" groups="base.group_no_one"/>
+                        <field name="protected" groups="base.group_no_one"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+     <record id="config_step_form" model="ir.ui.view">
+        <field name="model">runbot.build.config.step</field>
+        <field name="arch" type="xml">
+            <form string="Build config step">
+                <sheet>
+                    <div t-att-class="label label-warning" attrs="{'invisible': [('protected', '=', False)]}">
+                        This record is protected and can only be edited by config administrator.
+                    </div>
+                    <group string="General settings">
+                        <field name="name"/>
+                        <field name="job_type"/>
+                        <field name="protected" groups="base.group_no_one"/>
+                        <field name="default_sequence" groups="base.group_no_one"/>
+                    </group>
+                    <group string="Python settings" attrs="{'invisible': [('job_type', 'not in', ('python'))]}">
+                        <field name="python_code" widget="ace" options="{'mode': 'python'}"/>
+                        <field name="running_job"/>
+                    </group>
+                    <group string="Test settings" attrs="{'invisible': [('job_type', 'not in', ('python', 'install_odoo'))]}">
+                        <field name="create_db" groups="base.group_no_one"/>
+                        <field name="install_modules"/>
+                        <field name="db_name" groups="base.group_no_one"/>
+                        <field name="cpu_limit" groups="base.group_no_one"/>
+                        <field name="coverage"/>
+                        <field name="test_enable" groups="base.group_no_one"/>
+                        <field name="test_tags"/>
+                        <field name="extra_params" groups="base.group_no_one"/>
+                    </group>
+                    <group string="Create settings" attrs="{'invisible': [('job_type', 'not in', ('python', 'create_build'))]}">
+                        <field name="create_config_ids" widget="many2many_tags" options="{'no_create': True}" />
+                        <field name="number_builds"/>
+                        <field name="hide_build" groups="base.group_no_one"/>
+                        <field name="force_build"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="open_view_job_config_tree" model="ir.actions.act_window">
+        <field name="name">Build Configs</field>
+        <field name="res_model">runbot.build.config</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="open_view_job_tree" model="ir.actions.act_window">
+        <field name="name">Build Config Steps</field>
+        <field name="res_model">runbot.build.config.step</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    
+    <menuitem
+        name="Build Configs" 
+        id="runbot_menu_job_config_tree"
+        parent="runbot_menu_root"
+        sequence="30"
+        action="open_view_job_config_tree"
+        />
+
+    <menuitem
+        name="Build Config Step" 
+        id="runbot_menu_job_tree"
+        parent="runbot_menu_root"
+        sequence="31"
+        action="open_view_job_tree"
+        />
+
+  </data>
+</odoo>

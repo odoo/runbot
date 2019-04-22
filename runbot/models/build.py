@@ -8,35 +8,29 @@ import shlex
 import shutil
 import subprocess
 import time
-from ..common import dt2time, fqdn, now, grep, time2str, rfind, uniq_list, local_pgadmin_cursor, get_py_version
-from ..container import docker_build, docker_run, docker_stop, docker_is_running, docker_get_gateway_ip, build_odoo_cmd
+from ..common import dt2time, fqdn, now, grep, time2str, rfind, uniq_list, local_pgadmin_cursor, s2human
+from ..container import docker_build, docker_stop, docker_is_running, docker_get_gateway_ip, build_odoo_cmd
 from odoo import models, fields, api
 from odoo.exceptions import UserError
 from odoo.http import request
-from odoo.tools import appdirs
+from odoo.tools import config, appdirs
+from collections import defaultdict
 
 _re_error = r'^(?:\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ (?:ERROR|CRITICAL) )|(?:Traceback \(most recent call last\):)$'
 _re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING '
-re_job = re.compile('_job_\d')
 
 _logger = logging.getLogger(__name__)
 
+result_order = ['ok', 'warn', 'ko', 'skipped', 'killed', 'manually_killed']
+state_order = ['pending', 'testing', 'waiting', 'running', 'deathrow', 'duplicate', 'done']
 
-def runbot_job(*accepted_job_types):
-    """ Decorator for runbot_build _job_x methods to filter build jobs """
-    accepted_job_types += ('all', )
+def make_selection(array):
+    def format(string):
+        return (string, string.replace('_', ' ').capitalize())
+    return [format(elem) if isinstance(elem, str) else elem for elem in array]
 
-    def job_decorator(func):
-        def wrapper(self, build, log_path):
-            if build.job_type == 'none' or build.job_type not in accepted_job_types:
-                build._log(func.__name__, 'Skipping job')
-                return -2
-            return func(self, build, log_path)
-        return wrapper
-    return job_decorator
 
 class runbot_build(models.Model):
-
     _name = "runbot.build"
     _order = 'id desc'
 
@@ -45,8 +39,8 @@ class runbot_build(models.Model):
     name = fields.Char('Revno', required=True)
     host = fields.Char('Host')
     port = fields.Integer('Port')
-    dest = fields.Char(compute='_get_dest', type='char', string='Dest', readonly=1, store=True)
-    domain = fields.Char(compute='_get_domain', type='char', string='URL')
+    dest = fields.Char(compute='_compute_dest', type='char', string='Dest', readonly=1, store=True)
+    domain = fields.Char(compute='_compute_domain', type='char', string='URL')
     date = fields.Datetime('Commit date')
     author = fields.Char('Author')
     author_email = fields.Char('Author Email')
@@ -55,16 +49,31 @@ class runbot_build(models.Model):
     subject = fields.Text('Subject')
     sequence = fields.Integer('Sequence')
     modules = fields.Char("Modules to Install")
-    result = fields.Char('Result', default='')  # ok, ko, warn, skipped, killed, manually_killed
-    guess_result = fields.Char(compute='_guess_result')
+
+    # state machine
+
+    global_state = fields.Selection(make_selection(state_order), string='Status', compute='_compute_global_state', store=True)
+    local_state = fields.Selection(make_selection(state_order), string='Build Status', default='pending', required=True, oldname='state')
+    global_result = fields.Selection(make_selection(result_order), string='Result', compute='_compute_global_result', store=True)
+    local_result = fields.Selection(make_selection(result_order), string='Build Result', oldname='result')
+    triggered_result = fields.Selection(make_selection(result_order), string='Triggered Result') # triggered by db only
+
+    nb_pending = fields.Integer("Number of pending in queue", compute='_compute_nb_children', store=True)
+    nb_testing = fields.Integer("Number of test slot use", compute='_compute_nb_children', store=True)
+    nb_running = fields.Integer("Number of test slot use", compute='_compute_nb_children', store=True)
+
+    # should we add a stored field for children results?
     pid = fields.Integer('Pid')
-    state = fields.Char('Status', default='pending')  # pending, testing, running, done, duplicate, deathrow
-    job = fields.Char('Job')  # job_*
+    active_step = fields.Many2one('runbot.build.config.step', 'Active step')
+    job = fields.Char('Active step display name', compute='_compute_job')
     job_start = fields.Datetime('Job start')
     job_end = fields.Datetime('Job end')
-    job_time = fields.Integer(compute='_get_time', string='Job time')
-    job_age = fields.Integer(compute='_get_age', string='Job age')
-    duplicate_id = fields.Many2one('runbot.build', 'Corresponding Build')
+    build_start = fields.Datetime('Build start')
+    build_end = fields.Datetime('Build end')
+    job_time = fields.Integer(compute='_compute_job_time', string='Job time')
+    build_time = fields.Integer(compute='_compute_build_time', string='Job time')
+    build_age = fields.Integer(compute='_compute_build_age', string='Build age')
+    duplicate_id = fields.Many2one('runbot.build', 'Corresponding Build', index=True)
     server_match = fields.Selection([('builtin', 'This branch includes Odoo server'),
                                      ('match', 'This branch includes Odoo server'),
                                      ('default', 'No match found - defaults to master')],
@@ -73,7 +82,7 @@ class runbot_build(models.Model):
                                         column1='rev_dep_id', column2='dependent_id',
                                         string='Builds that depends on this build')
     extra_params = fields.Char('Extra cmd args')
-    coverage = fields.Boolean('Enable code coverage')
+    coverage = fields.Boolean('Code coverage was computed for this build')
     coverage_result = fields.Float('Coverage result', digits=(5, 2))
     build_type = fields.Selection([('scheduled', 'This build was automatically scheduled'),
                                    ('rebuild', 'This build is a rebuild'),
@@ -82,22 +91,102 @@ class runbot_build(models.Model):
                                    ],
                                   default='normal',
                                   string='Build type')
-    job_type = fields.Selection([
-        ('testing', 'Testing jobs only'),
-        ('running', 'Running job only'),
-        ('all', 'All jobs'),
-        ('none', 'Do not execute jobs'),
-    ])
+    parent_id = fields.Many2one('runbot.build', 'Parent Build', index=True)
+    # should we add a has children stored boolean?
+    hidden = fields.Boolean("Don't show build on main page", default=False) # index?
+    children_ids = fields.One2many('runbot.build', 'parent_id')
     dependency_ids = fields.One2many('runbot.build.dependency', 'build_id')
+
+    run_config_id = fields.Many2one('runbot.build.config', 'Run Config', required=True, default=lambda self: self.env.ref('runbot.runbot_build_config_default', raise_if_not_found=False))
+    real_build = fields.Many2one('runbot.build', 'Real Build', help="duplicate_id or self", compute='_compute_real_build')
+    log_list = fields.Char('Comma separted list of step_ids names with logs', compute="_compute_log_list", store=True)
+
+    @api.depends('run_config_id')
+    def _compute_log_list(self): # storing this field beacause it will be access trhoug repo viewn and keep track of the list at create
+        for build in self:
+            build.log_list = ','.join({step.name for step in build.run_config_id.step_ids() if step._has_log()})
+
+    @api.depends('children_ids.global_state', 'local_state', 'duplicate_id.global_state')
+    def _compute_global_state(self):
+        for record in self:
+            if record.duplicate_id: 
+                record.global_state = record.duplicate_id.global_state # not sure this is correct, redundant with real_build.global_state,
+            else:
+                waiting_score = record._get_state_score('waiting')
+                if record._get_state_score(record.local_state) > waiting_score and record.children_ids: # if finish, check children
+                    children_state = record._get_youngest_state([child.global_state for child in record.children_ids])
+                    # if all children are in running/done state (children could't be a duplicate I guess?)
+                    if record._get_state_score(children_state) > waiting_score:
+                        record.global_state = record.local_state
+                    else:
+                        record.global_state = 'waiting'
+                else:
+                    record.global_state = record.local_state
+
+    def _get_youngest_state(self, states, max=False):
+        index = min([self._get_state_score(state) for state in states])
+        return state_order[index]
+
+    def _get_state_score(self, result):
+        return state_order.index(result)
+
+    #random note: need to count hidden in pending and testing build displayed in frontend
+
+    @api.depends('children_ids.global_result', 'local_result', 'duplicate_id.global_result')
+    def _compute_global_result(self):
+        for record in self: # looks like it's computed twice for children
+            if record.duplicate_id: # would like to avoid to add state as a depends only for this.
+                record.global_result = record.duplicate_id.global_result
+            elif not record.local_result:
+                record.global_result = record.local_result
+            elif record._get_result_score(record.local_result) >= record._get_result_score('ko'):
+                record.global_result = record.local_result
+            elif record.children_ids:
+                children_result = record._get_worst_result([child.global_result for child in record.children_ids], max_res='ko')
+                record.global_result = record._get_worst_result([record.local_result, children_result])
+            else:
+                record.global_result = record.local_result
+
+    def _get_worst_result(self, results, max_res=False):
+        results = [result for result in results if result] # filter Falsy values
+        index = max([self._get_result_score(result) for result in results]) if results else 0
+        if max_res:
+            return result_order[min([index, self._get_result_score(max_res)])]
+        return result_order[index]
+
+    def _get_result_score(self, result):
+        return result_order.index(result)
+
+    @api.depends('local_state', 'children_ids.nb_pending', 'children_ids.nb_testing', 'children_ids.nb_running')
+    def _compute_nb_children(self):
+        for record in self:
+            # note, we don't need to take care of duplicates, count will be 0 wich is right
+            record.nb_pending = int(record.local_state == 'pending')
+            record.nb_testing = int(record.local_state == 'testing')
+            record.nb_running = int(record.local_state == 'running')
+            for child in record.children_ids:
+                record.nb_pending += child.nb_pending
+                record.nb_testing += child.nb_testing
+                record.nb_running += child.nb_running
+
+    @api.depends('real_build.active_step')
+    def _compute_job(self):
+        for build in self:
+            build.job = build.real_build.active_step.name
+
+    @api.depends('duplicate_id')
+    def _compute_real_build(self):
+        for build in self:
+            build.real_build = build.duplicate_id or build
 
     def copy(self, values=None):
         raise UserError("Cannot duplicate build!")
 
     def create(self, vals):
-        branch = self.env['runbot.branch'].search([('id', '=', vals.get('branch_id', False))])
-        if branch.job_type == 'none' or vals.get('job_type', '') == 'none':
+        branch = self.env['runbot.branch'].search([('id', '=', vals.get('branch_id', False))]) # branche 10174? 
+        if branch.no_build:
             return self.env['runbot.build']
-        vals['job_type'] = vals['job_type'] if 'job_type' in vals else branch.job_type
+        vals['run_config_id'] = vals['run_config_id'] if 'run_config_id' in vals else branch.run_config_id.id
         build_id = super(runbot_build, self).create(vals)
         extra_info = {'sequence': build_id.id if not build_id.sequence else build_id.sequence}
         context = self.env.context
@@ -106,18 +195,36 @@ class runbot_build(models.Model):
         repo = build_id.repo_id
         dep_create_vals = []
         nb_deps = len(repo.dependency_ids)
-        for extra_repo in repo.dependency_ids:
-            (build_closets_branch, match_type) = build_id.branch_id._get_closest_branch(extra_repo.id)
-            closest_name = build_closets_branch.name
-            closest_branch_repo = build_closets_branch.repo_id
-            last_commit = closest_branch_repo._git_rev_parse(closest_name)
-            dep_create_vals.append({
-                'build_id': build_id.id,
-                'dependecy_repo_id': extra_repo.id,
-                'closest_branch_id': build_closets_branch.id,
-                'dependency_hash': last_commit,
-                'match_type': match_type,
-            })
+        params = build_id._get_params()
+        if not vals.get('dependency_ids'):
+            for extra_repo in repo.dependency_ids:
+                repo_name = extra_repo.short_name
+                last_commit = params['dep'][repo_name] # not name
+                if last_commit:
+                    match_type = 'params'
+                    build_closets_branch = False
+                    message = 'Dependency for repo %s defined in commit message' % (repo_name)
+                else:
+                    (build_closets_branch, match_type) = build_id.branch_id._get_closest_branch(extra_repo.id)
+                    closest_name = build_closets_branch.name
+                    closest_branch_repo = build_closets_branch.repo_id
+                    last_commit = closest_branch_repo._git_rev_parse(closest_name)
+                    message = 'Dependency for repo %s defined from closest branch %s' % (repo_name, closest_name)
+                try:
+                    commit_oneline = extra_repo._git(['show', '--pretty="%H -- %s"', '-s', last_commit]).strip()
+                except:
+                    commit_oneline = 'Commit %s not found on build creation' % last_commit
+                    # possible that oneline fail if given from commit message. Do it on build? or keep this information
+                
+                build_id._log('create', '%s: %s' % (message, commit_oneline)) 
+
+                dep_create_vals.append({
+                    'build_id': build_id.id,
+                    'dependecy_repo_id': extra_repo.id,
+                    'closest_branch_id': build_closets_branch.id,
+                    'dependency_hash': last_commit,
+                    'match_type': match_type,
+                })
 
         for dep_vals in dep_create_vals:
             self.env['runbot.build.dependency'].sudo().create(dep_vals)
@@ -131,8 +238,8 @@ class runbot_build(models.Model):
                 ('name', '=', build_id.name),
                 ('duplicate_id', '=', False),
                 # ('build_type', '!=', 'indirect'),  # in case of performance issue, this little fix may improve performance a little but less duplicate will be detected when pushing an empty branch on repo with duplicates
-                ('result', '!=', 'skipped'),
-                ('job_type', '=', build_id.job_type),
+                '|', ('local_result', '=', False), ('local_result', '!=', 'skipped'), # had to reintroduce False posibility for selections
+                ('run_config_id', '=', build_id.run_config_id.id),
             ]
             candidates = self.search(domain)
             if candidates and nb_deps:
@@ -164,79 +271,108 @@ class runbot_build(models.Model):
                 duplicate_id = candidates[0].id if candidates else False
 
             if duplicate_id:
-                extra_info.update({'state': 'duplicate', 'duplicate_id': duplicate_id})
+                extra_info.update({'local_state': 'duplicate', 'duplicate_id': duplicate_id})
                 # maybe update duplicate priority if needed
 
         build_id.write(extra_info)
-        if build_id.state == 'duplicate' and build_id.duplicate_id.state in ('running', 'done'):
+        if build_id.local_state == 'duplicate' and build_id.duplicate_id.global_state in ('running', 'done'): # and not build_id.parent_id:
             build_id._github_status()
         return build_id
 
-    def _reset(self):
-        self.write({'state': 'pending'})
+    def write(self, values):
+        # some validation to ensure db consistency
+        assert not 'state' in values
+        local_result = values.get('local_result')
+        assert not local_result or local_result == self._get_worst_result([self.local_result, local_result]) # dont write ok on a warn/error build
+        res = super(runbot_build, self).write(values)
+        assert bool(not self.duplicate_id) ^ (self.local_state == 'duplicate') # don't change duplicate state without removing duplicate id. 
+        return res
+
+    def _end_test(self):
+        for build in self:
+            if build.parent_id:
+                global_result = build.global_result
+                loglevel = 'OK' if global_result == 'ok' else 'WARNING' if global_result == 'warn' else 'ERROR'
+                build.parent_id._log('children_build', 'returned a "%s" result ' % (global_result), level=loglevel, log_type='subbuild', path=self.id)
 
     @api.depends('name', 'branch_id.name')
-    def _get_dest(self):
+    def _compute_dest(self):
         for build in self:
-            nickname = build.branch_id.name.split('/')[2]
-            nickname = re.sub(r'"|\'|~|\:', '', nickname)
-            nickname = re.sub(r'_|/|\.', '-', nickname)
-            build.dest = ("%05d-%s-%s" % (build.id, nickname[:32], build.name[:6])).lower()
+            if build.name:
+                nickname = build.branch_id.name.split('/')[2]
+                nickname = re.sub(r'"|\'|~|\:', '', nickname)
+                nickname = re.sub(r'_|/|\.', '-', nickname)
+                build.dest = ("%05d-%s-%s" % (build.id, nickname[:32], build.name[:6])).lower()
 
-    def _get_domain(self):
+    @api.depends('repo_id', 'port', 'dest', 'host', 'duplicate_id.domain')
+    def _compute_domain(self):
         domain = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_domain', fqdn())
         for build in self:
-            if build.repo_id.nginx:
+            if build.duplicate_id:
+                build.domain = build.duplicate_id.domain
+            elif build.repo_id.nginx:
                 build.domain = "%s.%s" % (build.dest, build.host)
             else:
                 build.domain = "%s:%s" % (domain, build.port)
 
-    def _guess_result(self):
-        cr = self.env.cr
-        cr.execute("""
-            SELECT b.id,
-                   CASE WHEN array_agg(l.level)::text[] && ARRAY['ERROR', 'CRITICAL'] THEN 'ko'
-                        WHEN array_agg(l.level)::text[] && ARRAY['WARNING'] THEN 'warn'
-                        ELSE 'ok'
-                    END
-              FROM runbot_build b
-         LEFT JOIN ir_logging l ON (l.build_id = b.id AND l.level != 'INFO')
-             WHERE b.id = ANY(%s)
-          GROUP BY b.id
-        """, [list(self.filtered(lambda b: b.state == 'testing').ids)])
-        result = {row[0]: row[1] for row in cr.fetchall()}
-        for build in self:
-            build.guess_result = result.get(build.id, build.result)
-
-    def _get_time(self):
+    @api.depends('job_start', 'job_end', 'duplicate_id.job_time')
+    def _compute_job_time(self):
         """Return the time taken by the tests"""
         for build in self:
-            if build.job_end:
+            if build.duplicate_id:
+                build.job_time = build.duplicate_id.job_time
+            elif build.job_end:
                 build.job_time = int(dt2time(build.job_end) - dt2time(build.job_start))
             elif build.job_start:
                 build.job_time = int(time.time() - dt2time(build.job_start))
 
-    def _get_age(self):
+    @api.depends('build_start', 'build_end', 'duplicate_id.build_time')
+    def _compute_build_time(self):
+        for build in self:
+            if build.duplicate_id:
+                build.build_time = build.duplicate_id.build_time
+            elif build.build_end:
+                build.build_time = int(dt2time(build.build_end) - dt2time(build.build_start))
+            elif build.build_start:
+                build.build_time = int(time.time() - dt2time(build.build_start))
+
+    @api.depends('job_start', 'duplicate_id.build_age')
+    def _compute_build_age(self):
         """Return the time between job start and now"""
         for build in self:
-            if build.job_start:
-                build.job_age = int(time.time() - dt2time(build.job_start))
+            if build.duplicate_id:
+                build.build_age = build.duplicate_id.build_age
+            elif build.job_start:
+                build.build_age = int(time.time() - dt2time(build.build_start))
+
+    def _get_params(self):
+        message=False
+        try:
+            message = self.repo_id._git(['show', '-s', self.name])
+        except:
+            pass # todo remove this try catch and make correct patch for _git
+        params = defaultdict(lambda: defaultdict(str))
+        if message:
+            regex = re.compile(r'^[\t ]*dep=([A-Za-z0-9\-_]+/[A-Za-z0-9\-_]+):([0-9A-Fa-f\-]*) *(#.*)?$', re.M) # dep:repo:hash #comment
+            for result in re.findall(regex, message):
+                params['dep'][result[0]]=result[1]
+        return params
 
     def _force(self, message=None):
         """Force a rebuild and return a recordset of forced builds"""
         forced_builds = self.env['runbot.build']
         for build in self:
-            pending_ids = self.search([('state', '=', 'pending')], order='id', limit=1)
+            pending_ids = self.search([('local_state', '=', 'pending')], order='id', limit=1)
             if pending_ids:
                 sequence = pending_ids[0].id
             else:
                 sequence = self.search([], order='id desc', limit=1)[0].id
             # Force it now
             rebuild = True
-            if build.state == 'done' and build.result == 'skipped':
-                build.write({'state': 'pending', 'sequence': sequence, 'result': ''})
+            if build.local_state == 'done' and build.local_result == 'skipped':
+                build.write({'local_state': 'pending', 'sequence': sequence, 'local_result': ''})
             # or duplicate it
-            elif build.state in ['running', 'done', 'duplicate', 'deathrow']:
+            elif build.local_state in ['running', 'done', 'duplicate', 'deathrow']:
                 new_build = build.with_context(force_rebuild=True).create({
                     'sequence': sequence,
                     'branch_id': build.branch_id.id,
@@ -247,7 +383,8 @@ class runbot_build(models.Model):
                     'committer_email': build.committer_email,
                     'subject': build.subject,
                     'modules': build.modules,
-                    'build_type': 'rebuild'
+                    'build_type': 'rebuild',
+                    'run_config_id': build.run_config_id.id,
                 })
                 build = new_build
             else:
@@ -264,9 +401,16 @@ class runbot_build(models.Model):
         """Mark builds ids as skipped"""
         if reason:
             self._logger('skip %s', reason)
-        self.write({'state': 'done', 'result': 'skipped'})
-        to_unduplicate = self.search([('id', 'in', self.ids), ('duplicate_id', '!=', False)])
-        to_unduplicate._force()
+        self.write({'local_state': 'done', 'local_result': 'skipped', 'duplicate_id':False})
+
+        # undiplcate can make sence, if I copy a branch and want to build it, I don't want my branch to be killed if other one is killed
+        #to_unduplicate = self.search([('id', 'in', self.ids), ('duplicate_id', '!=', False)])
+        #should be 
+        #to_unduplicate = self.search([('id', 'not in', self.ids), ('duplicate_id', 'in', self.ids)])
+        #to_unduplicate = self.search([('duplicate_id', 'in', self.ids)])
+        #should be enough
+        # BUT actually, most of the time duplicates are for pr/branch and we don"t want to unduplicate. 
+        # Since we dont usually kill master, not really usefull to unduplicate, 
 
     def _local_cleanup(self):
         for build in self:
@@ -291,8 +435,8 @@ class runbot_build(models.Model):
                 SELECT dest
                   FROM runbot_build
                  WHERE dest IN %s
-                   AND (state != 'done' OR job_end > (now() - interval '7 days'))
-            """, [tuple(builds)])
+                   AND (local_state != 'done' OR job_end > (now() - interval '7 days')) 
+            """, [tuple(builds)]) # todo xdo not covered by tests
             actives = set(b[0] for b in self.env.cr.fetchall())
 
             for b in builds:
@@ -301,7 +445,7 @@ class runbot_build(models.Model):
                     shutil.rmtree(path)
 
         # cleanup old unused databases
-        self.env.cr.execute("select id from runbot_build where state in ('testing', 'running')")
+        self.env.cr.execute("select id from runbot_build where local_state in ('testing', 'running')") # todo xdo not coversed by tests
         db_ids = [id[0] for id in self.env.cr.fetchall()]
         if db_ids:
             with local_pgadmin_cursor() as local_cr:
@@ -317,13 +461,10 @@ class runbot_build(models.Model):
             for db, in to_delete:
                 self._local_pg_dropdb(db)
 
-    def _list_jobs(self):
-        """List methods that starts with _job_[[:digit:]]"""
-        return sorted(job[1:] for job in dir(self) if re_job.match(job))
 
     def _find_port(self):
         # currently used port
-        ids = self.search([('state', 'not in', ['pending', 'done'])])
+        ids = self.search([('local_state', 'not in', ['pending', 'done'])])
         ports = set(i['port'] for i in ids.read(['port']))
 
         # starting port
@@ -343,88 +484,152 @@ class runbot_build(models.Model):
 
     def _get_docker_name(self):
         self.ensure_one()
-        return '%s_%s' % (self.dest, self.job)
+        return '%s_%s' % (self.dest, self.active_step.name)
 
     def _schedule(self):
         """schedule the build"""
-        jobs = self._list_jobs()
-
         icp = self.env['ir.config_parameter']
         # For retro-compatibility, keep this parameter in seconds
-        default_timeout = int(icp.get_param('runbot.runbot_timeout', default=3600)) / 60
 
         for build in self:
-            if build.state == 'deathrow':
+            if build.local_state == 'deathrow':
                 build._kill(result='manually_killed')
                 continue
-            elif build.state == 'pending':
+
+            if build.local_state == 'pending':
                 # allocate port and schedule first job
                 port = self._find_port()
                 values = {
-                    'host': fqdn(),
+                    'host': fqdn(), # or ip? of false? 
                     'port': port,
-                    'state': 'testing',
-                    'job': jobs[0],
                     'job_start': now(),
+                    'build_start': now(),
                     'job_end': False,
                 }
+                values.update(build._next_job_values())
                 build.write(values)
-            else:
+                if not build.active_step:
+                    build._log('schedule', 'No job in config, doing nothing')
+                    build._end_test()
+                    continue
+                try:
+                    build._log('init', 'Init build environment with config %s ' % build.run_config_id.name)
+                    # notify pending build - avoid confusing users by saying nothing
+                    build._github_status()
+                    build._checkout()
+                    build._log('docker_build', 'Building docker image')
+                    docker_build(build._path('logs', 'docker_build.txt'), build._path())
+                except Exception:
+                    _logger.exception('Failed initiating build %s', build.dest)
+                    build._log('Failed initiating build')
+                    build._kill(result='ko')
+                    continue
+            else:  # testing/running build
+                if build.local_state == 'testing':
+                    # invalidate cache for triggered_result?
+                    if (not build.local_result or build.local_result == 'ok') and build.triggered_result:
+                        build.local_result = build.triggered_result
+                        build._github_status()  # failfast
                 # check if current job is finished
                 if docker_is_running(build._get_docker_name()):
-                    # kill if overpassed
-                    timeout = (build.branch_id.job_timeout or default_timeout) * 60 * ( build.coverage and 1.5 or 1)
-                    if build.job != jobs[-1] and build.job_time > timeout:
-                        build._log('schedule', '%s time exceeded (%ss)' % (build.job, build.job_time))
+                    timeout = min(build.active_step.cpu_limit, int(icp.get_param('runbot.runbot_timeout', default=10000)))
+                    if build.local_state != 'running' and build.job_time > timeout:
+                        build._logger('%s time exceded (%ss)', build.active_step.name if build.active_step else "?", build.job_time)
                         build.write({'job_end': now()})
                         build._kill(result='killed')
-                    else:
-                        # failfast
-                        if not build.result and build.guess_result in ('ko', 'warn'):
-                            build.result = build.guess_result
-                            build._github_status()
                     continue
-                build._logger('%s finished', build.job)
-                # schedule
-                v = {}
-                # testing -> running
-                if build.job == jobs[-2]:
-                    v['state'] = 'running'
-                    v['job'] = jobs[-1]
-                    v['job_end'] = now(),
-                # running -> done
-                elif build.job == jobs[-1]:
-                    v['state'] = 'done'
-                    v['job'] = ''
-                # testing
+                # No job running, make result and select nex job
+                build_values = {
+                    'job_end': now(),
+                }
+                # make result of previous job
+                if build.active_step.coverage:
+                    build._log('coverage_result', 'Start getting coverage result')
+                    cov_path = build._path('coverage/index.html')
+                    if os.path.exists(cov_path):
+                        with open(cov_path,'r') as f:
+                            data = f.read()
+                            covgrep = re.search(r'pc_cov.>(?P<coverage>\d+)%', data)
+                            build_values['coverage_result'] = covgrep and covgrep.group('coverage') or False
+                            if build_values['coverage_result']:
+                                build._log('coverage_result', 'Coverage result: %s' % build_values['coverage_result'])
+                            else:
+                                build._log('coverage_result', 'Coverage result not found', level='WARNING')
+                            
+                    else:
+                        build._log('coverage_result', 'Coverage file not found', level='WARNING')
+
+                if build.active_step.test_enable or build.active_step.test_tags:
+                    build._log('run', 'Getting results for build %s' % build.dest)
+                    log_file = build._path('logs', '%s.txt' % build.active_step.name)
+                    if not os.path.isfile(log_file):
+                        build_values['local_result'] = 'ko'
+                        build._log('_checkout', "Log file not found at the end of test job", level="ERROR")
+                    else:
+                        log_time = time.localtime(os.path.getmtime(log_file))
+                        build_values = {
+                            'job_end': time2str(log_time),
+                        }
+                        if not build.local_result or build.local_result in ['ok', "warn"]:
+                            if grep(log_file, ".modules.loading: Modules loaded."):
+                                local_result = False
+                                if rfind(log_file, _re_error):
+                                    local_result = 'ko'
+                                    build._log('_checkout', 'Error or traceback found in logs', level="ERROR")
+                                elif rfind(log_file, _re_warning):
+                                    local_result = 'warn'
+                                    build._log('_checkout', 'Warning found in logs', level="WARNING")
+                                elif not grep(log_file, "Initiating shutdown"): # todo check this
+                                    local_result = 'ko'
+                                    build._log('_checkout', 'No "Initiating shutdown" found in logs, maybe because of cpu limit.', level="ERROR")
+                                else:
+                                    local_result = 'ok'
+                                build_values['local_result'] = build._get_worst_result([build.local_result, local_result])
+                            else:
+                                build_values['local_result'] = 'ko'
+                                build._log('_checkout', "Module loaded not found in logs", level="ERROR")
+
+                # Non running build in
+                notify_end_job = build.active_step.job_type != 'create_build'
+
+                build_values.update(build._next_job_values()) # find next active_step or set to done
+                ending_build = build.local_state not in ('done', 'running') and build_values.get('local_state') in ('done', 'running')
+                if ending_build:
+                    build_values['build_end'] = now()
+
+                step_end_message = 'Step %s finished in %s' % (build.job, s2human(build.job_time))
+                build.write(build_values)
+
+                if ending_build:
+                    build._github_status()
+                    build._end_test() # notify parent of build end
+                    if not build.local_result:  # Set 'ok' result if no result set (no tests job on build)
+                        build.local_result = 'ok'
+                        build._logger("No result set, setting ok by default")
+
+                if notify_end_job:
+                    build._log('end_job', step_end_message)
                 else:
-                    v['job'] = jobs[jobs.index(build.job) + 1]
-                build.write(v)
+                    build._logger(step_end_message)
 
             # run job
             pid = None
-            if build.state != 'done':
-                build._logger('running %s', build.job)
-                job_method = getattr(self, '_' + build.job)  # compute the job method to run
+            if build.local_state != 'done':
+                build._logger('running %s', build.active_step.name)
                 os.makedirs(build._path('logs'), exist_ok=True)
                 os.makedirs(build._path('datadir'), exist_ok=True)
-                log_path = build._path('logs', '%s.txt' % build.job)
                 try:
-                    pid = job_method(build, log_path)
-                    build.write({'pid': pid})
-                except Exception:
-                    _logger.exception('%s failed running method %s', build.dest, build.job)
-                    build._log(build.job, "failed running job method, see runbot log")
+                    pid = build.active_step._run(build) # run should be on build?
+                    build.write({'pid': pid}) # no really usefull anymore with dockers
+                except Exception as e:
+                    message = '%s failed running step %s' % (build.dest, build.job)
+                    _logger.exception(message)
+                    build._log("run", message)
                     build._kill(result='ko')
                     continue
 
-            if pid == -2:
-                # no process to wait, directly call next job
-                # FIXME find a better way that this recursive call
-                build._schedule()
-
             # cleanup only needed if it was not killed
-            if build.state == 'done':
+            if build.local_state == 'done':
                 build._local_cleanup()
 
     def _path(self, *l, **kw):
@@ -434,7 +639,7 @@ class runbot_build(models.Model):
         root = self.env['runbot.repo']._root()
         return os.path.join(root, 'build', build.dest, *l)
 
-    def _server(self, *l, **kw):
+    def _server(self, *l, **kw): # not really build related, specific to odoo version, could be a data
         """Return the build server path"""
         self.ensure_one()
         build = self
@@ -497,30 +702,25 @@ class runbot_build(models.Model):
             for build_dependency in build.dependency_ids:
                 closest_branch = build_dependency.closest_branch_id
                 latest_commit = build_dependency.dependency_hash
-                repo = closest_branch.repo_id
-                closest_name = closest_branch.name
+                repo = closest_branch.repo_id or build_dependency.repo_id
+                closest_name = closest_branch.name or 'no_branch'
                 if build_dependency.match_type == 'default':
                     server_match = 'default'
                 elif server_match != 'default':
                     server_match = 'match'
 
                 build._log(
-                    'Building environment',
-                    '%s match branch %s of %s' % (build_dependency.match_type, closest_name, repo.name)
+                    '_checkout', 'Checkouting %s from %s' % (closest_name, repo.name)
                 )
+                
                 if not repo._hash_exists(latest_commit):
-                    repo._update(force=True)
+                    repo._update(repo, force=True)
                 if not repo._hash_exists(latest_commit):
                     repo._git(['fetch', 'origin', latest_commit])
                 if not repo._hash_exists(latest_commit):
                     build._log('_checkout',"Dependency commit %s in repo %s is unreachable" % (latest_commit, repo.name))
                     raise Exception
 
-                commit_oneline = repo._git(['show', '--pretty="%H -- %s"', '-s', latest_commit]).strip()
-                build._log(
-                    'Building environment',
-                    'Server built based on commit %s from %s' % (commit_oneline, closest_name)
-                )
                 repo._git_export(latest_commit, build._path())
 
             # Finally mark all addons to move to openerp/addons
@@ -578,22 +778,19 @@ class runbot_build(models.Model):
         with local_pgadmin_cursor() as local_cr:
             local_cr.execute("""CREATE DATABASE "%s" TEMPLATE template0 LC_COLLATE 'C' ENCODING 'unicode'""" % dbname)
 
-    def _log(self, func, message):
+    def _log(self, func, message, level='INFO', log_type='runbot', path='runbot'):
         self.ensure_one()
         _logger.debug("Build %s %s %s", self.id, func, message)
         self.env['ir.logging'].create({
             'build_id': self.id,
-            'level': 'INFO',
-            'type': 'runbot',
+            'level': level,
+            'type': log_type,
             'name': 'odoo.runbot',
             'message': message,
-            'path': 'runbot',
+            'path': path,
             'func': func,
             'line': '0',
         })
-
-    def reset(self):
-        self.write({'state': 'pending'})
 
     def _reap(self):
         while True:
@@ -606,33 +803,41 @@ class runbot_build(models.Model):
             _logger.debug('reaping: pid: %s status: %s', pid, status)
 
     def _kill(self, result=None):
+        # todo check result is always in selection, avoid to crach after transforming result
         host = fqdn()
         for build in self:
             if build.host != host:
                 continue
             build._log('kill', 'Kill build %s' % build.dest)
             docker_stop(build._get_docker_name())
-            v = {'state': 'done', 'job': False}
+            v = {'local_state': 'done', 'active_step': False, 'duplicate':False} # what if duplicate? state done? 
             if result:
-                v['result'] = result
+                v['local_result'] = result
             build.write(v)
             self.env.cr.commit()
             build._github_status()
             build._local_cleanup()
 
     def _ask_kill(self):
+        # todo xdo, should we kill or skip children builds? it looks like yes, but we need to be carefull if subbuild ca be duplicates
         self.ensure_one()
         user = request.env.user if request else self.env.user
         uid = user.id
-        build = self.duplicate_id if self.state == 'duplicate' else self
-        if build.state == 'pending':
+        build = self
+        if build.duplicate_id:
+            if build.duplicate_id.branch_id.sticky:
+                build._skip()
+                build._log('_ask_kill', 'Skipping build %s, requested by %s (user #%s)(duplicate of sticky, kill duplicate)' % (build.dest, user.name, uid))
+                return
+            build = build.duplicate_id # if duplicate is not sticky, most likely a pr, kill other build
+        if build.local_state == 'pending':
             build._skip()
             build._log('_ask_kill', 'Skipping build %s, requested by %s (user #%s)' % (build.dest, user.name, uid))
-        elif build.state in ['testing', 'running']:
-            build.write({'state': 'deathrow'})
+        elif build.local_state in ['testing', 'running']:
+            build.write({'local_state': 'deathrow'})
             build._log('_ask_kill', 'Killing build %s, requested by %s (user #%s)' % (build.dest, user.name, uid))
 
-    def _cmd(self):
+    def _cmd(self): # why not remove build.modules output ? 
         """Return a tuple describing the command to start the build
         First part is list with the command and parameters
         Second part is a list of Odoo modules
@@ -652,9 +857,9 @@ class runbot_build(models.Model):
         # commandline
         cmd = [ os.path.join('/data/build', odoo_bin), ]
         # options
-        if grep(build._server("tools/config.py"), "no-xmlrpcs"):
-            cmd.append("--no-xmlrpcs")
-        if grep(build._server("tools/config.py"), "no-netrpc"):
+        if grep(build._server("tools/config.py"), "no-xmlrpcs"): # move that to configs ?
+            cmd.append("--no-xmlrpcs") 
+        if grep(build._server("tools/config.py"), "no-netrpc"): 
             cmd.append("--no-netrpc")
         if grep(build._server("tools/config.py"), "log-db"):
             logdb_uri = self.env['ir.config_parameter'].get_param('runbot.runbot_logdb_uri')
@@ -687,155 +892,54 @@ class runbot_build(models.Model):
 
     def _github_status(self):
         """Notify github of failed/successful builds"""
-        runbot_domain = self.env['runbot.repo']._domain()
         for build in self:
-            desc = "runbot build %s" % (build.dest,)
-            if build.state == 'testing':
-                state = 'pending'
-            elif build.state in ('running', 'done'):
-                state = 'error'
-            else:
-                continue
-            desc += " (runtime %ss)" % (build.job_time,)
-            if build.result == 'ok':
-                state = 'success'
-            if build.result in ('ko', 'warn'):
-                state = 'failure'
-            status = {
-                "state": state,
-                "target_url": "http://%s/runbot/build/%s" % (runbot_domain, build.id),
-                "description": desc,
-                "context": "ci/runbot"
-            }
-            build._github_status_notify_all(status)
+            if build.run_config_id.update_github_state:
+                runbot_domain = self.env['runbot.repo']._domain()
+                desc = "runbot build %s" % (build.dest,)
+                if build.local_state == 'testing':
+                    state = 'pending'
+                elif build.local_state in ('running', 'done'):
+                    state = 'error'
+                else:
+                    continue
+                desc += " (runtime %ss)" % (build.job_time,)
+                if build.local_result == 'ok':
+                    state = 'success'
+                if build.local_result in ('ko', 'warn'):
+                    state = 'failure'
+                status = {
+                    "state": state,
+                    "target_url": "http://%s/runbot/build/%s" % (runbot_domain, build.id),
+                    "description": desc,
+                    "context": "ci/runbot"
+                }
+                build._github_status_notify_all(status)
 
-    # Jobs definitions
-    # They all need "build log_path" parameters
-    @runbot_job('testing', 'running')
-    def _job_00_init(self, build, log_path):
-        build._log('init', 'Init build environment')
-        # notify pending build - avoid confusing users by saying nothing
-        build._github_status()
-        build._checkout()
-        return -2
+    def _next_job_values(self):
+        self.ensure_one()
+        step_ids = self.run_config_id.step_ids()
+        if not step_ids: # no job to do, build is done 
+            return {'active_step': False, 'local_state':'done'}
 
-    @runbot_job('testing', 'running')
-    def _job_02_docker_build(self, build, log_path):
-        """Build the docker image"""
-        build._log('docker_build', 'Building docker image')
-        docker_build(log_path, build._path())
-        return -2
+        next_index = step_ids.index(self.active_step) + 1 if self.active_step else 0
+        if next_index >= len(step_ids): #  final job, build is done 
+            return {'active_step': False, 'local_state':'done'}
 
-    @runbot_job('testing')
-    def _job_10_test_base(self, build, log_path):
-        build._log('test_base', 'Start test base module')
-        self._local_pg_createdb("%s-base" % build.dest)
-        cmd, mods = build._cmd()
-        cmd += ['-d', '%s-base' % build.dest, '-i', 'base', '--stop-after-init', '--log-level=test', '--max-cron-threads=0']
-        if build.extra_params:
-            cmd.extend(shlex.split(build.extra_params))
-        return docker_run(build_odoo_cmd(cmd), log_path, build._path(), build._get_docker_name(), cpu_limit=600)
+        new_step = step_ids[next_index] #  job to do, state is job_state (testing or running)
+        return {'active_step': new_step.id, 'local_state': new_step._job_state()}
+    
+    def build_type_label(self):
+        self.ensure_one()
+        return dict(self.fields_get('build_type', 'selection')['build_type']['selection']).get(self.build_type, self.build_type)
 
-    @runbot_job('testing', 'running')
-    def _job_20_test_all(self, build, log_path):
+    def get_formated_job_time(self):
+        return s2human(self.job_time)
 
-        cpu_limit = int(self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=3600))
-        self._local_pg_createdb("%s-all" % build.dest)
-        cmd, mods = build._cmd()
-        build._log('test_all', 'Start test all modules')
-        if grep(build._server("tools/config.py"), "test-enable") and build.job_type in ('testing', 'all'):
-            cmd.extend(['--test-enable', '--log-level=test'])
-        else: 
-            build._log('test_all', 'Installing modules without testing')
-        cmd += ['-d', '%s-all' % build.dest, '-i', mods, '--stop-after-init', '--max-cron-threads=0']
-        if build.extra_params:
-            cmd.extend(build.extra_params.split(' '))
-        if build.coverage:
-            cpu_limit *= 1.5
-            available_modules = [
-                os.path.basename(os.path.dirname(a))
-                for a in (glob.glob(build._server('addons/*/__openerp__.py')) +
-                          glob.glob(build._server('addons/*/__manifest__.py')))
-            ]
-            bad_modules = set(available_modules) - set((mods or '').split(','))
-            omit = ['--omit', ','.join('*addons/%s/*' %m for m in bad_modules) + '*__manifest__.py']
-            cmd = [ get_py_version(build), '-m', 'coverage', 'run', '--branch', '--source', '/data/build'] + omit + cmd
-        # reset job_start to an accurate job_20 job_time
-        build.write({'job_start': now()})
-        return docker_run(build_odoo_cmd(cmd), log_path, build._path(), build._get_docker_name(), cpu_limit=cpu_limit)
+    def get_formated_build_time(self): # todo use this
+        return s2human(self.build_time)
 
-    @runbot_job('testing')
-    def _job_21_coverage_html(self, build, log_path):
-        if not build.coverage:
-            return -2
-        build._log('coverage_html', 'Start generating coverage html')
-        cov_path = build._path('coverage')
-        os.makedirs(cov_path, exist_ok=True)
-        cmd = [ get_py_version(build), "-m", "coverage", "html", "-d", "/data/build/coverage", "--ignore-errors"]
-        return docker_run(build_odoo_cmd(cmd), log_path, build._path(), build._get_docker_name())
+    def get_formated_build_age(self):
+        return s2human(self.build_age)
 
-    @runbot_job('testing')
-    def _job_22_coverage_result(self, build, log_path):
-        if not build.coverage:
-            return -2
-        build._log('coverage_result', 'Start getting coverage result')
-        cov_path = build._path('coverage/index.html')
-        if os.path.exists(cov_path):
-            with open(cov_path,'r') as f:
-                data = f.read()
-                covgrep = re.search(r'pc_cov.>(?P<coverage>\d+)%', data)
-                build.coverage_result = covgrep and covgrep.group('coverage') or False
-        else:
-            build._log('coverage_result', 'Coverage file not found')
-        return -2  # nothing to wait for
-
-    @runbot_job('testing', 'running')
-    def _job_29_results(self, build, log_path):
-        build._log('run', 'Getting results for build %s' % build.dest)
-        log_all = build._path('logs', 'job_20_test_all.txt')
-        log_time = time.localtime(os.path.getmtime(log_all))
-        v = {
-            'job_end': time2str(log_time),
-        }
-        if grep(log_all, ".modules.loading: Modules loaded."):
-            if rfind(log_all, _re_error):
-                v['result'] = "ko"
-            elif rfind(log_all, _re_warning):
-                v['result'] = "warn"
-            elif not grep(log_all, "Initiating shutdown"):
-                v['result'] = "ko"
-                build._log('run', "Seems that the build was stopped too early. The cpu_limit could have been reached")
-            elif not build.result:
-                v['result'] = "ok"
-        else:
-            build._log('run', "Modules not loaded")
-            v['result'] = "ko"
-        build.write(v)
-        build._github_status()
-        return -2
-
-    @runbot_job('running')
-    def _job_30_run(self, build, log_path):
-        # adjust job_end to record an accurate job_20 job_time
-        build._log('run', 'Start running build %s' % build.dest)
-        # run server
-        cmd, mods = build._cmd()
-        if os.path.exists(build._server('addons/im_livechat')):
-            cmd += ["--workers", "2"]
-            cmd += ["--longpolling-port", "8070"]
-            cmd += ["--max-cron-threads", "1"]
-        else:
-            # not sure, to avoid old server to check other dbs
-            cmd += ["--max-cron-threads", "0"]
-
-        cmd += ['-d', '%s-all' % build.dest]
-
-        if grep(build._server("tools/config.py"), "db-filter"):
-            if build.repo_id.nginx:
-                cmd += ['--db-filter', '%d.*$']
-            else:
-                cmd += ['--db-filter', '%s.*$' % build.dest]
-        smtp_host = docker_get_gateway_ip()
-        if smtp_host:
-            cmd += ['--smtp', smtp_host]
-        return docker_run(build_odoo_cmd(cmd), log_path, build._path(), build._get_docker_name(), exposed_ports = [build.port, build.port + 1])
+    def sorted_revdep_build_ids(self):
+        return sorted(self.revdep_build_ids, key=lambda build: build.repo_id.name)

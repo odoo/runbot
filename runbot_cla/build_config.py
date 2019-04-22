@@ -5,17 +5,22 @@ import io
 import logging
 import re
 
-from odoo.addons.runbot.models.build import runbot_job
-from odoo import models
+from odoo import models, fields
 
 _logger = logging.getLogger(__name__)
 
 
-class runbot_build(models.Model):
-    _inherit = "runbot.build"
+class Job(models.Model): # todo xdo test this
+    _inherit = "runbot.build.config.step"
+    
+    job_type = fields.Selection(selection_add = [('cla_check', 'Check cla')])
 
-    @runbot_job('testing')
-    def _job_05_check_cla(self, build, log_path):
+    def _run_step(self, build, log_path):
+        if self.job_type != 'cla_check':
+            return self._runbot_cla_check(build, log_path)
+        return super(Job, self)._run_step(build, log_path)
+
+    def _runbot_cla_check(self, build, log_path):
         cla_glob = glob.glob(build._path("doc/cla/*/*.md"))
         if cla_glob:
             description = "%s Odoo CLA signature check" % build.author
