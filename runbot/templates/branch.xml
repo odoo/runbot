@@ -27,21 +27,23 @@
                             </tr>
                         </thead>
                         <t t-foreach="builds" t-as="build">
-                            <t t-if="build['state'] in ['running','done'] and build['result'] == 'ko'"><t t-set="rowclass">danger</t></t>
-                            <t t-if="build['state'] in ['running','done'] and build['result'] == 'warn'"><t t-set="rowclass">warning</t></t>
-                            <t t-if="build['state'] in ['running','done'] and build['result'] == 'ok'"><t t-set="rowclass">success</t></t>
-                            <t t-if="build['state'] in ['running','done'] and build['result'] == 'skipped'"><t t-set="rowclass">default</t></t>
-                            <t t-if="build['state'] in ['running','done'] and build['result'] in ['killed', 'manually_killed']"><t t-set="rowclass">killed</t></t>
+                            <t t-if="build.global_state in ['running','done']">
+                                <t t-if="build.global_result == 'ko'"><t t-set="rowclass">danger</t></t>
+                                <t t-if="build.global_result == 'warn'"><t t-set="rowclass">warning</t></t>
+                                <t t-if="build.global_result == 'ok'"><t t-set="rowclass">success</t></t>
+                                <t t-if="build.global_result == 'skipped'"><t t-set="rowclass">default</t></t>
+                                <t t-if="build.global_result in ['killed', 'manually_killed']"><t t-set="rowclass">killed</t></t>
+                            </t>
                             <tr t-attf-class="{{rowclass}}">
                                 <td><t t-esc="build.sequence" /></td>
                                 <td><t t-esc="build.date" /></td>
                                 <td><a t-attf-href="/runbot/build/{{build['id']}}" title="Build details" aria-label="Build details"><t t-esc="build.dest" /></a></td>
                                 <td><t t-esc="build.subject" /></td>
                                 <td><t t-esc="build.name" /></td>
-                                <td><t t-esc="build.result" /></td>
-                                <td><t t-esc="build.state" /></td>
-                                <td><t t-esc="build.host" /></td>
-                                <td><t t-esc="build.job" /></td>
+                                <td><t t-esc="build.global_result" /></td>
+                                <td><t t-esc="build.global_state" /></td>
+                                <td><t t-esc="build.real_build.host" /></td>
+                                <td><t t-esc="build.active_step.name" /></td>
                                 <td><t t-esc="build.job_time" /></td>
                                 <td><t t-esc="build.build_type" /></td>
                             </tr>

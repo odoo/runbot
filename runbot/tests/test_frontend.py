@@ -42,8 +42,8 @@ class Test_Frontend(common.HttpCase):
                 'branch_id': branch.id,
                 'name': '%s0000ffffffffffffffffffffffffffff' % name,
                 'port': '1234',
-                'state': state,
-                'result': 'ok'
+                'local_state': state,
+                'local_result': 'ok'
                 })
 
         def mocked_simple_repo_render(template, context):
@@ -59,7 +59,7 @@ class Test_Frontend(common.HttpCase):
             return Response()
 
         mock_request.render = mocked_simple_repo_render
-        controller.repo()
+        controller.repo(repo=self.repo)
 
         def mocked_repo_search_render(template, context):
             dead_count = len([bu['name'] for b in context['branches'] for bu in b['builds'] if bu['name'].startswith('dead')])
@@ -69,4 +69,4 @@ class Test_Frontend(common.HttpCase):
             return Response()
 
         mock_request.render = mocked_repo_search_render
-        controller.repo(search='dead')
+        controller.repo(repo=self.repo, search='dead')

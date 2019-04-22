@@ -6,43 +6,17 @@ from collections import OrderedDict
 from odoo.addons.http_routing.models.ir_http import slug
 from odoo.addons.website.controllers.main import QueryURL
 from odoo.http import Controller, request, route
-from ..common import uniq_list, flatten, s2human
+from ..common import uniq_list, flatten, fqdn
+from odoo.osv import expression
 
 
 class Runbot(Controller):
-
-    def build_info(self, build):
-        real_build = build.duplicate_id if build.state == 'duplicate' else build
-        return {
-            'id': build.id,
-            'name': build.name,
-            'state': real_build.state,
-            'result': real_build.result,
-            'guess_result': real_build.guess_result,
-            'subject': build.subject,
-            'author': build.author,
-            'committer': build.committer,
-            'dest': build.dest,
-            'real_dest': real_build.dest,
-            'job_age': s2human(real_build.job_age),
-            'job_time': s2human(real_build.job_time),
-            'job': real_build.job,
-            'domain': real_build.domain,
-            'host': real_build.host,
-            'port': real_build.port,
-            'server_match': real_build.server_match,
-            'duplicate_of': build.duplicate_id if build.state == 'duplicate' else False,
-            'coverage': build.coverage or build.branch_id.coverage,
-            'revdep_build_ids': sorted(build.revdep_build_ids, key=lambda x: x.repo_id.name),
-            'build_type' : build.build_type,
-            'build_type_label': dict(build.fields_get('build_type', 'selection')['build_type']['selection']).get(build.build_type, build.build_type),
-        }
 
     def _pending(self):
         ICP = request.env['ir.config_parameter'].sudo().get_param
         warn = int(ICP('runbot.pending.warning', 5))
         crit = int(ICP('runbot.pending.critical', 12))
-        count = request.env['runbot.build'].search_count([('state', '=', 'pending')])
+        count = request.env['runbot.build'].search_count([('local_state', '=', 'pending')])
         level = ['info', 'warning', 'danger'][int(count > warn) + int(count > crit)]
         return count, level
 
@@ -71,16 +45,17 @@ class Runbot(Controller):
 
         build_ids = []
         if repo:
-            filters = {key: kwargs.get(key, '1') for key in ['pending', 'testing', 'running', 'done', 'deathrow']}
+            # FIXME or removeme (filters are broken)
+            filters = {key: kwargs.get(key, '1') for key in ['waiting', 'pending', 'testing', 'running', 'done', 'deathrow']}
             domain = [('repo_id', '=', repo.id)]
-            domain += [('state', '!=', key) for key, value in iter(filters.items()) if value == '0']
+            domain += [('global_state', '!=', key) for key, value in iter(filters.items()) if value == '0']
             if search:
                 search_domain = []
                 for to_search in search.split("|"):
                     search_domain = ['|', '|', '|'] + search_domain
                     search_domain += [('dest', 'ilike', to_search), ('subject', 'ilike', to_search), ('branch_id.branch_name', 'ilike', to_search)]
                 domain += search_domain[1:]
-
+            domain = expression.AND([domain, [('hidden', '=', False)]]) # don't display children builds on repo view
             build_ids = build_obj.search(domain, limit=100)
             branch_ids, build_by_branch_ids = [], {}
 
@@ -109,7 +84,7 @@ class Runbot(Controller):
                         FROM 
                             runbot_branch br INNER JOIN runbot_build bu ON br.id=bu.branch_id 
                         WHERE 
-                            br.id in %s
+                            br.id in %s AND (bu.hidden = 'f' OR bu.hidden IS NULL)
                         GROUP BY br.id, bu.id
                         ORDER BY br.id, bu.id DESC
                     ) AS br_bu
@@ -129,16 +104,18 @@ class Runbot(Controller):
             def branch_info(branch):
                 return {
                     'branch': branch,
-                    'builds': [self.build_info(build_dict[build_id]) for build_id in build_by_branch_ids.get(branch.id) or []]
+                    'fqdn': fqdn(),
+                    'builds': [build_dict[build_id] for build_id in build_by_branch_ids.get(branch.id) or []]
                 }
 
             context.update({
                 'branches': [branch_info(b) for b in branches],
-                'testing': build_obj.search_count([('repo_id', '=', repo.id), ('state', '=', 'testing')]),
-                'running': build_obj.search_count([('repo_id', '=', repo.id), ('state', '=', 'running')]),
-                'pending': build_obj.search_count([('repo_id', '=', repo.id), ('state', '=', 'pending')]),
+                'testing': build_obj.search_count([('repo_id', '=', repo.id), ('local_state', '=', 'testing')]),
+                'running': build_obj.search_count([('repo_id', '=', repo.id), ('local_state', '=', 'running')]),
+                'pending': build_obj.search_count([('repo_id', '=', repo.id), ('local_state', '=', 'pending')]),
                 'qu': QueryURL('/runbot/repo/' + slug(repo), search=search, refresh=refresh, **filters),
                 'filters': filters,
+                'fqdn': fqdn(),
             })
 
         # consider host gone if no build in last 100
@@ -148,8 +125,8 @@ class Runbot(Controller):
             if result['host']:
                 context['host_stats'].append({
                     'host': result['host'],
-                    'testing': build_obj.search_count([('state', '=', 'testing'), ('host', '=', result['host'])]),
-                    'running': build_obj.search_count([('state', '=', 'running'), ('host', '=', result['host'])]),
+                    'testing': build_obj.search_count([('local_state', '=', 'testing'), ('host', '=', result['host'])]),
+                    'running': build_obj.search_count([('local_state', '=', 'running'), ('host', '=', result['host'])]),
                 })
         return request.render('runbot.repo', context)
 
@@ -176,12 +153,10 @@ class Runbot(Controller):
         if not build.exists():
             return request.not_found()
 
-        real_build = build.duplicate_id if build.state == 'duplicate' else build
-
         # other builds
         build_ids = Build.search([('branch_id', '=', build.branch_id.id)], limit=100)
         other_builds = Build.browse(build_ids)
-        domain = [('build_id', '=', real_build.id)]
+        domain = [('build_id', '=', build.real_build.id)]
         log_type = request.params.get('type', '')
         if log_type:
             domain.append(('type', '=', log_type))
@@ -194,7 +169,8 @@ class Runbot(Controller):
 
         context = {
             'repo': build.repo_id,
-            'build': self.build_info(build),
+            'build': build,
+            'fqdn': fqdn(),
             'br': {'branch': build.branch_id},
             'logs': Logging.sudo().browse(logging_ids).ids,
             'other_builds': other_builds.ids,
@@ -221,15 +197,15 @@ class Runbot(Controller):
         if builds:
             last_build = False
             for build in builds:
-                if build.state == 'running' or (build.state == 'duplicate' and build.duplicate_id.state == 'running'):
-                    last_build = build if build.state == 'running' else build.duplicate_id
+                if build.local_state == 'running' or (build.local_state == 'duplicate' and build.duplicate_id.local_state == 'running'):
+                    last_build = build if build.local_state == 'running' else build.duplicate_id
                     break
 
             if not last_build:
                 # Find the last build regardless the state to propose a rebuild
                 last_build = builds[0]
 
-            if last_build.state != 'running':
+            if last_build.local_state != 'running':
                 url = "/runbot/build/%s?ask_rebuild=1" % last_build.id
             else:
                 url = build.branch_id._get_branch_quickconnect_url(last_build.domain, last_build.dest)[build.branch_id.id]
@@ -277,21 +253,22 @@ class Runbot(Controller):
                 r.update({
                     'name': repo.name,
                     'base': repo.base,
-                    'testing': count([('repo_id', '=', repo.id), ('state', '=', 'testing')]),
-                    'running': count([('repo_id', '=', repo.id), ('state', '=', 'running')]),
-                    'pending': count([('repo_id', '=', repo.id), ('state', '=', 'pending')]),
+                    'testing': count([('repo_id', '=', repo.id), ('local_state', '=', 'testing')]),
+                    'running': count([('repo_id', '=', repo.id), ('local_state', '=', 'running')]),
+                    'pending': count([('repo_id', '=', repo.id), ('local_state', '=', 'pending')]),
                 })
             b = r['branches'].setdefault(branch.id, {'name': branch.branch_name, 'builds': list()})
-            b['builds'].append(self.build_info(build))
+            b['builds'].append(build)
 
         # consider host gone if no build in last 100
         build_threshold = max(builds.ids or [0]) - 100
         for result in RB.read_group([('id', '>', build_threshold)], ['host'], ['host']):
             if result['host']:
                 qctx['host_stats'].append({
+                    'fqdn': fqdn(),
                     'host': result['host'],
-                    'testing': count([('state', '=', 'testing'), ('host', '=', result['host'])]),
-                    'running': count([('state', '=', 'running'), ('host', '=', result['host'])]),
+                    'testing': count([('local_state', '=', 'testing'), ('host', '=', result['host'])]),
+                    'running': count([('local_state', '=', 'running'), ('host', '=', result['host'])]),
                 })
 
         return request.render("runbot.sticky-dashboard", qctx)
@@ -302,18 +279,17 @@ class Runbot(Controller):
         query = """
             SELECT split_part(r.name, ':', 2),
                    br.branch_name,
-                   (array_agg(coalesce(du.result, bu.result) order by bu.id desc))[1]
+                   (array_agg(bu.global_result order by bu.id desc))[1]
               FROM runbot_build bu
               JOIN runbot_branch br on (br.id = bu.branch_id)
               JOIN runbot_repo r on (r.id = br.repo_id)
-         LEFT JOIN runbot_build du on (du.id = bu.duplicate_id and bu.state='duplicate')
              WHERE br.sticky
                AND br.repo_id in %s
+               AND (bu.hidden = 'f' OR bu.hidden IS NULL)
                AND (
-                    bu.state in ('running', 'done') or
-                    (bu.state='duplicate' and du.state in ('running', 'done'))
+                    bu.global_state in ('running', 'done')
                )
-               AND coalesce(du.result, bu.result) not in ('skipped', 'manually_killed')
+               AND bu.global_result not in ('skipped', 'manually_killed')
           GROUP BY 1,2,r.sequence,br.id
           ORDER BY r.sequence, (br.branch_name='master'), br.id
         """
@@ -335,14 +311,15 @@ class Runbot(Controller):
     @route(['/runbot/branch/<int:branch_id>', '/runbot/branch/<int:branch_id>/page/<int:page>'], website=True, auth='public', type='http')
     def branch_builds(self, branch_id=None, search='', page=1, limit=50, refresh='', **kwargs):
         """ list builds of a runbot branch """
-        builds_count = request.env['runbot.build'].search_count([('branch_id','=',branch_id)])
+        domain =[('branch_id','=',branch_id), ('hidden', '=', False)]
+        builds_count = request.env['runbot.build'].search_count(domain)
         pager = request.website.pager(
             url='/runbot/branch/%s' % branch_id,
             total=builds_count,
             page=page,
             step=50
         )
-        builds = request.env['runbot.build'].search([('branch_id','=',branch_id)], limit=limit, offset=pager.get('offset',0))
+        builds = request.env['runbot.build'].search(domain, limit=limit, offset=pager.get('offset',0))
 
         context = {'pager': pager, 'builds': builds}
         return request.render("runbot.branch", context)
