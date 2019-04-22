@@ -71,7 +71,7 @@ def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None,
     """
     _logger.debug('Docker run command: %s', run_cmd)
     logs = open(log_path, 'w')
-
+    logs.write("Docker command:\n%s\n=================================================\n" % run_cmd.replace('&& ', '&&\n').replace('|| ','||\n\t'))
     # create start script
     docker_command = [
         'docker', 'run', '--rm',

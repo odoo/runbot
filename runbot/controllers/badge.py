@@ -19,13 +19,15 @@ class RunbotBadge(Controller):
         domain = [('repo_id', '=', repo_id),
                   ('branch_id.branch_name', '=', branch),
                   ('branch_id.sticky', '=', True),
-                  ('state', 'in', ['testing', 'running', 'done']),
-                  ('result', 'not in', ['skipped', 'manually_killed']),
+                  ('hidden', '=', False),
+                  ('parent_id', '=', False),
+                  ('global_state', 'in', ['testing', 'running', 'done']),
+                  ('global_result', 'not in', ['skipped', 'manually_killed']),
                   ]
 
         last_update = '__last_update'
         builds = request.env['runbot.build'].sudo().search_read(
-            domain, ['state', 'result', 'job_age', last_update],
+            domain, ['global_state', 'global_result', 'build_age', last_update],
             order='id desc', limit=1)
 
         if not builds:
@@ -38,14 +40,14 @@ class RunbotBadge(Controller):
         if etag == retag:
             return werkzeug.wrappers.Response(status=304)
 
-        if build['state'] == 'testing':
-            state = 'testing'
+        if build['global_state'] in ('testing', 'waiting'):
+            state = build['global_state']
             cache_factor = 1
         else:
             cache_factor = 2
-            if build['result'] == 'ok':
+            if build['global_result'] == 'ok':
                 state = 'success'
-            elif build['result'] == 'warn':
+            elif build['global_result'] == 'warn':
                 state = 'warning'
             else:
                 state = 'failed'
@@ -53,6 +55,7 @@ class RunbotBadge(Controller):
         # from https://github.com/badges/shields/blob/master/colorscheme.json
         color = {
             'testing': "#dfb317",
+            'waiting': "#dfb317",
             'success': "#4c1",
             'failed': "#e05d44",
             'warning': "#fe7d37",

@@ -70,8 +70,8 @@ class Test_Repo(common.TransactionCase):
 
         build = self.env['runbot.build'].search([('repo_id', '=', repo.id), ('branch_id', '=', branch.id)])
         self.assertEqual(build.subject, 'A nice subject')
-        self.assertEqual(build.state, 'pending')
-        self.assertFalse(build.result)
+        self.assertEqual(build.local_state, 'pending')
+        self.assertFalse(build.local_result)
 
         # Simulate that a new commit is found in the other repo
         self.commit_list = [('refs/heads/bidon',
@@ -91,8 +91,8 @@ class Test_Repo(common.TransactionCase):
 
         build = self.env['runbot.build'].search([('repo_id', '=', repo.id), ('branch_id', '=', branch.id)])
         self.assertEqual(build.subject, 'A nice subject')
-        self.assertEqual(build.state, 'pending')
-        self.assertFalse(build.result)
+        self.assertEqual(build.local_state, 'pending')
+        self.assertFalse(build.local_result)
 
         # A new commit is found in the first repo, the previous pending build should be skipped
         self.commit_list = [('refs/heads/bidon',
@@ -112,12 +112,12 @@ class Test_Repo(common.TransactionCase):
 
         build = self.env['runbot.build'].search([('repo_id', '=', repo.id), ('branch_id', '=', branch.id), ('name', '=', 'b00b')])
         self.assertEqual(build.subject, 'Another subject')
-        self.assertEqual(build.state, 'pending')
-        self.assertFalse(build.result)
+        self.assertEqual(build.local_state, 'pending')
+        self.assertFalse(build.local_result)
 
         previous_build = self.env['runbot.build'].search([('repo_id', '=', repo.id), ('branch_id', '=', branch.id), ('name', '=', 'd0d0caca')])
-        self.assertEqual(previous_build.state, 'done', 'Previous pending build should be done')
-        self.assertEqual(previous_build.result, 'skipped', 'Previous pending build result should be skipped')
+        self.assertEqual(previous_build.local_state, 'done', 'Previous pending build should be done')
+        self.assertEqual(previous_build.local_result, 'skipped', 'Previous pending build result should be skipped')
 
     @skip('This test is for performances. It needs a lot of real branches in DB to mean something')
     @patch('odoo.addons.runbot.models.repo.runbot_repo._root')
@@ -174,6 +174,7 @@ class Test_Repo_Scheduler(common.TransactionCase):
     @patch('odoo.addons.runbot.models.repo.fqdn')
     def test_repo_scheduler(self, mock_repo_fqdn, mock_schedule, mock_kill, mock_reap):
         mock_repo_fqdn.return_value = 'test_host'
+        self.env['ir.config_parameter'].set_param('runbot.runbot_workers', 6)
         Build_model = self.env['runbot.build']
         builds = []
         # create 6 builds that are testing on the host to verify that
@@ -184,7 +185,7 @@ class Test_Repo_Scheduler(common.TransactionCase):
                 'name': build_name,
                 'port': '1234',
                 'build_type': 'normal',
-                'state': 'testing',
+                'local_state': 'testing',
                 'host': 'test_host'
             })
             builds.append(build)
@@ -194,7 +195,7 @@ class Test_Repo_Scheduler(common.TransactionCase):
             'name': 'sched_build',
             'port': '1234',
             'build_type': 'scheduled',
-            'state': 'pending',
+            'local_state': 'pending',
         })
         builds.append(scheduled_build)
         # create the build that should be assigned once a slot is available
@@ -203,7 +204,7 @@ class Test_Repo_Scheduler(common.TransactionCase):
             'name': 'foobuild',
             'port': '1234',
             'build_type': 'normal',
-            'state': 'pending',
+            'local_state': 'pending',
         })
         builds.append(build)
         self.foo_repo._scheduler()
@@ -214,7 +215,7 @@ class Test_Repo_Scheduler(common.TransactionCase):
         self.assertFalse(scheduled_build.host)
 
         # give some room for the pending build
-        Build_model.search([('name', '=', 'a')]).write({'state': 'done'})
+        Build_model.search([('name', '=', 'a')]).write({'local_state': 'done'})
 
         self.foo_repo._scheduler()
         build.invalidate_cache()

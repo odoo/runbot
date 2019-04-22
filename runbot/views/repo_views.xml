@@ -22,6 +22,7 @@
                 <field name="token"/>
                 <field name="group_ids"  widget="many2many_tags"/>
                 <field name="hook_time"/>
+                <field name="config_id"/>
               </group>
             </sheet>
           </form>

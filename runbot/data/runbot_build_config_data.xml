@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="runbot_build_config_step_test_base" model="runbot.build.config.step">
+        <field name="name">base</field>
+        <field name="install_modules">base</field>
+        <field name="cpu_limit">600</field>
+        <field name="test_enable" eval="False"/>
+        <field name="protected" eval="True"/>
+        <field name="default_sequence">10</field>
+    </record>
+
+    <record id="runbot_build_config_step_test_all" model="runbot.build.config.step">
+        <field name="name">all</field>
+        <field name="install_modules">*</field>
+        <field name="test_enable" eval="True"/>
+        <field name="protected" eval="True"/>
+        <field name="default_sequence">20</field>
+    </record>
+
+    <record id="runbot_build_config_step_run" model="runbot.build.config.step">
+        <field name="name">run</field>
+        <field name="job_type">run_odoo</field>
+        <field name="protected" eval="True"/>
+        <field name="default_sequence">1000</field>
+    </record>
+
+    <record id="runbot_build_config_default" model="runbot.build.config">
+        <field name="name">Default</field>
+        <field name="update_github_state" eval="True"/>
+        <field name="step_order_ids" eval="[(5,0,0),
+        (0, 0, {'step_id': ref('runbot_build_config_step_test_base')}), 
+        (0, 0, {'step_id': ref('runbot_build_config_step_test_all')}), 
+        (0, 0, {'step_id': ref('runbot_build_config_step_run')})]"/>
+        <field name="protected" eval="True"/>
+    </record>
+
+    <record id="runbot_build_config_default_no_run" model="runbot.build.config">
+        <field name="name">Default no run</field>
+        <field name="update_github_state" eval="True"/>
+        <field name="step_order_ids" eval="[(5,0,0),
+        (0, 0, {'step_id': ref('runbot_build_config_step_test_base')}), 
+        (0, 0, {'step_id': ref('runbot_build_config_step_test_all')})]"/>
+        <field name="protected" eval="True"/>
+    </record>
+
+    <record id="runbot_build_config_light_test" model="runbot.build.config">
+        <field name="name">All only</field>
+        <field name="description">Test all only, usefull for multibuild</field>
+        <field name="step_order_ids" eval="[(5,0,0), (0, 0, {'step_id': ref('runbot_build_config_step_test_all')})]"/>
+        <field name="protected" eval="True"/>
+    </record>
+
+    <!-- Coverage-->
+    <record id="runbot_build_config_step_test_coverage" model="runbot.build.config.step">
+        <field name="name">coverage</field>
+        <field name="install_modules">*</field>
+        <field name="cpu_limit">5400</field>
+        <field name="test_enable" eval="True"/>
+        <field name="coverage" eval="True"/>
+        <field name="protected" eval="True"/>
+        <field name="default_sequence">30</field>
+    </record>
+
+    <record id="runbot_build_config_test_coverage" model="runbot.build.config">
+        <field name="name">Coverage</field>
+        <field name="step_order_ids" eval="[(5,0,0), (0, 0, {'step_id': ref('runbot_build_config_step_test_coverage')})]"/>
+        <field name="protected" eval="True"/>
+    </record>
+
+    <!-- Multi build-->
+    <record id="runbot_build_config_step_create_light_multi" model="runbot.build.config.step">
+        <field name="name">create_light_multi</field>
+        <field name="job_type">create_build</field>
+        <field name="create_config_ids" eval="[(4, ref('runbot_build_config_light_test'))]"/>
+        <field name="number_builds">10</field>
+        <field name="protected" eval="True"/>
+    </record>
+
+    <record id="runbot_build_config_multibuild" model="runbot.build.config">
+        <field name="name">Multi build</field>
+        <field name="description">Run 10 children build with the same hash and dependencies. Use to detect undeterministic issues</field>
+        <field name="step_order_ids" eval="[(5,0,0), (0, 0, {'step_id': ref('runbot_build_config_step_create_light_multi')})]"/>
+        <field name="protected" eval="True"/>
+    </record>
+    <!-- l10n todo check-->
+    <record id="runbot_build_config_step_test_l10n" model="runbot.build.config.step">
+        <field name="name">l10n</field>
+        <field name="install_modules">*</field>
+        <field name="test_enable" eval="True"/>
+        <field name="protected" eval="True"/>
+        <field name="default_sequence">30</field>
+        <field name="test_tags">l10nall</field>
+        <field name="protected" eval="True"/>
+    </record>
+
+    <record id="runbot_build_config_l10n" model="runbot.build.config">
+        <field name="name">L10n</field>
+        <field name="description">A simple test_all with a l10n test_tags</field>
+        <field name="step_order_ids" eval="[(5,0,0), (0, 0, {'step_id': ref('runbot_build_config_step_test_l10n')})]"/>
+        <field name="protected" eval="True"/>
+    </record>
+    <!-- Click all-->
+    <record id="runbot_build_config_step_test_click_all" model="runbot.build.config.step">
+        <field name="name">clickall</field>
+        <field name="install_modules">*</field>
+        <field name="cpu_limit">5400</field>
+        <field name="test_enable" eval="True"/>
+        <field name="protected" eval="True"/>
+        <field name="default_sequence">40</field>
+        <field name="test_tags">click_all</field>
+        <field name="protected" eval="True"/>
+    </record>
+    <record id="runbot_build_config_click_all" model="runbot.build.config">
+        <field name="name">Click All</field>
+        <field name="description">Used for nightly click all, test all filters and menus.</field>
+        <field name="step_order_ids" eval="[(5,0,0), (0, 0, {'step_id': ref('runbot_build_config_step_test_click_all')})]"/>
+        <field name="protected" eval="True"/>
+    </record>
+</odoo>

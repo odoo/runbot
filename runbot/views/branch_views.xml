@@ -16,14 +16,9 @@
                 <field name="pull_head_name"/>
                 <field name="sticky"/>
                 <field name="priority"/>
-                <field name="job_type"/>
-                <field name="coverage"/>
                 <field name="state"/>
                 <field name="modules"/>
-                <field name="job_timeout"/>
-                <!-- keep for next version
-                <field name="test_tags"/>
-                -->
+                <field name="config_id"/>
               </group>
             </sheet>
           </form>
@@ -40,8 +35,7 @@
                 <field name="name"/>
                 <field name="sticky"/>
                 <field name="priority"/>
-                <field name="job_type"/>
-                <field name="coverage"/>
+                <field name="config_id"/>
                 <field name="state"/>
             </tree>
         </field>

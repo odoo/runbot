@@ -1,5 +1,6 @@
 from odoo import models, fields
 
+
 class RunbotBuildDependency(models.Model):
     _name = "runbot.build.dependency"
 

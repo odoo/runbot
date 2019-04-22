@@ -116,7 +116,7 @@
                               <td>
                                   <i t-if="br['branch'].sticky" class="fa fa-star" style="color: #f0ad4e" />
                                   <a t-attf-href="/runbot/branch/#{br['branch'].id}"><b t-esc="br['branch'].branch_name"/></a>
-                                  <small><t t-esc="br['builds'] and br['builds'][0]['job_age']"/></small><br/>
+                                  <small><t t-esc="br['builds'] and br['builds'][0].get_formated_build_time()"/></small><br/>
                                   <div class="btn-group btn-group-xs">
                                       <a t-attf-href="{{br['branch'].branch_url}}" class="btn btn-default btn-xs">Branch or pull <i class="fa fa-github"/></a>
                                       <a t-attf-href="/runbot/#{repo.id}/#{br['branch'].branch_name}" class="btn btn-default btn-xs" aria-label="Quick Connect"><i class="fa fa-fast-forward" title="Quick Connect"/></a>
@@ -125,7 +125,7 @@
                                       <br/>
                                       <t t-if="br['branch'].coverage_result > 0">
                                         <t t-set="last_build" t-value="br['branch']._get_last_coverage_build()" />
-                                        <a t-attf-href="http://{{last_build['host']}}/runbot/static/build/#{last_build['dest']}/coverage/index.html">
+                                        <a t-attf-href="http://{{last_build.real_build.host}}/runbot/static/build/#{last_build['dest']}/coverage/index.html">
                                         <span class="label label-info">cov: <t t-esc="br['branch'].coverage_result"/>%</span>
                                       </a>
                                       </t>
@@ -135,18 +135,20 @@
                                   </t>
                               </td>
                               <t t-foreach="br['builds']" t-as="bu">
-                                  <t t-if="bu['state']=='pending'"><t t-set="klass">default</t></t>
-                                  <t t-if="bu['state']=='testing'"><t t-set="klass">info</t></t>
-                                  <t t-if="bu['state']=='deathrow'"><t t-set="klass">default</t></t>
-                                  <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'ko'"><t t-set="klass">danger</t></t>
-                                  <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'warn'"><t t-set="klass">warning</t></t>
-                                  <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'ok'"><t t-set="klass">success</t></t>
-                                  <t t-if="bu['state'] in ['running','done'] and bu['result'] == 'skipped'"><t t-set="klass">default</t></t>
-                                  <t t-if="bu['state'] in ['running','done'] and bu['result'] in ['killed', 'manually_killed']"><t t-set="klass">killed</t></t>
+                                  <t t-if="bu.global_state=='pending'"><t t-set="klass">default</t></t>
+                                  <t t-if="bu.global_state in ('testing', 'waiting')"><t t-set="klass">info</t></t>
+                                  <t t-if="bu.global_state=='deathrow'"><t t-set="klass">default</t></t>
+                                  <t t-if="bu.global_state in ['running','done']">
+                                    <t t-if="bu.global_result == 'ko'"><t t-set="klass">danger</t></t>
+                                    <t t-if="bu.global_result == 'warn'"><t t-set="klass">warning</t></t>
+                                    <t t-if="bu.global_result == 'ok'"><t t-set="klass">success</t></t>
+                                    <t t-if="bu.global_result == 'skipped'"><t t-set="klass">default</t></t>
+                                    <t t-if="bu.global_result in ['killed', 'manually_killed']"><t t-set="klass">killed</t></t>
+                                  </t>
                                   <td t-attf-class="{{klass}}">
                                      <t t-call="runbot.build_button"><t t-set="klass">btn-group-sm</t></t>
-                                     <t t-if="bu['build_type']=='scheduled'"><i class="fa fa-moon-o" t-att-title="bu['build_type_label']" t-att-aria-label="bu['build_type_label']"/></t>
-                                     <t t-if="bu['build_type'] in ('rebuild', 'indirect')"><i class="fa fa-recycle" t-att-title="bu['build_type_label']" t-att-aria-label="bu['build_type_label']"/></t>
+                                     <t t-if="bu['build_type']=='scheduled'"><i class="fa fa-moon-o" t-att-title="bu.build_type_label()" t-att-aria-label="bu.build_type_label()"/></t>
+                                     <t t-if="bu['build_type'] in ('rebuild', 'indirect')"><i class="fa fa-recycle" t-att-title="bu.build_type_label()" t-att-aria-label="bu.build_type_label()"/></t>
                                      <t t-if="bu['subject']">
                                           <span t-esc="bu['subject'][:32] + ('...' if bu['subject'][32:] else '') " t-att-title="bu['subject']"/>
                                            <br/>
@@ -158,7 +160,7 @@
                                           </t>
                                           <br/>
                                       </t>
-                                      <small><t t-esc="bu['dest']"/> on <t t-esc="bu['host']"/></small><br/>
+                                      <small><t t-esc="bu['dest']"/> on <t t-esc="bu.real_build.host"/></small><br/>
                                       <t t-call="runbot.build_name"/>
                                   </td>
                               </t>
