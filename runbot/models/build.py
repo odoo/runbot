@@ -512,11 +512,11 @@ class runbot_build(models.Model):
                     '%s match branch %s of %s' % (build_dependency.match_type, closest_name, repo.name)
                 )
                 if not repo._hash_exists(latest_commit):
-                    repo._update(force=True)
+                    repo._update(repo, force=True)
                 if not repo._hash_exists(latest_commit):
                     repo._git(['fetch', 'origin', latest_commit])
                 if not repo._hash_exists(latest_commit):
-                    build._log('_checkout',"Dependency commit %s in repo %s is unreachable" % (latest_commit, repo.name))
+                    build._log('_checkout', "Dependency commit %s in repo %s is unreachable" % (latest_commit, repo.name))
                     raise Exception
 
                 commit_oneline = repo._git(['show', '--pretty="%H -- %s"', '-s', latest_commit]).strip()
