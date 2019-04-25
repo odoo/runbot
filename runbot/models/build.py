@@ -512,7 +512,7 @@ class runbot_build(models.Model):
                     '%s match branch %s of %s' % (build_dependency.match_type, closest_name, repo.name)
                 )
                 if not repo._hash_exists(latest_commit):
-                    repo._update(force=True)
+                    repo._update(repo, force=True)
                 if not repo._hash_exists(latest_commit):
                     repo._git(['fetch', 'origin', latest_commit])
                 if not repo._hash_exists(latest_commit):
