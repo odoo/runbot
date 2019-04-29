@@ -10,13 +10,15 @@ import time
 
 from itertools import takewhile
 
+import requests
+
 from odoo import api, fields, models, tools
 from odoo.exceptions import ValidationError
 
 from .. import github, exceptions, controllers, utils
 
-STAGING_SLEEP = 20
-"temp hack: add a delay between staging repositories in case there's a race when quickly pushing a repo then its dependency"
+STAGING_SLEEP = True # actually a flag now (whether to loop around waiting for visibility on the remote
+WAIT_FOR_VISIBILITY = [0, 10, 10, 10, 10]
 
 _logger = logging.getLogger(__name__)
 class Project(models.Model):
@@ -364,15 +366,45 @@ class Branch(models.Model):
             'heads': json.dumps(heads)
         })
         # create staging branch from tmp
+        token = self.project_id.github_token
         for r in self.project_id.repo_ids:
             it = meta[r]
+            staging_head = heads[r.name]
             _logger.info(
                 "%s: create staging for %s:%s at %s",
                 self.project_id.name, r.name, self.name,
-                heads[r.name]
+                staging_head
             )
-            it['gh'].set_ref('staging.{}'.format(self.name), heads[r.name])
-            time.sleep(STAGING_SLEEP)
+            refname = 'staging.{}'.format(self.name)
+            it['gh'].set_ref(refname, staging_head)
+            # asserts that the new head is visible through the api
+            head = it['gh'].head(refname)
+            assert head == staging_head,\
+                "[api] updated %s:%s to %s but found %s" % (
+                    r.name, refname,
+                    staging_head, head,
+                )
+            if not STAGING_SLEEP:
+                continue
+
+            # waits for the new head to be visible through the repo itself
+            for i, t in enumerate(WAIT_FOR_VISIBILITY):
+                time.sleep(t)
+                if self._check_visibility(r, refname, staging_head, token):
+                    _logger.info(
+                        "[repo] updated %s:%s to %s: ok (at %d/%d)",
+                        r.name, refname, staging_head,
+                        i, len(WAIT_FOR_VISIBILITY)
+                    )
+                    break
+                _logger.warn(
+                    "[repo] updated %s:%s to %s: failed (at %d/%d)",
+                    r.name, refname, staging_head,
+                    i, len(WAIT_FOR_VISIBILITY)
+                )
+            else: # if we never saw the update... cancel the staging?
+                raise TimeoutError("Staged head not updated after %d seconds" % sum(WAIT_FOR_VISIBILITY))
+
 
         # creating the staging doesn't trigger a write on the prs
         # and thus the ->staging taggings, so do that by hand
@@ -387,6 +419,23 @@ class Branch(models.Model):
 
         logger.info("Created staging %s (%s)", st, staged)
         return st
+
+    def _check_visibility(self, repo, branch_name, expected_head, token):
+        """ Checks the repository actual to see if the new / expected head is
+        now visible
+        """
+        # v1 protocol provides URL for ref discovery: https://github.com/git/git/blob/6e0cc6776106079ed4efa0cc9abace4107657abf/Documentation/technical/http-protocol.txt#L187
+        # for more complete client this is also the capabilities discovery and
+        # the "entry point" for the service
+        url = 'https://github.com/{}.git/info/refs?service=git-upload-pack'.format(repo.name)
+        with requests.get(url, stream=True, auth=(token, '')) as resp:
+            if not resp.ok:
+                return False
+            for head, ref in parse_refs_smart(resp.raw.read):
+                if ref != ('refs/heads/' + branch_name):
+                    continue
+                return head == expected_head
+            return False
 
 class PullRequests(models.Model):
     _name = 'runbot_merge.pull_requests'
@@ -1493,3 +1542,24 @@ def to_status(v):
     if isinstance(v, dict):
         return v
     return {'state': v, 'target_url': None, 'description': None}
+
+refline = re.compile(rb'([0-9a-f]{40}) ([^\0\n]+)(\0.*)?\n$')
+ZERO_REF = b'0'*40
+def parse_refs_smart(read):
+    """ yields pkt-line data (bytes), or None for flush lines """
+    def read_line():
+        length = int(read(4), 16)
+        if length == 0:
+            return None
+        return read(length - 4)
+
+    header = read_line()
+    assert header == b'# service=git-upload-pack\n', header
+    sep = read_line()
+    assert sep is None, sep
+    # read lines until second delimiter
+    for line in iter(read_line, None):
+        if line.startswith(ZERO_REF):
+            break # empty list (no refs)
+        m = refline.match(line)
+        yield m[1].decode(), m[2].decode()
