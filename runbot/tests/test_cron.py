@@ -42,8 +42,8 @@ class Test_Cron(common.TransactionCase):
         self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_update_frequency', 1)
         ret = self.Repo._cron_fetch_and_schedule('runbotx.foo.com')
         self.assertEqual(None, ret)
-        mock_update.assert_called_with(self.Repo, force=False)
-        mock_create.assert_called_with(self.Repo)
+        mock_update.assert_called_with(force=False)
+        mock_create.assert_called_with()
 
     @patch('odoo.addons.runbot.models.repo.runbot_repo._get_cron_period')
     @patch('odoo.addons.runbot.models.repo.runbot_repo._reload_nginx')
@@ -56,5 +56,5 @@ class Test_Cron(common.TransactionCase):
         self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_update_frequency', 1)
         ret = self.Repo._cron_fetch_and_build('runbotx.foo.com')
         self.assertEqual(None, ret)
-        mock_scheduler.assert_called_with([])
+        mock_scheduler.assert_called()
         self.assertTrue(mock_reload.called)
