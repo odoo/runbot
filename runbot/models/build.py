@@ -471,7 +471,7 @@ class runbot_build(models.Model):
 
         # update repo if needed
         if not build.repo_id._hash_exists(build.name):
-            build.repo_id._update(build.repo_id)
+            build.repo_id._update()
 
         # checkout branch
         build.branch_id.repo_id._git_export(build.name, build._path())
@@ -512,7 +512,7 @@ class runbot_build(models.Model):
                     '%s match branch %s of %s' % (build_dependency.match_type, closest_name, repo.name)
                 )
                 if not repo._hash_exists(latest_commit):
-                    repo._update(repo, force=True)
+                    repo._update(force=True)
                 if not repo._hash_exists(latest_commit):
                     repo._git(['fetch', 'origin', latest_commit])
                 if not repo._hash_exists(latest_commit):
