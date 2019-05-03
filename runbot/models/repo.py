@@ -291,7 +291,12 @@ class runbot_repo(models.Model):
                 _logger.debug('repo %s skip hook fetch fetch_time: %ss ago hook_time: %ss ago',
                               repo.name, int(t0 - fetch_time), int(t0 - dt2time(repo.hook_time)))
                 return
+        self._update_fetch_cmd()
 
+    def _update_fetch_cmd(self):
+        # Extracted from update_git to be easily overriden in external module
+        self.ensure_one()
+        repo = self
         repo._git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*', '+refs/pull/*/head:refs/pull/*'])
 
     @api.multi
