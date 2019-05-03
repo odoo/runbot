@@ -1,22 +1,19 @@
 # -*- coding: utf-8 -*-
 import glob
 import logging
-import operator
 import os
+import pwd
 import re
-import resource
 import shlex
 import shutil
-import signal
 import subprocess
 import time
-from subprocess import CalledProcessError
 from ..common import dt2time, fqdn, now, grep, time2str, rfind, uniq_list, local_pgadmin_cursor, get_py_version
 from ..container import docker_build, docker_run, docker_stop, docker_is_running, docker_get_gateway_ip, build_odoo_cmd
 from odoo import models, fields, api
 from odoo.exceptions import UserError
 from odoo.http import request
-from odoo.tools import config, appdirs
+from odoo.tools import appdirs
 
 _re_error = r'^(?:\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ (?:ERROR|CRITICAL) )|(?:Traceback \(most recent call last\):)$'
 _re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING '
@@ -674,8 +671,8 @@ class runbot_build(models.Model):
                 os.mkdir(datadir)
             cmd += ["--data-dir", '/data/build/datadir']
 
-        # if build.branch_id.test_tags:
-        #    cmd.extend(['--test_tags', "'%s'" % build.branch_id.test_tags])  # keep for next version
+        # use the username of the runbot host to connect to the databases
+        cmd += ['-r %s' % pwd.getpwuid(os.getuid()).pw_name]
 
         return cmd, build.modules
 
