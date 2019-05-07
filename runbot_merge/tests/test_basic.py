@@ -778,6 +778,33 @@ def test_ci_failure_after_review(env, repo, users):
         (users['user'], "'ci/runbot' failed on this reviewed PR.".format_map(users)),
     ]
 
+def test_reopen_state(env, repo):
+    """ The PR should be validated on opening and reopening in case there's
+    already a CI+ stored (as the CI might never trigger unless explicitly
+    re-requested)
+    """
+    m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+    repo.make_ref('heads/master', m)
+
+    c = repo.make_commit(m, 'fist', None, tree={'m': 'c1'})
+    repo.post_status(c, 'success', 'legal/cla')
+    repo.post_status(c, 'success', 'ci/runbot')
+    prx = repo.make_pr('title', 'body', target='master', ctid=c, user='user')
+
+    pr = env['runbot_merge.pull_requests'].search([
+        ('repository.name', '=', repo.name),
+        ('number', '=', prx.number),
+    ])
+    assert pr.state == 'validated', \
+        "if a PR is created on a CI'd commit, it should be validated immediately"
+
+    prx.close()
+    assert pr.state == 'closed'
+
+    prx.open()
+    assert pr.state == 'validated', \
+        "if a PR is reopened and had a CI'd head, it should be validated immediately"
+
 class TestRetry:
     @pytest.mark.xfail(reason="This may not be a good idea as it could lead to tons of rebuild spam")
     def test_auto_retry_push(self, env, repo):

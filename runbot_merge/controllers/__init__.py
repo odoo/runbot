@@ -193,6 +193,7 @@ def handle_pr(env, event):
         WHERE id = %s AND state != 'merged'
         ''', [pr_obj.id])
         env.cr.commit()
+        pr_obj.invalidate_cache(fnames=['state'], ids=[pr_obj.id])
         if env.cr.rowcount:
             env['runbot_merge.pull_requests.tagging'].create({
                 'pull_request': pr_obj.number,
@@ -205,10 +206,16 @@ def handle_pr(env, event):
                 pr_obj.repository.name, pr_obj.number,
                 event['sender']['login']
             )
+
         return 'Closed {}'.format(pr_obj.id)
 
     if event['action'] == 'reopened' and pr_obj.state == 'closed':
-        pr_obj.state = 'opened'
+        pr_obj.write({
+            'state': 'opened',
+            # updating the head triggers a revalidation
+            'head': pr['head']['sha'],
+        })
+
         return 'Reopened {}'.format(pr_obj.id)
 
     _logger.info("Ignoring event %s on PR %s", event['action'], pr['number'])
