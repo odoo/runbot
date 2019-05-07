@@ -901,18 +901,18 @@ class PullRequests(models.Model):
 
     def _build_merge_message(self, message):
         # handle co-authored commits (https://help.github.com/articles/creating-a-commit-with-multiple-authors/)
-        lines = message.splitlines()
+        original = message.splitlines()
+        lines = []
         coauthors = []
-        for idx, line in enumerate(reversed(lines)):
+        for line in original:
             if line.startswith('Co-authored-by:'):
+                # remove all empty lines before C-A-B
                 coauthors.append(line)
-                continue
-            if not line.strip():
+                while lines and not lines[-1]:
+                    lines.pop()
                 continue
 
-            if idx:
-                del lines[-idx:]
-            break
+            lines.append(line.strip())
 
         m = re.search(r'( |{repository})#{pr.number}\b'.format(
             pr=self,
@@ -925,7 +925,7 @@ class PullRequests(models.Model):
 
         if coauthors:
             lines.extend(['', ''])
-            lines.extend(reversed(coauthors))
+            lines.extend(coauthors)
         return '\n'.join(lines)
 
     def _stage(self, gh, target):

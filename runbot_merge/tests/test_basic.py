@@ -220,10 +220,13 @@ class TestCommitMessage:
 
     def test_commit_coauthored(self, env, repo, users):
         """ verify 'closes ...' and 'Signed-off-by' are added before co-authored-by tags.
+
+        Also checks that all co-authored-by are moved at the end of the
+        message
         """
         c1 = repo.make_commit(None, 'first!', None, tree={'f': 'm1'})
         repo.make_ref('heads/master', c1)
-        c2 = repo.make_commit(c1, 'simple commit message\n\n\nCo-authored-by: Bob <bob@example.com>', None, tree={'f': 'm2'})
+        c2 = repo.make_commit(c1, 'simple commit message\n\n\nCo-authored-by: Bob <bob@example.com>\n\nFixes a thing', None, tree={'f': 'm2'})
 
         prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
         repo.post_status(prx.head, 'success', 'ci/runbot')
@@ -237,7 +240,7 @@ class TestCommitMessage:
         run_crons(env)
 
         master = repo.commit('heads/master')
-        assert master.message == "simple commit message\n\ncloses {repo.name}#1"\
+        assert master.message == "simple commit message\n\nFixes a thing\n\ncloses {repo.name}#1"\
                                  "\n\nSigned-off-by: {reviewer.formatted_email}"\
                                  "\n\n\nCo-authored-by: Bob <bob@example.com>"\
                                  .format(repo=repo, reviewer=get_partner(env, users['reviewer']))
