@@ -8,6 +8,9 @@ import requests
 from odoo.tools import topological_sort
 from . import exceptions, utils
 
+def _is_json(r):
+    return r and r.headers.get('content-type', '').startswith(('application/json', 'application/javascript'))
+
 _logger = logging.getLogger(__name__)
 class GH(object):
     def __init__(self, token, repo):
@@ -33,7 +36,7 @@ class GH(object):
                     raise exc(r.text)
             if r.status_code >= 400:
                 headers = '\n'.join('\t%s: %s' % (h, v) for h, v in r.headers.items())
-                if r.headers.get('content-type', '').startswith(('application/json', 'application/javascript')):
+                if _is_json(r):
                     body = r.json()
                 elif r.encoding is not None:
                     body = utils.shorten(r.text, 200)
@@ -76,7 +79,18 @@ class GH(object):
         return c
 
     def comment(self, pr, message):
-        self('POST', 'issues/{}/comments'.format(pr), json={'body': message})
+        # if the mergebot user has been blocked by the PR author, this will
+        # fail, but we don't want the closing of the PR to fail, or for the
+        # feedback cron to get stuck
+        try:
+            self('POST', 'issues/{}/comments'.format(pr), json={'body': message})
+        except requests.HTTPError as r:
+            if _is_json(r.response):
+                body = r.response.json()
+                if any(e.message == 'User is blocked' for e in (body.get('errors') or [])):
+                    _logger.warn("comment(%s:%s) failed: user likely blocked", self._repo, pr)
+                    return
+            raise
         _logger.debug('comment(%s, %s, %s)', self._repo, pr, shorten(message))
 
     def close(self, pr, message):
