@@ -1278,7 +1278,7 @@ class Stagings(models.Model):
             commit = self.env['runbot_merge.commit'].search([
                 ('sha', '=', head)
             ])
-            statuses = json.loads(commit.statuses)
+            statuses = json.loads(commit.statuses or '{}')
             reason = next((
                 ctx for ctx, result in statuses.items()
                 if to_status(result).get('state') in ('error', 'failure')
