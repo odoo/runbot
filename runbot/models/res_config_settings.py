@@ -22,7 +22,7 @@ class ResConfigSettings(models.TransientModel):
         get_param = self.env['ir.config_parameter'].sudo().get_param
         res.update(runbot_workers=int(get_param('runbot.runbot_workers', default=6)),
                    runbot_running_max=int(get_param('runbot.runbot_running_max', default=75)),
-                   runbot_timeout=int(get_param('runbot.runbot_timeout', default=1800)),
+                   runbot_timeout=int(get_param('runbot.runbot_timeout', default=3600)),
                    runbot_starting_port=int(get_param('runbot.runbot_starting_port', default=2000)),
                    runbot_domain=get_param('runbot.runbot_domain', default=common.fqdn()),
                    runbot_max_age=int(get_param('runbot.runbot_max_age', default=30)),

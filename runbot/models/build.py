@@ -354,7 +354,7 @@ class runbot_build(models.Model):
 
         icp = self.env['ir.config_parameter']
         # For retro-compatibility, keep this parameter in seconds
-        default_timeout = int(icp.get_param('runbot.runbot_timeout', default=1800)) / 60
+        default_timeout = int(icp.get_param('runbot.runbot_timeout', default=3600)) / 60
 
         for build in self:
             if build.state == 'deathrow':
@@ -378,7 +378,7 @@ class runbot_build(models.Model):
                     # kill if overpassed
                     timeout = (build.branch_id.job_timeout or default_timeout) * 60 * ( build.coverage and 1.5 or 1)
                     if build.job != jobs[-1] and build.job_time > timeout:
-                        build._logger('%s time exceded (%ss)', build.job, build.job_time)
+                        build._log('schedule', '%s time exceeded (%ss)', build.job, build.job_time)
                         build.write({'job_end': now()})
                         build._kill(result='killed')
                     else:
@@ -742,7 +742,7 @@ class runbot_build(models.Model):
     @runbot_job('testing', 'running')
     def _job_20_test_all(self, build, log_path):
 
-        cpu_limit = 2400
+        cpu_limit = self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=3600)
         self._local_pg_createdb("%s-all" % build.dest)
         cmd, mods = build._cmd()
         build._log('test_all', 'Start test all modules')
@@ -805,9 +805,13 @@ class runbot_build(models.Model):
                 v['result'] = "ko"
             elif rfind(log_all, _re_warning):
                 v['result'] = "warn"
-            elif not grep(build._server("test/common.py"), "post_install") or grep(log_all, "Initiating shutdown."):
+            elif not grep(log_all, "Initiating shutdown"):
+                v['result'] = "ko"
+                build._log('run', "Seems that the build was stopped too early. The cpu_limit could have been reached")
+            elif not build.result:
                 v['result'] = "ok"
         else:
+            build._log('run', "Modules not loaded")
             v['result'] = "ko"
         build.write(v)
         build._github_status()
