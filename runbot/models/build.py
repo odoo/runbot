@@ -739,7 +739,7 @@ class runbot_build(models.Model):
     @runbot_job('testing', 'running')
     def _job_20_test_all(self, build, log_path):
 
-        cpu_limit = self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=3600)
+        cpu_limit = int(self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=3600))
         self._local_pg_createdb("%s-all" % build.dest)
         cmd, mods = build._cmd()
         build._log('test_all', 'Start test all modules')
