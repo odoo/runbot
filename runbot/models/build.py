@@ -375,7 +375,7 @@ class runbot_build(models.Model):
                     # kill if overpassed
                     timeout = (build.branch_id.job_timeout or default_timeout) * 60 * ( build.coverage and 1.5 or 1)
                     if build.job != jobs[-1] and build.job_time > timeout:
-                        build._log('schedule', '%s time exceeded (%ss)', build.job, build.job_time)
+                        build._log('schedule', '%s time exceeded (%ss)' % (build.job, build.job_time))
                         build.write({'job_end': now()})
                         build._kill(result='killed')
                     else:
