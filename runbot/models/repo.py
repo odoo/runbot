@@ -35,6 +35,7 @@ class runbot_repo(models.Model):
                             default='poll',
                             string="Mode", required=True, help="hook: Wait for webhook on /runbot/hook/<id> i.e. github push event")
     hook_time = fields.Datetime('Last hook time')
+    get_ref_time = fields.Datetime('Last refs db update')
     duplicate_id = fields.Many2one('runbot.repo', 'Duplicate repo', help='Repository for finding duplicate builds')
     modules = fields.Char("Modules to install", help="Comma-separated list of modules to install and test.")
     modules_auto = fields.Selection([('none', 'None (only explicit modules list)'),
@@ -148,17 +149,29 @@ class runbot_repo(models.Model):
                 else:
                     raise
 
+    def _get_fetch_head_time(self):
+        self.ensure_one()
+        fname_fetch_head = os.path.join(self.path, 'FETCH_HEAD')
+        if os.path.exists(fname_fetch_head):
+            return os.path.getmtime(fname_fetch_head)
+
     def _get_refs(self):
         """Find new refs
         :return: list of tuples with following refs informations:
         name, sha, date, author, author_email, subject, committer, committer_email
         """
         self.ensure_one()
-        fields = ['refname', 'objectname', 'committerdate:iso8601', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail']
-        fmt = "%00".join(["%(" + field + ")" for field in fields])
-        git_refs = self._git(['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/heads', 'refs/pull'])
-        git_refs = git_refs.strip()
-        return [tuple(field for field in line.split('\x00')) for line in git_refs.split('\n')]
+
+        get_ref_time = self._get_fetch_head_time()
+        if not self.get_ref_time or get_ref_time > dt2time(self.get_ref_time):
+            self.get_ref_time = get_ref_time
+            fields = ['refname', 'objectname', 'committerdate:iso8601', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail']
+            fmt = "%00".join(["%(" + field + ")" for field in fields])
+            git_refs = self._git(['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/heads', 'refs/pull'])
+            git_refs = git_refs.strip()
+            return [tuple(field for field in line.split('\x00')) for line in git_refs.split('\n')]
+        else:
+            return []
 
     def _find_or_create_branches(self, refs):
         """Parse refs and create branches that does not exists yet
@@ -299,9 +312,8 @@ class runbot_repo(models.Model):
         self._clone()
 
         # check for mode == hook
-        fname_fetch_head = os.path.join(repo.path, 'FETCH_HEAD')
-        if not force and os.path.isfile(fname_fetch_head):
-            fetch_time = os.path.getmtime(fname_fetch_head)
+        if not force:
+            fetch_time = repo._get_fetch_head_time()
             if repo.mode == 'hook' and repo.hook_time and dt2time(repo.hook_time) < fetch_time:
                 t0 = time.time()
                 _logger.debug('repo %s skip hook fetch fetch_time: %ss ago hook_time: %ss ago',
