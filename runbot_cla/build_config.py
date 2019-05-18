@@ -10,15 +10,15 @@ from odoo import models, fields
 _logger = logging.getLogger(__name__)
 
 
-class Job(models.Model):
+class Step(models.Model):
     _inherit = "runbot.build.config.step"
-    
+
     job_type = fields.Selection(selection_add=[('cla_check', 'Check cla')])
 
     def _run_step(self, build, log_path):
-        if self.job_type != 'cla_check':
+        if self.job_type == 'cla_check':
             return self._runbot_cla_check(build, log_path)
-        return super(Job, self)._run_step(build, log_path)
+        return super(Step, self)._run_step(build, log_path)
 
     def _runbot_cla_check(self, build, log_path):
         cla_glob = glob.glob(build._path("doc/cla/*/*.md"))

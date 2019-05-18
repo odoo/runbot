@@ -165,9 +165,9 @@ class ConfigStep(models.Model):
         log_path = build._path('logs', '%s.txt' % self.name)
         build.write({'job_start': now(), 'job_end': False})  # state, ...
         build._log('run', 'Starting step %s from config %s' % (self.name, build.config_id.name), level='SEPARATOR')
-        return self._run_step(log_path, build)
+        return self._run_step(build, log_path)
 
-    def _run_step(self, log_path, build):
+    def _run_step(self, build, log_path):
         if self.job_type == 'run_odoo':
             return self._run_odoo_run(build, log_path)
         if self.job_type == 'install_odoo':
