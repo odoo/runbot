@@ -11,6 +11,7 @@ import signal
 import subprocess
 import time
 
+from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT
 from odoo import models, fields, api
 from odoo.modules.module import get_module_resource
 from odoo.tools import config
@@ -163,7 +164,7 @@ class runbot_repo(models.Model):
 
         get_ref_time = self._get_fetch_head_time()
         if not self.get_ref_time or get_ref_time > dt2time(self.get_ref_time):
-            self.get_ref_time = get_ref_time
+            self.get_ref_time = datetime.datetime.fromtimestamp(get_ref_time).strftime(DEFAULT_SERVER_DATETIME_FORMAT)
             fields = ['refname', 'objectname', 'committerdate:iso8601', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail']
             fmt = "%00".join(["%(" + field + ")" for field in fields])
             git_refs = self._git(['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/heads', 'refs/pull'])
