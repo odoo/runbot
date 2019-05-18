@@ -153,7 +153,7 @@ class ConfigStep(models.Model):
             if not re.match(name_reg, values.get('name')):
                 raise UserError('Name cannot contain special char or spaces exepts "_" and "-"')
         if not self.env.user.has_group('runbot.group_build_config_administrator'):
-            if (values.get('job_type') == 'python' or ('python_code' in values and values['python_code'])):
+            if (values.get('job_type') == 'python' or ('python_code' in values and values['python_code'] and values['python_code'] != "# type python code here\n\n\n\n\n\n")):
                 raise UserError('cannot create or edit config step of type python code')
             if (values.get('extra_params')):
                 reg = r'^[a-zA-Z0-9\-_ "]*$'
