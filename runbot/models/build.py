@@ -668,7 +668,7 @@ class runbot_build(models.Model):
                 )
 
                 if not repo._hash_exists(latest_commit):
-                    repo._update(repo, force=True)
+                    repo._update(force=True)
                 if not repo._hash_exists(latest_commit):
                     repo._git(['fetch', 'origin', latest_commit])
                 if not repo._hash_exists(latest_commit):
