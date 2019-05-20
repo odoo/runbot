@@ -178,27 +178,20 @@ class Runbot(Controller):
         }
         return request.render("runbot.build", context)
 
-    @route(['/runbot/b/<branch_name>', '/runbot/<model("runbot.repo"):repo>/<branch_name>'], type='http', auth="public", website=True)
-    def fast_launch(self, branch_name=False, repo=False, **post):
+    @route(['/runbot/quick_connect/<model("runbot.branch"):branch>'], type='http', auth="public", website=True)
+    def fast_launch(self, branch, **post):
         """Connect to the running Odoo instance"""
         Build = request.env['runbot.build']
-
-        domain = [('branch_id.branch_name', '=', branch_name)]
-
-        if repo:
-            domain.extend([('branch_id.repo_id', '=', repo.id)])
-            order = "sequence desc"
-        else:
-            order = 'repo_id ASC, sequence DESC'
+        domain = [('branch_id', '=', branch.id), ('config_id', '=', branch.config_id.id)]
 
         # Take the 10 lasts builds to find at least 1 running... Else no luck
-        builds = Build.search(domain, order=order, limit=10)
+        builds = Build.search(domain, order='sequence desc', limit=10)
 
         if builds:
             last_build = False
             for build in builds:
-                if build.local_state == 'running' or (build.local_state == 'duplicate' and build.duplicate_id.local_state == 'running'):
-                    last_build = build if build.local_state == 'running' else build.duplicate_id
+                if build.real_build.local_state == 'running':
+                    last_build = build.real_build
                     break
 
             if not last_build:
@@ -208,7 +201,7 @@ class Runbot(Controller):
             if last_build.local_state != 'running':
                 url = "/runbot/build/%s?ask_rebuild=1" % last_build.id
             else:
-                url = build.branch_id._get_branch_quickconnect_url(last_build.domain, last_build.dest)[build.branch_id.id]
+                url = "http://%s/web/login?db=%s-all&login=admin&redirect=/web?debug=1" % (last_build.domain, last_build.dest)
         else:
             return request.not_found()
         return werkzeug.utils.redirect(url)

@@ -119,7 +119,7 @@
                                   <small><t t-esc="br['builds'] and br['builds'][0].get_formated_build_time()"/></small><br/>
                                   <div class="btn-group btn-group-xs">
                                       <a t-attf-href="{{br['branch'].branch_url}}" class="btn btn-default btn-xs">Branch or pull <i class="fa fa-github"/></a>
-                                      <a t-attf-href="/runbot/#{repo.id}/#{br['branch'].branch_name}" class="btn btn-default btn-xs" aria-label="Quick Connect"><i class="fa fa-fast-forward" title="Quick Connect"/></a>
+                                      <a t-attf-href="/runbot/quick_connect/#{br['branch'].id}" class="btn btn-default btn-xs" aria-label="Quick Connect"><i class="fa fa-fast-forward" title="Quick Connect"/></a>
                                   </div>
                                   <t t-if="br['branch'].sticky">
                                       <br/>
