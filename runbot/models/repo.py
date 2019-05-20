@@ -281,7 +281,9 @@ class runbot_repo(models.Model):
         ref_branches = {}
         for repo in self:
             try:
-                refs[repo] = repo._get_refs()
+                ref = repo._get_refs()
+                if ref:
+                    refs[repo] = ref
             except Exception:
                 _logger.exception('Fail to get refs for repo %s', repo.name)
             if repo in refs:

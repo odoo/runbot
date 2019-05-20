@@ -15,6 +15,7 @@ _logger = logging.getLogger(__name__)
 _re_error = r'^(?:\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ (?:ERROR|CRITICAL) )|(?:Traceback \(most recent call last\):)$'
 _re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING '
 
+PYTHON_DEFAULT = "# type python code here\n\n\n\n\n\n"
 
 class Config(models.Model):
     _name = "runbot.build.config"
@@ -94,7 +95,7 @@ class ConfigStep(models.Model):
     # install_odoo
     create_db = fields.Boolean('Create Db', default=True, tracking=True)  # future
     custom_db_name = fields.Char('Custom Db Name', tracking=True)  # future
-    install_modules = fields.Char('Modules to install', help="List of module to install, use * for all modules")
+    install_modules = fields.Char('Modules to install', help="List of module to install, use * for all modules", default='*')
     db_name = fields.Char('Db Name', compute='_compute_db_name', inverse='_inverse_db_name', tracking=True)
     cpu_limit = fields.Integer('Cpu limit', default=3600, tracking=True)
     coverage = fields.Boolean('Coverage', dafault=False, tracking=True)
@@ -102,7 +103,7 @@ class ConfigStep(models.Model):
     test_tags = fields.Char('Test tags', help="comma separated list of test tags")
     extra_params = fields.Char('Extra cmd args', tracking=True)
     # python
-    python_code = fields.Text('Python code', tracking=True, default="# type python code here\n\n\n\n\n\n")
+    python_code = fields.Text('Python code', tracking=True, default=PYTHON_DEFAULT)
     running_job = fields.Boolean('Job final state is running', default=False, help="Docker won't be killed if checked")
     # create_build
     create_config_ids = fields.Many2many('runbot.build.config', 'runbot_build_config_step_ids_create_config_ids_rel', string='New Build Configs', tracking=True, index=True)
@@ -153,7 +154,7 @@ class ConfigStep(models.Model):
             if not re.match(name_reg, values.get('name')):
                 raise UserError('Name cannot contain special char or spaces exepts "_" and "-"')
         if not self.env.user.has_group('runbot.group_build_config_administrator'):
-            if (values.get('job_type') == 'python' or ('python_code' in values and values['python_code'] and values['python_code'] != "# type python code here\n\n\n\n\n\n")):
+            if (values.get('job_type') == 'python' or ('python_code' in values and values['python_code'] and values['python_code'] != PYTHON_DEFAULT)):
                 raise UserError('cannot create or edit config step of type python code')
             if (values.get('extra_params')):
                 reg = r'^[a-zA-Z0-9\-_ "]*$'

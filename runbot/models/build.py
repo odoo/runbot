@@ -121,7 +121,7 @@ class runbot_build(models.Model):
                 else:
                     record.global_state = record.local_state
 
-    def _get_youngest_state(self, states, max=False):
+    def _get_youngest_state(self, states):
         index = min([self._get_state_score(state) for state in states])
         return state_order[index]
 
@@ -288,10 +288,12 @@ class runbot_build(models.Model):
 
     def _end_test(self):
         for build in self:
-            if build.parent_id:
+            if build.parent_id and build.global_state in ('running', 'done'):
                 global_result = build.global_result
                 loglevel = 'OK' if global_result == 'ok' else 'WARNING' if global_result == 'warn' else 'ERROR'
                 build.parent_id._log('children_build', 'returned a "%s" result ' % (global_result), level=loglevel, log_type='subbuild', path=self.id)
+                if build.parent_id.local_state in ('running', 'done'):
+                    build.parent_id._end_test()
 
     @api.depends('name', 'branch_id.name')
     def _compute_dest(self):
@@ -499,19 +501,19 @@ class runbot_build(models.Model):
                 values.update(build._next_job_values())
                 build.write(values)
                 if not build.active_step:
-                    build._log('schedule', 'No job in config, doing nothing')
-                    build._end_test()
+                    build._log('_schedule', 'No job in config, doing nothing')
+                    #build._end_test()
                     continue
                 try:
-                    build._log('init', 'Init build environment with config %s ' % build.config_id.name)
+                    build._log('_schedule', 'Init build environment with config %s ' % build.config_id.name)
                     # notify pending build - avoid confusing users by saying nothing
                     build._github_status()
                     build._checkout()
-                    build._log('docker_build', 'Building docker image')
+                    build._log('_schedule', 'Building docker image')
                     docker_build(build._path('logs', 'docker_build.txt'), build._path())
                 except Exception:
                     _logger.exception('Failed initiating build %s', build.dest)
-                    build._log('Failed initiating build')
+                    build._log('_schedule', 'Failed initiating build')
                     build._kill(result='ko')
                     continue
             else:  # testing/running build
@@ -524,7 +526,7 @@ class runbot_build(models.Model):
                 if docker_is_running(build._get_docker_name()):
                     timeout = min(build.active_step.cpu_limit, int(icp.get_param('runbot.runbot_timeout', default=10000)))
                     if build.local_state != 'running' and build.job_time > timeout:
-                        build._logger('%s time exceded (%ss)', build.active_step.name if build.active_step else "?", build.job_time)
+                        build._log('_schedule', '%s time exceeded (%ss)', build.active_step.name if build.active_step else "?", build.job_time)
                         build.write({'job_end': now()})
                         build._kill(result='killed')
                     continue
@@ -554,7 +556,7 @@ class runbot_build(models.Model):
 
                 if ending_build:
                     build._github_status()
-                    build._end_test()  # notify parent of build end
+                    # build._end_test()
                     if not build.local_result:  # Set 'ok' result if no result set (no tests job on build)
                         build.local_result = 'ok'
                         build._logger("No result set, setting ok by default")

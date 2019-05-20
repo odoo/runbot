@@ -86,7 +86,7 @@
         <field name="name">All config step can be edited by config admin</field>
         <field name="groups" eval="[(4, ref('group_build_config_administrator'))]"/>
         <field name="model_id" ref="model_runbot_build_config_step"/>
-        <field name="domain_force">[('1', '=', '1')]</field>
+        <field name="domain_force">[(1, '=', 1)]</field>
         <field name="perm_read" eval="False"/>
     </record>
 

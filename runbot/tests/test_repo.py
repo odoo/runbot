@@ -39,7 +39,8 @@ class Test_Repo(common.TransactionCase):
         self.assertEqual(local_repo.short_name, 'somewhere/rep')
 
     @patch('odoo.addons.runbot.models.repo.runbot_repo._root')
-    def test_repo_create_pending_builds(self, mock_root):
+    @patch('odoo.addons.runbot.models.repo.runbot_repo._get_fetch_head_time')
+    def test_repo_create_pending_builds(self, mock_fetch_head_time, mock_root):
         """ Test that when finding new refs in a repo, the missing branches
         are created and new builds are created in pending state
         """
@@ -61,6 +62,7 @@ class Test_Repo(common.TransactionCase):
                              'A nice subject',
                              'Marc Bidule',
                              '<marc.bidule@somewhere.com>')]
+        mock_fetch_head_time.side_effect = [100000.0, 100001.0, 100002.0]
 
         with patch('odoo.addons.runbot.models.repo.runbot_repo._git', new=self.mock_git_helper()):
             repo._create_pending_builds()

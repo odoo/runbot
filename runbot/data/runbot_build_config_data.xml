@@ -54,7 +54,7 @@
     <record id="runbot_build_config_step_test_coverage" model="runbot.build.config.step">
         <field name="name">coverage</field>
         <field name="install_modules">*</field>
-        <field name="cpu_limit">5400</field>
+        <field name="cpu_limit">7000</field>
         <field name="test_enable" eval="True"/>
         <field name="coverage" eval="True"/>
         <field name="protected" eval="True"/>
@@ -74,6 +74,7 @@
         <field name="create_config_ids" eval="[(4, ref('runbot_build_config_light_test'))]"/>
         <field name="number_builds">10</field>
         <field name="protected" eval="True"/>
+        <field name="force_build" eval="True"/>
     </record>
 
     <record id="runbot_build_config_multibuild" model="runbot.build.config">
