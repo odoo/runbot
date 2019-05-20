@@ -93,12 +93,6 @@ class runbot_branch(models.Model):
 
         return super(runbot_branch, self).create(vals)
 
-    def _get_branch_quickconnect_url(self, fqdn, dest):
-        self.ensure_one()
-        r = {}
-        r[self.id] = "http://%s/web/login?db=%s-all&login=admin&redirect=/web?debug=1" % (fqdn, dest)
-        return r
-
     def _get_last_coverage_build(self):
         """ Return the last build with a coverage value > 0"""
         self.ensure_one()
