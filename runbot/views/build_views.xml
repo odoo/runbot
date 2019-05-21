@@ -36,6 +36,7 @@
                         <field name="build_type" groups="base.group_no_one"/>
                         <field name="config_id" readonly="1"/>
                         <field name="config_id" groups="base.group_no_one"/>
+                        <field name="orphan_result" readonly="1"/>
                     </group>
                 </sheet>
             </form>

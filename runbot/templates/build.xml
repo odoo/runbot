@@ -215,6 +215,7 @@
                                   <tr><td t-attf-class="{{rowclass}}">
                                     <a t-attf-href="/runbot/build/{{child.id}}" >Build <t t-esc="child.id"/></a> 
                                     with config <a t-attf-href="/web#id={{child.config_id.id}}&amp;view_type=form&amp;model=runbot.build.config"><t t-esc="child.config_id.name"/></a>
+                                    <t t-if="child.orphan_result"><i class="fa fa-chain-broken" title="Build result ignored for parent" /></t>
                                     <t t-if="child.job"> Running step: <t t-esc="child.job"/></t>
                                     <t t-if="child.global_state in ['testing', 'waiting']">
                                       <i class="fa fa-spinner fa-spin"/>
@@ -228,7 +229,8 @@
                             </td>
                           </tr>
                         </table> 
-                        <p t-if="build.parent_id">Child of <a t-attf-href="/runbot/build/#{build.parent_id.id}"><t t-esc="build.parent_id.dest"/></a></p>
+                        <p t-if="build.parent_id">Child of <a t-attf-href="/runbot/build/#{build.parent_id.id}"><t t-esc="build.parent_id.dest"/></a>
+                        <t t-if="build.orphan_result">&amp;nbsp;<i class="fa fa-chain-broken" title="Build result ignored for parent" />&amp;nbsp;Orphaned build, the result does not affect parent build result</t></p>
                         <p t-if="build.duplicate_id">Duplicate of <a t-attf-href="/runbot/build/#{build.duplicate_id.id}"><t t-esc="build.duplicate_id.dest"/></a></p>
                         <table class="table table-condensed table-striped">
                         <tr>
