@@ -46,6 +46,22 @@ class Test_Build(common.TransactionCase):
         build._compute_domain()
         self.assertEqual(build.domain, 'runbot99.example.org:1234')
 
+        other = self.Build.create({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'port': '5678',
+            'local_result': 'ko'
+        })
+
+        # test a bulk write, that one cannot change from 'ko' to 'ok'
+        builds = self.Build.browse([build.id, other.id])
+        with self.assertRaises(AssertionError):
+            builds.write({'local_result': 'ok'})
+
+        # test that a build cannot have local state 'duplicate' without a duplicate_id
+        with self.assertRaises(AssertionError):
+            builds.write({'local_state': 'duplicate'})
+
     @patch('odoo.addons.runbot.models.build.os.mkdir')
     @patch('odoo.addons.runbot.models.build.grep')
     def test_build_cmd_log_db(self, mock_grep, mock_mkdir):
