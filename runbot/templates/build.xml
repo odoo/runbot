@@ -66,10 +66,10 @@
                         <li><a t-attf-href="http://{{bu['domain']}}/?db={{bu['real_build'].dest}}-base">Connect base <i class="fa fa-sign-in"></i></a></li>
                         <li><a t-attf-href="http://{{bu['domain']}}/">Connect <i class="fa fa-sign-in"></i></a></li>
                     </t>
-                    <li t-if="bu.global_state in ['done','running','deathrow'] and bu_index==0" groups="runbot.group_user">
+                    <li t-if="bu.global_state in ['done','running','deathrow'] and bu_index==0" groups="base.group_user">
                         <a href="#" class="runbot-rebuild" t-att-data-runbot-build="bu['id']">Rebuild <i class="fa fa-refresh"/></a>
                     </li>
-                    <li t-if="bu.global_state in ['pending','testing', 'waiting', 'running']" groups="runbot.group_user">
+                    <li t-if="bu.global_state in ['pending','testing', 'waiting', 'running']" groups="base.group_user">
                         <a href="#" class="runbot-kill" t-att-data-runbot-build="bu['id']">Kill <i class="fa fa-crosshairs"/></a>
                     </li>
                     <li t-if="bu.global_state not in ('testing', 'waiting', 'pending')" class="divider"></li>
