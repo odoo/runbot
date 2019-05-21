@@ -303,7 +303,7 @@ class ConfigStep(models.Model):
                         glob.glob(build._server('addons/*/__manifest__.py')))
         ]
         module_to_omit = set(available_modules) - modules_to_install
-        return ['--omit', ','.join('*addons/%s/*' % m for m in module_to_omit) + '*__manifest__.py']
+        return ['--omit', ','.join('*addons/%s/*' % m for m in module_to_omit) + ',*__manifest__.py']
 
     def _make_results(self, build):
         build_values = {}
