@@ -209,8 +209,8 @@ class ConfigStep(models.Model):
                 build._log('create_build', 'created with config %s' % create_config.name, log_type='subbuild', path=str(children.id))
 
     def _run_python(self, build, log_path):
-        eval_ctx = {'self': self, 'build': build, 'log_path': log_path}
-        return safe_eval(self.sudo().code.strip(), eval_ctx, mode="exec", nocopy=True)
+        eval_ctx = {'self': self, 'build': build, 'log_path': log_path, 'docker_run': docker_run, 'glob': glob, '_logger': _logger, 'build_odoo_cmd': build_odoo_cmd}
+        return safe_eval(self.sudo().python_code.strip(), eval_ctx, mode="exec", nocopy=True)
 
     def _run_odoo_run(self, build, log_path):
         # adjust job_end to record an accurate job_20 job_time

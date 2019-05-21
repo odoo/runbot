@@ -14,6 +14,7 @@
                 <field name="branch_name"/>
                 <field name="branch_url"/>
                 <field name="pull_head_name"/>
+                <field name="target_branch_name"/>
                 <field name="sticky"/>
                 <field name="priority"/>
                 <field name="state"/>

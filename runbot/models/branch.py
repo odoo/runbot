@@ -19,7 +19,7 @@ class runbot_branch(models.Model):
     branch_name = fields.Char(compute='_get_branch_infos', string='Branch', readonly=1, store=True)
     branch_url = fields.Char(compute='_get_branch_url', string='Branch url', readonly=1)
     pull_head_name = fields.Char(compute='_get_branch_infos', string='PR HEAD name', readonly=1, store=True)
-    target_branch_name = fields.Char(compute='_get_branch_infos', string='PR target branch', readonly=1, store=True)
+    target_branch_name = fields.Char(compute='_get_branch_infos', string='PR target branch', store=True)
     sticky = fields.Boolean('Sticky')
     coverage_result = fields.Float(compute='_compute_coverage_result', type='Float', string='Last coverage', store=False)  # non optimal search in loop, could we store this result ? or optimise
     state = fields.Char('Status')

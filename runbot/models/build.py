@@ -100,7 +100,7 @@ class runbot_build(models.Model):
     log_list = fields.Char('Comma separted list of step_ids names with logs', compute="_compute_log_list", store=True)
 
     @api.depends('config_id')
-    def _compute_log_list(self):  # storing this field beacause it will be access trhoug repo viewn and keep track of the list at create
+    def _compute_log_list(self):  # storing this field because it will be access trhoug repo viewn and keep track of the list at create
         for build in self:
             build.log_list = ','.join({step.name for step in build.config_id.step_ids() if step._has_log()})
 
@@ -113,6 +113,7 @@ class runbot_build(models.Model):
                 waiting_score = record._get_state_score('waiting')
                 if record._get_state_score(record.local_state) > waiting_score and record.children_ids:  # if finish, check children
                     children_state = record._get_youngest_state([child.global_state for child in record.children_ids])
+
                     # if all children are in running/done state (children could't be a duplicate I guess?)
                     if record._get_state_score(children_state) > waiting_score:
                         record.global_state = record.local_state
@@ -238,6 +239,7 @@ class runbot_build(models.Model):
                 # ('build_type', '!=', 'indirect'),  # in case of performance issue, this little fix may improve performance a little but less duplicate will be detected when pushing an empty branch on repo with duplicates
                 '|', ('local_result', '=', False), ('local_result', '!=', 'skipped'),  # had to reintroduce False posibility for selections
                 ('config_id', '=', build_id.config_id.id),
+                ('extra_params', '=', build_id.extra_params),
             ]
             candidates = self.search(domain)
             if candidates and nb_deps:
@@ -576,9 +578,9 @@ class runbot_build(models.Model):
                     pid = build.active_step._run(build)  # run should be on build?
                     build.write({'pid': pid})  # no really usefull anymore with dockers
                 except Exception as e:
-                    message = '%s failed running step %s' % (build.dest, build.job)
+                    message = '%s failed running step %s:\n %s' % (build.dest, build.job, str(e).replace('\\n', '\n').replace("\\'", "'"))
                     _logger.exception(message)
-                    build._log("run", message)
+                    build._log("run", message, level='ERROR')
                     build._kill(result='ko')
                     continue
 
@@ -880,6 +882,14 @@ class runbot_build(models.Model):
 
         new_step = step_ids[next_index]  # job to do, state is job_state (testing or running)
         return {'active_step': new_step.id, 'local_state': new_step._step_state()}
+
+    def read_file(self, file):
+        file_path = self._path(file)
+        try:
+            with open(file_path, 'r') as f:
+                return f.read()
+        except:
+            return False
 
     def build_type_label(self):
         self.ensure_one()
