@@ -111,6 +111,7 @@ class ConfigStep(models.Model):
     hide_build = fields.Boolean('Hide created build in frontend', default=True, tracking=True)
     force_build = fields.Boolean("As a forced rebuild, don't use duplicate detection", default=False, tracking=True)
     force_host = fields.Boolean('Use same host as parent for children', default=False, tracking=True)  # future
+    make_orphan = fields.Boolean('No effect on the parent result', help='Created build result will not affect parent build result', default=False, tracking=True)
 
     @api.constrains('python_code')
     def _check_python_code(self):
@@ -205,6 +206,7 @@ class ConfigStep(models.Model):
                     'subject': build.subject,
                     'modules': build.modules,
                     'hidden': self.hide_build,
+                    'orphan_result': self.make_orphan,
                 })
                 build._log('create_build', 'created with config %s' % create_config.name, log_type='subbuild', path=str(children.id))
 

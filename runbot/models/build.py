@@ -98,6 +98,7 @@ class runbot_build(models.Model):
     config_id = fields.Many2one('runbot.build.config', 'Run Config', required=True, default=lambda self: self.env.ref('runbot.runbot_build_config_default', raise_if_not_found=False))
     real_build = fields.Many2one('runbot.build', 'Real Build', help="duplicate_id or self", compute='_compute_real_build')
     log_list = fields.Char('Comma separted list of step_ids names with logs', compute="_compute_log_list", store=True)
+    orphan_result = fields.Boolean('No effect on the parent result', default=False)
 
     @api.depends('config_id')
     def _compute_log_list(self):  # storing this field because it will be access trhoug repo viewn and keep track of the list at create
@@ -131,20 +132,23 @@ class runbot_build(models.Model):
 
     # random note: need to count hidden in pending and testing build displayed in frontend
 
-    @api.depends('children_ids.global_result', 'local_result', 'duplicate_id.global_result')
+    @api.depends('children_ids.global_result', 'local_result', 'duplicate_id.global_result', 'children_ids.orphan_result')
     def _compute_global_result(self):
         for record in self:  # looks like it's computed twice for children
             if record.duplicate_id:  # would like to avoid to add state as a depends only for this.
                 record.global_result = record.duplicate_id.global_result
-            elif not record.local_result:
+            elif record.local_result and record._get_result_score(record.local_result) >= record._get_result_score('ko'):
                 record.global_result = record.local_result
-            elif record._get_result_score(record.local_result) >= record._get_result_score('ko'):
-                record.global_result = record.local_result
-            elif record.children_ids:
-                children_result = record._get_worst_result([child.global_result for child in record.children_ids], max_res='ko')
-                record.global_result = record._get_worst_result([record.local_result, children_result])
             else:
-                record.global_result = record.local_result
+                children_ids = [child for child in record.children_ids if not child.orphan_result]
+                if children_ids:
+                    children_result = record._get_worst_result([child.global_result for child in children_ids], max_res='ko')
+                    if record.local_result:
+                        record.global_result = record._get_worst_result([record.local_result, children_result])
+                    else:
+                        record.global_result = children_result
+                else:
+                    record.global_result = record.local_result
 
     def _get_worst_result(self, results, max_res=False):
         results = [result for result in results if result]  # filter Falsy values

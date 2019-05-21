@@ -61,6 +61,7 @@
                         <field name="number_builds"/>
                         <field name="hide_build" groups="base.group_no_one"/>
                         <field name="force_build"/>
+                        <field name="make_orphan"/>
                     </group>
                 </sheet>
             </form>
