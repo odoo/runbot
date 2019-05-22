@@ -394,7 +394,7 @@ class runbot_repo(models.Model):
                                 FOR UPDATE OF runbot_build SKIP LOCKED
                             LIMIT %(assignable_slots)s)"""
 
-            self.env.cr.execute(query, {'repo_ids': tuple(ids), 'host': fqdn(), 'assignable_slots': assignable_slots})
+                self.env.cr.execute(query, {'repo_ids': tuple(ids), 'host': fqdn(), 'assignable_slots': assignable_slots})
             pending_build = Build.search(domain_host + [('local_state', '=', 'pending')], limit=available_slots)
             if pending_build:
                 pending_build._schedule()
