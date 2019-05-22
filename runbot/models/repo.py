@@ -358,6 +358,7 @@ class runbot_repo(models.Model):
         # schedule jobs (transitions testing -> running, kill jobs, ...)
         build_ids = Build.search(domain_host + [('local_state', 'in', ['testing', 'running', 'deathrow'])])
         build_ids._schedule()
+        self.env.cr.commit()
 
         # launch new tests
 
@@ -365,7 +366,7 @@ class runbot_repo(models.Model):
         available_slots = workers - nb_testing
         reserved_slots = Build.search_count(domain_host + [('local_state', '=', 'pending')])
         assignable_slots = available_slots - reserved_slots
-        if available_slots > 0: 
+        if available_slots > 0:
             if assignable_slots > 0:  # note: slots have been addapt to be able to force host on pending build. Normally there is no pending with host.
                 # commit transaction to reduce the critical section duration
                 self.env.cr.commit()

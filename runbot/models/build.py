@@ -486,6 +486,7 @@ class runbot_build(models.Model):
         # For retro-compatibility, keep this parameter in seconds
 
         for build in self:
+            self.env.cr.commit()  # commit between each build to minimise transactionnal errors due to state computations
             if build.local_state == 'deathrow':
                 build._kill(result='manually_killed')
                 continue

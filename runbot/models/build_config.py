@@ -237,7 +237,12 @@ class ConfigStep(models.Model):
         smtp_host = docker_get_gateway_ip()
         if smtp_host:
             cmd += ['--smtp', smtp_host]
-        return docker_run(build_odoo_cmd(cmd), log_path, build._path(), build._get_docker_name(), exposed_ports=[build.port, build.port + 1])
+
+        docker_name = build._get_docker_name()
+        build_path = build._path()
+        build_port = build.port
+        self.env.cr.commit()  # commit before docker run to be 100% sure that db state is consistent with dockers
+        return docker_run(build_odoo_cmd(cmd), log_path, build_path, docker_name, exposed_ports=[build_port, build_port + 1])
 
     def _run_odoo_install(self, build, log_path):
         cmd, _ = build._cmd()
