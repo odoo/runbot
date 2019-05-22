@@ -528,7 +528,7 @@ class runbot_build(models.Model):
                 if docker_is_running(build._get_docker_name()):
                     timeout = min(build.active_step.cpu_limit, int(icp.get_param('runbot.runbot_timeout', default=10000)))
                     if build.local_state != 'running' and build.job_time > timeout:
-                        build._log('_schedule', '%s time exceeded (%ss)', build.active_step.name if build.active_step else "?", build.job_time)
+                        build._log('_schedule', '%s time exceeded (%ss)' % (build.active_step.name if build.active_step else "?", build.job_time))
                         build.write({'job_end': now()})
                         build._kill(result='killed')
                     continue
