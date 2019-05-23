@@ -38,7 +38,12 @@
                                 <td><t t-esc="build.sequence" /></td>
                                 <td><t t-esc="build.date" /></td>
                                 <td><a t-attf-href="/runbot/build/{{build['id']}}" title="Build details" aria-label="Build details"><t t-esc="build.dest" /></a></td>
-                                <td><t t-esc="build.subject" /></td>
+                                <td>
+                                    <t t-if="build.config_id != build.branch_id.config_id">
+                                    <b t-esc="build.config_id.name"/>
+                                    </t>
+                                    <t t-esc="build.subject" />
+                                </td>
                                 <td><t t-esc="build.name" /></td>
                                 <td><t t-esc="build.global_result" /></td>
                                 <td><t t-esc="build.global_state" /></td>

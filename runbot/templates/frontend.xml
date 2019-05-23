@@ -133,6 +133,10 @@
                                         <span class="label label-info">cov: <t t-esc="br['branch'].coverage_result"/>%</span>
                                       </t>
                                   </t>
+                                  <t t-if="br['branch'].branch_config_id"><!--custom config on branch-->
+                                    <br/>
+                                    <span class="label label-info"><t t-esc="br['branch'].branch_config_id.name" t-att-title="br['branch'].branch_config_id.description"/></span>
+                                  </t>
                               </td>
                               <t t-foreach="br['builds']" t-as="bu">
                                   <t t-if="bu.global_state=='pending'"><t t-set="klass">default</t></t>
@@ -150,6 +154,9 @@
                                      <t t-if="bu['build_type']=='scheduled'"><i class="fa fa-moon-o" t-att-title="bu.build_type_label()" t-att-aria-label="bu.build_type_label()"/></t>
                                      <t t-if="bu['build_type'] in ('rebuild', 'indirect')"><i class="fa fa-recycle" t-att-title="bu.build_type_label()" t-att-aria-label="bu.build_type_label()"/></t>
                                      <t t-if="bu['subject']">
+                                          <t t-if="bu.config_id != bu.branch_id.config_id">
+                                            <b t-esc="bu.config_id.name"/>
+                                          </t>
                                           <span t-esc="bu['subject'][:32] + ('...' if bu['subject'][32:] else '') " t-att-title="bu['subject']"/>
                                            <br/>
                                       </t>
