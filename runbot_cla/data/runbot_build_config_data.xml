@@ -9,4 +9,7 @@
     <record id="runbot.runbot_build_config_default" model="runbot.build.config">
         <field name="step_order_ids" eval="[(0, 0, {'step_id': ref('runbot_build_config_step_check_cla')})]"/>
     </record>
+    <record id="runbot.runbot_build_config_default_no_run" model="runbot.build.config">
+        <field name="step_order_ids" eval="[(0, 0, {'step_id': ref('runbot_build_config_step_check_cla')})]"/>
+    </record>
 </odoo>
