@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from odoo.addons.runbot.models.res_config_settings import grant_access
 
 
 def migrate(cr, version):
@@ -18,3 +19,9 @@ def migrate(cr, version):
         else:
             install_modules = '-*'
         cr.execute("UPDATE runbot_build_config_step SET install_modules = %s WHERE id=%s", (install_modules, step_id))
+
+    cr.execute("SELECT value FROM ir_config_parameter WHERE key='runbot.runbot_logdb_uri'")
+    res = cr.fetchone()
+    logdb_uri = res[0] if res else None
+    if logdb_uri:
+        grant_access(logdb_uri=logdb_uri, cr=cr)

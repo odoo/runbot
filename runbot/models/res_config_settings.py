@@ -1,7 +1,42 @@
 # -*- coding: utf-8 -*-
+from psycopg2.extensions import AsIs
+import re
+import string
 
 from .. import common
 from odoo import api, fields, models
+from odoo.exceptions import UserError
+
+RE_POSTGRE_URI = re.compile(r'(?P<protocol>postgres|postgresql)://(?P<user>\w+)?:?(?P<password>[\w%s]+)?@?\w+' % string.punctuation.replace('@', ''))
+
+
+def grant_access(logdb_uri='', cr=None):
+    """ validate postgresql uri. See Connections URI:
+        https://www.postgresql.org/docs/10/libpq-connect.html
+        and grant access to the log user
+    """
+    if not logdb_uri:
+        return
+    res = RE_POSTGRE_URI.search(logdb_uri)
+    if not res:
+        raise UserError('Invalid URI in the runbot build logs')
+    if not res.group('user'):
+        raise UserError('A username is required in the runbot URI for build logs')
+    if not res.group('password'):
+        raise UserError('A Password is required in the runbot URI for build logs')
+
+    if cr:
+        cr.execute("SELECT 1 FROM pg_roles WHERE rolname=%s", (res.group('user'), ))
+        user_exists = cr.fetchone()
+        if not user_exists:
+            cr.execute("CREATE USER %s WITH PASSWORD %s", (AsIs(res.group('user')), res.group('password')))
+        else:
+            cr.execute("ALTER USER %s WITH PASSWORD %s", (AsIs(res.group('user')), res.group('password')))
+        cr.execute("GRANT INSERT,SELECT,UPDATE ON ir_logging TO %s", (AsIs(res.group('user')), ))
+        cr.execute("GRANT UPDATE ON ir_logging_id_seq TO %s", (AsIs(res.group('user')), ))
+        cr.execute("GRANT SELECT,UPDATE(triggered_result, log_counter) on runbot_build to %s", (AsIs(res.group('user')), ))
+        cr.execute("GRANT SELECT(id) on runbot_build to %s", (AsIs(res.group('user')), ))
+        cr.execute("GRANT SELECT(active_step) ON runbot_build TO %s", (AsIs(res.group('user')), ))
 
 
 class ResConfigSettings(models.TransientModel):
@@ -43,6 +78,11 @@ class ResConfigSettings(models.TransientModel):
         set_param("runbot.runbot_starting_port", self.runbot_starting_port)
         set_param("runbot.runbot_domain", self.runbot_domain)
         set_param("runbot.runbot_max_age", self.runbot_max_age)
-        set_param("runbot.runbot_logdb_uri", self.runbot_logdb_uri)
+        if self.runbot_logdb_uri != self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_logdb_uri'):
+            self._grant_access()
+            set_param("runbot.runbot_logdb_uri", self.runbot_logdb_uri)
         set_param('runbot.runbot_update_frequency', self.runbot_update_frequency)
         set_param('runbot.runbot_message', self.runbot_message)
+
+    def _grant_access(self):
+        grant_access(cr=self.env.cr, logdb_uri=self.runbot_logdb_uri)
