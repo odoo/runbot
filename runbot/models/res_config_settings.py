@@ -15,6 +15,7 @@ class ResConfigSettings(models.TransientModel):
     runbot_max_age = fields.Integer('Max branch age (in days)')
     runbot_logdb_uri = fields.Char('Runbot URI for build logs')
     runbot_update_frequency = fields.Integer('Update frequency (in seconds)')
+    runbot_message = fields.Text('Frontend warning message')
 
     @api.model
     def get_values(self):
@@ -28,6 +29,7 @@ class ResConfigSettings(models.TransientModel):
                    runbot_max_age=int(get_param('runbot.runbot_max_age', default=30)),
                    runbot_logdb_uri=get_param('runbot.runbot_logdb_uri', default=False),
                    runbot_update_frequency=int(get_param('runbot.runbot_update_frequency', default=10)),
+                   runbot_message = get_param('runbot.runbot_message', default=''),
                    )
         return res
 
@@ -43,3 +45,4 @@ class ResConfigSettings(models.TransientModel):
         set_param("runbot.runbot_max_age", self.runbot_max_age)
         set_param("runbot.runbot_logdb_uri", self.runbot_logdb_uri)
         set_param('runbot.runbot_update_frequency', self.runbot_update_frequency)
+        set_param('runbot.runbot_message', self.runbot_message)
