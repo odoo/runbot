@@ -97,6 +97,9 @@
                               </p>
                             </div>
                           </nav>
+                          <div t-if="message" class="alert alert-warning" role="alert">
+                            <t t-esc="message" />
+                          </div>
                           <div t-if="not repo" class="mb32">
                               <h1>No Repository yet.</h1>
                           </div>

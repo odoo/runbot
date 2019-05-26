@@ -128,6 +128,8 @@ class Runbot(Controller):
                     'testing': build_obj.search_count([('local_state', '=', 'testing'), ('host', '=', result['host'])]),
                     'running': build_obj.search_count([('local_state', '=', 'running'), ('host', '=', result['host'])]),
                 })
+
+        context.update({'message': request.env['ir.config_parameter'].sudo().get_param('runbot.runbot_message')})
         return request.render('runbot.repo', context)
 
     @route(['/runbot/build/<int:build_id>/kill'], type='http', auth="user", methods=['POST'], csrf=False)
