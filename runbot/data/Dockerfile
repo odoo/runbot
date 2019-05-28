@@ -56,10 +56,14 @@ RUN curl -sSL https://deb.nodesource.com/gpgkey/nodesource.gpg.key | apt-key add
 
 RUN npm install -g rtlcss
 
+# Install es-check tool
+RUN npm install -g es-check
+
 # Install Odoo Debian dependencies
 ADD https://raw.githubusercontent.com/odoo/odoo/10.0/debian/control /tmp/p2-control
 ADD https://raw.githubusercontent.com/odoo/odoo/master/debian/control /tmp/p3-control
 RUN pip install -U setuptools wheel \
+    && apt-get update \
     && sed -n '/^Depends:/,/^[A-Z]/p' /tmp/p2-control /tmp/p3-control | awk '/^ [a-z]/ { gsub(/,/,"") ; print }' | sort -u | sed 's/python-imaging/python-pil/'| sed 's/python-pypdf/python-pypdf2/' | DEBIAN_FRONTEND=noninteractive xargs apt-get install -y -qq \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
