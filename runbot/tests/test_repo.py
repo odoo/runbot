@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
+import datetime
 from unittest import skip
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 from odoo.tests import common
 import logging
 import odoo
@@ -152,6 +153,30 @@ class Test_Repo(common.TransactionCase):
 
         _logger.info('Create pending builds took: %ssec', (time.time() - inserted_time))
 
+    def test_github(self):
+        """ Test different github responses or failures"""
+        repo = self.Repo.create({'name': 'bla@example.com:foo/foo'})
+        self.assertEqual(repo._github('/repos/:owner/:repo/statuses/abcdef', dict(), ignore_errors=True), None, 'A repo without token should return None')
+        repo.token = 'abc'
+        with patch('odoo.addons.runbot.models.repo.requests.Session') as mock_session:
+            with self.assertRaises(Exception, msg='should raise an exception with ignore_errors=False'):
+                mock_session.return_value.post.side_effect = Exception('301: Bad gateway')
+                repo._github('/repos/:owner/:repo/statuses/abcdef', {'foo': 'bar'}, ignore_errors=False)
+
+            mock_session.return_value.post.reset_mock()
+            with self.assertLogs(logger='odoo.addons.runbot.models.repo') as assert_log:
+                repo._github('/repos/:owner/:repo/statuses/abcdef', {'foo': 'bar'}, ignore_errors=True)
+                self.assertIn('Ignored github error', assert_log.output[0])
+
+            self.assertEqual(2, mock_session.return_value.post.call_count, "_github method should try two times by default")
+
+            mock_session.return_value.post.reset_mock()
+            mock_session.return_value.post.side_effect = [Exception('301: Bad gateway'), Mock()]
+            with self.assertLogs(logger='odoo.addons.runbot.models.repo') as assert_log:
+                repo._github('/repos/:owner/:repo/statuses/abcdef', {'foo': 'bar'}, ignore_errors=True)
+                self.assertIn('Success after 2 tries', assert_log.output[0])
+
+            self.assertEqual(2, mock_session.return_value.post.call_count, "_github method should try two times by default")
 
 class Test_Repo_Scheduler(common.TransactionCase):
 

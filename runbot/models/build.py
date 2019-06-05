@@ -858,10 +858,13 @@ class runbot_build(models.Model):
         """Notify each repo with a status"""
         self.ensure_one()
         if self.config_id.update_github_state:
-            commits = {(b.repo_id, b.name) for b in self.search([('name', '=', self.name)])}
-            for repo, commit_hash in commits:
-                _logger.debug("github updating %s status %s to %s in repo %s", status['context'], commit_hash, status['state'], repo.name)
-                repo._github('/repos/:owner/:repo/statuses/%s' % commit_hash, status, ignore_errors=True)
+            repos = {b.repo_id for b in self.search([('name', '=', self.name)])}
+            for repo in repos:
+                _logger.debug("github updating %s status %s to %s in repo %s", status['context'], self.name, status['state'], repo.name)
+                try:
+                    repo._github('/repos/:owner/:repo/statuses/%s' % self.name, status, ignore_errors=True)
+                except Exception:
+                    self._log('_github_status_notify_all', 'Status notification failed for "%s" in repo "%s"' % (self.name, repo.name))
 
     def _github_status(self):
         """Notify github of failed/successful builds"""
