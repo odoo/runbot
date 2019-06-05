@@ -123,31 +123,39 @@ class runbot_repo(models.Model):
             return False
         return True
 
-    def _github(self, url, payload=None, ignore_errors=False):
+    def _github(self, url, payload=None, ignore_errors=False, nb_tries=2):
         """Return a http request to be sent to github"""
         for repo in self:
             if not repo.token:
                 return
-            try:
-                match_object = re.search('([^/]+)/([^/]+)/([^/.]+(.git)?)', repo.base)
-                if match_object:
-                    url = url.replace(':owner', match_object.group(2))
-                    url = url.replace(':repo', match_object.group(3))
-                    url = 'https://api.%s%s' % (match_object.group(1), url)
-                    session = requests.Session()
-                    session.auth = (repo.token, 'x-oauth-basic')
-                    session.headers.update({'Accept': 'application/vnd.github.she-hulk-preview+json'})
-                    if payload:
-                        response = session.post(url, data=json.dumps(payload))
-                    else:
-                        response = session.get(url)
-                    response.raise_for_status()
-                    return response.json()
-            except Exception:
-                if ignore_errors:
-                    _logger.exception('Ignored github error %s %r', url, payload)
-                else:
-                    raise
+            match_object = re.search('([^/]+)/([^/]+)/([^/.]+(.git)?)', repo.base)
+            if match_object:
+                url = url.replace(':owner', match_object.group(2))
+                url = url.replace(':repo', match_object.group(3))
+                url = 'https://api.%s%s' % (match_object.group(1), url)
+                session = requests.Session()
+                session.auth = (repo.token, 'x-oauth-basic')
+                session.headers.update({'Accept': 'application/vnd.github.she-hulk-preview+json'})
+                try_count = 0
+                while try_count < nb_tries:
+                    try:
+                        if payload:
+                            response = session.post(url, data=json.dumps(payload))
+                        else:
+                            response = session.get(url)
+                        response.raise_for_status()
+                        if try_count > 0:
+                            _logger.info('Success after %s tries' % (try_count + 1))
+                        return response.json()
+                    except Exception as e:
+                        try_count += 1
+                        if try_count < nb_tries:
+                            time.sleep(2)
+                        else:
+                            if ignore_errors:
+                                _logger.exception('Ignored github error %s %r (try %s/%s)' % (url, payload, try_count + 1, nb_tries))
+                            else:
+                                raise
 
     def _get_fetch_head_time(self):
         self.ensure_one()
