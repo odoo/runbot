@@ -44,6 +44,7 @@ RUN curl -sSL https://bitbucket.org/ariya/phantomjs/downloads/phantomjs-2.1.1-li
 
 # Install wkhtml
 RUN curl -sSL https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.5/wkhtmltox_0.12.5-1.bionic_amd64.deb -o /tmp/wkhtml.deb \
+    && apt-get update \
     && dpkg --force-depends -i /tmp/wkhtml.deb \
     && apt-get install -y -f --no-install-recommends \
     && rm /tmp/wkhtml.deb
