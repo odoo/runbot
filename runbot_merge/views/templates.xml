@@ -27,6 +27,7 @@
             .pr-listing > * { display: inline-block; }
             .pr-awaiting { opacity: 0.8; }
             .pr-blocked { opacity: 0.6; }
+            .pr-failed { opacity: 0.9; }
             </style>
         </t>
         <t t-call="website.layout">
@@ -70,6 +71,24 @@
                             <h5>Blocked</h5>
                             <ul class="list-inline">
                                 <li t-foreach="blocked" t-as="pr">
+                                    <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
+                                       t-att-title="pr.message.split('\n')[0]">
+                                        <t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                        <t t-set="failed" t-value="
+                            project.env['runbot_merge.pull_requests'].search([
+                                ('target', '=', branch.id),
+                                ('state', '=', 'error'),
+                                ('staging_id', '=', False),
+                            ])
+                        "/>
+                        <div t-if="failed" class="pr-listing pr-failed bg-danger">
+                            <h5>Failed</h5>
+                            <ul class="list-inline">
+                                <li t-foreach="failed" t-as="pr">
                                     <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
                                        t-att-title="pr.message.split('\n')[0]">
                                         <t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/>
