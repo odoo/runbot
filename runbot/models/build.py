@@ -890,12 +890,13 @@ class runbot_build(models.Model):
         new_step = step_ids[next_index]  # job to do, state is job_state (testing or running)
         return {'active_step': new_step.id, 'local_state': new_step._step_state()}
 
-    def read_file(self, file):
+    def read_file(self, file, mode='r'):
         file_path = self._path(file)
         try:
-            with open(file_path, 'r') as f:
+            with open(file_path, mode) as f:
                 return f.read()
-        except:
+        except Exception as e:
+            self._log('readfile', 'exception: %s' % e)
             return False
 
     def build_type_label(self):
