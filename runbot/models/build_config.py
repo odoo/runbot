@@ -1,3 +1,4 @@
+import base64
 import glob
 import logging
 import os
@@ -211,7 +212,23 @@ class ConfigStep(models.Model):
                 build._log('create_build', 'created with config %s' % create_config.name, log_type='subbuild', path=str(children.id))
 
     def _run_python(self, build, log_path):
-        eval_ctx = {'self': self, 'build': build, 'log_path': log_path, 'docker_run': docker_run, 'glob': glob, '_logger': _logger, 'build_odoo_cmd': build_odoo_cmd}
+        eval_ctx = {
+            'self': self,
+            'fields': fields,
+            'models': models,
+            'build': build,
+            'docker_run': docker_run,
+            '_logger': _logger,
+            'log_path': log_path,
+            'glob': glob.glob,
+            'build_odoo_cmd': build_odoo_cmd,
+            'base64': base64,
+            're': re,
+            'time': time,
+            'grep': grep,
+            'get_py_version': get_py_version,
+            'rfind': rfind,
+        }
         return safe_eval(self.sudo().python_code.strip(), eval_ctx, mode="exec", nocopy=True)
 
     def _run_odoo_run(self, build, log_path):
