@@ -60,6 +60,10 @@ RUN npm install -g rtlcss
 # Install es-check tool
 RUN npm install -g es-check
 
+# Install for migration scripts
+RUN apt-get update \
+    && apt-get install -y python3-markdown
+
 # Install Odoo Debian dependencies
 ADD https://raw.githubusercontent.com/odoo/odoo/10.0/debian/control /tmp/p2-control
 ADD https://raw.githubusercontent.com/odoo/odoo/master/debian/control /tmp/p3-control
