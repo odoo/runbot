@@ -370,32 +370,44 @@ class runbot_repo(models.Model):
         if available_slots > 0:
             if assignable_slots > 0:  # note: slots have been addapt to be able to force host on pending build. Normally there is no pending with host.
                 # commit transaction to reduce the critical section duration
-                self.env.cr.commit()
-                # self-assign to be sure that another runbot instance cannot self assign the same builds
-                query = """UPDATE
-                                runbot_build
-                            SET
-                                host = %(host)s
-                            WHERE
-                                runbot_build.id IN (
-                                    SELECT
-                                        runbot_build.id
-                                    FROM
-                                        runbot_build
-                                    LEFT JOIN runbot_branch ON runbot_branch.id = runbot_build.branch_id
+                def allocate_builds(where_clause, limit):
+                    self.env.cr.commit()
+                    # self-assign to be sure that another runbot instance cannot self assign the same builds
+                    query = """UPDATE
+                                    runbot_build
+                                SET
+                                    host = %%(host)s
                                 WHERE
-                                    runbot_build.repo_id IN %(repo_ids)s
-                                    AND runbot_build.local_state = 'pending'
-                                    AND runbot_build.host IS NULL
-                                ORDER BY
-                                    runbot_branch.sticky DESC,
-                                    runbot_branch.priority DESC,
-                                    array_position(array['normal','rebuild','indirect','scheduled']::varchar[], runbot_build.build_type) ASC,
-                                    runbot_build.sequence ASC
-                                FOR UPDATE OF runbot_build SKIP LOCKED
-                            LIMIT %(assignable_slots)s)"""
+                                    runbot_build.id IN (
+                                        SELECT runbot_build.id
+                                        FROM runbot_build
+                                        LEFT JOIN runbot_branch
+                                        ON runbot_branch.id = runbot_build.branch_id
+                                        WHERE
+                                            runbot_build.repo_id IN %%(repo_ids)s
+                                            AND runbot_build.local_state = 'pending'
+                                            AND runbot_build.host IS NULL
+                                            %s
+                                        ORDER BY
+                                            array_position(array['normal','rebuild','indirect','scheduled']::varchar[], runbot_build.build_type) ASC,
+                                            runbot_branch.sticky DESC,
+                                            runbot_branch.priority DESC,
+                                            runbot_build.sequence ASC
+                                        FOR UPDATE OF runbot_build SKIP LOCKED
+                                        LIMIT %%(limit)s
+                                    )
+                                RETURNING id""" % where_clause
 
-                self.env.cr.execute(query, {'repo_ids': tuple(ids), 'host': fqdn(), 'assignable_slots': assignable_slots})
+                    self.env.cr.execute(query, {'repo_ids': tuple(ids), 'host': fqdn(), 'limit': limit})
+                    return self.env.cr.fetchall()
+
+                allocated = allocate_builds("""AND runbot_build.build_type != 'scheduled'""", assignable_slots)
+                _logger.debug('Normal builds %s where allocated to runbot' % allocated)
+                weak_slot = assignable_slots - len(allocated) - 1
+                if weak_slot > 0:
+                    allocated = allocate_builds('', weak_slot)
+                    _logger.debug('Scheduled builds %s where allocated to runbot' % allocated)
+
             pending_build = Build.search(domain_host + [('local_state', '=', 'pending')], limit=available_slots)
             if pending_build:
                 pending_build._schedule()
