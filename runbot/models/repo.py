@@ -347,9 +347,10 @@ class runbot_repo(models.Model):
         if not ids:
             return
         icp = self.env['ir.config_parameter']
-        workers = int(icp.get_param('runbot.runbot_workers', default=6))
-        running_max = int(icp.get_param('runbot.runbot_running_max', default=75))
         host = fqdn()
+        settings_workers = int(icp.get_param('runbot.runbot_workers', default=6))
+        workers = int(icp.get_param('%s.workers' % host, default=settings_workers))
+        running_max = int(icp.get_param('runbot.runbot_running_max', default=75))
 
         Build = self.env['runbot.build']
         domain = [('repo_id', 'in', ids)]
