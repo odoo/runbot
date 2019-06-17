@@ -377,11 +377,7 @@ class runbot_build(models.Model):
             else:
                 sequence = self.search([], order='id desc', limit=1)[0].id
             # Force it now
-            rebuild = True
-            if build.local_state == 'done' and build.local_result == 'skipped':
-                build.write({'local_state': 'pending', 'sequence': sequence, 'local_result': ''})
-            # or duplicate it
-            elif build.local_state in ['running', 'done', 'duplicate', 'deathrow']:
+            if build.local_state in ['running', 'done', 'duplicate', 'deathrow']:
                 values = {
                     'sequence': sequence,
                     'branch_id': build.branch_id.id,
@@ -412,15 +408,11 @@ class runbot_build(models.Model):
                         build.orphan_result = True  # set result of build as orphan
 
                 new_build = build.with_context(force_rebuild=True).create(values)
-                build = new_build
-            else:
-                rebuild = False
-            if rebuild:
-                forced_builds |= build
+                forced_builds |= new_build
                 user = request.env.user if request else self.env.user
-                build._log('rebuild', 'Rebuild initiated by %s' % user.name)
+                new_build._log('rebuild', 'Rebuild initiated by %s' % user.name)
                 if message:
-                    build._log('rebuild', message)
+                    new_build._log('rebuild', new_build)
         return forced_builds
 
     def _skip(self, reason=None):
