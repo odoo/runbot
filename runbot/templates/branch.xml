@@ -13,16 +13,13 @@
                     <table class="table table-condensed table-stripped" style="table-layout: initial;">
                         <thead>
                             <tr>
-                                <th>Seq</th>
-                                <th>Date</th>
+                                <th>Create date</th>
                                 <th>Dest</th>
                                 <th>Subject</th>
-                                <th>Revno</th>
                                 <th>result</th>
                                 <th>state</th>
                                 <th>host</th>
-                                <th>job</th>
-                                <th>duration</th>
+                                <th>Build duration</th>
                                 <th>type</th>
                             </tr>
                         </thead>
@@ -35,12 +32,11 @@
                                 <t t-if="build.global_result in ['killed', 'manually_killed']"><t t-set="rowclass">killed</t></t>
                             </t>
                             <tr t-attf-class="{{rowclass}}">
-                                <td><t t-esc="build.sequence" /></td>
-                                <td><t t-esc="build.date" /></td>
+                                <td><t t-esc="build.create_date" /></td>
                                 <td><a t-attf-href="/runbot/build/{{build['id']}}" title="Build details" aria-label="Build details"><t t-esc="build.dest" /></a></td>
                                 <td>
                                     <t t-if="build.config_id != build.branch_id.config_id">
-                                    <b t-esc="build.config_id.name"/>
+                                        <b t-esc="build.config_id.name"/>
                                     </t>
                                     <t t-esc="build.subject" />
                                 </td>
@@ -48,8 +44,7 @@
                                 <td><t t-esc="build.global_result" /></td>
                                 <td><t t-esc="build.global_state" /></td>
                                 <td><t t-esc="build.real_build.host" /></td>
-                                <td><t t-esc="build.active_step.name" /></td>
-                                <td><t t-esc="build.job_time" /></td>
+                                <td><t t-esc="build.build_time" /></td>
                                 <td><t t-esc="build.build_type" /></td>
                             </tr>
                         </t>
