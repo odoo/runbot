@@ -136,10 +136,13 @@ class Runbot(Controller):
         build._ask_kill()
         return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id + ('?search=%s' % search if search else ''))
 
-    @route(['/runbot/build/<int:build_id>/force'], type='http', auth="public", methods=['POST'], csrf=False)
-    def build_force(self, build_id, search=None, **post):
+    @route([
+        '/runbot/build/<int:build_id>/force',
+        '/runbot/build/<int:build_id>/force/<int:exact>',
+    ], type='http', auth="public", methods=['POST'], csrf=False)
+    def build_force(self, build_id, exact=0, search=None, **post):
         build = request.env['runbot.build'].sudo().browse(build_id)
-        build._force()
+        build._force(exact=bool(exact))
         return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id + ('?search=%s' % search if search else ''))
 
     @route(['/runbot/build/<int:build_id>'], type='http', auth="public", website=True)
