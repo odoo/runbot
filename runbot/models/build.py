@@ -199,6 +199,7 @@ class runbot_build(models.Model):
         dep_create_vals = []
         nb_deps = len(repo.dependency_ids)
         params = build_id._get_params()
+        build_id._log('create', 'Build created') # mainly usefull to log creation time
         if not vals.get('dependency_ids'):
             for extra_repo in repo.dependency_ids:
                 repo_name = extra_repo.short_name
