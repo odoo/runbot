@@ -52,9 +52,9 @@
                         <field name="db_name" groups="base.group_no_one"/>
                         <field name="cpu_limit" groups="base.group_no_one"/>
                         <field name="coverage"/>
-                        <field name="test_enable" groups="base.group_no_one"/>
+                        <field name="test_enable"/>
                         <field name="test_tags"/>
-                        <field name="extra_params" groups="base.group_no_one"/>
+                        <field name="extra_params"/>
                     </group>
                     <group string="Create settings" attrs="{'invisible': [('job_type', 'not in', ('python', 'create_build'))]}">
                         <field name="create_config_ids" widget="many2many_tags" options="{'no_create': True}" />

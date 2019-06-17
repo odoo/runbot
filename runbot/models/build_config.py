@@ -100,7 +100,7 @@ class ConfigStep(models.Model):
     db_name = fields.Char('Db Name', compute='_compute_db_name', inverse='_inverse_db_name', tracking=True)
     cpu_limit = fields.Integer('Cpu limit', default=3600, tracking=True)
     coverage = fields.Boolean('Coverage', dafault=False, tracking=True)
-    test_enable = fields.Boolean('Test enable', default=False, tracking=True)
+    test_enable = fields.Boolean('Test enable', default=True, tracking=True)
     test_tags = fields.Char('Test tags', help="comma separated list of test tags")
     extra_params = fields.Char('Extra cmd args', tracking=True)
     # python
