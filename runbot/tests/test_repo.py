@@ -6,6 +6,8 @@ import logging
 import odoo
 import time
 
+import datetime
+
 _logger = logging.getLogger(__name__)
 
 
@@ -56,7 +58,7 @@ class Test_Repo(common.TransactionCase):
 
         self.commit_list = [('refs/heads/bidon',
                              'd0d0caca',
-                             '2019-04-29 13:03:17 +0200',
+                             datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
                              'Marc Bidule',
                              '<marc.bidule@somewhere.com>',
                              'A nice subject',
@@ -71,6 +73,7 @@ class Test_Repo(common.TransactionCase):
         self.assertEqual(branch.name, 'refs/heads/bidon', 'A new branch should have been created')
 
         build = self.env['runbot.build'].search([('repo_id', '=', repo.id), ('branch_id', '=', branch.id)])
+        self.assertEqual(len(build), 1, 'Build found')
         self.assertEqual(build.subject, 'A nice subject')
         self.assertEqual(build.local_state, 'pending')
         self.assertFalse(build.local_result)
@@ -78,7 +81,7 @@ class Test_Repo(common.TransactionCase):
         # Simulate that a new commit is found in the other repo
         self.commit_list = [('refs/heads/bidon',
                              'deadbeef',
-                             '2019-04-29 13:05:30 +0200',
+                             datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
                              'Marc Bidule',
                              '<marc.bidule@somewhere.com>',
                              'A better subject',
@@ -99,7 +102,7 @@ class Test_Repo(common.TransactionCase):
         # A new commit is found in the first repo, the previous pending build should be skipped
         self.commit_list = [('refs/heads/bidon',
                              'b00b',
-                             '2019-04-29 13:07:30 +0200',
+                             datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
                              'Marc Bidule',
                              '<marc.bidule@somewhere.com>',
                              'Another subject',
@@ -136,7 +139,7 @@ class Test_Repo(common.TransactionCase):
         for i in range(20005):
             self.commit_list.append(['refs/heads/bidon-%05d' % i,
                                      'd0d0caca %s' % i,
-                                     '2019-04-29 13:03:17 +0200',
+                                     datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
                                      'Marc Bidule',
                                      '<marc.bidule@somewhere.com>',
                                      'A nice subject',
