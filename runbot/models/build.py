@@ -519,7 +519,6 @@ class runbot_build(models.Model):
                 build.write(values)
                 if not build.active_step:
                     build._log('_schedule', 'No job in config, doing nothing')
-                    #build._end_test()
                     continue
                 try:
                     build._log('_schedule', 'Init build environment with config %s ' % build.config_id.name)
@@ -544,7 +543,6 @@ class runbot_build(models.Model):
                     timeout = min(build.active_step.cpu_limit, int(icp.get_param('runbot.runbot_timeout', default=10000)))
                     if build.local_state != 'running' and build.job_time > timeout:
                         build._log('_schedule', '%s time exceeded (%ss)' % (build.active_step.name if build.active_step else "?", build.job_time))
-                        build.write({'job_end': now()})
                         build._kill(result='killed')
                     continue
                 # No job running, make result and select nex job
@@ -780,7 +778,9 @@ class runbot_build(models.Model):
                 continue
             build._log('kill', 'Kill build %s' % build.dest)
             docker_stop(build._get_docker_name())
-            v = {'local_state': 'done', 'active_step': False, 'duplicate': False}  # what if duplicate? state done?
+            v = {'local_state': 'done', 'active_step': False, 'duplicate': False, 'build_end': now()}  # what if duplicate? state done?
+            if not build.job_end:
+                v['job_end'] = now()
             if result:
                 v['local_result'] = result
             build.write(v)
