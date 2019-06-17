@@ -367,7 +367,7 @@ class runbot_build(models.Model):
                 params['dep'][result[0]] = result[1]
         return params
 
-    def _force(self, message=None):
+    def _force(self, message=None, exact=False):
         """Force a rebuild and return a recordset of forced builds"""
         forced_builds = self.env['runbot.build']
         for build in self:
@@ -382,10 +382,11 @@ class runbot_build(models.Model):
                 build.write({'local_state': 'pending', 'sequence': sequence, 'local_result': ''})
             # or duplicate it
             elif build.local_state in ['running', 'done', 'duplicate', 'deathrow']:
-                new_build = build.with_context(force_rebuild=True).create({
+                values = {
                     'sequence': sequence,
                     'branch_id': build.branch_id.id,
                     'name': build.name,
+                    'date': build.date,
                     'author': build.author,
                     'author_email': build.author_email,
                     'committer': build.committer,
@@ -393,10 +394,24 @@ class runbot_build(models.Model):
                     'subject': build.subject,
                     'modules': build.modules,
                     'build_type': 'rebuild',
-                    # 'config_id': build.config_id.id,
-                    # we use the branch config for now since we are recomputing dependencies,
-                    # we may introduce an 'exact rebuild' later
-                })
+                }
+                if exact:
+                    values.update({
+                        'config_id': build.config_id.id,
+                        'extra_params': build.extra_params,
+                        'dependency_ids': build.dependency_ids,
+                        'server_match': build.server_match,
+                        'orphan_result': build.orphan_result,
+                    })
+                    #if replace: ?
+                    if build.parent_id:
+                        values.update({
+                            'parent_id': build.parent_id.id,  # attach it to parent
+                            'hidden': build.hidden,
+                        })
+                        build.orphan_result = True  # set result of build as orphan
+
+                new_build = build.with_context(force_rebuild=True).create(values)
                 build = new_build
             else:
                 rebuild = False
