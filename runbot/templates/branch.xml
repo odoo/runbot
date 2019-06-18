@@ -40,7 +40,6 @@
                                     </t>
                                     <t t-esc="build.subject" />
                                 </td>
-                                <td><t t-esc="build.name" /></td>
                                 <td><t t-esc="build.global_result" /></td>
                                 <td><t t-esc="build.global_state" /></td>
                                 <td><t t-esc="build.real_build.host" /></td>

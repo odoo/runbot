@@ -66,11 +66,13 @@
                         <li><a t-attf-href="http://{{bu['domain']}}/?db={{bu['real_build'].dest}}-base">Connect base <i class="fa fa-sign-in"></i></a></li>
                         <li><a t-attf-href="http://{{bu['domain']}}/">Connect <i class="fa fa-sign-in"></i></a></li>
                     </t>
-                    <li t-if="bu.global_state in ['done','running','deathrow'] and bu_index==0" groups="base.group_user">
-                        <a href="#" class="runbot-rebuild" t-att-data-runbot-build="bu['id']"
-                          title="Create a new build keeping build commit head, but will recompute all other info (config, dependencies, extra_params)">
-                        Default Rebuild <i class="fa fa-refresh"/>
-                        </a>
+                    <li t-if="bu.global_state in ['done','running','deathrow']" groups="base.group_user">
+                        <t t-if="bu_index==0">
+                          <a href="#" class="runbot-rebuild" t-att-data-runbot-build="bu['id']"
+                            title="Create a new build keeping build commit head, but will recompute all other info (config, dependencies, extra_params)">
+                          Default Rebuild <i class="fa fa-refresh"/>
+                          </a>
+                        </t>
                         <a href="#" class="runbot-rebuild-exact" t-att-data-runbot-build="bu['id']"
                           title="Create a new build keeping all build info (config, dependencies, extra_params)">
                         Exact Rebuild <i class="fa fa-refresh"/>
