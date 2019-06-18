@@ -90,7 +90,7 @@
                               <p class="text-center">
                                   <t  t-foreach="host_stats" t-as="hs">
                                   <span class="label label-default">
-                                      <t t-esc="hs['host']"/>: <t t-esc="hs['testing']"/> testing, <t t-esc="hs['running']"/> running
+                                      <t t-esc="hs['host']"/>: <t t-esc="hs['testing']"/> testing
                                   </span>&amp;nbsp;
                                   </t>
                                   <span t-attf-class="label label-{{pending_level}}">Pending: <t t-esc="pending_total"/></span>
