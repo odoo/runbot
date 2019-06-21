@@ -56,9 +56,9 @@ class runbot_build(models.Model):
     local_result = fields.Selection(make_selection(result_order), string='Build Result', oldname='result')
     triggered_result = fields.Selection(make_selection(result_order), string='Triggered Result')  # triggered by db only
 
-    nb_pending = fields.Integer("Number of pending in queue", compute='_compute_nb_children', store=True)
-    nb_testing = fields.Integer("Number of test slot use", compute='_compute_nb_children', store=True)
-    nb_running = fields.Integer("Number of test slot use", compute='_compute_nb_children', store=True)
+    nb_pending = fields.Integer("Number of pending in queue", default=0)
+    nb_testing = fields.Integer("Number of test slot use", default=0)
+    nb_running = fields.Integer("Number of test slot use", default=0)
 
     # should we add a stored field for children results?
     pid = fields.Integer('Pid')
@@ -107,15 +107,14 @@ class runbot_build(models.Model):
 
     @api.depends('children_ids.global_state', 'local_state', 'duplicate_id.global_state')
     def _compute_global_state(self):
+        # could we use nb_pending / nb_testing ? not in a compute, but in a update state method
         for record in self:
             if record.duplicate_id:
-                record.global_state = record.duplicate_id.global_state  # not sure this is correct, redundant with real_build.global_state,
+                record.global_state = record.duplicate_id.global_state
             else:
                 waiting_score = record._get_state_score('waiting')
                 if record._get_state_score(record.local_state) > waiting_score and record.children_ids:  # if finish, check children
                     children_state = record._get_youngest_state([child.global_state for child in record.children_ids])
-
-                    # if all children are in running/done state (children could't be a duplicate I guess?)
                     if record._get_state_score(children_state) > waiting_score:
                         record.global_state = record.local_state
                     else:
@@ -134,8 +133,8 @@ class runbot_build(models.Model):
 
     @api.depends('children_ids.global_result', 'local_result', 'duplicate_id.global_result', 'children_ids.orphan_result')
     def _compute_global_result(self):
-        for record in self:  # looks like it's computed twice for children
-            if record.duplicate_id:  # would like to avoid to add state as a depends only for this.
+        for record in self:
+            if record.duplicate_id:
                 record.global_result = record.duplicate_id.global_result
             elif record.local_result and record._get_result_score(record.local_result) >= record._get_result_score('ko'):
                 record.global_result = record.local_result
@@ -160,17 +159,22 @@ class runbot_build(models.Model):
     def _get_result_score(self, result):
         return result_order.index(result)
 
-    @api.depends('local_state', 'children_ids.nb_pending', 'children_ids.nb_testing', 'children_ids.nb_running')
-    def _compute_nb_children(self):
+    def _update_nb_children(self, new_state, old_state=None):
+        # could be interresting to update state in batches.
+        tracked_count_list = ['pending', 'testing', 'running']
+        if (new_state not in tracked_count_list and old_state not in tracked_count_list) or new_state == old_state:
+            return
+
         for record in self:
-            # note, we don't need to take care of duplicates, count will be 0 wich is right
-            record.nb_pending = int(record.local_state == 'pending')
-            record.nb_testing = int(record.local_state == 'testing')
-            record.nb_running = int(record.local_state == 'running')
-            for child in record.children_ids:
-                record.nb_pending += child.nb_pending
-                record.nb_testing += child.nb_testing
-                record.nb_running += child.nb_running
+            values = {}
+            if old_state in tracked_count_list:
+                values['nb_%s' % old_state] = record['nb_%s' % old_state] - 1
+            if new_state in tracked_count_list:
+                values['nb_%s' % new_state] = record['nb_%s' % new_state] + 1
+
+            record.write(values)
+            if record.parent_id:
+                record.parent_id._update_nb_children(new_state, old_state)
 
     @api.depends('real_build.active_step')
     def _compute_job(self):
@@ -282,10 +286,18 @@ class runbot_build(models.Model):
         build_id.write(extra_info)
         if build_id.local_state == 'duplicate' and build_id.duplicate_id.global_state in ('running', 'done'):  # and not build_id.parent_id:
             build_id._github_status()
+
+        build_id._update_nb_children(build_id.local_state)
         return build_id
 
     def write(self, values):
         # some validation to ensure db consistency
+        if 'local_state' in values:
+            build_by_old_values = defaultdict(lambda: self.env['runbot.build'])
+            for record in self:
+                build_by_old_values[record.local_state] += record
+            for local_state, builds in build_by_old_values.items():
+                builds._update_nb_children(values.get('local_state'), local_state)
         assert 'state' not in values
         local_result = values.get('local_result')
         for build in self:
