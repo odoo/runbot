@@ -225,6 +225,14 @@ class Test_Build(common.TransactionCase):
         assert_state(0, 1, 0, 'testing', build1_1_1)
         assert_state(1, 0, 0, 'pending', build1_1_2)
 
+        build1_2.local_state = 'testing'  # writing same state a second time
+
+        assert_state(1, 2, 0, 'waiting', build1)
+        assert_state(1, 1, 0, 'waiting', build1_1)
+        assert_state(0, 1, 0, 'testing', build1_2)
+        assert_state(0, 1, 0, 'testing', build1_1_1)
+        assert_state(1, 0, 0, 'pending', build1_1_2)
+
         build1_1_2.local_state = 'done'
         build1_1_1.local_state = 'done'
         build1_2.local_state = 'done'
