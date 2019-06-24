@@ -36,7 +36,7 @@ class runbot_repo(models.Model):
                             default='poll',
                             string="Mode", required=True, help="hook: Wait for webhook on /runbot/hook/<id> i.e. github push event")
     hook_time = fields.Datetime('Last hook time')
-    get_ref_time = fields.Datetime('Last refs db update')
+    get_ref_time = fields.Float('Last refs db update')
     duplicate_id = fields.Many2one('runbot.repo', 'Duplicate repo', help='Repository for finding duplicate builds')
     modules = fields.Char("Modules to install", help="Comma-separated list of modules to install and test.")
     modules_auto = fields.Selection([('none', 'None (only explicit modules list)'),
@@ -171,8 +171,8 @@ class runbot_repo(models.Model):
         self.ensure_one()
 
         get_ref_time = self._get_fetch_head_time()
-        if not self.get_ref_time or get_ref_time > dt2time(self.get_ref_time):
-            self.get_ref_time = datetime.datetime.fromtimestamp(get_ref_time).strftime(DEFAULT_SERVER_DATETIME_FORMAT)
+        if not self.get_ref_time or get_ref_time > self.get_ref_time:
+            self.get_ref_time = get_ref_time
             fields = ['refname', 'objectname', 'committerdate:iso8601', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail']
             fmt = "%00".join(["%(" + field + ")" for field in fields])
             git_refs = self._git(['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/heads', 'refs/pull'])
