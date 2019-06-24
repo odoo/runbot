@@ -290,8 +290,10 @@ class runbot_repo(models.Model):
         for repo in self:
             try:
                 ref = repo._get_refs()
-                if ref:
-                    refs[repo] = ref
+                max_age = int(self.env['ir.config_parameter'].get_param('runbot.runbot_max_age', default=30))
+                good_refs = [r for r in ref if dateutil.parser.parse(r[2][:19]) + datetime.timedelta(days=max_age) > datetime.datetime.now()]
+                if good_refs:
+                    refs[repo] = good_refs
             except Exception:
                 _logger.exception('Fail to get refs for repo %s', repo.name)
             if repo in refs:
