@@ -191,6 +191,7 @@ class runbot_build(models.Model):
             return self.env['runbot.build']
         vals['config_id'] = vals['config_id'] if 'config_id' in vals else branch.config_id.id
         build_id = super(runbot_build, self).create(vals)
+        build_id._update_nb_children(build_id.local_state)
         extra_info = {'sequence': build_id.id if not build_id.sequence else build_id.sequence}
         context = self.env.context
 
@@ -282,8 +283,6 @@ class runbot_build(models.Model):
         build_id.write(extra_info)
         if build_id.local_state == 'duplicate' and build_id.duplicate_id.global_state in ('running', 'done'):  # and not build_id.parent_id:
             build_id._github_status()
-
-        build_id._update_nb_children(build_id.local_state)
         return build_id
 
     def write(self, values):

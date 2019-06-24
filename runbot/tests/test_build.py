@@ -159,7 +159,6 @@ class Test_Build(common.TransactionCase):
             'branch_id': self.branch_10.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
         })
-        self.env.cr.test = True
         build1_1 = self.Build.create({
             'branch_id': self.branch_10.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
@@ -242,6 +241,30 @@ class Test_Build(common.TransactionCase):
         assert_state(0, 0, 0, 'done', build1_2)
         assert_state(0, 0, 0, 'done', build1_1_1)
         assert_state(0, 0, 0, 'done', build1_1_2)
+
+    def test_duplicate_childrens(self):
+        build_old = self.Build.create({
+            'branch_id': self.branch_10.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'extra_params': '0',
+        })
+        build_parent = self.Build.create({
+            'branch_id': self.branch_10.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'extra_params': '1',
+        })
+        build_child = self.Build.create({
+            'branch_id': self.branch_10.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'parent_id': build_parent.id,
+            'extra_params': '0',
+        })
+        build_parent.local_state = 'done'
+        self.assertEqual(build_child.local_state, 'duplicate')
+        self.assertEqual(build_child.duplicate_id, build_old)
+        self.assertEqual(build_parent.nb_pending, 0)
+        self.assertEqual(build_parent.nb_testing, 0)
+        self.assertEqual(build_parent.global_state, 'done')
 
 def rev_parse(repo, branch_name):
     """
