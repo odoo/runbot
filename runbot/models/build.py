@@ -105,7 +105,7 @@ class runbot_build(models.Model):
         for build in self:
             build.log_list = ','.join({step.name for step in build.config_id.step_ids() if step._has_log()})
 
-    @api.depends('children_ids.global_state', 'local_state', 'duplicate_id.global_state')
+    @api.depends('nb_testing', 'nb_pending', 'local_state', 'duplicate_id.global_state')
     def _compute_global_state(self):
         # could we use nb_pending / nb_testing ? not in a compute, but in a update state method
         for record in self:
@@ -113,14 +113,10 @@ class runbot_build(models.Model):
                 record.global_state = record.duplicate_id.global_state
             else:
                 waiting_score = record._get_state_score('waiting')
-                if record._get_state_score(record.local_state) > waiting_score and record.children_ids:  # if finish, check children
-                    children_state = record._get_youngest_state([child.global_state for child in record.children_ids])
-                    if record._get_state_score(children_state) > waiting_score:
-                        record.global_state = record.local_state
-                    else:
-                        record.global_state = 'waiting'
-                else:
+                if record._get_state_score(record.local_state) < waiting_score or record.nb_pending + record.nb_testing == 0:
                     record.global_state = record.local_state
+                else:
+                    record.global_state = 'waiting'
 
     def _get_youngest_state(self, states):
         index = min([self._get_state_score(state) for state in states])
