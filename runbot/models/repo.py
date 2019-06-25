@@ -16,7 +16,7 @@ from odoo import models, fields, api
 from odoo.modules.module import get_module_resource
 from odoo.tools import config
 from ..common import fqdn, dt2time
-
+from psycopg2.extensions import TransactionRollbackError
 _logger = logging.getLogger(__name__)
 
 
@@ -512,10 +512,16 @@ class runbot_repo(models.Model):
         update_frequency = int(icp.get_param('runbot.runbot_update_frequency', default=10))
         while time.time() - start_time < timeout:
             repos = self.search([('mode', '!=', 'disabled')])
-            repos._scheduler()
-            self.env.cr.commit()
-            self.env.reset()
-            self = self.env()[self._name]
-            self._reload_nginx()
-            time.sleep(update_frequency)
+            try:
+                repos._scheduler()
+                self.env.cr.commit()
+                self.env.reset()
+                self = self.env()[self._name]
+                self._reload_nginx()
+                time.sleep(update_frequency)
+            except TransactionRollbackError:
+                _logger.exception('Trying to rollback')
+                self.env.cr.rollback()
+                self.env.reset()
+                time.sleep(random.uniform(0, 1))
         self.env['runbot.build']._local_cleanup()
