@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import time
+import datetime
 from ..common import dt2time, fqdn, now, grep, uniq_list, local_pgadmin_cursor, s2human
 from ..container import docker_build, docker_stop, docker_is_running
 from odoo import models, fields, api
@@ -429,53 +430,60 @@ class runbot_build(models.Model):
         self.write({'local_state': 'done', 'local_result': 'skipped', 'duplicate_id': False})
 
     def _local_cleanup(self):
-        for build in self:
-            # Cleanup the *local* cluster
-            with local_pgadmin_cursor() as local_cr:
-                local_cr.execute("""
-                    SELECT datname
-                      FROM pg_database
-                     WHERE pg_get_userbyid(datdba) = current_user
-                       AND datname LIKE %s
-                """, [build.dest + '%'])
-                to_delete = local_cr.fetchall()
-            for db, in to_delete:
-                self._local_pg_dropdb(db)
 
-        # cleanup: find any build older than 7 days.
+        _logger.debug('Local cleaning')
+
+        def cleanup(dest_list, func, max_days, label):
+            dest_by_builds_ids = defaultdict(list)
+            ignored = set()
+            dest_reg = re.compile(r'^\d{5,}-.{1,32}-[\da-f]{6}(-.*)*$')
+            for dest in dest_list:
+                try:
+                    if not dest_reg.match(dest):
+                        raise Exception
+                    dest_by_builds_ids[int(dest.split('-')[0])].append(dest)
+                except:
+                    ignored.add(dest)
+            if ignored:
+                _logger.debug('%s (%s) not deleted because not dest format', label, " ".join(list(ignored)))
+
+            builds = self.browse(dest_by_builds_ids)
+            existing = builds.exists()
+            remaining = (builds - existing)
+            if remaining:
+                dest_list = [dest for sublist in [dest_by_builds_ids[rem_id] for rem_id in remaining] for dest in sublist]
+                #dest_list = [dest for dest in dest_by_builds_ids[rem_id] for rem_id in remaining]
+                _logger.debug('(%s) (%s) not deleted because no corresponding build found' % (label, " ".join(dest_list)))
+            for build in existing:
+                if fields.Datetime.from_string(build.create_date) + datetime.timedelta(days=max_days) < datetime.datetime.now():
+                    if build.local_state == 'done':
+                        for db in dest_by_builds_ids[build.id]:
+                            func(db)
+                    elif build.local_state != 'running':
+                        _logger.warning('db (%s) not deleted because state is not done' % " ".join(dest_by_builds_ids[build.id]))
+
+        icp = self.env['ir.config_parameter']
+        max_days = int(icp.get_param('runbot.db_gc_days', default=30))
+        with local_pgadmin_cursor() as local_cr:
+            local_cr.execute("""
+                SELECT datname
+                    FROM pg_database
+                    WHERE pg_get_userbyid(datdba) = current_user
+            """)
+            existing_db = [d[0] for d in local_cr.fetchall()]
+
+        cleanup(dest_list=existing_db, func=self._local_pg_dropdb, max_days=max_days, label='db')
+
         root = self.env['runbot.repo']._root()
         build_dir = os.path.join(root, 'build')
         builds = os.listdir(build_dir)
-        if builds:
-            self.env.cr.execute("""
-                SELECT dest
-                  FROM runbot_build
-                 WHERE dest IN %s
-                   AND (local_state != 'done' OR job_end > (now() - interval '7 days'))
-            """, [tuple(builds)])  # todo xdo not covered by tests
-            actives = set(b[0] for b in self.env.cr.fetchall())
 
-            for b in builds:
-                path = os.path.join(build_dir, b)
-                if b not in actives and os.path.isdir(path) and os.path.isabs(path):
-                    shutil.rmtree(path)
+        def rm(dest):
+            path = os.path.join(build_dir, dest)
+            if os.path.isdir(path) and os.path.isabs(path):
+                shutil.rmtree(path)
 
-        # cleanup old unused databases
-        self.env.cr.execute("select id from runbot_build where local_state in ('testing', 'running')")  # todo xdo not coversed by tests
-        db_ids = [id[0] for id in self.env.cr.fetchall()]
-        if db_ids:
-            with local_pgadmin_cursor() as local_cr:
-                local_cr.execute("""
-                    SELECT datname
-                      FROM pg_database
-                     WHERE pg_get_userbyid(datdba) = current_user
-                       AND datname ~ '^[0-9]+-.*'
-                       AND SUBSTRING(datname, '^([0-9]+)-.*')::int not in %s
-
-                """, [tuple(db_ids)])
-                to_delete = local_cr.fetchall()
-            for db, in to_delete:
-                self._local_pg_dropdb(db)
+        cleanup(dest_list=builds, func=rm, max_days=max_days, label='workspace')
 
     def _find_port(self):
         # currently used port
@@ -605,9 +613,6 @@ class runbot_build(models.Model):
                     build._kill(result='ko')
                     continue
 
-            # cleanup only needed if it was not killed
-            if build.local_state == 'done':
-                build._local_cleanup()
         self.env.cr.commit()
         self.invalidate_cache()
 
@@ -796,7 +801,6 @@ class runbot_build(models.Model):
             build.write(v)
             self.env.cr.commit()
             build._github_status()
-            build._local_cleanup()
             self.invalidate_cache()
 
     def _ask_kill(self):

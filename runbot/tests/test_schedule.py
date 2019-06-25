@@ -22,11 +22,10 @@ class TestSchedule(common.TransactionCase):
         })
         self.Build = self.env['runbot.build']
 
-    @patch('odoo.addons.runbot.models.build.runbot_build._local_cleanup')
     @patch('odoo.addons.runbot.models.build.os.makedirs')
     @patch('odoo.addons.runbot.models.build.os.path.getmtime')
     @patch('odoo.addons.runbot.models.build.docker_is_running')
-    def test_schedule_mark_done(self, mock_running, mock_getmtime, mock_makedirs, mock_localcleanup):
+    def test_schedule_mark_done(self, mock_running, mock_getmtime, mock_makedirs):
         """ Test that results are set even when job_30_run is skipped """
         job_end_time = datetime.datetime.now()
         mock_getmtime.return_value = job_end_time.timestamp()

@@ -518,3 +518,4 @@ class runbot_repo(models.Model):
             self = self.env()[self._name]
             self._reload_nginx()
             time.sleep(update_frequency)
+        self.env['runbot.build']._local_cleanup()
