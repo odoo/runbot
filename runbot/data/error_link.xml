@@ -1,0 +1,22 @@
+<odoo>
+    <record model="ir.actions.server" id="action_link_build_errors">
+        <field name="name">Link build errors</field>
+        <field name="model_id" ref="runbot.model_runbot_build_error" />
+        <field name="binding_model_id" ref="runbot.model_runbot_build_error" />
+        <field name="type">ir.actions.server</field>
+        <field name="state">code</field>
+        <field name="code">
+            records.link_errors()
+        </field>
+    </record>
+    <record model="ir.actions.server" id="action_clean_build_errors">
+        <field name="name">Re-clean build errors</field>
+        <field name="model_id" ref="runbot.model_runbot_build_error" />
+        <field name="binding_model_id" ref="runbot.model_runbot_build_error" />
+        <field name="type">ir.actions.server</field>
+        <field name="state">code</field>
+        <field name="code">
+            records.clean_content()
+        </field>
+    </record>
+</odoo>

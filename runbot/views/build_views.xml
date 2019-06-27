@@ -37,6 +37,7 @@
                         <field name="config_id" groups="base.group_no_one"/>
                         <field name="orphan_result" readonly="1"/>
                         <field name="hidden" groups="base.group_no_one"/>
+                        <field name="build_url" widget="url" readonly="1"/>
                     </group>
                 </sheet>
             </form>
@@ -77,6 +78,7 @@
         <field name="model">runbot.build</field>
         <field name="arch" type="xml">
             <search string="Search builds">
+                <field name="id"/>
                 <field name="branch_id"/>
                 <field name="name"/>
                 <field name="global_state"/>

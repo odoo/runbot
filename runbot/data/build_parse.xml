@@ -1,0 +1,12 @@
+<odoo>
+    <record model="ir.actions.server" id="action_parse_build_logs">
+        <field name="name">Parse build logs</field>
+        <field name="model_id" ref="runbot.model_runbot_build" />
+         <field name="binding_model_id" ref="runbot.model_runbot_build" /> 
+        <field name="type">ir.actions.server</field>
+        <field name="state">code</field>
+        <field name="code">
+            records._parse_logs()
+        </field>
+    </record>
+</odoo>
