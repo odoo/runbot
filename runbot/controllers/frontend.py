@@ -274,6 +274,7 @@ class Runbot(Controller):
     @route('/runbot/glances', type='http', auth='public', website=True)
     def glances(self, refresh=None):
         repos = request.env['runbot.repo'].search([])   # respect record rules
+        default_config_id = request.env.ref('runbot.runbot_build_config_default').id
         query = """
             SELECT split_part(r.name, ':', 2),
                    br.branch_name,
@@ -288,11 +289,14 @@ class Runbot(Controller):
                     bu.global_state in ('running', 'done')
                )
                AND bu.global_result not in ('skipped', 'manually_killed')
+               AND (bu.config_id = r.repo_config_id
+                    OR bu.config_id =  br.branch_config_id
+                    OR bu.config_id =  %s)
           GROUP BY 1,2,r.sequence,br.id
           ORDER BY r.sequence, (br.branch_name='master'), br.id
         """
         cr = request.env.cr
-        cr.execute(query, [tuple(repos.ids)])
+        cr.execute(query, (tuple(repos.ids), default_config_id))
         ctx = OrderedDict()
         for row in cr.fetchall():
             ctx.setdefault(row[0], []).append(row[1:])
