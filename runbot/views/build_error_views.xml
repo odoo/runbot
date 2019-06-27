@@ -1,0 +1,66 @@
+<odoo>
+  <data>
+    <record id="build_error_form" model="ir.ui.view">
+        <field name="name">runbot.build.error.form</field>
+        <field name="model">runbot.build.error</field>
+        <field name="arch" type="xml">
+          <form>
+            <header>
+            </header>
+            <sheet>
+              <group name="build_error_group">
+                <field name="hash"/>
+                <field name="content"/>
+                <field name="cleaned_content" groups="base.group_no_one"/>
+                <field name="module_name"/>
+                <field name="random"/>
+                <field name="responsible"/>
+                <field name="fixing_commit"/>
+                <field name="active"/>
+                <field name="tag_ids" widget="many2many_tags"/>
+              </group>
+              <field name="build_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}">
+                <tree>
+                  <field name="create_date"/>
+                  <field name="id"/>
+                  <field name="repo_id"/>
+                  <field name="branch_id"/>
+                  <field name="dest"/>
+                  <field name="build_url" widget="url" readonly="1" text="View build"/>
+                </tree>
+              </field>
+            </sheet>
+          </form>
+        </field>
+    </record>
+          
+    <record id="build_error_view_tree" model="ir.ui.view">
+        <field name="name">runbot.build.error.tree</field>
+        <field name="model">runbot.build.error</field>
+        <field name="arch" type="xml">
+            <tree string="Errors">
+                <field name="module_name"/>
+                <field name="hash"/>
+                <field name="random"/>
+                <field name="build_count"/>
+                <field name="responsible"/>
+                <field name="fixing_commit"/>
+            </tree>
+        </field>
+    </record>
+    
+    <record id="open_view_build_error_tree" model="ir.actions.act_window">
+        <field name="name">Build errors</field>
+        <field name="res_model">runbot.build.error</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+    
+    <menuitem
+        name="Build errors" 
+        id="runbot_menu_build_error_tree"
+        parent="runbot_menu_root"
+        sequence="40"
+        action="open_view_build_error_tree"
+        />
+  </data>
+</odoo>

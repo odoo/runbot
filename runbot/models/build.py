@@ -104,6 +104,9 @@ class runbot_build(models.Model):
                                          ],
                                         default='soft',
                                         string='Source export path mode')
+    build_url = fields.Char('Build url', compute='_compute_build_url', store=False)
+    build_error_ids = fields.Many2many('runbot.build.error', 'runbot_build_error_ids_runbot_build_rel', string='Errors')
+
     @api.depends('config_id')
     def _compute_log_list(self):  # storing this field because it will be access trhoug repo viewn and keep track of the list at create
         for build in self:
@@ -341,6 +344,10 @@ class runbot_build(models.Model):
                 build.domain = "%s.%s" % (build.dest, build.host)
             else:
                 build.domain = "%s:%s" % (domain, build.port)
+
+    def _compute_build_url(self):
+        for build in self:
+            build.build_url = "/runbot/build/%s" % build.id
 
     @api.depends('job_start', 'job_end', 'duplicate_id.job_time')
     def _compute_job_time(self):
@@ -987,6 +994,14 @@ class runbot_build(models.Model):
             if f.readline().strip().endswith('python3'):
                 return '3'
         return ''
+
+    def _parse_logs(self):
+        """ Parse build logs to classify errors """
+        BuildError = self.env['runbot.build.error']
+        # only parse logs from builds in error and not already scanned
+        builds_to_scan = self.search([('id', 'in', self.ids), ('local_result', '=', 'ko'), ('build_error_ids', '=', False)])
+        ir_logs = self.env['ir.logging'].search([('level', '=', 'ERROR'), ('type', '=', 'server'), ('build_id', 'in', builds_to_scan.ids)])
+        BuildError._parse_logs(ir_logs)
 
     def read_file(self, file, mode='r'):
         file_path = self._path(file)
