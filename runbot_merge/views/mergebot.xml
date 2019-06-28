@@ -42,8 +42,10 @@
                     </field>
                     <separator string="Branches"/>
                     <field name="branch_ids">
-                        <tree editable="bottom">
+                        <tree editable="bottom" decoration-muted="not active">
+                            <field name="sequence" widget="handle" />
                             <field name="name"/>
+                            <field name="active"/>
                         </tree>
                     </field>
                 </sheet>
