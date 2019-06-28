@@ -2,26 +2,28 @@
 <odoo>
   <data>
     <template id="runbot.build_name">
-        <t t-if="bu.global_state=='deathrow'"><i class="text-info fa fa-crosshairs"/> killing</t>
-        <t t-if="bu.global_state=='pending'"><i class="text-default fa fa-pause"/> pending</t>
-        <t t-if="bu.global_state in ('testing', 'waiting')">
-          <t t-set="textklass" t-value="dict(ko='danger', warn='warning').get(bu.global_result, 'info')"/>
-          <t t-if="bu.global_state == 'waiting'">
-            <span t-attf-class="text-{{textklass}}"><i class="fa fa-spinner fa-spin"/> <t t-esc="bu.global_state"/></span> <small t-if="not hide_time">time: <t t-esc="bu.get_formated_build_time()"/></small>
+        <t t-if="bu.real_build.requested_action=='deathrow'"><i class="text-info fa fa-crosshairs"/> killing</t>
+        <t t-if="bu.real_build.requested_action=='wake_up'"><i class="text-info fa fa-coffee"/> waking up</t>
+        <t t-if="not bu.requested_action">
+          <t t-if="bu.global_state=='pending'"><i class="text-default fa fa-pause"/> pending</t>
+          <t t-if="bu.global_state in ('testing', 'waiting')">
+            <t t-set="textklass" t-value="dict(ko='danger', warn='warning').get(bu.global_result, 'info')"/>
+            <t t-if="bu.global_state == 'waiting'">
+              <span t-attf-class="text-{{textklass}}"><i class="fa fa-spinner fa-spin"/> <t t-esc="bu.global_state"/></span> <small t-if="not hide_time">time: <t t-esc="bu.get_formated_build_time()"/></small>
+            </t>
+            <t t-else="">
+              <span t-attf-class="text-{{textklass}}"><i class="fa fa-spinner fa-spin"/> <t t-esc="bu.global_state"/></span> <small> step <t t-esc="bu['job']"/>: </small><small t-if="not hide_time"><t t-esc="bu.get_formated_job_time()"/> -- time: <t t-esc="bu.get_formated_build_time()"/></small>
+            </t>
           </t>
-          <t t-else="">
-            <span t-attf-class="text-{{textklass}}"><i class="fa fa-spinner fa-spin"/> <t t-esc="bu.global_state"/></span> <small> step <t t-esc="bu['job']"/>: </small><small t-if="not hide_time"><t t-esc="bu.get_formated_job_time()"/> -- time: <t t-esc="bu.get_formated_build_time()"/></small>
+          <t t-if="bu.global_state in ('running', 'done')">
+            <t t-if="bu.global_result=='ok'"><i class="text-success fa fa-thumbs-up" title="Success" aria-label="Success"/><small t-if="not hide_time"> age: <t t-esc="bu.get_formated_build_age()"/> -- time: <t t-esc="bu.get_formated_build_time()"/></small></t>
+            <t t-if="bu.global_result=='ko'"><i class="text-danger fa fa-thumbs-down" title="Failed" aria-label="Failed"/><small t-if="not hide_time"> age: <t t-esc="bu.get_formated_build_age()"/> -- time: <t t-esc="bu.get_formated_build_time()"/></small></t>
+            <t t-if="bu.global_result=='warn'"><i class="text-warning fa fa-warning" title="Some warnings" aria-label="Some warnings"/><small t-if="not hide_time"> age: <t t-esc="bu.get_formated_build_age()"/> -- time: <t t-esc="bu.get_formated_build_time()"/></small></t>
+            <t t-if="bu.global_result=='skipped'"><i class="text-danger fa fa-ban"/> skipped</t>
+            <t t-if="bu.global_result=='killed'"><i class="text-danger fa fa-times"/> killed</t>
+            <t t-if="bu.global_result=='manually_killed'"><i class="text-danger fa fa-times"/> manually killed</t>
           </t>
         </t>
-        <t t-if="bu.global_state in ('running', 'done')">
-          <t t-if="bu.global_result=='ok'"><i class="text-success fa fa-thumbs-up" title="Success" aria-label="Success"/><small t-if="not hide_time"> age: <t t-esc="bu.get_formated_build_age()"/> -- time: <t t-esc="bu.get_formated_build_time()"/></small></t>
-          <t t-if="bu.global_result=='ko'"><i class="text-danger fa fa-thumbs-down" title="Failed" aria-label="Failed"/><small t-if="not hide_time"> age: <t t-esc="bu.get_formated_build_age()"/> -- time: <t t-esc="bu.get_formated_build_time()"/></small></t>
-          <t t-if="bu.global_result=='warn'"><i class="text-warning fa fa-warning" title="Some warnings" aria-label="Some warnings"/><small t-if="not hide_time"> age: <t t-esc="bu.get_formated_build_age()"/> -- time: <t t-esc="bu.get_formated_build_time()"/></small></t>
-          <t t-if="bu.global_result=='skipped'"><i class="text-danger fa fa-ban"/> skipped</t>
-          <t t-if="bu.global_result=='killed'"><i class="text-danger fa fa-times"/> killed</t>
-          <t t-if="bu.global_result=='manually_killed'"><i class="text-danger fa fa-times"/> manually killed</t>
-        </t>
-
         <t t-if="bu.revdep_build_ids">
             <small class="pull-right">Dep builds:
                 <t t-foreach="bu.sorted_revdep_build_ids()" t-as="rbu">
@@ -32,7 +34,6 @@
                             <t t-if="rbu.global_result=='skipped'"><i class="text-danger fa fa-ban"/></t>
                             <t t-if="rbu.global_result=='killed'"><i class="text-danger fa fa-times"/>&#x1f480;</t>
                             <t t-if="rbu.global_result=='manually_killed'"><i class="text-danger fa fa-times"/>&#x1f52b;</t>
-                            <t t-if="rbu.global_state=='deathrow'"><i class="fa fa-crosshairs" style="color: #666666;"/></t>
                             <t t-if="rbu.global_state=='pending'"><i class="fa fa-pause" style="color: #666666;"/></t>
                             <t t-if="rbu.global_state in ('testing', 'waiting')"><i class="fa fa-spinner fa-spin" style="color: #666666;"/></t>
                             </a>
@@ -63,11 +64,11 @@
                         <li><a t-attf-href="http://{{bu['domain']}}/?db={{bu['real_build'].dest}}-base">Connect base <i class="fa fa-sign-in"></i></a></li>
                         <li><a t-attf-href="http://{{bu['domain']}}/">Connect <i class="fa fa-sign-in"></i></a></li>
                     </t>
-                    <li t-if="bu.global_state in ['done','running','deathrow']" groups="base.group_user">
+                    <li t-if="bu.global_state in ['done','running'] or requested_action == 'deathrow'" groups="base.group_user">
                         <t t-if="bu_index==0">
                           <a href="#" class="runbot-rebuild" t-att-data-runbot-build="bu['id']"
                             title="Create a new build keeping build commit head, but will recompute all other info (config, dependencies, extra_params)">
-                          Default Rebuild <i class="fa fa-refresh"/>
+                          Rebuild <i class="fa fa-refresh"/>
                           </a>
                         </t>
                         <a href="#" class="runbot-rebuild-exact" t-att-data-runbot-build="bu['id']"
@@ -75,9 +76,15 @@
                         Exact Rebuild <i class="fa fa-refresh"/>
                         </a>
                     </li>
-                    <li t-if="bu.global_state in ['pending','testing', 'waiting', 'running']" groups="base.group_user">
-                        <a href="#" class="runbot-kill" t-att-data-runbot-build="bu['id']">Kill <i class="fa fa-crosshairs"/></a>
+                    <li t-if="bu.global_state != 'done'" groups="base.group_user">
+                        <a t-if="bu.real_build.requested_action != 'deathrow'" href="#" class="runbot-kill" t-att-data-runbot-build="bu['id']">Kill <i class="fa fa-crosshairs"/></a>
+                        <span t-else="" class="runbot-kill" > Killing <i class="fa fa-spinner fa-spin"/> <i class="fa fa-crosshairs"/></span>
                     </li>
+                    <li t-if="bu.global_state == 'done'" groups="base.group_user">
+                        <a t-if="bu.real_build.requested_action != 'wake_up'" href="#" class="runbot-wakeup" t-att-data-runbot-build="bu['id']">Wake up <i class="fa fa-coffee"/></a>
+                        <span t-else="" class="runbot-wakeup" > Waking up <i class="fa fa-spinner fa-spin"/> <i class="fa fa-crosshairs"/></span>
+                    </li>
+
                     <li t-if="bu.global_state not in ('testing', 'waiting', 'pending')" class="divider"></li>
                     <li><a t-attf-href="/runbot/build/{{bu['id']}}">Logs <i class="fa fa-file-text-o"/></a></li>
                     <t t-set="log_url" t-value="'http://%s' % bu.real_build.host if bu.real_build.host != fqdn else ''"/>

@@ -45,10 +45,7 @@ class Runbot(Controller):
 
         build_ids = []
         if repo:
-            # FIXME or removeme (filters are broken)
-            filters = {key: kwargs.get(key, '1') for key in ['waiting', 'pending', 'testing', 'running', 'done', 'deathrow']}
             domain = [('repo_id', '=', repo.id)]
-            domain += [('global_state', '!=', key) for key, value in iter(filters.items()) if value == '0']
             if search:
                 search_domain = []
                 for to_search in search.split("|"):
@@ -113,8 +110,7 @@ class Runbot(Controller):
                 'testing': build_obj.search_count([('repo_id', '=', repo.id), ('local_state', '=', 'testing')]),
                 'running': build_obj.search_count([('repo_id', '=', repo.id), ('local_state', '=', 'running')]),
                 'pending': build_obj.search_count([('repo_id', '=', repo.id), ('local_state', '=', 'pending')]),
-                'qu': QueryURL('/runbot/repo/' + slug(repo), search=search, refresh=refresh, **filters),
-                'filters': filters,
+                'qu': QueryURL('/runbot/repo/' + slug(repo), search=search, refresh=refresh),
                 'fqdn': fqdn(),
             })
 
@@ -136,6 +132,12 @@ class Runbot(Controller):
     def build_ask_kill(self, build_id, search=None, **post):
         build = request.env['runbot.build'].sudo().browse(build_id)
         build._ask_kill()
+        return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id + ('?search=%s' % search if search else ''))
+
+    @route(['/runbot/build/<int:build_id>/wakeup'], type='http', auth="user", methods=['POST'], csrf=False)
+    def build_wake_up(self, build_id, search=None, **post):
+        build = request.env['runbot.build'].sudo().browse(build_id)
+        build._wake_up()
         return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id + ('?search=%s' % search if search else ''))
 
     @route([

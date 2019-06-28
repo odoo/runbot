@@ -303,7 +303,7 @@ class runbot_repo(models.Model):
                     ])
                     for btk in builds_to_kill:
                         btk._log('repo._update_git', 'Build automatically killed, newer build found.', level='WARNING')
-                    builds_to_kill.write({'local_state': 'deathrow'})
+                    builds_to_kill.write({'requested_action': 'deathrow'})
 
                 new_build = Build.create(build_info)
                 # create a reverse dependency build if needed
@@ -409,7 +409,7 @@ class runbot_repo(models.Model):
         domain_host = domain + [('host', '=', host)]
 
         # schedule jobs (transitions testing -> running, kill jobs, ...)
-        build_ids = Build.search(domain_host + [('local_state', 'in', ['testing', 'running', 'deathrow'])])
+        build_ids = Build.search(domain_host + ['|', ('local_state', 'in', ['testing', 'running']), ('requested_action', 'in', ['wake_up', 'deathrow'])])
         build_ids._schedule()
         self.env.cr.commit()
         self.invalidate_cache()
@@ -467,7 +467,7 @@ class runbot_repo(models.Model):
                 pending_build._schedule()
 
         # terminate and reap doomed build
-        build_ids = Build.search(domain_host + [('local_state', '=', 'running')]).ids
+        build_ids = Build.search(domain_host + [('local_state', '=', 'running')], order='job_start desc').ids
         # sort builds: the last build of each sticky branch then the rest
         sticky = {}
         non_sticky = []

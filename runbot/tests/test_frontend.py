@@ -32,11 +32,11 @@ class Test_Frontend(common.HttpCase):
         mock_request._cr = self.cr
         controller = frontend.Runbot()
 
-        states = ['done', 'pending', 'testing', 'running', 'deathrow']
+        states = ['done', 'pending', 'testing', 'running']
         branches = [self.branch, self.sticky_branch]
         names = ['deadbeef', 'd0d0caca', 'deadface', 'cacafeed']
         # create 5 builds in each branch
-        for i, state, branch, name in zip(range(10), cycle(states), cycle(branches), cycle(names)):
+        for i, state, branch, name in zip(range(8), cycle(states), cycle(branches), cycle(names)):
             name = '%s%s' % (name, i)
             build = self.Build.create({
                 'branch_id': branch.id,

@@ -47,7 +47,6 @@
                     <t t-foreach="br['builds']" t-as="bu">
                       <t t-if="bu.global_state=='pending'"><t t-set="klass">default</t></t>
                       <t t-if="bu.global_state in ('testing', 'waiting')"><t t-set="klass">info</t></t>
-                      <t t-if="bu.global_state=='deathrow'"><t t-set="klass">default</t></t>
                       <t t-if="bu.global_state in ['running','done'] and bu.global_result == 'ko'"><t t-set="klass">danger</t></t>
                       <t t-if="bu.global_state in ['running','done'] and bu.global_result == 'warn'"><t t-set="klass">warning</t></t>
                       <t t-if="bu.global_state in ['running','done'] and bu.global_result == 'ok'"><t t-set="klass">success</t></t>

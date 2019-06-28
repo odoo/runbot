@@ -21,7 +21,7 @@ from subprocess import CalledProcessError
 _logger = logging.getLogger(__name__)
 
 result_order = ['ok', 'warn', 'ko', 'skipped', 'killed', 'manually_killed']
-state_order = ['pending', 'testing', 'waiting', 'running', 'deathrow', 'duplicate', 'done']
+state_order = ['pending', 'testing', 'waiting', 'running', 'duplicate', 'done']
 
 
 def make_selection(array):
@@ -56,6 +56,8 @@ class runbot_build(models.Model):
     global_result = fields.Selection(make_selection(result_order), string='Result', compute='_compute_global_result', store=True)
     local_result = fields.Selection(make_selection(result_order), string='Build Result', oldname='result')
     triggered_result = fields.Selection(make_selection(result_order), string='Triggered Result')  # triggered by db only
+
+    requested_action = fields.Selection([('wake_up', 'To wake up'), ('deathrow', 'To kill')], string='Action requested', index=True)
 
     nb_pending = fields.Integer("Number of pending in queue", default=0)
     nb_testing = fields.Integer("Number of test slot use", default=0)
@@ -402,7 +404,7 @@ class runbot_build(models.Model):
             else:
                 sequence = self.search([], order='id desc', limit=1)[0].id
             # Force it now
-            if build.local_state in ['running', 'done', 'duplicate', 'deathrow']:
+            if build.local_state in ['running', 'done', 'duplicate']:
                 values = {
                     'sequence': sequence,
                     'branch_id': build.branch_id.id,
@@ -533,8 +535,19 @@ class runbot_build(models.Model):
         for build in self:
             self.env.cr.commit()  # commit between each build to minimise transactionnal errors due to state computations
             self.invalidate_cache()
-            if build.local_state == 'deathrow':
+            if build.requested_action == 'deathrow':
                 build._kill(result='manually_killed')
+                continue
+
+            if build.requested_action == 'wake_up':
+                if docker_is_running(build._get_docker_name()):
+                    build.write({'requested_action': False, 'local_state': 'running'})
+                    build._log('wake_up', 'Waking up failed, docker is already running', level='SEPARATOR')
+                else:
+                    log_path = build._path('logs', 'wake_up.txt')
+                    build.write({'job_start': now(), 'job_end': False, 'active_step': False, 'requested_action': False, 'local_state': 'running'})
+                    build._log('wake_up', 'Waking up build', level='SEPARATOR')
+                    self.env['runbot.build.config.step']._run_odoo_run(build, log_path)
                 continue
 
             if build.local_state == 'pending':
@@ -789,7 +802,7 @@ class runbot_build(models.Model):
                 continue
             build._log('kill', 'Kill build %s' % build.dest)
             docker_stop(build._get_docker_name())
-            v = {'local_state': 'done', 'active_step': False, 'duplicate_id': False, 'build_end': now()}  # what if duplicate? state done?
+            v = {'local_state': 'done', 'requested_action': False, 'active_step': False, 'duplicate_id': False, 'build_end': now()}  # what if duplicate? state done?
             if not build.job_end:
                 v['job_end'] = now()
             if result:
@@ -815,11 +828,18 @@ class runbot_build(models.Model):
             build._skip()
             build._log('_ask_kill', 'Skipping build %s, requested by %s (user #%s)' % (build.dest, user.name, uid))
         elif build.local_state in ['testing', 'running']:
-            build.write({'local_state': 'deathrow'})
+            build.requested_action = 'deathrow'
             build._log('_ask_kill', 'Killing build %s, requested by %s (user #%s)' % (build.dest, user.name, uid))
         for child in build.children_ids:  # should we filter build that are target of a duplicate_id?
             if not child.duplicate_id:
                 child._ask_kill()
+
+    def _wake_up(self):
+        build = self.real_build
+        if build.local_state != 'done':
+            build._log('wake_up', 'Impossibe to wake up, state is not done')
+        else:
+            build.requested_action = 'wake_up'
 
     def _get_all_commit(self):
         return [Commit(self.repo_id, self.name)] + [Commit(dep._get_repo(), dep.dependency_hash) for dep in self.dependency_ids]
@@ -937,6 +957,10 @@ class runbot_build(models.Model):
         self.ensure_one()
         step_ids = self.config_id.step_ids()
         if not step_ids:  # no job to do, build is done
+            return {'active_step': False, 'local_state': 'done'}
+
+        if not self.active_step and self.local_state != 'pending':
+            # means that a step has been run manually without using config
             return {'active_step': False, 'local_state': 'done'}
 
         next_index = step_ids.index(self.active_step) + 1 if self.active_step else 0

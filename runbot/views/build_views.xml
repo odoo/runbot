@@ -87,7 +87,6 @@
                 <filter string="Running" domain="[('global_state','=', 'running')]"/>
                 <filter string="Done" domain="[('global_state','=','done')]"/>
                 <filter string="Duplicate" domain="[('global_state','=', 'duplicate')]"/>
-                <filter string="Deathrow" domain="[('global_state','=', 'deathrow')]"/>
                 <separator />
                 <group expand="0" string="Group By...">
                     <filter string="Repo" domain="[]" context="{'group_by':'repo_id'}"/>
