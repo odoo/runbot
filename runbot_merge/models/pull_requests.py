@@ -32,6 +32,7 @@ class Project(models.Model):
     )
     branch_ids = fields.One2many(
         'runbot_merge.branch', 'project_id',
+        context={'active_test': False},
         help="Branches of all project's repos which are managed by the merge bot. Also "\
         "target branches of PR this project handles."
     )
@@ -232,6 +233,7 @@ class Repository(models.Model):
 
 class Branch(models.Model):
     _name = 'runbot_merge.branch'
+    _order = 'sequence, name'
 
     name = fields.Char(required=True)
     project_id = fields.Many2one('runbot_merge.project', required=True)
@@ -247,6 +249,9 @@ class Branch(models.Model):
         ('state', '!=', 'closed'),
         ('state', '!=', 'merged'),
     ])
+
+    active = fields.Boolean(default=True)
+    sequence = fields.Integer()
 
     def _auto_init(self):
         res = super(Branch, self)._auto_init()

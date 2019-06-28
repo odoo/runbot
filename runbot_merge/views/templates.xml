@@ -44,7 +44,7 @@
                             <li class="bg-gray-lighter">cancelled</li>
                         </ul>
                     </div>
-                    <section t-foreach="project.branch_ids" t-as="branch" class="col-md-12">
+                    <section t-foreach="project.branch_ids" t-as="branch" t-if="branch.active" class="col-md-12">
                         <h2><t t-esc="branch.name"/></h2>
                         <t t-call="runbot_merge.stagings"/>
                         <t t-set="ready_unstaged" t-value="
