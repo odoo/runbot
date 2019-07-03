@@ -361,6 +361,7 @@ class runbot_repo(models.Model):
         settings_workers = int(icp.get_param('runbot.runbot_workers', default=6))
         workers = int(icp.get_param('%s.workers' % host, default=settings_workers))
         running_max = int(icp.get_param('runbot.runbot_running_max', default=75))
+        assigned_only = int(icp.get_param('%s.assigned_only' % host, default=False))
 
         Build = self.env['runbot.build']
         domain = [('repo_id', 'in', ids)]
@@ -377,7 +378,7 @@ class runbot_repo(models.Model):
         nb_testing = Build.search_count(domain_host + [('local_state', '=', 'testing')])
         available_slots = workers - nb_testing
         reserved_slots = Build.search_count(domain_host + [('local_state', '=', 'pending')])
-        assignable_slots = available_slots - reserved_slots
+        assignable_slots = (available_slots - reserved_slots) if not assigned_only else 0
         if available_slots > 0:
             if assignable_slots > 0:  # note: slots have been addapt to be able to force host on pending build. Normally there is no pending with host.
                 # commit transaction to reduce the critical section duration
