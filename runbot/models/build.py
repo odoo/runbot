@@ -802,7 +802,7 @@ class runbot_build(models.Model):
                 continue
             build._log('kill', 'Kill build %s' % build.dest)
             docker_stop(build._get_docker_name())
-            v = {'local_state': 'done', 'active_step': False, 'duplicate': False, 'build_end': now()}  # what if duplicate? state done?
+            v = {'local_state': 'done', 'active_step': False, 'duplicate_id': False, 'build_end': now()}  # what if duplicate? state done?
             if not build.job_end:
                 v['job_end'] = now()
             if result:
