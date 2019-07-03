@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import datetime
+import time
 import json
 
 from odoo import http, tools
@@ -25,5 +25,7 @@ class RunbotHook(http.Controller):
                 repo_id = repo.id
 
         repo = request.env['runbot.repo'].sudo().browse([repo_id])
-        repo.hook_time = datetime.datetime.now().strftime(tools.DEFAULT_SERVER_DATETIME_FORMAT)
+
+        # force update of dependencies to in case a hook is lost
+        (repo | repo.dependency_ids).write({'hook_time': time.time()})
         return ""
