@@ -418,7 +418,7 @@ class runbot_build(models.Model):
                 new_build = build.with_context(force_rebuild=True).create(values)
                 forced_builds |= new_build
                 user = request.env.user if request else self.env.user
-                new_build._log('rebuild', 'Rebuild initiated by %s' % user.name)
+                new_build._log('rebuild', 'Rebuild initiated by %s (%s)' % (user.name, 'exact' if exact else 'default'))
                 if message:
                     new_build._log('rebuild', new_build)
         return forced_builds
@@ -700,9 +700,12 @@ class runbot_build(models.Model):
                 if not repo._hash_exists(latest_commit):
                     repo._update(force=True)
                 if not repo._hash_exists(latest_commit):
-                    repo._git(['fetch', 'origin', latest_commit])
+                    try:
+                        repo._git(['fetch', 'origin', latest_commit])
+                    except:
+                        pass
                 if not repo._hash_exists(latest_commit):
-                    build._log('_checkout', "Dependency commit %s in repo %s is unreachable" % (latest_commit, repo.name))
+                    build._log('_checkout', "Dependency commit %s in repo %s is unreachable. Did you force push the branch since build creation?" % (latest_commit, repo.name))
                     raise Exception
 
                 repo._git_export(latest_commit, build._path())
