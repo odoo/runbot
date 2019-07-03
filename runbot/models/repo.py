@@ -344,7 +344,7 @@ class runbot_repo(models.Model):
     @api.multi
     def _update(self, force=True):
         """ Update the physical git reposotories on FS"""
-        for repo in self:
+        for repo in reversed(self):
             try:
                 repo._update_git(force)
             except Exception:
