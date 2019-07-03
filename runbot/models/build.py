@@ -400,10 +400,16 @@ class runbot_build(models.Model):
                     'build_type': 'rebuild',
                 }
                 if exact:
+                    if build.dependency_ids:
+                        values['dependency_ids'] = [(0, 0, {
+                            'match_type': dep.match_type,
+                            'closest_branch_id': dep.closest_branch_id.id,
+                            'dependency_hash': dep.dependency_hash,
+                            'dependecy_repo_id': dep.dependecy_repo_id.id,
+                        }) for dep in build.dependency_ids]
                     values.update({
                         'config_id': build.config_id.id,
                         'extra_params': build.extra_params,
-                        'dependency_ids': build.dependency_ids,
                         'server_match': build.server_match,
                         'orphan_result': build.orphan_result,
                     })
