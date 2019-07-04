@@ -577,7 +577,7 @@ class runbot_build(models.Model):
                 except:
                     _logger.exception('An error occured while computing results')
                     build._log('_make_results', 'An error occured while computing results', level='ERROR')
-                    results = {'local_state': 'ko'}
+                    results = {'local_result': 'ko'}
                 build_values.update(results)
 
                 # Non running build in
