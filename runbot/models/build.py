@@ -567,6 +567,9 @@ class runbot_build(models.Model):
                         build._log('_schedule', '%s time exceeded (%ss)' % (build.active_step.name if build.active_step else "?", build.job_time))
                         build._kill(result='killed')
                     continue
+                elif build.job_time < 15:
+                    _logger.debug('container "%s" seems too take a while to start', build._get_docker_name())
+                    continue
                 # No job running, make result and select nex job
                 build_values = {
                     'job_end': now(),
