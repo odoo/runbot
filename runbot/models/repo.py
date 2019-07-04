@@ -18,7 +18,7 @@ from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT
 from odoo import models, fields, api, registry
 from odoo.modules.module import get_module_resource
 from odoo.tools import config
-from ..common import fqdn, dt2time, Commit
+from ..common import fqdn, dt2time, Commit, dest_reg
 from psycopg2.extensions import TransactionRollbackError
 _logger = logging.getLogger(__name__)
 
@@ -542,6 +542,15 @@ class runbot_repo(models.Model):
         """
         if hostname != fqdn():
             return 'Not for me'
+
+        # docker cleanup
+        containers = {int(dc.split('-', 1)[0]):dc for dc in docker_ps() if dest_reg.match(dc)}
+        if containers:
+            candidates = env['runbot.build'].search([('id', 'in', list(containers.keys())), ('local_state', '=', 'done')])
+            for c in candidates:
+                _logger.info('container %s found running with build state done', containers[c.id])
+                docker_stop(containers[c.id])
+
         start_time = time.time()
         timeout = self._get_cron_period()
         icp = self.env['ir.config_parameter']

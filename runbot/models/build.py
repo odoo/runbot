@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import time
 import datetime
-from ..common import dt2time, fqdn, now, grep, uniq_list, local_pgadmin_cursor, s2human, Commit
+from ..common import dt2time, fqdn, now, grep, uniq_list, local_pgadmin_cursor, s2human, Commit, dest_reg
 from ..container import docker_build, docker_stop, docker_is_running, Command
 from odoo.addons.runbot.models.repo import HashMissingException, ArchiveFailException
 from odoo import models, fields, api
@@ -461,7 +461,6 @@ class runbot_build(models.Model):
         def cleanup(dest_list, func, max_days, label):
             dest_by_builds_ids = defaultdict(list)
             ignored = set()
-            dest_reg = re.compile(r'^\d{5,}-.{1,32}-[\da-f]{6}(.*)*$')
             for dest in dest_list:
                 try:
                     if not dest_reg.match(dest):
