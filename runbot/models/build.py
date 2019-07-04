@@ -442,7 +442,7 @@ class runbot_build(models.Model):
         def cleanup(dest_list, func, max_days, label):
             dest_by_builds_ids = defaultdict(list)
             ignored = set()
-            dest_reg = re.compile(r'^\d{5,}-.{1,32}-[\da-f]{6}(-.*)*$')
+            dest_reg = re.compile(r'^\d{5,}-.{1,32}-[\da-f]{6}(.*)*$')
             for dest in dest_list:
                 try:
                     if not dest_reg.match(dest):
