@@ -135,6 +135,13 @@ def docker_get_gateway_ip():
         except KeyError:
             return None
 
+def docker_ps():
+    """Return a list of running containers names"""
+    docker_ps = subprocess.run(['docker', 'ps', '--format', '{{.Names}}'], stderr=subprocess.DEVNULL, stdout=subprocess.PIPE)
+    if docker_ps.returncode !=0:
+        return []
+    return docker_ps.stdout.decode().strip().split('\n')
+
 def build(args):
     """Build container from CLI"""
     _logger.info('Building the base image container')
