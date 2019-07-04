@@ -831,7 +831,7 @@ class runbot_build(models.Model):
             build.write({'local_state': 'deathrow'})
             build._log('_ask_kill', 'Killing build %s, requested by %s (user #%s)' % (build.dest, user.name, uid))
         for child in build.children_ids:  # should we filter build that are target of a duplicate_id?
-            if not build.duplicate_id and build.local_state != 'done':
+            if not child.duplicate_id:
                 child._ask_kill()
 
     def _cmd(self):  # why not remove build.modules output ?
