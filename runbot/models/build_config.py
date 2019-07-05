@@ -121,6 +121,13 @@ class ConfigStep(models.Model):
             if msg:
                 raise ValidationError(msg)
 
+    @api.onchange('number_builds')
+    def _onchange_number_builds(self):
+        if self.number_builds > 1:
+            self.force_build = True
+        else:
+            self.force_build = False
+
     @api.depends('name', 'custom_db_name')
     def _compute_db_name(self):
         for step in self:
