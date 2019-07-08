@@ -38,6 +38,8 @@ def build_odoo_cmd(odoo_cmd):
     """
     # build cmd
     cmd_chain = []
+    cmd_chain.append('mkdir -p /data/build/tests')
+    cmd_chain.append('ln -s /data/build/tests /tmp/odoo_tests')
     cmd_chain.append('cd /data/build')
     cmd_chain.append('head -1 odoo-bin | grep -q python3 && sudo pip3 install -r requirements.txt || sudo pip install -r requirements.txt')
     cmd_chain.append(' '.join(odoo_cmd))
