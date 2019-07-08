@@ -23,6 +23,9 @@
                 <field name="group_ids"  widget="many2many_tags"/>
                 <field name="hook_time"/>
                 <field name="config_id"/>
+                <field name="server_files"/>
+                <field name="manifest_files"/>
+                <field name="addons_paths"/>
               </group>
             </sheet>
           </form>

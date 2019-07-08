@@ -21,7 +21,8 @@ class Step(models.Model):
         return super(Step, self)._run_step(build, log_path)
 
     def _runbot_cla_check(self, build, log_path):
-        cla_glob = glob.glob(build._path("doc/cla/*/*.md"))
+        build._checkout()
+        cla_glob = glob.glob(build.get_server_commit()._source_path("doc/cla/*/*.md"))
         if cla_glob:
             description = "%s Odoo CLA signature check" % build.author
             mo = re.search('[^ <@]+@[^ @>]+', build.author_email or '')

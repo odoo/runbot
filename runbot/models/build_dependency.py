@@ -9,3 +9,7 @@ class RunbotBuildDependency(models.Model):
     dependency_hash = fields.Char('Name of commit', index=True)
     closest_branch_id = fields.Many2one('runbot.branch', 'Branch', required=True, ondelete='cascade')
     match_type = fields.Char('Match Type')
+
+    def get_repo(self):
+        return self.closest_branch_id.repo_id or self.dependecy_repo_id
+

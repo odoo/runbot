@@ -21,10 +21,7 @@
           <t t-if="bu.global_result=='killed'"><i class="text-danger fa fa-times"/> killed</t>
           <t t-if="bu.global_result=='manually_killed'"><i class="text-danger fa fa-times"/> manually killed</t>
         </t>
-        <t t-if="bu.real_build.server_match == 'default'">
-            <i class="text-warning fa fa-question-circle fa-fw"
-                title="Server branch cannot be determined exactly. Please use naming convention '12.0-my-branch' to build with '12.0' server branch."/>
-        </t>
+
         <t t-if="bu.revdep_build_ids">
             <small class="pull-right">Dep builds:
                 <t t-foreach="bu.sorted_revdep_build_ids()" t-as="rbu">
