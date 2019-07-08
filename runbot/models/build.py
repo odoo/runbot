@@ -8,10 +8,11 @@ import shutil
 import subprocess
 import time
 import datetime
-from ..common import dt2time, fqdn, now, grep, uniq_list, local_pgadmin_cursor, s2human
+from ..common import dt2time, fqdn, now, grep, uniq_list, local_pgadmin_cursor, s2human, Commit
 from ..container import docker_build, docker_stop, docker_is_running
+from odoo.addons.runbot.models.repo import HashMissingException
 from odoo import models, fields, api
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.http import request
 from odoo.tools import appdirs
 from collections import defaultdict
@@ -47,7 +48,6 @@ class runbot_build(models.Model):
     committer_email = fields.Char('Committer Email')
     subject = fields.Text('Subject')
     sequence = fields.Integer('Sequence')
-    modules = fields.Char("Modules to Install")
 
     # state machine
 
@@ -73,10 +73,6 @@ class runbot_build(models.Model):
     build_time = fields.Integer(compute='_compute_build_time', string='Job time')
     build_age = fields.Integer(compute='_compute_build_age', string='Build age')
     duplicate_id = fields.Many2one('runbot.build', 'Corresponding Build', index=True)
-    server_match = fields.Selection([('builtin', 'This branch includes Odoo server'),
-                                     ('match', 'This branch includes Odoo server'),
-                                     ('default', 'No match found - defaults to master')],
-                                    string='Server branch matching')
     revdep_build_ids = fields.Many2many('runbot.build', 'runbot_rev_dep_builds',
                                         column1='rev_dep_id', column2='dependent_id',
                                         string='Builds that depends on this build')
@@ -101,6 +97,11 @@ class runbot_build(models.Model):
     log_list = fields.Char('Comma separted list of step_ids names with logs', compute="_compute_log_list", store=True)
     orphan_result = fields.Boolean('No effect on the parent result', default=False)
 
+    commit_path_mode = fields.Selection([('rep_sha', 'repo name + sha'),
+                                         ('soft', 'repo name only'),
+                                         ],
+                                        default='soft',
+                                        string='Source export path mode')
     @api.depends('config_id')
     def _compute_log_list(self):  # storing this field because it will be access trhoug repo viewn and keep track of the list at create
         for build in self:
@@ -281,6 +282,14 @@ class runbot_build(models.Model):
                 extra_info.update({'local_state': 'duplicate', 'duplicate_id': duplicate_id})
                 # maybe update duplicate priority if needed
 
+            docker_source_folders = set()
+            for commit in build_id.get_all_commit():
+                docker_source_folder = build_id._docker_source_folder(commit)
+                if docker_source_folder in docker_source_folders:
+                    extra_info['commit_path_mode'] = 'rep_sha'
+                    continue
+                docker_source_folders.add(docker_source_folder)
+
         build_id.write(extra_info)
         if build_id.local_state == 'duplicate' and build_id.duplicate_id.global_state in ('running', 'done'):  # and not build_id.parent_id:
             build_id._github_status()
@@ -396,7 +405,6 @@ class runbot_build(models.Model):
                     'committer': build.committer,
                     'committer_email': build.committer_email,
                     'subject': build.subject,
-                    'modules': build.modules,
                     'build_type': 'rebuild',
                 }
                 if exact:
@@ -410,7 +418,6 @@ class runbot_build(models.Model):
                     values.update({
                         'config_id': build.config_id.id,
                         'extra_params': build.extra_params,
-                        'server_match': build.server_match,
                         'orphan_result': build.orphan_result,
                     })
                     #if replace: ?
@@ -436,6 +443,8 @@ class runbot_build(models.Model):
         self.write({'local_state': 'done', 'local_result': 'skipped', 'duplicate_id': False})
 
     def _local_cleanup(self):
+        if self.pool._init:
+            return
 
         _logger.debug('Local cleaning')
 
@@ -457,8 +466,7 @@ class runbot_build(models.Model):
             existing = builds.exists()
             remaining = (builds - existing)
             if remaining:
-                dest_list = [dest for sublist in [dest_by_builds_ids[rem_id] for rem_id in remaining] for dest in sublist]
-                #dest_list = [dest for dest in dest_by_builds_ids[rem_id] for rem_id in remaining]
+                dest_list = [dest for sublist in [dest_by_builds_ids[rem_id] for rem_id in remaining.ids] for dest in sublist]
                 _logger.debug('(%s) (%s) not deleted because no corresponding build found' % (label, " ".join(dest_list)))
             for build in existing:
                 if fields.Datetime.from_string(build.create_date) + datetime.timedelta(days=max_days) < datetime.datetime.now():
@@ -546,7 +554,7 @@ class runbot_build(models.Model):
                     build._log('_schedule', 'Init build environment with config %s ' % build.config_id.name)
                     # notify pending build - avoid confusing users by saying nothing
                     build._github_status()
-                    build._checkout()
+                    os.makedirs(build._path('logs'), exist_ok=True)
                     build._log('_schedule', 'Building docker image')
                     docker_build(build._path('logs', 'docker_build.txt'), build._path())
                 except Exception:
@@ -632,128 +640,102 @@ class runbot_build(models.Model):
         root = self.env['runbot.repo']._root()
         return os.path.join(root, 'build', build.dest, *l)
 
-    def _server(self, *l, **kw):  # not really build related, specific to odoo version, could be a data
-        """Return the build server path"""
+    def _server(self, *path):
+        """Return the absolute path to the direcory containing the server file, adding optional *path"""
         self.ensure_one()
-        build = self
-        if os.path.exists(build._path('odoo')):
-            return build._path('odoo', *l)
-        return build._path('openerp', *l)
+        commit = self.get_server_commit()
+        if os.path.exists(commit._source_path('odoo')):
+            return commit._source_path('odoo', *path)
+        return commit._source_path('openerp', *path)
 
     def _filter_modules(self, modules, available_modules, explicit_modules):
+        # TODO add blacklist_modules and blacklist prefixes as data on repo
         blacklist_modules = set(['auth_ldap', 'document_ftp', 'base_gengo',
                                  'website_gengo', 'website_instantclick',
                                  'pad', 'pad_project', 'note_pad',
                                  'pos_cache', 'pos_blackbox_be'])
 
-        mod_filter = lambda m: (
-            m in available_modules and
-            (m in explicit_modules or (not m.startswith(('hw_', 'theme_', 'l10n_')) and
-                                       m not in blacklist_modules))
-        )
-        return uniq_list(filter(mod_filter, modules))
+        def mod_filter(module):
+            if module not in available_modules:
+                return False
+            if module in explicit_modules:
+                return True
+            if module.startswith(('hw_', 'theme_', 'l10n_')):
+                return False
+            if module in blacklist_modules:
+                return False
+            return True
 
-    def _checkout(self):
+        return uniq_list([module for module in modules if mod_filter(module)])
+
+    def _get_available_modules(self, commit):
+        for manifest_file_name in commit.repo.manifest_files.split(','):  # '__manifest__.py' '__openerp__.py'
+            for addons_path in commit.repo.addons_paths.split(','):  # '' 'addons' 'odoo/addons'
+                sep = os.path.join(addons_path, '*')
+                for manifest_path in glob.glob(commit._source_path(sep, manifest_file_name)):
+                    module = os.path.basename(os.path.dirname(manifest_path))
+                    yield (addons_path, module, manifest_file_name)
+
+    def _docker_source_folder(self, commit):
+        # in case some build have commits with the same repo name (ex: foo/bar, foo-ent/bar)
+        # it can be usefull to uniquify commit export path using hash
+        if self.commit_path_mode == 'rep_sha':
+            return '%s-%s' % (commit.repo._get_repo_name_part(), commit.sha[:8])
+        else:
+            return commit.repo._get_repo_name_part()
+
+    def _checkout(self, commits=None):
         self.ensure_one()  # will raise exception if hash not found, we don't want to fail for all build.
-        # starts from scratch
-        build = self
-        if os.path.isdir(build._path()):
-            shutil.rmtree(build._path())
-
-        # runbot log path
-        os.makedirs(build._path("logs"), exist_ok=True)
-        os.makedirs(build._server('addons'), exist_ok=True)
-
-        # update repo if needed
-        if not build.repo_id._hash_exists(build.name):
-            build.repo_id._update()
-
         # checkout branch
-        build.branch_id.repo_id._git_export(build.name, build._path())
+        exports = {}
+        for commit in commits or self.get_all_commit():
+            build_export_path = self._docker_source_folder(commit)
+            if build_export_path in exports:
+                self.log('_checkout', 'Multiple repo have same export path in build, some source may be missing for %s' % build_export_path, level='ERROR')
+                self._kill(result='ko')
+            try:
+                exports[build_export_path] = commit.export()
+            except HashMissingException:
+                self._log('_checkout', "Commit %s is unreachable. Did you force push the branch since build creation?" % commit, level='ERROR')
+                self.kill(result='ko')
+        return exports
 
-        has_server = os.path.isfile(build._server('__init__.py'))
-        server_match = 'builtin'
-
-        # build complete set of modules to install
-        modules_to_move = []
-        modules_to_test = ((build.branch_id.modules or '') + ',' +
-                            (build.repo_id.modules or ''))
-        modules_to_test = list(filter(None, modules_to_test.split(',')))  # ???
-        explicit_modules = set(modules_to_test)
-        _logger.debug("manual modules_to_test for build %s: %s", build.dest, modules_to_test)
-
-        if not has_server:
-            if build.repo_id.modules_auto == 'repo':
-                modules_to_test += [
-                    os.path.basename(os.path.dirname(a))
-                    for a in (glob.glob(build._path('*/__openerp__.py')) +
-                                glob.glob(build._path('*/__manifest__.py')))
-                ]
-                _logger.debug("local modules_to_test for build %s: %s", build.dest, modules_to_test)
-
-            # todo make it backward compatible, or create migration script?
-            for build_dependency in build.dependency_ids:
-                closest_branch = build_dependency.closest_branch_id
-                latest_commit = build_dependency.dependency_hash
-                repo = closest_branch.repo_id or build_dependency.repo_id
-                closest_name = closest_branch.name or 'no_branch'
-                if build_dependency.match_type == 'default':
-                    server_match = 'default'
-                elif server_match != 'default':
-                    server_match = 'match'
-
-                build._log(
-                    '_checkout', 'Checkouting %s from %s' % (closest_name, repo.name)
-                )
-
-                if not repo._hash_exists(latest_commit):
-                    repo._update(force=True)
-                if not repo._hash_exists(latest_commit):
-                    try:
-                        repo._git(['fetch', 'origin', latest_commit])
-                    except:
-                        pass
-                if not repo._hash_exists(latest_commit):
-                    build._log('_checkout', "Dependency commit %s in repo %s is unreachable. Did you force push the branch since build creation?" % (latest_commit, repo.name))
-                    raise Exception
-
-                repo._git_export(latest_commit, build._path())
-
-            # Finally mark all addons to move to openerp/addons
-            modules_to_move += [
-                os.path.dirname(module)
-                for module in (glob.glob(build._path('*/__openerp__.py')) +
-                                glob.glob(build._path('*/__manifest__.py')))
-            ]
-
-        # move all addons to server addons path
-        for module in uniq_list(glob.glob(build._path('addons/*')) + modules_to_move):
-            basename = os.path.basename(module)
-            addon_path = build._server('addons', basename)
-            if os.path.exists(addon_path):
-                build._log(
-                    'Building environment',
-                    'You have duplicate modules in your branches "%s"' % basename
-                )
-                if os.path.islink(addon_path) or os.path.isfile(addon_path):
-                    os.remove(addon_path)
+    def _get_modules_to_test(self, commits=None):
+        self.ensure_one()  # will raise exception if hash not found, we don't want to fail for all build.
+        # checkout branch
+        repo_modules = []
+        available_modules = []
+        for commit in commits or self.get_all_commit():
+            for (addons_path, module, manifest_file_name) in self._get_available_modules(commit):
+                if commit.repo == self.repo_id:
+                    repo_modules.append(module)
+                if module in available_modules:
+                    self._log(
+                        'Building environment',
+                        '%s is a duplicated modules (found in "%s")' % (module, commit._source_path(addons_path, module, manifest_file_name)),
+                        level='WARNING'
+                    )
                 else:
-                    shutil.rmtree(addon_path)
-            shutil.move(module, build._server('addons'))
+                    available_modules.append(module)
+        explicit_modules = uniq_list([module for module in (self.branch_id.modules or '').split(',') + (self.repo_id.modules or '').split(',') if module])
 
-        available_modules = [
-            os.path.basename(os.path.dirname(a))
-            for a in (glob.glob(build._server('addons/*/__openerp__.py')) +
-                        glob.glob(build._server('addons/*/__manifest__.py')))
-        ]
-        if build.repo_id.modules_auto == 'all' or (build.repo_id.modules_auto != 'none' and has_server):
-            modules_to_test += available_modules
+        if explicit_modules:
+            _logger.debug("explicit modules_to_test for build %s: %s", self.dest, explicit_modules)
 
-        modules_to_test = self._filter_modules(modules_to_test,
-                                                set(available_modules), explicit_modules)
-        _logger.debug("modules_to_test for build %s: %s", build.dest, modules_to_test)
-        build.write({'server_match': server_match,
-                        'modules': ','.join(modules_to_test)})
+        if set(explicit_modules) - set(available_modules):
+            self.log('checkout', 'Some explicit modules (branch or repo defined) are not in available module list.', level='WARNING')
+
+        if self.repo_id.modules_auto == 'all':
+            modules_to_test = available_modules
+        elif self.repo_id.modules_auto == 'repo':
+            modules_to_test = explicit_modules + repo_modules
+            _logger.debug("local modules_to_test for build %s: %s", self.dest, modules_to_test)
+        else:
+            modules_to_test = explicit_modules
+
+        modules_to_test = self._filter_modules(modules_to_test, available_modules, explicit_modules)
+        _logger.debug("modules_to_test for build %s: %s", self.dest, modules_to_test)
+        return modules_to_test
 
     def _local_pg_dropdb(self, dbname):
         with local_pgadmin_cursor() as local_cr:
@@ -837,28 +819,51 @@ class runbot_build(models.Model):
             if not child.duplicate_id:
                 child._ask_kill()
 
-    def _cmd(self):  # why not remove build.modules output ?
+    def get_all_commit(self):
+        return [Commit(self.repo_id, self.name)] + [Commit(dep.get_repo(), dep.dependency_hash) for dep in self.dependency_ids]
+
+    def get_server_commit(self, commits=None):
+        """
+        returns a Commit() of the first repo containing server files found in commits or in build commits
+        the commits param is not used in code base but could be usefull for jobs and crons
+        """
+        for commit in (commits or self.get_all_commit()):
+            if commit.repo.server_files:
+                return commit
+        raise ValidationError('No repo found with defined server_files')
+
+    def get_addons_path(self, commits=None):
+        for commit in (commits or self.get_all_commit()):
+            source_path = self._docker_source_folder(commit)
+            for addons_path in commit.repo.addons_paths.split(','):
+                if os.path.isdir(commit._source_path(addons_path)):
+                    yield os.path.join(source_path, addons_path).strip(os.sep)
+
+    def get_server_info(self, commit=None):
+        server_dir = False
+        server = False
+        commit = commit or self.get_server_commit()
+        for server_file in commit.repo.server_files.split(','):
+            if os.path.isfile(commit._source_path(server_file)):
+                return (self._docker_source_folder(commit), server_file)
+        self._log('server_info', 'No server found in %s' % commit, level='ERROR')
+        raise ValidationError('No server found in %s' % commit)
+
+    def _cmd(self):
         """Return a tuple describing the command to start the build
         First part is list with the command and parameters
         Second part is a list of Odoo modules
         """
         self.ensure_one()
         build = self
-        bins = [
-            'odoo-bin',                 # >= 10.0
-            'openerp-server',           # 9.0, 8.0
-            'openerp-server.py',        # 7.0
-            'bin/openerp-server.py',    # < 7.0
-        ]
-        for odoo_bin in bins:
-            if os.path.isfile(build._path(odoo_bin)):
-                break
 
+        (server_dir, server_file) = self.get_server_info()
+        addons_paths = self.get_addons_path()
         # commandline
-        cmd = [ os.path.join('/data/build', odoo_bin), ]
+        cmd = [os.path.join('/data/build', server_dir, server_file), '--addons-path', ",".join(addons_paths)]
         # options
         if grep(build._server("tools/config.py"), "no-xmlrpcs"):  # move that to configs ?
-            cmd.append("--no-xmlrpcs") 
+            cmd.append("--no-xmlrpcs")
         if grep(build._server("tools/config.py"), "no-netrpc"):
             cmd.append("--no-netrpc")
         if grep(build._server("tools/config.py"), "log-db"):
@@ -879,7 +884,7 @@ class runbot_build(models.Model):
         # use the username of the runbot host to connect to the databases
         cmd += ['-r %s' % pwd.getpwuid(os.getuid()).pw_name]
 
-        return cmd, build.modules
+        return cmd
 
     def _github_status_notify_all(self, status):
         """Notify each repo with a status"""

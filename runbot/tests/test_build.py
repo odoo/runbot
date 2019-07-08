@@ -4,12 +4,21 @@ from odoo.tools.config import configmanager
 from odoo.tests import common
 
 
+def rev_parse(repo, branch_name):
+    """
+    simulate a rev parse by returning a fake hash of form
+    'rp_odoo-dev/enterprise_saas-12.2__head'
+    should be overwitten if a pr head should match a branch head
+    """
+    head_hash = 'rp_%s_%s_head' % (repo.name.split(':')[1], branch_name.split('/')[-1])
+    return head_hash
+
 class Test_Build(common.TransactionCase):
 
     def setUp(self):
         super(Test_Build, self).setUp()
         self.Repo = self.env['runbot.repo']
-        self.repo = self.Repo.create({'name': 'bla@example.com:foo/bar'})
+        self.repo = self.Repo.create({'name': 'bla@example.com:foo/bar', 'server_files': 'server.py', 'addons_paths': 'addons,core/addons'})
         self.Branch = self.env['runbot.branch']
         self.branch = self.Branch.create({
             'repo_id': self.repo.id,
@@ -62,10 +71,12 @@ class Test_Build(common.TransactionCase):
         with self.assertRaises(AssertionError):
             builds.write({'local_state': 'duplicate'})
 
+    @patch('odoo.addons.runbot.models.build.os.path.isfile')
     @patch('odoo.addons.runbot.models.build.os.mkdir')
     @patch('odoo.addons.runbot.models.build.grep')
-    def test_build_cmd_log_db(self, mock_grep, mock_mkdir):
+    def test_build_cmd_log_db(self, mock_grep, mock_mkdir, mock_is_file):
         """ test that the logdb connection URI is taken from the .odoorc file """
+        mock_is_file.return_value = True
         uri = 'postgres://someone:pass@somewhere.com/db'
         self.env['ir.config_parameter'].sudo().set_param("runbot.runbot_logdb_uri", uri)
         build = self.Build.create({
@@ -73,8 +84,120 @@ class Test_Build(common.TransactionCase):
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'port': '1234',
         })
-        cmd = build._cmd()[0]
+        cmd = build._cmd()
         self.assertIn('--log-db=%s' % uri, cmd)
+
+    @patch('odoo.addons.runbot.models.build.os.path.isdir')
+    @patch('odoo.addons.runbot.models.build.os.path.isfile')
+    @patch('odoo.addons.runbot.models.build.os.mkdir')
+    @patch('odoo.addons.runbot.models.build.grep')
+    def test_build_cmd_server_path_no_dep(self, mock_grep, mock_mkdir, mock_is_file, mock_is_dir):
+        """ test that the server path and addons path """
+        mock_is_file.return_value = True
+        mock_is_dir.return_value = True
+        build = self.Build.create({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'port': '1234',
+        })
+        cmd = build._cmd()
+        self.assertEqual('/data/build/bar/server.py', cmd[0])
+        self.assertIn('--addons-path', cmd)
+        addons_path_pos = cmd.index('--addons-path') + 1
+        self.assertEqual(cmd[addons_path_pos], 'bar/addons,bar/core/addons')
+
+    @patch('odoo.addons.runbot.models.branch.runbot_branch._is_on_remote')
+    @patch('odoo.addons.runbot.models.build.os.path.isdir')
+    @patch('odoo.addons.runbot.models.build.os.path.isfile')
+    @patch('odoo.addons.runbot.models.build.os.mkdir')
+    @patch('odoo.addons.runbot.models.build.grep')
+    def test_build_cmd_server_path_with_dep(self, mock_grep, mock_mkdir, mock_is_file, mock_is_dir, mock_is_on_remote):
+        """ test that the server path and addons path """
+
+        def is_file(file):
+            self.assertIn('sources/bar/dfdfcfcf0000ffffffffffffffffffffffffffff/server.py', file)
+            return True
+
+        def is_dir(file):
+            paths = [
+                'sources/bar/dfdfcfcf0000ffffffffffffffffffffffffffff/addons',
+                'sources/bar/dfdfcfcf0000ffffffffffffffffffffffffffff/core/addons',
+                'sources/bar-ent/d0d0caca0000ffffffffffffffffffffffffffff'
+            ]
+            self.assertTrue(any([path in file for path in paths]))  # checking that addons path existence check looks ok
+            return True
+
+        mock_is_file.side_effect = is_file
+        mock_is_dir.side_effect = is_dir
+        mock_is_on_remote.return_value = True
+        repo_ent = self.env['runbot.repo'].create({
+            'name': 'bla@example.com:foo/bar-ent',
+            'server_files': '',
+        })
+        repo_ent.dependency_ids = self.repo
+        enterprise_branch = self.env['runbot.branch'].create({
+            'repo_id': repo_ent.id,
+            'name': 'refs/heads/master'
+        })
+
+        def rev_parse(repo, branch_name):
+            self.assertEqual(repo, self.repo)
+            self.assertEqual(branch_name, 'refs/heads/master')
+            return 'dfdfcfcf0000ffffffffffffffffffffffffffff'
+
+        with patch('odoo.addons.runbot.models.repo.runbot_repo._git_rev_parse', new=rev_parse):
+            build = self.Build.create({
+                'branch_id': enterprise_branch.id,
+                'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+                'port': '1234',
+            })
+        cmd = build._cmd()
+        self.assertIn('--addons-path', cmd)
+        addons_path_pos = cmd.index('--addons-path') + 1
+        self.assertEqual(cmd[addons_path_pos], 'bar-ent,bar/addons,bar/core/addons')
+        self.assertEqual('/data/build/bar/server.py', cmd[0])
+
+    @patch('odoo.addons.runbot.models.branch.runbot_branch._is_on_remote')
+    @patch('odoo.addons.runbot.models.build.os.path.isdir')
+    @patch('odoo.addons.runbot.models.build.os.path.isfile')
+    @patch('odoo.addons.runbot.models.build.os.mkdir')
+    @patch('odoo.addons.runbot.models.build.grep')
+    def test_build_cmd_server_path_with_dep_collision(self, mock_grep, mock_mkdir, mock_is_file, mock_is_dir, mock_is_on_remote):
+        """ test that the server path and addons path """
+
+        def is_file(file):
+            self.assertIn('sources/bar/dfdfcfcf0000ffffffffffffffffffffffffffff/server.py', file)
+            return True
+
+        mock_is_file.side_effect = is_file
+        mock_is_dir.return_value = True
+        mock_is_on_remote.return_value = True
+        repo_ent = self.env['runbot.repo'].create({
+            'name': 'bla@example.com:foo-ent/bar',
+            'server_files': '',
+        })
+        repo_ent.dependency_ids = self.repo
+        enterprise_branch = self.env['runbot.branch'].create({
+            'repo_id': repo_ent.id,
+            'name': 'refs/heads/master'
+        })
+
+        def rev_parse(repo, branch_name):
+            self.assertEqual(repo, self.repo)
+            self.assertEqual(branch_name, 'refs/heads/master')
+            return 'dfdfcfcf0000ffffffffffffffffffffffffffff'
+
+        with patch('odoo.addons.runbot.models.repo.runbot_repo._git_rev_parse', new=rev_parse):
+            build = self.Build.create({
+                'branch_id': enterprise_branch.id,
+                'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+                'port': '1234',
+            })
+        cmd = build._cmd()
+        self.assertIn('--addons-path', cmd)
+        addons_path_pos = cmd.index('--addons-path') + 1
+        self.assertEqual(cmd[addons_path_pos], 'bar-d0d0caca,bar-dfdfcfcf/addons,bar-dfdfcfcf/core/addons')
+        self.assertEqual('/data/build/bar-dfdfcfcf/server.py', cmd[0])
 
     def test_build_config_from_branch_default(self):
         """test build config_id is computed from branch default config_id"""
@@ -265,16 +388,6 @@ class Test_Build(common.TransactionCase):
         self.assertEqual(build_parent.nb_pending, 0)
         self.assertEqual(build_parent.nb_testing, 0)
         self.assertEqual(build_parent.global_state, 'done')
-
-def rev_parse(repo, branch_name):
-    """
-    simulate a rev parse by returning a fake hash of form
-    'rp_odoo-dev/enterprise_saas-12.2__head'
-    should be overwitten if a pr head should match a branch head
-    """
-    head_hash = 'rp_%s_%s_head' % (repo.name.split(':')[1], branch_name.split('/')[-1])
-    return head_hash
-
 
 class TestClosestBranch(common.TransactionCase):
 

@@ -11,14 +11,17 @@ import signal
 import subprocess
 import time
 
+from odoo.exceptions import UserError, ValidationError
 from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT
 from odoo import models, fields, api
 from odoo.modules.module import get_module_resource
 from odoo.tools import config
-from ..common import fqdn, dt2time
+from ..common import fqdn, dt2time, Commit
 from psycopg2.extensions import TransactionRollbackError
 _logger = logging.getLogger(__name__)
 
+class HashMissingException(Exception):
+    pass
 
 class runbot_repo(models.Model):
 
@@ -55,6 +58,10 @@ class runbot_repo(models.Model):
     repo_config_id = fields.Many2one('runbot.build.config', 'Run Config')
     config_id = fields.Many2one('runbot.build.config', 'Run Config', compute='_compute_config_id', inverse='_inverse_config_id')
 
+    server_files = fields.Char('Server files', help='Comma separated list of possible server files')  # odoo-bin,openerp-server,openerp-server.py
+    manifest_files = fields.Char('Addons files', help='Comma separated list of possible addons files', default='__manifest__.py,__openerp__.py')
+    addons_paths = fields.Char('Addons files', help='Comma separated list of possible addons path', default='')
+
     def _compute_config_id(self):
         for repo in self:
             if repo.repo_config_id:
@@ -71,15 +78,25 @@ class runbot_repo(models.Model):
         default = os.path.join(os.path.dirname(__file__), '../static')
         return os.path.abspath(default)
 
+    def _source_path(self, sha, *path):
+        """
+        returns the absolute path to the source folder of the repo (adding option *path)
+        """
+        self.ensure_one()
+        return os.path.join(self._root(), 'sources', self._get_repo_name_part(), sha, *path)
+
     @api.depends('name')
     def _get_path(self):
         """compute the server path of repo from the name"""
         root = self._root()
         for repo in self:
-            name = repo.name
-            for i in '@:/':
-                name = name.replace(i, '_')
-            repo.path = os.path.join(root, 'repo', name)
+            repo.path = os.path.join(root, 'repo', repo._sanitized_name(repo.name))
+
+    @api.model
+    def _sanitized_name(self, name):
+        for i in '@:/':
+            name = name.replace(i, '_')
+        return name
 
     @api.depends('name')
     def _get_base_url(self):
@@ -95,24 +112,48 @@ class runbot_repo(models.Model):
         for repo in self:
             repo.short_name = '/'.join(repo.base.split('/')[-2:])
 
+    def _get_repo_name_part(self):
+        self.ensure_one
+        return self._sanitized_name(self.name.split('/')[-1])
+
     def _git(self, cmd):
         """Execute a git command 'cmd'"""
-        for repo in self:
-            cmd = ['git', '--git-dir=%s' % repo.path] + cmd
-            _logger.debug("git command: %s", ' '.join(cmd))
-            return subprocess.check_output(cmd).decode('utf-8')
+        self.ensure_one()
+        cmd = ['git', '--git-dir=%s' % self.path] + cmd
+        _logger.debug("git command: %s", ' '.join(cmd))
+        return subprocess.check_output(cmd).decode('utf-8')
 
     def _git_rev_parse(self, branch_name):
         return self._git(['rev-parse', branch_name]).strip()
 
-    def _git_export(self, treeish, dest):
-        """Export a git repo to dest"""
+    def _git_export(self, sha):
+        """Export a git repo into a sources"""
+        # TODO add automated tests
         self.ensure_one()
-        _logger.debug('checkout %s %s %s', self.name, treeish, dest)
-        p1 = subprocess.Popen(['git', '--git-dir=%s' % self.path, 'archive', treeish], stdout=subprocess.PIPE)
-        p2 = subprocess.Popen(['tar', '-xmC', dest], stdin=p1.stdout, stdout=subprocess.PIPE)
+        export_path = self._source_path(sha)
+
+        if os.path.isdir(export_path):
+            _logger.info('git export: checkouting to %s (already exists)' % export_path)
+            return export_path
+
+        if not self._hash_exists(sha):
+            self._update(force=True)
+        if not self._hash_exists(sha):
+            try:
+                self._git(['fetch', 'origin', sha])
+            except:
+                pass
+        if not self._hash_exists(sha):
+            raise HashMissingException()
+
+        _logger.info('git export: checkouting to %s (new)' % export_path)
+        os.makedirs(export_path)
+        p1 = subprocess.Popen(['git', '--git-dir=%s' % self.path, 'archive', sha], stdout=subprocess.PIPE)
+        p2 = subprocess.Popen(['tar', '-xmC', export_path], stdin=p1.stdout, stdout=subprocess.PIPE)
         p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
         p2.communicate()[0]
+        # TODO get result and fallback on cleaing in case of problem
+        return export_path
 
     def _hash_exists(self, commit_hash):
         """ Verify that a commit hash exists in the repo """

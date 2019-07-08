@@ -39,7 +39,9 @@ def build_odoo_cmd(odoo_cmd):
     # build cmd
     cmd_chain = []
     cmd_chain.append('cd /data/build')
-    cmd_chain.append('head -1 odoo-bin | grep -q python3 && sudo pip3 install -r requirements.txt || sudo pip install -r requirements.txt')
+    server_path = odoo_cmd[0]
+    requirement_path = os.path.join(os.path.dirname(server_path), 'requirements.txt')
+    cmd_chain.append('head -1 %s | grep -q python3 && sudo pip3 install -r %s || sudo pip install -r %s' % (server_path, requirement_path, requirement_path))
     cmd_chain.append(' '.join(odoo_cmd))
     return ' && '.join(cmd_chain)
 
@@ -60,7 +62,7 @@ def docker_build(log_path, build_dir):
     dbuild = subprocess.Popen(['docker', 'build', '--tag', 'odoo:runbot_tests', '.'], stdout=logs, stderr=logs, cwd=docker_dir)
     dbuild.wait()
 
-def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None, cpu_limit=None, preexec_fn=None):
+def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None, cpu_limit=None, preexec_fn=None, ro_volumes=None):
     """Run tests in a docker container
     :param run_cmd: command string to run in container
     :param log_path: path to the logfile that will contain odoo stdout and stderr
@@ -68,6 +70,7 @@ def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None,
                       This directory is shared as a volume with the container
     :param container_name: used to give a name to the container for later reference
     :param exposed_ports: if not None, starting at 8069, ports will be exposed as exposed_ports numbers
+    :params ro_volumes: dict of dest:source volumes to mount readonly in builddir
     """
     _logger.debug('Docker run command: %s', run_cmd)
     logs = open(log_path, 'w')
@@ -81,13 +84,18 @@ def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None,
         '--shm-size=128m',
         '--init',
     ]
+    if ro_volumes:
+        for dest, source in ro_volumes.items():
+            logs.write("Adding readonly volume '%s' pointing to %s \n" % (dest, source))
+            docker_command.append('--volume=%s:/data/build/%s:ro' % (source, dest))
+
     serverrc_path = os.path.expanduser('~/.openerp_serverrc')
     odoorc_path = os.path.expanduser('~/.odoorc')
     final_rc = odoorc_path if os.path.exists(odoorc_path) else serverrc_path if os.path.exists(serverrc_path) else None
     if final_rc:
         docker_command.extend(['--volume=%s:/home/odoo/.odoorc:ro' % final_rc])
     if exposed_ports:
-        for dp,hp in enumerate(exposed_ports, start=8069):
+        for dp, hp in enumerate(exposed_ports, start=8069):
             docker_command.extend(['-p', '127.0.0.1:%s:%s' % (hp, dp)])
     if cpu_limit:
         docker_command.extend(['--ulimit', 'cpu=%s' % int(cpu_limit)])

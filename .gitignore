@@ -7,4 +7,5 @@
 # runbot work files
 runbot/static/build
 runbot/static/repo
+runbot/static/sources
 runbot/static/nginx

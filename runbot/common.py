@@ -17,6 +17,20 @@ from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT
 _logger = logging.getLogger(__name__)
 
 
+class Commit():
+    def __init__(self, repo, sha):
+        self.repo = repo
+        self.sha = sha
+
+    def _source_path(self, *path):
+        return self.repo._source_path(self.sha, *path)
+
+    def export(self):
+        return self.repo._git_export(self.sha)
+
+    def __str__(self):
+        return '%s:%s' % (self.repo.short_name, self.sha)
+
 def fqdn():
     return socket.getfqdn()
 
