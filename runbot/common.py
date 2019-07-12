@@ -28,8 +28,17 @@ class Commit():
     def export(self):
         return self.repo._git_export(self.sha)
 
+    def read_source(self, file, mode='r'):
+        file_path = self._source_path(file)
+        try:
+            with open(file_path, mode) as f:
+                return f.read()
+        except:
+            return False
+
     def __str__(self):
         return '%s:%s' % (self.repo.short_name, self.sha)
+
 
 def fqdn():
     return socket.getfqdn()
