@@ -314,7 +314,7 @@ class ConfigStep(models.Model):
         modules_to_install = set([mod.strip() for mod in self.install_modules.split(',')])
         if '*' in modules_to_install:
             modules_to_install.remove('*')
-            default_mod = set([mod.strip() for mod in build.modules.split(',')])
+            default_mod = set([mod.strip() for mod in build.modules.split(',')]) if build.modules else set()
             modules_to_install = default_mod | modules_to_install
             #  todo add without support
         return modules_to_install

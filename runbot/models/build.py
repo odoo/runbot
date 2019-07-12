@@ -457,7 +457,7 @@ class runbot_build(models.Model):
             existing = builds.exists()
             remaining = (builds - existing)
             if remaining:
-                dest_list = [dest for sublist in [dest_by_builds_ids[rem_id] for rem_id in remaining] for dest in sublist]
+                dest_list = [dest for sublist in [dest_by_builds_ids[rem_id] for rem_id in remaining.ids] for dest in sublist]
                 #dest_list = [dest for dest in dest_by_builds_ids[rem_id] for rem_id in remaining]
                 _logger.debug('(%s) (%s) not deleted because no corresponding build found' % (label, " ".join(dest_list)))
             for build in existing:
