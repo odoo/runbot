@@ -691,7 +691,7 @@ class runbot_build(models.Model):
         for commit in commits or self.get_all_commit():
             build_export_path = self._docker_source_folder(commit)
             if build_export_path in exports:
-                self.log('_checkout', 'Multiple repo have same export path in build, some source may be missing for %s' % build_export_path, level='ERROR')
+                self._log('_checkout', 'Multiple repo have same export path in build, some source may be missing for %s' % build_export_path, level='ERROR')
                 self._kill(result='ko')
             try:
                 exports[build_export_path] = commit.export()
@@ -723,7 +723,7 @@ class runbot_build(models.Model):
             _logger.debug("explicit modules_to_test for build %s: %s", self.dest, explicit_modules)
 
         if set(explicit_modules) - set(available_modules):
-            self.log('checkout', 'Some explicit modules (branch or repo defined) are not in available module list.', level='WARNING')
+            self._log('checkout', 'Some explicit modules (branch or repo defined) are not in available module list.', level='WARNING')
 
         if self.repo_id.modules_auto == 'all':
             modules_to_test = available_modules
