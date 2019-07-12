@@ -333,7 +333,7 @@ class ConfigStep(models.Model):
 
     def _coverage_params(self, build, modules_to_install):
         pattern_to_omit = set()
-        for commit in self.get_all_commit:
+        for commit in build.get_all_commit():
             docker_source_folder = build._docker_source_folder(commit)
             for manifest_file in commit.repo.manifest_files.split(','):
                 pattern_to_omit.add('*%s' % manifest_file)
