@@ -99,13 +99,3 @@ def local_pgadmin_cursor():
     finally:
         if cnx:
             cnx.close()
-
-def get_py_version(build):
-    """return the python name to use from build instance"""
-    executables = [ 'odoo-bin', 'openerp-server' ]
-    for server_path in map(build._path, executables):
-        if os.path.exists(server_path):
-            with open(server_path, 'r') as f:
-                if f.readline().strip().endswith('python3'):
-                    return 'python3'
-    return 'python'

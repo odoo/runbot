@@ -84,7 +84,7 @@ class Test_Build(common.TransactionCase):
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'port': '1234',
         })
-        cmd = build._cmd()
+        cmd = build._cmd(py_version=3)
         self.assertIn('--log-db=%s' % uri, cmd)
 
     @patch('odoo.addons.runbot.models.build.os.path.isdir')
@@ -100,8 +100,9 @@ class Test_Build(common.TransactionCase):
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'port': '1234',
         })
-        cmd = build._cmd()
-        self.assertEqual('/data/build/bar/server.py', cmd[0])
+        cmd = build._cmd(py_version=3)
+        self.assertEqual('python3', cmd[0])
+        self.assertEqual('bar/server.py', cmd[1])
         self.assertIn('--addons-path', cmd)
         addons_path_pos = cmd.index('--addons-path') + 1
         self.assertEqual(cmd[addons_path_pos], 'bar/addons,bar/core/addons')
@@ -151,11 +152,12 @@ class Test_Build(common.TransactionCase):
                 'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
                 'port': '1234',
             })
-        cmd = build._cmd()
+        cmd = build._cmd(py_version=3)
         self.assertIn('--addons-path', cmd)
         addons_path_pos = cmd.index('--addons-path') + 1
         self.assertEqual(cmd[addons_path_pos], 'bar-ent,bar/addons,bar/core/addons')
-        self.assertEqual('/data/build/bar/server.py', cmd[0])
+        self.assertEqual('bar/server.py', cmd[1])
+        self.assertEqual('python3', cmd[0])
 
     @patch('odoo.addons.runbot.models.branch.runbot_branch._is_on_remote')
     @patch('odoo.addons.runbot.models.build.os.path.isdir')
@@ -193,11 +195,12 @@ class Test_Build(common.TransactionCase):
                 'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
                 'port': '1234',
             })
-        cmd = build._cmd()
+        cmd = build._cmd(py_version=3)
         self.assertIn('--addons-path', cmd)
         addons_path_pos = cmd.index('--addons-path') + 1
         self.assertEqual(cmd[addons_path_pos], 'bar-d0d0caca,bar-dfdfcfcf/addons,bar-dfdfcfcf/core/addons')
-        self.assertEqual('/data/build/bar-dfdfcfcf/server.py', cmd[0])
+        self.assertEqual('bar-dfdfcfcf/server.py', cmd[1])
+        self.assertEqual('python3', cmd[0])
 
     def test_build_config_from_branch_default(self):
         """test build config_id is computed from branch default config_id"""
