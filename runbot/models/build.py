@@ -9,7 +9,7 @@ import subprocess
 import time
 import datetime
 from ..common import dt2time, fqdn, now, grep, uniq_list, local_pgadmin_cursor, s2human, Commit
-from ..container import docker_build, docker_stop, docker_is_running
+from ..container import docker_build, docker_stop, docker_is_running, Command
 from odoo.addons.runbot.models.repo import HashMissingException
 from odoo import models, fields, api
 from odoo.exceptions import UserError, ValidationError
@@ -283,7 +283,7 @@ class runbot_build(models.Model):
                 # maybe update duplicate priority if needed
 
             docker_source_folders = set()
-            for commit in build_id.get_all_commit():
+            for commit in build_id._get_all_commit():
                 docker_source_folder = build_id._docker_source_folder(commit)
                 if docker_source_folder in docker_source_folders:
                     extra_info['commit_path_mode'] = 'rep_sha'
@@ -384,6 +384,14 @@ class runbot_build(models.Model):
                 params['dep'][result[0]] = result[1]
         return params
 
+    def _copy_dependency_ids(self):
+        return [(0, 0, {
+            'match_type': dep.match_type,
+            'closest_branch_id': dep.closest_branch_id.id,
+            'dependency_hash': dep.dependency_hash,
+            'dependecy_repo_id': dep.dependecy_repo_id.id,
+        }) for dep in self.dependency_ids]
+
     def _force(self, message=None, exact=False):
         """Force a rebuild and return a recordset of forced builds"""
         forced_builds = self.env['runbot.build']
@@ -408,19 +416,13 @@ class runbot_build(models.Model):
                     'build_type': 'rebuild',
                 }
                 if exact:
-                    if build.dependency_ids:
-                        values['dependency_ids'] = [(0, 0, {
-                            'match_type': dep.match_type,
-                            'closest_branch_id': dep.closest_branch_id.id,
-                            'dependency_hash': dep.dependency_hash,
-                            'dependecy_repo_id': dep.dependecy_repo_id.id,
-                        }) for dep in build.dependency_ids]
                     values.update({
                         'config_id': build.config_id.id,
                         'extra_params': build.extra_params,
                         'orphan_result': build.orphan_result,
+                        'dependency_ids': build._copy_dependency_ids(),
                     })
-                    #if replace: ?
+                    #  if replace: ?
                     if build.parent_id:
                         values.update({
                             'parent_id': build.parent_id.id,  # attach it to parent
@@ -643,7 +645,7 @@ class runbot_build(models.Model):
     def _server(self, *path):
         """Return the absolute path to the direcory containing the server file, adding optional *path"""
         self.ensure_one()
-        commit = self.get_server_commit()
+        commit = self._get_server_commit()
         if os.path.exists(commit._source_path('odoo')):
             return commit._source_path('odoo', *path)
         return commit._source_path('openerp', *path)
@@ -688,7 +690,7 @@ class runbot_build(models.Model):
         self.ensure_one()  # will raise exception if hash not found, we don't want to fail for all build.
         # checkout branch
         exports = {}
-        for commit in commits or self.get_all_commit():
+        for commit in commits or self._get_all_commit():
             build_export_path = self._docker_source_folder(commit)
             if build_export_path in exports:
                 self._log('_checkout', 'Multiple repo have same export path in build, some source may be missing for %s' % build_export_path, level='ERROR')
@@ -705,7 +707,7 @@ class runbot_build(models.Model):
         # checkout branch
         repo_modules = []
         available_modules = []
-        for commit in commits or self.get_all_commit():
+        for commit in commits or self._get_all_commit():
             for (addons_path, module, manifest_file_name) in self._get_available_modules(commit):
                 if commit.repo == self.repo_id:
                     repo_modules.append(module)
@@ -819,54 +821,58 @@ class runbot_build(models.Model):
             if not child.duplicate_id:
                 child._ask_kill()
 
-    def get_all_commit(self):
-        return [Commit(self.repo_id, self.name)] + [Commit(dep.get_repo(), dep.dependency_hash) for dep in self.dependency_ids]
+    def _get_all_commit(self):
+        return [Commit(self.repo_id, self.name)] + [Commit(dep._get_repo(), dep.dependency_hash) for dep in self.dependency_ids]
 
-    def get_server_commit(self, commits=None):
+    def _get_server_commit(self, commits=None):
         """
         returns a Commit() of the first repo containing server files found in commits or in build commits
         the commits param is not used in code base but could be usefull for jobs and crons
         """
-        for commit in (commits or self.get_all_commit()):
+        for commit in (commits or self._get_all_commit()):
             if commit.repo.server_files:
                 return commit
         raise ValidationError('No repo found with defined server_files')
 
-    def get_addons_path(self, commits=None):
-        for commit in (commits or self.get_all_commit()):
+    def _get_addons_path(self, commits=None):
+        for commit in (commits or self._get_all_commit()):
             source_path = self._docker_source_folder(commit)
             for addons_path in commit.repo.addons_paths.split(','):
                 if os.path.isdir(commit._source_path(addons_path)):
                     yield os.path.join(source_path, addons_path).strip(os.sep)
 
-    def get_server_info(self, commit=None):
+    def _get_server_info(self, commit=None):
         server_dir = False
         server = False
-        commit = commit or self.get_server_commit()
+        commit = commit or self._get_server_commit()
         for server_file in commit.repo.server_files.split(','):
             if os.path.isfile(commit._source_path(server_file)):
-                return (self._docker_source_folder(commit), server_file)
+                return (commit, server_file)
         self._log('server_info', 'No server found in %s' % commit, level='ERROR')
         raise ValidationError('No server found in %s' % commit)
 
-    def _cmd(self):
-        """Return a tuple describing the command to start the build
-        First part is list with the command and parameters
-        Second part is a list of Odoo modules
+    def _cmd(self, python_params=None, py_version=None):
+        """Return a list describing the command to start the build
         """
         self.ensure_one()
         build = self
+        python_params = python_params or []
+        py_version = py_version if py_version is not None else build._get_py_version()
+        (server_commit, server_file) = self._get_server_info()
+        server_dir = self._docker_source_folder(server_commit)
+        addons_paths = self._get_addons_path()
+        requirement_path = os.path.join(server_dir, 'requirements.txt')
+        pres = [['sudo', 'pip%s' % py_version, 'install', '-r', '%s' % requirement_path]]
 
-        (server_dir, server_file) = self.get_server_info()
-        addons_paths = self.get_addons_path()
         # commandline
-        cmd = [os.path.join('/data/build', server_dir, server_file), '--addons-path', ",".join(addons_paths)]
+        cmd = ['python%s' % py_version] + python_params + [os.path.join(server_dir, server_file), '--addons-path', ",".join(addons_paths)]
         # options
-        if grep(build._server("tools/config.py"), "no-xmlrpcs"):  # move that to configs ?
+        config_path = build._server("tools/config.py")
+        if grep(config_path, "no-xmlrpcs"):  # move that to configs ?
             cmd.append("--no-xmlrpcs")
-        if grep(build._server("tools/config.py"), "no-netrpc"):
+        if grep(config_path, "no-netrpc"):
             cmd.append("--no-netrpc")
-        if grep(build._server("tools/config.py"), "log-db"):
+        if grep(config_path, "log-db"):
             logdb_uri = self.env['ir.config_parameter'].get_param('runbot.runbot_logdb_uri')
             logdb = self.env.cr.dbname
             if logdb_uri and grep(build._server('sql_db.py'), 'allow_uri'):
@@ -875,7 +881,7 @@ class runbot_build(models.Model):
             if grep(build._server('tools/config.py'), 'log-db-level'):
                 cmd += ["--log-db-level", '25']
 
-        if grep(build._server("tools/config.py"), "data-dir"):
+        if grep(config_path, "data-dir"):
             datadir = build._path('datadir')
             if not os.path.exists(datadir):
                 os.mkdir(datadir)
@@ -883,8 +889,7 @@ class runbot_build(models.Model):
 
         # use the username of the runbot host to connect to the databases
         cmd += ['-r %s' % pwd.getpwuid(os.getuid()).pw_name]
-
-        return cmd
+        return Command(pres, cmd, [])
 
     def _github_status_notify_all(self, status):
         """Notify each repo with a status"""
@@ -935,6 +940,15 @@ class runbot_build(models.Model):
 
         new_step = step_ids[next_index]  # job to do, state is job_state (testing or running)
         return {'active_step': new_step.id, 'local_state': new_step._step_state()}
+
+    def _get_py_version(self):
+        """return the python name to use from build instance"""
+        (server_commit, server_file) = self._get_server_info()
+        server_path = server_commit._source_path(server_file)
+        with open(server_path, 'r') as f:
+            if f.readline().strip().endswith('python3'):
+                return '3'
+        return ''
 
     def read_file(self, file, mode='r'):
         file_path = self._path(file)

@@ -5,8 +5,8 @@ import os
 import re
 import shlex
 import time
-from ..common import now, grep, get_py_version, time2str, rfind, Commit
-from ..container import docker_run, docker_get_gateway_ip, build_odoo_cmd
+from ..common import now, grep, time2str, rfind, Commit
+from ..container import docker_run, docker_get_gateway_ip, Command
 from odoo import models, fields, api
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools.safe_eval import safe_eval, test_python_expr
@@ -201,7 +201,7 @@ class ConfigStep(models.Model):
                     build._logger('Too much build created')
                     break
                 children = Build.create({
-                    'dependency_ids': [(4, did.id) for did in build.dependency_ids],
+                    'dependency_ids': build._copy_dependency_ids(),
                     'config_id': create_config.id,
                     'parent_id': build.id,
                     'branch_id': build.branch_id.id,
@@ -228,12 +228,11 @@ class ConfigStep(models.Model):
             '_logger': _logger,
             'log_path': log_path,
             'glob': glob.glob,
-            'build_odoo_cmd': build_odoo_cmd,
+            'Command': Command,
             'base64': base64,
             're': re,
             'time': time,
             'grep': grep,
-            'get_py_version': get_py_version,
             'rfind': rfind,
         }
         return safe_eval(self.sudo().python_code.strip(), eval_ctx, mode="exec", nocopy=True)
@@ -244,8 +243,7 @@ class ConfigStep(models.Model):
         build._log('run', 'Start running build %s' % build.dest)
         # run server
         cmd = build._cmd()
-        server = build._server()
-        if os.path.exists(os.path.join(server, 'addons/im_livechat')):
+        if os.path.exists(build._get_server_commit()._source_path('addons/im_livechat')):
             cmd += ["--workers", "2"]
             cmd += ["--longpolling-port", "8070"]
             cmd += ["--max-cron-threads", "1"]
@@ -257,7 +255,7 @@ class ConfigStep(models.Model):
         # we need to have at least one job of type install_odoo to run odoo, take the last one for db_name.
         cmd += ['-d', '%s-%s' % (build.dest, db_name)]
 
-        if grep(os.path.join(server, "tools/config.py"), "db-filter"):
+        if grep(build._server("tools/config.py"), "db-filter"):
             if build.repo_id.nginx:
                 cmd += ['--db-filter', '%d.*$']
             else:
@@ -271,19 +269,26 @@ class ConfigStep(models.Model):
         build_port = build.port
         self.env.cr.commit()  # commit before docker run to be 100% sure that db state is consistent with dockers
         self.invalidate_cache()
-        return docker_run(build_odoo_cmd(cmd), log_path, build_path, docker_name, exposed_ports=[build_port, build_port + 1], ro_volumes=exports)
+        return docker_run(cmd.build(), log_path, build_path, docker_name, exposed_ports=[build_port, build_port + 1], ro_volumes=exports)
 
     def _run_odoo_install(self, build, log_path):
         exports = build._checkout()
-        cmd = build._cmd()
+
+        modules_to_install = self._modules_to_install(build)
+        mods = ",".join(modules_to_install)
+        python_params = []
+        py_version = build._get_py_version()
+        if self.coverage:
+            build.coverage = True
+            coverage_extra_params = self._coverage_params(build, modules_to_install)
+            python_params = ['-m', 'coverage', 'run', '--branch', '--source', '/data/build'] + coverage_extra_params
+        cmd = build._cmd(python_params, py_version)
         # create db if needed
         db_name = "%s-%s" % (build.dest, self.db_name)
         if self.create_db:
             build._local_pg_createdb(db_name)
         cmd += ['-d', db_name]
         # list module to install
-        modules_to_install = self._modules_to_install(build)
-        mods = ",".join(modules_to_install)
         if mods:
             cmd += ['-i', mods]
         if self.test_enable:
@@ -301,17 +306,11 @@ class ConfigStep(models.Model):
         if self.extra_params:
             cmd.extend(shlex.split(self.extra_params))
 
-        if self.coverage:
-            build.coverage = True
-            coverage_extra_params = self._coverage_params(build, modules_to_install)
-            py_version = get_py_version(build)
-            cmd = [py_version, '-m', 'coverage', 'run', '--branch', '--source', '/data/build'] + coverage_extra_params + cmd
-
-        cmd += self._post_install_command(build, modules_to_install)  # coverage post, extra-checks, ...
+        cmd.posts.append(self._post_install_command(build, modules_to_install, py_version))  # coverage post, extra-checks, ...
 
         max_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=10000))
         timeout = min(self.cpu_limit, max_timeout)
-        return docker_run(build_odoo_cmd(cmd), log_path, build._path(), build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports)
+        return docker_run(cmd.build(), log_path, build._path(), build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports)
 
     def _modules_to_install(self, build):
         modules_to_install = set([mod.strip() for mod in self.install_modules.split(',')])
@@ -322,18 +321,18 @@ class ConfigStep(models.Model):
             #  todo add without support
         return modules_to_install
 
-    def _post_install_command(self, build, modules_to_install):
+    def _post_install_command(self, build, modules_to_install, py_version=None):
         if self.coverage:
-            py_version = get_py_version(build)
+            py_version = py_version if py_version is not None else build._get_py_version()
             # prepare coverage result
             cov_path = build._path('coverage')
             os.makedirs(cov_path, exist_ok=True)
-            return ['&&', py_version, "-m", "coverage", "html", "-d", "/data/build/coverage", "--ignore-errors"]
+            return ['python%s' % py_version, "-m", "coverage", "html", "-d", "/data/build/coverage", "--ignore-errors"]
         return []
 
     def _coverage_params(self, build, modules_to_install):
         pattern_to_omit = set()
-        for commit in build.get_all_commit():
+        for commit in build._get_all_commit():
             docker_source_folder = build._docker_source_folder(commit)
             for manifest_file in commit.repo.manifest_files.split(','):
                 pattern_to_omit.add('*%s' % manifest_file)
