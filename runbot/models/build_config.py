@@ -289,22 +289,31 @@ class ConfigStep(models.Model):
             build._local_pg_createdb(db_name)
         cmd += ['-d', db_name]
         # list module to install
-        if mods:
+        extra_params = build.extra_params or self.extra_params or ''
+        if mods and '-i' not in extra_params:
             cmd += ['-i', mods]
+        config_path = build._server("tools/config.py")
         if self.test_enable:
-            if grep(build._server("tools/config.py"), "test-enable"):
+            if grep(config_path, "test-enable"):
                 cmd.extend(['--test-enable'])
             else:
                 build._log('test_all', 'Installing modules without testing', level='WARNING')
-        if self.test_tags:
-                test_tags = self.test_tags.replace(' ', '')
-                cmd.extend(['--test-tags', test_tags])
+        test_tags_in_extra = '--test-tags' in extra_params
+        if self.test_tags or test_tags_in_extra:
+            if grep(config_path, "test-tags"):
+                if not test_tags_in_extra:
+                    test_tags = self.test_tags.replace(' ', '')
+                    cmd.extend(['--test-tags', test_tags])
+            else:
+                build._log('test_all', 'Test tags given but not supported', level='WARNING')
 
-        cmd += ['--stop-after-init']  # install job should always finish
-        cmd += ['--log-level=test', '--max-cron-threads=0']
+        cmd.append('--stop-after-init')  # install job should always finish
+        if '--log-level' not in extra_params:
+            cmd.append('--log-level=test')
+        cmd.append('--max-cron-threads=0')
 
-        if self.extra_params:
-            cmd.extend(shlex.split(self.extra_params))
+        if extra_params:
+            cmd.extend(shlex.split(extra_params))
 
         cmd.posts.append(self._post_install_command(build, modules_to_install, py_version))  # coverage post, extra-checks, ...
 
