@@ -354,7 +354,7 @@ class ConfigStep(models.Model):
 
     def _make_results(self, build):
         build_values = {}
-        if self.job_type == 'install_odoo':
+        if self.job_type in ['install_odoo', 'python']:
             if self.coverage:
                 build_values.update(self._make_coverage_results(build))
             if self.test_enable or self.test_tags:
