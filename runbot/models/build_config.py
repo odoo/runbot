@@ -242,7 +242,7 @@ class ConfigStep(models.Model):
         # adjust job_end to record an accurate job_20 job_time
         build._log('run', 'Start running build %s' % build.dest)
         # run server
-        cmd = build._cmd()
+        cmd = build._cmd(local_only=False)
         if os.path.exists(build._get_server_commit()._source_path('addons/im_livechat')):
             cmd += ["--workers", "2"]
             cmd += ["--longpolling-port", "8070"]

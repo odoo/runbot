@@ -851,7 +851,7 @@ class runbot_build(models.Model):
         self._log('server_info', 'No server found in %s' % commit, level='ERROR')
         raise ValidationError('No server found in %s' % commit)
 
-    def _cmd(self, python_params=None, py_version=None):
+    def _cmd(self, python_params=None, py_version=None, local_only=True):
         """Return a list describing the command to start the build
         """
         self.ensure_one()
@@ -868,6 +868,11 @@ class runbot_build(models.Model):
         cmd = ['python%s' % py_version] + python_params + [os.path.join(server_dir, server_file), '--addons-path', ",".join(addons_paths)]
         # options
         config_path = build._server("tools/config.py")
+        if local_only:
+            if grep(config_path, "--http-interface"):
+                cmd.append("--http-interface=127.0.0.1")
+            elif grep(config_path, "--xmlrpc-interface"):
+                cmd.append("--xmlrpc-interface=127.0.0.1")
         if grep(config_path, "no-xmlrpcs"):  # move that to configs ?
             cmd.append("--no-xmlrpcs")
         if grep(config_path, "no-netrpc"):
