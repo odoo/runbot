@@ -359,7 +359,7 @@ class runbot_build(models.Model):
         for build in self:
             if build.duplicate_id:
                 build.build_time = build.duplicate_id.build_time
-            elif build.build_end:
+            elif build.build_end and build.global_state != 'waiting':
                 build.build_time = int(dt2time(build.build_end) - dt2time(build.build_start))
             elif build.build_start:
                 build.build_time = int(time.time() - dt2time(build.build_start))
