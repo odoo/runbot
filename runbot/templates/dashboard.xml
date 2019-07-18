@@ -64,7 +64,7 @@
                         <t t-if="bu['build_type'] in ('rebuild', 'redirect')"><i class="fa fa-recycle" t-att-title="bu.build_type_label()" t-att-aria-label="bu.build_type_label()"/></t>
                         <a t-attf-href="https://#{repo['base']}/commit/#{bu['name']}"><t t-esc="bu['subject'][:32] + ('...' if bu['subject'][32:] else '') " t-att-title="bu['subject']"/></a>
                         <br/>
-                        <t t-call="runbot.build_name"/> — <small><a t-attf-href="/runbot/build/{{bu['id']}}"><t t-esc="bu['dest']"/></a> on <t t-esc="bu.real_build.host"/> <a t-if="bu.global_state == 'running'" t-attf-href="http://{{bu['domain']}}/?db={{bu['dest']}}-all"><i class="fa fa-sign-in"></i></a></small>
+                        <t t-call="runbot.build_name"/> — <small><a t-attf-href="/runbot/build/{{bu['id']}}"><t t-esc="bu['dest']"/></a> on <t t-esc="bu.real_build.host"/> <a t-if="bu.local_state == 'running'" t-attf-href="http://{{bu['domain']}}/?db={{bu['dest']}}-all"><i class="fa fa-sign-in"></i></a></small>
                       </div>
                     </t>
                   </div>
