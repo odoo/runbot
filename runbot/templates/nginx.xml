@@ -39,7 +39,7 @@ server {
     location /runbot/static/ {
        alias <t t-esc="runbot_static"/>;
        autoindex off;
-       location ~ /runbot/static/build/[^/]+/logs/ {
+       location ~ /runbot/static/build/[^/]+/(logs|tests)/ {
           autoindex on;
        }
     }
