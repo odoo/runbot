@@ -543,6 +543,9 @@ class runbot_build(models.Model):
                 if docker_is_running(build._get_docker_name()):
                     build.write({'requested_action': False, 'local_state': 'running'})
                     build._log('wake_up', 'Waking up failed, docker is already running', level='SEPARATOR')
+                elif not os.path.exists(build._path()):
+                    build.write({'requested_action': False, 'local_state': 'done'})
+                    build._log('wake_up', 'Impossible to wake-up, build dir does not exists anymore', level='SEPARATOR')
                 else:
                     log_path = build._path('logs', 'wake_up.txt')
                     build.write({'job_start': now(), 'job_end': False, 'active_step': False, 'requested_action': False, 'local_state': 'running'})
