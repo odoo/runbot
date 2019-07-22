@@ -449,7 +449,6 @@ class runbot_build(models.Model):
     def _local_cleanup(self):
         if self.pool._init:
             return
-
         _logger.debug('Local cleaning')
 
         def cleanup(dest_list, func, max_days, label):

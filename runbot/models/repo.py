@@ -10,6 +10,8 @@ import requests
 import signal
 import subprocess
 import time
+import glob
+import shutil
 
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT
@@ -550,6 +552,14 @@ class runbot_repo(models.Model):
         if hostname != fqdn():
             return 'Not for me'
         start_time = time.time()
+        # 1. source cleanup
+        # -> Remove sources when no build is using them
+        # (could be usefull to keep them for wakeup but we can checkout them again if not forced push)
+        self.env['runbot.repo']._source_cleanup()
+        # 2. db and log cleanup
+        # -> Keep them as long as possible
+        self.env['runbot.build']._local_cleanup()
+
         timeout = self._get_cron_period()
         icp = self.env['ir.config_parameter']
         update_frequency = int(icp.get_param('runbot.runbot_update_frequency', default=10))
@@ -567,4 +577,45 @@ class runbot_repo(models.Model):
                 self.env.cr.rollback()
                 self.env.reset()
                 time.sleep(random.uniform(0, 1))
-        self.env['runbot.build']._local_cleanup()
+
+    def _source_cleanup(self):
+        try:
+            if self.pool._init:
+                return
+            _logger.info('Source cleaning')
+            # we can remove a source only if no build are using them as name or rependency_ids aka as commit
+            cannot_be_deleted_builds = self.env['runbot.build'].search([('host', '=', fqdn()), ('local_state', 'not in', ('done', 'duplicate'))])
+            cannot_be_deleted_path = set()
+            for build in cannot_be_deleted_builds:
+                for commit in build._get_all_commit():
+                    cannot_be_deleted_path.add(commit._source_path())
+
+            to_delete = set()
+            to_keep = set()
+            repos = self.search([('mode', '!=', 'disabled')])
+            for repo in repos:
+                repo_source = os.path.join(repo._root(), 'sources', repo._get_repo_name_part(), '*')
+                for source_dir in glob.glob(repo_source):
+                    if source_dir not in cannot_be_deleted_path:
+                        to_delete.add(source_dir)
+                    else:
+                        to_keep.add(source_dir)
+
+            # we are comparing cannot_be_deleted_path with to keep to sensure that the algorithm is working, we want to avoid to erase file by mistake
+            # note: it is possible that a parent_build is in testing without checkouting sources, but it should be exceptions
+            if to_delete:
+                if cannot_be_deleted_path == to_keep:
+                    to_delete = list(to_delete)
+                    to_keep = list(to_keep)
+                    cannot_be_deleted_path = list(cannot_be_deleted_path)
+                    for source_dir in to_delete:
+                        _logger.info('Deleting source: %s' % source_dir)
+                        assert 'static' in source_dir
+                        shutil.rmtree(source_dir)
+                    _logger.info('%s/%s source folder where deleted (%s kept)' % (len(to_delete), len(to_delete+to_keep), len(to_keep)))
+                else:
+                    _logger.warning('Inconsistency between sources and database: %s %s' % (cannot_be_deleted_path, to_keep))
+
+        except:
+            _logger.error('An exception occured while cleaning sources')
+            pass
