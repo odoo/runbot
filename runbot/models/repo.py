@@ -458,11 +458,13 @@ class runbot_repo(models.Model):
                     return self.env.cr.fetchall()
 
                 allocated = allocate_builds("""AND runbot_build.build_type != 'scheduled'""", assignable_slots)
-                _logger.debug('Normal builds %s where allocated to runbot' % allocated)
+                if allocated:
+                    _logger.debug('Normal builds %s where allocated to runbot' % allocated)
                 weak_slot = assignable_slots - len(allocated) - 1
                 if weak_slot > 0:
                     allocated = allocate_builds('', weak_slot)
-                    _logger.debug('Scheduled builds %s where allocated to runbot' % allocated)
+                    if allocated:
+                        _logger.debug('Scheduled builds %s where allocated to runbot' % allocated)
 
             pending_build = Build.search(domain_host + [('local_state', '=', 'pending')], limit=available_slots)
             if pending_build:
@@ -501,21 +503,25 @@ class runbot_repo(models.Model):
 
             nginx_config = self.env['ir.ui.view'].render_template("runbot.nginx_config", settings)
             os.makedirs(nginx_dir, exist_ok=True)
-            with open(os.path.join(nginx_dir, 'nginx.conf'), 'wb') as nginx_file:
-                nginx_file.write(nginx_config)
-            try:
+            content = None
+            with open(os.path.join(nginx_dir, 'nginx.conf'), 'rb') as f:
+                content = f.read()
+            if content != nginx_config:
                 _logger.debug('reload nginx')
-                pid = int(open(os.path.join(nginx_dir, 'nginx.pid')).read().strip(' \n'))
-                os.kill(pid, signal.SIGHUP)
-            except Exception:
-                _logger.debug('start nginx')
-                if subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf']):
-                    # obscure nginx bug leaving orphan worker listening on nginx port
-                    if not subprocess.call(['pkill', '-f', '-P1', 'nginx: worker']):
-                        _logger.debug('failed to start nginx - orphan worker killed, retrying')
-                        subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf'])
-                    else:
-                        _logger.debug('failed to start nginx - failed to kill orphan worker - oh well')
+                with open(os.path.join(nginx_dir, 'nginx.conf'), 'wb') as f:
+                    f.write(nginx_config)
+                try:
+                    pid = int(open(os.path.join(nginx_dir, 'nginx.pid')).read().strip(' \n'))
+                    os.kill(pid, signal.SIGHUP)
+                except Exception:
+                    _logger.debug('start nginx')
+                    if subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf']):
+                        # obscure nginx bug leaving orphan worker listening on nginx port
+                        if not subprocess.call(['pkill', '-f', '-P1', 'nginx: worker']):
+                            _logger.debug('failed to start nginx - orphan worker killed, retrying')
+                            subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf'])
+                        else:
+                            _logger.debug('failed to start nginx - failed to kill orphan worker - oh well')
 
     def _get_cron_period(self, min_margin=120):
         """ Compute a randomized cron period with a 2 min margin below
@@ -614,7 +620,7 @@ class runbot_repo(models.Model):
                         shutil.rmtree(source_dir)
                     _logger.info('%s/%s source folder where deleted (%s kept)' % (len(to_delete), len(to_delete+to_keep), len(to_keep)))
                 else:
-                    _logger.warning('Inconsistency between sources and database: %s %s' % (cannot_be_deleted_path, to_keep))
+                    _logger.warning('Inconsistency between sources and database: \n%s \n%s' % (cannot_be_deleted_path-to_keep, to_keep-cannot_be_deleted_path))
 
         except:
             _logger.error('An exception occured while cleaning sources')
