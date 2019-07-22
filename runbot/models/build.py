@@ -714,7 +714,7 @@ class runbot_build(models.Model):
                 exports[build_export_path] = commit.export()
             except HashMissingException:
                 self._log('_checkout', "Commit %s is unreachable. Did you force push the branch since build creation?" % commit, level='ERROR')
-                self.kill(result='ko')
+                self._kill(result='ko')
         return exports
 
     def _get_modules_to_test(self, commits=None):
