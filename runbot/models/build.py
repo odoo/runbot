@@ -293,7 +293,7 @@ class runbot_build(models.Model):
                 docker_source_folders.add(docker_source_folder)
 
         build_id.write(extra_info)
-        if build_id.local_state == 'duplicate' and build_id.duplicate_id.global_state in ('running', 'done'):  # and not build_id.parent_id:
+        if build_id.local_state == 'duplicate' and build_id.duplicate_id.global_state in ('running', 'done'):
             build_id._github_status()
         return build_id
 
@@ -933,20 +933,25 @@ class runbot_build(models.Model):
     def _github_status(self):
         """Notify github of failed/successful builds"""
         for build in self:
-            if build.config_id.update_github_state:
+            if build.parent_id:
+                build.parent_id._github_status()
+            elif build.config_id.update_github_state:
                 runbot_domain = self.env['runbot.repo']._domain()
                 desc = "runbot build %s" % (build.dest,)
-                if build.local_state == 'testing':
+
+                if build.global_result in ('ko', 'warn'):
+                    state = 'failure'
+                elif build.global_state == 'testing':
                     state = 'pending'
-                elif build.local_state in ('running', 'done'):
+                elif build.global_state in ('running', 'done'):
                     state = 'error'
+                    if build.global_result == 'ok':
+                        state = 'success'
                 else:
+                    _logger.debug("skipping github status for build %s ", build.id)
                     continue
                 desc += " (runtime %ss)" % (build.job_time,)
-                if build.local_result == 'ok':
-                    state = 'success'
-                if build.local_result in ('ko', 'warn'):
-                    state = 'failure'
+
                 status = {
                     "state": state,
                     "target_url": "http://%s/runbot/build/%s" % (runbot_domain, build.id),
