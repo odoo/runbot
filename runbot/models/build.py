@@ -535,7 +535,10 @@ class runbot_build(models.Model):
             self.env.cr.commit()  # commit between each build to minimise transactionnal errors due to state computations
             self.invalidate_cache()
             if build.requested_action == 'deathrow':
-                build._kill(result='manually_killed')
+                result = None
+                if build.local_state != 'running' and build.global_result not in ('warn', 'ko'):
+                    result = 'manually_killed'
+                build._kill(result=result)
                 continue
 
             if build.requested_action == 'wake_up':
