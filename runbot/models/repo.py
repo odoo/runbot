@@ -115,7 +115,7 @@ class runbot_repo(models.Model):
             repo.short_name = '/'.join(repo.base.split('/')[-2:])
 
     def _get_repo_name_part(self):
-        self.ensure_one
+        self.ensure_one()
         return self._sanitized_name(self.name.split('/')[-1])
 
     def _git(self, cmd):
