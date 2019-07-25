@@ -191,12 +191,12 @@
                         </nav>
                         <t t-set="rowclass">info</t>
                         <t t-if="build.global_state in ['running','done']">
-                          <t t-if="build.global_result == 'ko'"><t t-set="rowclass">danger</t></t>
-                          <t t-if="build.global_result == 'warn'"><t t-set="rowclass">warning</t></t>
                           <t t-if="build.global_result == 'ok'"><t t-set="rowclass">success</t></t>
                           <t t-if="build.global_result == 'skipped'"><t t-set="rowclass">default</t></t>
                           <t t-if="build.global_result in ['killed', 'manually_killed']"><t t-set="rowclass">killed</t></t>
                         </t>
+                        <t t-if="build.global_result == 'ko'"><t t-set="rowclass">danger</t></t>
+                        <t t-if="build.global_result == 'warn'"><t t-set="rowclass">warning</t></t>
                         <table class="table table-condensed tabel-bordered">
                           <tr>
                             <td t-attf-class="{{rowclass}}">
@@ -220,12 +220,12 @@
                                 <t t-foreach="build.children_ids" t-as="child">
                                   <t t-set="rowclass">info</t>
                                   <t t-if="child.global_state in ['running','done']">
-                                    <t t-if="child.global_result == 'ko'"><t t-set="rowclass">danger</t></t>
-                                    <t t-if="child.global_result == 'warn'"><t t-set="rowclass">warning</t></t>
                                     <t t-if="child.global_result == 'ok'"><t t-set="rowclass">success</t></t>
                                     <t t-if="child.global_result == 'skipped'"><t t-set="rowclass">default</t></t>
                                     <t t-if="child.global_result in ['killed', 'manually_killed']"><t t-set="rowclass">killed</t></t>
                                   </t>
+                                  <t t-if="child.global_result == 'ko'"><t t-set="rowclass">danger</t></t>
+                                  <t t-if="child.global_result == 'warn'"><t t-set="rowclass">warning</t></t>
                                   <tr><td t-attf-class="{{rowclass}}">
                                     <a t-attf-href="/runbot/build/{{child.id}}" >Build <t t-esc="child.id"/></a> 
                                     with config <a t-attf-href="/web#id={{child.config_id.id}}&amp;view_type=form&amp;model=runbot.build.config"><t t-esc="child.config_id.name"/></a>
