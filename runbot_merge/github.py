@@ -172,7 +172,7 @@ class GH(object):
         """ Rebase pr's commits on top of dest, updates dest unless ``reset``
         is set.
 
-        Returns the hash of the rebased head.
+        Returns the hash of the rebased head and a map of all PR commits (to the PR they were rebased to)
         """
         logger = _logger.getChild('rebase')
         original_head = self.head(dest)
@@ -189,6 +189,7 @@ class GH(object):
             c['new_tree'] = self.merge(c['sha'], dest, tmp_msg)['tree']['sha']
 
         prev = original_head
+        mapping = {}
         for c in commits:
             copy = self('post', 'git/commits', json={
                 'message': c['commit']['message'],
@@ -198,7 +199,7 @@ class GH(object):
                 'committer': c['commit']['committer'],
             }, check={409: exceptions.MergeError}).json()
             logger.debug('copied %s to %s (parent: %s)', c['sha'], copy['sha'], prev)
-            prev = copy['sha']
+            prev = mapping[c['sha']] = copy['sha']
 
         if reset:
             self.set_ref(dest, original_head)
@@ -209,7 +210,7 @@ class GH(object):
                       self._repo, pr, dest, reset, len(commits),
                       prev)
         # prev is updated after each copy so it's the rebased PR head
-        return prev
+        return prev, mapping
 
     # fetch various bits of issues / prs to load them
     def pr(self, number):
