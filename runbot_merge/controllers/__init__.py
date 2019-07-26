@@ -153,7 +153,7 @@ def handle_pr(env, event):
             return "It's my understanding that closed/merged PRs don't get sync'd"
 
         if pr_obj.state == 'ready':
-            pr_obj.staging_id.cancel(
+            pr_obj.unstage(
                 "PR %s:%s updated by %s",
                 pr_obj.repository.name, pr_obj.number,
                 event['sender']['login']
@@ -201,7 +201,7 @@ def handle_pr(env, event):
                 'state_from': res[1] if not pr_obj.staging_id else 'staged',
                 'state_to': 'closed',
             })
-            pr_obj.staging_id.cancel(
+            pr_obj.unstage(
                 "PR %s:%s closed by %s",
                 pr_obj.repository.name, pr_obj.number,
                 event['sender']['login']

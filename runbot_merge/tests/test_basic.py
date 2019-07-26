@@ -1599,6 +1599,49 @@ class TestPRUpdate(object):
         assert not pr.staging_id
         assert not env['runbot_merge.stagings'].search([])
 
+    def test_split(self, env, repo):
+        """ Should remove the PR from its split, and possibly delete the split
+        entirely.
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        repo.make_ref('heads/master', m)
+
+        c = repo.make_commit(m, 'first', None, tree={'m': 'm', '1': '1'})
+        prx1 = repo.make_pr('t1', 'b1', target='master', ctid=c, user='user', label='p1')
+        repo.post_status(prx1.head, 'success', 'legal/cla')
+        repo.post_status(prx1.head, 'success', 'ci/runbot')
+        prx1.post_comment('hansen r+', user='reviewer')
+
+        c = repo.make_commit(m, 'first', None, tree={'m': 'm', '2': '2'})
+        prx2 = repo.make_pr('t2', 'b2', target='master', ctid=c, user='user', label='p2')
+        repo.post_status(prx2.head, 'success', 'legal/cla')
+        repo.post_status(prx2.head, 'success', 'ci/runbot')
+        prx2.post_comment('hansen r+', user='reviewer')
+
+        run_crons(env)
+
+        pr1, pr2 = env['runbot_merge.pull_requests'].search([], order='number')
+        assert pr1.number == prx1.number
+        assert pr2.number == prx2.number
+        assert pr1.staging_id == pr2.staging_id
+        s0 = pr1.staging_id
+
+        repo.post_status('heads/staging.master', 'failure', 'ci/runbot')
+        run_crons(env)
+
+        assert pr1.staging_id and pr1.staging_id != s0, "pr1 should have been re-staged"
+        assert not pr2.staging_id, "pr2 should not"
+        # TODO: remote doesn't currently handle env context so can't mess
+        #       around using active_test=False
+        assert env['runbot_merge.split'].search([])
+
+        prx2.push(repo.make_commit(c, 'second', None, tree={'m': 'm', '2': '22'}))
+        # probably not necessary ATM but...
+        run_crons(env)
+
+        assert pr2.state == 'opened', "state should have been reset"
+        assert not env['runbot_merge.split'].search([]), "there should be no split left"
+
     def test_update_error(self, env, repo):
         m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
         repo.make_ref('heads/master', m)
@@ -2370,6 +2413,49 @@ class TestRMinus:
         assert pr.staging_id == st
         assert pr.state == 'ready'
 
+    def test_split(self, env, repo):
+        """ Should remove the PR from its split, and possibly delete the split
+        entirely.
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        repo.make_ref('heads/master', m)
+
+        c = repo.make_commit(m, 'first', None, tree={'m': 'm', '1': '1'})
+        prx1 = repo.make_pr('t1', 'b1', target='master', ctid=c, user='user', label='p1')
+        repo.post_status(prx1.head, 'success', 'legal/cla')
+        repo.post_status(prx1.head, 'success', 'ci/runbot')
+        prx1.post_comment('hansen r+', user='reviewer')
+
+        c = repo.make_commit(m, 'first', None, tree={'m': 'm', '2': '2'})
+        prx2 = repo.make_pr('t2', 'b2', target='master', ctid=c, user='user', label='p2')
+        repo.post_status(prx2.head, 'success', 'legal/cla')
+        repo.post_status(prx2.head, 'success', 'ci/runbot')
+        prx2.post_comment('hansen r+', user='reviewer')
+
+        run_crons(env)
+
+        pr1, pr2 = env['runbot_merge.pull_requests'].search([], order='number')
+        assert pr1.number == prx1.number
+        assert pr2.number == prx2.number
+        assert pr1.staging_id == pr2.staging_id
+        s0 = pr1.staging_id
+
+        repo.post_status('heads/staging.master', 'failure', 'ci/runbot')
+        run_crons(env)
+
+        assert pr1.staging_id and pr1.staging_id != s0, "pr1 should have been re-staged"
+        assert not pr2.staging_id, "pr2 should not"
+        # TODO: remote doesn't currently handle env context so can't mess
+        #       around using active_test=False
+        assert env['runbot_merge.split'].search([])
+
+        # prx2 was actually a terrible idea!
+        prx2.post_comment('hansen r-', user='reviewer')
+        # probably not necessary ATM but...
+        run_crons(env)
+
+        assert pr2.state == 'validated', "state should have been reset"
+        assert not env['runbot_merge.split'].search([]), "there should be no split left"
 
 class TestComments:
     def test_address_method(self, repo, env):

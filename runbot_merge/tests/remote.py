@@ -348,8 +348,8 @@ class Model:
         ids = self._env(self._model, 'exists', self._ids)
         return Model(self._env, self._model, ids)
 
-    def search(self, domain):
-        ids = self._env(self._model, 'search', domain)
+    def search(self, domain, **kw):
+        ids = self._env(self._model, 'search', domain, **kw)
         return Model(self._env, self._model, ids)
 
     def create(self, values):
