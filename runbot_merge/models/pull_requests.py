@@ -487,6 +487,7 @@ class PullRequests(models.Model):
     ], default=2, index=True)
 
     statuses = fields.Text(compute='_compute_statuses')
+    status = fields.Char(compute='_compute_statuses')
 
     batch_id = fields.Many2one('runbot_merge.batch',compute='_compute_active_batch', store=True)
     batch_ids = fields.Many2many('runbot_merge.batch')
@@ -513,13 +514,26 @@ class PullRequests(models.Model):
         for pr in self:
             pr.blocked = pr.id not in stageable
 
-    @api.depends('head')
+    @api.depends('head', 'repository.project_id.required_statuses')
     def _compute_statuses(self):
         Commits = self.env['runbot_merge.commit']
         for s in self:
             c = Commits.search([('sha', '=', s.head)])
-            if c and c.statuses:
-                s.statuses = pprint.pformat(json.loads(c.statuses))
+            if not (c and c.statuses):
+                continue
+
+            statuses = json.loads(c.statuses)
+            s.statuses = pprint.pformat(statuses)
+
+            st = 'success'
+            for ci in s.repository.project_id.required_statuses.split(','):
+                v = state_(statuses, ci) or 'pending'
+                if v in ('error', 'failure'):
+                    st = 'failure'
+                    break
+                if v == 'pending':
+                    st = 'pending'
+            s.status = st
 
     @api.depends('batch_ids.active')
     def _compute_active_batch(self):
@@ -661,10 +675,19 @@ class PullRequests(models.Model):
             elif command == 'review':
                 if param and is_reviewer:
                     newstate = RPLUS.get(self.state)
+                    print('r+', self.state, self.status)
                     if newstate:
                         self.state = newstate
                         self.reviewed_by = author
                         ok = True
+                        if self.status == 'failure':
+                            # the normal infrastructure is for failure and
+                            # prefixes messages with "I'm sorry"
+                            Feedback.create({
+                                'repository': self.repository.id,
+                                'pull_request': self.number,
+                                'message': "You may want to rebuild or fix this PR as it has failed CI.",
+                            })
                     else:
                         msg = "This PR is already reviewed, reviewing it again is useless."
                 elif not param and is_author:
@@ -748,11 +771,13 @@ class PullRequests(models.Model):
         for pr in self:
             required = pr.repository.project_id.required_statuses.split(',')
 
+            success = True
             for ci in required:
                 st = state_(statuses, ci) or 'pending'
                 if st == 'success':
                     continue
 
+                success = False
                 # only report an issue of the PR is already approved (r+'d)
                 if st in ('error', 'failure') and pr.state == 'approved':
                     self.env['runbot_merge.pull_requests.feedback'].create({
@@ -760,8 +785,8 @@ class PullRequests(models.Model):
                         'pull_request': pr.number,
                         'message': "%r failed on this reviewed PR." % ci,
                     })
-                break
-            else: # all success (no break)
+
+            if success:
                 oldstate = pr.state
                 if oldstate == 'opened':
                     pr.state = 'validated'

@@ -2435,6 +2435,55 @@ class TestComments:
         # check that PR is still unreviewed
         assert pr.state == 'opened'
 
+class TestFeedback:
+    def test_ci_approved(self, repo, env, users):
+        """CI failing on an r+'d PR sends feedback"""
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        repo.make_ref('heads/master', m)
+
+        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
+        prx = repo.make_pr('title', 'body', target='master', ctid=c1, user='user')
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number)
+        ])
+
+        prx.post_comment('hansen r+', user='reviewer')
+        assert pr.state == 'approved'
+
+        repo.post_status(prx.head, 'failure', 'ci/runbot')
+        run_crons(env)
+
+        assert prx.comments == [
+            (users['reviewer'], 'hansen r+'),
+            (users['user'], "'ci/runbot' failed on this reviewed PR.")
+        ]
+
+    def test_review_unvalidated(self, repo, env, users):
+        """r+-ing a PR with failed CI sends feedback"""
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        repo.make_ref('heads/master', m)
+
+        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
+        prx = repo.make_pr('title', 'body', target='master', ctid=c1, user='user')
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number)
+        ])
+
+        repo.post_status(prx.head, 'failure', 'ci/runbot')
+        run_crons(env)
+        assert pr.state == 'opened'
+
+        prx.post_comment('hansen r+', user='reviewer')
+        assert pr.state == 'approved'
+
+        run_crons(env)
+
+        assert prx.comments == [
+            (users['reviewer'], 'hansen r+'),
+            (users['user'], "You may want to rebuild or fix this PR as it has failed CI.")
+        ]
 class TestInfrastructure:
     def test_protection(self, repo):
         """ force-pushing on a protected ref should fail
