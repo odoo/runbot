@@ -211,12 +211,12 @@ class runbot_build(models.Model):
                 last_commit = params['dep'][repo_name]  # not name
                 if last_commit:
                     match_type = 'params'
-                    build_closets_branch = False
+                    build_closet_branch = False
                     message = 'Dependency for repo %s defined in commit message' % (repo_name)
                 else:
-                    (build_closets_branch, match_type) = build_id.branch_id._get_closest_branch(extra_repo.id)
-                    closest_name = build_closets_branch.name
-                    closest_branch_repo = build_closets_branch.repo_id
+                    (build_closet_branch, match_type) = build_id.branch_id._get_closest_branch(extra_repo.id)
+                    closest_name = build_closet_branch.name
+                    closest_branch_repo = build_closet_branch.repo_id
                     last_commit = closest_branch_repo._git_rev_parse(closest_name)
                     message = 'Dependency for repo %s defined from closest branch %s' % (repo_name, closest_name)
                 try:
@@ -230,7 +230,7 @@ class runbot_build(models.Model):
                 dep_create_vals.append({
                     'build_id': build_id.id,
                     'dependecy_repo_id': extra_repo.id,
-                    'closest_branch_id': build_closets_branch.id,
+                    'closest_branch_id': build_closet_branch and build_closet_branch.id,
                     'dependency_hash': last_commit,
                     'match_type': match_type,
                 })
@@ -265,7 +265,6 @@ class runbot_build(models.Model):
                     FROM runbot_build_dependency as DUPLIDEPS
                     JOIN runbot_build_dependency as BUILDDEPS
                     ON BUILDDEPS.dependency_hash = DUPLIDEPS.dependency_hash
-                    --AND BUILDDEPS.closest_branch_id = DUPLIDEPS.closest_branch_id -- only usefull if we are affraid of hash collision in different branches
                     AND BUILDDEPS.build_id = %s
                     AND DUPLIDEPS.build_id in %s
                     GROUP BY DUPLIDEPS.build_id
@@ -381,7 +380,7 @@ class runbot_build(models.Model):
             pass  # todo remove this try catch and make correct patch for _git
         params = defaultdict(lambda: defaultdict(str))
         if message:
-            regex = re.compile(r'^[\t ]*dep=([A-Za-z0-9\-_]+/[A-Za-z0-9\-_]+):([0-9A-Fa-f\-]*) *(#.*)?$', re.M)  # dep:repo:hash #comment
+            regex = re.compile(r'^[\t ]*Runbot-dependency: ([A-Za-z0-9\-_]+/[A-Za-z0-9\-_]+):([0-9A-Fa-f\-]*) *(#.*)?$', re.M)  # dep:repo:hash #comment
             for result in re.findall(regex, message):
                 params['dep'][result[0]] = result[1]
         return params
@@ -389,7 +388,7 @@ class runbot_build(models.Model):
     def _copy_dependency_ids(self):
         return [(0, 0, {
             'match_type': dep.match_type,
-            'closest_branch_id': dep.closest_branch_id.id,
+            'closest_branch_id': dep.closest_branch_id and dep.closest_branch_id.id,
             'dependency_hash': dep.dependency_hash,
             'dependecy_repo_id': dep.dependecy_repo_id.id,
         }) for dep in self.dependency_ids]
