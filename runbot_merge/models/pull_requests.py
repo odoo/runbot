@@ -316,18 +316,21 @@ class Branch(models.Model):
 
         rows = self._stageable()
         priority = rows[0][0] if rows else -1
-        if priority == 0:
+        if priority == 0 or priority == 1:
             # p=0 take precedence over all else
+            # p=1 allows merging a fix inside / ahead of a split (e.g. branch
+            # is broken or widespread false positive) without having to cancel
+            # the existing staging
             batched_prs = [PRs.browse(pr_ids) for _, pr_ids in takewhile(lambda r: r[0] == priority, rows)]
         elif self.split_ids:
             split_ids = self.split_ids[0]
             logger.info("Found split of PRs %s, re-staging", split_ids.mapped('batch_ids.prs'))
             batched_prs = [batch.prs for batch in split_ids.batch_ids]
             split_ids.unlink()
-        elif rows:
-            # p=1 or p=2
+        else: # p=2
             batched_prs = [PRs.browse(pr_ids) for _, pr_ids in takewhile(lambda r: r[0] == priority, rows)]
-        else:
+
+        if not batched_prs:
             return
 
         Batch = self.env['runbot_merge.batch']
