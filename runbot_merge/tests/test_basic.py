@@ -975,11 +975,16 @@ class TestMergeMethod:
         repo.post_status(staging.id, 'success', 'legal/cla')
         repo.post_status(staging.id, 'success', 'ci/runbot')
         run_crons(env)
-        assert env['runbot_merge.pull_requests'].search([
+        pr = env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
-        ]).state == 'merged'
+        ])
+        assert pr.state == 'merged'
         assert prx.state == 'closed'
+        assert json.loads(pr.commits_map) == {
+            c1: actual_sha,
+            '': actual_sha,
+        }, "for a squash, the one PR commit should be mapped to the one rebased commit"
 
     def test_pr_update_to_many_commits(self, repo, env):
         """
@@ -1157,16 +1162,26 @@ class TestMergeMethod:
         repo.post_status('heads/staging.master', 'success', 'ci/runbot')
         run_crons(env)
 
-        assert env['runbot_merge.pull_requests'].search([
+        pr = env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
-        ]).state == 'merged'
+        ])
+        assert pr.state == 'merged'
 
         # check that the dummy commit is not in the final master
         master = log_to_node(repo.log('heads/master'))
         assert master == merge_head
-        final_tree = repo.read_tree(repo.commit('heads/master'))
+        head = repo.commit('heads/master')
+        final_tree = repo.read_tree(head)
         assert final_tree == {'m': b'2', 'b': b'1'}, "sanity check of final tree"
+        r1 = repo.commit(head.parents[1])
+        r0 = repo.commit(r1.parents[0])
+        assert json.loads(pr.commits_map) == {
+            b0: r0.id,
+            b1: r1.id,
+            '': head.id,
+        }
+        assert r0.parents == [m2]
 
     def test_pr_rebase_ff(self, repo, env, users):
         """ test result on rebase-merge
@@ -1220,16 +1235,27 @@ class TestMergeMethod:
         repo.post_status('heads/staging.master', 'success', 'ci/runbot')
         run_crons(env)
 
-        assert env['runbot_merge.pull_requests'].search([
+        pr = env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
-        ]).state == 'merged'
+        ])
+        assert pr.state == 'merged'
 
         # check that the dummy commit is not in the final master
         master = log_to_node(repo.log('heads/master'))
         assert master == nb1
-        final_tree = repo.read_tree(repo.commit('heads/master'))
+        head = repo.commit('heads/master')
+        final_tree = repo.read_tree(head)
         assert final_tree == {'m': b'2', 'b': b'1'}, "sanity check of final tree"
+
+        m1 = head
+        m0 = repo.commit(m1.parents[0])
+        assert json.loads(pr.commits_map) == {
+            '': m1.id, # merge commit
+            b1: m1.id, # second PR's commit
+            b0: m0.id, # first PR's commit
+        }
+        assert m0.parents == [m2], "can't hurt to check the parent of our root commit"
 
     @pytest.mark.skip(reason="what do if the PR contains merge commits???")
     def test_pr_contains_merges(self, repo, env):
@@ -1272,6 +1298,14 @@ class TestMergeMethod:
         expected = node('gibberish\n\nblahblah\n\ncloses {}#{}'
                         '\n\nSigned-off-by: {}'.format(repo.name, prx.number, reviewer), m, c0)
         assert log_to_node(repo.log('heads/master')), expected
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number),
+        ])
+        assert json.loads(pr.commits_map) == {
+            prx.head: prx.head,
+            '': master.id
+        }
 
     def test_unrebase_emptymessage(self, repo, env, users):
         """ When merging between master branches (e.g. forward port), the PR

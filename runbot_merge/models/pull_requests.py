@@ -494,6 +494,7 @@ class PullRequests(models.Model):
     batch_id = fields.Many2one('runbot_merge.batch',compute='_compute_active_batch', store=True)
     batch_ids = fields.Many2many('runbot_merge.batch')
     staging_id = fields.Many2one(related='batch_id.staging_id', store=True)
+    commits_map = fields.Char(help="JSON-encoded mapping of PR commits to actually integrated commits. The integration head (either a merge commit or the PR's topmost) is mapped from the 'empty' pr commit (the key is an empty string, because you can't put a null key in json maps).", default='{}')
 
     link_warned = fields.Boolean(
         default=False, help="Whether we've already warned that this (ready)"
@@ -961,12 +962,16 @@ class PullRequests(models.Model):
         # on top of target
         msg = self._build_merge_message(commits[-1]['commit']['message'])
         commits[-1]['commit']['message'] = msg
-        return gh.rebase(self.number, target, commits=commits)
+        head, mapping = gh.rebase(self.number, target, commits=commits)
+        self.commits_map = json.dumps({**mapping, '': head})
+        return head
 
     def _stage_rebase_merge(self, gh, target, commits):
         msg = self._build_merge_message(self.message)
-        h = gh.rebase(self.number, target, reset=True, commits=commits)
-        return gh.merge(h, target, msg)['sha']
+        h, mapping = gh.rebase(self.number, target, reset=True, commits=commits)
+        merge_head = gh.merge(h, target, msg)['sha']
+        self.commits_map = json.dumps({**mapping, '': merge_head})
+        return merge_head
 
     def _stage_merge(self, gh, target, commits):
         pr_head = commits[-1] # oldest to newest
@@ -981,6 +986,7 @@ class PullRequests(models.Model):
             if len(merge) == 1:
                 [base_commit] = merge
 
+        commits_map = {c['sha']: c['sha'] for c in commits}
         if base_commit:
             # replicate pr_head with base_commit replaced by
             # the current head
@@ -996,11 +1002,18 @@ class PullRequests(models.Model):
                 'parents': new_parents,
             }).json()
             gh.set_ref(target, copy['sha'])
+            # merge commit *and old PR head* map to the pr head replica
+            commits_map[''] = commits_map[pr_head['sha']] = copy['sha']
+            self.commits_map = json.dumps(commits_map)
             return copy['sha']
         else:
             # otherwise do a regular merge
             msg = self._build_merge_message(self.message)
-            return gh.merge(self.head, target, msg)['sha']
+            merge_head = gh.merge(self.head, target, msg)['sha']
+            # and the merge commit is the normal merge head
+            commits_map[''] = merge_head
+            self.commits_map = json.dumps(commits_map)
+            return merge_head
 
 # state changes on reviews
 RPLUS = {
@@ -1363,7 +1376,7 @@ class Stagings(models.Model):
                     self.env['runbot_merge.pull_requests.feedback'].create({
                         'repository': pr.repository.id,
                         'pull_request': pr.number,
-                        'message': "Merged, thanks!",
+                        'message': "Merged at %s, thanks!" % json.loads(pr.commits_map)[''],
                         'close': True,
                     })
             finally:
