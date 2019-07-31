@@ -698,11 +698,7 @@ class PullRequests(models.Model):
                     newstate = RMINUS.get(self.state)
                     if newstate:
                         self.state = newstate
-                        if self.staging_id:
-                            self.staging_id.cancel(
-                                "unreview (r-) by %s",
-                                author.github_login
-                            )
+                        self.unstage("unreview (r-) by %s", author.github_login)
                         ok = True
                     else:
                         msg = "r- makes no sense in the current PR state."
@@ -1039,6 +1035,23 @@ class PullRequests(models.Model):
             commits_map[''] = merge_head
             self.commits_map = json.dumps(commits_map)
             return merge_head
+
+    def unstage(self, reason, *args):
+        """ If the PR is staged, cancel the staging. If the PR is split and
+        waiting, remove it from the split (possibly delete the split entirely)
+        """
+        split_batches = self.with_context(active_test=False).mapped('batch_ids').filtered('split_id')
+        if len(split_batches) > 1:
+            _logger.warn("Found a PR linked with more than one split batch: %s (%s)", self, split_batches)
+        for b in split_batches:
+            if len(b.split_id.batch_ids) == 1:
+                # only the batch of this PR -> delete split
+                b.split_id.unlink()
+            else:
+                # else remove this batch from the split
+                b.split_id = False
+
+        self.staging_id.cancel(reason, *args)
 
 # state changes on reviews
 RPLUS = {
