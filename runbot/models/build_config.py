@@ -23,11 +23,11 @@ class Config(models.Model):
     _name = "runbot.build.config"
     _inherit = "mail.thread"
 
-    name = fields.Char('Config name', required=True, unique=True, tracking=True, help="Unique name for config please use trigram as postfix for custom configs")
+    name = fields.Char('Config name', required=True, unique=True, track_visibility='onchange', help="Unique name for config please use trigram as postfix for custom configs")
     description = fields.Char('Config description')
     step_order_ids = fields.One2many('runbot.build.config.step.order', 'config_id')
-    update_github_state = fields.Boolean('Notify build state to github', default=False, tracking=True)
-    protected = fields.Boolean('Protected', default=False, tracking=True)
+    update_github_state = fields.Boolean('Notify build state to github', default=False, track_visibility='onchange')
+    protected = fields.Boolean('Protected', default=False, track_visibility='onchange')
 
     @api.model
     def create(self, values):
@@ -85,35 +85,35 @@ class ConfigStep(models.Model):
     _inherit = 'mail.thread'
 
     # general info
-    name = fields.Char('Step name', required=True, unique=True, tracking=True, help="Unique name for step please use trigram as postfix for custom step_ids")
+    name = fields.Char('Step name', required=True, unique=True, track_visibility='onchange', help="Unique name for step please use trigram as postfix for custom step_ids")
     job_type = fields.Selection([
         ('install_odoo', 'Test odoo'),
         ('run_odoo', 'Run odoo'),
         ('python', 'Python code'),
         ('create_build', 'Create build'),
-    ], default='install_odoo', required=True, tracking=True)
-    protected = fields.Boolean('Protected', default=False, tracking=True)
-    default_sequence = fields.Integer('Sequence', default=100, tracking=True)  # or run after? # or in many2many rel?
+    ], default='install_odoo', required=True, track_visibility='onchange')
+    protected = fields.Boolean('Protected', default=False, track_visibility='onchange')
+    default_sequence = fields.Integer('Sequence', default=100, track_visibility='onchange')  # or run after? # or in many2many rel?
     # install_odoo
-    create_db = fields.Boolean('Create Db', default=True, tracking=True)  # future
-    custom_db_name = fields.Char('Custom Db Name', tracking=True)  # future
+    create_db = fields.Boolean('Create Db', default=True, track_visibility='onchange')  # future
+    custom_db_name = fields.Char('Custom Db Name', track_visibility='onchange')  # future
     install_modules = fields.Char('Modules to install', help="List of module to install, use * for all modules", default='*')
-    db_name = fields.Char('Db Name', compute='_compute_db_name', inverse='_inverse_db_name', tracking=True)
-    cpu_limit = fields.Integer('Cpu limit', default=3600, tracking=True)
-    coverage = fields.Boolean('Coverage', dafault=False, tracking=True)
-    test_enable = fields.Boolean('Test enable', default=True, tracking=True)
+    db_name = fields.Char('Db Name', compute='_compute_db_name', inverse='_inverse_db_name', track_visibility='onchange')
+    cpu_limit = fields.Integer('Cpu limit', default=3600, track_visibility='onchange')
+    coverage = fields.Boolean('Coverage', dafault=False, track_visibility='onchange')
+    test_enable = fields.Boolean('Test enable', default=True, track_visibility='onchange')
     test_tags = fields.Char('Test tags', help="comma separated list of test tags")
-    extra_params = fields.Char('Extra cmd args', tracking=True)
+    extra_params = fields.Char('Extra cmd args', track_visibility='onchange')
     # python
-    python_code = fields.Text('Python code', tracking=True, default=PYTHON_DEFAULT)
+    python_code = fields.Text('Python code', track_visibility='onchange', default=PYTHON_DEFAULT)
     running_job = fields.Boolean('Job final state is running', default=False, help="Docker won't be killed if checked")
     # create_build
-    create_config_ids = fields.Many2many('runbot.build.config', 'runbot_build_config_step_ids_create_config_ids_rel', string='New Build Configs', tracking=True, index=True)
-    number_builds = fields.Integer('Number of build to create', default=1, tracking=True)
-    hide_build = fields.Boolean('Hide created build in frontend', default=True, tracking=True)
-    force_build = fields.Boolean("As a forced rebuild, don't use duplicate detection", default=False, tracking=True)
-    force_host = fields.Boolean('Use same host as parent for children', default=False, tracking=True)  # future
-    make_orphan = fields.Boolean('No effect on the parent result', help='Created build result will not affect parent build result', default=False, tracking=True)
+    create_config_ids = fields.Many2many('runbot.build.config', 'runbot_build_config_step_ids_create_config_ids_rel', string='New Build Configs', track_visibility='onchange', index=True)
+    number_builds = fields.Integer('Number of build to create', default=1, track_visibility='onchange')
+    hide_build = fields.Boolean('Hide created build in frontend', default=True, track_visibility='onchange')
+    force_build = fields.Boolean("As a forced rebuild, don't use duplicate detection", default=False, track_visibility='onchange')
+    force_host = fields.Boolean('Use same host as parent for children', default=False, track_visibility='onchange')  # future
+    make_orphan = fields.Boolean('No effect on the parent result', help='Created build result will not affect parent build result', default=False, track_visibility='onchange')
 
     @api.constrains('python_code')
     def _check_python_code(self):
