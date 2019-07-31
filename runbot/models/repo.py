@@ -312,11 +312,12 @@ class runbot_repo(models.Model):
                 if branch.sticky:
                     for rev_repo in self.search([('dependency_ids', 'in', self.id)]):
                         # find the latest build with the same branch name
-                        latest_rev_build = Build.search([('repo_id.id', '=', rev_repo.id), ('branch_id.branch_name', '=', branch.branch_name)], order='id desc', limit=1)
+                        latest_rev_build = Build.search([('build_type', '=', 'normal'), ('hidden', '=', 'False'), ('repo_id.id', '=', rev_repo.id), ('branch_id.branch_name', '=', branch.branch_name)], order='id desc', limit=1)
                         if latest_rev_build:
                             _logger.debug('Reverse dependency build %s forced in repo %s by commit %s', latest_rev_build.dest, rev_repo.name, sha[:6])
-                            latest_rev_build.build_type = 'indirect'
-                            new_build.revdep_build_ids += latest_rev_build._force(message='Rebuild from dependency %s commit %s' % (self.name, sha[:6]))
+                            indirect = latest_rev_build._force(message='Rebuild from dependency %s commit %s' % (self.name, sha[:6]))
+                            indirect.build_type = 'indirect'
+                            new_build.revdep_build_ids += indirect
 
         # skip old builds (if their sequence number is too low, they will not ever be built)
         skippable_domain = [('repo_id', '=', self.id), ('local_state', '=', 'pending')]
