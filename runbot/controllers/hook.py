@@ -2,18 +2,21 @@
 
 import time
 import json
+import logging
 
 from odoo import http, tools
 from odoo.http import request
 
+_logger = logging.getLogger(__name__)
 
 class RunbotHook(http.Controller):
 
     @http.route(['/runbot/hook/<int:repo_id>', '/runbot/hook/org'], type='http', auth="public", website=True, csrf=False)
     def hook(self, repo_id=None, **post):
+        event = request.httprequest.headers.get("X-Github-Event")
+        payload = json.loads(request.params['payload'])
         if repo_id is None:
-            event = request.httprequest.headers.get("X-Github-Event")
-            repo_data = json.loads(request.params['payload']).get('repository')
+            repo_data = payload.get('repository')
             if repo_data and event in ['push', 'pull_request']:
                 repo_domain = [
                     '|', '|', ('name', '=', repo_data['ssh_url']),
@@ -27,5 +30,8 @@ class RunbotHook(http.Controller):
         repo = request.env['runbot.repo'].sudo().browse([repo_id])
 
         # force update of dependencies to in case a hook is lost
-        (repo | repo.dependency_ids).write({'hook_time': time.time()})
+        if event == 'push' or (event == 'pull_request' and payload.get('action') in ('synchronize', 'opened', 'reopened')):
+            (repo | repo.dependency_ids).write({'hook_time': time.time()})
+        else:
+            _logger.debug('Ignoring unsupported hook %s %s', event, payload.get('action', ''))
         return ""
