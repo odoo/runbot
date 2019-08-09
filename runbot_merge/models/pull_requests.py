@@ -357,8 +357,15 @@ class Branch(models.Model):
             # ensures staging branches are unique and always
             # rebuilt
             r = base64.b64encode(os.urandom(12)).decode('ascii')
+            trailer = ''
+            if heads:
+                trailer = '\n' + '\n'.join(
+                    'Runbot-dependency: %s:%s' % (repo, h)
+                    for repo, h in heads.items()
+                    if not repo.endswith('^')
+                )
             dummy_head = it['gh']('post', 'git/commits', json={
-                'message': 'force rebuild\n\nuniquifier: %s' % r,
+                'message': 'force rebuild\n\nuniquifier: %s%s' % (r, trailer),
                 'tree': tree['sha'],
                 'parents': [it['head']],
             }).json()
