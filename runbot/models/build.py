@@ -211,12 +211,12 @@ class runbot_build(models.Model):
                 last_commit = params['dep'][repo_name]  # not name
                 if last_commit:
                     match_type = 'params'
-                    build_closet_branch = False
+                    build_closest_branch = False
                     message = 'Dependency for repo %s defined in commit message' % (repo_name)
                 else:
-                    (build_closet_branch, match_type) = build_id.branch_id._get_closest_branch(extra_repo.id)
-                    closest_name = build_closet_branch.name
-                    closest_branch_repo = build_closet_branch.repo_id
+                    (build_closest_branch, match_type) = build_id.branch_id._get_closest_branch(extra_repo.id)
+                    closest_name = build_closest_branch.name
+                    closest_branch_repo = build_closest_branch.repo_id
                     last_commit = closest_branch_repo._git_rev_parse(closest_name)
                     message = 'Dependency for repo %s defined from closest branch %s' % (repo_name, closest_name)
                 try:
@@ -230,7 +230,7 @@ class runbot_build(models.Model):
                 dep_create_vals.append({
                     'build_id': build_id.id,
                     'dependecy_repo_id': extra_repo.id,
-                    'closest_branch_id': build_closet_branch and build_closet_branch.id,
+                    'closest_branch_id': build_closest_branch and build_closest_branch.id,
                     'dependency_hash': last_commit,
                     'match_type': match_type,
                 })
