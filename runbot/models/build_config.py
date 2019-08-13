@@ -318,6 +318,9 @@ class ConfigStep(models.Model):
             else:
                 build._log('test_all', 'Test tags given but not supported', level='WARNING')
 
+        if grep(config_path, "--screenshots"):
+            cmd += ['--screenshots', '/data/build/tests']
+
         cmd.append('--stop-after-init')  # install job should always finish
         if '--log-level' not in extra_params:
             cmd.append('--log-level=test')
