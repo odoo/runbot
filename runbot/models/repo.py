@@ -316,8 +316,11 @@ class runbot_repo(models.Model):
                         if latest_rev_build:
                             _logger.debug('Reverse dependency build %s forced in repo %s by commit %s', latest_rev_build.dest, rev_repo.name, sha[:6])
                             indirect = latest_rev_build._force(message='Rebuild from dependency %s commit %s' % (self.name, sha[:6]))
-                            indirect.build_type = 'indirect'
-                            new_build.revdep_build_ids += indirect
+                            if not indirect:
+                                _logger.exception('Failed to create indirect for %s from %s in repo %s', new_build, latest_rev_build, rev_repo)
+                            else:
+                                indirect.build_type = 'indirect'
+                                new_build.revdep_build_ids += indirect
 
         # skip old builds (if their sequence number is too low, they will not ever be built)
         skippable_domain = [('repo_id', '=', self.id), ('local_state', '=', 'pending')]
