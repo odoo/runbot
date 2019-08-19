@@ -76,7 +76,7 @@
       </t>
     </template>
     <template id="runbot.glances">
-      <t t-call='website.layout'>
+      <t t-call='portal.frontend_layout'>
         <t t-set="head">
           <t t-if="refresh">
             <meta http-equiv="refresh" t-att-content="refresh"/>
@@ -98,16 +98,115 @@
               <div>
                 <span t-attf-class="label label-{{pending_level}}">Pending: <t t-esc="pending_total"/></span>
               </div>
-              <t t-foreach="data.keys()" t-as="repo">
+              <t t-foreach="glances_data.keys()" t-as="repo">
                 <h4><t t-esc="repo"/>
                 </h4>
-                <t t-foreach="data[repo]" t-as="br">
+                <t t-foreach="glances_data[repo]" t-as="br">
                   <t t-if="br[1] == 'ko'"><t t-set="klass">danger</t></t>
                   <t t-if="br[1] == 'warn'"><t t-set="klass">warning</t></t>
                   <t t-if="br[1] == 'ok'"><t t-set="klass">success</t></t>
                   <t t-if="br[1] == 'killed'"><t t-set="klass">killed</t></t>
                   <span t-attf-class="label label-{{klass}}"><t t-esc="br[0]"/></span>
                 </t>
+              </t>
+            </div>
+          </div>
+        </div>
+      </t>
+    </template>
+
+    <template id="frontend_no_nav" inherit_id="portal.frontend_layout" primary="True">
+        <xpath expr="//header" position="replace">
+        </xpath>
+    </template>
+
+    <template id="runbot.monitoring">
+       <t t-call="runbot.frontend_no_nav">
+        <t t-set="head">
+          <t t-if="refresh">
+            <meta http-equiv="refresh" t-att-content="refresh"/>
+          </t>
+          <style>
+            .label-killed {
+              background-color: #aaa;
+            }
+            h4 {
+              padding: 3px 0;
+              border-bottom: 1px solid grey;
+            }
+            .r-mb02 { margin-bottom: 0.2em; }
+          </style>
+        </t>
+        <div class="container-fluid">
+          <div class="row">
+            <div class="col-md-12">
+              <div>
+                <span t-attf-class="label label-{{pending_level}}">Pending: <t t-esc="pending_total"/></span>
+                 <t t-set="testing">0</t>
+                 <t t-set="workers">0</t>
+
+                 <t t-foreach="hosts_data.sorted(key=lambda h:h.name)" t-as="host">
+                  <t t-set="testing" t-value="int(testing) + host.nb_testing"/>
+                  <t t-set="workers" t-value="int(workers) + host.sudo().get_nb_worker()"/>
+                 </t>
+                 <t t-set="klass">success</t>
+
+                  <t t-if="int(testing)/workers > 0"><t t-set="klass">info</t></t>
+                  <t t-if="int(testing)/workers > 0.75"><t t-set="klass">warning</t></t>
+                  <t t-if="int(testing)/workers >= 1"><t t-set="klass">danger</t></t>
+
+                <span t-attf-class="label label-{{klass}}">Testing: <t t-esc="testing"/>/<t t-esc="workers"/></span>
+              </div>
+              <t t-foreach="glances_data.keys()" t-as="repo">
+                <div>
+                  <span t-esc="repo"/>
+                  <t t-foreach="glances_data[repo]" t-as="br">
+                    <t t-if="br[1] == 'ko'"><t t-set="klass">danger</t></t>
+                    <t t-if="br[1] == 'warn'"><t t-set="klass">warning</t></t>
+                    <t t-if="br[1] == 'ok'"><t t-set="klass">success</t></t>
+                    <t t-if="br[1] == 'killed'"><t t-set="klass">killed</t></t>
+                    <span t-attf-class="label label-{{klass}}"><t t-esc="br[0]"/></span>
+                  </t>
+                </div>
+              </t>
+              <t t-foreach="hosts_data.sorted(key=lambda h:h.name)" t-as="host">
+                <div>
+                  <span t-esc="host.name.split('.')[0]"/>
+                  <t t-if="host.nb_testing == 0"><t t-set="klass">success</t></t>
+                  <t t-if="host.nb_testing > 0"><t t-set="klass">info</t></t>
+                  <t t-if="host.nb_testing == host.sudo().get_nb_worker()"><t t-set="klass">warning</t></t>
+                  <t t-if="host.nb_testing > host.sudo().get_nb_worker()"><t t-set="klass">danger</t></t>
+                  <span t-attf-class="label label-{{klass}}"><span t-esc="host.nb_testing"/>/<span t-esc="host.sudo().get_nb_worker()"/></span>
+                  <t t-esc="host.nb_running"/>
+                  <t t-set="succes_time" t-value="int(datetime.datetime.now().timestamp() - datetime.datetime.strptime(host.last_success, '%Y-%m-%d %H:%M:%S').timestamp())"/>
+                  <t t-set="start_time" t-value="int(datetime.datetime.now().timestamp() - datetime.datetime.strptime(host.last_start_loop, '%Y-%m-%d %H:%M:%S').timestamp())"/>
+                  <t t-set="end_time" t-value="int(datetime.datetime.now().timestamp() - datetime.datetime.strptime(host.last_end_loop, '%Y-%m-%d %H:%M:%S').timestamp())"/>
+
+                  <t t-set="klass">success</t>
+                  <t t-if="succes_time > 30"><t t-set="klass">info</t></t>
+                  <t t-if="succes_time > 180"><t t-set="klass">danger</t></t>
+
+                  <span t-attf-class="label label-{{klass}}"><span t-esc="succes_time"/></span>
+
+                  <t t-set="klass">success</t>
+                  <t t-if="start_time > 60*10"><t t-set="klass">info</t></t>
+                  <t t-if="start_time > 60*15"><t t-set="klass">danger</t></t>
+
+                  <span t-attf-class="label label-{{klass}}"><span t-esc="start_time"/></span>
+
+                  <t t-set="klass">success</t>
+                  <t t-if="end_time > 60*10"><t t-set="klass">info</t></t>
+                  <t t-if="end_time > 60*15"><t t-set="klass">danger</t></t>
+
+                  <span t-attf-class="label label-{{klass}}"><span t-esc="end_time"/></span>
+
+                  <t t-set="cron_time" t-value="end_time-start_time"/>
+                  <t t-set="klass">success</t>
+                  <t t-if="abs(cron_time) > 10"><t t-set="klass">info</t></t>
+                  <t t-if="abs(cron_time) > 60"><t t-set="klass">danger</t></t>
+                  <span t-attf-class="label label-{{klass}}"><span t-esc="cron_time"/></span>
+
+                </div>
               </t>
             </div>
           </div>

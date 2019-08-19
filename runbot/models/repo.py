@@ -15,7 +15,7 @@ import shutil
 
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT
-from odoo import models, fields, api
+from odoo import models, fields, api, registry
 from odoo.modules.module import get_module_resource
 from odoo.tools import config
 from ..common import fqdn, dt2time, Commit
@@ -398,21 +398,20 @@ class runbot_repo(models.Model):
                 _logger.exception('Fail to update repo %s', repo.name)
 
     @api.multi
-    def _scheduler(self):
+    def _scheduler(self, host=None):
         """Schedule builds for the repository"""
         ids = self.ids
         if not ids:
             return
         icp = self.env['ir.config_parameter']
-        host = fqdn()
-        settings_workers = int(icp.get_param('runbot.runbot_workers', default=6))
-        workers = int(icp.get_param('%s.workers' % host, default=settings_workers))
+        host = host or self.env['runbot.host']._get_current()
+        workers = host.get_nb_worker()
         running_max = int(icp.get_param('runbot.runbot_running_max', default=75))
-        assigned_only = int(icp.get_param('%s.assigned_only' % host, default=False))
+        assigned_only = host.assigned_only
 
         Build = self.env['runbot.build']
         domain = [('repo_id', 'in', ids)]
-        domain_host = domain + [('host', '=', host)]
+        domain_host = domain + [('host', '=', host.name)]
 
         # schedule jobs (transitions testing -> running, kill jobs, ...)
         build_ids = Build.search(domain_host + ['|', ('local_state', 'in', ['testing', 'running']), ('requested_action', 'in', ['wake_up', 'deathrow'])])
@@ -458,7 +457,7 @@ class runbot_repo(models.Model):
                                     )
                                 RETURNING id""" % where_clause
 
-                    self.env.cr.execute(query, {'repo_ids': tuple(ids), 'host': fqdn(), 'limit': limit})
+                    self.env.cr.execute(query, {'repo_ids': tuple(ids), 'host': host.name, 'limit': limit})
                     return self.env.cr.fetchall()
 
                 allocated = allocate_builds("""AND runbot_build.build_type != 'scheduled'""", assignable_slots)
@@ -561,6 +560,10 @@ class runbot_repo(models.Model):
         """
         if hostname != fqdn():
             return 'Not for me'
+        host = self.env['runbot.host']._get_current()
+        host.set_psql_conn_count()
+        host.last_start_loop = fields.Datetime.now()
+        self.env.cr.commit()
         start_time = time.time()
         # 1. source cleanup
         # -> Remove sources when no build is using them
@@ -576,7 +579,8 @@ class runbot_repo(models.Model):
         while time.time() - start_time < timeout:
             repos = self.search([('mode', '!=', 'disabled')])
             try:
-                repos._scheduler()
+                repos._scheduler(host)
+                host.last_success = fields.Datetime.now()
                 self.env.cr.commit()
                 self.env.reset()
                 self = self.env()[self._name]
@@ -587,6 +591,21 @@ class runbot_repo(models.Model):
                 self.env.cr.rollback()
                 self.env.reset()
                 time.sleep(random.uniform(0, 1))
+            except Exception as e:
+                with registry(self._cr.dbname).cursor() as cr:  # user another cursor since transaction will be rollbacked
+                    message = str(e)
+                    chost = host.with_env(self.env(cr=cr))
+                    if chost.last_exception == message:
+                        chost.exception_count += 1
+                    else:
+                        chost.with_env(self.env(cr=cr)).last_exception = str(e)
+                        chost.exception_count = 1
+                raise
+
+        if host.last_exception:
+            host.last_exception = ""
+            host.exception_count = 0
+        host.last_end_loop = fields.Datetime.now()
 
     def _source_cleanup(self):
         try:

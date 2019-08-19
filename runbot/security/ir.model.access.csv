@@ -17,3 +17,6 @@ access_runbot_build_config_manager,runbot_build_config_manager,runbot.model_runb
 
 access_runbot_build_config_step_order_user,runbot_build_config_step_order_user,runbot.model_runbot_build_config_step_order,group_user,1,0,0,0
 access_runbot_build_config_step_order_manager,runbot_build_config_step_order_manager,runbot.model_runbot_build_config_step_order,runbot.group_build_config_user,1,1,1,1
+
+access_runbot_host_user,runbot_host_user,runbot.model_runbot_host,group_user,1,0,0,0
+access_runbot_host_manager,runbot_host_manager,runbot.model_runbot_host,runbot.group_runbot_admin,1,1,1,1

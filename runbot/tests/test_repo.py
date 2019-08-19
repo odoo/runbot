@@ -201,9 +201,9 @@ class Test_Repo_Scheduler(common.TransactionCase):
     @patch('odoo.addons.runbot.models.build.runbot_build._reap')
     @patch('odoo.addons.runbot.models.build.runbot_build._kill')
     @patch('odoo.addons.runbot.models.build.runbot_build._schedule')
-    @patch('odoo.addons.runbot.models.repo.fqdn')
-    def test_repo_scheduler(self, mock_repo_fqdn, mock_schedule, mock_kill, mock_reap):
-        mock_repo_fqdn.return_value = 'test_host'
+    @patch('odoo.addons.runbot.models.host.fqdn')
+    def test_repo_scheduler(self, mock_fqdn, mock_schedule, mock_kill, mock_reap):
+        mock_fqdn.return_value = 'test_host'
         self.env['ir.config_parameter'].set_param('runbot.runbot_workers', 6)
         Build_model = self.env['runbot.build']
         builds = []
@@ -237,6 +237,7 @@ class Test_Repo_Scheduler(common.TransactionCase):
             'local_state': 'pending',
         })
         builds.append(build)
+
         self.foo_repo._scheduler()
 
         build.invalidate_cache()

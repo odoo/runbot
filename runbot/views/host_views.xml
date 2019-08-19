@@ -1,0 +1,60 @@
+<odoo>
+  <data>
+
+    <record id="host_form" model="ir.ui.view">
+        <field name="name">runbot.host.form</field>
+        <field name="model">runbot.host</field>
+        <field name="arch" type="xml">
+            <form string="Host">
+                <sheet>
+                    <group>
+                        <field name="name" readonly='1'/>
+                        <field name="disp_name"/>
+                        <field name="active"/>
+                        <field name="last_start_loop" readonly='1'/>
+                        <field name="last_end_loop" readonly='1'/>
+                        <field name="last_success" readonly='1'/>
+                        <field name="assigned_only"/>
+                        <field name="nb_worker"/>
+                        <field name="nb_testing"/>
+                        <field name="nb_running"/>
+                        <field name="last_exception" readonly='1'/>
+                        <field name="exception_count" readonly='1'/>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids" widget="mail_followers"/>
+                    <field name="message_ids" widget="mail_thread"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_host_tree" model="ir.ui.view">
+        <field name="name">runbot.host.tree</field>
+        <field name="model">runbot.host</field>
+        <field name="arch" type="xml">
+            <tree string="Builds">
+                <field name="name"/>
+                <field name="disp_name"/>
+                <field name="assigned_only"/>
+                <field name="nb_worker"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="open_view_host_tree" model="ir.actions.act_window">
+        <field name="name">Host</field>
+        <field name="res_model">runbot.host</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem
+        name="Build Hosts" 
+        id="runbot_menu_host_tree"
+        parent="runbot_menu_root"
+        sequence="32"
+        action="open_view_host_tree"
+        />
+  </data>
+</odoo>

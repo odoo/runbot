@@ -48,13 +48,15 @@ class Test_Cron(common.TransactionCase):
         mock_update.assert_called_with(force=False)
         mock_create.assert_called_with()
 
+    @patch('odoo.addons.runbot.models.host.fqdn')
     @patch('odoo.addons.runbot.models.repo.runbot_repo._get_cron_period')
     @patch('odoo.addons.runbot.models.repo.runbot_repo._reload_nginx')
     @patch('odoo.addons.runbot.models.repo.runbot_repo._scheduler')
     @patch('odoo.addons.runbot.models.repo.fqdn')
-    def test_cron_build(self, mock_fqdn, mock_scheduler, mock_reload, mock_cron_period):
+    def test_cron_build(self, mock_fqdn, mock_scheduler, mock_reload, mock_cron_period, mock_host_fqdn):
         """ test that cron_fetch_and_build do its work """
-        mock_fqdn.return_value = 'runbotx.foo.com'
+        hostname = 'runbotx.foo.com'
+        mock_fqdn.return_value = mock_host_fqdn.return_value = hostname
         mock_cron_period.return_value = 2
         self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_update_frequency', 1)
         self.Repo.create({'name': '/path/somewhere/disabled.git', 'mode': 'disabled'})  # create a disabled
@@ -64,3 +66,6 @@ class Test_Cron(common.TransactionCase):
         self.assertEqual(None, ret)
         mock_scheduler.assert_called()
         self.assertTrue(mock_reload.called)
+        host = self.env['runbot.host'].search([('name', '=', 'runbotx.foo.com')])
+        self.assertEqual(host.name, hostname, 'A new host should have been created')
+        self.assertGreater(host.psql_conn_count, 0, 'A least one connection should exist on the current psql instance')
