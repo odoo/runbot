@@ -273,8 +273,7 @@ class Runbot(Controller):
 
         return request.render("runbot.sticky-dashboard", qctx)
 
-    @route('/runbot/glances', type='http', auth='public', website=True)
-    def glances(self, refresh=None):
+    def _glances_ctx(self):
         repos = request.env['runbot.repo'].search([])   # respect record rules
         default_config_id = request.env.ref('runbot.runbot_build_config_default').id
         query = """
@@ -302,15 +301,33 @@ class Runbot(Controller):
         ctx = OrderedDict()
         for row in cr.fetchall():
             ctx.setdefault(row[0], []).append(row[1:])
+        return ctx
 
+    @route('/runbot/glances', type='http', auth='public', website=True)
+    def glances(self, refresh=None):
+        glances_ctx = self._glances_ctx()
         pending = self._pending()
         qctx = {
             'refresh': refresh,
             'pending_total': pending[0],
             'pending_level': pending[1],
-            'data': ctx,
+            'glances_data': glances_ctx,
         }
         return request.render("runbot.glances", qctx)
+
+    @route('/runbot/monitoring', type='http', auth='user', website=True)
+    def monitoring(self, refresh=None):
+        glances_ctx = self._glances_ctx()
+        pending = self._pending()
+        hosts_data = request.env['runbot.host'].search([])
+        qctx = {
+            'refresh': refresh,
+            'pending_total': pending[0],
+            'pending_level': pending[1],
+            'glances_data': glances_ctx,
+            'hosts_data': hosts_data,
+        }
+        return request.render("runbot.monitoring", qctx)
 
     @route(['/runbot/branch/<int:branch_id>', '/runbot/branch/<int:branch_id>/page/<int:page>'], website=True, auth='public', type='http')
     def branch_builds(self, branch_id=None, search='', page=1, limit=50, refresh='', **kwargs):
