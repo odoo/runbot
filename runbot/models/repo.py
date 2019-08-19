@@ -398,21 +398,20 @@ class runbot_repo(models.Model):
                 _logger.exception('Fail to update repo %s', repo.name)
 
     @api.multi
-    def _scheduler(self):
+    def _scheduler(self, host=None):
         """Schedule builds for the repository"""
         ids = self.ids
         if not ids:
             return
         icp = self.env['ir.config_parameter']
-        host = fqdn()
-        settings_workers = int(icp.get_param('runbot.runbot_workers', default=6))
-        workers = int(icp.get_param('%s.workers' % host, default=settings_workers))
+        host = host or self.env['runbot_host']._get_current()
+        workers = host.nb_worker or int(icp.get_param('runbot.runbot_workers', default=6))
         running_max = int(icp.get_param('runbot.runbot_running_max', default=75))
-        assigned_only = int(icp.get_param('%s.assigned_only' % host, default=False))
+        assigned_only = host.assigned_only
 
         Build = self.env['runbot.build']
         domain = [('repo_id', 'in', ids)]
-        domain_host = domain + [('host', '=', host)]
+        domain_host = domain + [('host', '=', host.name)]
 
         # schedule jobs (transitions testing -> running, kill jobs, ...)
         build_ids = Build.search(domain_host + ['|', ('local_state', 'in', ['testing', 'running']), ('requested_action', 'in', ['wake_up', 'deathrow'])])
@@ -561,6 +560,8 @@ class runbot_repo(models.Model):
         """
         if hostname != fqdn():
             return 'Not for me'
+        host = self.env['runbot.host']._get_current()
+        host.last_start_loop = fields.Datetime.now()
         start_time = time.time()
         # 1. source cleanup
         # -> Remove sources when no build is using them
@@ -576,17 +577,20 @@ class runbot_repo(models.Model):
         while time.time() - start_time < timeout:
             repos = self.search([('mode', '!=', 'disabled')])
             try:
-                repos._scheduler()
+                repos._scheduler(host)
                 self.env.cr.commit()
                 self.env.reset()
                 self = self.env()[self._name]
                 self._reload_nginx()
                 time.sleep(update_frequency)
+                host.last_success = fields.Datetime.now()
             except TransactionRollbackError:
                 _logger.exception('Trying to rollback')
                 self.env.cr.rollback()
                 self.env.reset()
                 time.sleep(random.uniform(0, 1))
+
+        host.last_end_loop = fields.Datetime.now()
 
     def _source_cleanup(self):
         try:
