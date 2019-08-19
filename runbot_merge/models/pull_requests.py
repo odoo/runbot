@@ -98,7 +98,6 @@ class Project(models.Model):
         to_remove = []
         for repo_id, pr, ids, from_, to_ in self.env.cr.fetchall():
             repo = Repos.browse(repo_id)
-            from_tags = _TAGS[from_ or False]
             to_tags = _TAGS[to_ or False]
 
             gh = ghs.get(repo)
@@ -106,11 +105,11 @@ class Project(models.Model):
                 gh = ghs[repo] = repo.github()
 
             try:
-                gh.change_tags(pr, from_tags, to_tags)
+                gh.change_tags(pr, to_tags)
             except Exception:
                 _logger.exception(
                     "Error while trying to change the tags of %s:%s from %s to %s",
-                    repo.name, pr, from_tags, to_tags,
+                    repo.name, pr, _TAGS[from_ or False], to_tags,
                 )
             else:
                 to_remove.extend(ids)

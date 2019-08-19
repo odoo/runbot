@@ -635,8 +635,58 @@ ct = itertools.count()
 
 Commit = collections.namedtuple('Commit', 'id tree message author committer parents')
 
+from odoo.tools.func import lazy_property
+class LabelsProxy(collections.abc.MutableSet):
+    def __init__(self, pr):
+        self._pr = pr
+
+    @property
+    def _labels(self):
+        pr = self._pr
+        r = pr._session.get('https://api.github.com/repos/{}/issues/{}/labels'.format(pr.repo.name, pr.number))
+        assert r.ok, r.json()
+        return {label['name'] for label in r.json()}
+
+    def __repr__(self):
+        return '<LabelsProxy %r>' % self._labels
+
+    def __eq__(self, other):
+        if isinstance(other, collections.abc.Set):
+            return other == self._labels
+        return NotImplemented
+
+    def __contains__(self, label):
+        return label in self._labels
+
+    def __iter__(self):
+        return iter(self._labels)
+
+    def __len__(self):
+        return len(self._labels)
+
+    def add(self, label):
+        pr = self._pr
+        r = pr._session.post('https://api.github.com/repos/{}/issues/{}/labels'.format(pr.repo.name, pr.number), json={
+            'labels': [label]
+        })
+        assert r.ok, r.json()
+
+    def discard(self, label):
+        pr = self._pr
+        r = pr._session.delete('https://api.github.com/repos/{}/issues/{}/labels/{}'.format(pr.repo.name, pr.number, label))
+        # discard should do nothing if the item didn't exist in the set
+        assert r.ok or r.status_code == 404, r.json()
+
+    def update(self, *others):
+        pr = self._pr
+        # because of course that one is not provided by MutableMapping...
+        r = pr._session.post('https://api.github.com/repos/{}/issues/{}/labels'.format(pr.repo.name, pr.number), json={
+            'labels': list(set(itertools.chain.from_iterable(others)))
+        })
+        assert r.ok, r.json()
+
 class PR:
-    __slots__ = ['number', '_branch', 'repo']
+    __slots__ = ['number', '_branch', 'repo', 'labels']
     def __init__(self, repo, branch, number):
         """
         :type repo: Repo
@@ -646,6 +696,7 @@ class PR:
         self.number = number
         self._branch = branch
         self.repo = repo
+        self.labels = LabelsProxy(self)
 
     @property
     def _session(self):
@@ -668,12 +719,6 @@ class PR:
     @property
     def state(self):
         return self._pr['state']
-
-    @property
-    def labels(self):
-        r = self._session.get('https://api.github.com/repos/{}/issues/{}/labels'.format(self.repo.name, self.number))
-        assert 200 <= r.status_code < 300, r.json()
-        return {label['name'] for label in r.json()}
 
     @property
     def comments(self):

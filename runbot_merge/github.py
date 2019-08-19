@@ -18,6 +18,7 @@ class GH(object):
         self._repo = repo
         session = self._session = requests.Session()
         session.headers['Authorization'] = 'token {}'.format(token)
+        session.headers['Accept'] = 'application/vnd.github.symmetra-preview+json'
 
     def __call__(self, method, path, params=None, json=None, check=True):
         """
@@ -97,19 +98,17 @@ class GH(object):
         self.comment(pr, message)
         self('PATCH', 'pulls/{}'.format(pr), json={'state': 'closed'})
 
-    def change_tags(self, pr, from_, to_):
-        to_add, to_remove = to_ - from_, from_ - to_
-        for t in to_remove:
-            r = self('DELETE', 'issues/{}/labels/{}'.format(pr, t), check=False)
-            # successful deletion or attempt to delete a tag which isn't there
-            # is fine, otherwise trigger an error
-            if r.status_code not in (200, 404):
-                r.raise_for_status()
+    def change_tags(self, pr, to_):
+        labels_endpoint = 'issues/{}/labels'.format(pr)
+        from .models.pull_requests import _TAGS
+        mergebot_tags = set.union(*_TAGS.values())
+        tags_before = {label['name'] for label in self('GET', labels_endpoint).json()}
+        # remove all mergebot tags from the PR, then add just the ones which should be set
+        tags_after = (tags_before - mergebot_tags) | to_
+        # replace labels entirely
+        self('PUT', labels_endpoint, json={'labels': list(tags_after)})
 
-        if to_add:
-            self('POST', 'issues/{}/labels'.format(pr), json=list(to_add))
-
-        _logger.debug('change_tags(%s, %s, remove=%s, add=%s)', self._repo, pr, to_remove, to_add)
+        _logger.debug('change_tags(%s, %s, from=%s, to=%s)', self._repo, pr, tags_before, tags_after)
 
     def fast_forward(self, branch, sha):
         try:
