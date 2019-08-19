@@ -456,7 +456,7 @@ class PullRequests(models.Model):
     _name = 'runbot_merge.pull_requests'
     _order = 'number desc'
 
-    target = fields.Many2one('runbot_merge.branch', required=True)
+    target = fields.Many2one('runbot_merge.branch', required=True, index=True)
     repository = fields.Many2one('runbot_merge.repository', required=True)
     # NB: check that target & repo have same project & provide project related?
 
@@ -801,13 +801,15 @@ class PullRequests(models.Model):
                     pr.state = 'ready'
 
     def _auto_init(self):
-        res = super(PullRequests, self)._auto_init()
+        super(PullRequests, self)._auto_init()
+        # incorrect index: unique(number, target, repository).
+        tools.drop_index(self._cr, 'runbot_merge_unique_pr_per_target', self._table)
+        # correct index:
         tools.create_unique_index(
-            self._cr, 'runbot_merge_unique_pr_per_target', self._table, ['number', 'target', 'repository'])
+            self._cr, 'runbot_merge_unique_pr_per_repo', self._table, ['repository', 'number'])
         self._cr.execute("CREATE INDEX IF NOT EXISTS runbot_merge_pr_head "
                          "ON runbot_merge_pull_requests "
                          "USING hash (head)")
-        return res
 
     @property
     def _tagstate(self):
