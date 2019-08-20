@@ -30,8 +30,8 @@ class RunboHost(models.Model):
         for group in groups:
             count_by_host_state[group['host']][group['local_state']] = group['__count']
         for host in self:
-            host.nb_testing = count_by_host_state[self.name].get('testing', 0)
-            host.nb_running = count_by_host_state[self.name].get('running', 0)
+            host.nb_testing = count_by_host_state[host.name].get('testing', 0)
+            host.nb_running = count_by_host_state[host.name].get('running', 0)
 
     @api.model
     def create(self, values):
