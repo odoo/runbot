@@ -45,3 +45,7 @@ class RunboHost(models.Model):
         name = fqdn()
         return self.search([('name', '=', name)]) or self.create({'name': name})
 
+    def get_nb_worker(self):
+        icp = self.env['ir.config_parameter']
+        return self.nb_worker or int(icp.get_param('runbot.runbot_workers', default=6))
+
