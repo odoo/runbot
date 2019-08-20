@@ -16,20 +16,22 @@ CLEANING_REGS = [
 class RunbotBuildError(models.Model):
 
     _name = "runbot.build.error"
+    _inherit = "mail.thread"
 
     content = fields.Text('Error message', required=True)
     cleaned_content = fields.Text('Cleaned error message')
     module_name = fields.Char('Module name')  # name in ir_logging
     fingerprint = fields.Char('Error fingerprint', index=True)
-    random = fields.Boolean('underterministic error')
-    responsible = fields.Many2one('res.users', 'Assigned fixer')
-    fixing_commit = fields.Char('Fixing commit')
+    random = fields.Boolean('underterministic error', track_visibility='onchange')
+    responsible = fields.Many2one('res.users', 'Assigned fixer', track_visibility='onchange')
+    fixing_commit = fields.Char('Fixing commit', track_visibility='onchange')
     build_ids = fields.Many2many('runbot.build', 'runbot_build_error_ids_runbot_build_rel', string='Affected builds')
     branch_ids = fields.Many2many('runbot.branch', compute='_compute_branch_ids')
     repo_ids = fields.Many2many('runbot.repo', compute='_compute_repo_ids')
-    active = fields.Boolean('Error is not fixed', default=True)
+    active = fields.Boolean('Error is not fixed', default=True, track_visibility='onchange')
     tag_ids = fields.Many2many('runbot.build.error.tag', string='Tags')
     build_count = fields.Integer(compute='_compute_build_counts', string='Nb seen', stored=True)
+    parent_id = fields.Many2one('runbot.build.error', 'Linked to')
 
     @api.model
     def create(self, vals):
