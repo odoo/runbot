@@ -144,14 +144,16 @@
                 <span t-attf-class="label label-{{pending_level}}">Pending: <t t-esc="pending_total"/></span>
               </div>
               <t t-foreach="glances_data.keys()" t-as="repo">
-                <span t-esc="repo"/>
-                <t t-foreach="glances_data[repo]" t-as="br">
-                  <t t-if="br[1] == 'ko'"><t t-set="klass">danger</t></t>
-                  <t t-if="br[1] == 'warn'"><t t-set="klass">warning</t></t>
-                  <t t-if="br[1] == 'ok'"><t t-set="klass">success</t></t>
-                  <t t-if="br[1] == 'killed'"><t t-set="klass">killed</t></t>
-                  <span t-attf-class="label label-{{klass}}"><t t-esc="br[0]"/></span>
-                </t>
+                <div>
+                  <span t-esc="repo"/>
+                  <t t-foreach="glances_data[repo]" t-as="br">
+                    <t t-if="br[1] == 'ko'"><t t-set="klass">danger</t></t>
+                    <t t-if="br[1] == 'warn'"><t t-set="klass">warning</t></t>
+                    <t t-if="br[1] == 'ok'"><t t-set="klass">success</t></t>
+                    <t t-if="br[1] == 'killed'"><t t-set="klass">killed</t></t>
+                    <span t-attf-class="label label-{{klass}}"><t t-esc="br[0]"/></span>
+                  </t>
+                </div>
               </t>
             </div>
           </div>
