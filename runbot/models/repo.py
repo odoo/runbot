@@ -457,7 +457,7 @@ class runbot_repo(models.Model):
                                     )
                                 RETURNING id""" % where_clause
 
-                    self.env.cr.execute(query, {'repo_ids': tuple(ids), 'host': fqdn(), 'limit': limit})
+                    self.env.cr.execute(query, {'repo_ids': tuple(ids), 'host': host.name, 'limit': limit})
                     return self.env.cr.fetchall()
 
                 allocated = allocate_builds("""AND runbot_build.build_type != 'scheduled'""", assignable_slots)
