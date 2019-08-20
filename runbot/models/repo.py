@@ -404,7 +404,7 @@ class runbot_repo(models.Model):
         if not ids:
             return
         icp = self.env['ir.config_parameter']
-        host = host or self.env['runbot_host']._get_current()
+        host = host or self.env['runbot.host']._get_current()
         workers = host.get_nb_worker()
         running_max = int(icp.get_param('runbot.runbot_running_max', default=75))
         assigned_only = host.assigned_only
