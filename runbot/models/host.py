@@ -14,7 +14,6 @@ class RunboHost(models.Model):
     last_start_loop = fields.Datetime('Last')
     last_end_loop = fields.Datetime('Last')
     last_success = fields.Datetime('Last')
-    name = fields.Char('Host name', required=True, unique=True)
     assigned_only = fields.Boolean('Only accept assigned build', default=False)
     nb_worker = fields.Integer('Number of max paralel build', help="0 to use icp value", default=0)
     nb_testing = fields.Integer(compute='_compute_nb')
@@ -27,14 +26,14 @@ class RunboHost(models.Model):
             ['host', 'local_state'],
             lazy=False
         )
-        count_by_host_state = {host: {} for host in self}
+        count_by_host_state = {host.name: {} for host in self}
         for group in groups:
             count_by_host_state[group['host']][group['local_state']] = group['__count']
         for host in self:
             host.nb_testing = count_by_host_state[self.name].get('testing', 0)
             host.nb_running = count_by_host_state[self.name].get('running', 0)
 
-    @api.multi
+    @api.model
     def create(self, values):
         if not 'display_name' in values:
             values['display_name'] = values['name']

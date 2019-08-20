@@ -1,0 +1,40 @@
+<odoo>
+  <data>
+
+    <record id="config_form" model="ir.ui.view">
+        <field name="model">runbot.host</field>
+        <field name="arch" type="xml">
+            <form string="Host">
+                <sheet>
+                    <group>
+                        <field name="name" readonly='1'/>
+                        <field name="display_name"/>
+                        <field name="active"/>
+                        <field name="last_start_loop" readonly='1'/>
+                        <field name="last_end_loop" readonly='1'/>
+                        <field name="last_success" readonly='1'/>
+                        <field name="assigned_only"/>
+                        <field name="nb_worker"/>
+                        <field name="nb_testing"/>
+                        <field name="nb_running"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="open_view_host_tree" model="ir.actions.act_window">
+        <field name="name">Host</field>
+        <field name="res_model">runbot.host</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem
+        name="Build Hosts" 
+        id="runbot_menu_host_tree"
+        parent="runbot_menu_root"
+        sequence="32"
+        action="open_view_host_tree"
+        />
+  </data>
+</odoo>

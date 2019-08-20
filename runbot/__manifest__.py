@@ -16,6 +16,7 @@
         'views/repo_views.xml',
         'views/branch_views.xml',
         'views/build_views.xml',
+        'views/host_views.xml',
         'views/build_error_views.xml',
         'views/config_views.xml',
         'views/res_config_settings_views.xml',
