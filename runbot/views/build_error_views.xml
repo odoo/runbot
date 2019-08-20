@@ -9,7 +9,7 @@
             </header>
             <sheet>
               <group name="build_error_group">
-                <field name="hash"/>
+                <field name="fingerprint"/>
                 <field name="content"/>
                 <field name="cleaned_content" groups="base.group_no_one"/>
                 <field name="module_name"/>
@@ -17,6 +17,8 @@
                 <field name="responsible"/>
                 <field name="fixing_commit"/>
                 <field name="active"/>
+                <field name="branch_ids" widget="many2many_tags"/>
+                <field name="repo_ids" widget="many2many_tags"/>
                 <field name="tag_ids" widget="many2many_tags"/>
               </group>
               <field name="build_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}">
@@ -40,7 +42,7 @@
         <field name="arch" type="xml">
             <tree string="Errors">
                 <field name="module_name"/>
-                <field name="hash"/>
+                <field name="fingerprint"/>
                 <field name="random"/>
                 <field name="build_count"/>
                 <field name="responsible"/>

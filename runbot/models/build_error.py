@@ -20,11 +20,13 @@ class RunbotBuildError(models.Model):
     content = fields.Text('Error message', required=True)
     cleaned_content = fields.Text('Cleaned error message')
     module_name = fields.Char('Module name')  # name in ir_logging
-    hash = fields.Char('Error fingerprint', index=True)
+    fingerprint = fields.Char('Error fingerprint', index=True)
     random = fields.Boolean('underterministic error')
     responsible = fields.Many2one('res.users', 'Assigned fixer')
     fixing_commit = fields.Char('Fixing commit')
     build_ids = fields.Many2many('runbot.build', 'runbot_build_error_ids_runbot_build_rel', string='Affected builds')
+    branch_ids = fields.Many2many('runbot.branch', compute='_compute_branch_ids')
+    repo_ids = fields.Many2many('runbot.repo', compute='_compute_repo_ids')
     active = fields.Boolean('Error is not fixed', default=True)
     tag_ids = fields.Many2many('runbot.build.error.tag', string='Tags')
     build_count = fields.Integer(compute='_compute_build_counts', string='Nb seen', stored=True)
@@ -34,7 +36,7 @@ class RunbotBuildError(models.Model):
         content = vals.get('content')
         cleaned_content = self._clean(content)
         vals.update({'cleaned_content': cleaned_content,
-                     'hash': self._digest(cleaned_content)
+                     'fingerprint': self._digest(cleaned_content)
         })
         print(vals)
         return super().create(vals)
@@ -43,6 +45,16 @@ class RunbotBuildError(models.Model):
     def _compute_build_counts(self):
         for build_error in self:
             build_error.build_count = len(build_error.build_ids)
+
+    @api.depends('build_ids')
+    def _compute_branch_ids(self):
+        for build_error in self:
+            build_error.branch_ids = build_error.mapped('build_ids.branch_id')
+
+    @api.depends('build_ids')
+    def _compute_repo_ids(self):
+        for build_error in self:
+            build_error.repo_ids = build_error.mapped('build_ids.repo_id')
 
     @api.model
     def _clean(self, s):
@@ -66,17 +78,17 @@ class RunbotBuildError(models.Model):
 
         hash_dict = defaultdict(list)
         for log in ir_logs:
-            hash = self._digest(self._clean(log.message))
-            hash_dict[hash].append(log)
+            fingerprint = self._digest(self._clean(log.message))
+            hash_dict[fingerprint].append(log)
 
         # add build ids to already detected errors
-        for build_error in self.env['runbot.build.error'].search([('hash', 'in', list(hash_dict.keys()))]):
-            for build in {rec.build_id for rec in hash_dict[build_error.hash]}:
+        for build_error in self.env['runbot.build.error'].search([('fingerprint', 'in', list(hash_dict.keys()))]):
+            for build in {rec.build_id for rec in hash_dict[build_error.fingerprint]}:
                 build.build_error_ids += build_error
-            del hash_dict[build_error.hash]
+            del hash_dict[build_error.fingerprint]
 
         # create an error for the remaining entries
-        for hash, logs in hash_dict.items():
+        for fingerprint, logs in hash_dict.items():
             self.env['runbot.build.error'].create({
                 'content': logs[0].message,
                 'module_name': logs[0].name,
