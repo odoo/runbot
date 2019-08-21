@@ -11,15 +11,15 @@ class RunboHost(models.Model):
     name = fields.Char('Host name', required=True, unique=True)
     display_name = fields.Char('Display name')
     active = fields.Boolean('Active', default=True)
-    last_start_loop = fields.Datetime('Last')
-    last_end_loop = fields.Datetime('Last')
-    last_success = fields.Datetime('Last')
+    last_start_loop = fields.Datetime('Last start')
+    last_end_loop = fields.Datetime('Last end')
+    last_success = fields.Datetime('Last success')
     assigned_only = fields.Boolean('Only accept assigned build', default=False)
     nb_worker = fields.Integer('Number of max paralel build', help="0 to use icp value", default=0)
     nb_testing = fields.Integer(compute='_compute_nb')
     nb_running = fields.Integer(compute='_compute_nb')
     last_exception = fields.Char('Last exception')
-    exception_count = fields.Char('Last exception')
+    exception_count = fields.Integer('Exception count')
 
     def _compute_nb(self):
         groups = self.env['runbot.build'].read_group(
