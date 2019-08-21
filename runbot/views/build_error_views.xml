@@ -13,6 +13,7 @@
                 <field name="content"/>
                 <field name="cleaned_content" groups="base.group_no_one"/>
                 <field name="module_name"/>
+                <field name="function"/>
                 <field name="random"/>
                 <field name="responsible"/>
                 <field name="fixing_commit"/>
