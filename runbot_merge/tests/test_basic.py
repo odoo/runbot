@@ -2658,3 +2658,57 @@ class TestEmailFormatting:
             'github_login': 'Osmose99',
         })
         assert p1.formatted_email == 'Shultz <Osmose99@users.noreply.github.com>'
+
+class TestLabelling:
+    def test_desync(self, env, repo):
+        m = repo.make_commit(None, 'initial', None, tree={'a': 'some content'})
+        repo.make_ref('heads/master', m)
+
+        c = repo.make_commit(m, 'replace file contents', None, tree={'a': 'some other content'})
+        pr = repo.make_pr('gibberish', 'blahblah', target='master', ctid=c, user='user')
+
+        [pr_id] = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', pr.number),
+        ])
+        repo.post_status(c, 'success', 'legal/cla')
+        repo.post_status(c, 'success', 'ci/runbot')
+
+        run_crons(env)
+
+        assert pr.labels == {'seen 🙂', 'CI 🤖'}
+        # desync state and labels
+        pr.labels.remove('CI 🤖')
+
+        pr.post_comment('hansen r+', 'reviewer')
+        run_crons(env)
+
+        assert pr.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merging 👷'},\
+            "labels should be resynchronised"
+
+    def test_other_tags(self, env, repo):
+        m = repo.make_commit(None, 'initial', None, tree={'a': 'some content'})
+        repo.make_ref('heads/master', m)
+
+        c = repo.make_commit(m, 'replace file contents', None, tree={'a': 'some other content'})
+        pr = repo.make_pr('gibberish', 'blahblah', target='master', ctid=c, user='user')
+
+        # "foreign" labels
+        pr.labels.update(('L1', 'L2'))
+
+        [pr_id] = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', pr.number),
+        ])
+        repo.post_status(c, 'success', 'legal/cla')
+        repo.post_status(c, 'success', 'ci/runbot')
+
+        run_crons(env)
+
+        assert pr.labels == {'seen 🙂', 'CI 🤖', 'L1', 'L2'}, "should not lose foreign labels"
+
+        pr.post_comment('hansen r+', 'reviewer')
+        run_crons(env)
+
+        assert pr.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merging 👷', 'L1', 'L2'},\
+            "should not lose foreign labels"

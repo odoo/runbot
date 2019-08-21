@@ -502,28 +502,23 @@ class Repo(object):
             body=body, preload_content=False,
         )
 
-    def _add_labels(self, r, number):
+    def _get_labels(self, r, number):
         try:
             pr = self.issues[int(number)]
         except KeyError:
             return (404, None)
 
-        pr.labels.update(json.loads(r.body))
+        return (200, [{'name': label} for label in pr.labels])
+
+    def _reset_labels(self, r, number):
+        try:
+            pr = self.issues[int(number)]
+        except KeyError:
+            return (404, None)
+
+        pr.labels = set(json.loads(r.body)['labels'])
 
         return (200, {})
-
-    def _remove_label(self, _, number, label):
-        try:
-            pr = self.issues[int(number)]
-        except KeyError:
-            return (404, None)
-
-        try:
-            pr.labels.remove(werkzeug.urls.url_unquote(label))
-        except KeyError:
-            return (404, None)
-        else:
-            return (200, {})
 
     def _do_merge(self, r):
         body = json.loads(r.body) # {base, head, commit_message}
@@ -585,8 +580,8 @@ class Repo(object):
         ('GET', r'pulls/(?P<number>\d+)/reviews', _read_pr_reviews),
         ('GET', r'pulls/(?P<number>\d+)/commits', _read_pr_commits),
 
-        ('POST', r'issues/(?P<number>\d+)/labels', _add_labels),
-        ('DELETE', r'issues/(?P<number>\d+)/labels/(?P<label>.+)', _remove_label),
+        ('GET', r'issues/(?P<number>\d+)/labels', _get_labels),
+        ('PUT', r'issues/(?P<number>\d+)/labels', _reset_labels),
     ]
 
 class Issue(object):
