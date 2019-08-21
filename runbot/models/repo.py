@@ -562,6 +562,7 @@ class runbot_repo(models.Model):
             return 'Not for me'
         host = self.env['runbot.host']._get_current()
         host.last_start_loop = fields.Datetime.now()
+        self.env.cr.commit()
         start_time = time.time()
         # 1. source cleanup
         # -> Remove sources when no build is using them
@@ -578,12 +579,12 @@ class runbot_repo(models.Model):
             repos = self.search([('mode', '!=', 'disabled')])
             try:
                 repos._scheduler(host)
+                host.last_success = fields.Datetime.now()
                 self.env.cr.commit()
                 self.env.reset()
                 self = self.env()[self._name]
                 self._reload_nginx()
                 time.sleep(update_frequency)
-                host.last_success = fields.Datetime.now()
             except TransactionRollbackError:
                 _logger.exception('Trying to rollback')
                 self.env.cr.rollback()
