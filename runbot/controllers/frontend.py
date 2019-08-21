@@ -320,12 +320,23 @@ class Runbot(Controller):
         glances_ctx = self._glances_ctx()
         pending = self._pending()
         hosts_data = request.env['runbot.host'].search([])
+
+        monitored_config_id = int(request.env['ir.config_parameter'].sudo().get_param('runbot.monitored_config_id', 1))
+        request.env.cr.execute("""SELECT DISTINCT ON (branch_id) branch_id, id FROM runbot_build
+                                WHERE config_id = %s
+                                AND global_state in ('running', 'done')
+                                AND branch_id in (SELECT id FROM runbot_branch where sticky='t')
+                                ORDER BY branch_id ASC, id DESC""", [int(monitored_config_id)])
+        last_monitored = request.env['runbot.build'].browse([r[1] for r in request.env.cr.fetchall()])
+
         qctx = {
             'refresh': refresh,
             'pending_total': pending[0],
             'pending_level': pending[1],
             'glances_data': glances_ctx,
             'hosts_data': hosts_data,
+            'last_monitored': last_monitored  # nightly
+
         }
         return request.render("runbot.monitoring", qctx)
 
