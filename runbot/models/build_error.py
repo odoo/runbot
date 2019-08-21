@@ -66,7 +66,7 @@ class RunbotBuildError(models.Model):
         Replacing the regex with a space
         """
         for r in CLEANING_REGS:
-            s = r.sub(' ', s)
+            s = r.sub('%', s)
         return s
 
     @api.model
