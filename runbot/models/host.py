@@ -18,6 +18,8 @@ class RunboHost(models.Model):
     nb_worker = fields.Integer('Number of max paralel build', help="0 to use icp value", default=0)
     nb_testing = fields.Integer(compute='_compute_nb')
     nb_running = fields.Integer(compute='_compute_nb')
+    last_exception = fields.Char('Last exception')
+    exception_count = fields.Char('Last exception')
 
     def _compute_nb(self):
         groups = self.env['runbot.build'].read_group(

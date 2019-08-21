@@ -15,7 +15,7 @@ import shutil
 
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT
-from odoo import models, fields, api
+from odoo import models, fields, api, registry
 from odoo.modules.module import get_module_resource
 from odoo.tools import config
 from ..common import fqdn, dt2time, Commit
@@ -590,7 +590,20 @@ class runbot_repo(models.Model):
                 self.env.cr.rollback()
                 self.env.reset()
                 time.sleep(random.uniform(0, 1))
+            except Exception as e:
+                with registry(self._cr.dbname).cursor() as cr:  # user another cursor since transaction will be rollbacked
+                    message = str(e)
+                    chost = host.with_env(self.env(cr=cr))
+                    if chost.last_exception == message:
+                        chost.exception_count += 1
+                    else:
+                        chost.with_env(self.env(cr=cr)).last_exception = str(e)
+                        chost.exception_count = 1
+                raise
 
+        if host.last_exception:
+            host.last_exception = ""
+            host.exception_count = 0
         host.last_end_loop = fields.Datetime.now()
 
     def _source_cleanup(self):
