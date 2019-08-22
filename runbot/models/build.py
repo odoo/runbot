@@ -10,7 +10,7 @@ import time
 import datetime
 from ..common import dt2time, fqdn, now, grep, uniq_list, local_pgadmin_cursor, s2human, Commit
 from ..container import docker_build, docker_stop, docker_is_running, Command
-from odoo.addons.runbot.models.repo import HashMissingException
+from odoo.addons.runbot.models.repo import HashMissingException, ArchiveFailException
 from odoo import models, fields, api
 from odoo.exceptions import UserError, ValidationError
 from odoo.http import request
@@ -728,6 +728,9 @@ class runbot_build(models.Model):
                 exports[build_export_path] = commit.export()
             except HashMissingException:
                 self._log('_checkout', "Commit %s is unreachable. Did you force push the branch since build creation?" % commit, level='ERROR')
+                self._kill(result='ko')
+            except ArchiveFailException:
+                self._log('_checkout', "Archive %s failed. Did you force push the branch since build creation?" % commit, level='ERROR')
                 self._kill(result='ko')
         return exports
 
