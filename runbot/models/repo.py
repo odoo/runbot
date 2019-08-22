@@ -25,6 +25,9 @@ _logger = logging.getLogger(__name__)
 class HashMissingException(Exception):
     pass
 
+class ArchiveFailException(Exception):
+    pass
+
 class runbot_repo(models.Model):
 
     _name = "runbot.repo"
@@ -121,8 +124,8 @@ class runbot_repo(models.Model):
     def _git(self, cmd):
         """Execute a git command 'cmd'"""
         self.ensure_one()
+        _logger.debug("git command: git (dir %s) %s", self.short_name, ' '.join(cmd))
         cmd = ['git', '--git-dir=%s' % self.path] + cmd
-        _logger.debug("git command: %s", ' '.join(cmd))
         return subprocess.check_output(cmd).decode('utf-8')
 
     def _git_rev_parse(self, branch_name):
@@ -142,7 +145,7 @@ class runbot_repo(models.Model):
             self._update(force=True)
         if not self._hash_exists(sha):
             try:
-                self._git(['fetch', 'origin', sha])
+                result = self._git(['fetch', 'origin', sha])
             except:
                 pass
         if not self._hash_exists(sha):
@@ -150,10 +153,14 @@ class runbot_repo(models.Model):
 
         _logger.info('git export: checkouting to %s (new)' % export_path)
         os.makedirs(export_path)
+
         p1 = subprocess.Popen(['git', '--git-dir=%s' % self.path, 'archive', sha], stdout=subprocess.PIPE)
         p2 = subprocess.Popen(['tar', '-xmC', export_path], stdin=p1.stdout, stdout=subprocess.PIPE)
         p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
-        p2.communicate()[0]
+        (out, err) = p2.communicate()
+        if err:
+            raise ArchiveFailException(err)
+
         # TODO get result and fallback on cleaing in case of problem
         return export_path
 
