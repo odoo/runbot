@@ -9,7 +9,7 @@
                 <sheet>
                     <group>
                         <field name="name" readonly='1'/>
-                        <field name="display_name"/>
+                        <field name="disp_name"/>
                         <field name="active"/>
                         <field name="last_start_loop" readonly='1'/>
                         <field name="last_end_loop" readonly='1'/>
@@ -36,7 +36,7 @@
         <field name="arch" type="xml">
             <tree string="Builds">
                 <field name="name"/>
-                <field name="display_name"/>
+                <field name="disp_name"/>
                 <field name="assigned_only"/>
                 <field name="nb_worker"/>
             </tree>

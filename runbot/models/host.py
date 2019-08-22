@@ -10,7 +10,7 @@ class RunboHost(models.Model):
     _inherit = 'mail.thread'
 
     name = fields.Char('Host name', required=True, unique=True)
-    display_name = fields.Char('Display name')
+    disp_name = fields.Char('Display name')
     active = fields.Boolean('Active', default=True)
     last_start_loop = fields.Datetime('Last start')
     last_end_loop = fields.Datetime('Last end')
@@ -38,8 +38,8 @@ class RunboHost(models.Model):
 
     @api.model
     def create(self, values):
-        if not 'display_name' in values:
-            values['display_name'] = values['name']
+        if not 'disp_name' in values:
+            values['disp_name'] = values['name']
         return super().create(values)
 
     @api.model
