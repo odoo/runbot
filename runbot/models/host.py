@@ -7,6 +7,7 @@ _logger = logging.getLogger(__name__)
 class RunboHost(models.Model):
     _name = "runbot.host"
     _order = 'id'
+    _inherit = 'mail.thread'
 
     name = fields.Char('Host name', required=True, unique=True)
     display_name = fields.Char('Display name')
