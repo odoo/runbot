@@ -562,7 +562,7 @@ class runbot_build(models.Model):
                         self.env['runbot.build.config.step']._run_odoo_run(build, log_path)
                     except Exception:
                         _logger.exception('Failed to wake up build %s', build.dest)
-                        build._log('_schedule', 'Failed waking up build')
+                        build._log('_schedule', 'Failed waking up build', level='ERROR')
                         build.write({'requested_action': False, 'local_state': 'done'})
                 continue
 
