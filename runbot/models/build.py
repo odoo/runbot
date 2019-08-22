@@ -555,10 +555,15 @@ class runbot_build(models.Model):
                     build.write({'requested_action': False, 'local_state': 'done'})
                     build._log('wake_up', 'Impossible to wake-up, build dir does not exists anymore', level='SEPARATOR')
                 else:
-                    log_path = build._path('logs', 'wake_up.txt')
-                    build.write({'job_start': now(), 'job_end': False, 'active_step': False, 'requested_action': False, 'local_state': 'running'})
-                    build._log('wake_up', 'Waking up build', level='SEPARATOR')
-                    self.env['runbot.build.config.step']._run_odoo_run(build, log_path)
+                    try:
+                        log_path = build._path('logs', 'wake_up.txt')
+                        build.write({'job_start': now(), 'job_end': False, 'active_step': False, 'requested_action': False, 'local_state': 'running'})
+                        build._log('wake_up', 'Waking up build', level='SEPARATOR')
+                        self.env['runbot.build.config.step']._run_odoo_run(build, log_path)
+                    except Exception:
+                        _logger.exception('Failed to wake up build %s', build.dest)
+                        build._log('_schedule', 'Failed waking up build')
+                        build.write({'requested_action': False, 'local_state': 'done'})
                 continue
 
             if build.local_state == 'pending':
