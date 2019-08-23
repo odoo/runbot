@@ -123,21 +123,7 @@ def handle_pr(env, event):
 
     _logger.info("%s: %s:%s (%s) (%s)", event['action'], repo.name, pr['number'], pr['title'].strip(), author.github_login)
     if event['action'] == 'opened':
-        # some PRs have leading/trailing newlines in body/title (resp)
-        message = pr['title'].strip()
-        body = pr['body'] and pr['body'].strip()
-        if body:
-            message += '\n\n' + body
-        pr_obj = env['runbot_merge.pull_requests'].create({
-            'number': pr['number'],
-            'label': pr['head']['label'],
-            'author': author.id,
-            'target': branch.id,
-            'repository': repo.id,
-            'head': pr['head']['sha'],
-            'squash': pr['commits'] == 1,
-            'message': message,
-        })
+        pr_obj = env['runbot_merge.pull_requests']._from_gh(pr)
         return "Tracking PR as {}".format(pr_obj.id)
 
     pr_obj = env['runbot_merge.pull_requests']._get_or_schedule(r, pr['number'])
