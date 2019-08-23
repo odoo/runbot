@@ -1,4 +1,5 @@
 import base64
+import collections
 import datetime
 import io
 import json
@@ -6,6 +7,7 @@ import logging
 import os
 import pprint
 import re
+import sys
 import time
 
 from itertools import takewhile
@@ -433,7 +435,10 @@ class Branch(models.Model):
                 'state_to': 'staged',
             })
 
-        logger.info("Created staging %s (%s)", st, staged)
+        logger.info("Created staging %s (%s) to %s", st, ', '.join(
+            '%s[%s]' % (batch, batch.prs)
+            for batch in staged
+        ), st.target.name)
         return st
 
     def _check_visibility(self, repo, branch_name, expected_head, token):
@@ -453,6 +458,7 @@ class Branch(models.Model):
                 return head == expected_head
             return False
 
+ACL = collections.namedtuple('ACL', 'is_admin is_reviewer is_author')
 class PullRequests(models.Model):
     _name = 'runbot_merge.pull_requests'
     _order = 'number desc'
@@ -533,7 +539,7 @@ class PullRequests(models.Model):
         else:
             separator = 's '
         return '<pull_request%s%s>' % (separator, ' '.join(
-            '%s:%s' % (p.repository.name, p.number)
+            '{0.id} ({0.repository.name}:{0.number})'.format(p)
             for p in self
         ))
 
@@ -653,10 +659,7 @@ class PullRequests(models.Model):
 
         (login, name) = (author.github_login, author.display_name) if author else (login, 'not in system')
 
-        is_admin = (author.reviewer and self.author != author) or (author.self_reviewer and self.author == author)
-        is_reviewer = is_admin or self in author.delegate_reviewer
-        # TODO: should delegate reviewers be able to retry PRs?
-        is_author = is_reviewer or self.author == author
+        is_admin, is_reviewer, is_author = self._pr_acl(author)
 
         commands = dict(
             ps
@@ -709,7 +712,6 @@ class PullRequests(models.Model):
             elif command == 'review':
                 if param and is_reviewer:
                     newstate = RPLUS.get(self.state)
-                    print('r+', self.state, self.status)
                     if newstate:
                         self.state = newstate
                         self.reviewed_by = author
@@ -793,6 +795,16 @@ class PullRequests(models.Model):
                 'message': ' '.join(msgs),
             })
         return '\n'.join(msg)
+
+    def _pr_acl(self, user):
+        if not self:
+            return ACL(False, False, False)
+
+        is_admin = (user.reviewer and self.author != user) or (user.self_reviewer and self.author == user)
+        is_reviewer = is_admin or self in user.delegate_reviewer
+        # TODO: should delegate reviewers be able to retry PRs?
+        is_author = is_reviewer or self.author == user
+        return ACL(is_admin, is_reviewer, is_author)
 
     def _validate(self, statuses):
         # could have two PRs (e.g. one open and one closed) at least
@@ -1107,6 +1119,39 @@ class PullRequests(models.Model):
                 b.split_id = False
 
         self.staging_id.cancel(reason, *args)
+
+    def _try_closing(self, by):
+        # ignore if the PR is already being updated in a separate transaction
+        # (most likely being merged?)
+        self.env.cr.execute('''
+        SELECT id, state FROM runbot_merge_pull_requests
+        WHERE id = %s AND state != 'merged'
+        FOR UPDATE SKIP LOCKED;
+        ''', [self.id])
+        res = self.env.cr.fetchone()
+        if not res:
+            return False
+
+        self.env.cr.execute('''
+        UPDATE runbot_merge_pull_requests
+        SET state = 'closed'
+        WHERE id = %s AND state != 'merged'
+        ''', [self.id])
+        self.env.cr.commit()
+        self.invalidate_cache(fnames=['state'], ids=[self.id])
+        if self.env.cr.rowcount:
+            self.env['runbot_merge.pull_requests.tagging'].create({
+                'pull_request': self.number,
+                'repository': self.repository.id,
+                'state_from': res[1] if not self.staging_id else 'staged',
+                'state_to': 'closed',
+            })
+            self.unstage(
+                "PR %s:%s closed by %s",
+                self.repository.name, self.number,
+                by
+            )
+        return True
 
 # state changes on reviews
 RPLUS = {

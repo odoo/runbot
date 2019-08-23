@@ -119,7 +119,7 @@ def read_object(store, tid):
     # recursively reads tree of objects
     o = store[tid]
     if isinstance(o, bytes):
-        return o
+        return o.decode()
     return {
         k: read_object(store, v)
         for k, v in o.items()

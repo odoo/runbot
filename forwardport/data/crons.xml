@@ -1,0 +1,46 @@
+<odoo>
+    <record model="ir.cron" id="port_forward">
+        <field name="name">Check if there are merged PRs to port</field>
+        <field name="model_id" ref="model_forwardport_batches"/>
+        <field name="state">code</field>
+        <field name="code">model._process()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="doall" eval="False"/>
+    </record>
+
+    <record model="ir.cron" id="updates">
+        <field name="name">Update followup FP PRs</field>
+        <field name="model_id" ref="model_forwardport_updates"/>
+        <field name="state">code</field>
+        <field name="code">model._process()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="doall" eval="False"/>
+    </record>
+
+    <record model="ir.cron" id="reminder">
+        <field name="name">Remind open PR</field>
+        <field name="model_id" ref="model_forwardport_updates"/>
+        <field name="state">code</field>
+        <field name="code">
+            for pr in env['runbot_merge.pull_requests'].search([
+                # only FP PRs
+                ('source_id', '!=', False),
+                # active
+                ('state', 'not in', ['merged', 'closed']),
+            ]):
+                env['runbot_merge.pull_requests.feedback'].create({
+                    'repository': pr.repository.id,
+                    'pull_request': pr.number,
+                    'message': "This forward port PR is awaiting action",
+                })
+        </field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">weeks</field>
+        <field name="numbercall">-1</field>
+        <field name="doall" eval="False"/>
+    </record>
+</odoo>

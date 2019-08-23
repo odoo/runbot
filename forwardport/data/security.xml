@@ -1,0 +1,37 @@
+<odoo>
+    <record id="access_forwardport_batches_admin" model="ir.model.access">
+        <field name="name">Admin access to batches</field>
+        <field name="model_id" ref="model_forwardport_batches"/>
+        <field name="group_id" ref="runbot_merge.group_admin"/>
+        <field name="perm_read">1</field>
+        <field name="perm_create">1</field>
+        <field name="perm_write">1</field>
+        <field name="perm_unlink">1</field>
+    </record>
+    <record id="access_forwardport_updates_admin" model="ir.model.access">
+        <field name="name">Admin access to updates</field>
+        <field name="model_id" ref="model_forwardport_updates"/>
+        <field name="group_id" ref="runbot_merge.group_admin"/>
+        <field name="perm_read">1</field>
+        <field name="perm_create">1</field>
+        <field name="perm_write">1</field>
+        <field name="perm_unlink">1</field>
+    </record>
+
+    <record id="access_forwardport_batches" model="ir.model.access">
+        <field name="name">No normal access to batches</field>
+        <field name="model_id" ref="model_forwardport_batches"/>
+        <field name="perm_read">0</field>
+        <field name="perm_create">0</field>
+        <field name="perm_write">0</field>
+        <field name="perm_unlink">0</field>
+    </record>
+    <record id="access_forwardport_updates" model="ir.model.access">
+        <field name="name">No normal access to updates</field>
+        <field name="model_id" ref="model_forwardport_updates"/>
+        <field name="perm_read">0</field>
+        <field name="perm_create">0</field>
+        <field name="perm_write">0</field>
+        <field name="perm_unlink">0</field>
+    </record>
+</odoo>

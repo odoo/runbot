@@ -1,0 +1,63 @@
+<odoo>
+    <record model="ir.ui.view" id="project">
+        <field name="name">Show forwardport project fields</field>
+        <field name="inherit_id" ref="runbot_merge.runbot_merge_form_project"/>
+        <field name="model">runbot_merge.project</field>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet/group[2]" position="after">
+                <group string="Forwardport Configuration">
+                    <group>
+                        <field string="Token" name="fp_github_token"/>
+                    </group>
+                    <group>
+                        <field string="Bot Name" name="fp_github_name"/>
+                        <field string="Bot Email" name="fp_github_email"/>
+                    </group>
+                </group>
+            </xpath>
+            <xpath expr="//field[@name='repo_ids']/tree" position="inside">
+                <field string="FP remote" name="fp_remote_target"
+                       help="Repository where forward port branches will be created"
+                />
+            </xpath>
+
+            <xpath expr="//field[@name='branch_ids']/tree" position="inside">
+                <field name="fp_target" string="FP to"
+                       help="This branch will be forward-ported to (from lower ones)"
+                />
+                <field name="fp_sequence" string="FP sequence"
+                       help="Overrides the normal sequence"
+                />
+            </xpath>
+        </field>
+    </record>
+
+    <record model="ir.ui.view" id="pr">
+        <field name="name">Show forwardport PR fields</field>
+        <field name="inherit_id" ref="runbot_merge.runbot_merge_form_prs"/>
+        <field name="model">runbot_merge.pull_requests</field>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet/group[2]" position="after">
+                <separator string="Forwardported" attrs="{'invisible': [('source_id', '=', False)]}"/>
+                <group attrs="{'invisible': [('source_id', '=', False)]}">
+                    <group>
+                        <field string="Original PR" name="source_id"/>
+                    </group>
+                    <group attrs="{'invisible': [('parent_id', '=', False)]}">
+                        <field name="parent_id"/>
+                    </group>
+                    <group colspan="4" attrs="{'invisible': [('parent_id', '!=', False)]}">
+                        <span>
+                            Detached from forward porting (either conflicting
+                            or explicitly updated).
+                        </span>
+                    </group>
+                    <group>
+                        <field string="Forward ported up to" name="limit_id"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
