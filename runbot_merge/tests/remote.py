@@ -534,7 +534,11 @@ class Repo:
         )
 
     def read_tree(self, commit):
-        # read tree object
+        """ read tree object from commit
+
+        :param Commit commit:
+        :rtype: Dict[str, str]
+        """
         r = self._session.get('https://api.github.com/repos/{}/git/trees/{}'.format(self.name, commit.tree))
         assert 200 <= r.status_code < 300, r.json()
 
@@ -542,9 +546,10 @@ class Repo:
         tree = {}
         for t in r.json()['tree']:
             assert t['type'] == 'blob', "we're *not* doing recursive trees in test cases"
-            r = self._session.get('https://api.github.com/repos/{}/git/blobs/{}'.format(self.name, t['sha']))
+            r = self._session.get(t['url'])
             assert 200 <= r.status_code < 300, r.json()
-            tree[t['path']] = base64.b64decode(r.json()['content'])
+            # assume all test content is textual
+            tree[t['path']] = base64.b64decode(r.json()['content']).decode()
 
         return tree
 

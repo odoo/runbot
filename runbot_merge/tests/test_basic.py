@@ -91,8 +91,8 @@ def test_trivial_flow(env, repo, page, users):
     # with default-rebase, only one parent is "known"
     assert master.parents[0] == m
     assert repo.read_tree(master) == {
-        'a': b'some other content',
-        'b': b'a second file',
+        'a': 'some other content',
+        'b': 'a second file',
     }
     assert master.message == "gibberish\n\nblahblah\n\ncloses {repo.name}#1"\
                              "\n\nSigned-off-by: {reviewer.formatted_email}"\
@@ -803,8 +803,8 @@ def test_rebase_failure(env, repo, users, remote_p):
         (users['reviewer'], 'hansen r+'),
     ]
     assert repo.read_tree(repo.commit('heads/staging.master')) == {
-        'm': b'm',
-        'b': b'b',
+        'm': 'm',
+        'b': 'b',
     }
 
 def test_ci_failure_after_review(env, repo, users):
@@ -1010,7 +1010,7 @@ class TestMergeMethod:
             "the pr head should not be an ancestor of the staging branch in a squash merge"
         assert re.match('^force rebuild', staging.message)
         assert repo.read_tree(staging) == {
-            'm': b'c1', 'm2': b'm2',
+            'm': 'c1', 'm2': 'm2',
         }, "the tree should still be correctly merged"
         [actual_sha] = staging.parents
         actual = repo.commit(actual_sha)
@@ -1218,7 +1218,7 @@ class TestMergeMethod:
         assert master == merge_head
         head = repo.commit('heads/master')
         final_tree = repo.read_tree(head)
-        assert final_tree == {'m': b'2', 'b': b'1'}, "sanity check of final tree"
+        assert final_tree == {'m': '2', 'b': '1'}, "sanity check of final tree"
         r1 = repo.commit(head.parents[1])
         r0 = repo.commit(r1.parents[0])
         assert json.loads(pr.commits_map) == {
@@ -1291,7 +1291,7 @@ class TestMergeMethod:
         assert master == nb1
         head = repo.commit('heads/master')
         final_tree = repo.read_tree(head)
-        assert final_tree == {'m': b'2', 'b': b'1'}, "sanity check of final tree"
+        assert final_tree == {'m': '2', 'b': '1'}, "sanity check of final tree"
 
         m1 = head
         m0 = repo.commit(m1.parents[0])
@@ -1455,7 +1455,7 @@ class TestMergeMethod:
 
         master = repo.commit('heads/master')
         assert master.parents == [m2, c1]
-        assert repo.read_tree(master) == {'a': b'1', 'b': b'2', 'bb': b'bb'}
+        assert repo.read_tree(master) == {'a': '1', 'b': '2', 'bb': 'bb'}
 
         m1 = node('M1')
         reviewer = get_partner(env, users["reviewer"]).formatted_email
@@ -1495,7 +1495,7 @@ class TestMergeMethod:
         assert staging.parents == [m2],\
             "the previous master's tip should be the sole parent of the staging commit"
         assert repo.read_tree(staging) == {
-            'm': b'c2', 'm2': b'm2',
+            'm': 'c2', 'm2': 'm2',
         }, "the tree should still be correctly merged"
 
         repo.post_status(staging.id, 'success', 'legal/cla')
@@ -1533,7 +1533,7 @@ class TestMergeMethod:
         assert repo.is_ancestor(prx.head, of=staging.id)
         assert staging.parents == [m2, c1]
         assert repo.read_tree(staging) == {
-            'm': b'c1', 'm2': b'm2',
+            'm': 'c1', 'm2': 'm2',
         }
 
         repo.post_status(staging.id, 'success', 'legal/cla')

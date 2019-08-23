@@ -163,39 +163,11 @@ def handle_pr(env, event):
 
     # don't marked merged PRs as closed (!!!)
     if event['action'] == 'closed' and pr_obj.state != 'merged':
-        # ignore if the PR is already being updated in a separate transaction
-        # (most likely being merged?)
-        env.cr.execute('''
-        SELECT id, state FROM runbot_merge_pull_requests
-        WHERE id = %s AND state != 'merged'
-        FOR UPDATE SKIP LOCKED;
-        ''', [pr_obj.id])
-        res = env.cr.fetchone()
         # FIXME: store some sort of "try to close it later" if the merge fails?
-        if not res:
+        if pr_obj._try_closing(event['sender']['login']):
+            return 'Closed {}'.format(pr_obj.id)
+        else:
             return 'Ignored: could not lock rows (probably being merged)'
-
-        env.cr.execute('''
-        UPDATE runbot_merge_pull_requests
-        SET state = 'closed'
-        WHERE id = %s AND state != 'merged'
-        ''', [pr_obj.id])
-        env.cr.commit()
-        pr_obj.invalidate_cache(fnames=['state'], ids=[pr_obj.id])
-        if env.cr.rowcount:
-            env['runbot_merge.pull_requests.tagging'].create({
-                'pull_request': pr_obj.number,
-                'repository': repo.id,
-                'state_from': res[1] if not pr_obj.staging_id else 'staged',
-                'state_to': 'closed',
-            })
-            pr_obj.unstage(
-                "PR %s:%s closed by %s",
-                pr_obj.repository.name, pr_obj.number,
-                event['sender']['login']
-            )
-
-        return 'Closed {}'.format(pr_obj.id)
 
     if event['action'] == 'reopened' and pr_obj.state == 'closed':
         pr_obj.write({
