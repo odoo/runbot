@@ -226,7 +226,12 @@ class TestCommitMessage:
         """
         c1 = repo.make_commit(None, 'first!', None, tree={'f': 'm1'})
         repo.make_ref('heads/master', c1)
-        c2 = repo.make_commit(c1, 'simple commit message\n\n\nCo-authored-by: Bob <bob@example.com>\n\nFixes a thing', None, tree={'f': 'm2'})
+        c2 = repo.make_commit(c1, '''simple commit message
+
+
+Co-authored-by: Bob <bob@example.com>
+
+Fixes a thing''', None, tree={'f': 'm2'})
 
         prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
         repo.post_status(prx.head, 'success', 'ci/runbot')
@@ -240,10 +245,17 @@ class TestCommitMessage:
         run_crons(env)
 
         master = repo.commit('heads/master')
-        assert master.message == "simple commit message\n\nFixes a thing\n\ncloses {repo.name}#1"\
-                                 "\n\nSigned-off-by: {reviewer.formatted_email}"\
-                                 "\n\n\nCo-authored-by: Bob <bob@example.com>"\
-                                 .format(repo=repo, reviewer=get_partner(env, users['reviewer']))
+        assert master.message == """simple commit message
+
+Fixes a thing
+
+closes {repo.name}#1
+
+Signed-off-by: {reviewer.formatted_email}
+Co-authored-by: Bob <bob@example.com>""".format(
+            repo=repo,
+            reviewer=get_partner(env, users['reviewer'])
+        )
 
 class TestWebhookSecurity:
     def test_no_secret(self, env, project, repo):

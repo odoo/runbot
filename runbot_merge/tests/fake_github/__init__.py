@@ -733,7 +733,7 @@ class Commit(object):
     __slots__ = ['tree', 'message', 'author', 'committer', 'parents', 'statuses']
     def __init__(self, tree, message, author, committer, parents):
         self.tree = tree
-        self.message = message
+        self.message = message.strip()
         self.author = Author.from_(author) or Author('', '', '')
         self.committer = Author.from_(committer) or self.author
         self.parents = parents
