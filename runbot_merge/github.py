@@ -116,7 +116,7 @@ class GH(object):
             _logger.debug('fast_forward(%s, %s, %s) -> OK', self._repo, branch, sha)
         except requests.HTTPError:
             _logger.debug('fast_forward(%s, %s, %s) -> ERROR', self._repo, branch, sha, exc_info=True)
-            raise exceptions.FastForwardError()
+            raise exceptions.FastForwardError(self._repo)
 
     def set_ref(self, branch, sha):
         # force-update ref
