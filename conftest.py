@@ -4,8 +4,13 @@ import re
 import subprocess
 import time
 
+import psutil
 import pytest
 import requests
+
+NGROK_CLI = [
+    'ngrok', 'start', '--none', '--region', 'eu',
+]
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -79,8 +84,27 @@ def tunnel(pytestconfig, port):
 
     tunnel = pytestconfig.getoption('--tunnel')
     if tunnel == 'ngrok':
-        p = subprocess.Popen(['ngrok', 'http', '--region', 'eu', str(port)], stdout=subprocess.DEVNULL)
+        addr = 'localhost:%d' % port
+        # if ngrok is not running, start it
+        try:
+            # FIXME: use config file so we can set web_addr to something else
+            #        than localhost:4040 (otherwise we can't disambiguate
+            #        between the ngrok we started and an ngrok started by
+            #        some other user)
+            requests.get('http://localhost:4040/api')
+        except requests.exceptions.ConnectionError:
+            subprocess.Popen(NGROK_CLI, stdout=subprocess.DEVNULL)
+            time.sleep(1)
+
+        requests.post('http://localhost:4040/api/tunnels', json={
+            'name': str(port),
+            'proto': 'http',
+            'bind_tls': True,
+            'addr': addr,
+            'inspect': False,
+        })
         time.sleep(5)
+
         try:
             r = requests.get('http://localhost:4040/api/tunnels')
             r.raise_for_status()
@@ -88,10 +112,22 @@ def tunnel(pytestconfig, port):
                 t['public_url']
                 for t in r.json()['tunnels']
                 if t['proto'] == 'https'
+                if t['config']['addr'].endswith(addr)
             )
         finally:
-            p.terminate()
-            p.wait(30)
+            requests.delete('http://localhost:4040/api/tunnels/%s' % port)
+            time.sleep(5) # apparently tearing down the tunnel can take some time
+            r = requests.get('http://localhost:4040/api/tunnels')
+            if r.ok and r.json()['tunnels']:
+                return
+
+            # ngrok is broken or all tunnels have been shut down -> try to
+            # find and kill it (but only if it looks a lot like we started it)
+            for p in psutil.process_iter():
+                if p.name() == 'ngrok' and p.cmdline() == NGROK_CLI:
+                    p.terminate()
+                    break
+
     elif tunnel == 'localtunnel':
         p = subprocess.Popen(['lt', '-p', str(port)], stdout=subprocess.PIPE)
         try:
