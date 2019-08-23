@@ -26,7 +26,6 @@ Configuration:
 
   ``role_reviewer``, ``role_self_reviewer`` and ``role_other``
     - name (optional)
-    - user, the login of the user for that role
     - token, a personal access token with the ``public_repo`` scope (otherwise
       the API can't leave comments)
 
@@ -45,12 +44,10 @@ logic errors.
 """
 import base64
 import collections
-import configparser
 import itertools
 import re
 import socket
 import subprocess
-import sys
 import time
 import xmlrpc.client
 
@@ -68,26 +65,13 @@ def pytest_addhooks(pluginmanager):
 
 def pytest_addoption(parser):
     parser.addoption("--no-delete", action="store_true", help="Don't delete repo after a failed run")
-    parser.addoption(
-        '--tunnel', action="store", type="choice", choices=['ngrok', 'localtunnel'],
-        help="Which tunneling method to use to expose the local Odoo server "
-             "to hook up github's webhook. ngrok is more reliable, but "
-             "creating a free account is necessary to avoid rate-limiting "
-             "issues (anonymous limiting is rate-limited at 20 incoming "
-             "queries per minute, free is 40, multi-repo batching tests will "
-             "blow through the former); localtunnel has no rate-limiting but "
-             "the servers are way less reliable")
 
-@pytest.fixture(scope="session")
-def config(pytestconfig):
-    conf = configparser.ConfigParser(interpolation=None)
-    conf.read([pytestconfig.inifile])
-    return {
-        name: dict(s.items())
-        for name, s in conf.items()
-    }
 
 PORT=8069
+
+@pytest.fixture(scope='session')
+def port():
+    return PORT
 
 def wait_for_hook(n=1):
     # TODO: find better way to wait for roundtrip of actions which can trigger webhooks
@@ -151,63 +135,9 @@ def env(request):
         p.terminate()
         p.wait(timeout=30)
 
-@pytest.fixture(scope='session')
-def tunnel(request):
-    """ Creates a tunnel to localhost:8069 using ~~ngrok~~ localtunnel, should yield the
-    publicly routable address & terminate the process at the end of the session
-    """
-
-    tunnel = request.config.getoption('--tunnel')
-    if tunnel == 'ngrok':
-        p = subprocess.Popen(['ngrok', 'http', '--region', 'eu', str(PORT)])
-        time.sleep(5)
-        try:
-            r = requests.get('http://localhost:4040/api/tunnels')
-            r.raise_for_status()
-            yield next(
-                t['public_url']
-                for t in r.json()['tunnels']
-                if t['proto'] == 'https'
-            )
-        finally:
-            p.terminate()
-            p.wait(30)
-    elif tunnel == 'localtunnel':
-        p = subprocess.Popen(['lt', '-p', str(PORT)], stdout=subprocess.PIPE)
-        try:
-            r = p.stdout.readline()
-            m = re.match(br'your url is: (https://.*\.localtunnel\.me)', r)
-            assert m, "could not get the localtunnel URL"
-            yield m.group(1).decode('ascii')
-        finally:
-            p.terminate()
-            p.wait(30)
-    else:
-        raise ValueError("Unsupported %s tunnel method" % tunnel)
-
-ROLES = ['reviewer', 'self_reviewer', 'other']
 @pytest.fixture(autouse=True)
-def users(env, github, config):
-    # get github login of "current user"
-    r = github.get('https://api.github.com/user')
-    r.raise_for_status()
-    rolemap = {
-        'user': r.json()['login']
-    }
-    for role in ROLES:
-        data = config['role_' + role]
-        username = data['user']
-        rolemap[role] = username
-        if role == 'other':
-            continue
-        env['res.partner'].create({
-            'name': data.get('name', username),
-            'github_login': username,
-            'reviewer': role == 'reviewer',
-            'self_reviewer': role == 'self_reviewer',
-        })
-
-    return rolemap
+def users(users_):
+    return users_
 
 @pytest.fixture
 def project(env, config):
@@ -287,13 +217,14 @@ def make_repo(request, config, project, github, tunnel, users, owner):
         })
         project.write({'repo_ids': [(0, 0, {'name': fullname})]})
 
-        tokens = {
-            r: config['role_' + r]['token']
-            for r in ROLES
+        role_tokens = {
+            n[5:]: vals['token']
+            for n, vals in config.items()
+            if n.startswith('role_')
         }
-        tokens['user'] = config['github']['token']
+        role_tokens['user'] = config['github']['token']
 
-        return Repo(github, fullname, tokens)
+        return Repo(github, fullname, role_tokens)
 
     yield repomaker
 

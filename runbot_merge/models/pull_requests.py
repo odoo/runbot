@@ -523,6 +523,18 @@ class PullRequests(models.Model):
             for p in self
         }
 
+    def __str__(self):
+        if len(self) == 0:
+            separator = ''
+        elif len(self) == 1:
+            separator = ' '
+        else:
+            separator = 's '
+        return '<pull_request%s%s>' % (separator, ' '.join(
+            '%s:%s' % (p.repository.name, p.number)
+            for p in self
+        ))
+
     # missing link to other PRs
     @api.depends('priority', 'state', 'squash', 'merge_method', 'batch_id.active', 'label')
     def _compute_is_blocked(self):
@@ -841,6 +853,36 @@ class PullRequests(models.Model):
                 'state_to': pr._tagstate,
             })
         return pr
+
+    def _from_gh(self, description, author=None, branch=None, repo=None):
+        if repo is None:
+            repo = self.env['runbot_merge.repository'].search([
+                ('name', '=', description['base']['repo']['full_name']),
+            ])
+        if branch is None:
+            branch = self.env['runbot_merge.branch'].search([
+                ('name', '=', description['base']['ref']),
+                ('project_id', '=', repo.project_id.id),
+            ])
+        if author is None:
+            author = self.env['res.partner'].search([
+                ('github_login', '=', description['user']['login']),
+            ], limit=1)
+
+        message = description['title'].strip()
+        body = description['body'] and description['body'].strip()
+        if body:
+            message += '\n\n' + body
+        return self.env['runbot_merge.pull_requests'].create({
+            'number': description['number'],
+            'label': description['head']['label'],
+            'author': author.id,
+            'target': branch.id,
+            'repository': repo.id,
+            'head': description['head']['sha'],
+            'squash': description['commits'] == 1,
+            'message': message,
+        })
 
     @api.multi
     def write(self, vals):
