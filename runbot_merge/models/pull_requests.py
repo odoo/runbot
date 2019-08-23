@@ -513,6 +513,16 @@ class PullRequests(models.Model):
         help="PR is not currently stageable for some reason (mostly an issue if status is ready)"
     )
 
+    @api.depends('repository.name', 'number')
+    def _compute_display_name(self):
+        return super(PullRequests, self)._compute_display_name()
+
+    def name_get(self):
+        return {
+            p.id: '%s:%s' % (p.repository.name, p.number)
+            for p in self
+        }
+
     # missing link to other PRs
     @api.depends('priority', 'state', 'squash', 'merge_method', 'batch_id.active', 'label')
     def _compute_is_blocked(self):
