@@ -31,8 +31,8 @@ RUN set -x ; \
     zlib1g-dev
 
 # Install Google Chrome
-RUN curl -sSL https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb https://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+RUN curl -sSL http://nightly.odoo.com/odoo.key | apt-key add - \
+    && echo "deb http://nightly.odoo.com/deb/bionic ./" > /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \ 
     && apt-get install -y -qq google-chrome-stable
 
