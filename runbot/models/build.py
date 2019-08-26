@@ -560,6 +560,7 @@ class runbot_build(models.Model):
                         build.write({'job_start': now(), 'job_end': False, 'active_step': False, 'requested_action': False, 'local_state': 'running'})
                         build._log('wake_up', 'Waking up build', level='SEPARATOR')
                         self.env['runbot.build.config.step']._run_odoo_run(build, log_path)
+                        # reload_nginx will be triggered by _run_odoo_run
                     except Exception:
                         _logger.exception('Failed to wake up build %s', build.dest)
                         build._log('_schedule', 'Failed waking up build', level='ERROR')

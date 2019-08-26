@@ -592,11 +592,11 @@ class runbot_repo(models.Model):
                 self = self.env()[self._name]
                 self._reload_nginx()
                 time.sleep(update_frequency)
-            except TransactionRollbackError:
+            except TransactionRollbackError: # can lead to psycopg2.InternalError'>: "current transaction is aborted, commands ignored until end of transaction block
                 _logger.exception('Trying to rollback')
                 self.env.cr.rollback()
                 self.env.reset()
-                time.sleep(random.uniform(0, 1))
+                time.sleep(random.uniform(0, 3))
             except Exception as e:
                 with registry(self._cr.dbname).cursor() as cr:  # user another cursor since transaction will be rollbacked
                     message = str(e)
