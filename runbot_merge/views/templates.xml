@@ -170,73 +170,109 @@
                 <section class="row">
                     <h1 class="col-md-12"><t t-esc="branch.project_id.name"/>: <t t-esc="branch.name"/></h1>
                 </section>
-                <t t-foreach="stagings" t-as="staging">
-                    <t t-set="success" t-value="staging.state == 'success'"/>
-                    <t t-set="failure" t-value="staging.state == 'failure'"/>
-                    <t t-set="pending" t-value="staging.active and (not staging.state or staging.state == 'pending')"/>
-                    <t t-set="stateclass">
-                        <t t-if="success">bg-success</t>
-                        <t t-if="failure">bg-danger</t>
-                        <t t-if="pending">bg-info</t>
-                        <t t-if="not (success or failure or pending)">bg-gray-lighter</t>
-                    </t>
-                    <t t-set="title">
-                        <t t-if="staging.state == 'canceled'">Cancelled: <t t-esc="staging.reason"/></t>
-                        <t t-if="staging.state == 'ff_failed'">Fast Forward Failed</t>
-                        <t t-if="staging.state not in ('canceled', 'ff_failed')"><t t-esc="staging.reason"/></t>
-                    </t>
-                    <ul
-                        t-attf-class="row border-bottom {{stateclass}} list-inline list-unstyled mb0"
-                        t-att-title="title.strip() or None"
-                        style="border-bottom: 1px solid gainsboro"
-                    >
-                        <t t-if="staging.heads">
-                            <li class="dropdown">
-                                <button class="btn btn-link dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
-                                    <span t-field="staging.staged_at" t-options="{'widget': 'text'}"/>
-                                    <span class="caret"></span>
-                                </button>
-                                <ul class="dropdown-menu">
-                                    <li groups="runbot_merge.group_admin">
-                                        <a t-attf-href="/web#id={{staging.id}}&amp;view_type=form&amp;model=runbot_merge.stagings" target="new">
-                                            Open Staging
-                                        </a>
-                                    </li>
-                                    <li t-foreach="staging.statuses" t-as="st" t-if="st[3]"
-                                        t-att-class="
-                                            'bg-success' if st[2] == 'success'
-                                       else 'bg-danger' if st[2] in ('error', 'failure')
-                                       else 'bg-info'"
-                                    >
-                                        <a t-att-href="st[3]" target="new">
-                                            <t t-esc="st[0]"/>: <t t-esc="st[1]"/>
-                                        </a>
-                                    </li>
-                                </ul>
-                            </li>
+                <table>
+                    <t t-foreach="stagings" t-as="staging">
+                        <t t-set="success"
+                           t-value="staging.state == 'success'"/>
+                        <t t-set="failure"
+                           t-value="staging.state == 'failure'"/>
+                        <t t-set="pending"
+                           t-value="staging.active and (not staging.state or staging.state == 'pending')"/>
+                        <t t-set="stateclass">
+                            <t t-if="success">bg-success</t>
+                            <t t-if="failure">bg-danger</t>
+                            <t t-if="pending">bg-info</t>
+                            <t t-if="not (success or failure or pending)">
+                                bg-gray-lighter
+                            </t>
                         </t>
-                        <t t-foreach="staging.batch_ids" t-as="batch">
-                            <t t-set="first_pr" t-value="batch.prs[-1]"/>
-                            <li class="dropdown">
-                                <button class="btn btn-link dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"
-                                        t-att-title="first_pr.message.split('\n')[0]"
-                                >
-                                    <t t-esc="first_pr.label"/>
-                                    <span class="caret"></span>
-                                </button>
-                                <ul class="dropdown-menu">
-                                    <li t-foreach="batch.prs" t-as="pr">
-                                        <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
-                                           t-att-title="pr.message.split('\n')[0]"
-                                           target="new">
-                                            <t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/>
-                                        </a>
-                                    </li>
-                                </ul>
-                            </li>
+                        <t t-set="title">
+                            <t t-if="staging.state == 'canceled'">Cancelled:
+                                <t t-esc="staging.reason"/>
+                            </t>
+                            <t t-if="staging.state == 'ff_failed'">Fast
+                                Forward Failed
+                            </t>
+                            <t t-if="staging.state not in ('canceled', 'ff_failed')">
+                                <t t-esc="staging.reason"/>
+                            </t>
                         </t>
-                    </ul>
-                </t>
+                        <tr t-att-class="stateclass"
+                            style="border-bottom: 1px solid gainsboro; vertical-align: top">
+                            <th t-att-title="title.strip() or None">
+                                <t t-if="not staging.heads">
+                                    <span t-field="staging.staged_at"
+                                          t-options="{'widget': 'text'}"/>
+                                </t>
+                                <t t-if="staging.heads">
+                                    <button class="btn btn-link dropdown-toggle"
+                                            type="button"
+                                            data-toggle="dropdown"
+                                            aria-haspopup="true"
+                                            aria-expanded="true">
+                                        <span t-field="staging.staged_at"
+                                              t-options="{'widget': 'text'}"/>
+                                        <span class="caret"></span>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li groups="runbot_merge.group_admin">
+                                            <a t-attf-href="/web#id={{staging.id}}&amp;view_type=form&amp;model=runbot_merge.stagings"
+                                               target="new">
+                                                Open Staging
+                                            </a>
+                                        </li>
+                                        <li t-foreach="staging.statuses"
+                                            t-as="st" t-if="st[3]"
+                                            t-att-class="
+                                        'bg-success' if st[2] == 'success'
+                                   else 'bg-danger' if st[2] in ('error', 'failure')
+                                   else 'bg-info'"
+                                        >
+                                            <a t-att-href="st[3]"
+                                               target="new">
+                                                <t t-esc="st[0]"/>:
+                                                <t t-esc="st[1]"/>
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </t>
+                            </th>
+                            <td>
+                                <ul class="list-inline list-unstyled mb0">
+                                    <t t-foreach="staging.batch_ids"
+                                       t-as="batch">
+                                        <t t-set="first_pr"
+                                           t-value="batch.prs[-1]"/>
+                                        <li class="dropdown">
+                                            <button class="btn btn-link dropdown-toggle"
+                                                    type="button"
+                                                    data-toggle="dropdown"
+                                                    aria-haspopup="true"
+                                                    aria-expanded="true"
+                                                    t-att-title="first_pr.message.split('\n')[0]"
+                                            >
+                                                <t t-esc="first_pr.label"/>
+                                                <span class="caret"></span>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li t-foreach="batch.prs"
+                                                    t-as="pr">
+                                                    <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
+                                                       t-att-title="pr.message.split('\n')[0]"
+                                                       target="new">
+                                                        <t t-esc="pr.repository.name"/>
+                                                        #
+                                                        <t t-esc="pr.number"/>
+                                                    </a>
+                                                </li>
+                                            </ul>
+                                        </li>
+                                    </t>
+                                </ul>
+                            </td>
+                        </tr>
+                    </t>
+                </table>
                 <t t-if="next">
                     <a t-attf-href="/runbot_merge/{{branch.id}}?until={{next}}">
                         Next >
