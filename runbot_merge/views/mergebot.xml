@@ -201,11 +201,18 @@
                         </group>
                         <group>
                             <field name="staged_at"/>
-                            <field name="statuses"/>
                         </group>
                     </group>
-                    <group>
-                        <field name="batch_ids" colspan="4">
+                    <group string="Heads">
+                        <field name="head_ids" colspan="4" nolabel="1">
+                            <tree>
+                                <field name="sha"/>
+                                <field name="statuses"/>
+                            </tree>
+                        </field>
+                    </group>
+                    <group string="Batches">
+                        <field name="batch_ids" colspan="4" nolabel="1">
                             <tree>
                                 <field name="prs"/>
                             </tree>

@@ -1265,6 +1265,7 @@ class Stagings(models.Model):
 
     # seems simpler than adding yet another indirection through a model
     heads = fields.Char(required=True, help="JSON-encoded map of heads, one per repo in the project")
+    head_ids = fields.Many2many('runbot_merge.commit', compute='_compute_statuses')
 
     statuses = fields.Binary(compute='_compute_statuses')
 
@@ -1279,7 +1280,7 @@ class Stagings(models.Model):
                 head: repo for repo, head in json.loads(st.heads).items()
                 if not repo.endswith('^')
             }
-            commits = Commits.search([('sha', 'in', list(heads.keys()))])
+            commits = st.head_ids = Commits.search([('sha', 'in', list(heads.keys()))])
             st.statuses = [
                 (
                     heads[commit.sha],
