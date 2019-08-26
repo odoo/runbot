@@ -2336,6 +2336,47 @@ class TestUnknownPR:
             (users['user'], "I'm sorry. Branch `branch` is not within my remit."),
         ]
 
+class TestRecognizeCommands:
+    @pytest.mark.parametrize('botname', ['hansen', 'Hansen', 'HANSEN', 'HanSen', 'hAnSeN'])
+    def test_botname_casing(self, repo, env, botname):
+        """ Test that the botname is case-insensitive as people might write
+        bot names capitalised or titlecased or uppercased or whatever
+        """
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        repo.make_ref('heads/master', m)
+
+        c = repo.make_commit(m, 'first', None, tree={'m': 'c'})
+        prx = repo.make_pr('title', None, target='master', ctid=c, user='user')
+
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number),
+        ])
+        assert pr.state == 'opened'
+
+        prx.post_comment('%s r+' % botname, 'reviewer')
+        assert pr.state == 'approved'
+
+    @pytest.mark.parametrize('indent', ['', '\N{SPACE}', '\N{SPACE}'*4, '\N{TAB}'])
+    def test_botname_indented(self, repo, env, indent):
+        """ matching botname should ignore leading whitespaces
+        """
+
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        repo.make_ref('heads/master', m)
+
+        c = repo.make_commit(m, 'first', None, tree={'m': 'c'})
+        prx = repo.make_pr('title', None, target='master', ctid=c, user='user')
+
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number),
+        ])
+        assert pr.state == 'opened'
+
+        prx.post_comment('%shansen r+' % indent, 'reviewer')
+        assert pr.state == 'approved'
+
 class TestRMinus:
     def test_rminus_approved(self, repo, env):
         """ approved -> r- -> opened
