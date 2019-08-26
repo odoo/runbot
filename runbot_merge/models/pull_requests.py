@@ -1402,7 +1402,6 @@ class Stagings(models.Model):
         project = self.target.project_id
         if self.state == 'success':
             gh = {repo.name: repo.github() for repo in project.repo_ids}
-            repo_name = None
             staging_heads = json.loads(self.heads)
             self.env.cr.execute('''
             SELECT 1 FROM runbot_merge_pull_requests
@@ -1410,11 +1409,11 @@ class Stagings(models.Model):
             FOR UPDATE
             ''', [tuple(self.mapped('batch_ids.prs.id'))])
             try:
-                repo_name = self._safety_dance(gh, staging_heads)
+                self._safety_dance(gh, staging_heads)
             except exceptions.FastForwardError as e:
                 logger.warning(
                     "Could not fast-forward successful staging on %s:%s",
-                    repo_name, self.target.name,
+                    e.args[0], self.target.name,
                     exc_info=True
                 )
                 self.write({
