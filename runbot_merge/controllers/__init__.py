@@ -67,6 +67,7 @@ def handle_pr(env, event):
 
     # PRs to unmanaged branches are not necessarily abnormal and
     # we don't care
+    # note: deactivated ~= unmanaged for new PRs
     branch = env['runbot_merge.branch'].search([
         ('name', '=', b),
         ('project_id', '=', repo.project_id.id),
@@ -86,6 +87,7 @@ def handle_pr(env, event):
         source_branch = env['runbot_merge.branch'].search([
             ('name', '=', source),
             ('project_id', '=', repo.project_id.id),
+            '|', ('active', '=', True), ('active', '=', False)
         ])
         # retargeting to un-managed => delete
         if not branch:

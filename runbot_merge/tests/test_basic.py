@@ -556,86 +556,119 @@ def test_ff_failure_batch(env, repo, users):
         'c1', 'c2', 'C\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, C.number, reviewer),
     }
 
-def test_edit(env, repo):
-    """ Editing PR:
+class TestPREdition:
+    def test_edit(self, env, repo):
+        """ Editing PR:
 
-    * title (-> message)
-    * body (-> message)
-    * base.ref (-> target)
-    """
-    branch_1 = env['runbot_merge.branch'].create({
-        'name': '1.0',
-        'project_id': env['runbot_merge.project'].search([]).id,
-    })
+        * title (-> message)
+        * body (-> message)
+        * base.ref (-> target)
+        """
+        branch_1 = env['runbot_merge.branch'].create({
+            'name': '1.0',
+            'project_id': env['runbot_merge.project'].search([]).id,
+        })
 
-    m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
-    repo.make_ref('heads/master', m)
-    repo.make_ref('heads/1.0', m)
-    repo.make_ref('heads/2.0', m)
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        repo.make_ref('heads/master', m)
+        repo.make_ref('heads/1.0', m)
+        repo.make_ref('heads/2.0', m)
 
-    c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
-    c2 = repo.make_commit(c1, 'second', None, tree={'m': 'c2'})
-    prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
-    pr = env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', repo.name),
-        ('number', '=', prx.number)
-    ])
-    assert pr.message == 'title\n\nbody'
-    prx.title = "title 2"
-    assert pr.message == 'title 2\n\nbody'
-    prx.base = '1.0'
-    assert pr.target == branch_1
-    # FIXME: should a PR retargeted to an unmanaged branch really be deleted?
-    prx.base = '2.0'
-    assert not pr.exists()
-    run_crons(env)
-    assert prx.labels == set()
+        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
+        c2 = repo.make_commit(c1, 'second', None, tree={'m': 'c2'})
+        prx = repo.make_pr('title', 'body', target='master', ctid=c2, user='user')
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number)
+        ])
+        assert pr.message == 'title\n\nbody'
+        prx.title = "title 2"
+        assert pr.message == 'title 2\n\nbody'
+        prx.base = '1.0'
+        assert pr.target == branch_1
 
-    prx.base = '1.0'
-    assert env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', repo.name),
-        ('number', '=', prx.number)
-    ]).target == branch_1
+        prx.base = '2.0'
+        assert not pr.exists()
+        run_crons(env)
+        assert prx.labels == set()
 
-def test_retarget_update_commits(env, repo):
-    """ Retargeting a PR should update its commits count
-    """
-    branch_1 = env['runbot_merge.branch'].create({
-        'name': '1.0',
-        'project_id': env['runbot_merge.project'].search([]).id,
-    })
-    master = env['runbot_merge.branch'].search([('name', '=', 'master')])
+        prx.base = '1.0'
+        assert env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number)
+        ]).target == branch_1
 
-    # master is 1 commit in advance of 1.0
-    m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
-    m2 = repo.make_commit(m, 'second', None, tree={'m': 'm2'})
-    repo.make_ref('heads/master', m2)
-    repo.make_ref('heads/1.0', m)
+    def test_retarget_update_commits(self, env, repo):
+        """ Retargeting a PR should update its commits count
+        """
+        branch_1 = env['runbot_merge.branch'].create({
+            'name': '1.0',
+            'project_id': env['runbot_merge.project'].search([]).id,
+        })
+        master = env['runbot_merge.branch'].search([('name', '=', 'master')])
 
-    # the PR builds on master, but is errorneously targeted to 1.0
-    c = repo.make_commit(m2, 'first', None, tree={'m': 'm3'})
-    prx = repo.make_pr('title', 'body', target='1.0', ctid=c, user='user')
-    pr = env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', repo.name),
-        ('number', '=', prx.number)
-    ])
-    assert not pr.squash
+        # master is 1 commit in advance of 1.0
+        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+        m2 = repo.make_commit(m, 'second', None, tree={'m': 'm2'})
+        repo.make_ref('heads/master', m2)
+        repo.make_ref('heads/1.0', m)
 
-    prx.base = 'master'
-    assert pr.target == master
-    assert pr.squash
+        # the PR builds on master, but is errorneously targeted to 1.0
+        c = repo.make_commit(m2, 'first', None, tree={'m': 'm3'})
+        prx = repo.make_pr('title', 'body', target='1.0', ctid=c, user='user')
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number)
+        ])
+        assert not pr.squash
 
-    prx.base = '1.0'
-    assert pr.target == branch_1
-    assert not pr.squash
+        prx.base = 'master'
+        assert pr.target == master
+        assert pr.squash
 
-@pytest.mark.skip(reason="what do?")
-def test_edit_retarget_managed(env, repo):
-    """ A PR targeted to an un-managed branch is ignored but if the PR
-    is re-targeted to a managed branch it should be managed
+        prx.base = '1.0'
+        assert pr.target == branch_1
+        assert not pr.squash
 
-    TODO: maybe bot should tag PR as managed/unmanaged?
-    """
+    def test_retarget_from_disabled(self, env, repo):
+        """ Retargeting a PR from a disabled branch should not duplicate the PR
+        """
+        branch_1 = env['runbot_merge.branch'].create({
+            'name': '1.0',
+            'project_id': env['runbot_merge.project'].search([]).id,
+        })
+        branch_2 = env['runbot_merge.branch'].create({
+            'name': '2.0',
+            'project_id': env['runbot_merge.project'].search([]).id,
+        })
+
+        c0 = repo.make_commit(None, '0', None, tree={'a': '0'})
+        repo.make_ref('heads/1.0', c0)
+        c1 = repo.make_commit(c0, '1', None, tree={'a': '1'})
+        repo.make_ref('heads/2.0', c1)
+        c2 = repo.make_commit(c1, '2', None, tree={'a': '2'})
+        repo.make_ref('heads/master', c2)
+
+        # create PR on 1.0
+        c = repo.make_commit(c0, 'c', None, tree={'a': '0', 'b': '0'})
+        prx = repo.make_pr('t', 'b', target='1.0', ctid=c, user='user')
+        # there should only be a single PR in the system at this point
+        [pr] = env['runbot_merge.pull_requests'].search([])
+        assert pr.target == branch_1
+
+        # branch 1 is EOL, disable it
+        branch_1.active = False
+
+        # we forgot we had active PRs for it, and we may want to merge them
+        # still, retarget them!
+        prx.base = '2.0'
+
+        # check that we still only have one PR in the system
+        [pr_] = env['runbot_merge.pull_requests'].search([])
+        # and that it's the same as the old one, just edited with a new target
+        assert pr_ == pr
+        assert pr.target == branch_2
+
 @pytest.mark.skip(reason="What do?")
 def test_edit_staged(env, repo):
     """
