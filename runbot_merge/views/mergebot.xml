@@ -189,8 +189,11 @@
         <field name="model">runbot_merge.stagings</field>
         <field name="arch" type="xml">
             <form>
+                <field name="active" invisible="1"/>
                 <header>
-                    <button type="object" name="cancel" string="Cancel" class="oe_highlight"/>
+                    <button type="object" name="action_cancel" string="Cancel" class="oe_highlight"
+                            attrs="{'invisible': [('active', '=', False)]}"
+                    />
                 </header>
                 <sheet>
                     <group>

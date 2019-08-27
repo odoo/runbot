@@ -262,7 +262,7 @@ class Branch(models.Model):
     @api.depends('staging_ids.active')
     def _compute_active_staging(self):
         for b in self:
-            b.active_staging_id = b.staging_ids
+            b.active_staging_id = b.with_context(active_test=True).staging_ids
 
     def _stageable(self):
         # noinspection SqlResolve
@@ -1327,15 +1327,17 @@ class Stagings(models.Model):
             s.state = st
 
     @api.multi
-    def cancel(self, reason=None, *args):
+    def action_cancel(self):
+        self.cancel("explicitly cancelled by %s", self.env.user.display_name)
+        return { 'type': 'ir.actions.act_window_close' }
+
+    def cancel(self, reason, *args):
+        self = self.filtered('active')
         if not self:
             return
 
-        if reason is None:
-            reason = "explicitly cancelled by %s"
-            args = [self.env.user.display_name]
         _logger.info("Cancelling staging %s: " + reason, self, *args)
-        self.batch_ids.write({'active': False})
+        self.mapped('batch_ids').write({'active': False})
         self.write({
             'active': False,
             'state': 'cancelled',
