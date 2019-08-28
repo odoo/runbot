@@ -1,0 +1,103 @@
+<odoo>
+  <data>
+
+    <record id="runbot_error_log_form_view" model="ir.ui.view">
+      <field name="name">Runbot Error Log form view</field>
+      <field name="model">runbot.error.log</field>
+      <field name="arch" type="xml">
+        <form string="Build Error">
+
+      
+          <header>
+          </header>
+          <sheet>
+              <div class="oe_button_box" name="button_box" groups="base.group_user">
+              </div>
+              <div class="oe_title">
+                  <h1><field name="build_id"/></h1>
+                  <field name="build_url" widget="url"/>
+              </div>
+              <group>
+                  <group>
+                    <field name="repo_short_name"/>
+                    <field name="branch_name"/>
+                    <field name="log_type"/>
+                  </group>
+                  <group>
+                    <field name="name"/>
+                    <field name="func"/>
+                    <field name="path"/>
+                  </group>
+              </group>
+              <notebook>
+                  <page string="Log message" name="log_message">
+                    <group>
+                      <field name="message"/>
+                    </group>
+                  </page>
+              </notebook>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    
+    <record id="runbot_error_log_tree_view" model="ir.ui.view">
+      <field name="name">Runbot Error Log tree view</field>
+      <field name="model">runbot.error.log</field>
+      <field name="arch" type="xml">
+        <tree string="Build Errors">
+          <button name="action_goto_build" type="object" icon="fa-external-link "/>
+          <field name="build_id"/>
+          <field name="log_create_date"/>
+          <field name="repo_short_name"/>
+          <field name="branch_name"/>
+          <field name="name"/>
+          <field name="func"/>
+          <field name="path"/>
+          <field name="summary"/>
+          <field name="log_type"/>
+        </tree>
+      </field>
+    </record>
+    
+    <record id="runbot_logs_search_view" model="ir.ui.view">
+      <field name="name">runbot.error.log.filter</field>
+      <field name="model">runbot.error.log</field>
+      <field name="arch" type="xml">
+        <search string="Search master">
+          <field name="message"/>
+          <field name="name" string="Module"/>
+          <field name="func"/>
+          <field name="branch_name"/>
+          <field name="repo_name"/>
+          <field name="build_id"/>
+          <filter string="Failed builds" name="failed_builds" domain="[('global_state', '=', 'done'), ('global_result', '=', 'ko')]"/>
+          <separator/>
+          <filter string="Master branches" name="master_branches" domain="[('branch_name', '=', 'master')]"/>
+        </search>
+      </field>
+    </record>
+
+    <record id="open_view_error_log_tree" model="ir.actions.act_window">
+        <field name="name">Error Logs</field>
+        <field name="res_model">runbot.error.log</field>
+        <field name="view_mode">tree,form</field>
+        <field name="context">{'search_default_master_branches': True, 'search_default_failed_builds': True}</field>
+    </record>
+
+    <menuitem
+      id="runbot_log_menu"
+      name="Logs"
+      parent="runbot_menu_root"
+      sequence="50"
+    />
+
+    <menuitem
+        name="Error Logs" 
+        id="runbot_menu_error_logs"
+        parent="runbot_log_menu"
+        sequence="20"
+        action="open_view_error_log_tree"
+    />
+  </data>
+</odoo>

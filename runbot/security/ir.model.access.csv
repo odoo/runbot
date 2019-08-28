@@ -28,3 +28,6 @@ access_runbot_error_regex_manager,runbot_error_regex_manager,runbot.model_runbot
 
 access_runbot_host_user,runbot_host_user,runbot.model_runbot_host,group_user,1,0,0,0
 access_runbot_host_manager,runbot_host_manager,runbot.model_runbot_host,runbot.group_runbot_admin,1,1,1,1
+
+access_runbot_error_log_user,runbot_error_log_user,runbot.model_runbot_error_log,group_user,1,0,0,0
+access_runbot_error_log_manager,runbot_error_log_manager,runbot.model_runbot_error_log,runbot.group_runbot_admin,1,1,1,1
