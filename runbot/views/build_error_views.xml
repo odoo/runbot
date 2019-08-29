@@ -62,13 +62,76 @@
         <field name="res_model">runbot.build.error</field>
         <field name="view_mode">tree,form</field>
     </record>
-    
+
+    <record id="build_error_regex_form" model="ir.ui.view">
+        <field name="name">runbot.error.regex.form</field>
+        <field name="model">runbot.error.regex</field>
+        <field name="arch" type="xml">
+          <form>
+            <sheet>
+              <group name="build_regex_group">
+                <field name="regex"/>
+                <field name="re_type"/>
+              </group>
+            </sheet>
+            <div class="oe_chatter">
+                <field name="message_follower_ids" widget="mail_followers"/>
+                <field name="message_ids" widget="mail_thread"/>
+            </div>
+          </form>
+        </field>
+    </record>
+
+    <record id="build_error_regex_tree" model="ir.ui.view">
+        <field name="name">runbot.error.regex.tree</field>
+        <field name="model">runbot.error.regex</field>
+        <field name="arch" type="xml">
+            <tree string="Errors Regexes">
+                <field name="regex"/>
+                <field name="re_type"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="runbot_regex_search_view" model="ir.ui.view">
+      <field name="name">runbot.error.regex.filter</field>
+      <field name="model">runbot.error.regex</field>
+      <field name="arch" type="xml">
+        <search string="Search regex">
+          <field name="regex"/>
+          <filter string="Filtering regex's" name="filtering_regex" domain="[(['re_type', '=', 'filter'])]"/>
+          <filter string="Cleaning regex's" name="clening_regex" domain="[(['re_type', '=', 'cleaning'])]"/>
+        </search>
+      </field>
+    </record>
+
+    <record id="open_view_error_regex" model="ir.actions.act_window">
+        <field name="name">Errors regex</field>
+        <field name="res_model">runbot.error.regex</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
     <menuitem
-        name="Build errors" 
-        id="runbot_menu_build_error_tree"
+        name="Manage errors"
+        id="runbot_menu_manage_errors"
         parent="runbot_menu_root"
         sequence="40"
+        />
+
+    <menuitem
+        name="Build errors"
+        id="runbot_menu_build_error_tree"
+        parent="runbot_menu_manage_errors"
+        sequence="10"
         action="open_view_build_error_tree"
+        />
+
+    <menuitem
+        name="Error regex"
+        id="runbot_menu_error_regex_tree"
+        parent="runbot_menu_manage_errors"
+        sequence="20"
+        action="open_view_error_regex"
         />
   </data>
 </odoo>

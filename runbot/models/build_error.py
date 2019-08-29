@@ -8,10 +8,6 @@ from odoo import models, fields, api
 
 _logger = logging.getLogger(__name__)
 
-CLEANING_REGS = [
-    re.compile(r', line \d+,'),  # simply remove line numbers
-]
-
 
 class RunbotBuildError(models.Model):
 
@@ -36,12 +32,12 @@ class RunbotBuildError(models.Model):
 
     @api.model
     def create(self, vals):
+        cleaners = self.env['runbot.error.regex'].search([('re_type', '=', 'cleaning')])
         content = vals.get('content')
-        cleaned_content = self._clean(content)
+        cleaned_content = cleaners.r_sub('%', content)
         vals.update({'cleaned_content': cleaned_content,
                      'fingerprint': self._digest(cleaned_content)
         })
-        print(vals)
         return super().create(vals)
 
     @api.depends('build_ids')
@@ -60,16 +56,6 @@ class RunbotBuildError(models.Model):
             build_error.repo_ids = build_error.mapped('build_ids.repo_id')
 
     @api.model
-    def _clean(self, s):
-        """
-        Clean the string s with the cleaning regs
-        Replacing the regex with a space
-        """
-        for r in CLEANING_REGS:
-            s = r.sub('%', s)
-        return s
-
-    @api.model
     def _digest(self, s):
         """
         return a hash 256 digest of the string s
@@ -79,9 +65,15 @@ class RunbotBuildError(models.Model):
     @api.model
     def _parse_logs(self, ir_logs):
 
+        regexes = self.env['runbot.error.regex'].search([])
+        search_regs = regexes.filtered(lambda r: r.re_type == 'filter')
+        cleaning_regs = regexes.filtered(lambda r: r.re_type == 'cleaning')
+
         hash_dict = defaultdict(list)
         for log in ir_logs:
-            fingerprint = self._digest(self._clean(log.message))
+            if search_regs.r_search(log.message):
+                continue
+            fingerprint = self._digest(cleaning_regs.r_sub('%', log.message))
             hash_dict[fingerprint].append(log)
 
         # add build ids to already detected errors
@@ -106,3 +98,25 @@ class RunbotBuildErrorTag(models.Model):
 
     name = fields.Char('Tag')
     error_ids = fields.Many2many('runbot.build.error', string='Errors')
+
+
+class RunbotErrorRegex(models.Model):
+
+    _name = "runbot.error.regex"
+    _inherit = "mail.thread"
+
+    regex = fields.Char('Regular expression')
+    re_type = fields.Selection([('filter', 'Filter out'), ('cleaning', 'Cleaning')], string="Regex type")
+
+    def r_sub(self, replace, s):
+        """ replaces patterns from the recordset by replace in the given string """
+        for c in self:
+            s = re.sub(c.regex, '%', s)
+        return s
+
+    def r_search(self, s):
+        """ Return True if one of the regex is found in s """
+        for filter in self:
+            if re.search(filter.regex, s):
+                return True
+        return False

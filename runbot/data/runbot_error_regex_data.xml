@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data noupdate="1">
+    <record id="runbot_error_regex_clean_numbers" model="runbot.error.regex">
+        <field name="regex">, line \d+,</field>
+        <field name="re_type">cleaning</field>
+    </record>
+    <record id="runbot_error_regex_filter_failures" model="runbot.error.regex">
+        <field name="regex">Module .+: \d+ failures, \d+ errors</field>
+        <field name="re_type">filter</field>
+    </record>
+    <record id="runbot_error_regex_filter_failed" model="runbot.error.regex">
+        <field name="regex">At least one test failed when loading the modules.</field>
+        <field name="re_type">filter</field>
+    </record>
+  </data>
+</odoo>
