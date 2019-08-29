@@ -52,6 +52,7 @@ FOR EACH ROW EXECUTE PROCEDURE runbot_set_logging_build();
 class RunbotErrorLog(models.Model):
     _name = "runbot.error.log"
     _auto = False
+    _order = 'id desc'
 
     id = fields.Many2one('ir.logging', string='Log', readonly=True)
     name = fields.Char(string='Module', readonly=True)
@@ -80,13 +81,8 @@ class RunbotErrorLog(models.Model):
     branch_name = fields.Char(string='Branch name', readonly=True)
     repo_id = fields.Many2one('runbot.repo', string='Repo', readonly=True)
     repo_name = fields.Char(string='Repo name', readonly=True)
-    build_id_id = fields.Char(compute='_compute_build_id_id', string="Build id", readonly=True)
     repo_short_name = fields.Char(compute='_compute_repo_short_name', readonly=True)
     build_url = fields.Char(compute='_compute_build_url', readonly=True)
-
-    def _compute_build_id_id(self):
-        for l in self:
-            l.build_id_id = "%s" % l.build_id.id
 
     def _compute_repo_short_name(self):
         for l in self:
