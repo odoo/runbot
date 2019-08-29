@@ -16,6 +16,7 @@ class RunbotBuildError(models.Model):
 
     content = fields.Text('Error message', required=True)
     cleaned_content = fields.Text('Cleaned error message')
+    summary = fields.Char('Content summary', compute='_compute_summary', store=False)
     module_name = fields.Char('Module name')  # name in ir_logging
     function = fields.Char('Function name')  # func name in ir logging
     fingerprint = fields.Char('Error fingerprint', index=True)
@@ -54,6 +55,11 @@ class RunbotBuildError(models.Model):
     def _compute_repo_ids(self):
         for build_error in self:
             build_error.repo_ids = build_error.mapped('build_ids.repo_id')
+
+    @api.depends('content')
+    def _compute_summary(self):
+        for build_error in self:
+            build_error.summary = build_error.content[:50]
 
     @api.model
     def _digest(self, s):

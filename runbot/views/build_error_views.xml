@@ -48,7 +48,7 @@
         <field name="arch" type="xml">
             <tree string="Errors">
                 <field name="module_name"/>
-                <field name="fingerprint"/>
+                <field name="summary"/>
                 <field name="random"/>
                 <field name="build_count"/>
                 <field name="responsible"/>
@@ -56,11 +56,34 @@
             </tree>
         </field>
     </record>
+
+    <record id="build_error_search_view" model="ir.ui.view">
+      <field name="name">runbot.build.error.log.filter</field>
+      <field name="model">runbot.build.error</field>
+      <field name="arch" type="xml">
+        <search string="Search errors">
+          <field name="content"/>
+          <field name="module_name"/>
+          <field name="function"/>
+          <field name="responsible"/>
+          <field name="fixing_commit"/>
+          <filter string="No Parent" name="no_parent_error" domain="[('parent_id', '=', False)]"/>
+          <separator/>
+          <filter string="Undeterministic" name="random_error" domain="[('random', '=', True)]"/>
+          <separator/>
+          <filter string="Fixed" name="fixed_errors" domain="[('active', '=', False)]"/>
+          <filter string="Not Fixed" name="not_fixed_errors" domain="[('active', '=', True)]"/>
+          <separator/>
+          <filter string="Not Asigned" name="not_assigned_errors" domain="[('responsible', '=', False)]"/>
+        </search>
+      </field>
+    </record>
     
     <record id="open_view_build_error_tree" model="ir.actions.act_window">
         <field name="name">Build errors</field>
         <field name="res_model">runbot.build.error</field>
         <field name="view_mode">tree,form</field>
+        <field name="context">{'search_default_no_parent_error': True, 'search_default_random_error': True}</field>
     </record>
 
     <record id="build_error_regex_form" model="ir.ui.view">
