@@ -20,6 +20,7 @@
                 <field name="state"/>
                 <field name="modules"/>
                 <field name="config_id"/>
+                <field name="no_build"/>
               </group>
             </sheet>
           </form>
