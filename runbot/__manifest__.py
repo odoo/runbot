@@ -31,5 +31,6 @@
         'data/runbot_build_config_data.xml',
         'data/build_parse.xml',
         'data/runbot_error_regex_data.xml',
+        'data/error_link.xml',
     ],
 }

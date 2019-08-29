@@ -13,6 +13,7 @@ class RunbotBuildError(models.Model):
 
     _name = "runbot.build.error"
     _inherit = "mail.thread"
+    _rec_name = "id"
 
     content = fields.Text('Error message', required=True)
     cleaned_content = fields.Text('Cleaned error message')
@@ -96,6 +97,16 @@ class RunbotBuildError(models.Model):
                 'function': logs[0].func,
                 'build_ids': [(6, False, [r.build_id.id for r in logs])],
             })
+
+    def link_errors(self):
+        """ Link errors with the first one of the recordset
+        choosing parent in error with responsible, random bug and finally fisrt seen
+        """
+        if len(self) < 2:
+            return
+        build_errors = self.search([('id', 'in', self.ids)], order='responsible asc, random desc, id asc')
+        build_errors[1:].parent_id = build_errors[0]
+
 
 
 class RunbotBuildErrorTag(models.Model):
