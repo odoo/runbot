@@ -280,6 +280,7 @@ class ConfigStep(models.Model):
         self.invalidate_cache()
         res = docker_run(cmd.build(), log_path, build_path, docker_name, exposed_ports=[build_port, build_port + 1], ro_volumes=exports)
         build.repo_id._reload_nginx()
+        build._local_pg_limit_db(db_name, 25)
         return res
 
     def _run_odoo_install(self, build, log_path):
@@ -335,7 +336,9 @@ class ConfigStep(models.Model):
 
         max_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=10000))
         timeout = min(self.cpu_limit, max_timeout)
-        return docker_run(cmd.build(), log_path, build._path(), build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports)
+        res = docker_run(cmd.build(), log_path, build._path(), build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports)
+        build._local_pg_limit_db(db_name, 25)
+        return res
 
     def _modules_to_install(self, build):
         modules_to_install = set([mod.strip() for mod in self.install_modules.split(',')])

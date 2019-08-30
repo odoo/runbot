@@ -792,6 +792,11 @@ class runbot_build(models.Model):
         with local_pgadmin_cursor() as local_cr:
             local_cr.execute("""CREATE DATABASE "%s" TEMPLATE template0 LC_COLLATE 'C' ENCODING 'unicode'""" % dbname)
 
+    def _local_pg_limit_db(self, db_name, datconnlimit=25):
+        """Limit number of connections allowed for a db"""
+        with local_pgadmin_cursor() as local_cr:
+            local_cr.execute('UPDATE pg_database SET datconnlimit=%s WHERE datname=%s', (datconnlimit, db_name))
+
     def _log(self, func, message, level='INFO', log_type='runbot', path='runbot'):
         self.ensure_one()
         _logger.debug("Build %s %s %s", self.id, func, message)
