@@ -9,4 +9,14 @@
             records._parse_logs()
         </field>
     </record>
+    <record model="ir.actions.server" id="action_parse_log">
+        <field name="name">Parse log entry</field>
+        <field name="model_id" ref="runbot.model_runbot_error_log" />
+        <field name="binding_model_id" ref="runbot.model_runbot_error_log" /> 
+        <field name="type">ir.actions.server</field>
+        <field name="state">code</field>
+        <field name="code">
+            records._parse_logs()
+        </field>
+    </record>
 </odoo>

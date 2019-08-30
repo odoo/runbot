@@ -100,6 +100,11 @@ class RunbotErrorLog(models.Model):
             "target": "new",
         }
 
+    def _parse_logs(self):
+        BuildError = self.env['runbot.build.error']
+        BuildError._parse_logs(self)
+
+
     @api.model_cr
     def init(self):
         """ Create an SQL view for ir.logging """
