@@ -511,7 +511,7 @@ class runbot_build(models.Model):
 
     def _find_port(self):
         # currently used port
-        ids = self.search([('local_state', 'not in', ['pending', 'done'])])
+        ids = self.search([('local_state', 'not in', ['pending', 'done']), ('host', '=', fqdn())])
         ports = set(i['port'] for i in ids.read(['port']))
 
         # starting port
