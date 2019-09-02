@@ -72,14 +72,14 @@
         <field name="name">create_light_multi</field>
         <field name="job_type">create_build</field>
         <field name="create_config_ids" eval="[(4, ref('runbot_build_config_light_test'))]"/>
-        <field name="number_builds">10</field>
+        <field name="number_builds">20</field>
         <field name="protected" eval="True"/>
         <field name="force_build" eval="True"/>
     </record>
 
     <record id="runbot_build_config_multibuild" model="runbot.build.config">
         <field name="name">Multi build</field>
-        <field name="description">Run 10 children build with the same hash and dependencies. Use to detect undeterministic issues</field>
+        <field name="description">Run 20 children build with the same hash and dependencies. Use to detect undeterministic issues</field>
         <field name="step_order_ids" eval="[(5,0,0), (0, 0, {'step_id': ref('runbot_build_config_step_create_light_multi')})]"/>
         <field name="protected" eval="True"/>
     </record>
