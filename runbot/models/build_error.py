@@ -32,7 +32,7 @@ class RunbotBuildError(models.Model):
     build_count = fields.Integer(compute='_compute_build_counts', string='Nb seen', stored=True)
     parent_id = fields.Many2one('runbot.build.error', 'Linked to')
     child_ids = fields.One2many('runbot.build.error', 'parent_id', string='Child Errors')
-    Children_build_ids = fields.Many2many(related='child_ids.build_ids', string='Children builds')
+    children_build_ids = fields.Many2many('runbot.build', compute='_compute_children_build_ids', string='Children builds')
 
     @api.model
     def create(self, vals):
@@ -47,7 +47,7 @@ class RunbotBuildError(models.Model):
     @api.depends('build_ids')
     def _compute_build_counts(self):
         for build_error in self:
-            build_error.build_count = len(build_error.build_ids) + len(build_error.Children_build_ids)
+            build_error.build_count = len(build_error.build_ids) + len(build_error.children_build_ids)
 
     @api.depends('build_ids')
     def _compute_branch_ids(self):
@@ -63,6 +63,11 @@ class RunbotBuildError(models.Model):
     def _compute_summary(self):
         for build_error in self:
             build_error.summary = build_error.content[:50]
+
+    @api.depends('child_ids')
+    def _compute_children_build_ids(self):
+        for build_error in self:
+            build_error.children_build_ids = build_error.mapped('child_ids.build_ids')
 
     @api.model
     def _digest(self, s):
