@@ -329,13 +329,6 @@ class runbot_repo(models.Model):
                                 indirect.build_type = 'indirect'
                                 new_build.revdep_build_ids += indirect
 
-        # skip old builds (if their sequence number is too low, they will not ever be built)
-        skippable_domain = [('repo_id', '=', self.id), ('local_state', '=', 'pending')]
-        icp = self.env['ir.config_parameter']
-        running_max = int(icp.get_param('runbot.runbot_running_max', default=75))
-        builds_to_be_skipped = Build.search(skippable_domain, order='sequence desc', offset=running_max)
-        builds_to_be_skipped._skip()
-
     @api.multi
     def _create_pending_builds(self):
         """ Find new commits in physical repos"""
