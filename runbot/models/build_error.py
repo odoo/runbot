@@ -34,6 +34,10 @@ class RunbotBuildError(models.Model):
     child_ids = fields.One2many('runbot.build.error', 'parent_id', string='Child Errors')
     children_build_ids = fields.Many2many('runbot.build', compute='_compute_children_build_ids', string='Children builds')
     error_history_ids = fields.One2many('runbot.build.error', compute='_compute_error_history_ids', string='Old errors')
+    first_seen_build_id = fields.Many2one('runbot.build', compute='_compute_first_seen_build_id', string='First Seen build')
+    first_seen_date = fields.Datetime(string='First Seen Date', related='first_seen_build_id.create_date')
+    last_seen_build_id = fields.Many2one('runbot.build', compute='_compute_last_seen_build_id', string='Last Seen build')
+    last_seen_date = fields.Datetime(string='Last Seen Date', related='last_seen_build_id.create_date')
 
     @api.model
     def create(self, vals):
@@ -48,7 +52,7 @@ class RunbotBuildError(models.Model):
     @api.depends('build_ids')
     def _compute_build_counts(self):
         for build_error in self:
-            build_error.build_count = len(build_error.build_ids) + len(build_error.children_build_ids)
+            build_error.build_count = len(build_error.children_build_ids)
 
     @api.depends('build_ids')
     def _compute_branch_ids(self):
@@ -68,7 +72,18 @@ class RunbotBuildError(models.Model):
     @api.depends('child_ids')
     def _compute_children_build_ids(self):
         for build_error in self:
-            build_error.children_build_ids = build_error.mapped('child_ids.build_ids')
+            all_builds = build_error.build_ids | build_error.mapped('child_ids.build_ids')
+            build_error.children_build_ids = all_builds.sorted(key=lambda rec: rec.id, reverse=True)
+
+    @api.depends('build_ids', 'child_ids')
+    def _compute_last_seen_build_id(self):
+        for build_error in self:
+            build_error.last_seen_build_id = build_error.children_build_ids and build_error.children_build_ids[0] or False
+
+    @api.depends('build_ids', 'child_ids')
+    def _compute_first_seen_build_id(self):
+        for build_error in self:
+            build_error.first_seen_build_id = build_error.children_build_ids and build_error.children_build_ids[-1] or False
 
     @api.depends('fingerprint')
     def _compute_error_history_ids(self):

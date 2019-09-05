@@ -475,7 +475,7 @@ class runbot_repo(models.Model):
                 pending_build._schedule()
 
         # terminate and reap doomed build
-        build_ids = Build.search(domain_host + [('local_state', '=', 'running')], order='job_start desc').ids
+        build_ids = Build.search(domain_host + [('local_state', '=', 'running'), ('keep_running', '!=', True)], order='job_start desc').ids
         # sort builds: the last build of each sticky branch then the rest
         sticky = {}
         non_sticky = []

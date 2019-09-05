@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+  <data noupdate="1">
     <record id="runbot_build_config_step_test_base" model="runbot.build.config.step">
         <field name="name">base</field>
         <field name="install_modules">base</field>
@@ -117,4 +118,5 @@
         <field name="step_order_ids" eval="[(5,0,0), (0, 0, {'step_id': ref('runbot_build_config_step_test_click_all')})]"/>
         <field name="protected" eval="True"/>
     </record>
+  </data>
 </odoo>

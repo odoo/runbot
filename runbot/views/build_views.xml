@@ -38,6 +38,7 @@
                         <field name="orphan_result" readonly="1"/>
                         <field name="hidden" groups="base.group_no_one"/>
                         <field name="build_url" widget="url" readonly="1"/>
+                        <field name="keep_running"/>
                     </group>
                 </sheet>
             </form>
