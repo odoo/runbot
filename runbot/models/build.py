@@ -107,6 +107,7 @@ class runbot_build(models.Model):
                                         string='Source export path mode')
     build_url = fields.Char('Build url', compute='_compute_build_url', store=False)
     build_error_ids = fields.Many2many('runbot.build.error', 'runbot_build_error_ids_runbot_build_rel', string='Errors')
+    keep_running = fields.Boolean('Keep running', help='Keep running')
 
     @api.depends('config_id')
     def _compute_log_list(self):  # storing this field because it will be access trhoug repo viewn and keep track of the list at create
@@ -607,9 +608,11 @@ class runbot_build(models.Model):
             else:  # testing/running build
                 if build.local_state == 'testing':
                     # failfast in case of docker error (triggered in database)
-                    if (not build.local_result or build.local_result == 'ok') and build.triggered_result:
-                        build.local_result = build.triggered_result
-                        build._github_status()  # failfast
+                    if build.triggered_result:
+                        worst_result = self._get_worst_result([build.triggered_result, build.local_result])
+                        if  worst_result != build.local_result:
+                            build.local_result = build.triggered_result
+                            build._github_status()  # failfast
                 # check if current job is finished
                 if docker_is_running(build._get_docker_name()):
                     timeout = min(build.active_step.cpu_limit, int(icp.get_param('runbot.runbot_timeout', default=10000)))

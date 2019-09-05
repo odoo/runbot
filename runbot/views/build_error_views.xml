@@ -22,40 +22,60 @@
                 <field name="branch_ids" widget="many2many_tags"/>
                 <field name="repo_ids" widget="many2many_tags"/>
                 <field name="tag_ids" widget="many2many_tags"/>
+                <field name="first_seen_date"/>
+                <field name="first_seen_build_id"/>
+                <field name="last_seen_date"/>
+                <field name="last_seen_build_id"/>
               </group>
-              <field name="build_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}">
-                <tree>
-                  <field name="create_date"/>
-                  <field name="id"/>
-                  <field name="repo_id"/>
-                  <field name="branch_id"/>
-                  <field name="dest"/>
-                  <field name="build_url" widget="url" readonly="1" text="View build"/>
-                </tree>
-              </field>
-              <label for="children_build_ids" string="Linked errors builds"/>
-              <field name="children_build_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}">
-                <tree>
-                  <field name="create_date"/>
-                  <field name="id"/>
-                  <field name="repo_id"/>
-                  <field name="branch_id"/>
-                  <field name="dest"/>
-                  <field name="build_url" widget="url" readonly="1" text="View build"/>
-                </tree>
-              </field>
-              <label for="error_history_ids" string="Error history"/>
-              <field name="error_history_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}">
-                <tree>
-                  <field name="create_date"/>
-                  <field name="module_name"/>
-                  <field name="summary"/>
-                  <field name="random"/>
-                  <field name="build_count"/>
-                  <field name="responsible"/>
-                  <field name="fixing_commit"/>
-                </tree>
-              </field>
+              <notebook>
+                <page string="Builds">
+                  <field name="build_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}">
+                    <tree>
+                      <field name="create_date"/>
+                      <field name="id"/>
+                      <field name="repo_id"/>
+                      <field name="branch_id"/>
+                      <field name="dest"/>
+                      <field name="build_url" widget="url" readonly="1" text="View build"/>
+                    </tree>
+                  </field>
+                </page>
+                <page string="All Errors Builds">
+                  <field name="children_build_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}">
+                    <tree>
+                      <field name="create_date"/>
+                      <field name="id"/>
+                      <field name="repo_id"/>
+                      <field name="branch_id"/>
+                      <field name="dest"/>
+                      <field name="build_url" widget="url" readonly="1" text="View build"/>
+                    </tree>
+                  </field>
+                </page>
+                <page string="Linked Errors">
+                  <field name="child_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}">
+                    <tree>
+                      <field name="create_date"/>
+                      <field name="module_name"/>
+                      <field name="summary"/>
+                      <field name="build_count"/>
+                    </tree>
+                  </field>
+                </page>
+                <page string="Error history">
+                  <field name="error_history_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}">
+                    <tree>
+                      <field name="create_date"/>
+                      <field name="module_name"/>
+                      <field name="summary"/>
+                      <field name="random"/>
+                      <field name="build_count"/>
+                      <field name="responsible"/>
+                      <field name="fixing_commit"/>
+                    </tree>
+                  </field>
+                </page>
+              </notebook>
             </sheet>
             <div class="oe_chatter">
                 <field name="message_follower_ids" widget="mail_followers"/>
@@ -72,7 +92,8 @@
             <tree string="Errors">
                 <field name="module_name"/>
                 <field name="summary"/>
-                <field name="random"/>
+                <field name="random" string="Random"/>
+                <field name="last_seen_date" string="Last Seen"/>
                 <field name="build_count"/>
                 <field name="responsible"/>
                 <field name="fixing_commit"/>

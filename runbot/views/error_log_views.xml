@@ -74,6 +74,7 @@
           <filter string="Failed builds" name="failed_builds" domain="[('global_state', '=', 'done'), ('global_result', '=', 'ko')]"/>
           <separator/>
           <filter string="Master branches" name="master_branches" domain="[('branch_name', '=', 'master')]"/>
+          <filter string="Sticky branches" name="sticky_branches" domain="[('branch_sticky', '=', True)]"/>
         </search>
       </field>
     </record>
@@ -82,7 +83,7 @@
         <field name="name">Error Logs</field>
         <field name="res_model">runbot.error.log</field>
         <field name="view_mode">tree,form</field>
-        <field name="context">{'search_default_master_branches': True, 'search_default_failed_builds': True}</field>
+        <field name="context">{'search_default_sticky_branches': True, 'search_default_failed_builds': True}</field>
     </record>
 
     <menuitem
