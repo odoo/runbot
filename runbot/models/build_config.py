@@ -179,6 +179,7 @@ class ConfigStep(models.Model):
         return self._run_step(build, log_path)
 
     def _run_step(self, build, log_path):
+        build.log_counter = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_maxlogs', 100)
         if self.job_type == 'run_odoo':
             return self._run_odoo_run(build, log_path)
         if self.job_type == 'install_odoo':
