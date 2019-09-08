@@ -29,6 +29,28 @@ BEGIN
   IF (NEW.build_id IS NULL AND NEW.dbname IS NOT NULL AND NEW.dbname != current_database()) THEN
     NEW.build_id := split_part(NEW.dbname, '-', 1)::integer;
   END IF;
+  IF (NEW.build_id IS NOT NULL) AND (NEW.type = 'server') THEN
+    DECLARE
+        counter INTEGER;
+    BEGIN
+        UPDATE runbot_build b
+            SET log_counter = log_counter - 1
+        WHERE b.id = NEW.build_id;
+        SELECT log_counter
+        INTO counter
+        FROM runbot_build
+        WHERE runbot_build.id = NEW.build_id;
+        IF (counter = 0) THEN
+            NEW.message = 'Log limit reached (full logs are still available in the log file)';
+            NEW.level = 'SEPARATOR';
+            NEW.func = '';
+            NEW.type = 'runbot';
+            RETURN NEW;
+        ELSIF (counter < 0) THEN
+                RETURN NULL;
+        END IF;
+    END;
+  END IF;
   IF (NEW.build_id IS NOT NULL AND UPPER(NEW.level) NOT IN ('INFO', 'SEPARATOR')) THEN
     BEGIN
         UPDATE runbot_build b
