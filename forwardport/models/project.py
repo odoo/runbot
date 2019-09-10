@@ -380,6 +380,12 @@ class PullRequests(models.Model):
             owner, _ = pr.repository.fp_remote_target.split('/', 1)
             source = pr.source_id or pr
             message = source.message
+            if message:
+                message += '\n\n'
+            else:
+                message = ''
+            message += "Forward-Port-Of: %s#%s" % (source.repository.name, source.number)
+
             (h, out, err) = conflicts.get(pr) or (None, None, None)
             if h:
                 message = """Cherrypicking %s of source #%d failed with the following
@@ -407,7 +413,7 @@ In the former case, you may want to edit this PR message as well.
                         target.name,
                         ' (failed)' if has_conflicts else ''
                     ),
-                    'message': message,
+                    'body': message,
                     'head': '%s:%s' % (owner, new_branch),
                     'base': target.name,
                     'draft': has_conflicts,
