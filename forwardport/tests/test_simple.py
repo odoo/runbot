@@ -182,11 +182,15 @@ def test_straightforward_flow(env, config, make_repo, users):
         'x': '1'
     }
     assert prod.get_pr(pr2.number).comments == [
-        (users['user'], "Ping @%s, @%s" % (users['other'], users['reviewer'])),
-        (users['user'], "This forward port PR is awaiting action"),
-    ]
-    assert prod.get_pr(pr2.number).comments == [
-        (users['user'], "Ping @%s, @%s" % (users['other'], users['reviewer'])),
+        (users['user'], """\
+Ping @%s
+This PR targets c and is the last of the forward-port chain.
+
+To merge the full chain, say
+> @%s r+
+
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
+""" % (users['reviewer'], project.fp_github_name)),
         (users['user'], "This forward port PR is awaiting action"),
     ]
     with prod:
@@ -591,10 +595,12 @@ def test_empty(env, config, make_repo, users):
     env.run_crons('forwardport.reminder', 'runbot_merge.feedback_cron')
     env.run_crons('forwardport.reminder', 'runbot_merge.feedback_cron')
     failed_pr = prod.get_pr(fail_id.number)
+    # stop there (criminal scum), checking the entire message is a PITA and
+    # I'd need to look into integrating better diffing / error reporting when
+    # an re_matches doesn't match
+    ping_note = re_matches(r"Ping @%s\nCherrypicking [0-9a-z]{40} of source #%d failed" % (users['reviewer'], pr1.number))
     assert failed_pr.comments == [
-        (users['user'], 'Ping @{}, @{}'.format(
-            users['user'], users['reviewer'],
-        )),
+        (users['user'], ping_note),
         (users['user'], "This forward port PR is awaiting action"),
         (users['user'], "This forward port PR is awaiting action"),
     ]
@@ -602,13 +608,12 @@ def test_empty(env, config, make_repo, users):
     with prod:
         failed_pr.close()
     env.run_crons('forwardport.reminder', 'runbot_merge.feedback_cron')
+    # FIXME: carve out git messages as they're not necessarily stable / parseable
     assert failed_pr.comments == [
-        (users['user'], 'Ping @{}, @{}'.format(
-            users['user'], users['reviewer'],
-        )),
+        (users['user'], ping_note),
         (users['user'], "This forward port PR is awaiting action"),
         (users['user'], "This forward port PR is awaiting action"),
-    ], "should not have a third note"
+    ], "should not have a 4th note"
 
 def test_partially_empty(env, config, make_repo):
     """ Check what happens when only some commits of the PR are now empty
@@ -925,7 +930,11 @@ def test_batched(env, config, make_repo, users):
     ])
     # check that relevant users were pinged
     ping = [
-        (users['user'], "Ping @{}, @{}".format(friendo['user'], users['reviewer'])),
+        (users['user'], """\
+This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
+
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
+"""),
     ]
     pr_remote_1b = main1.get_pr(pr1b.number)
     pr_remote_2b = main2.get_pr(pr2b.number)
@@ -1021,9 +1030,11 @@ class TestClosing:
         assert env['runbot_merge.pull_requests'].search([], order='number') == pr0 | pr1,\
             "closing the PR should suppress the FP sequence"
         assert prod.get_pr(pr1.number).comments == [
-            (users['user'], 'Ping @{}, @{}'.format(
-                users['user'], users['reviewer'],
-            ))
+            (users['user'], """\
+This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
+
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
+""")
         ]
 
     def test_closing_after_fp(self, env, config, make_repo):

@@ -387,24 +387,6 @@ class PullRequests(models.Model):
             message += "Forward-Port-Of: %s#%s" % (source.repository.name, source.number)
 
             (h, out, err) = conflicts.get(pr) or (None, None, None)
-            if h:
-                message = """Cherrypicking %s of source #%d failed with the following
-
-stdout:
-```
-%s
-```
-
-stderr:
-```
-%s
-```
-
-Either perform the forward-port manually (and push to this branch, proceeding
-as usual) or close this PR (maybe?).
-
-In the former case, you may want to edit this PR message as well.
-""" % (h, source.number, out, err)
 
             r = requests.post(
                 'https://api.github.com/repos/{}/pulls'.format(pr.repository.name), json={
@@ -433,11 +415,49 @@ In the former case, you may want to edit this PR message as well.
                 # only link to previous PR of sequence if cherrypick passed
                 'parent_id': pr.id if not has_conflicts else False,
             })
-            assignees = (new_pr.source_id.author | new_pr.source_id.reviewed_by).mapped('github_login')
+
+            assignees = (new_pr.source_id.author | new_pr.source_id.reviewed_by) \
+                .filtered(lambda p: new_pr.source_id._pr_acl(p).is_reviewer) \
+                .mapped('github_login')
+            ping = "Ping %s" % ', '.join('@' + login for login in assignees if login)
+            if h:
+                sout = serr = ''
+                if out.strip():
+                    sout = "\nstdout:\n```\n%s\n```\n" % out
+                if err.strip():
+                    serr = "\nstderr:\n```\n%s\n```\n" % err
+
+                message = ping + """
+Cherrypicking %s of source #%d failed
+%s%s
+Either perform the forward-port manually (and push to this branch, proceeding as usual) or close this PR (maybe?).
+
+In the former case, you may want to edit this PR message as well.
+""" % (h, source.number, sout, serr)
+            elif base.limit_id == target:
+                ancestors = "".join(
+                    "* %s#%d\n" % (p.repository.name, p.number)
+                    for p in pr._iter_ancestors()
+                    if p.parent_id and p.parent_id != source
+                )
+                message = ping + """
+This PR targets %s and is the last of the forward-port chain%s
+%s
+To merge the full chain, say
+> @%s r+
+
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
+""" % (target.name, 'containing:' if ancestors else '.', ancestors, pr.repository.project_id.fp_github_name)
+            else:
+                message = """\
+This PR targets %s and is part of the forward-port chain. Further PRs will be created up to %s.
+
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
+""" % (target.name, base.limit_id.name)
             self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': new_pr.repository.id,
                 'pull_request': new_pr.number,
-                'message': "Ping %s" % ', '.join('@' + login for login in assignees if login),
+                'message': message,
             })
             # not great but we probably want to avoid the risk of the webhook
             # creating the PR from under us. There's still a "hole" between
