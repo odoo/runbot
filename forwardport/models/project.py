@@ -460,10 +460,13 @@ In the former case, you may want to edit this PR message as well.
         """
         source = self._get_local_directory()
         # update all the branches & PRs
+        _logger.info("Update %s", source._directory)
         source.with_params('gc.pruneExpire=1.day.ago').fetch('-p', 'origin')
         # FIXME: check that pr.head is pull/{number}'s head instead?
         source.cat_file(e=self.head)
         # create working copy
+        _logger.info("Create working copy to forward-port %s:%d to %s",
+                     self.repository.name, self.number, target_branch.name)
         working_copy = source.clone(
             cleanup.enter_context(tempfile.TemporaryDirectory()),
             branch=target_branch.name
@@ -480,6 +483,7 @@ In the former case, you may want to edit this PR message as well.
                 p=project_id
             )
         )
+        _logger.info("Create FP branch %s", fp_branch_name)
         working_copy.checkout(b=fp_branch_name)
 
         root = self._get_root()
@@ -580,6 +584,7 @@ stderr:
         if repo_dir.is_dir():
             return git(repo_dir)
         else:
+            _logger.info("Cloning out %s to %s", self.repository.name, repo_dir)
             subprocess.run([
                 'git', 'clone', '--bare',
                 'https://{}:{}@github.com/{}'.format(
@@ -661,7 +666,7 @@ class Repo:
 
     def clone(self, to, branch=None):
         self._run(
-            'git', 'clone', '-s',
+            'clone', '-s',
             *([] if branch is None else ['-b', branch]),
             self._directory, to,
         )
