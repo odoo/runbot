@@ -493,6 +493,7 @@ In the former case, you may want to edit this PR message as well.
         working_copy.checkout(b=fp_branch_name)
 
         root = self._get_root()
+        working_copy.branch(root.target.name, 'origin/' + root.target.name)
         try:
             root._cherry_pick(working_copy)
         except CherrypickError as e:
@@ -594,7 +595,7 @@ stderr:
         :returns: (PR target, PR branch)
         """
         ancestor_branch = 'origin/pull/%d' % self.number
-        source_target = 'origin/%s' % self.target.name
+        source_target = self.target.name
         return source_target, ancestor_branch
 
     def _get_local_directory(self):
@@ -687,7 +688,7 @@ class Repo:
 
     def clone(self, to, branch=None):
         self._run(
-            'clone', '-s',
+            'clone',
             *([] if branch is None else ['-b', branch]),
             self._directory, to,
         )
