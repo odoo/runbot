@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import collections
-import re
+import pprint
 import sys
 import time
 from operator import itemgetter
@@ -328,12 +328,12 @@ def test_update_pr(env, config, make_repo):
     assert prod.read_tree(prod.commit(pr2.head)) == {
         'f': 'c',
         'g': 'a',
-        'h': '''<<<<<<< ours
+        'h': re_matches(r'''<<<<<<< HEAD
 a
 =======
 0
->>>>>>> theirs
-''',
+>>>>>>> [0-9a-f]{7,}(...)? temp
+'''),
     }
 
 def test_conflict(env, config, make_repo):
@@ -378,12 +378,12 @@ def test_conflict(env, config, make_repo):
     assert pr1.state == 'opened'
     assert prod.read_tree(prod.commit(pr1.head)) == {
         'f': 'c',
-        'g': '''<<<<<<< ours
+        'g': re_matches(r'''<<<<<<< HEAD
 a
 =======
 xxx
->>>>>>> theirs
-''',
+>>>>>>> [0-9a-f]{7,}(...)? temp
+'''),
     }
 
     # check that CI passing does not create more PRs
@@ -441,6 +441,77 @@ xxx
         'g': 'xxx',
         'h': 'a',
     }
+
+def test_conflict_deleted(env, config, make_repo):
+    prod, other = make_basic(env, config, make_repo)
+    # remove f from b
+    with prod:
+        prod.make_commits(
+            'b', Commit('33', tree={'g': 'c'}, reset=True),
+            ref='heads/b'
+        )
+
+    # generate a conflict: update f in a
+    with prod:
+        [p_0] = prod.make_commits(
+            'a', Commit('p_0', tree={'f': 'xxx'}),
+            ref='heads/conflicting'
+        )
+        pr = prod.make_pr(target='a', head='conflicting')
+        prod.post_status(p_0, 'success', 'legal/cla')
+        prod.post_status(p_0, 'success', 'ci/runbot')
+        pr.post_comment('hansen r+', config['role_reviewer']['token'])
+
+    env.run_crons()
+    with prod:
+        prod.post_status('staging.a', 'success', 'legal/cla')
+        prod.post_status('staging.a', 'success', 'ci/runbot')
+
+    env.run_crons()
+    # wait a bit for PR webhook... ?
+    time.sleep(5)
+    env.run_crons()
+
+    # should have created a new PR
+    pr0, pr1 = env['runbot_merge.pull_requests'].search([], order='number')
+    # but it should not have a parent
+    assert not pr1.parent_id
+    assert pr1.source_id == pr0
+    assert prod.read_tree(prod.commit('b')) == {
+        'g': 'c',
+    }
+    assert pr1.state == 'opened'
+    # NOTE: no actual conflict markers because pr1 essentially adds f de-novo
+    assert prod.read_tree(prod.commit(pr1.head)) == {
+        'f': 'xxx',
+        'g': 'c',
+    }
+
+    # check that CI passing does not create more PRs
+    with prod:
+        validate_all([prod], [pr1.head])
+    env.run_crons()
+    time.sleep(5)
+    env.run_crons()
+    assert pr0 | pr1 == env['runbot_merge.pull_requests'].search([], order='number'),\
+        "CI passing should not have resumed the FP process on a conflicting / draft PR"
+
+    # fix the PR, should behave as if this were a normal PR
+    get_pr = prod.get_pr(pr1.number)
+    pr_repo, pr_ref = get_pr.branch
+    with pr_repo:
+        pr_repo.make_commits(
+            # if just given a branch name, goes and gets it from pr_repo whose
+            # "b" was cloned before that branch got rolled back
+            prod.commit('b').id,
+            Commit('f should indeed be removed', tree={'g': 'c'}, reset=True),
+            ref='heads/%s' % pr_ref
+        )
+    env.run_crons()
+    assert prod.read_tree(prod.commit(pr1.head)) == {
+        'g': 'c',
+    }
+    assert pr1.state == 'opened', "state should be open still"
 
 def test_empty(env, config, make_repo, users):
     """ Cherrypick of an already cherrypicked (or separately implemented)

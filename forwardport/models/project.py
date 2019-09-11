@@ -496,13 +496,28 @@ In the former case, you may want to edit this PR message as well.
         try:
             root._cherry_pick(working_copy)
         except CherrypickError as e:
-            # apply the diff of the PR to the target
-            # in git diff, "A...B" selects the bits of B not in A
-            # (which is the other way around from gitrevisions(7)
-            # because git)
-            diff = working_copy.stdout().diff('%s...%s' % root._reference_branches()).stdout
-            # apply probably fails (because conflict, we don't care
-            working_copy.with_config(input=diff).apply('-3', '-')
+            # using git diff | git apply -3 to get the entire conflict set
+            # turns out to not work correctly: in case files have been moved
+            # / removed (which turns out to be a common source of conflicts
+            # when forward-porting) it'll just do nothing to the working copy
+            # so the "conflict commit" will be empty
+            # switch to a squashed-pr branch
+            root_base, root_branch = root._reference_branches()
+            working_copy.checkout('-bsquashed', root_branch)
+            root_commits = list(
+                working_copy.lazy().stdout()
+                    .rev_list('--reverse', '%s..%s' % (root_base, root_branch))
+                    .stdout
+            )
+            # squash the PR to a single commit
+            working_copy.reset('--soft', 'HEAD~%d' % len(root_commits))
+            working_copy.commit(a=True, message="temp")
+            squashed = working_copy.stdout().rev_parse('HEAD').stdout.strip().decode()
+
+            # switch back to the PR branch
+            working_copy.checkout(fp_branch_name)
+            # cherry-pick the squashed commit
+            working_copy.with_config(check=False).cherry_pick(squashed)
 
             working_copy.commit(
                 a=True, allow_empty=True,
