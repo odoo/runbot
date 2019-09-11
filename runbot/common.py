@@ -44,7 +44,7 @@ class Commit():
 
 
 def fqdn():
-    return socket.getfqdn()
+    return os.environ.get('RUNBOTNAME', socket.getfqdn())
 
 
 def time2str(t):
