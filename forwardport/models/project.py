@@ -537,10 +537,10 @@ stderr:
         rev_list = working_copy.lazy().stdout()\
             .rev_list('--reverse', '%s..%s' % commits_range)
         commits = list(rev_list.stdout)
-        logger.info("%d commit(s) on %s", len(commits), h.decode())
+        logger.info("%s: %d commits in %s..%s on %s", self, len(commits), commits_range[0], commits_range[1], h.decode())
         for commit in commits:
             commit = commit.decode().strip()
-            r = working_copy.with_config(
+            r = working_copy.with_params('merge.renamelimit=0').with_config(
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=False,
