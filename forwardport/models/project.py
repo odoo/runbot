@@ -416,7 +416,7 @@ In the former case, you may want to edit this PR message as well.
                     'body': message,
                     'head': '%s:%s' % (owner, new_branch),
                     'base': target.name,
-                    'draft': has_conflicts,
+                    #'draft': has_conflicts, draft mode is not supported on private repos so remove it (again)
                 }, headers={
                     'Accept': 'application/vnd.github.shadow-cat-preview+json',
                     'Authorization': 'token %s' % pr.repository.project_id.fp_github_token,
