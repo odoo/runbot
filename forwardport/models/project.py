@@ -649,6 +649,10 @@ stderr:
             ], check=True)
             # add PR branches as local but namespaced (?)
             repo = git(repo_dir)
+            # bare repos don't have a fetch spec by default (!) so adding one
+            # removes the default behaviour and stops fetching the base
+            # branches unless we add an explicit fetch spec for them
+            repo.config('--add', 'remote.origin.fetch', '+refs/heads/*:refs/heads/*')
             repo.config('--add', 'remote.origin.fetch', '+refs/pull/*/head:refs/heads/pull/*')
             return repo
 
