@@ -303,8 +303,10 @@ class PullRequests(models.Model):
         ), None)
 
     def _commits_lazy(self):
+        s = requests.Session()
+        s.headers['Authorization'] = 'token %s' % self.repository.project_id.fp_github_token
         for page in itertools.count(1):
-            r = requests.get('https://api.github.com/repos/{}/pulls/{}/commits'.format(
+            r = s.get('https://api.github.com/repos/{}/pulls/{}/commits'.format(
                 self.repository.name,
                 self.number
             ), params={'page': page})
