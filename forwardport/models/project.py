@@ -18,16 +18,16 @@ import json
 import logging
 import os
 import pathlib
+import re
 import subprocess
 import tempfile
 
-import re
 import requests
 
-from odoo.exceptions import UserError
-from odoo.tools.appdirs import user_cache_dir
-
 from odoo import _, models, fields, api
+from odoo.exceptions import UserError
+from odoo.tools import topological_sort
+from odoo.tools.appdirs import user_cache_dir
 from odoo.addons.runbot_merge import utils
 from odoo.addons.runbot_merge.models.pull_requests import RPLUS
 
@@ -302,6 +302,32 @@ class PullRequests(models.Model):
             if branch.fp_enabled
         ), None)
 
+    def _commits_lazy(self):
+        for page in itertools.count(1):
+            r = requests.get('https://api.github.com/repos/{}/pulls/{}/commits'.format(
+                self.repository.name,
+                self.number
+            ), params={'page': page})
+            r.raise_for_status()
+            yield from r.json()
+            if not r.links.get('next'):
+                return
+
+    def commits(self):
+        """ Returns a PR's commits oldest first (that's what GH does &
+        is what we want)
+        """
+        commits = list(self._commits_lazy())
+        # map shas to the position the commit *should* have
+        idx =  {
+            c: i
+            for i, c in enumerate(topological_sort({
+                c['sha']: [p['sha'] for p in c['parents']]
+                for c in commits
+            }))
+        }
+        return sorted(commits, key=lambda c: idx[c['sha']])
+
     def _iter_descendants(self):
         pr = self
         while True:
@@ -513,7 +539,6 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         working_copy.checkout(b=fp_branch_name)
 
         root = self._get_root()
-        working_copy.branch(root.target.name, 'origin/' + root.target.name)
         try:
             root._cherry_pick(working_copy)
         except CherrypickError as e:
@@ -523,22 +548,20 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
             # when forward-porting) it'll just do nothing to the working copy
             # so the "conflict commit" will be empty
             # switch to a squashed-pr branch
-            root_base, root_branch = root._reference_branches()
+            root_branch = 'origin/pull/%d' % root.number
             working_copy.checkout('-bsquashed', root_branch)
-            root_commits = list(
-                working_copy.lazy().stdout()
-                    .rev_list('--reverse', '%s..%s' % (root_base, root_branch))
-                    .stdout
-            )
-            # squash the PR to a single commit
-            working_copy.reset('--soft', 'HEAD~%d' % len(root_commits))
+            root_commits = root.commits()
+
+            # squash to a single commit: reset to the first parent of the pr's
+            # first commit
+            working_copy.reset('--soft', root_commits[0]['parents'][0]['sha'])
             working_copy.commit(a=True, message="temp")
             squashed = working_copy.stdout().rev_parse('HEAD').stdout.strip().decode()
 
             # switch back to the PR branch
             working_copy.checkout(fp_branch_name)
             # cherry-pick the squashed commit
-            working_copy.with_config(check=False).cherry_pick(squashed)
+            working_copy.with_params('merge.renamelimit=0').with_config(check=False).cherry_pick(squashed)
 
             working_copy.commit(
                 a=True, allow_empty=True,
@@ -565,31 +588,25 @@ stderr:
         # original head so we can reset
         h = working_copy.stdout().rev_parse('HEAD').stdout
 
-        commits_range = self._reference_branches()
-        # need to cherry-pick commit by commit because `-n` doesn't yield
-        # back control on each op. `-e` with VISUAL=false kinda works but
-        # doesn't seem to provide a good way to know when we're done
-        # cherrypicking
-        rev_list = working_copy.lazy().stdout()\
-            .rev_list('--reverse', '%s..%s' % commits_range)
-        commits = list(rev_list.stdout)
-        logger.info("%s: %d commits in %s..%s on %s", self, len(commits), commits_range[0], commits_range[1], h.decode())
+        commits = self.commits()
+        logger.info("%s: %s commits in %s", self, len(commits), h.decode())
+        for c in commits:
+            logger.debug('- %s (%s)', c['sha'], c['commit']['message'])
+
         for commit in commits:
-            commit = commit.decode().strip()
+            commit_sha = commit['sha']
             r = working_copy.with_params('merge.renamelimit=0').with_config(
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=False,
-            ).cherry_pick(commit)
+            ).cherry_pick(commit_sha)
 
             if r.returncode: # pick failed, reset and bail
-                logger.info("%s: failed", commit)
+                logger.info("%s: failed", commit_sha)
                 working_copy.reset('--hard', h.decode().strip())
-                raise CherrypickError(commit, r.stdout.decode(), r.stderr.decode())
+                raise CherrypickError(commit_sha, r.stdout.decode(), r.stderr.decode())
 
-            original_msg = working_copy.stdout().show('-s', '--format=%B', commit).stdout.decode()
-
-            msg = self._parse_commit_message(original_msg)
+            msg = self._parse_commit_message(commit['commit']['message'])
 
             # original signed-off-er should be retained but didn't necessarily
             # sign off here, so convert signed-off-by to something else
@@ -601,22 +618,14 @@ stderr:
                     for v in sob
                 )
             # write the *merged* commit as "original", not the PR's
-            msg.headers['x-original-commit'] = cmap.get(commit, commit)
+            msg.headers['x-original-commit'] = cmap.get(commit_sha, commit_sha)
 
             # replace existing commit message with massaged one
             working_copy\
                 .with_config(input=str(msg).encode())\
                 .commit(amend=True, file='-')
             new = working_copy.stdout().rev_parse('HEAD').stdout.decode()
-            logger.info('%s: success -> %s', commit, new)
-
-    def _reference_branches(self):
-        """
-        :returns: (PR target, PR branch)
-        """
-        ancestor_branch = 'origin/pull/%d' % self.number
-        source_target = self.target.name
-        return source_target, ancestor_branch
+            logger.info('%s: success -> %s', commit_sha, new)
 
     def _get_local_directory(self):
         repos_dir = pathlib.Path(user_cache_dir('forwardport'))
