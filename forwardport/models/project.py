@@ -588,25 +588,39 @@ stderr:
         cmap = json.loads(self.commits_map)
 
         # original head so we can reset
-        h = working_copy.stdout().rev_parse('HEAD').stdout
+        original_head = working_copy.stdout().rev_parse('HEAD').stdout.decode().strip()
 
         commits = self.commits()
-        logger.info("%s: %s commits in %s", self, len(commits), h.decode())
+        logger.info("%s: %s commits in %s", self, len(commits), original_head)
         for c in commits:
             logger.debug('- %s (%s)', c['sha'], c['commit']['message'])
 
         for commit in commits:
             commit_sha = commit['sha']
-            r = working_copy.with_params('merge.renamelimit=0').with_config(
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=False,
-            ).cherry_pick(commit_sha)
+            conf = working_copy.with_config(stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+            # first try with default / low renamelimit
+            r = conf.cherry_pick(commit_sha)
+            _logger.debug("Cherry-picked %s: %s\n%s\n%s", commit_sha, r.returncode, r.stdout.decode(), r.stderr.decode())
+            if r.returncode:
+                # if it failed, retry with high renamelimit
+                working_copy.reset('--hard', original_head)
+                r = conf.with_params('merge.renamelimit=0').cherry_pick(commit_sha)
+                _logger.debug("Cherry-picked %s (renamelimit=0): %s\n%s\n%s", commit_sha, r.returncode, r.stdout.decode(), r.stderr.decode())
 
             if r.returncode: # pick failed, reset and bail
                 logger.info("%s: failed", commit_sha)
-                working_copy.reset('--hard', h.decode().strip())
-                raise CherrypickError(commit_sha, r.stdout.decode(), r.stderr.decode())
+                working_copy.reset('--hard', original_head)
+                raise CherrypickError(
+                    commit_sha,
+                    r.stdout.decode(),
+                    # Don't include the inexact rename detection spam in the
+                    # feedback, it's useless. There seems to be no way to
+                    # silence these messages.
+                    '\n'.join(
+                        line for line in r.stderr.decode().splitlines()
+                        if not line.startswith('Performing inexact rename detection')
+                    )
+                )
 
             msg = self._parse_commit_message(commit['commit']['message'])
 
