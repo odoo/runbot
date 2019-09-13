@@ -462,7 +462,7 @@ Either perform the forward-port manually (and push to this branch, proceeding as
 
 In the former case, you may want to edit this PR message as well.
 """ % (h, source.number, sout, serr)
-            elif base.limit_id == target:
+            elif base._find_next_target(new_pr) is None:
                 ancestors = "".join(
                     "* %s#%d\n" % (p.repository.name, p.number)
                     for p in pr._iter_ancestors()

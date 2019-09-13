@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import collections
-import pprint
 import sys
 import time
 from operator import itemgetter
@@ -425,8 +424,6 @@ xxx
         get_pr.post_comment('hansen r+', config['role_reviewer']['token'])
     env.run_crons()
 
-    print(f"check staging of {pr1} ({pr1.staging_id})", file=sys.stderr)
-    print(f'\t{pr1.batch_ids.read(["id", "active", "staging_id"])}', file=sys.stderr)
     assert pr1.staging_id
     with prod:
         prod.post_status('staging.b', 'success', 'legal/cla')
@@ -788,6 +785,48 @@ def test_limit_disable(env, config, make_repo, users, enabled):
         (users['user'], "Forward-porting to 'c'."),
     }
 
+def test_default_disabled(env, config, make_repo, users):
+    """ If the default limit is disabled, it should still be the default
+    limit but the ping message should be set on the actual last FP (to the
+    last non-deactivated target)
+    """
+    prod, other = make_basic(env, config, make_repo)
+    branch_c = env['runbot_merge.branch'].search([('name', '=', 'c')])
+    branch_c.fp_target = False
+
+    with prod:
+        [c] = prod.make_commits('a', Commit('c', tree={'0': '0'}), ref='heads/branch0')
+        pr = prod.make_pr(target='a', head='branch0')
+        prod.post_status(c, 'success', 'legal/cla')
+        prod.post_status(c, 'success', 'ci/runbot')
+        pr.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+
+    assert env['runbot_merge.pull_requests'].search([]).limit_id == branch_c
+
+    with prod:
+        prod.post_status('staging.a', 'success', 'legal/cla')
+        prod.post_status('staging.a', 'success', 'ci/runbot')
+    env.run_crons()
+
+    p1, p2 = env['runbot_merge.pull_requests'].search([], order='number')
+    assert p1.number == pr.number
+    pr2 = prod.get_pr(p2.number)
+
+    cs = pr2.comments
+    assert len(cs) == 1
+    assert pr2.comments == [
+        (users['user'], """\
+Ping @%s
+This PR targets b and is the last of the forward-port chain.
+
+To merge the full chain, say
+> @%s r+
+
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
+""" % (users['reviewer'], users['user'])),
+    ]
+
 # reviewer = of the FP sequence, the original PR is always reviewed by `user`
 # set as reviewer
 Case = collections.namedtuple('Case', 'author reviewer delegate success')
@@ -856,7 +895,6 @@ def test_access_rights(env, config, make_repo, users, author, reviewer, delegate
             token=config['role_' + reviewer]['token']
         )
     env.run_crons()
-    print(f"check staging of {pr1} ({pr1.staging_id}), {pr2} ({pr2.staging_id})", file=sys.stderr)
     if success:
         assert pr1.staging_id and pr2.staging_id,\
             "%s should have approved FP of PRs by %s" % (reviewer, author)
@@ -957,10 +995,6 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     assert pr1a.number == pr1.number
     assert pr2a.number == pr2.number
     assert pr1a.state == pr2a.state == 'merged'
-
-    print('PRA label', (pr1a | pr2a).mapped('label'))
-    print('PRB label', (pr1b | pr2b).mapped('label'))
-    print('PRC label', (pr1c | pr2c).mapped('label'))
 
     assert pr1b.label == pr2b.label, "batched source should yield batched FP"
     assert pr1c.label == pr2c.label, "batched source should yield batched FP"
@@ -1121,7 +1155,6 @@ class TestRecognizeCommands:
             sPeNgBaB(botname),
         ]
 
-        print([repr(o) for o in [a, c, pr_id, pr_id.limit_id]])
         for n in names:
             assert pr_id.limit_id == c
             with repo:
