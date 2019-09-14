@@ -44,6 +44,18 @@
                   <field name="build_url" widget="url" readonly="1" text="View build"/>
                 </tree>
               </field>
+              <label for="error_history_ids" string="Error history"/>
+              <field name="error_history_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}">
+                <tree>
+                  <field name="create_date"/>
+                  <field name="module_name"/>
+                  <field name="summary"/>
+                  <field name="random"/>
+                  <field name="build_count"/>
+                  <field name="responsible"/>
+                  <field name="fixing_commit"/>
+                </tree>
+              </field>
             </sheet>
             <div class="oe_chatter">
                 <field name="message_follower_ids" widget="mail_followers"/>
