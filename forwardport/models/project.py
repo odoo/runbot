@@ -522,7 +522,15 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         _logger.info("Create working copy to forward-port %s:%d to %s",
                      self.repository.name, self.number, target_branch.name)
         working_copy = source.clone(
-            cleanup.enter_context(tempfile.TemporaryDirectory()),
+            cleanup.enter_context(
+                tempfile.TemporaryDirectory(
+                    prefix='%s:%d-to-%s' % (
+                        self.repository.name,
+                        self.number,
+                        target_branch.name
+                    ),
+                    dir=user_cache_dir('forwardport')
+                )),
             branch=target_branch.name
         )
         project_id = self.repository.project_id
