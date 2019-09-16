@@ -197,7 +197,7 @@ class PullRequests(models.Model):
                         pr.state = newstate
                         pr.reviewed_by = author
                         # TODO: logging & feedback
-            elif token == 'up' and next(tokens, None) == 'to' and self._pr_acl(author).is_reviewer:
+            elif token == 'up' and next(tokens, None) == 'to' and self._pr_acl(author).is_author:
                 limit = next(tokens, None)
                 if not limit:
                     msg = "Please provide a branch to forward-port to."
