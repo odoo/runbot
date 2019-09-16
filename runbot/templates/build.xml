@@ -209,6 +209,8 @@
                                   <t t-if='dep.closest_branch_id'> from branch <t t-esc="dep.closest_branch_id.name"/></t>
                                   <br/>
                                 </t>
+                                Branch: <span id="branchclp"><t t-esc="build.branch_id.branch_name"/></span>
+                                <a href="#" class="clipbtn octicon octicon-clippy" data-clipboard-target="#branchclp" title="Copy branch name to clipboard"/><br/>
                                 Build host: <t t-esc="build.real_build.host"/><br/>
                             </td>
                             <td t-if="build.children_ids">
