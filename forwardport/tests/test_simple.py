@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 import collections
-import sys
+from datetime import datetime, timedelta
 import time
 from operator import itemgetter
 
 import pytest
 
 from utils import *
+
+FAKE_PREV_WEEK = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
 
 # need:
 # * an odoo server
@@ -163,7 +165,14 @@ def test_straightforward_flow(env, config, make_repo, users):
         prod.post_status(pr1.head, 'success', 'legal/cla')
 
     env.run_crons()
-    env.run_crons('forwardport.reminder', 'runbot_merge.feedback_cron')
+    env.run_crons('forwardport.reminder', 'runbot_merge.feedback_cron', context={'forwardport_updated_before': FAKE_PREV_WEEK})
+
+    assert pr.comments == [
+        (users['reviewer'], 'hansen r+ rebase-ff'),
+        (users['user'], 'Merge method set to rebase and fast-forward'),
+        (users['user'], re_matches(r'Merged at [0-9a-f]{40}, thanks!')),
+        (users['user'], 'This pull request has forward-port PRs awaiting action'),
+    ]
 
     pr0_, pr1_, pr2 = env['runbot_merge.pull_requests'].search([], order='number')
     assert pr0_ == pr0
@@ -190,7 +199,6 @@ To merge the full chain, say
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """ % (users['reviewer'], project.fp_github_name)),
-        (users['user'], "This forward port PR is awaiting action"),
     ]
     with prod:
         prod.post_status(pr2.head, 'success', 'ci/runbot')
@@ -589,28 +597,25 @@ def test_empty(env, config, make_repo, users):
     assert env['runbot_merge.pull_requests'].search([], order='number') == prs
 
     # check reminder
-    env.run_crons('forwardport.reminder', 'runbot_merge.feedback_cron')
-    env.run_crons('forwardport.reminder', 'runbot_merge.feedback_cron')
-    failed_pr = prod.get_pr(fail_id.number)
-    # stop there (criminal scum), checking the entire message is a PITA and
-    # I'd need to look into integrating better diffing / error reporting when
-    # an re_matches doesn't match
-    ping_note = re_matches(r"Ping @%s\nCherrypicking [0-9a-z]{40} of source #%d failed" % (users['reviewer'], pr1.number))
-    assert failed_pr.comments == [
-        (users['user'], ping_note),
-        (users['user'], "This forward port PR is awaiting action"),
-        (users['user'], "This forward port PR is awaiting action"),
-    ]
+    env.run_crons('forwardport.reminder', 'runbot_merge.feedback_cron', context={'forwardport_updated_before': FAKE_PREV_WEEK})
+    env.run_crons('forwardport.reminder', 'runbot_merge.feedback_cron', context={'forwardport_updated_before': FAKE_PREV_WEEK})
+
+    assert pr1.comments == [
+        (users['reviewer'], 'hansen r+'),
+        (users['user'], re_matches(r'Merged at [0-9a-f]{40}, thanks!')),
+        (users['user'], 'This pull request has forward-port PRs awaiting action'),
+        (users['user'], 'This pull request has forward-port PRs awaiting action'),
+    ], "each cron run should trigger a new message on the ancestor"
     # check that this stops if we close the PR
     with prod:
-        failed_pr.close()
-    env.run_crons('forwardport.reminder', 'runbot_merge.feedback_cron')
-    # FIXME: carve out git messages as they're not necessarily stable / parseable
-    assert failed_pr.comments == [
-        (users['user'], ping_note),
-        (users['user'], "This forward port PR is awaiting action"),
-        (users['user'], "This forward port PR is awaiting action"),
-    ], "should not have a 4th note"
+        prod.get_pr(fail_id.number).close()
+    env.run_crons('forwardport.reminder', 'runbot_merge.feedback_cron', context={'forwardport_updated_before': FAKE_PREV_WEEK})
+    assert pr1.comments == [
+        (users['reviewer'], 'hansen r+'),
+        (users['user'], re_matches(r'Merged at [0-9a-f]{40}, thanks!')),
+        (users['user'], 'This pull request has forward-port PRs awaiting action'),
+        (users['user'], 'This pull request has forward-port PRs awaiting action'),
+    ]
 
 def test_partially_empty(env, config, make_repo):
     """ Check what happens when only some commits of the PR are now empty

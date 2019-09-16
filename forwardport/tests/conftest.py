@@ -566,12 +566,12 @@ class Environment:
     def __getitem__(self, name):
         return Model(self, name)
 
-    def run_crons(self, *xids):
+    def run_crons(self, *xids, **kw):
         crons = xids or DEFAULT_CRONS
         for xid in crons:
             _, model, cron_id = self('ir.model.data', 'xmlid_lookup', xid)
             assert model == 'ir.cron', "Expected {} to be a cron, got {}".format(xid, model)
-            self('ir.cron', 'method_direct_trigger', [cron_id])
+            self('ir.cron', 'method_direct_trigger', [cron_id], **kw)
         # sleep for some time as a lot of crap may have happened (?)
         wait_for_hook()
 
