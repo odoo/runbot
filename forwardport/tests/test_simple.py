@@ -191,14 +191,14 @@ def test_straightforward_flow(env, config, make_repo, users):
     }
     assert prod.get_pr(pr2.number).comments == [
         (users['user'], """\
-Ping @%s
+Ping @%s, @%s
 This PR targets c and is the last of the forward-port chain.
 
 To merge the full chain, say
 > @%s r+
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
-""" % (users['reviewer'], project.fp_github_name)),
+""" % (users['other'], users['reviewer'], project.fp_github_name)),
     ]
     with prod:
         prod.post_status(pr2.head, 'success', 'ci/runbot')
@@ -822,21 +822,21 @@ def test_default_disabled(env, config, make_repo, users):
     assert len(cs) == 1
     assert pr2.comments == [
         (users['user'], """\
-Ping @%s
+Ping @%s, @%s
 This PR targets b and is the last of the forward-port chain.
 
 To merge the full chain, say
 > @%s r+
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
-""" % (users['reviewer'], users['user'])),
+""" % (users['user'], users['reviewer'], users['user'])),
     ]
 
 # reviewer = of the FP sequence, the original PR is always reviewed by `user`
 # set as reviewer
 Case = collections.namedtuple('Case', 'author reviewer delegate success')
 ACL = [
-    Case('reviewer', 'reviewer', None, False),
+    Case('reviewer', 'reviewer', None, True),
     Case('reviewer', 'self_reviewer', None, False),
     Case('reviewer', 'other', None, False),
     Case('reviewer', 'other', 'other', True),
@@ -848,7 +848,7 @@ ACL = [
 
     Case('other', 'reviewer', None, True),
     Case('other', 'self_reviewer', None, False),
-    Case('other', 'other', None, False),
+    Case('other', 'other', None, True),
     Case('other', 'other', 'other', True),
 ]
 @pytest.mark.parametrize(Case._fields, ACL)

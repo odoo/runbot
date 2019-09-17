@@ -443,10 +443,16 @@ class PullRequests(models.Model):
                 # only link to previous PR of sequence if cherrypick passed
                 'parent_id': pr.id if not has_conflicts else False,
             })
+            # delegate original author on merged original PR & on new PR so
+            # they can r+ the forward ports (via mergebot or forwardbot)
+            source.author.write({
+                'delegate_reviewer': [
+                    (4, source.id, False),
+                    (4, new_pr.id, False),
+                ]
+            })
 
-            assignees = (new_pr.source_id.author | new_pr.source_id.reviewed_by) \
-                .filtered(lambda p: new_pr.source_id._pr_acl(p).is_reviewer) \
-                .mapped('github_login')
+            assignees = (source.author | source.reviewed_by).mapped('github_login')
             ping = "Ping %s" % ', '.join('@' + login for login in assignees if login)
             if h:
                 sout = serr = ''
