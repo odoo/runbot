@@ -222,13 +222,23 @@ class PullRequests(models.Model):
 
     def _validate(self, statuses):
         _logger = logging.getLogger(__name__).getChild('forwardport.next')
-        super()._validate(statuses)
+        failed = super()._validate(statuses)
         # if the PR has a parent and is CI-validated, enqueue the next PR
         for pr in self:
             _logger.info('Checking if forward-port %s (%s)', pr, pr.number)
-            if not pr.parent_id or pr.state not in ('validated', 'ready'):
-                _logger.info('-> no parent or wrong state (%s)', pr.state)
+            if not pr.source_id:
+                _logger.info('-> no parent (%s)', pr)
                 continue
+            if pr.state not in ['validated', 'ready']:
+                _logger.info('-> wrong state (%s)', pr.state)
+                if pr in failed:
+                    self.env['runbot_merge.pull_requests.feedback'].create({
+                        'repository': pr.repository.id,
+                        'pull_request': pr.number,
+                        'message': pr.source_id._pingline() + '\n\nCI failed on this forward-port PR'
+                    })
+                continue
+
             # if it already has a child, bail
             if self.search_count([('parent_id', '=', self.id)]):
                 _logger.info('-> already has a child')
@@ -262,6 +272,7 @@ class PullRequests(models.Model):
                 'batch_id': batch.id,
                 'source': 'fp',
             })
+        return failed
 
     def _forward_port_sequence(self):
         # risk: we assume disabled branches are still at the correct location
@@ -452,8 +463,6 @@ class PullRequests(models.Model):
                 ]
             })
 
-            assignees = (source.author | source.reviewed_by).mapped('github_login')
-            ping = "Ping %s" % ', '.join('@' + login for login in assignees if login)
             if h:
                 sout = serr = ''
                 if out.strip():
@@ -461,7 +470,7 @@ class PullRequests(models.Model):
                 if err.strip():
                     serr = "\nstderr:\n```\n%s\n```\n" % err
 
-                message = ping + """
+                message = source._pingline() + """
 Cherrypicking %s of source #%d failed
 %s%s
 Either perform the forward-port manually (and push to this branch, proceeding as usual) or close this PR (maybe?).
@@ -474,7 +483,7 @@ In the former case, you may want to edit this PR message as well.
                     for p in pr._iter_ancestors()
                     if p.parent_id and p.parent_id != source
                 )
-                message = ping + """
+                message = source._pingline() + """
 This PR targets %s and is the last of the forward-port chain%s
 %s
 To merge the full chain, say
@@ -507,6 +516,14 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
             'prs': [(6, 0, new_batch.ids)],
             'active': not has_conflicts,
         })
+
+    def _pingline(self):
+        assignees = (self.author | self.reviewed_by).mapped('github_login')
+        return "Ping %s" % ', '.join(
+            '@' + login
+            for login in assignees
+            if login
+        )
 
     def _create_fp_branch(self, target_branch, fp_branch_name, cleanup):
         """ Creates a forward-port for the current PR to ``target_branch`` under

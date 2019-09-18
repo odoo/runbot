@@ -810,6 +810,7 @@ class PullRequests(models.Model):
         # could have two PRs (e.g. one open and one closed) at least
         # temporarily on the same head, or on the same head with different
         # targets
+        failed = self.browse(())
         for pr in self:
             required = pr.repository.project_id.required_statuses.split(',')
 
@@ -820,13 +821,15 @@ class PullRequests(models.Model):
                     continue
 
                 success = False
-                # only report an issue of the PR is already approved (r+'d)
-                if st in ('error', 'failure') and pr.state == 'approved':
-                    self.env['runbot_merge.pull_requests.feedback'].create({
-                        'repository': pr.repository.id,
-                        'pull_request': pr.number,
-                        'message': "%r failed on this reviewed PR." % ci,
-                    })
+                if st in ('error', 'failure'):
+                    failed |= pr
+                    # only report an issue of the PR is already approved (r+'d)
+                    if pr.state == 'approved':
+                        self.env['runbot_merge.pull_requests.feedback'].create({
+                            'repository': pr.repository.id,
+                            'pull_request': pr.number,
+                            'message': "%r failed on this reviewed PR." % ci,
+                        })
 
             if success:
                 oldstate = pr.state
@@ -834,6 +837,7 @@ class PullRequests(models.Model):
                     pr.state = 'validated'
                 elif oldstate == 'approved':
                     pr.state = 'ready'
+        return failed
 
     def _auto_init(self):
         super(PullRequests, self)._auto_init()

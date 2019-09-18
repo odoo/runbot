@@ -254,7 +254,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     # check that we didn't just smash the original trees
     assert prod.read_tree(prod.commit('a')) != b_tree != c_tree
 
-def test_update_pr(env, config, make_repo):
+def test_update_pr(env, config, make_repo, users):
     """ Even for successful cherrypicks, it's possible that e.g. CI doesn't
     pass or the reviewer finds out they need to update the code.
 
@@ -282,9 +282,40 @@ def test_update_pr(env, config, make_repo):
     env.run_crons()
 
     pr0, pr1 = env['runbot_merge.pull_requests'].search([], order='number')
-    with prod: # FP to c as well
-        prod.post_status(pr1.head, 'success', 'ci/runbot')
+
+    fp_intermediate = (users['user'], '''\
+This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
+
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
+''')
+    ci_warning = (users['user'], 'Ping @%(user)s, @%(reviewer)s\n\nCI failed on this forward-port PR' % users)
+
+    # oh no CI of the first FP PR failed!
+    with prod:
+        prod.post_status(pr1.head, 'failure', 'ci/runbot')
         prod.post_status(pr1.head, 'success', 'legal/cla')
+    env.run_crons()
+    # check that FP did not resume & we have a ping on the PR
+    assert env['runbot_merge.pull_requests'].search([], order='number') == pr0 | pr1,\
+        "forward port should not continue on CI failure"
+    pr1_remote = prod.get_pr(pr1.number)
+    assert pr1_remote.comments == [fp_intermediate, ci_warning]
+
+    # it was a false positive, rebuild... it fails again!
+    with prod:
+        prod.post_status(pr1.head, 'failure', 'ci/runbot')
+    env.run_crons()
+    # check that FP did not resume & we have a ping on the PR
+    assert env['runbot_merge.pull_requests'].search([], order='number') == pr0 | pr1,\
+        "ensure it still hasn't restarted"
+    assert pr1_remote.comments == [fp_intermediate, ci_warning, ci_warning]
+
+    # nb: updating the head would detach the PR and not put it in the warning
+    # path anymore
+
+    # rebuild again, finally passes
+    with prod:
+        prod.post_status(pr1.head, 'success', 'ci/runbot')
     env.run_crons()
 
     pr0, pr1, pr2 = env['runbot_merge.pull_requests'].search([], order='number')
