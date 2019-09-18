@@ -226,7 +226,7 @@ class PullRequests(models.Model):
         # if the PR has a parent and is CI-validated, enqueue the next PR
         for pr in self:
             _logger.info('Checking if forward-port %s (%s)', pr, pr.number)
-            if not pr.source_id:
+            if not pr.parent_id:
                 _logger.info('-> no parent (%s)', pr)
                 continue
             if pr.state not in ['validated', 'ready']:
