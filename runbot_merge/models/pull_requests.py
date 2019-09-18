@@ -122,9 +122,9 @@ class Project(models.Model):
         to_remove = []
         for f in self.env['runbot_merge.pull_requests.feedback'].search([]):
             repo = f.repository
-            gh = ghs.get(repo)
+            gh = ghs.get((repo, f.token_field))
             if not gh:
-                gh = ghs[repo] = repo.github()
+                gh = ghs[(repo, f.token_field)] = repo.github(f.token_field)
 
             try:
                 if f.close:
@@ -186,8 +186,8 @@ class Repository(models.Model):
     name = fields.Char(required=True)
     project_id = fields.Many2one('runbot_merge.project', required=True)
 
-    def github(self):
-        return github.GH(self.project_id.github_token, self.name)
+    def github(self, token_field='github_token'):
+        return github.GH(self.project_id[token_field], self.name)
 
     def _auto_init(self):
         res = super(Repository, self)._auto_init()
@@ -1228,6 +1228,12 @@ class Feedback(models.Model):
     pull_request = fields.Integer()
     message = fields.Char()
     close = fields.Boolean()
+    token_field = fields.Selection(
+        [('github_token', "Mergebot")],
+        default='github_token',
+        string="Bot User",
+        help="Token field (from repo's project) to use to post messages"
+    )
 
 class Commit(models.Model):
     """Represents a commit onto which statuses might be posted,

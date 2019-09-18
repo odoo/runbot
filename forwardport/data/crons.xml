@@ -41,6 +41,7 @@ for pr in env['runbot_merge.pull_requests'].search([
         'repository': pr.repository.id,
         'pull_request': pr.number,
         'message': "This pull request has forward-port PRs awaiting action",
+        'token_field': 'fp_github_token',
     })
         </field>
         <field name="interval_number">1</field>

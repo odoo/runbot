@@ -626,6 +626,10 @@ def test_empty(env, config, make_repo, users):
 
     # should not have created any new PR
     assert env['runbot_merge.pull_requests'].search([], order='number') == prs
+    # change FP token to see if the feedback comes from the proper user
+    project = env['runbot_merge.project'].search([])
+    project.fp_github_token = config['role_other']['token']
+    assert project.fp_github_name == users['other']
 
     # check reminder
     env.run_crons('forwardport.reminder', 'runbot_merge.feedback_cron', context={'forwardport_updated_before': FAKE_PREV_WEEK})
@@ -634,8 +638,8 @@ def test_empty(env, config, make_repo, users):
     assert pr1.comments == [
         (users['reviewer'], 'hansen r+'),
         (users['user'], re_matches(r'Merged at [0-9a-f]{40}, thanks!')),
-        (users['user'], 'This pull request has forward-port PRs awaiting action'),
-        (users['user'], 'This pull request has forward-port PRs awaiting action'),
+        (users['other'], 'This pull request has forward-port PRs awaiting action'),
+        (users['other'], 'This pull request has forward-port PRs awaiting action'),
     ], "each cron run should trigger a new message on the ancestor"
     # check that this stops if we close the PR
     with prod:
@@ -644,8 +648,8 @@ def test_empty(env, config, make_repo, users):
     assert pr1.comments == [
         (users['reviewer'], 'hansen r+'),
         (users['user'], re_matches(r'Merged at [0-9a-f]{40}, thanks!')),
-        (users['user'], 'This pull request has forward-port PRs awaiting action'),
-        (users['user'], 'This pull request has forward-port PRs awaiting action'),
+        (users['other'], 'This pull request has forward-port PRs awaiting action'),
+        (users['other'], 'This pull request has forward-port PRs awaiting action'),
     ]
 
 def test_partially_empty(env, config, make_repo):
@@ -770,7 +774,8 @@ def test_limit_disable(env, config, make_repo, users, enabled):
     !fp_target (won't be forward-ported to).
     """
     prod, other = make_basic(env, config, make_repo)
-    bot_name = env['runbot_merge.project'].search([]).fp_github_name
+    project = env['runbot_merge.project'].search([])
+    bot_name = project.fp_github_name
     with prod:
         [c] = prod.make_commits('a', Commit('c 0', tree={'0': '0'}), ref='heads/branch0')
         pr = prod.make_pr(target='a', head='branch0')
@@ -797,6 +802,8 @@ def test_limit_disable(env, config, make_repo, users, enabled):
     assert p.parent_id == _1
     assert p.target.name == 'c'
 
+    project.fp_github_token = config['role_other']['token']
+    bot_name = project.fp_github_name
     with prod:
         [c] = prod.make_commits('a', Commit('c 2', tree={'2': '2'}), ref='heads/branch2')
         pr = prod.make_pr(target='a', head='branch2')
@@ -815,10 +822,10 @@ def test_limit_disable(env, config, make_repo, users, enabled):
         (users['reviewer'], "%s up to b" % bot_name),
         (users['reviewer'], "%s up to foo" % bot_name),
         (users['reviewer'], "%s up to c" % bot_name),
-        (users['user'], "Please provide a branch to forward-port to."),
-        (users['user'], "Branch 'b' is disabled, it can't be used as a forward port target."),
-        (users['user'], "There is no branch 'foo', it can't be used as a forward port target."),
-        (users['user'], "Forward-porting to 'c'."),
+        (users['other'], "Please provide a branch to forward-port to."),
+        (users['other'], "Branch 'b' is disabled, it can't be used as a forward port target."),
+        (users['other'], "There is no branch 'foo', it can't be used as a forward port target."),
+        (users['other'], "Forward-porting to 'c'."),
     }
 
 def test_default_disabled(env, config, make_repo, users):

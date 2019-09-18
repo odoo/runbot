@@ -218,6 +218,7 @@ class PullRequests(models.Model):
                     'repository': self.repository.id,
                     'pull_request': self.number,
                     'message': msg,
+                    'token_field': 'fp_github_token',
                 })
 
     def _validate(self, statuses):
@@ -235,6 +236,7 @@ class PullRequests(models.Model):
                     self.env['runbot_merge.pull_requests.feedback'].create({
                         'repository': pr.repository.id,
                         'pull_request': pr.number,
+                        'token_field': 'fp_github_token',
                         'message': pr.source_id._pingline() + '\n\nCI failed on this forward-port PR'
                     })
                 continue
@@ -501,6 +503,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
                 'repository': new_pr.repository.id,
                 'pull_request': new_pr.number,
                 'message': message,
+                'token_field': 'fp_github_token',
             })
             # not great but we probably want to avoid the risk of the webhook
             # creating the PR from under us. There's still a "hole" between
@@ -717,6 +720,10 @@ class Stagings(models.Model):
                     })
         return r
 
+class Feedback(models.Model):
+    _inherit = 'runbot_merge.pull_requests.feedback'
+
+    token_field = fields.Selection(selection_add=[('fp_github_token', 'Forwardport Bot')])
 
 def git(directory): return Repo(directory, check=True)
 class Repo:
