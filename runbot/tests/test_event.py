@@ -33,6 +33,7 @@ class TestIrLogging(common.TransactionCase):
             'branch_id': self.branch.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'port': '1234',
+            'active_step': self.env.ref('runbot.runbot_build_config_step_test_all').id,
         })
 
         build.log_counter = 10
@@ -42,6 +43,7 @@ class TestIrLogging(common.TransactionCase):
         log_line = self.IrLogging.search([('func', '=', 'test function'), ('message', '=', 'test message'), ('level', '=', 'INFO')])
         self.assertEqual(len(log_line), 1, "A build log event should have been created")
         self.assertEqual(log_line.build_id, build)
+        self.assertEqual(log_line.active_step_id, self.env.ref('runbot.runbot_build_config_step_test_all'), 'The active step should be set on the log line')
 
         #  Test that a warn log line sets the build in warn
         self.simulate_log(build, 'test function', 'test message', level='WARNING')
