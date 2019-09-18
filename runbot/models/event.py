@@ -15,6 +15,7 @@ class runbot_event(models.Model):
     _order = 'id'
 
     build_id = fields.Many2one('runbot.build', 'Build', index=True, ondelete='cascade')
+    active_step_id = fields.Many2one('runbot.build.config.step', 'Active step', index=True)
     type = fields.Selection(TYPES, string='Type', required=True, index=True)
 
     @api.model_cr
@@ -28,6 +29,7 @@ CREATE OR REPLACE FUNCTION runbot_set_logging_build() RETURNS TRIGGER AS $runbot
 BEGIN
   IF (NEW.build_id IS NULL AND NEW.dbname IS NOT NULL AND NEW.dbname != current_database()) THEN
     NEW.build_id := split_part(NEW.dbname, '-', 1)::integer;
+    SELECT active_step INTO NEW.active_step_id FROM runbot_build WHERE runbot_build.id = NEW.build_id;
   END IF;
   IF (NEW.build_id IS NOT NULL) AND (NEW.type = 'server') THEN
     DECLARE
