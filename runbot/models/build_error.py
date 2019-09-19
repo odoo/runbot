@@ -31,7 +31,7 @@ class RunbotBuildError(models.Model):
     tag_ids = fields.Many2many('runbot.build.error.tag', string='Tags')
     build_count = fields.Integer(compute='_compute_build_counts', string='Nb seen', stored=True)
     parent_id = fields.Many2one('runbot.build.error', 'Linked to')
-    child_ids = fields.One2many('runbot.build.error', 'parent_id', string='Child Errors')
+    child_ids = fields.One2many('runbot.build.error', 'parent_id', string='Child Errors', context={'active_test': False})
     children_build_ids = fields.Many2many('runbot.build', compute='_compute_children_build_ids', string='Children builds')
     error_history_ids = fields.One2many('runbot.build.error', compute='_compute_error_history_ids', string='Old errors')
     first_seen_build_id = fields.Many2one('runbot.build', compute='_compute_first_seen_build_id', string='First Seen build')
@@ -48,6 +48,13 @@ class RunbotBuildError(models.Model):
                      'fingerprint': self._digest(cleaned_content)
         })
         return super().create(vals)
+
+    @api.multi
+    def write(self, vals):
+        if 'active' in vals:
+            for build_error in self:
+                (build_error.child_ids - self).write({'active': vals['active']})
+        return super(RunbotBuildError, self).write(vals)
 
     @api.depends('build_ids')
     def _compute_build_counts(self):
@@ -90,10 +97,6 @@ class RunbotBuildError(models.Model):
         for error in self:
             fingerprints = [error.fingerprint] + [rec.fingerprint for rec in error.child_ids]
             error.error_history_ids = self.search([('fingerprint', 'in', fingerprints), ('active', '=', False), ('id', '!=', error.id)])
-
-    @api.onchange('active')
-    def _onchange_active(self):
-        self.child_ids.write({'active': self.active})
 
     @api.model
     def _digest(self, s):
@@ -138,6 +141,7 @@ class RunbotBuildError(models.Model):
         """
         if len(self) < 2:
             return
+        self = self.with_context(active_test=False)
         build_errors = self.search([('id', 'in', self.ids)], order='responsible asc, random desc, id asc')
         build_errors[1:].write({'parent_id': build_errors[0].id})
 

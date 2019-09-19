@@ -91,3 +91,42 @@ class TestBuildError(common.TransactionCase):
         new_build_error = self.BuildError.search([('build_ids','in', [ko_build_new.id])])
         self.assertIn(ko_build_new, new_build_error.build_ids, 'The parsed build with a re-apearing error should generate a new runbot.build.error')
         self.assertIn(build_error, new_build_error.error_history_ids, 'The old error should appear in history')
+
+    @patch('odoo.addons.runbot.models.build.runbot_build._get_params')
+    def test_build_error_links(self, mock_get_params):
+        build_a = self.create_build({'local_result': 'ko'})
+        build_b = self.create_build({'local_result': 'ko'})
+
+        error_a = self.env['runbot.build.error'].create({
+            'content': 'foo',
+            'build_ids': [(6, 0, [build_a.id])],
+            'active': False  # Even a fixed error coul be linked
+        })
+
+        error_b = self.env['runbot.build.error'].create({
+            'content': 'bar',
+            'build_ids': [(6, 0, [build_b.id])],
+            'random': True
+        })
+
+        #  test that the random bug is parent when linking errors
+        all_errors = error_a | error_b
+        all_errors.link_errors()
+
+        self.assertIn(error_b.child_ids, error_a, 'Random error should be the parent')
+
+        #  Test that changing bug resolution is propagated to children
+        error_b.active = True
+        self.assertTrue(error_a.active)
+        error_b.active = False
+        self.assertFalse(error_a.active)
+
+        #  Test build_ids
+        self.assertIn(build_b, error_b.build_ids)
+        self.assertNotIn(build_a, error_b.build_ids)
+
+        #  Test that children builds contains all builds
+        self.assertIn(build_b, error_b.children_build_ids)
+        self.assertIn(build_a, error_b.children_build_ids)
+        self.assertEqual(error_a.build_count, 1)
+        self.assertEqual(error_b.build_count, 2)
