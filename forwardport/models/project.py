@@ -188,7 +188,15 @@ class PullRequests(models.Model):
 
         # TODO: don't use a mutable tokens iterator
         tokens = iter(tokens)
-        for token in tokens:
+        while True:
+            token = next(tokens, None)
+            if token is None:
+                break
+
+            if token == 'ignore': # replace 'ignore' by 'up to <pr_branch>'
+                token = 'up'
+                tokens = itertools.chain(['to', self.target.name], tokens)
+
             if token in ('r+', 'review+') and self.source_id._pr_acl(author).is_reviewer:
                 # don't update the root ever
                 for pr in filter(lambda p: p.parent_id, self._iter_ancestors()):
@@ -208,18 +216,23 @@ class PullRequests(models.Model):
                     ])
                     if not limit_id:
                         msg = "There is no branch %r, it can't be used as a forward port target." % limit
+                    elif limit_id == self.target:
+                        msg = "Forward-port disabled."
+                        self.limit_id = limit_id
                     elif not limit_id.fp_enabled:
                         msg = "Branch %r is disabled, it can't be used as a forward port target." % limit_id.name
                     else:
                         msg = "Forward-porting to %r." % limit_id.name
                         self.limit_id = limit_id
 
+                _logger.info("%s: %s", author, msg)
                 self.env['runbot_merge.pull_requests.feedback'].create({
                     'repository': self.repository.id,
                     'pull_request': self.number,
                     'message': msg,
                     'token_field': 'fp_github_token',
                 })
+
 
     def _validate(self, statuses):
         _logger = logging.getLogger(__name__).getChild('forwardport.next')

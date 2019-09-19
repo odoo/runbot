@@ -761,6 +761,54 @@ def test_limit_configure(env, config, make_repo):
     assert prs[1].number == originals[1]
     assert prs[2].number == originals[2]
 
+def test_limit_self_disabled(env, config, make_repo):
+    """ Allow setting target as limit even if it's disabled
+    """
+    prod, other = make_basic(env, config, make_repo)
+    bot_name = env['runbot_merge.project'].search([]).fp_github_name
+    branch_a = env['runbot_merge.branch'].search([('name', '=', 'a')])
+    branch_a.fp_target = False
+    with prod:
+        [c] = prod.make_commits('a', Commit('c', tree={'0': '0'}), ref='heads/mybranch')
+        pr = prod.make_pr(target='a', head='mybranch')
+        prod.post_status(c, 'success', 'legal/cla')
+        prod.post_status(c, 'success', 'ci/runbot')
+        pr.post_comment('hansen r+\n%s up to a' % bot_name, config['role_reviewer']['token'])
+    env.run_crons()
+    pr_id = env['runbot_merge.pull_requests'].search([('number', '=', pr.number)])
+    assert pr_id.limit_id == branch_a
+
+    with prod:
+        prod.post_status('staging.a', 'success', 'legal/cla')
+        prod.post_status('staging.a', 'success', 'ci/runbot')
+
+    assert env['runbot_merge.pull_requests'].search([]) == pr_id,\
+        "should not have created a forward port"
+
+def test_fp_ignore(env, config, make_repo):
+    """ Provide an "ignore" command which is equivalent to setting the limit
+    to target
+    """
+    prod, other = make_basic(env, config, make_repo)
+    bot_name = env['runbot_merge.project'].search([]).fp_github_name
+    branch_a = env['runbot_merge.branch'].search([('name', '=', 'a')])
+    with prod:
+        [c] = prod.make_commits('a', Commit('c', tree={'0': '0'}), ref='heads/mybranch')
+        pr = prod.make_pr(target='a', head='mybranch')
+        prod.post_status(c, 'success', 'legal/cla')
+        prod.post_status(c, 'success', 'ci/runbot')
+        pr.post_comment('hansen r+\n%s ignore' % bot_name, config['role_reviewer']['token'])
+    env.run_crons()
+    pr_id = env['runbot_merge.pull_requests'].search([('number', '=', pr.number)])
+    assert pr_id.limit_id == branch_a
+
+    with prod:
+        prod.post_status('staging.a', 'success', 'legal/cla')
+        prod.post_status('staging.a', 'success', 'ci/runbot')
+
+    assert env['runbot_merge.pull_requests'].search([]) == pr_id,\
+        "should not have created a forward port"
+
 @pytest.mark.parametrize('enabled', ['active', 'fp_target'])
 def test_limit_disable(env, config, make_repo, users, enabled):
     """ Checks behaviour if the limit target is disabled:
