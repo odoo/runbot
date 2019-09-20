@@ -438,7 +438,11 @@ class PullRequests(models.Model):
                 message += '\n\n'
             else:
                 message = ''
-            message += "Forward-Port-Of: %s#%s" % (source.repository.name, source.number)
+            root = pr._get_root()
+            message += '\n'.join(
+                "Forward-Port-Of: %s#%s" % (p.repository.name, p.number)
+                for p in root | source
+            )
 
             (h, out, err) = conflicts.get(pr) or (None, None, None)
 

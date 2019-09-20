@@ -379,9 +379,6 @@ a
     }
 
 def test_conflict(env, config, make_repo):
-    """ If there's a conflict when forward-porting the commit, commit the
-    conflict and create a draft PR.
-    """
     prod, other = make_basic(env, config, make_repo)
     # reset b to b~1 (g=a) parent so there's no b -> c conflict
     with prod:
@@ -454,6 +451,7 @@ xxx
         'g': 'xxx',
     }
     assert pr1.state == 'opened', "state should be open still"
+    assert ('#%d' % pr.number) in pr1.message
 
     # check that merging the fixed PR fixes the flow and restarts a forward
     # port process
@@ -470,6 +468,10 @@ xxx
     env.run_crons()
 
     *_, pr2 = env['runbot_merge.pull_requests'].search([], order='number')
+    assert ('#%d' % pr.number) in pr2.message, \
+        "check that source / pr0 is referenced by resume PR"
+    assert ('#%d' % pr1.number) in pr2.message, \
+        "check that parent / pr1 is referenced by resume PR"
     assert pr2.parent_id == pr1
     assert pr2.source_id == pr0
     assert re.match(
