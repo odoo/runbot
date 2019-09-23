@@ -29,15 +29,6 @@ DEFAULT_CRONS = [
     'runbot_merge.feedback_cron',
 ]
 
-
-def pytest_report_header(config):
-    return 'Running against database ' + config.getoption('--db')
-
-def pytest_addoption(parser):
-    parser.addoption('--db', help="DB to run the tests against", default=str(uuid.uuid4()))
-    parser.addoption('--addons-path')
-    parser.addoption("--no-delete", action="store_true", help="Don't delete repo after a failed run")
-
 def wait_for_hook(n=1):
     time.sleep(10 * n)
 
@@ -136,32 +127,6 @@ def port():
         s.bind(('', 0))
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         return s.getsockname()[1]
-
-@pytest.fixture(scope='session')
-def dbcache(request, module):
-    """ Creates template DB once per run, then just duplicates it before
-    starting odoo and running the testcase
-    """
-    db = request.config.getoption('--db')
-    subprocess.run([
-        'odoo', '--no-http',
-        '--addons-path', request.config.getoption('--addons-path'),
-        '-d', db, '-i', module,
-        '--max-cron-threads', '0',
-        '--stop-after-init'
-    ], check=True)
-    yield db
-    subprocess.run(['dropdb', db])
-
-@pytest.fixture
-def db(request, dbcache):
-    rundb = str(uuid.uuid4())
-    subprocess.run(['createdb', '-T', dbcache, rundb], check=True)
-
-    yield rundb
-
-    if not request.config.getoption('--no-delete'):
-        subprocess.run(['dropdb', rundb], check=True)
 
 @pytest.fixture
 def server(request, db, port, module):

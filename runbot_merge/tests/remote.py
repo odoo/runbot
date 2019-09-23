@@ -63,10 +63,6 @@ import requests
 def pytest_addhooks(pluginmanager):
     pluginmanager.set_blocked('local')
 
-def pytest_addoption(parser):
-    parser.addoption("--no-delete", action="store_true", help="Don't delete repo after a failed run")
-
-
 PORT=8069
 
 @pytest.fixture(scope='session')

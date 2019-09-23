@@ -18,6 +18,10 @@ def gh():
     with fake_github.Github() as gh:
         yield gh
 
+@pytest.fixture
+def db(dbcache):
+    return dbcache
+
 @pytest.fixture(scope='session')
 def registry(request):
     """ Set up Odoo & yields a registry to the specified db
