@@ -152,6 +152,7 @@ class PullRequests(models.Model):
         # also a bit odd to only handle updating 1 head at a time, but then
         # again 2 PRs with same head is weird so...
         newhead = vals.get('head')
+        with_parents = self.filtered('parent_id')
         if newhead and not self.env.context.get('ignore_head_update') and newhead != self.head:
             vals.setdefault('parent_id', False)
             # if any children, this is an FP PR being updated, enqueue
@@ -164,12 +165,23 @@ class PullRequests(models.Model):
 
         if vals.get('parent_id') and 'source_id' not in vals:
             vals['source_id'] = self.browse(vals['parent_id'])._get_root().id
-        return super().write(vals)
+        r = super().write(vals)
+        if self.env.context.get('forwardport_detach_warn', True):
+            for p in with_parents:
+                if not p.parent_id:
+                    self.env['runbot_merge.pull_requests.feedback'].create({
+                        'repository': p.repository.id,
+                        'pull_request': p.number,
+                        'message': "This PR was modified / updated and has become a normal PR. "
+                                   "It should be merged the normal way (via @%s)" % p.repository.project_id.github_prefix,
+                        'token_field': 'fp_github_token',
+                    })
+        return r
 
     def _try_closing(self, by):
         r = super()._try_closing(by)
         if r:
-            self.parent_id = False
+            self.with_context(forwardport_detach_warn=False).parent_id = False
         return r
 
     def _parse_commands(self, author, comment, login):

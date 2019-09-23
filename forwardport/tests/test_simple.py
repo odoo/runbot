@@ -338,6 +338,10 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 
     assert pr1.head == new_c != pr1_head, "the FP PR should be updated"
     assert not pr1.parent_id, "the FP PR should be detached from the original"
+    assert pr1_remote.comments == [
+        fp_intermediate, ci_warning, ci_warning,
+        (users['user'], "This PR was modified / updated and has become a normal PR. It should be merged the normal way (via @%s)" % pr1.repository.project_id.github_prefix),
+    ], "users should be warned that the PR has become non-FP"
     # NOTE: should the followup PR wait for pr1 CI or not?
     assert pr2.head != pr2_head
     assert pr2.parent_id == pr1, "the followup PR should still be linked"
