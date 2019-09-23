@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from unittest.mock import patch
-from odoo.tools.config import configmanager
 from odoo.tests import common
 
 
@@ -70,6 +69,35 @@ class Test_Build(common.TransactionCase):
         # test that a build cannot have local state 'duplicate' without a duplicate_id
         with self.assertRaises(AssertionError):
             builds.write({'local_state': 'duplicate'})
+
+    @patch('odoo.addons.runbot.models.build.runbot_build._get_repo_available_modules')
+    @patch('odoo.addons.runbot.models.build.runbot_build._get_params')
+    @patch('odoo.addons.runbot.models.build.fqdn')
+    def test_filter_modules(self, mock_fqdn, mock_get_params, mock_get_repo_mods):
+        """ test module filtering """
+        build = self.Build.create({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'port': '1234',
+        })
+
+        repo_mods = ['good_module', 'bad_module', 'other_good', 'l10n_be', 'hw_foo', 'hwgood', 'hw_explicit']
+        available_mods = ['good_module', 'bad_module', 'other_good', 'l10n_be', 'hw_foo', 'hwgood', 'hw_explicit', 'other_mod_1', 'other_mod_2']
+        mock_get_repo_mods.return_value = (repo_mods, available_mods)
+        self.repo.modules_auto = 'repo'
+        self.repo.modules = '-bad_module,-hw_*,hw_explicit,-l10n_*'
+        modules_to_test = build._get_modules_to_test(self, modules_patterns='')
+        self.assertEqual(modules_to_test, sorted(['good_module', 'hwgood', 'other_good', 'hw_explicit']))
+
+        modules_to_test = build._get_modules_to_test(self, modules_patterns='-*, l10n_be')
+        self.assertEqual(modules_to_test, sorted(['l10n_be']))
+
+        modules_to_test = build._get_modules_to_test(self, modules_patterns='l10n_be')
+        self.assertEqual(modules_to_test, sorted(['good_module', 'hwgood', 'other_good', 'hw_explicit', 'l10n_be']))
+
+        # star to get all available mods
+        modules_to_test = build._get_modules_to_test(self, modules_patterns='*, -hw_*, hw_explicit')
+        self.assertEqual(modules_to_test, sorted(['good_module', 'bad_module', 'other_good', 'l10n_be', 'hwgood', 'hw_explicit', 'other_mod_1', 'other_mod_2']))
 
     @patch('odoo.addons.runbot.models.build.os.path.isfile')
     @patch('odoo.addons.runbot.models.build.os.mkdir')

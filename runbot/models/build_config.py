@@ -97,7 +97,7 @@ class ConfigStep(models.Model):
     # install_odoo
     create_db = fields.Boolean('Create Db', default=True, track_visibility='onchange')  # future
     custom_db_name = fields.Char('Custom Db Name', track_visibility='onchange')  # future
-    install_modules = fields.Char('Modules to install', help="List of module to install, use * for all modules", default='*')
+    install_modules = fields.Char('Modules to install', help="List of module patterns to install, use * to install all available modules, prefix the pattern with dash to remove the module.", default='*')
     db_name = fields.Char('Db Name', compute='_compute_db_name', inverse='_inverse_db_name', track_visibility='onchange')
     cpu_limit = fields.Integer('Cpu limit', default=3600, track_visibility='onchange')
     coverage = fields.Boolean('Coverage', dafault=False, track_visibility='onchange')
@@ -338,13 +338,7 @@ class ConfigStep(models.Model):
         return docker_run(cmd.build(), log_path, build._path(), build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports)
 
     def _modules_to_install(self, build):
-        modules_to_install = set([mod.strip() for mod in self.install_modules.split(',')])
-        if '*' in modules_to_install:
-            modules_to_install.remove('*')
-            default_mod = set(build._get_modules_to_test())
-            modules_to_install = default_mod | modules_to_install
-            #  todo add without support
-        return modules_to_install
+        return set(build._get_modules_to_test(modules_patterns=self.install_modules))
 
     def _post_install_command(self, build, modules_to_install, py_version=None):
         if self.coverage:

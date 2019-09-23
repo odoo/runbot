@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import fnmatch
 import glob
 import logging
 import os
@@ -689,26 +690,6 @@ class runbot_build(models.Model):
             return commit._source_path('odoo', *path)
         return commit._source_path('openerp', *path)
 
-    def _filter_modules(self, modules, available_modules, explicit_modules):
-        # TODO add blacklist_modules and blacklist prefixes as data on repo
-        blacklist_modules = set(['auth_ldap', 'document_ftp', 'base_gengo',
-                                 'website_gengo', 'website_instantclick',
-                                 'pad', 'pad_project', 'note_pad',
-                                 'pos_cache', 'pos_blackbox_be'])
-
-        def mod_filter(module):
-            if module not in available_modules:
-                return False
-            if module in explicit_modules:
-                return True
-            if module.startswith(('hw_', 'theme_', 'l10n_')):
-                return False
-            if module in blacklist_modules:
-                return False
-            return True
-
-        return uniq_list([module for module in modules if mod_filter(module)])
-
     def _get_available_modules(self, commit):
         for manifest_file_name in commit.repo.manifest_files.split(','):  # '__manifest__.py' '__openerp__.py'
             for addons_path in commit.repo.addons_paths.split(','):  # '' 'addons' 'odoo/addons'
@@ -744,11 +725,9 @@ class runbot_build(models.Model):
                 self._kill(result='ko')
         return exports
 
-    def _get_modules_to_test(self, commits=None):
-        self.ensure_one()  # will raise exception if hash not found, we don't want to fail for all build.
-        # checkout branch
-        repo_modules = []
+    def _get_repo_available_modules(self, commits=None):
         available_modules = []
+        repo_modules = []
         for commit in commits or self._get_all_commit():
             for (addons_path, module, manifest_file_name) in self._get_available_modules(commit):
                 if commit.repo == self.repo_id:
@@ -761,25 +740,34 @@ class runbot_build(models.Model):
                     )
                 else:
                     available_modules.append(module)
-        explicit_modules = uniq_list([module for module in (self.branch_id.modules or '').split(',') + (self.repo_id.modules or '').split(',') if module])
+        return repo_modules, available_modules
 
-        if explicit_modules:
-            _logger.debug("explicit modules_to_test for build %s: %s", self.dest, explicit_modules)
+    def _get_modules_to_test(self, commits=None, modules_patterns=''):
+        self.ensure_one()  # will raise exception if hash not found, we don't want to fail for all build.
 
-        if set(explicit_modules) - set(available_modules):
-            self._log('checkout', 'Some explicit modules (branch or repo defined) are not in available module list.', level='WARNING')
+        # checkout branch
+        repo_modules, available_modules = self._get_repo_available_modules(commits=commits)
+
+        patterns_list = []
+        for pats in [self.repo_id.modules, self.branch_id.modules, modules_patterns]:
+            patterns_list += [p.strip() for p in (pats or '').split(',')]
 
         if self.repo_id.modules_auto == 'all':
-            modules_to_test = available_modules
+            default_repo_modules = available_modules
         elif self.repo_id.modules_auto == 'repo':
-            modules_to_test = explicit_modules + repo_modules
-            _logger.debug("local modules_to_test for build %s: %s", self.dest, modules_to_test)
+            default_repo_modules = repo_modules
         else:
-            modules_to_test = explicit_modules
+            default_repo_modules = []
 
-        modules_to_test = self._filter_modules(modules_to_test, available_modules, explicit_modules)
-        _logger.debug("modules_to_test for build %s: %s", self.dest, modules_to_test)
-        return modules_to_test
+        modules_to_install = set(default_repo_modules)
+        for pat in patterns_list:
+            if pat.startswith('-'):
+                pat = pat.strip('- ')
+                modules_to_install -= {mod for mod in modules_to_install if fnmatch.fnmatch(mod, pat)}
+            else:
+                modules_to_install |= {mod for mod in available_modules if fnmatch.fnmatch(mod, pat)}
+
+        return sorted(modules_to_install)
 
     def _local_pg_dropdb(self, dbname):
         with local_pgadmin_cursor() as local_cr:
