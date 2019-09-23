@@ -440,6 +440,24 @@ def test_staging_ci_timeout(env, repo, users):
     env['runbot_merge.project']._check_progress()
     assert pr1.state == 'error', "timeout should fail the PR"
 
+def test_timeout_bump_on_pending(env, repo):
+    m = repo.make_commit(None, 'initial', None, tree={'f': '0'})
+    repo.make_ref('heads/master', m)
+
+    c = repo.make_commit(m, 'c', None, tree={'f': '1'})
+    prx = repo.make_pr('title', 'body', target='master', ctid=c, user='user')
+    repo.post_status(prx.head, 'success', 'ci/runbot')
+    repo.post_status(prx.head, 'success', 'legal/cla')
+    prx.post_comment('hansen r+', 'reviewer')
+    run_crons(env)
+
+    st = env['runbot_merge.stagings'].search([])
+    old_timeout = odoo.fields.Datetime.to_string(datetime.datetime.now() - datetime.timedelta(days=15))
+    st.timeout_limit = old_timeout
+    repo.post_status(repo.commit('heads/staging.master').id, 'pending', 'ci/runbot')
+    env['runbot_merge.commit']._notify()
+    assert st.timeout_limit > old_timeout
+
 def test_staging_ci_failure_single(env, repo, users):
     """ on failure of single-PR staging, mark & notify failure
     """

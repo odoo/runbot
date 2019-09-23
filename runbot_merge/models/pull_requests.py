@@ -143,7 +143,7 @@ class Project(models.Model):
         self.env['runbot_merge.pull_requests.feedback'].browse(to_remove).unlink()
 
     def is_timed_out(self, staging):
-        return fields.Datetime.from_string(staging.staged_at) + datetime.timedelta(minutes=self.ci_timeout) < datetime.datetime.now()
+        return fields.Datetime.from_string(staging.timeout_limit) < datetime.datetime.now()
 
     def _check_fetch(self, commit=False):
         """
@@ -1311,6 +1311,7 @@ class Stagings(models.Model):
     active = fields.Boolean(default=True)
 
     staged_at = fields.Datetime(default=fields.Datetime.now)
+    timeout_limit = fields.Datetime(store=True, compute='_compute_timeout_limit')
     reason = fields.Text("Reason for final state (if any)")
 
     # seems simpler than adding yet another indirection through a model
@@ -1343,6 +1344,17 @@ class Stagings(models.Model):
                 for status in [to_status(st)]
             ]
 
+    # only depend on staged_at as it should not get modified, but we might
+    # update the CI timeout after the staging have been created and we
+    # *do not* want to update the staging timeouts in that case
+    @api.depends('staged_at')
+    def _compute_timeout_limit(self):
+        for st in self:
+            st.timeout_limit = fields.Datetime.to_string(
+                  fields.Datetime.from_string(st.staged_at)
+                + datetime.timedelta(minutes=st.target.project_id.ci_timeout)
+            )
+
     def _validate(self):
         Commits = self.env['runbot_merge.commit']
         for s in self:
@@ -1357,6 +1369,7 @@ class Stagings(models.Model):
                 ('sha', 'in', heads)
             ])
 
+            update_timeout_limit = False
             reqs = [r.strip() for r in s.target.project_id.required_statuses.split(',')]
             st = 'success'
             for c in commits:
@@ -1364,17 +1377,22 @@ class Stagings(models.Model):
                 for v in map(lambda n: state_(statuses, n), reqs):
                     if st == 'failure' or v in ('error', 'failure'):
                         st = 'failure'
-                    elif v in (None, 'pending'):
+                    elif v is None:
                         st = 'pending'
+                    elif v == 'pending':
+                        st = 'pending'
+                        update_timeout_limit = True
                     else:
                         assert v == 'success'
             # mark failure as soon as we find a failed status, but wait until
             # all commits are known & not pending to mark a success
             if st == 'success' and len(commits) < len(heads):
-                s.state = 'pending'
-                continue
+                st = 'pending'
 
-            s.state = st
+            vals = {'state': st}
+            if update_timeout_limit:
+                vals['timeout_limit'] = fields.Datetime.to_string(datetime.datetime.now() + datetime.timedelta(minutes=s.target.project_id.ci_timeout))
+            s.write(vals)
 
     @api.multi
     def action_cancel(self):
