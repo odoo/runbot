@@ -88,6 +88,7 @@ class Branch(models.Model):
     fp_sequence = fields.Integer(default=50)
     fp_target = fields.Boolean(default=False)
     fp_enabled = fields.Boolean(compute='_compute_fp_enabled')
+    fp_check_ids = fields.One2many("forwardport.check", "branch_id")
 
     @api.depends('active', 'fp_target')
     def _compute_fp_enabled(self):
@@ -430,14 +431,18 @@ class PullRequests(models.Model):
         )
         # TODO: send outputs to logging?
         conflicts = {}
+        errors = {}
         with contextlib.ExitStack() as s:
             for pr in self:
                 conflicts[pr], working_copy = pr._create_fp_branch(
                     target, new_branch, s)
 
+                errors[pr] = pr._check(working_copy, target)
+
                 working_copy.push('target', new_branch)
 
         has_conflicts = any(conflicts.values())
+        has_errors = has_conflicts or any(errors.values())
         # problemo: this should forward port a batch at a time, if porting
         # one of the PRs in the batch fails is huge problem, though this loop
         # only concerns itself with the creation of the followup objects so...
@@ -463,7 +468,7 @@ class PullRequests(models.Model):
                     'title': "Forward Port of #%d to %s%s" % (
                         source.number,
                         target.name,
-                        ' (failed)' if has_conflicts else ''
+                        ' (failed)' if has_errors else ''
                     ),
                     'body': message,
                     'head': '%s:%s' % (owner, new_branch),
@@ -483,7 +488,7 @@ class PullRequests(models.Model):
                 'merge_method': pr.merge_method,
                 'source_id': source.id,
                 # only link to previous PR of sequence if cherrypick passed
-                'parent_id': pr.id if not has_conflicts else False,
+                'parent_id': pr.id if not has_errors else False,
             })
             # delegate original author on merged original PR & on new PR so
             # they can r+ the forward ports (via mergebot or forwardbot)
@@ -494,6 +499,7 @@ class PullRequests(models.Model):
                 ]
             })
 
+            pinging = True
             if h:
                 sout = serr = ''
                 if out.strip():
@@ -501,7 +507,7 @@ class PullRequests(models.Model):
                 if err.strip():
                     serr = "\nstderr:\n```\n%s\n```\n" % err
 
-                message = source._pingline() + """
+                message = """\
 Cherrypicking %s of source #%d failed
 %s%s
 Either perform the forward-port manually (and push to this branch, proceeding as usual) or close this PR (maybe?).
@@ -514,7 +520,7 @@ In the former case, you may want to edit this PR message as well.
                     for p in pr._iter_ancestors()
                     if p.parent_id and p.parent_id != source
                 )
-                message = source._pingline() + """
+                message = """\
 This PR targets %s and is the last of the forward-port chain%s
 %s
 To merge the full chain, say
@@ -523,11 +529,29 @@ To merge the full chain, say
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """ % (target.name, 'containing:' if ancestors else '.', ancestors, pr.repository.project_id.fp_github_name)
             else:
+                pinging = False
                 message = """\
 This PR targets %s and is part of the forward-port chain. Further PRs will be created up to %s.
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """ % (target.name, base.limit_id.name)
+
+            if errors[pr]:
+                pinging = True
+                fmt_errors = "".join(
+                    "* %s" % e
+                    for e in errors[pr]
+                )
+                message = """\
+💥This PR is likely to fail due to the following errors:
+%s
+
+%s
+                """ % (fmt_errors, message)
+
+            if pinging:
+                message = "%s\n%s" % (source._pingline(), message)
+
             self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': new_pr.repository.id,
                 'pull_request': new_pr.number,
@@ -546,7 +570,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         return self.env['runbot_merge.batch'].create({
             'target': target.id,
             'prs': [(6, 0, new_batch.ids)],
-            'active': not has_conflicts,
+            'active': not has_errors,
         })
 
     def _pingline(self):
@@ -710,6 +734,22 @@ stderr:
                 .commit(amend=True, file='-')
             new = working_copy.stdout().rev_parse('HEAD').stdout.decode()
             logger.info('%s: success -> %s', commit_sha, new)
+
+    def _check(self, working_copy, base):
+        diff = working_copy.diff("%s..HEAD" % base.name)
+        additions = "".join(l[1:] for l in diff.splitlines() if l[0] == "+")
+
+        fp_complete = self.env['runbot_merge.branch'].with_context(active_test=False)._forward_port_ordered()
+
+        matches = []
+        for branch in fp_complete:
+            for check in branch.fp_checks_ids:
+                if check.match(additions):
+                    matches.append(check.message)
+            if branch == base:
+                break
+
+        return matches
 
     def _get_local_directory(self):
         repos_dir = pathlib.Path(user_cache_dir('forwardport'))

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 import logging
 from contextlib import ExitStack
+import re
 
-import subprocess
-
-from odoo import fields, models
+from odoo import fields, models, api
+from odoo.exceptions import ValidationError
 
 
 _logger = logging.getLogger(__name__)
@@ -89,3 +89,26 @@ class UpdateQueue(models.Model, Queue):
                 self.env.cr.commit()
 
                 previous = child
+
+
+class Check(models.Model):
+    _name = "forwardport.check"
+    _description = "Early check that this fowardport PR will (potentially) fail"
+    _order = "sequence, id"
+
+    sequence = fields.Interger()
+    regex = fields.Char("Matching Regex", required=True)
+    message = fields.Char("Message", required=True)
+    branch_id = fields.Many2one("runbot_merge.branch", required=True)
+    # warn = fields.Boolean("Warning", help="Is this check a warning instead of a failure?")
+
+    @api.contraints("regex")
+    def _valid_regex(self):
+        for record in self:
+            try:
+                re.compile(record.regex, re.U)
+            except ValueError:
+                raise ValidationError("Invalid regex: %r" % record.regex)
+
+    def match(self, text):
+        return re.search(self.regexp, text, re.U) is not None
