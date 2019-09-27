@@ -257,7 +257,7 @@ class PullRequests(models.Model):
                 continue
             if pr.state not in ['validated', 'ready']:
                 _logger.info('-> wrong state (%s)', pr.state)
-                if pr in failed:
+                if pr in failed and pr.state not in ['closed', 'merged']:
                     self.env['runbot_merge.pull_requests.feedback'].create({
                         'repository': pr.repository.id,
                         'pull_request': pr.number,
