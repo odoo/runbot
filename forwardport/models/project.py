@@ -516,7 +516,7 @@ In the former case, you may want to edit this PR message as well.
                 ancestors = "".join(
                     "* %s#%d\n" % (p.repository.name, p.number)
                     for p in pr._iter_ancestors()
-                    if p.parent_id and p.parent_id != source
+                    if p.parent_id
                 )
                 message = source._pingline() + """
 This PR targets %s and is the last of the forward-port chain%s
@@ -525,7 +525,7 @@ To merge the full chain, say
 > @%s r+
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
-""" % (target.name, 'containing:' if ancestors else '.', ancestors, pr.repository.project_id.fp_github_name)
+""" % (target.name, ' containing:' if ancestors else '.', ancestors, pr.repository.project_id.fp_github_name)
             else:
                 message = """\
 This PR targets %s and is part of the forward-port chain. Further PRs will be created up to %s.
