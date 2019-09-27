@@ -1307,7 +1307,7 @@ class Stagings(models.Model):
         ('pending', 'Pending'),
         ('cancelled', "Cancelled"),
         ('ff_failed', "Fast forward failed")
-    ])
+    ], default='pending')
     active = fields.Boolean(default=True)
 
     staged_at = fields.Datetime(default=fields.Datetime.now)
@@ -1358,7 +1358,7 @@ class Stagings(models.Model):
     def _validate(self):
         Commits = self.env['runbot_merge.commit']
         for s in self:
-            if s.state in ('cancelled', 'ff_failed'):
+            if s.state != 'pending':
                 continue
 
             heads = [
