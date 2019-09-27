@@ -177,6 +177,7 @@ def test_straightforward_flow(env, config, make_repo, users):
     pr0_, pr1_, pr2 = env['runbot_merge.pull_requests'].search([], order='number')
     assert pr0_ == pr0
     assert pr1_ == pr1
+    assert pr1.parent_id == pr1.source_id == pr0
     assert pr2.parent_id == pr1
     assert pr2.source_id == pr0
     assert not pr0.squash, "original PR has >1 commit"
@@ -192,13 +193,18 @@ def test_straightforward_flow(env, config, make_repo, users):
     assert prod.get_pr(pr2.number).comments == [
         (users['user'], """\
 Ping @%s, @%s
-This PR targets c and is the last of the forward-port chain.
+This PR targets c and is the last of the forward-port chain containing:
+* %s#%d
 
 To merge the full chain, say
 > @%s r+
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
-""" % (users['other'], users['reviewer'], project.fp_github_name)),
+""" % (
+            users['other'], users['reviewer'],
+            pr1.repository.name, pr1.number,
+            project.fp_github_name
+    )),
     ]
     with prod:
         prod.post_status(pr2.head, 'success', 'ci/runbot')
