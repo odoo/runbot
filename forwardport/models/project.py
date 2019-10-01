@@ -266,14 +266,18 @@ class PullRequests(models.Model):
                     })
                 continue
 
-            # if it already has a child, bail
-            if self.search_count([('parent_id', '=', self.id)]):
-                _logger.info('-> already has a child')
+            # check if we've already forward-ported this branch:
+            # it has a batch without a staging
+            batch = self.env['runbot_merge.batch'].with_context(active_test=False).search([
+                ('staging_id', '=', False),
+                ('prs', 'in', pr.id),
+            ], limit=1)
+            # if the batch is inactive, the forward-port has been done *or*
+            # the PR's own forward port is in error, so bail
+            if not batch.active:
                 continue
 
-            # check if we've already selected this PR's batch for forward
-            # porting and just haven't come around to it yet
-            batch = pr.batch_id
+            # otherwise check if we already have a pending forward port
             _logger.info("%s %s %s", pr, batch, batch.prs)
             if self.env['forwardport.batches'].search_count([('batch_id', '=', batch.id)]):
                 _logger.warn('-> already recorded')

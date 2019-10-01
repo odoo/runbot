@@ -141,3 +141,66 @@ def test_no_target(env, config, make_repo):
     env.run_crons()
     assert len(env['runbot_merge.pull_requests'].search([], order='number')) == 1,\
         "should not have created forward port"
+
+def test_failed_staging(env, config, make_repo):
+    proj, prod, _ = make_basic(env, config, make_repo, fp_token=True, fp_remote=True)
+
+    reviewer = config['role_reviewer']['token']
+    with prod:
+        prod.make_commits('a', Commit('c', tree={'a': '0'}), ref='heads/abranch')
+        pr1 = prod.make_pr(target='a', head='abranch')
+        prod.post_status(pr1.head, 'success', 'legal/cla')
+        prod.post_status(pr1.head, 'success', 'ci/runbot')
+        pr1.post_comment('hansen r+', reviewer)
+    env.run_crons()
+    with prod:
+        prod.post_status('staging.a', 'success', 'legal/cla')
+        prod.post_status('staging.a', 'success', 'ci/runbot')
+    env.run_crons()
+
+    pr1_id, pr2_id = env['runbot_merge.pull_requests'].search([], order='number')
+    assert pr2_id.parent_id == pr2_id.source_id == pr1_id
+    with prod:
+        prod.post_status(pr2_id.head, 'success', 'legal/cla')
+        prod.post_status(pr2_id.head, 'success', 'ci/runbot')
+    env.run_crons()
+
+    pr1_id, pr2_id, pr3_id = env['runbot_merge.pull_requests'].search([], order='number')
+    pr2 = prod.get_pr(pr2_id.number)
+    pr3 = prod.get_pr(pr3_id.number)
+    with prod:
+        prod.post_status(pr3_id.head, 'success', 'legal/cla')
+        prod.post_status(pr3_id.head, 'success', 'ci/runbot')
+        pr3.post_comment('%s r+' % proj.fp_github_name, reviewer)
+    env.run_crons()
+
+    prod.commit('staging.c')
+
+    with prod:
+        prod.post_status('staging.b', 'success', 'legal/cla')
+        prod.post_status('staging.b', 'success', 'ci/runbot')
+        prod.post_status('staging.c', 'failure', 'ci/runbot')
+    env.run_crons()
+
+    pr3_head = env['runbot_merge.commit'].search([
+        ('sha', '=', pr3_id.head),
+    ])
+    assert len(pr3_head) == 1
+
+    assert not pr3_id.batch_id, "check that the PR indeed has no batch anymore"
+    assert not pr3_id.batch_ids
+
+    assert len(env['runbot_merge.batch'].search([
+        ('prs', 'in', pr3_id.id),
+        '|', ('active', '=', True),
+             ('active', '=', False),
+    ])) == 2, "check that there do exist batches"
+
+    # send a new status to the PR, as if somebody had rebuilt it or something
+    with prod:
+        pr3.post_comment('hansen retry', reviewer)
+        prod.post_status(pr3_id.head, 'success', 'foo/bar')
+        prod.post_status(pr3_id.head, 'success', 'legal/cla')
+    assert pr3_head.to_check, "check that the commit was updated as to process"
+    env.run_crons()
+    assert not pr3_head.to_check, "check that the commit was processed"
