@@ -521,7 +521,7 @@ To merge the full chain, say
 > @%s r+
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
-""" % (target.name, 'containing:' if ancestors else '.', ancestors, pr.repository.project_id.fp_github_name)
+""" % (target.name, ' containing:' if ancestors else '.', ancestors, pr.repository.project_id.fp_github_name)
             else:
                 message = """\
 This PR targets %s and is part of the forward-port chain. Further PRs will be created up to %s.
