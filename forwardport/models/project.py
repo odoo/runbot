@@ -486,8 +486,18 @@ class PullRequests(models.Model):
                 }
             )
             assert 200 <= r.status_code < 300, r.json()
-            new_pr = self._from_gh(r.json())
-            _logger.info("Created forward-port PR %s", new_pr)
+            r = r.json()
+            self.env.cr.commit()
+
+            new_pr = self.search([
+                ('number', '=', r['number']),
+                ('repository.name', '=', r['base']['repo']['full_name']),
+            ], limit=1)
+            if new_pr:
+                _logger.info("Received forward-port PR %s", new_pr)
+            else:
+                new_pr = self._from_gh(r)
+                _logger.info("Created forward-port PR %s", new_pr)
             new_batch |= new_pr
 
             new_pr.write({
