@@ -204,7 +204,7 @@
                                     <span t-field="staging.staged_at"
                                           t-options="{'widget': 'text'}"/>
                                 </t>
-                                <t t-if="staging.heads">
+                                <div class="dropdown" t-if="staging.heads">
                                     <button class="btn btn-link dropdown-toggle"
                                             type="button"
                                             data-toggle="dropdown"
@@ -235,7 +235,7 @@
                                             </a>
                                         </li>
                                     </ul>
-                                </t>
+                                </div>
                             </th>
                             <td>
                                 <ul class="list-inline list-unstyled mb0">
