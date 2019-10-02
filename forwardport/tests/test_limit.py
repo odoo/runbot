@@ -208,3 +208,53 @@ To merge the full chain, say
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """ % (users['user'], users['reviewer'], users['user'])),
     ]
+
+def test_limit_after_merge(env, config, make_repo, users):
+    """ If attempting to set a limit (<up to>) on a PR which is merged
+    (already forward-ported or not), or is a forward-port PR, fwbot should
+    just feedback that it won't do it
+    """
+    prod, _ = make_basic(env, config, make_repo)
+    reviewer = config['role_reviewer']['token']
+    branch_c = env['runbot_merge.branch'].search([('name', '=', 'c')])
+    bot_name = env['runbot_merge.project'].search([]).fp_github_name
+    with prod:
+        [c] = prod.make_commits('a', Commit('c', tree={'0': '0'}), ref='heads/abranch')
+        pr1 = prod.make_pr(target='a', head='abranch')
+        prod.post_status(c, 'success', 'legal/cla')
+        prod.post_status(c, 'success', 'ci/runbot')
+        pr1.post_comment('hansen r+', reviewer)
+    env.run_crons()
+
+    with prod:
+        prod.post_status('staging.a', 'success', 'legal/cla')
+        prod.post_status('staging.a', 'success', 'ci/runbot')
+    env.run_crons()
+
+    p1, p2 = env['runbot_merge.pull_requests'].search([], order='number')
+    assert p1.limit_id == p2.limit_id == branch_c, "check that limit is correctly set"
+    pr2 = prod.get_pr(p2.number)
+    with prod:
+        pr1.post_comment(bot_name + ' up to b', reviewer)
+        pr2.post_comment(bot_name + ' up to b', reviewer)
+    env.run_crons()
+
+    assert p1.limit_id == p2.limit_id == branch_c, \
+        "check that limit was not updated"
+    assert pr1.comments == [
+        (users['reviewer'], "hansen r+"),
+        (users['user'], re_matches(r'Merged at [0-9a-z]{40}, thanks!')),
+        (users['reviewer'], bot_name + ' up to b'),
+        (bot_name, "Sorry, forward-port limit can only be set before the PR is merged."),
+    ]
+    assert pr2.comments == [
+        (users['user'], """\
+This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
+
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
+"""),
+        (users['reviewer'], bot_name + ' up to b'),
+        (bot_name, "Sorry, forward-port limit can only be set on an origin PR"
+                   " (#%d here) before it's merged and forward-ported." % p1.number
+         ),
+    ]
