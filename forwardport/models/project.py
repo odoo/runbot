@@ -226,7 +226,14 @@ class PullRequests(models.Model):
                         ('project_id', '=', self.repository.project_id.id),
                         ('name', '=', limit),
                     ])
-                    if not limit_id:
+                    if self.parent_id:
+                        msg = "Sorry, forward-port limit can only be set on an origin PR" \
+                              " (#%d here) before it's merged and forward-ported." % (
+                            self._get_root().number
+                        )
+                    elif self.state in ['merged', 'closed']:
+                        msg = "Sorry, forward-port limit can only be set before the PR is merged."
+                    elif not limit_id:
                         msg = "There is no branch %r, it can't be used as a forward port target." % limit
                     elif limit_id == self.target:
                         msg = "Forward-port disabled."
