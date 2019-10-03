@@ -871,6 +871,24 @@ def test_reopen_state(env, repo):
     assert pr.state == 'validated', \
         "if a PR is reopened and had a CI'd head, it should be validated immediately"
 
+def test_no_required_statuses(env, repo):
+    """ check that mergebot can work on a repo with no CI at all
+    """
+    env['runbot_merge.project'].search([]).required_statuses = ''
+    m = repo.make_commit(None, 'initial', None, tree={'0': '0'})
+    repo.make_ref('heads/master', m)
+
+    c = repo.make_commit(m, 'first', None, tree={'0': '1'})
+    prx = repo.make_pr('title', 'body', target='master', ctid=c, user='user')
+    prx.post_comment('hansen r+', 'reviewer')
+
+    run_crons(env)
+
+    assert env['runbot_merge.pull_requests'].search([
+        ('repository.name', '=', repo.name),
+        ('number', '=', prx.number)
+    ]).state == 'ready'
+
 class TestRetry:
     @pytest.mark.xfail(reason="This may not be a good idea as it could lead to tons of rebuild spam")
     def test_auto_retry_push(self, env, repo):

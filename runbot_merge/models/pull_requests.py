@@ -812,7 +812,7 @@ class PullRequests(models.Model):
         # targets
         failed = self.browse(())
         for pr in self:
-            required = pr.repository.project_id.required_statuses.split(',')
+            required = filter(None, pr.repository.project_id.required_statuses.split(','))
 
             success = True
             for ci in required:
@@ -830,7 +830,6 @@ class PullRequests(models.Model):
                             'pull_request': pr.number,
                             'message': "%r failed on this reviewed PR." % ci,
                         })
-
             if success:
                 oldstate = pr.state
                 if oldstate == 'opened':
@@ -860,8 +859,7 @@ class PullRequests(models.Model):
     def create(self, vals):
         pr = super().create(vals)
         c = self.env['runbot_merge.commit'].search([('sha', '=', pr.head)])
-        if c and c.statuses:
-            pr._validate(json.loads(c.statuses))
+        pr._validate(json.loads(c.statuses or '{}'))
 
         if pr.state not in ('closed', 'merged'):
             self.env['runbot_merge.pull_requests.tagging'].create({
