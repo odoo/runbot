@@ -7,10 +7,7 @@
                 align-items: stretch;
             }
             .stagings > li {
-                /* 4 to 6 stagings displayed, avoid stretching */
                 flex: 1;
-                min-width: 16%;
-                max-width: 25%;
 
                 padding: 0.1em;
                 padding-left: 0.5em;
@@ -117,7 +114,8 @@
                     <t t-if="pending">bg-info</t>
                     <t t-if="not (success or failure or pending)">bg-gray-lighter</t>
                 </t>
-                <t t-set="decorationclass">
+                <t t-set="decorationclass" >
+                    <t t-if="staging_index >= 2">hidden-xs</t>
                     <t t-if="staging_index >= 4">visible-lg-block</t>
                 </t>
                 <t t-set="title">
@@ -125,7 +123,7 @@
                     <t t-if="staging.state == 'ff_failed'">Fast Forward Failed</t>
                     <t t-if="staging.state not in ('canceled', 'ff_failed')"><t t-esc="staging.reason"/></t>
                 </t>
-                <li t-attf-class="staging {{stateclass}} {{decorationclass}}" t-att-title="title.strip() or None">
+                <li t-attf-class="staging {{stateclass.strip()}} {{decorationclass.strip()}}" t-att-title="title.strip() or None">
                     <ul class="list-unstyled">
                         <li t-foreach="staging.batch_ids" t-as="batch" class="batch">
                             <t t-esc="batch.prs[:1].label"/>
