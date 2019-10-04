@@ -318,14 +318,11 @@ class runbot_build(models.Model):
             assert bool(not build.duplicate_id) ^ (build.local_state == 'duplicate')  # don't change duplicate state without removing duplicate id.
         return res
 
-    def _end_test(self):
+    def update_build_end(self):
         for build in self:
-            if build.parent_id and build.global_state in ('running', 'done'):
-                global_result = build.global_result
-                loglevel = 'OK' if global_result == 'ok' else 'WARNING' if global_result == 'warn' else 'ERROR'
-                build.parent_id._log('children_build', 'returned a "%s" result ' % (global_result), level=loglevel, log_type='subbuild', path=self.id)
-                if build.parent_id.local_state in ('running', 'done'):
-                    build.parent_id._end_test()
+            build.build_end = now()
+            if build.parent_id and build.parent_id.local_state in ('running', 'done'):
+                    build.parent_id.update_build_end()
 
     @api.depends('name', 'branch_id.name')
     def _compute_dest(self):
@@ -642,14 +639,13 @@ class runbot_build(models.Model):
                 build_values.update(build._next_job_values())  # find next active_step or set to done
                 ending_build = build.local_state not in ('done', 'running') and build_values.get('local_state') in ('done', 'running')
                 if ending_build:
-                    build_values['build_end'] = now()
+                    build.update_build_end()
 
                 step_end_message = 'Step %s finished in %s' % (build.job, s2human(build.job_time))
                 build.write(build_values)
 
                 if ending_build:
                     build._github_status()
-                    # build._end_test()
                     if not build.local_result:  # Set 'ok' result if no result set (no tests job on build)
                         build.local_result = 'ok'
                         build._logger("No result set, setting ok by default")
