@@ -505,6 +505,7 @@ class PullRequests(models.Model):
 
     statuses = fields.Text(compute='_compute_statuses')
     status = fields.Char(compute='_compute_statuses')
+    previous_failure = fields.Char(default='{}')
 
     batch_id = fields.Many2one('runbot_merge.batch',compute='_compute_active_batch', store=True)
     batch_ids = fields.Many2many('runbot_merge.batch')
@@ -823,13 +824,7 @@ class PullRequests(models.Model):
                 success = False
                 if st in ('error', 'failure'):
                     failed |= pr
-                    # only report an issue of the PR is already approved (r+'d)
-                    if pr.state == 'approved':
-                        self.env['runbot_merge.pull_requests.feedback'].create({
-                            'repository': pr.repository.id,
-                            'pull_request': pr.number,
-                            'message': "%r failed on this reviewed PR." % ci,
-                        })
+                    self._notify_ci_new_failure(ci, to_status(statuses.get(ci.strip(), 'pending')))
             if success:
                 oldstate = pr.state
                 if oldstate == 'opened':
@@ -837,6 +832,23 @@ class PullRequests(models.Model):
                 elif oldstate == 'approved':
                     pr.state = 'ready'
         return failed
+
+    def _notify_ci_new_failure(self, ci, st):
+        # only sending notification if the newly failed status is different than
+        # the old one
+        prev = json.loads(self.previous_failure)
+        if st != prev:
+            self.previous_failure = json.dumps(st)
+            self._notify_ci_failed(ci)
+
+    def _notify_ci_failed(self, ci):
+        # only report an issue of the PR is already approved (r+'d)
+        if self.state == 'approved':
+            self.env['runbot_merge.pull_requests.feedback'].create({
+                'repository': self.repository.id,
+                'pull_request': self.number,
+                'message': "%r failed on this reviewed PR." % ci,
+            })
 
     def _auto_init(self):
         super(PullRequests, self)._auto_init()
@@ -1254,8 +1266,6 @@ class Commit(models.Model):
         r = super(Commit, self).write(values)
         return r
 
-    # NB: GH recommends doing heavy work asynchronously, may be a good
-    #     idea to defer this to a cron or something
     def _notify(self):
         Stagings = self.env['runbot_merge.stagings']
         PRs = self.env['runbot_merge.pull_requests']

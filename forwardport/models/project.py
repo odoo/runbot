@@ -252,6 +252,21 @@ class PullRequests(models.Model):
                     'token_field': 'fp_github_token',
                 })
 
+    def _notify_ci_failed(self, ci):
+        # only care about FP PRs which are not staged / merged yet
+        # NB: probably ignore approved PRs as normal message will handle them?
+        if not (self.state == 'opened' and self.parent_id):
+            return
+
+        self.env['runbot_merge.pull_requests.feedback'].create({
+            'repository': self.repository.id,
+            'pull_request': self.number,
+            'token_field': 'fp_github_token',
+            'message': '%s\n\n%s failed on this forward-port PR' % (
+                self.source_id._pingline(),
+                ci,
+            )
+        })
 
     def _validate(self, statuses):
         _logger = logging.getLogger(__name__).getChild('forwardport.next')
@@ -264,13 +279,6 @@ class PullRequests(models.Model):
                 continue
             if pr.state not in ['validated', 'ready']:
                 _logger.info('-> wrong state (%s)', pr.state)
-                if pr in failed and pr.state not in ['closed', 'merged']:
-                    self.env['runbot_merge.pull_requests.feedback'].create({
-                        'repository': pr.repository.id,
-                        'pull_request': pr.number,
-                        'token_field': 'fp_github_token',
-                        'message': pr.source_id._pingline() + '\n\nCI failed on this forward-port PR'
-                    })
                 continue
 
             # check if we've already forward-ported this branch:

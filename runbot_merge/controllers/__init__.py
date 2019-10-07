@@ -190,14 +190,17 @@ def handle_status(env, event):
     env.cr.execute('SELECT id FROM runbot_merge_commit WHERE sha=%s FOR UPDATE', [event['sha']])
     c = Commits.browse(env.cr.fetchone())
     if c:
-        c.statuses = json.dumps({
-            **json.loads(c.statuses),
+        old = json.loads(c.statuses)
+        new = {
+            **old,
             event['context']: {
                 'state': event['state'],
                 'target_url': event['target_url'],
                 'description': event['description']
             }
-        })
+        }
+        if new != old: # don't update the commit if nothing's changed (e.g dupe status)
+            c.statuses = json.dumps(new)
     else:
         Commits.create({
             'sha': event['sha'],

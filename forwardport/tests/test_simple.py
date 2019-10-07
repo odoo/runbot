@@ -236,13 +236,15 @@ This PR targets b and is part of the forward-port chain. Further PRs will be cre
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 ''')
-    ci_warning = (users['user'], 'Ping @%(user)s, @%(reviewer)s\n\nCI failed on this forward-port PR' % users)
+    ci_warning = (users['user'], 'Ping @%(user)s, @%(reviewer)s\n\nci/runbot failed on this forward-port PR' % users)
 
     # oh no CI of the first FP PR failed!
-    with prod:
-        prod.post_status(pr1.head, 'failure', 'ci/runbot')
-        prod.post_status(pr1.head, 'success', 'legal/cla')
-    env.run_crons()
+    # simulate status being sent multiple times (e.g. on multiple repos) with
+    # some delivery lag allowing for the cron to run between each delivery
+    for st, ctx in [('failure', 'ci/runbot'), ('failure', 'ci/runbot'), ('success', 'legal/cla'), ('success', 'legal/cla')]:
+        with prod:
+            prod.post_status(pr1.head, st, ctx)
+        env.run_crons()
     # check that FP did not resume & we have a ping on the PR
     assert env['runbot_merge.pull_requests'].search([], order='number') == pr0 | pr1,\
         "forward port should not continue on CI failure"
@@ -251,7 +253,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 
     # it was a false positive, rebuild... it fails again!
     with prod:
-        prod.post_status(pr1.head, 'failure', 'ci/runbot')
+        prod.post_status(pr1.head, 'failure', 'ci/runbot', target_url='http://example.org/4567890')
     env.run_crons()
     # check that FP did not resume & we have a ping on the PR
     assert env['runbot_merge.pull_requests'].search([], order='number') == pr0 | pr1,\
