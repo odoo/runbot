@@ -64,6 +64,10 @@ RUN npm install -g es-check
 RUN apt-get update \
     && apt-get install -y python3-markdown
 
+# Install flamegraph.pl
+ADD https://raw.githubusercontent.com/brendangregg/FlameGraph/master/flamegraph.pl /usr/local/bin/flamegraph.pl
+RUN chmod +rx /usr/local/bin/flamegraph.pl
+
 # Install Odoo Debian dependencies
 ADD https://raw.githubusercontent.com/odoo/odoo/10.0/debian/control /tmp/p2-control
 ADD https://raw.githubusercontent.com/odoo/odoo/master/debian/control /tmp/p3-control
@@ -77,4 +81,4 @@ RUN pip install -U setuptools wheel \
 ADD https://raw.githubusercontent.com/odoo/odoo/master/requirements.txt /root/p3-requirements.txt
 ADD https://raw.githubusercontent.com/odoo/odoo/10.0/requirements.txt /root/p2-requirements.txt
 RUN pip install --no-cache-dir -r /root/p2-requirements.txt coverage flanker==0.4.38 pylint==1.7.2 phonenumbers redis \
-    && pip3 install --no-cache-dir -r /root/p3-requirements.txt coverage websocket-client astroid==2.0.4 pylint==1.7.2 phonenumbers pyCrypto dbfread==2.0.7 firebase-admin==2.17.0
+    && pip3 install --no-cache-dir -r /root/p3-requirements.txt coverage websocket-client astroid==2.0.4 pylint==1.7.2 phonenumbers pyCrypto dbfread==2.0.7 firebase-admin==2.17.0 flamegraph
