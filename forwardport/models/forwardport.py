@@ -14,16 +14,14 @@ class Queue:
         raise NotImplementedError
 
     def _process(self):
-        while True:
-            b = self.search([], limit=1)
-            if not b:
-                return
-
-            b._process_item()
-
-            b.unlink()
-            self.env.cr.commit()
-
+        for b in self.search([]):
+            try:
+                with self.env.cr.savepoint():
+                    b._process_item()
+                b.unlink()
+                self.env.cr.commit()
+            except Exception:
+                _logger.exception("Error while processing %s, skipping", b)
 
 class BatchQueue(models.Model, Queue):
     _name = 'forwardport.batches'
