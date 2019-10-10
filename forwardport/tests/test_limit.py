@@ -255,6 +255,6 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """),
         (users['reviewer'], bot_name + ' up to b'),
         (bot_name, "Sorry, forward-port limit can only be set on an origin PR"
-                   " (#%d here) before it's merged and forward-ported." % p1.number
+                   " (%s here) before it's merged and forward-ported." % p1.display_name
          ),
     ]

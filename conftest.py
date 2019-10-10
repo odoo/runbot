@@ -80,6 +80,13 @@ def pytest_addoption(parser):
 def pytest_report_header(config):
     return 'Running against database ' + config.getoption('--db')
 
+@pytest.fixture(scope='session', autouse=True)
+def _set_socket_timeout():
+    """ Avoid unlimited wait on standard sockets during tests, this is mostly
+    an issue for non-trivial cron calls
+    """
+    socket.setdefaulttimeout(60.0)
+
 @pytest.fixture(scope="session")
 def config(pytestconfig):
     """ Flat version of the pytest config file (pytest.ini), parses to a

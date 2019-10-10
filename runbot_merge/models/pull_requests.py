@@ -528,7 +528,7 @@ class PullRequests(models.Model):
 
     def name_get(self):
         return {
-            p.id: '%s:%s' % (p.repository.name, p.number)
+            p.id: '%s#%s' % (p.repository.name, p.number)
             for p in self
         }
 
@@ -540,7 +540,7 @@ class PullRequests(models.Model):
         else:
             separator = 's '
         return '<pull_request%s%s>' % (separator, ' '.join(
-            '{0.id} ({0.repository.name}:{0.number})'.format(p)
+            '{0.id} ({0.display_name})'.format(p)
             for p in self
         ))
 
@@ -988,7 +988,7 @@ class PullRequests(models.Model):
                     'pull_request': r.number,
                     'message': "Linked pull request(s) {} not ready. Linked PRs are not staged until all of them are ready.".format(
                         ', '.join(map(
-                            '{0.repository.name}#{0.number}'.format,
+                            '{0.display_name}'.format,
                             unready
                         ))
                     )
@@ -1032,7 +1032,7 @@ class PullRequests(models.Model):
             repository=self.repository.name.replace('/', '\\/')
         )
         if not re.search(pattern, m.body):
-            m.body += '\n\ncloses {pr.repository.name}#{pr.number}'.format(pr=self)
+            m.body += '\n\ncloses {pr.display_name}'.format(pr=self)
 
         if self.reviewed_by:
             m.headers.add('signed-off-by', self.reviewed_by.formatted_email)

@@ -23,27 +23,9 @@
 
     <record model="ir.cron" id="reminder">
         <field name="name">Remind open PR</field>
-        <field name="model_id" ref="model_forwardport_updates"/>
+        <field name="model_id" ref="model_runbot_merge_pull_requests"/>
         <field name="state">code</field>
-        <field name="code">
-default_delta = dateutil.relativedelta.relativedelta(days=3)
-cutoff = env.context.get('forwardport_updated_before') or (datetime.datetime.now() - default_delta).strftime('%Y-%m-%d %H:%M:%S')
-
-for pr in env['runbot_merge.pull_requests'].search([
-    # only FP PRs
-    ('source_id', '!=', False),
-    # active
-    ('state', 'not in', ['merged', 'closed']),
-    # last updated more than a week ago
-    ('write_date', '&lt;', cutoff),
-]).mapped('source_id'):
-    env['runbot_merge.pull_requests.feedback'].create({
-        'repository': pr.repository.id,
-        'pull_request': pr.number,
-        'message': "This pull request has forward-port PRs awaiting action",
-        'token_field': 'fp_github_token',
-    })
-        </field>
+        <field name="code">model._reminder()</field>
         <field name="interval_number">1</field>
         <field name="interval_type">days</field>
         <field name="numbercall">-1</field>

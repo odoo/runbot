@@ -13,6 +13,7 @@ it up), ...
 """
 import base64
 import contextlib
+import datetime
 import itertools
 import json
 import logging
@@ -22,15 +23,17 @@ import re
 import subprocess
 import tempfile
 
+import dateutil
 import requests
 
 from odoo import _, models, fields, api
 from odoo.exceptions import UserError
-from odoo.tools import topological_sort
+from odoo.tools import topological_sort, groupby
 from odoo.tools.appdirs import user_cache_dir
 from odoo.addons.runbot_merge import utils
 from odoo.addons.runbot_merge.models.pull_requests import RPLUS
 
+DEFAULT_DELTA = dateutil.relativedelta.relativedelta(days=3)
 
 _logger = logging.getLogger('odoo.addons.forwardport')
 
@@ -228,8 +231,8 @@ class PullRequests(models.Model):
                     ])
                     if self.parent_id:
                         msg = "Sorry, forward-port limit can only be set on an origin PR" \
-                              " (#%d here) before it's merged and forward-ported." % (
-                            self._get_root().number
+                              " (%s here) before it's merged and forward-ported." % (
+                            self._get_root().display_name
                         )
                     elif self.state in ['merged', 'closed']:
                         msg = "Sorry, forward-port limit can only be set before the PR is merged."
@@ -417,16 +420,16 @@ class PullRequests(models.Model):
         target = base._find_next_target(ref)
         if target is None:
             _logger.info(
-                "Will not forward-port %s#%s: no next target",
-                ref.repository.name, ref.number,
+                "Will not forward-port %s: no next target",
+                ref.display_name,
             )
             return  # QUESTION: do the prs need to be updated?
 
         proj = self.mapped('target.project_id')
         if not proj.fp_github_token:
             _logger.warning(
-                "Can not forward-port %s#%s: no token on project %s",
-                ref.repository.name, ref.number,
+                "Can not forward-port %s: no token on project %s",
+                ref.display_name,
                 proj.name
             )
             return
@@ -471,7 +474,7 @@ class PullRequests(models.Model):
                 message = ''
             root = pr._get_root()
             message += '\n'.join(
-                "Forward-Port-Of: %s#%s" % (p.repository.name, p.number)
+                "Forward-Port-Of: %s" % p.display_name
                 for p in root | source
             )
 
@@ -539,7 +542,7 @@ In the former case, you may want to edit this PR message as well.
 """ % (h, source.number, sout, serr)
             elif base._find_next_target(new_pr) is None:
                 ancestors = "".join(
-                    "* %s#%d\n" % (p.repository.name, p.number)
+                    "* %s\n" % p.display_name
                     for p in pr._iter_ancestors()
                     if p.parent_id
                 )
@@ -766,6 +769,26 @@ stderr:
             repo.config('--add', 'remote.origin.fetch', '+refs/heads/*:refs/heads/*')
             repo.config('--add', 'remote.origin.fetch', '+refs/pull/*/head:refs/heads/pull/*')
             return repo
+
+    def _reminder(self):
+        cutoff = self.env.context.get('forwardport_updated_before') or fields.Datetime.to_string(datetime.datetime.now() - DEFAULT_DELTA)
+
+        for source, prs in groupby(self.env['runbot_merge.pull_requests'].search([
+            # only FP PRs
+            ('source_id', '!=', False),
+            # active
+            ('state', 'not in', ['merged', 'closed']),
+            # last updated more than <cutoff> ago
+            ('write_date', '<', cutoff),
+        ]), lambda p: p.source_id):
+            self.env['runbot_merge.pull_requests.feedback'].create({
+                'repository': source.repository.id,
+                'pull_request': source.number,
+                'message': "This pull request has forward-port PRs awaiting action (not merged or closed): %s" % ', '.join(
+                    pr.display_name for pr in sorted(prs, key=lambda p: p.number)
+                ),
+                'token_field': 'fp_github_token',
+            })
 
 class Stagings(models.Model):
     _inherit = 'runbot_merge.stagings'
