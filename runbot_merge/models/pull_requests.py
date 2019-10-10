@@ -415,7 +415,7 @@ class Branch(models.Model):
                         i, len(WAIT_FOR_VISIBILITY)
                     )
                     break
-                _logger.warn(
+                _logger.warning(
                     "[repo] updated %s:%s to %s: failed (at %d/%d)",
                     r.name, refname, staging_head,
                     i, len(WAIT_FOR_VISIBILITY)
@@ -1123,7 +1123,7 @@ class PullRequests(models.Model):
         """
         split_batches = self.with_context(active_test=False).mapped('batch_ids').filtered('split_id')
         if len(split_batches) > 1:
-            _logger.warn("Found a PR linked with more than one split batch: %s (%s)", self, split_batches)
+            _logger.warning("Found a PR linked with more than one split batch: %s (%s)", self, split_batches)
         for b in split_batches:
             if len(b.split_id.batch_ids) == 1:
                 # only the batch of this PR -> delete split

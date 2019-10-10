@@ -66,7 +66,7 @@ class Project(models.Model):
                 'Authorization': 'token %s' % project.fp_github_token
             })
             if not (r0.ok and r1.ok):
-                _logger.warn("Failed to fetch bot information for project %s: %s", project.name, (r0.text or r0.content) if not r0.ok else (r1.text or r1.content))
+                _logger.warning("Failed to fetch bot information for project %s: %s", project.name, (r0.text or r0.content) if not r0.ok else (r1.text or r1.content))
                 continue
             project.fp_github_name = r0.json()['login']
             project.fp_github_email = next((
@@ -424,7 +424,7 @@ class PullRequests(models.Model):
 
         proj = self.mapped('target.project_id')
         if not proj.fp_github_token:
-            _logger.warn(
+            _logger.warning(
                 "Can not forward-port %s#%s: no token on project %s",
                 ref.repository.name, ref.number,
                 proj.name
@@ -433,19 +433,19 @@ class PullRequests(models.Model):
 
         notarget = [p.repository.name for p in self if not p.repository.fp_remote_target]
         if notarget:
-            _logger.warn(
+            _logger.warning(
                 "Can not forward-port %s: repos %s don't have a remote configured",
                 self, ', '.join(notarget)
             )
             return
 
         # take only the branch bit
-        new_branch = '%s-%s-%s-forwardport' % (
+        new_branch = '%s-%s-%s-fw' % (
             target.name,
             base.refname,
             # avoid collisions between fp branches (labels can be reused
             # or conflict especially as we're chopping off the owner)
-            base64.b32encode(os.urandom(5)).decode()
+            base64.urlsafe_b64encode(os.urandom(3)).decode()
         )
         # TODO: send outputs to logging?
         conflicts = {}
