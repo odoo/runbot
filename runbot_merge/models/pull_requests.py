@@ -824,7 +824,7 @@ class PullRequests(models.Model):
                 success = False
                 if st in ('error', 'failure'):
                     failed |= pr
-                    self._notify_ci_new_failure(ci, to_status(statuses.get(ci.strip(), 'pending')))
+                    pr._notify_ci_new_failure(ci, to_status(statuses.get(ci.strip(), 'pending')))
             if success:
                 oldstate = pr.state
                 if oldstate == 'opened':
