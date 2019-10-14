@@ -523,7 +523,7 @@ class Repo:
         )
         return h
 
-    def make_commits(self, root, *commits, ref=None):
+    def make_commits(self, root, *commits, ref=None, make=True):
         assert self.hook
         if isinstance(root, list):
             parents = root
@@ -567,7 +567,8 @@ class Repo:
             parents = [hashes[-1]]
 
         if ref:
-            self.make_ref(ref, hashes[-1], force=True)
+            fn = self.make_ref if make else self.update_ref
+            fn(ref, hashes[-1], force=True)
 
         return hashes
 
@@ -925,7 +926,7 @@ class Model:
     def __eq__(self, other):
         if not isinstance(other, Model):
             return NotImplemented
-        return self._model == other._model and self._ids == other._ids
+        return self._model == other._model and set(self._ids) == set(other._ids)
 
     def __repr__(self):
         return "{}({})".format(self._model, ', '.join(str(id_) for id_ in self._ids))
@@ -949,6 +950,10 @@ class Model:
 
     def unlink(self):
         return self._env(self._model, 'unlink', self._ids)
+
+    def sorted(self, field):
+        rs = sorted(self.read([field]), key=lambda r: r[field])
+        return Model(self._env, self._model, [r['id'] for r in rs])
 
     def __getitem__(self, index):
         if isinstance(index, str):

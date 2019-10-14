@@ -283,7 +283,8 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         [new_c] = pr_repo.make_commits(
             pr1.target.name,
             Commit('whop whop', tree={'x': '5'}),
-            ref='heads/%s' % pr_ref
+            ref='heads/%s' % pr_ref,
+            make=False
         )
     env.run_crons()
 
@@ -398,7 +399,8 @@ xxx
             # "b" was cloned before that branch got rolled back
             prod.commit('b').id,
             Commit('g should indeed b xxx', tree={'g': 'xxx'}),
-            ref='heads/%s' % pr_ref
+            ref='heads/%s' % pr_ref,
+            make=False,
         )
     env.run_crons()
     assert prod.read_tree(prod.commit(pr1.head)) == {
@@ -502,7 +504,8 @@ def test_conflict_deleted(env, config, make_repo):
             # "b" was cloned before that branch got rolled back
             prod.commit('b').id,
             Commit('f should indeed be removed', tree={'g': 'c'}, reset=True),
-            ref='heads/%s' % pr_ref
+            ref='heads/%s' % pr_ref,
+            make=False,
         )
     env.run_crons()
     assert prod.read_tree(prod.commit(pr1.head)) == {

@@ -809,7 +809,7 @@ def test_forward_port(env, repo, config):
     commits = {c['sha'] for c in repo.log('heads/master')}
     assert len(commits) == 112
 
-@pytest.skip("Needs to find a way to make set_ref fail on *second* call.")
+@pytest.mark.skip("Needs to find a way to make set_ref fail on *second* call.")
 def test_rebase_failure(env, repo, users, config):
     """ It looks like gh.rebase() can fail in the final ref-setting after
     the merging & commits creation has been performed. At this point, the
