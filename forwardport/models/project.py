@@ -597,6 +597,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
                 'repository': new_pr.repository.id,
                 'pull_request': new_pr.number,
                 'to_add': json.dumps(labels),
+                'token_field': 'fp_github_token',
             })
             # not great but we probably want to avoid the risk of the webhook
             # creating the PR from under us. There's still a "hole" between
