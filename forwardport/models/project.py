@@ -86,10 +86,9 @@ class Project(models.Model):
         to_remove = []
         for f in self.env['forwardport.tagging'].search([]):
             repo = f.repository
-            key = (repo, f.token_field)
-            gh = ghs.get(key)
+            gh = ghs.get(repo)
             if not gh:
-                gh = ghs[key] = repo.github(f.token_field)
+                gh = ghs[repo] = repo.github()
 
             try:
                 gh('POST', 'issues/{}/labels'.format(f.pull_request), json={
@@ -598,7 +597,6 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
                 'repository': new_pr.repository.id,
                 'pull_request': new_pr.number,
                 'to_add': json.dumps(labels),
-                'token_field': 'fp_github_token',
             })
             # not great but we probably want to avoid the risk of the webhook
             # creating the PR from under us. There's still a "hole" between
