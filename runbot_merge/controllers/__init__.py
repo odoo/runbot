@@ -142,14 +142,14 @@ def handle_pr(env, event):
 
         if pr_obj.state == 'ready':
             pr_obj.unstage(
-                "PR %s:%s updated by %s",
-                pr_obj.repository.name, pr_obj.number,
+                "PR %s updated by %s",
+                pr_obj.display_name,
                 event['sender']['login']
             )
 
         _logger.info(
-            "PR %s:%s updated to %s by %s, resetting to 'open' and squash=%s",
-            pr_obj.repository.name, pr_obj.number,
+            "PR %s updated to %s by %s, resetting to 'open' and squash=%s",
+            pr_obj.display_name,
             pr['head']['sha'], event['sender']['login'],
             pr['commits'] == 1
         )
@@ -164,12 +164,19 @@ def handle_pr(env, event):
     # don't marked merged PRs as closed (!!!)
     if event['action'] == 'closed' and pr_obj.state != 'merged':
         # FIXME: store some sort of "try to close it later" if the merge fails?
+        _logger.info(
+            '%s closing %s (state=%s)',
+            event['sender']['login'],
+            pr_obj.display_name,
+            pr_obj.state,
+        )
         if pr_obj._try_closing(event['sender']['login']):
             return 'Closed {}'.format(pr_obj.id)
         else:
             return 'Ignored: could not lock rows (probably being merged)'
 
     if event['action'] == 'reopened' and pr_obj.state == 'closed':
+        _logger.info('%s reopening %s', event['sender']['login'], pr_obj.display_name)
         pr_obj.write({
             'state': 'opened',
             # updating the head triggers a revalidation
