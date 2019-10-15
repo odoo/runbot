@@ -35,11 +35,6 @@ class BatchQueue(models.Model, Queue):
     def _process_item(self):
         batch = self.batch_id
 
-        # only some prs of the batch have a parent, that's weird
-        with_parent = batch.prs.filtered(lambda p: p.parent_id)
-        if with_parent and with_parent != batch.prs:
-            _logger.warning("Found a subset of batch %s (%s) with parents: %s, should probably investigate (normally either they're all parented or none are)", batch, batch.prs, with_parent)
-
         newbatch = batch.prs._port_forward()
         if newbatch:
             _logger.info(
