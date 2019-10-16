@@ -385,6 +385,10 @@ class Repo:
         # unwatch repo
         self.unsubscribe()
 
+    @property
+    def owner(self):
+        return self.name.split('/')[0]
+
     def unsubscribe(self, token=None):
         self._get_session(token).put('https://api.github.com/repos/{}/subscription'.format(self.name), json={
             'subscribed': False,
@@ -417,7 +421,27 @@ class Repo:
         assert 200 <= r.status_code < 300, r.json()
 
     def get_ref(self, ref):
-        return self.commit(ref).id
+        # differs from .commit(ref).id for the sake of assertion error messages
+        # apparently commits/{ref} returns 422 or some other fool thing when the
+        # ref' does not exist which sucks for asserting "the ref' has been
+        # deleted"
+        # FIXME: avoid calling get_ref on a hash & remove this code
+        if re.match(r'[0-9a-f]{40}', ref):
+            # just check that the commit exists
+            r = self._session.get('https://api.github.com/repos/{}/git/commits/{}'.format(self.name, ref))
+            assert 200 <= r.status_code < 300, r.reason
+            return r.json()['sha']
+
+        if ref.startswith('refs/'):
+            ref = ref[5:]
+        if not ref.startswith('heads'):
+            ref = 'heads/' + ref
+
+        r = self._session.get('https://api.github.com/repos/{}/git/ref/{}'.format(self.name, ref))
+        assert 200 <= r.status_code < 300, r.reason
+        res = r.json()
+        assert res['object']['type'] == 'commit'
+        return res['object']['sha']
 
     def commit(self, ref):
         if not re.match(r'[0-9a-f]{40}', ref):
@@ -739,7 +763,7 @@ class PR:
 
     @property
     def ref(self):
-        return 'heads/' + self.branch[1]
+        return 'heads/' + self.branch.branch
 
     def post_comment(self, body, token=None):
         assert self.repo.hook

@@ -31,4 +31,15 @@
         <field name="numbercall">-1</field>
         <field name="doall" eval="False"/>
     </record>
+
+    <record model="ir.cron" id="remover">
+        <field name="name">Remove branches of merged PRs</field>
+        <field name="model_id" ref="model_forwardport_branch_remover"/>
+        <field name="state">code</field>
+        <field name="code">model._process()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="numbercall">-1</field>
+        <field name="doall" eval="False"/>
+    </record>
 </odoo>

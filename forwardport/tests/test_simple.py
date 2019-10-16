@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import collections
-from datetime import datetime, timedelta
 import time
+from datetime import datetime, timedelta
 from operator import itemgetter
 
 import pytest
@@ -202,6 +202,22 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     }
     # check that we didn't just smash the original trees
     assert prod.read_tree(prod.commit('a')) != b_tree != c_tree
+
+    prs = env['forwardport.branch_remover'].search([]).mapped('pr_id')
+    assert prs == pr0 | pr1 | pr2, "pr1 and pr2 should be slated for branch deletion"
+    env.run_crons('forwardport.remover', context={'forwardport_merged_before': FAKE_PREV_WEEK})
+
+    # should not have deleted the base branch (wrong repo)
+    assert other_user_repo.get_ref(pr.ref) == p_1
+
+    # should have deleted all PR branches
+    pr1_ref = prod.get_pr(pr1.number).ref
+    with pytest.raises(AssertionError, match='Not Found'):
+        other.get_ref(pr1_ref)
+
+    pr2_ref = prod.get_pr(pr2.number).ref
+    with pytest.raises(AssertionError, match="Not Found"):
+        other.get_ref(pr2_ref)
 
 def test_update_pr(env, config, make_repo, users):
     """ Even for successful cherrypicks, it's possible that e.g. CI doesn't
@@ -963,6 +979,86 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         assert pr1_1.state == 'closed'
         assert not pr1_1.parent_id
         assert pr2_1.state == 'opened'
+
+class TestBranchDeletion:
+    def test_delete_normal(self, env, config, make_repo):
+        """ Regular PRs should get their branch deleted as long as they're
+        created in the fp repository
+        """
+        prod, other = make_basic(env, config, make_repo)
+        with prod, other:
+            [c] = other.make_commits('a', Commit('c', tree={'0': '0'}), ref='heads/abranch')
+            pr = prod.make_pr(
+                target='a', head='%s:abranch' % other.owner,
+                title="a pr",
+            )
+            prod.post_status(c, 'success', 'legal/cla')
+            prod.post_status(c, 'success', 'ci/runbot')
+            pr.post_comment('hansen r+', config['role_reviewer']['token'])
+        env.run_crons()
+
+        with prod:
+            prod.post_status('staging.a', 'success', 'legal/cla')
+            prod.post_status('staging.a', 'success', 'ci/runbot')
+        env.run_crons()
+
+        pr_id = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', prod.name),
+            ('number', '=', pr.number)
+        ])
+        assert pr_id.state == 'merged'
+        removers = env['forwardport.branch_remover'].search([])
+        to_delete_branch = removers.mapped('pr_id')
+        assert to_delete_branch == pr_id
+
+        env.run_crons('forwardport.remover', context={'forwardport_merged_before': FAKE_PREV_WEEK})
+        with pytest.raises(AssertionError, match="Not Found"):
+            other.get_ref('heads/abranch')
+
+    def test_not_merged(self, env, config, make_repo):
+        """ The branches of PRs which are still open or have been closed (rather
+        than merged) should not get deleted
+        """
+        prod, other = make_basic(env, config, make_repo)
+        with prod, other:
+            [c] = other.make_commits('a', Commit('c1', tree={'1': '0'}), ref='heads/abranch')
+            pr1 = prod.make_pr(target='a', head='%s:abranch' % other.owner, title='a')
+            prod.post_status(c, 'success', 'legal/cla')
+            prod.post_status(c, 'success', 'ci/runbot')
+            pr1.post_comment('hansen r+', config['role_reviewer']['token'])
+
+            [c] = other.make_commits('a', Commit('c2', tree={'2': '0'}), ref='heads/bbranch')
+            pr2 = prod.make_pr(target='a', head='%s:bbranch' % other.owner, title='b')
+            pr2.close()
+
+            [c] = other.make_commits('a', Commit('c3', tree={'3': '0'}), ref='heads/cbranch')
+            pr3 = prod.make_pr(target='a', head='%s:cbranch' % other.owner, title='c')
+            prod.post_status(c, 'success', 'legal/cla')
+            prod.post_status(c, 'success', 'ci/runbot')
+
+            other.make_commits('a', Commit('c3', tree={'4': '0'}), ref='heads/dbranch')
+            pr4 = prod.make_pr(target='a', head='%s:dbranch' % other.owner, title='d')
+            pr4.post_comment('hansen r+', config['role_reviewer']['token'])
+        env.run_crons()
+
+        PR = env['runbot_merge.pull_requests']
+        # check PRs are in states we expect
+        pr_heads = []
+        for p, st in [(pr1, 'ready'), (pr2, 'closed'), (pr3, 'validated'), (pr4, 'approved')]:
+            p_id = PR.search([
+                ('repository.name', '=', prod.name),
+                ('number', '=', p.number),
+            ])
+            assert p_id.state == st
+            pr_heads.append(p_id.head)
+
+        env.run_crons('forwardport.remover', context={'forwardport_merged_before': FAKE_PREV_WEEK})
+
+        # check that the branches still exist
+        assert other.get_ref('heads/abranch') == pr_heads[0]
+        assert other.get_ref('heads/bbranch') == pr_heads[1]
+        assert other.get_ref('heads/cbranch') == pr_heads[2]
+        assert other.get_ref('heads/dbranch') == pr_heads[3]
 
 def sPeNgBaB(s):
     return ''.join(

@@ -202,6 +202,11 @@ class PullRequests(models.Model):
                                    "It should be merged the normal way (via @%s)" % p.repository.project_id.github_prefix,
                         'token_field': 'fp_github_token',
                     })
+        if vals.get('state') == 'merged':
+            for p in self:
+                self.env['forwardport.branch_remover'].create({
+                    'pr_id': p.id,
+                })
         return r
 
     def _try_closing(self, by):

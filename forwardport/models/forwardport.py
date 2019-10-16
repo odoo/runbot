@@ -1,18 +1,26 @@
 # -*- coding: utf-8 -*-
 import logging
 from contextlib import ExitStack
+from datetime import datetime
+
+from dateutil import relativedelta
 
 from odoo import fields, models
+from odoo.addons.runbot_merge.github import GH
 
+# how long a merged PR survives
+MERGE_AGE = relativedelta.relativedelta(weeks=2)
 
 _logger = logging.getLogger(__name__)
 
 class Queue:
+    limit = 100
+
     def _process_item(self):
         raise NotImplementedError
 
     def _process(self):
-        for b in self.search([]):
+        for b in self.search(self._search_domain(), order='create_date, id', limit=self.limit):
             try:
                 b._process_item()
                 b.unlink()
@@ -22,9 +30,14 @@ class Queue:
                 self.env.cr.rollback()
             self.clear_caches()
 
+    def _search_domain(self):
+        return []
+
 class BatchQueue(models.Model, Queue):
     _name = 'forwardport.batches'
     _description = 'batches which got merged and are candidates for forward-porting'
+
+    limit = 10
 
     batch_id = fields.Many2one('runbot_merge.batch', required=True)
     source = fields.Selection([
@@ -56,6 +69,8 @@ class UpdateQueue(models.Model, Queue):
     _name = 'forwardport.updates'
     _description = 'if a forward-port PR gets updated & has followups (cherrypick succeeded) the followups need to be updated as well'
 
+    limit = 10
+
     original_root = fields.Many2one('runbot_merge.pull_requests')
     new_root = fields.Many2one('runbot_merge.pull_requests')
 
@@ -81,3 +96,63 @@ class UpdateQueue(models.Model, Queue):
                 self.env.cr.commit()
 
                 previous = child
+
+_deleter = _logger.getChild('deleter')
+class DeleteBranches(models.Model, Queue):
+    _name = 'forwardport.branch_remover'
+    _description = "Removes branches of merged PRs"
+
+    pr_id = fields.Many2one('runbot_merge.pull_requests')
+
+    def _search_domain(self):
+        cutoff = self.env.context.get('forwardport_merged_before') \
+             or fields.Datetime.to_string(datetime.now() - MERGE_AGE)
+        return [('pr_id.write_date', '<', cutoff)]
+
+    def _process_item(self):
+        _deleter.info(
+            "PR %s: checking deletion of linked branch %s",
+            self.pr_id.display_name,
+            self.pr_id.label
+        )
+
+        if self.pr_id.state != 'merged':
+            _deleter.info('✘ PR is not "merged" (got %s)', self.pr_id.state)
+            return
+
+        repository = self.pr_id.repository
+        fp_remote = repository.fp_remote_target
+        if not fp_remote:
+            _deleter.info('✘ no forward-port target')
+            return
+
+        repo_owner, repo_name = fp_remote.split('/')
+        owner, branch = self.pr_id.label.split(':')
+        if repo_owner != owner:
+            _deleter.info('✘ PR owner != FP target owner (%s)', repo_owner)
+            return # probably don't have access to arbitrary repos
+
+        github = GH(token=repository.project_id.fp_github_token, repo=fp_remote)
+        refurl = 'git/refs/heads/' + branch
+        ref = github('get', refurl)
+        if ref.status_code != 200:
+            _deleter.info("✘ branch already deleted (%s)", ref.json())
+            return
+
+        ref = ref.json()
+        if ref['object']['sha'] != self.pr_id.head:
+            _deleter.info(
+                "✘ branch %s head mismatch, expected %s, got %s",
+                self.pr_id.label,
+                self.pr_id.head,
+                ref['object']['sha']
+            )
+            return
+
+        r = github('delete', refurl)
+        assert r.status_code == 204, \
+            "Tried to delete branch %s of %s, got %s" % (
+                branch, self.pr_id.display_name,
+                r.json()
+            )
+        _deleter.info('✔ deleted branch %s of PR %s', self.pr_id.label, self.pr_id.display_name)
