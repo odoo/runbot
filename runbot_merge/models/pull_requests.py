@@ -1556,7 +1556,7 @@ class Stagings(models.Model):
                     self.env['runbot_merge.pull_requests.feedback'].create({
                         'repository': pr.repository.id,
                         'pull_request': pr.number,
-                        'message': "Merged at %s, thanks!" % json.loads(pr.commits_map)[''],
+                        'message': "Merged at %s, thanks!\n\n![pr merged](https://user-images.githubusercontent.com/7165771/66703266-070c8a00-ed11-11e9-812e-13248709e3e7.gif)" % json.loads(pr.commits_map)[''],
                         'close': True,
                     })
             finally:
