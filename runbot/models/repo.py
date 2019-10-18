@@ -44,7 +44,7 @@ class runbot_repo(models.Model):
                              ('hook', 'Hook')],
                             default='poll',
                             string="Mode", required=True, help="hook: Wait for webhook on /runbot/hook/<id> i.e. github push event")
-    hook_time = fields.Datetime('Last hook time', default=fields.Datetime.now)
+    hook_time = fields.Float('Last hook time')
     get_ref_time = fields.Float('Last refs db update')
     duplicate_id = fields.Many2one('runbot.repo', 'Duplicate repo', help='Repository for finding duplicate builds')
     modules = fields.Char("Modules to install", help="Comma-separated list of modules to install and test.")
