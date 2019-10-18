@@ -145,6 +145,7 @@ class DeleteBranches(models.Model, Queue):
                 "✘ got a fuzzy match (%s), branch probably deleted",
                 ', '.join(r['ref'] for r in ref)
             )
+            return
 
         if ref['object']['sha'] != self.pr_id.head:
             _deleter.info(
