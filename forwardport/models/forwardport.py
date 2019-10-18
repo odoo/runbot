@@ -132,7 +132,7 @@ class DeleteBranches(models.Model, Queue):
             _deleter.info('✘ PR owner != FP target owner (%s)', repo_owner)
             return # probably don't have access to arbitrary repos
 
-        github = GH(token=repository.project_id.fp_github_token, repo=fp_remote)
+        github = GH(token=repository.project_id.fp_github_token, repo=fp_remote, check=False)
         refurl = 'git/refs/heads/' + branch
         ref = github('get', refurl)
         if ref.status_code != 200:
