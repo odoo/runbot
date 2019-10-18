@@ -334,6 +334,8 @@ class ConfigStep(models.Model):
 
         cmd.posts.append(self._post_install_command(build, modules_to_install, py_version))  # coverage post, extra-checks, ...
 
+        cmd.finals.append(['pg_dump', db_name, '|', 'gzip', '>', '/data/build/logs/%s.sql.gz' % db_name])
+
         max_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=10000))
         timeout = min(self.cpu_limit, max_timeout)
         return docker_run(cmd.build(), log_path, build._path(), build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports)

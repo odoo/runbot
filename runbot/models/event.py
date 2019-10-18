@@ -6,7 +6,7 @@ from odoo import models, fields, api, tools
 
 _logger = logging.getLogger(__name__)
 
-TYPES = [(t, t.capitalize()) for t in 'client server runbot subbuild'.split()]
+TYPES = [(t, t.capitalize()) for t in 'client server runbot subbuild link'.split()]
 
 
 class runbot_event(models.Model):

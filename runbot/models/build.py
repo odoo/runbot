@@ -642,7 +642,8 @@ class runbot_build(models.Model):
                 if ending_build:
                     build.update_build_end()
 
-                step_end_message = 'Step %s finished in %s' % (build.job, s2human(build.job_time))
+                step_end_message = 'Step %s finished in %s $$fa-download$$' % (build.job, s2human(build.job_time))
+                step_end_link = 'http://%s/runbot/static/build/%s/logs/%s-%s.sql.gz' % (build.host, build.dest, build.dest, build.active_step.db_name)
                 build.write(build_values)
 
                 if ending_build:
@@ -652,7 +653,7 @@ class runbot_build(models.Model):
                         build._logger("No result set, setting ok by default")
 
                 if notify_end_job:
-                    build._log('end_job', step_end_message)
+                    build._log('end_job', step_end_message, log_type='link', path=step_end_link)
                 else:
                     build._logger(step_end_message)
 
