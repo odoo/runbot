@@ -132,9 +132,9 @@ class DeleteBranches(models.Model, Queue):
             _deleter.info('✘ PR owner != FP target owner (%s)', repo_owner)
             return # probably don't have access to arbitrary repos
 
-        github = GH(token=repository.project_id.fp_github_token, repo=fp_remote, check=False)
+        github = GH(token=repository.project_id.fp_github_token, repo=fp_remote)
         refurl = 'git/refs/heads/' + branch
-        ref = github('get', refurl)
+        ref = github('get', refurl, check=False)
         if ref.status_code != 200:
             _deleter.info("✘ branch already deleted (%s)", ref.json())
             return
@@ -149,7 +149,7 @@ class DeleteBranches(models.Model, Queue):
             )
             return
 
-        r = github('delete', refurl)
+        r = github('delete', refurl, check=False)
         assert r.status_code == 204, \
             "Tried to delete branch %s of %s, got %s" % (
                 branch, self.pr_id.display_name,
