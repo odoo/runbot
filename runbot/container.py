@@ -32,10 +32,11 @@ ENV COVERAGE_FILE /data/build/.coverage
 
 
 class Command():
-    def __init__(self, pres, cmd, posts):
+    def __init__(self, pres, cmd, posts, finals=None):
         self.pres = pres or []
         self.cmd = cmd
         self.posts = posts or []
+        self.finals = finals or []
 
     def __getattr__(self, name):
         return getattr(self.cmd, name)
@@ -44,14 +45,16 @@ class Command():
         return self.cmd[key]
 
     def __add__(self, l):
-        return Command(self.pres, self.cmd + l, self.posts)
+        return Command(self.pres, self.cmd + l, self.posts, self.finals)
 
     def build(self):
         cmd_chain = []
         cmd_chain += [' '.join(pre) for pre in self.pres if pre]
         cmd_chain.append(' '.join(self))
         cmd_chain += [' '.join(post) for post in self.posts if post]
-        return ' && '.join(cmd_chain)
+        cmd_chain = [' && '.join(cmd_chain)]
+        cmd_chain += [' '.join(final) for final in self.finals if final]
+        return ' ; '.join(cmd_chain)
 
 
 def docker_build(log_path, build_dir):
@@ -138,7 +141,7 @@ def docker_get_gateway_ip():
 def docker_ps():
     """Return a list of running containers names"""
     docker_ps = subprocess.run(['docker', 'ps', '--format', '{{.Names}}'], stderr=subprocess.DEVNULL, stdout=subprocess.PIPE)
-    if docker_ps.returncode !=0:
+    if docker_ps.returncode != 0:
         return []
     return docker_ps.stdout.decode().strip().split('\n')
 

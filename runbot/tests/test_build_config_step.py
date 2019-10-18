@@ -107,7 +107,8 @@ class TestBuildConfigStep(common.TransactionCase):
             cmds = cmd.split(' && ')
             self.assertEqual(cmds[0], 'sudo pip3 install -r bar/requirements.txt')
             self.assertEqual(cmds[1].split(' bar/server.py')[0], 'python3 -m coverage run --branch --source /data/build --omit *__manifest__.py')
-            self.assertEqual(cmds[2], 'python3 -m coverage html -d /data/build/coverage --ignore-errors')
+            self.assertEqual(cmds[2].split(' ; ')[0], 'python3 -m coverage html -d /data/build/coverage --ignore-errors')
+            self.assertEqual(cmds[2].split(' ; ')[1], 'pg_dump %s-coverage | gzip > /data/build/logs/%s-coverage.sql.gz' % (self.parent_build.dest, self.parent_build.dest))
             self.assertEqual(log_path, 'dev/null/logpath')
 
         mock_docker_run.side_effect = docker_run
