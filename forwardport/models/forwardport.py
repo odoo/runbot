@@ -140,6 +140,12 @@ class DeleteBranches(models.Model, Queue):
             return
 
         ref = ref.json()
+        if isinstance(ref, list):
+            _deleter.info(
+                "✘ got a fuzzy match (%s), branch probably deleted",
+                ', '.join(r['ref'] for r in ref)
+            )
+
         if ref['object']['sha'] != self.pr_id.head:
             _deleter.info(
                 "✘ branch %s head mismatch, expected %s, got %s",
