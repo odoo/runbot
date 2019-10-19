@@ -8,7 +8,7 @@
                 <sheet>
                     <div attrs="{'invisible': [('protected', '=', False)]}">
                         <i class="fa fa-warning text-warning"/>This record is protected and can only be edited by config administrator.
-                    </div> 
+                    </div>
                     <group>
                         <field name="name"/>
                         <field name="description"/>
@@ -22,6 +22,7 @@
                         <field name="update_github_state" readonly='1'/>
                         <field name="update_github_state" groups="base.group_no_one"/>
                         <field name="protected" groups="base.group_no_one"/>
+                        <field name="group" groups="base.group_no_one"/>
                     </group>
                 </sheet>
                 <div class="oe_chatter">
@@ -45,6 +46,7 @@
                         <field name="job_type"/>
                         <field name="protected" groups="base.group_no_one"/>
                         <field name="default_sequence" groups="base.group_no_one"/>
+                        <field name="group" groups="base.group_no_one"/>
                     </group>
                     <group string="Python settings" attrs="{'invisible': [('job_type', 'not in', ('python'))]}">
                         <field name="python_code" widget="ace" options="{'mode': 'python'}"/>
@@ -76,6 +78,62 @@
         </field>
     </record>
 
+    <record id="runbot_config_tree_view" model="ir.ui.view">
+      <field name="name">Runbot Config tree view</field>
+      <field name="model">runbot.build.config</field>
+      <field name="arch" type="xml">
+        <tree string="Build Configs">
+          <field name="name"/>
+          <field name="description"/>
+          <field name="group"/>
+        </tree>
+      </field>
+    </record>
+
+    <record id="runbot_step_config_tree_view" model="ir.ui.view">
+      <field name="name">Runbot Config Step tree view</field>
+      <field name="model">runbot.build.config.step</field>
+      <field name="arch" type="xml">
+        <tree string="Build Config Steps">
+          <field name="name"/>
+          <field name="job_type"/>
+          <field name="group"/>
+        </tree>
+      </field>
+    </record>
+
+    <record id="runbot_config_search_view" model="ir.ui.view">
+      <field name="name">runbot.build.config.filter</field>
+      <field name="model">runbot.build.config</field>
+      <field name="arch" type="xml">
+        <search string="Search config">
+          <field name="name"/>
+          <field name="group_name"/>
+          <filter string="Is in a group" domain="[(['group', '!=', False])]"/>
+          <filter string="No step's defined" name="no_step" domain="[(['step_order_ids', '=', False])]"/>
+        </search>
+      </field>
+    </record>
+
+    <record id="runbot_config_step_search_view" model="ir.ui.view">
+      <field name="name">runbot.build.config.step.filter</field>
+      <field name="model">runbot.build.config.step</field>
+      <field name="arch" type="xml">
+        <search string="Search config step">
+          <field name="name"/>
+          <field name="group_name"/>
+          <filter string="Install job" domain="[(['job_type', '=', 'install_odoo'])]"/>
+          <filter string="Run job" domain="[(['job_type', '=', 'run_odoo'])]"/>
+          <filter string="Python job" domain="[(['job_type', '=', 'python'])]"/>
+          <filter string="Create job" domain="[(['job_type', '=', 'create_build'])]"/>
+          <separator/>
+          <filter string="Is in a group" domain="[(['group', '!=', False])]"/>
+          <separator/>
+          <filter string="No config defined" name="no_step" domain="[(['step_order_ids', '=', False])]"/>
+        </search>
+      </field>
+    </record>
+
     <record id="open_view_job_config_tree" model="ir.actions.act_window">
         <field name="name">Build Configs</field>
         <field name="res_model">runbot.build.config</field>
@@ -88,20 +146,26 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    
     <menuitem
-        name="Build Configs" 
-        id="runbot_menu_job_config_tree"
+        name="Configs"
+        id="runbot_menu_configs"
         parent="runbot_menu_root"
         sequence="30"
+        />
+
+    <menuitem
+        name="Build Configs"
+        id="runbot_menu_job_config_tree"
+        parent="runbot_menu_configs"
+        sequence="10"
         action="open_view_job_config_tree"
         />
 
     <menuitem
-        name="Build Config Step" 
+        name="Build Config Step"
         id="runbot_menu_job_tree"
-        parent="runbot_menu_root"
-        sequence="31"
+        parent="runbot_menu_configs"
+        sequence="20"
         action="open_view_job_tree"
         />
 

@@ -6,7 +6,7 @@
     'author': "Odoo SA",
     'website': "http://runbot.odoo.com",
     'category': 'Website',
-    'version': '4.5',
+    'version': '4.6',
     'depends': ['website', 'base'],
     'data': [
         'security/runbot_security.xml',
@@ -21,6 +21,7 @@
         'views/error_log_views.xml',
         'views/config_views.xml',
         'views/res_config_settings_views.xml',
+        'wizards/mutli_build_wizard_views.xml',
         'templates/frontend.xml',
         'templates/build.xml',
         'templates/assets.xml',

@@ -28,6 +28,8 @@ class Config(models.Model):
     step_order_ids = fields.One2many('runbot.build.config.step.order', 'config_id')
     update_github_state = fields.Boolean('Notify build state to github', default=False, track_visibility='onchange')
     protected = fields.Boolean('Protected', default=False, track_visibility='onchange')
+    group = fields.Many2one('runbot.build.config', 'Configuration group', help="Group of config's and config steps")
+    group_name = fields.Char(related='group.name')
 
     @api.model
     def create(self, values):
@@ -94,6 +96,9 @@ class ConfigStep(models.Model):
     ], default='install_odoo', required=True, track_visibility='onchange')
     protected = fields.Boolean('Protected', default=False, track_visibility='onchange')
     default_sequence = fields.Integer('Sequence', default=100, track_visibility='onchange')  # or run after? # or in many2many rel?
+    step_order_ids = fields.One2many('runbot.build.config.step.order', 'step_id')
+    group = fields.Many2one('runbot.build.config', 'Configuration group', help="Group of config's and config steps")
+    group_name = fields.Char('Group name', related='group.name')
     # install_odoo
     create_db = fields.Boolean('Create Db', default=True, track_visibility='onchange')  # future
     custom_db_name = fields.Char('Custom Db Name', track_visibility='onchange')  # future
