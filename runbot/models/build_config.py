@@ -97,7 +97,7 @@ class ConfigStep(models.Model):
     # install_odoo
     create_db = fields.Boolean('Create Db', default=True, track_visibility='onchange')  # future
     custom_db_name = fields.Char('Custom Db Name', track_visibility='onchange')  # future
-    install_modules = fields.Char('Modules to install', help="List of module patterns to install, use * to install all available modules, prefix the pattern with dash to remove the module.", default='*')
+    install_modules = fields.Char('Modules to install', help="List of module patterns to install, use * to install all available modules, prefix the pattern with dash to remove the module.", default='')
     db_name = fields.Char('Db Name', compute='_compute_db_name', inverse='_inverse_db_name', track_visibility='onchange')
     cpu_limit = fields.Integer('Cpu limit', default=3600, track_visibility='onchange')
     coverage = fields.Boolean('Coverage', default=False, track_visibility='onchange')
@@ -298,7 +298,7 @@ class ConfigStep(models.Model):
             coverage_extra_params = self._coverage_params(build, modules_to_install)
             python_params = ['-m', 'coverage', 'run', '--branch', '--source', '/data/build'] + coverage_extra_params
         elif self.flamegraph:
-            python_params = ['-m', 'flamegraph', '-o', self._perfs_data_path()] + coverage_extra_params
+            python_params = ['-m', 'flamegraph', '-o', self._perfs_data_path()]
         cmd = build._cmd(python_params, py_version)
         # create db if needed
         db_name = "%s-%s" % (build.dest, self.db_name)
