@@ -19,6 +19,7 @@ from odoo import models, fields, api, registry
 from odoo.modules.module import get_module_resource
 from odoo.tools import config
 from ..common import fqdn, dt2time, Commit, dest_reg
+from ..container import docker_ps, docker_stop
 from psycopg2.extensions import TransactionRollbackError
 _logger = logging.getLogger(__name__)
 
