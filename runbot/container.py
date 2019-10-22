@@ -140,7 +140,11 @@ def docker_get_gateway_ip():
 
 def docker_ps():
     """Return a list of running containers names"""
-    docker_ps = subprocess.run(['docker', 'ps', '--format', '{{.Names}}'], stderr=subprocess.DEVNULL, stdout=subprocess.PIPE)
+    try:
+        docker_ps = subprocess.run(['docker', 'ps', '--format', '{{.Names}}'], stderr=subprocess.DEVNULL, stdout=subprocess.PIPE)
+    except FileNotFoundError:
+        _logger.warning('Docker not found, returning an empty list.')
+        return []
     if docker_ps.returncode != 0:
         return []
     return docker_ps.stdout.decode().strip().split('\n')
