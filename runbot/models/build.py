@@ -507,7 +507,7 @@ class runbot_build(models.Model):
             if os.path.isdir(path) and os.path.isabs(path):
                 shutil.rmtree(path)
 
-        cleanup(dest_list=builds, func=rm, max_days=max_days, label='workspace')
+        cleanup(dest_list=builds, func=rm, max_days_main=max_days_main, max_days_child=max_days_child, label='workspace')
 
     def _find_port(self):
         # currently used port
