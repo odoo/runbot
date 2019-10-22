@@ -634,28 +634,20 @@ class runbot_build(models.Model):
                     results = {'local_result': 'ko'}
                 build_values.update(results)
 
-                # Non running build in
-                notify_end_job = build.active_step.job_type != 'create_build'
+                build.active_step.log_end(build)
 
                 build_values.update(build._next_job_values())  # find next active_step or set to done
+
                 ending_build = build.local_state not in ('done', 'running') and build_values.get('local_state') in ('done', 'running')
                 if ending_build:
                     build.update_build_end()
 
-                step_end_message = 'Step %s finished in %s $$fa-download$$' % (build.job, s2human(build.job_time))
-                step_end_link = 'http://%s/runbot/static/build/%s/logs/%s-%s.sql.gz' % (build.host, build.dest, build.dest, build.active_step.db_name)
                 build.write(build_values)
-
                 if ending_build:
                     build._github_status()
                     if not build.local_result:  # Set 'ok' result if no result set (no tests job on build)
                         build.local_result = 'ok'
                         build._logger("No result set, setting ok by default")
-
-                if notify_end_job:
-                    build._log('end_job', step_end_message, log_type='link', path=step_end_link)
-                else:
-                    build._logger(step_end_message)
 
             # run job
             pid = None
@@ -682,6 +674,9 @@ class runbot_build(models.Model):
         build = self
         root = self.env['runbot.repo']._root()
         return os.path.join(root, 'build', build.dest, *l)
+
+    def http_log_url(self):
+        return 'http://%s/runbot/static/build/%s/logs/' % (self.host, self.dest)
 
     def _server(self, *path):
         """Return the absolute path to the direcory containing the server file, adding optional *path"""
