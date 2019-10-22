@@ -5,7 +5,7 @@ import os
 import re
 import shlex
 import time
-from ..common import now, grep, time2str, rfind, Commit
+from ..common import now, grep, time2str, rfind, Commit, s2human
 from ..container import docker_run, docker_get_gateway_ip, Command
 from odoo import models, fields, api
 from odoo.exceptions import UserError, ValidationError
@@ -339,9 +339,30 @@ class ConfigStep(models.Model):
 
         cmd.finals.append(['pg_dump', db_name, '|', 'gzip', '>', '/data/build/logs/%s.sql.gz' % db_name])
 
+        if self.flamegraph:
+            cmd.finals.append(['flamegraph.pl', '--title', 'Flamegraph %s for build %s' % (self.name, build.id), self._perfs_data_path(), '>', self._perfs_data_path(ext='svg')])
+            cmd.finals.append(['gzip', '-f', self._perfs_data_path()])  # keep data but gz them to save disc space
         max_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=10000))
         timeout = min(self.cpu_limit, max_timeout)
         return docker_run(cmd.build(), log_path, build._path(), build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports)
+
+    def log_end(self, build):
+        if self.job_type == 'create_build':
+            build._logger('Step %s finished in %s' % (self.name, s2human(build.job_time)))
+            return
+
+        message = 'Step %s finished in %s $$fa-download$$' % (self.name, s2human(build.job_time))
+        link = '%s%s-%s.sql.gz' % (build.http_log_url(), build.dest, self.db_name)
+        build._log('end_job', message, log_type='link', path=link)
+
+        if self.flamegraph:
+            link = self._perf_data_url(build, 'log.gz')
+            message = 'Flamegraph data: $$fa-download$$'
+            build._log('end_job', message, log_type='link', path=link)
+
+            link = self._perf_data_url(build, 'svg')
+            message = 'Flamegraph svg: $$fa-download$$'
+            build._log('end_job', message, log_type='link', path=link)
 
     def _modules_to_install(self, build):
         return set(build._get_modules_to_test(modules_patterns=self.install_modules))
@@ -353,12 +374,13 @@ class ConfigStep(models.Model):
             cov_path = build._path('coverage')
             os.makedirs(cov_path, exist_ok=True)
             return ['python%s' % py_version, "-m", "coverage", "html", "-d", "/data/build/coverage", "--ignore-errors"]
-        elif self.flamegraph:
-            return ['flamegraph.pl', '--title', 'Flamegraph %s for build %s' % (self.name, build.id), self._perfs_data_path(), '>', self._perfs_data_path(prefix='flame', ext='svg')]
         return []
 
-    def _perfs_data_path(self, prefix='perf', ext='log'):
-        return '/data/build/logs/%s_%s.%s' % (prefix, self.name, ext)
+    def _perfs_data_path(self, ext='log'):
+        return '/data/build/logs/flame_%s.%s' % (self.name, ext)
+
+    def _perf_data_url(self, build, ext='log'):
+        return '%sflame_%s.%s' % (build.http_log_url(), self.name, ext)
 
     def _coverage_params(self, build, modules_to_install):
         pattern_to_omit = set()
