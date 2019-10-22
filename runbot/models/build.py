@@ -458,7 +458,7 @@ class runbot_build(models.Model):
             return
         _logger.debug('Local cleaning')
 
-        def cleanup(dest_list, func, max_days, label):
+        def cleanup(dest_list, func, max_days_main, max_days_child, label):
             dest_by_builds_ids = defaultdict(list)
             ignored = set()
             for dest in dest_list:
@@ -478,7 +478,7 @@ class runbot_build(models.Model):
                 dest_list = [dest for sublist in [dest_by_builds_ids[rem_id] for rem_id in remaining.ids] for dest in sublist]
                 _logger.debug('(%s) (%s) not deleted because no corresponding build found' % (label, " ".join(dest_list)))
             for build in existing:
-                if fields.Datetime.from_string(build.job_end or build.create_date) + datetime.timedelta(days=max_days) < datetime.datetime.now():
+                if fields.Datetime.from_string(build.job_end or build.create_date) + datetime.timedelta(days=(max_days_main if not build.parent_id else int(max_days_child / 2))) < datetime.datetime.now():
                     if build.local_state == 'done':
                         for db in dest_by_builds_ids[build.id]:
                             func(db)
@@ -486,7 +486,8 @@ class runbot_build(models.Model):
                         _logger.warning('db (%s) not deleted because state is not done' % " ".join(dest_by_builds_ids[build.id]))
 
         icp = self.env['ir.config_parameter']
-        max_days = int(icp.get_param('runbot.db_gc_days', default=30))
+        max_days_main = int(icp.get_param('runbot.db_gc_days', default=30))
+        max_days_child = int(icp.get_param('runbot.db_gc_days_child', default=15))
         with local_pgadmin_cursor() as local_cr:
             local_cr.execute("""
                 SELECT datname
@@ -495,7 +496,7 @@ class runbot_build(models.Model):
             """)
             existing_db = [d[0] for d in local_cr.fetchall()]
 
-        cleanup(dest_list=existing_db, func=self._local_pg_dropdb, max_days=max_days, label='db')
+        cleanup(dest_list=existing_db, func=self._local_pg_dropdb, max_days_main=max_days_main, max_days_child=max_days_child, label='db')
 
         root = self.env['runbot.repo']._root()
         build_dir = os.path.join(root, 'build')
@@ -632,6 +633,7 @@ class runbot_build(models.Model):
                     _logger.exception('An error occured while computing results')
                     build._log('_make_results', 'An error occured while computing results', level='ERROR')
                     results = {'local_result': 'ko'}
+
                 build_values.update(results)
 
                 build.active_step.log_end(build)
