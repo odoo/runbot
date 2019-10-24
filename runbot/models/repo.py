@@ -166,6 +166,14 @@ class runbot_repo(models.Model):
         # TODO get result and fallback on cleaing in case of problem
         return export_path
 
+    def _git_read_gc_log(self):
+        """ Returns content of a potential gc.log file in repo """
+        self.ensure_one()
+        gc_path = os.path.join(self.path, 'gc.log')
+        if os.path.exists(gc_path):
+            return open(gc_path, 'r').read()
+        return ''
+
     def _hash_exists(self, commit_hash):
         """ Verify that a commit hash exists in the repo """
         self.ensure_one()
@@ -620,6 +628,7 @@ class runbot_repo(models.Model):
         if host.last_exception:
             host.last_exception = ""
             host.exception_count = 0
+        host._check_repos()
         host.last_end_loop = fields.Datetime.now()
 
     def _source_cleanup(self):

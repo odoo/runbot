@@ -48,6 +48,16 @@ class RunboHost(models.Model):
         name = fqdn()
         return self.search([('name', '=', name)]) or self.create({'name': name})
 
+    def _check_repos(self):
+        """ Check the active repos for gc.log file on host and reserve host on error """
+        self.ensure_one()
+        for repo in self.env['runbot.repo'].search([('mode', '!=', 'disabled')]):
+            gc_log_content = repo._git_read_gc_log()
+            if gc_log_content:
+                self.last_exception = gc_log_content
+                self.assigned_only = True
+                _logger.warning('gc.log file found in repo %s', repo.short_name)
+
     def get_nb_worker(self):
         icp = self.env['ir.config_parameter']
         return self.nb_worker or int(icp.sudo().get_param('runbot.runbot_workers', default=6))
