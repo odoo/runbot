@@ -66,8 +66,8 @@ class runbot_repo(models.Model):
     config_id = fields.Many2one('runbot.build.config', 'Run Config', compute='_compute_config_id', inverse='_inverse_config_id')
 
     server_files = fields.Char('Server files', help='Comma separated list of possible server files')  # odoo-bin,openerp-server,openerp-server.py
-    manifest_files = fields.Char('Addons files', help='Comma separated list of possible addons files', default='__manifest__.py')
-    addons_paths = fields.Char('Addons files', help='Comma separated list of possible addons path', default='')
+    manifest_files = fields.Char('Manifest files', help='Comma separated list of possible manifest files', default='__manifest__.py')
+    addons_paths = fields.Char('Addons paths', help='Comma separated list of possible addons path', default='')
 
     def _compute_config_id(self):
         for repo in self:
