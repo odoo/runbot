@@ -213,13 +213,13 @@
                                 <a href="#" class="clipbtn octicon octicon-clippy" data-clipboard-target="#branchclp" title="Copy branch name to clipboard"/><br/>
                                 Build host: <t t-esc="build.real_build.host"/><br/>
                             </td>
-                            <td t-if="build.children_ids">
+                            <td t-if="build.real_build.children_ids">
                               Children: 
-                              <t t-if="build.nb_pending > 0"><t t-esc="build.nb_pending"/> pending </t>
-                              <t t-if="build.nb_testing > 0"><t t-esc="build.nb_testing"/> testing </t>
-                              <t t-if="build.nb_running > 0"><t t-esc="build.nb_running"/> running </t>
+                              <t t-if="build.real_build.nb_pending > 0"><t t-esc="build.real_build.nb_pending"/> pending </t>
+                              <t t-if="build.real_build.nb_testing > 0"><t t-esc="build.real_build.nb_testing"/> testing </t>
+                              <t t-if="build.real_build.nb_running > 0"><t t-esc="build.real_build.nb_running"/> running </t>
                               <table class="table table-condensed">
-                                <t t-foreach="build.children_ids" t-as="child">
+                                <t t-foreach="build.real_build.children_ids" t-as="child">
                                   <t t-set="rowclass">info</t>
                                   <t t-if="child.global_state in ['running','done']">
                                     <t t-if="child.global_result == 'ok'"><t t-set="rowclass">success</t></t>
