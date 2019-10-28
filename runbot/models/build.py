@@ -478,7 +478,7 @@ class runbot_build(models.Model):
                 dest_list = [dest for sublist in [dest_by_builds_ids[rem_id] for rem_id in remaining.ids] for dest in sublist]
                 _logger.debug('(%s) (%s) not deleted because no corresponding build found' % (label, " ".join(dest_list)))
             for build in existing:
-                if fields.Datetime.from_string(build.job_end or build.create_date) + datetime.timedelta(days=(max_days_main if not build.parent_id else int(max_days_child / 2))) < datetime.datetime.now():
+                if fields.Datetime.from_string(build.job_end or build.create_date) + datetime.timedelta(days=(max_days_main if not build.parent_id else max_days_child)) < datetime.datetime.now():
                     if build.local_state == 'done':
                         for db in dest_by_builds_ids[build.id]:
                             func(db)
