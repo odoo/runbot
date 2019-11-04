@@ -336,8 +336,17 @@ class ConfigStep(models.Model):
             cmd.extend(shlex.split(extra_params))
 
         cmd.posts.append(self._post_install_command(build, modules_to_install, py_version))  # coverage post, extra-checks, ...
-
-        cmd.finals.append(['pg_dump', db_name, '|', 'gzip', '>', '/data/build/logs/%s.sql.gz' % db_name])
+        dump_dir = '/data/build/logs/%s/' % db_name
+        sql_dest = '%s/dump.sql' % dump_dir
+        filestore_path = '/data/build/datadir/filestore/%s' % db_name
+        filestore_dest = '%s/filestore/' % dump_dir
+        zip_path = '/data/build/logs/%s.zip' % db_name
+        info_dest = '%s/%s/info.json' % (dump_dir, db_name)
+        cmd.finals.append(['pg_dump', db_name, '>', sql_dest])
+        cmd.finals.append(['cp', '-r', filestore_path, filestore_dest])
+        cmd.finals.append(['zip', '-rm9', zip_path, dump_dir])
+        infos = '{\n    "db_name": "%s",\n    "build_id": %s,\n    "shas": [%s]\n}' % (db_name, build.id, ', '.join(['"%s"' % commit for commit in build._get_all_commit()]))
+        build.write_file(info_dest, infos)  # make dir and add info
 
         if self.flamegraph:
             cmd.finals.append(['flamegraph.pl', '--title', 'Flamegraph %s for build %s' % (self.name, build.id), self._perfs_data_path(), '>', self._perfs_data_path(ext='svg')])
