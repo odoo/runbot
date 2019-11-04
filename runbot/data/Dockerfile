@@ -28,6 +28,7 @@ RUN set -x ; \
     sed \
     sudo \
     xfonts-75dpi \
+    zip \
     zlib1g-dev
 
 # Install Google Chrome

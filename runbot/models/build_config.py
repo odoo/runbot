@@ -346,12 +346,12 @@ class ConfigStep(models.Model):
         filestore_path = '/data/build/datadir/filestore/%s' % db_name
         filestore_dest = '%s/filestore/' % dump_dir
         zip_path = '/data/build/logs/%s.zip' % db_name
-        info_dest = '%s/%s/info.json' % (dump_dir, db_name)
         cmd.finals.append(['pg_dump', db_name, '>', sql_dest])
         cmd.finals.append(['cp', '-r', filestore_path, filestore_dest])
-        cmd.finals.append(['zip', '-rm9', zip_path, dump_dir])
+        cmd.finals.append(['cd', dump_dir])
+        cmd.finals.append(['zip', '-rm9', zip_path, '*'])
         infos = '{\n    "db_name": "%s",\n    "build_id": %s,\n    "shas": [%s]\n}' % (db_name, build.id, ', '.join(['"%s"' % commit for commit in build._get_all_commit()]))
-        build.write_file(info_dest, infos)  # make dir and add info
+        build.write_file('logs/%s/info.json' % db_name, infos)
 
         if self.flamegraph:
             cmd.finals.append(['flamegraph.pl', '--title', 'Flamegraph %s for build %s' % (self.name, build.id), self._perfs_data_path(), '>', self._perfs_data_path(ext='svg')])
@@ -366,7 +366,7 @@ class ConfigStep(models.Model):
             return
 
         message = 'Step %s finished in %s $$fa-download$$' % (self.name, s2human(build.job_time))
-        link = '%s%s-%s.sql.gz' % (build.http_log_url(), build.dest, self.db_name)
+        link = '%s%s-%s.zip' % (build.http_log_url(), build.dest, self.db_name)
         build._log('end_job', message, log_type='link', path=link)
 
         if self.flamegraph:
