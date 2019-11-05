@@ -353,8 +353,7 @@ class ConfigStep(models.Model):
         zip_path = '/data/build/logs/%s.zip' % db_name
         cmd.finals.append(['pg_dump', db_name, '>', sql_dest])
         cmd.finals.append(['cp', '-r', filestore_path, filestore_dest])
-        cmd.finals.append(['cd', dump_dir])
-        cmd.finals.append(['zip', '-rqm9', zip_path, '*'])
+        cmd.finals.append(['cd', dump_dir, '&&', 'zip', '-rmq9', zip_path, '*'])
         infos = '{\n    "db_name": "%s",\n    "build_id": %s,\n    "shas": [%s]\n}' % (db_name, build.id, ', '.join(['"%s"' % commit for commit in build._get_all_commit()]))
         build.write_file('logs/%s/info.json' % db_name, infos)
 
