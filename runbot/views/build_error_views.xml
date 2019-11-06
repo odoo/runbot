@@ -33,6 +33,7 @@
                     <tree>
                       <field name="create_date"/>
                       <field name="id"/>
+                      <field name="host" groups="base.group_no_one"/>
                       <field name="repo_id"/>
                       <field name="branch_id"/>
                       <field name="dest"/>
@@ -45,6 +46,7 @@
                     <tree>
                       <field name="create_date"/>
                       <field name="id"/>
+                      <field name="host" groups="base.group_no_one"/>
                       <field name="repo_id"/>
                       <field name="branch_id"/>
                       <field name="dest"/>
