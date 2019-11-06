@@ -327,7 +327,7 @@ class ConfigStep(models.Model):
                     test_tags = self.test_tags.replace(' ', '')
                     cmd.extend(['--test-tags', test_tags])
             else:
-                build._log('test_all', 'Test tags given but not supported', level='WARNING')
+                build._log('test_all', 'Test tags given but not supported')
 
         if grep(config_path, "--screenshots"):
             cmd += ['--screenshots', '/data/build/tests']
