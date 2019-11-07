@@ -7,6 +7,7 @@
                 <form string="Send Mail">
                     <group>
                         <field name="base_name"/>
+                        <field name="prefix"/>
                         <field name="config_multi_name"/>
                         <field name="step_create_multi_name"/>
                         <field name="config_single_name"/>
