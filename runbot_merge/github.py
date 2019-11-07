@@ -110,15 +110,26 @@ class GH(object):
 
         _logger.debug('change_tags(%s, %s, from=%s, to=%s)', self._repo, pr, tags_before, tags_after)
 
+    def _check_updated(self, branch, to):
+        """
+        :return: nothing if successful, the incorrect HEAD otherwise
+        """
+        head = self.head(branch)
+        if head == to:
+            _logger.info("Sanity check ref update of %s to %s: ok", branch, to)
+            return
+
+        _logger.warning("Sanity check ref update of %s, expected %s got %s", branch, to, head)
+        return head
+
     def fast_forward(self, branch, sha):
         try:
             self('patch', 'git/refs/heads/{}'.format(branch), json={'sha': sha})
             _logger.debug('fast_forward(%s, %s, %s) -> OK', self._repo, branch, sha)
-            head = self.head(branch)
-            if head != sha:
-                _logger.error("Sanity check ref update of %s, expected %s got %s",
-                    branch, sha, head
-                )
+            @utils.backoff(exc=exceptions.FastForwardError)
+            def _wait_for_update():
+                if not self._check_updated(branch, sha):
+                    return
                 raise exceptions.FastForwardError(self._repo)
         except requests.HTTPError:
             _logger.debug('fast_forward(%s, %s, %s) -> ERROR', self._repo, branch, sha, exc_info=True)
@@ -138,10 +149,12 @@ class GH(object):
             'OK' if status0 == 200 else r.text or r.reason
         )
         if status0 == 200:
-            head = self.head(branch)
-            assert head == sha, "Sanity check ref update of %s, expected %s got %s" % (
-                branch, sha, head
-            )
+            @utils.backoff(exc=AssertionError)
+            def _wait_for_update():
+                head = self._check_updated(branch, sha)
+                assert not head, "Sanity check ref update of %s, expected %s got %s" % (
+                    branch, sha, head
+                )
             return
 
         # 422 makes no sense but that's what github returns, leaving 404 just
@@ -160,10 +173,12 @@ class GH(object):
                 'OK' if status1 == 201 else r.text or r.reason
             )
             if status1 == 201:
-                head = self.head(branch)
-                assert head == sha, "Sanity check ref update of %s, expected %s got %s" % (
-                    branch, sha, head
-                )
+                @utils.backoff(exc=AssertionError)
+                def _wait_for_update():
+                    head = self._check_updated(branch, sha)
+                    assert not head, "Sanity check ref update of %s, expected %s got %s" % (
+                        branch, sha, head
+                    )
                 return
 
         raise AssertionError("set_ref failed(%s, %s)" % (status0, status1))
@@ -178,7 +193,11 @@ class GH(object):
             r = r.json()
         except Exception:
             raise exceptions.MergeError("Got non-JSON reponse from github: %s %s (%s)" % (r.status_code, r.reason, r.text))
-        _logger.debug("merge(%s, %s, %s) -> %s", self._repo, dest, shorten(message), r['sha'])
+        _logger.debug(
+            "merge(%s, %s (%s), %s) -> %s",
+            self._repo, dest, r['parents'][0]['sha'],
+            shorten(message), r['sha']
+        )
         return dict(r['commit'], sha=r['sha'])
 
     def rebase(self, pr, dest, reset=False, commits=None):

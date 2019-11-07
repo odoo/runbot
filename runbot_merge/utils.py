@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+import itertools
+import time
+
 
 def shorten(text_ish, length):
     """ If necessary, cuts-off the text or bytes input and appends ellipsis to
@@ -14,3 +17,16 @@ def shorten(text_ish, length):
         cont = cont.encode('ascii') # whatever
     # add enough room for the ellipsis
     return text_ish[:length-3] + cont
+
+BACKOFF_DELAYS = (0.1, 0.2, 0.4, 0.8, 1.6)
+def backoff(func=None, *, delays=BACKOFF_DELAYS, exc=Exception):
+    if func is None:
+        return lambda func: backoff(func, delays=delays, exc=exc)
+
+    for delay in itertools.chain(delays, [None]):
+        try:
+            return func()
+        except exc:
+            if delay is None:
+                raise
+            time.sleep(delay)

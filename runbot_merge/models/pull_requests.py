@@ -2,6 +2,7 @@ import base64
 import collections
 import datetime
 import io
+import itertools
 import json
 import logging
 import os
@@ -21,8 +22,7 @@ from odoo.tools import OrderedSet
 
 from .. import github, exceptions, controllers, utils
 
-STAGING_SLEEP = True # actually a flag now (whether to loop around waiting for visibility on the remote
-WAIT_FOR_VISIBILITY = [0, 10, 10, 10, 10]
+WAIT_FOR_VISIBILITY = [10, 10, 10, 10]
 
 _logger = logging.getLogger(__name__)
 class Project(models.Model):
@@ -402,25 +402,22 @@ class Branch(models.Model):
                     r.name, refname,
                     staging_head, head,
                 )
-            if not STAGING_SLEEP:
-                continue
 
-            # waits for the new head to be visible through the repo itself
-            for i, t in enumerate(WAIT_FOR_VISIBILITY):
-                time.sleep(t)
+            i = itertools.count()
+            @utils.backoff(delays=WAIT_FOR_VISIBILITY, exc=TimeoutError)
+            def wait_for_visibility():
                 if self._check_visibility(r, refname, staging_head, token):
                     _logger.info(
                         "[repo] updated %s:%s to %s: ok (at %d/%d)",
                         r.name, refname, staging_head,
-                        i, len(WAIT_FOR_VISIBILITY)
+                        next(i), len(WAIT_FOR_VISIBILITY)
                     )
-                    break
+                    return
                 _logger.warning(
                     "[repo] updated %s:%s to %s: failed (at %d/%d)",
                     r.name, refname, staging_head,
-                    i, len(WAIT_FOR_VISIBILITY)
+                    next(i), len(WAIT_FOR_VISIBILITY)
                 )
-            else: # if we never saw the update... cancel the staging?
                 raise TimeoutError("Staged head not updated after %d seconds" % sum(WAIT_FOR_VISIBILITY))
 
 
