@@ -8,6 +8,7 @@ class MultiBuildWizard(models.TransientModel):
     _name = 'runbot.build.config.multi.wizard'
 
     base_name = fields.Char('Generic name', required=True)
+    prefix = fields.Char('Prefix', help="Leave blank to use login.")
     config_multi_name = fields.Char('Config name')
     step_create_multi_name = fields.Char('Create multi step name')
     config_single_name = fields.Char('Config only name')
@@ -16,12 +17,14 @@ class MultiBuildWizard(models.TransientModel):
     config_single_test_enable = fields.Boolean('Enable tests', default=True)
     step_single_name = fields.Char('Only step name')
     number_builds = fields.Integer('Number of multi builds', default=10)
-    modules = fields.Char('Modules to install', default='')
+    modules = fields.Char('Modules to install', help="List of module patterns to install, use * to install all available modules, prefix the pattern with dash to remove the module.", default='')
 
-    @api.onchange('base_name')
+    @api.onchange('base_name', 'prefix')
     def _onchange_name(self):
         if self.base_name:
-            name = '%s %s' % (self.env.user.login.split('@')[0], self.base_name.capitalize())
+            prefix = self.env.user.login.split('@')[0] if not self.prefix else self.prefix
+            self.prefix = prefix
+            name = '%s %s' % (prefix, self.base_name.capitalize())
             step_name = name.replace(' ', '_').lower()
 
             self.config_multi_name = '%s Multi' % name
@@ -38,6 +41,7 @@ class MultiBuildWizard(models.TransientModel):
                 'test_tags': self.config_single_test_tags,
                 'extra_params': self.config_single_extra_params,
                 'test_enable': self.config_single_test_enable,
+                'install_modules': self.modules,
             })
             config_single = self.env['runbot.build.config'].create({'name': self.config_single_name})
 
