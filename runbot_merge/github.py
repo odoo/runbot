@@ -4,6 +4,7 @@ import json as json_
 import logging
 
 import requests
+import werkzeug.exceptions
 
 from odoo.tools import topological_sort
 from . import exceptions, utils
@@ -67,7 +68,10 @@ class GH(object):
         return r.json()
 
     def head(self, branch):
-        d = self('get', 'git/refs/heads/{}'.format(branch)).json()
+        d = utils.backoff(
+            lambda: self('get', 'git/refs/heads/{}'.format(branch)).json(),
+            exc=requests.HTTPError
+        )
 
         assert d['ref'] == 'refs/heads/{}'.format(branch)
         assert d['object']['type'] == 'commit'
@@ -114,7 +118,12 @@ class GH(object):
         """
         :return: nothing if successful, the incorrect HEAD otherwise
         """
-        head = self.head(branch)
+        r = self('get', 'git/refs/heads/{}'.format(branch), check=False)
+        if r.status_code == 200:
+            head = r.json()['object']['sha']
+        else:
+            head = '<Response [%s]: %s)>' % (r.status_code, r.json() if _is_json(r) else r.text)
+
         if head == to:
             _logger.info("Sanity check ref update of %s to %s: ok", branch, to)
             return
@@ -198,7 +207,7 @@ class GH(object):
             self._repo, dest, r['parents'][0]['sha'],
             shorten(message), r['sha']
         )
-        return dict(r['commit'], sha=r['sha'])
+        return dict(r['commit'], sha=r['sha'], parents=r['parents'])
 
     def rebase(self, pr, dest, reset=False, commits=None):
         """ Rebase pr's commits on top of dest, updates dest unless ``reset``
@@ -215,10 +224,23 @@ class GH(object):
                      self._repo, pr, dest, reset, len(commits))
 
         assert commits, "can't rebase a PR with no commits"
-        for c in commits:
-            assert len(c['parents']) == 1, "can't rebase commits with more than one parent"
-            tmp_msg = 'temp rebasing PR %s (%s)' % (pr, c['sha'])
-            c['new_tree'] = self.merge(c['sha'], dest, tmp_msg)['tree']['sha']
+        prev = original_head
+        for original in commits:
+            assert len(original['parents']) == 1, "can't rebase commits with more than one parent"
+            tmp_msg = 'temp rebasing PR %s (%s)' % (pr, original['sha'])
+            merged = self.merge(original['sha'], dest, tmp_msg)
+
+            # whichever parent is not original['sha'] should be what dest
+            # deref'd to, and we want to check that matches the "left parent" we
+            # expect (either original_head or the previously merged commit)
+            [base_commit] = (parent['sha'] for parent in merged['parents']
+                             if parent['sha'] != original['sha'])
+            assert prev == base_commit,\
+                "Inconsistent view of %s between head (%s) and merge (%s)" % (
+                    dest, prev, base_commit,
+                )
+            prev = merged['sha']
+            original['new_tree'] = merged['tree']['sha']
 
         prev = original_head
         mapping = {}
