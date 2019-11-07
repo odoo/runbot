@@ -38,6 +38,14 @@ class RunbotBuildError(models.Model):
     first_seen_date = fields.Datetime(string='First Seen Date', related='first_seen_build_id.create_date')
     last_seen_build_id = fields.Many2one('runbot.build', compute='_compute_last_seen_build_id', string='Last Seen build')
     last_seen_date = fields.Datetime(string='Last Seen Date', related='last_seen_build_id.create_date')
+    test_tags = fields.Char(string='Test tags', help="Comma separated list of test_tags to use to reproduce/remove this error")
+
+
+    @api.constrains('test_tags')
+    def _check_test_tags(self):
+        for step in self:
+            if '-' in step.test_tags:
+                raise ValidationError('Build error test_tags should not be negated')
 
     @api.model
     def create(self, vals):
@@ -149,6 +157,16 @@ class RunbotBuildError(models.Model):
         cleaning_regs = self.env['runbot.error.regex'].search([('re_type', '=', 'cleaning')])
         for build_error in self:
             build_error.cleaned_content = cleaning_regs.r_sub('%', build_error.content)
+
+    @api.model
+    def test_tags_list(self):
+        active_errors = self.search([('test_tags', '!=', 'False'), ('random', '=', True)])
+        test_tag_list = active_errors.mapped('test_tags')
+        return [test_tag for error_tags in test_tag_list for test_tag in error_tags.split(',')]
+
+    @api.model
+    def disabling_tags(self):
+        return ['-%s' % tag for tag in self.test_tags_list()]
 
 
 class RunbotBuildErrorTag(models.Model):

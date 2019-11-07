@@ -108,9 +108,58 @@ class TestBuildConfigStep(common.TransactionCase):
             self.assertEqual(cmds[0], 'sudo pip3 install -r bar/requirements.txt')
             self.assertEqual(cmds[1].split(' bar/server.py')[0], 'python3 -m coverage run --branch --source /data/build --omit *__manifest__.py')
             self.assertEqual(cmds[2].split(' ; ')[0], 'python3 -m coverage html -d /data/build/coverage --ignore-errors')
-            self.assertEqual(cmds[2].split(' ; ')[1], 'pg_dump %s-coverage | gzip > /data/build/logs/%s-coverage.sql.gz' % (self.parent_build.dest, self.parent_build.dest))
+            self.assertEqual(cmds[2].split(' ; ')[1], 'pg_dump %s-coverage > /data/build/logs/%s-coverage//dump.sql' % (self.parent_build.dest, self.parent_build.dest))
             self.assertEqual(log_path, 'dev/null/logpath')
 
         mock_docker_run.side_effect = docker_run
     
+        config_step._run_odoo_install(self.parent_build, 'dev/null/logpath')
+
+
+    @patch('odoo.addons.runbot.models.build.runbot_build._local_pg_createdb')
+    @patch('odoo.addons.runbot.models.build.runbot_build._get_server_info')
+    @patch('odoo.addons.runbot.models.build.runbot_build._get_addons_path')
+    @patch('odoo.addons.runbot.models.build.runbot_build._get_py_version')
+    @patch('odoo.addons.runbot.models.build.runbot_build._server')
+    @patch('odoo.addons.runbot.models.build.runbot_build._checkout')
+    @patch('odoo.addons.runbot.models.build_config.docker_run')
+    @patch('odoo.addons.runbot.models.build_config.grep')
+    def test_install_tags(self, mock_grep, mock_docker_run, mock_checkout, mock_server, mock_get_py_version, mock_get_addons_path, mock_get_server_info, mock_local_pg_createdb):
+        config_step = self.ConfigStep.create({
+            'name': 'all',
+            'job_type': 'install_odoo',
+            'enable_auto_tags': False,
+            'test_tags': '/module,:class.method',
+        })
+        self.env['runbot.build.error'].create({
+            'content': 'foo',
+            'random': True,
+            'test_tags': ':otherclass.othertest'
+        })
+
+        mock_checkout.return_value = {}
+        mock_server.return_value = 'bar'
+        mock_get_py_version.return_value = '3'
+        mock_get_addons_path.return_value = ['bar/addons']
+        mock_get_server_info.return_value = (self.parent_build._get_all_commit()[0], 'server.py')
+        mock_local_pg_createdb.return_value = True
+        mock_grep.return_value = True
+
+        def docker_run(cmd, log_path, build_dir, *args, **kwargs):
+            cmds = cmd.split(' && ')
+            self.assertEqual(cmds[1].split(' bar/server.py')[0], 'python3')
+            tags = cmds[1].split('--test-tags ')[1].split(' ')[0]
+            self.assertEqual(tags, '/module,:class.method')
+
+        mock_docker_run.side_effect = docker_run
+        config_step._run_odoo_install(self.parent_build, 'dev/null/logpath')
+
+        config_step.enable_auto_tags =True
+        def docker_run(cmd, log_path, build_dir, *args, **kwargs):
+            cmds = cmd.split(' && ')
+            self.assertEqual(cmds[1].split(' bar/server.py')[0], 'python3')
+            tags = cmds[1].split('--test-tags ')[1].split(' ')[0]
+            self.assertEqual(tags, '/module,:class.method,-:otherclass.othertest')
+
+        mock_docker_run.side_effect = docker_run
         config_step._run_odoo_install(self.parent_build, 'dev/null/logpath')
