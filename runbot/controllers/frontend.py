@@ -336,8 +336,9 @@ class Runbot(Controller):
             'pending_level': pending[1],
             'glances_data': glances_ctx,
             'hosts_data': hosts_data,
-            'last_monitored': last_monitored  # nightly
-
+            'last_monitored': last_monitored,  # nightly
+            'auto_tags': request.env['runbot.build.error'].disabling_tags(),
+            'build_errors': request.env['runbot.build.error'].search([('random', '=', True)])
         }
         return request.render("runbot.monitoring", qctx)
 
