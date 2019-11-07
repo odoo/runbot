@@ -108,9 +108,10 @@ class ConfigStep(models.Model):
     coverage = fields.Boolean('Coverage', default=False, track_visibility='onchange')
     flamegraph = fields.Boolean('Allow Flamegraph', default=False, track_visibility='onchange')
     test_enable = fields.Boolean('Test enable', default=True, track_visibility='onchange')
-    test_tags = fields.Char('Test tags', help="comma separated list of test tags")
-    enable_auto_tags = fields.Boolean('Allow auto tag', default=True)
+    test_tags = fields.Char('Test tags', help="comma separated list of test tags", track_visibility='onchange')
+    enable_auto_tags = fields.Boolean('Allow auto tag', default=True, track_visibility='onchange')
     extra_params = fields.Char('Extra cmd args', track_visibility='onchange')
+    additionnal_env = fields.Char('Extra env', help='Example: foo="bar",bar="foo". Cannot contains \' ', track_visibility='onchange')
     # python
     python_code = fields.Text('Python code', track_visibility='onchange', default=PYTHON_DEFAULT)
     running_job = fields.Boolean('Job final state is running', default=False, help="Docker won't be killed if checked")
@@ -362,7 +363,8 @@ class ConfigStep(models.Model):
             cmd.finals.append(['gzip', '-f', self._perfs_data_path()])  # keep data but gz them to save disc space
         max_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=10000))
         timeout = min(self.cpu_limit, max_timeout)
-        return docker_run(cmd.build(), log_path, build._path(), build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports)
+        env_variables = self.additionnal_env.replace("'", '"').split(',')  # remove '
+        return docker_run(cmd.build(), log_path, build._path(), build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports, env_variables=env_variables)
 
     def log_end(self, build):
         if self.job_type == 'create_build':
