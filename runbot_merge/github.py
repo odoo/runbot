@@ -114,6 +114,12 @@ class GH(object):
         try:
             self('patch', 'git/refs/heads/{}'.format(branch), json={'sha': sha})
             _logger.debug('fast_forward(%s, %s, %s) -> OK', self._repo, branch, sha)
+            head = self.head(branch)
+            if head != sha:
+                _logger.error("Sanity check ref update of %s, expected %s got %s",
+                    branch, sha, head
+                )
+                raise exceptions.FastForwardError(self._repo)
         except requests.HTTPError:
             _logger.debug('fast_forward(%s, %s, %s) -> ERROR', self._repo, branch, sha, exc_info=True)
             raise exceptions.FastForwardError(self._repo)
@@ -132,6 +138,10 @@ class GH(object):
             'OK' if status0 == 200 else r.text or r.reason
         )
         if status0 == 200:
+            head = self.head(branch)
+            assert head == sha, "Sanity check ref update of %s, expected %s got %s" % (
+                branch, sha, head
+            )
             return
 
         # 422 makes no sense but that's what github returns, leaving 404 just
@@ -150,6 +160,10 @@ class GH(object):
                 'OK' if status1 == 201 else r.text or r.reason
             )
             if status1 == 201:
+                head = self.head(branch)
+                assert head == sha, "Sanity check ref update of %s, expected %s got %s" % (
+                    branch, sha, head
+                )
                 return
 
         raise AssertionError("set_ref failed(%s, %s)" % (status0, status1))

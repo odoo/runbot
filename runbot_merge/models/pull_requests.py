@@ -1623,6 +1623,8 @@ class Stagings(models.Model):
                         time.sleep(pause)
                         continue
                     raise
+                else:
+                    break
             first = False
         return repo_name
 
