@@ -60,7 +60,9 @@
                         <field name="coverage"/>
                         <field name="test_enable"/>
                         <field name="test_tags"/>
+                        <field name="enable_auto_tags"/>
                         <field name="extra_params"/>
+                        <field name="additionnal_env"/>
                     </group>
                     <group string="Create settings" attrs="{'invisible': [('job_type', 'not in', ('python', 'create_build'))]}">
                         <field name="create_config_ids" widget="many2many_tags" options="{'no_create': True}" />

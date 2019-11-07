@@ -74,7 +74,7 @@ def docker_build(log_path, build_dir):
     dbuild.wait()
 
 
-def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None, cpu_limit=None, preexec_fn=None, ro_volumes=None):
+def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None, cpu_limit=None, preexec_fn=None, ro_volumes=None, env_variables=None):
     """Run tests in a docker container
     :param run_cmd: command string to run in container
     :param log_path: path to the logfile that will contain odoo stdout and stderr
@@ -101,6 +101,11 @@ def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None,
         for dest, source in ro_volumes.items():
             logs.write("Adding readonly volume '%s' pointing to %s \n" % (dest, source))
             docker_command.append('--volume=%s:/data/build/%s:ro' % (source, dest))
+
+    if env_variables:
+        for var in env_variables:
+            assert not "'" in var
+            docker_command.append('-e=\'%s\'' % var)
 
     serverrc_path = os.path.expanduser('~/.openerp_serverrc')
     odoorc_path = os.path.expanduser('~/.odoorc')
