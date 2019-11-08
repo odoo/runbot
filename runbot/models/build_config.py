@@ -362,7 +362,7 @@ class ConfigStep(models.Model):
             cmd.finals.append(['gzip', '-f', self._perfs_data_path()])  # keep data but gz them to save disc space
         max_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=10000))
         timeout = min(self.cpu_limit, max_timeout)
-        env_variables = self.additionnal_env.replace("'", '"').split(',')  # remove '
+        env_variables = self.additionnal_env.split(',') if self.additionnal_env else []
         return docker_run(cmd.build(), log_path, build._path(), build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports, env_variables=env_variables)
 
     def log_end(self, build):

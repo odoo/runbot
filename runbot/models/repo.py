@@ -68,6 +68,7 @@ class runbot_repo(models.Model):
     server_files = fields.Char('Server files', help='Comma separated list of possible server files')  # odoo-bin,openerp-server,openerp-server.py
     manifest_files = fields.Char('Manifest files', help='Comma separated list of possible manifest files', default='__manifest__.py')
     addons_paths = fields.Char('Addons paths', help='Comma separated list of possible addons path', default='')
+    no_build = fields.Boolean("No build", help="Forbid creation of build on this repo", default=False)
 
     def _compute_config_id(self):
         for repo in self:
@@ -285,7 +286,7 @@ class runbot_repo(models.Model):
 
             # create build (and mark previous builds as skipped) if not found
             if not (branch.id, sha) in builds_candidates:
-                if branch.no_auto_build or branch.no_build:
+                if branch.no_auto_build or branch.no_build or branch.repo_id.no_build:
                     continue
                 _logger.debug('repo %s branch %s new build found revno %s', self.name, branch.name, sha)
                 build_info = {

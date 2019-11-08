@@ -14,6 +14,7 @@
                 <field name="sequence"/>
                 <field name="name"/>
                 <field name="mode"/>
+                <field name="no_build"/>
                 <field name="nginx"/>
                 <field name="duplicate_id"/>
                 <field name="dependency_ids" widget="many2many_tags"/>
