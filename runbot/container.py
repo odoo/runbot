@@ -9,7 +9,9 @@ When testing this file:
     The second parameter is the exposed port
 """
 import argparse
+import configparser
 import datetime
+import io
 import json
 import logging
 import os
@@ -32,11 +34,20 @@ ENV COVERAGE_FILE /data/build/.coverage
 
 
 class Command():
-    def __init__(self, pres, cmd, posts, finals=None):
+    def __init__(self, pres, cmd, posts, finals=None, config_tuples=None):
+        """ Command object that represent commands to run in Docker container
+        :param pres: list of pre-commands
+        :param cmd: list of main command only run if the pres commands succeed (&&)
+        :param posts: list of post commands posts only run if the cmd command succedd (&&)
+        :param finals: list of finals commands always executed
+        :param config_tuples: list of key,value tuples to write in config file
+        returns a string of the full command line to run
+        """
         self.pres = pres or []
         self.cmd = cmd
         self.posts = posts or []
         self.finals = finals or []
+        self.config_tuples = config_tuples or []
 
     def __getattr__(self, name):
         return getattr(self.cmd, name)
@@ -47,6 +58,12 @@ class Command():
     def __add__(self, l):
         return Command(self.pres, self.cmd + l, self.posts, self.finals)
 
+    def __str__(self):
+        return ' '.join(self)
+
+    def __repr__(self):
+        return self.build().replace('&& ', '&&\n').replace('|| ', '||\n\t').replace(';', ';\n')
+
     def build(self):
         cmd_chain = []
         cmd_chain += [' '.join(pre) for pre in self.pres if pre]
@@ -55,6 +72,24 @@ class Command():
         cmd_chain = [' && '.join(cmd_chain)]
         cmd_chain += [' '.join(final) for final in self.finals if final]
         return ' ; '.join(cmd_chain)
+
+    def add_config_tuple(self, option, value):
+        self.config_tuples.append((option, value))
+
+    def get_config(self, starting_config=''):
+        """ returns a config file content based on config tuples and
+            and eventually update the starting config
+        """
+        config = configparser.ConfigParser()
+        config.read_string(starting_config)
+        if self.config_tuples and not config.has_section('options'):
+            config.add_section('options')
+        for option, value in self.config_tuples:
+            config.set('options', option, value)
+        res = io.StringIO()
+        config.write(res)
+        res.seek(0)
+        return res.read()
 
 
 def docker_build(log_path, build_dir):
@@ -85,10 +120,15 @@ def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None,
     :params ro_volumes: dict of dest:source volumes to mount readonly in builddir
     :params env_variables: list of environment variables
     """
+    if isinstance(run_cmd, Command):
+        cmd_object = run_cmd
+        run_cmd = cmd_object.build()
+    else:
+        cmd_object = Command([], run_cmd.split(' '), [])
     _logger.debug('Docker run command: %s', run_cmd)
     logs = open(log_path, 'w')
     run_cmd = 'cd /data/build && %s' % run_cmd
-    logs.write("Docker command:\n%s\n=================================================\n" % run_cmd.replace('&& ', '&&\n').replace('|| ', '||\n\t'))
+    logs.write("Docker command:\n%s\n=================================================\n" % cmd_object)
     # create start script
     docker_command = [
         'docker', 'run', '--rm',
@@ -110,8 +150,12 @@ def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None,
     serverrc_path = os.path.expanduser('~/.openerp_serverrc')
     odoorc_path = os.path.expanduser('~/.odoorc')
     final_rc = odoorc_path if os.path.exists(odoorc_path) else serverrc_path if os.path.exists(serverrc_path) else None
-    if final_rc:
-        docker_command.extend(['--volume=%s:/home/odoo/.odoorc:ro' % final_rc])
+    rc_content = cmd_object.get_config(starting_config=open(final_rc, 'r').read() if final_rc else '')
+    rc_path = os.path.join(build_dir, '.odoorc')
+    with open(rc_path, 'w') as rc_file:
+        rc_file.write(rc_content)
+    docker_command.extend(['--volume=%s:/home/odoo/.odoorc:ro' % rc_path])
+
     if exposed_ports:
         for dp, hp in enumerate(exposed_ports, start=8069):
             docker_command.extend(['-p', '127.0.0.1:%s:%s' % (hp, dp)])
@@ -204,8 +248,10 @@ def tests(args):
     elif args.flamegraph:
         flame_log = '/data/build/logs/flame.log'
         python_params = ['-m', 'flamegraph', '-o', flame_log]
-    odoo_cmd = ['python%s' % py_version ] + python_params + ['/data/build/odoo-bin', '-d %s' % args.db_name, '--addons-path=/data/build/addons', '--data-dir', '/data/build/datadir', '-r %s' % os.getlogin(), '-i', args.odoo_modules,  '--test-enable', '--stop-after-init', '--max-cron-threads=0']
+    odoo_cmd = ['python%s' % py_version ] + python_params + ['/data/build/odoo-bin', '-d %s' % args.db_name, '--addons-path=/data/build/addons', '-i', args.odoo_modules,  '--test-enable', '--stop-after-init', '--max-cron-threads=0']
     cmd = Command(pres, odoo_cmd, posts)
+    cmd.add_config_tuple('data-dir', '/data/build/datadir')
+    cmd.add_config_tuple('db_user', '%s' % os.getlogin())
 
     if args.dump:
         os.makedirs(os.path.join(args.build_dir, 'logs', args.db_name), exist_ok=True)
@@ -235,7 +281,7 @@ def tests(args):
     # Test full testing
     logfile = os.path.join(args.build_dir, 'logs', 'logs-full-test.txt')
     container_name = 'odoo-container-test-%s' % datetime.datetime.now().microsecond
-    docker_run(cmd.build(), logfile, args.build_dir, container_name)
+    docker_run(cmd, logfile, args.build_dir, container_name)
     time.sleep(1)  # give time for the container to start
 
     while docker_is_running(container_name):
