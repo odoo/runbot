@@ -903,33 +903,38 @@ class runbot_build(models.Model):
         cmd = ['python%s' % py_version] + python_params + [os.path.join(server_dir, server_file), '--addons-path', ",".join(addons_paths)]
         # options
         config_path = build._server("tools/config.py")
-        if local_only:
-            if grep(config_path, "--http-interface"):
-                cmd.append("--http-interface=127.0.0.1")
-            elif grep(config_path, "--xmlrpc-interface"):
-                cmd.append("--xmlrpc-interface=127.0.0.1")
         if grep(config_path, "no-xmlrpcs"):  # move that to configs ?
             cmd.append("--no-xmlrpcs")
         if grep(config_path, "no-netrpc"):
             cmd.append("--no-netrpc")
+
+        command = Command(pres, cmd, [])
+
+        # use the username of the runbot host to connect to the databases
+        command.add_config_tuple('db_user', '%s' % pwd.getpwuid(os.getuid()).pw_name)
+
+        if local_only:
+            if grep(config_path, "--http-interface"):
+                command.add_config_tuple("http-interface", "127.0.0.1")
+            elif grep(config_path, "--xmlrpc-interface"):
+                command.add_config_tuple("xmlrpc-interface", "127.0.0.1")
+
         if grep(config_path, "log-db"):
             logdb_uri = self.env['ir.config_parameter'].get_param('runbot.runbot_logdb_uri')
             logdb = self.env.cr.dbname
             if logdb_uri and grep(build._server('sql_db.py'), 'allow_uri'):
                 logdb = '%s' % logdb_uri
-            cmd += ["--log-db=%s" % logdb]
+            command.add_config_tuple("log-db", "%s" % logdb)
             if grep(build._server('tools/config.py'), 'log-db-level'):
-                cmd += ["--log-db-level", '25']
+                command.add_config_tuple("log-db-level", '25')
 
         if grep(config_path, "data-dir"):
             datadir = build._path('datadir')
             if not os.path.exists(datadir):
                 os.mkdir(datadir)
-            cmd += ["--data-dir", '/data/build/datadir']
+            command.add_config_tuple("data-dir", '/data/build/datadir')
 
-        # use the username of the runbot host to connect to the databases
-        cmd += ['-r %s' % pwd.getpwuid(os.getuid()).pw_name]
-        return Command(pres, cmd, [])
+        return command
 
     def _github_status_notify_all(self, status):
         """Notify each repo with a status"""

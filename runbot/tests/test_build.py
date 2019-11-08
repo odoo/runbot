@@ -113,7 +113,7 @@ class Test_Build(common.TransactionCase):
             'port': '1234',
         })
         cmd = build._cmd(py_version=3)
-        self.assertIn('--log-db=%s' % uri, cmd)
+        self.assertIn('log-db = %s' % uri, cmd.get_config())
 
     @patch('odoo.addons.runbot.models.build.os.path.isdir')
     @patch('odoo.addons.runbot.models.build.os.path.isfile')

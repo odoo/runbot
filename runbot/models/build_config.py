@@ -287,7 +287,7 @@ class ConfigStep(models.Model):
         build_port = build.port
         self.env.cr.commit()  # commit before docker run to be 100% sure that db state is consistent with dockers
         self.invalidate_cache()
-        res = docker_run(cmd.build(), log_path, build_path, docker_name, exposed_ports=[build_port, build_port + 1], ro_volumes=exports)
+        res = docker_run(cmd, log_path, build_path, docker_name, exposed_ports=[build_port, build_port + 1], ro_volumes=exports)
         build.repo_id._reload_nginx()
         return res
 
@@ -335,7 +335,7 @@ class ConfigStep(models.Model):
                 build._log('test_all', 'Test tags given but not supported')
 
         if grep(config_path, "--screenshots"):
-            cmd += ['--screenshots', '/data/build/tests']
+            cmd.add_config_tuple('screenshots', '/data/build/tests')
 
         cmd.append('--stop-after-init')  # install job should always finish
         if '--log-level' not in extra_params:
@@ -363,7 +363,7 @@ class ConfigStep(models.Model):
         max_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=10000))
         timeout = min(self.cpu_limit, max_timeout)
         env_variables = self.additionnal_env.split(',') if self.additionnal_env else []
-        return docker_run(cmd.build(), log_path, build._path(), build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports, env_variables=env_variables)
+        return docker_run(cmd, log_path, build._path(), build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports, env_variables=env_variables)
 
     def log_end(self, build):
         if self.job_type == 'create_build':
