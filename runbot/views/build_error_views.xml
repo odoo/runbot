@@ -26,6 +26,7 @@
                 <field name="first_seen_build_id"/>
                 <field name="last_seen_date"/>
                 <field name="last_seen_build_id"/>
+                <field name="test_tags"/>
               </group>
               <notebook>
                 <page string="Builds">

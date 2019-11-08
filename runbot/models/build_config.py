@@ -109,7 +109,7 @@ class ConfigStep(models.Model):
     flamegraph = fields.Boolean('Allow Flamegraph', default=False, track_visibility='onchange')
     test_enable = fields.Boolean('Test enable', default=True, track_visibility='onchange')
     test_tags = fields.Char('Test tags', help="comma separated list of test tags", track_visibility='onchange')
-    enable_auto_tags = fields.Boolean('Allow auto tag', default=True, track_visibility='onchange')
+    enable_auto_tags = fields.Boolean('Allow auto tag', default=False, track_visibility='onchange')
     extra_params = fields.Char('Extra cmd args', track_visibility='onchange')
     additionnal_env = fields.Char('Extra env', help='Example: foo="bar",bar="foo". Cannot contains \' ', track_visibility='onchange')
     # python
@@ -333,6 +333,11 @@ class ConfigStep(models.Model):
                     cmd.extend(['--test-tags', test_tags])
             else:
                 build._log('test_all', 'Test tags given but not supported')
+        elif self.enable_auto_tags and self.test_enable:
+            auto_tags = self.env['runbot.build.error'].disabling_tags()
+            if auto_tags:
+                test_tags = ','.join(auto_tags)
+                cmd.extend(['--test-tags', test_tags])
 
         if grep(config_path, "--screenshots"):
             cmd += ['--screenshots', '/data/build/tests']
