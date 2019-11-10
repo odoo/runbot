@@ -2,14 +2,13 @@
 import fnmatch
 import glob
 import logging
-import os
 import pwd
 import re
 import shutil
 import subprocess
 import time
 import datetime
-from ..common import dt2time, fqdn, now, grep, uniq_list, local_pgadmin_cursor, s2human, Commit, dest_reg
+from ..common import dt2time, fqdn, now, grep, uniq_list, local_pgadmin_cursor, s2human, Commit, dest_reg, os
 from ..container import docker_build, docker_stop, docker_is_running, Command
 from odoo.addons.runbot.models.repo import RunbotException
 from odoo import models, fields, api
@@ -382,10 +381,7 @@ class runbot_build(models.Model):
 
     def _get_params(self):
         message = False
-        try:
-            message = self.repo_id._git(['show', '-s', self.name])
-        except CalledProcessError:
-            pass  # todo remove this try catch and make correct patch for _git
+        message = self.repo_id._git(['show', '-s', self.name])
         params = defaultdict(lambda: defaultdict(str))
         if message:
             regex = re.compile(r'^[\t ]*Runbot-dependency: ([A-Za-z0-9\-_]+/[A-Za-z0-9\-_]+):([0-9A-Fa-f\-]*) *(#.*)?$', re.M)  # dep:repo:hash #comment

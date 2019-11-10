@@ -1,11 +1,10 @@
 import base64
 import glob
 import logging
-import os
 import re
 import shlex
 import time
-from ..common import now, grep, time2str, rfind, Commit, s2human
+from ..common import now, grep, time2str, rfind, Commit, s2human, os
 from ..container import docker_run, docker_get_gateway_ip, Command
 from odoo import models, fields, api
 from odoo.exceptions import UserError, ValidationError

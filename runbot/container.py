@@ -14,7 +14,7 @@ import datetime
 import io
 import json
 import logging
-import os
+from .common import os
 import shutil
 import subprocess
 import time
