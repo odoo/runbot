@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
+from collections import defaultdict
 from unittest.mock import patch
 from odoo.tests import common
 
+from .common import RunbotCase
 
 def rev_parse(repo, branch_name):
     """
@@ -12,13 +14,11 @@ def rev_parse(repo, branch_name):
     head_hash = 'rp_%s_%s_head' % (repo.name.split(':')[1], branch_name.split('/')[-1])
     return head_hash
 
-class Test_Build(common.TransactionCase):
+class Test_Build(RunbotCase):
 
     def setUp(self):
         super(Test_Build, self).setUp()
-        self.Repo = self.env['runbot.repo']
         self.repo = self.Repo.create({'name': 'bla@example.com:foo/bar', 'server_files': 'server.py', 'addons_paths': 'addons,core/addons'})
-        self.Branch = self.env['runbot.branch']
         self.branch = self.Branch.create({
             'repo_id': self.repo.id,
             'name': 'refs/heads/master'
@@ -31,11 +31,9 @@ class Test_Build(common.TransactionCase):
             'repo_id': self.repo.id,
             'name': 'refs/heads/11.0'
         })
-        self.Build = self.env['runbot.build']
 
-    @patch('odoo.addons.runbot.models.build.fqdn')
-    def test_base_fields(self, mock_fqdn):
-        build = self.Build.create({
+    def test_base_fields(self):
+        build = self.create_build({
             'branch_id': self.branch.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'port': '1234',
@@ -47,14 +45,14 @@ class Test_Build(common.TransactionCase):
         self.assertEqual(build.dest, '%05d-master-deadbe' % build.id)
 
         # Test domain compute with fqdn and ir.config_parameter
-        mock_fqdn.return_value = 'runbot98.nowhere.org'
+        self.patchers['fqdn_patcher'].return_value = 'runbot98.nowhere.org'
         self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_domain', False)
         self.assertEqual(build.domain, 'runbot98.nowhere.org:1234')
         self.env['ir.config_parameter'].set_param('runbot.runbot_domain', 'runbot99.example.org')
         build._compute_domain()
         self.assertEqual(build.domain, 'runbot99.example.org:1234')
 
-        other = self.Build.create({
+        other = self.create_build({
             'branch_id': self.branch.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'port': '5678',
@@ -71,11 +69,9 @@ class Test_Build(common.TransactionCase):
             builds.write({'local_state': 'duplicate'})
 
     @patch('odoo.addons.runbot.models.build.runbot_build._get_repo_available_modules')
-    @patch('odoo.addons.runbot.models.build.runbot_build._get_params')
-    @patch('odoo.addons.runbot.models.build.fqdn')
-    def test_filter_modules(self, mock_fqdn, mock_get_params, mock_get_repo_mods):
+    def test_filter_modules(self, mock_get_repo_mods):
         """ test module filtering """
-        build = self.Build.create({
+        build = self.create_build({
             'branch_id': self.branch.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'port': '1234',
@@ -99,15 +95,11 @@ class Test_Build(common.TransactionCase):
         modules_to_test = build._get_modules_to_test(self, modules_patterns='*, -hw_*, hw_explicit')
         self.assertEqual(modules_to_test, sorted(['good_module', 'bad_module', 'other_good', 'l10n_be', 'hwgood', 'hw_explicit', 'other_mod_1', 'other_mod_2']))
 
-    @patch('odoo.addons.runbot.models.build.os.path.isfile')
-    @patch('odoo.addons.runbot.models.build.os.mkdir')
-    @patch('odoo.addons.runbot.models.build.grep')
-    def test_build_cmd_log_db(self, mock_grep, mock_mkdir, mock_is_file):
+    def test_build_cmd_log_db(self, ):
         """ test that the logdb connection URI is taken from the .odoorc file """
-        mock_is_file.return_value = True
         uri = 'postgres://someone:pass@somewhere.com/db'
         self.env['ir.config_parameter'].sudo().set_param("runbot.runbot_logdb_uri", uri)
-        build = self.Build.create({
+        build = self.create_build({
             'branch_id': self.branch.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'port': '1234',
@@ -115,15 +107,9 @@ class Test_Build(common.TransactionCase):
         cmd = build._cmd(py_version=3)
         self.assertIn('log-db = %s' % uri, cmd.get_config())
 
-    @patch('odoo.addons.runbot.models.build.os.path.isdir')
-    @patch('odoo.addons.runbot.models.build.os.path.isfile')
-    @patch('odoo.addons.runbot.models.build.os.mkdir')
-    @patch('odoo.addons.runbot.models.build.grep')
-    def test_build_cmd_server_path_no_dep(self, mock_grep, mock_mkdir, mock_is_file, mock_is_dir):
+    def test_build_cmd_server_path_no_dep(self):
         """ test that the server path and addons path """
-        mock_is_file.return_value = True
-        mock_is_dir.return_value = True
-        build = self.Build.create({
+        build = self.create_build({
             'branch_id': self.branch.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'port': '1234',
@@ -135,19 +121,15 @@ class Test_Build(common.TransactionCase):
         addons_path_pos = cmd.index('--addons-path') + 1
         self.assertEqual(cmd[addons_path_pos], 'bar/addons,bar/core/addons')
 
-    @patch('odoo.addons.runbot.models.branch.runbot_branch._is_on_remote')
-    @patch('odoo.addons.runbot.models.build.os.path.isdir')
-    @patch('odoo.addons.runbot.models.build.os.path.isfile')
-    @patch('odoo.addons.runbot.models.build.os.mkdir')
-    @patch('odoo.addons.runbot.models.build.grep')
-    def test_build_cmd_server_path_with_dep(self, mock_grep, mock_mkdir, mock_is_file, mock_is_dir, mock_is_on_remote):
+    def test_build_cmd_server_path_with_dep(self):
         """ test that the server path and addons path """
 
         def is_file(file):
             self.assertIn(file, [
                 '/tmp/runbot_test/static/sources/bar-ent/d0d0caca0000ffffffffffffffffffffffffffff/requirements.txt',
                 '/tmp/runbot_test/static/sources/bar/dfdfcfcf0000ffffffffffffffffffffffffffff/requirements.txt',
-                '/tmp/runbot_test/static/sources/bar/dfdfcfcf0000ffffffffffffffffffffffffffff/server.py'
+                '/tmp/runbot_test/static/sources/bar/dfdfcfcf0000ffffffffffffffffffffffffffff/server.py',
+                '/tmp/runbot_test/static/sources/bar/dfdfcfcf0000ffffffffffffffffffffffffffff/openerp/tools/config.py'
             ])
             if file == '/tmp/runbot_test/static/sources/bar-ent/d0d0caca0000ffffffffffffffffffffffffffff/requirements.txt':
                 return False
@@ -162,9 +144,9 @@ class Test_Build(common.TransactionCase):
             self.assertTrue(any([path in file for path in paths]))  # checking that addons path existence check looks ok
             return True
 
-        mock_is_file.side_effect = is_file
-        mock_is_dir.side_effect = is_dir
-        mock_is_on_remote.return_value = True
+        self.patchers['isfile'].side_effect = is_file
+        self.patchers['isdir'].side_effect = is_dir
+
         repo_ent = self.env['runbot.repo'].create({
             'name': 'bla@example.com:foo/bar-ent',
             'server_files': '',
@@ -181,7 +163,7 @@ class Test_Build(common.TransactionCase):
             return 'dfdfcfcf0000ffffffffffffffffffffffffffff'
 
         with patch('odoo.addons.runbot.models.repo.runbot_repo._git_rev_parse', new=rev_parse):
-            build = self.Build.create({
+            build = self.create_build({
                 'branch_id': enterprise_branch.id,
                 'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
                 'port': '1234',
@@ -193,26 +175,21 @@ class Test_Build(common.TransactionCase):
         self.assertEqual('bar/server.py', cmd[1])
         self.assertEqual('python3', cmd[0])
 
-    @patch('odoo.addons.runbot.models.branch.runbot_branch._is_on_remote')
-    @patch('odoo.addons.runbot.models.build.os.path.isdir')
-    @patch('odoo.addons.runbot.models.build.os.path.isfile')
-    @patch('odoo.addons.runbot.models.build.os.mkdir')
-    @patch('odoo.addons.runbot.models.build.grep')
-    def test_build_cmd_server_path_with_dep_collision(self, mock_grep, mock_mkdir, mock_is_file, mock_is_dir, mock_is_on_remote):
+    def test_build_cmd_server_path_with_dep_collision(self):
         """ test that the server path and addons path """
 
         def is_file(file):
             self.assertIn(file, [
                 '/tmp/runbot_test/static/sources/bar/dfdfcfcf0000ffffffffffffffffffffffffffff/requirements.txt',
                 '/tmp/runbot_test/static/sources/bar/d0d0caca0000ffffffffffffffffffffffffffff/requirements.txt',
-                '/tmp/runbot_test/static/sources/bar/dfdfcfcf0000ffffffffffffffffffffffffffff/server.py'])
+                '/tmp/runbot_test/static/sources/bar/dfdfcfcf0000ffffffffffffffffffffffffffff/server.py',
+                '/tmp/runbot_test/static/sources/bar/dfdfcfcf0000ffffffffffffffffffffffffffff/openerp/tools/config.py'
+            ])
             if file == '/tmp/runbot_test/static/sources/bar/dfdfcfcf0000ffffffffffffffffffffffffffff/requirements.txt':
                 return False
             return True
 
-        mock_is_file.side_effect = is_file
-        mock_is_dir.return_value = True
-        mock_is_on_remote.return_value = True
+        self.patchers['isfile'].side_effect = is_file
         repo_ent = self.env['runbot.repo'].create({
             'name': 'bla@example.com:foo-ent/bar',
             'server_files': '',
@@ -229,7 +206,7 @@ class Test_Build(common.TransactionCase):
             return 'dfdfcfcf0000ffffffffffffffffffffffffffff'
 
         with patch('odoo.addons.runbot.models.repo.runbot_repo._git_rev_parse', new=rev_parse):
-            build = self.Build.create({
+            build = self.create_build({
                 'branch_id': enterprise_branch.id,
                 'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
                 'port': '1234',
@@ -243,7 +220,7 @@ class Test_Build(common.TransactionCase):
 
     def test_build_config_from_branch_default(self):
         """test build config_id is computed from branch default config_id"""
-        build = self.Build.create({
+        build = self.create_build({
             'branch_id': self.branch.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
         })
@@ -252,7 +229,7 @@ class Test_Build(common.TransactionCase):
     def test_build_config_from_branch_testing(self):
         """test build config_id is computed from branch"""
         self.branch.config_id = self.env.ref('runbot.runbot_build_config_default_no_run')
-        build = self.Build.create({
+        build = self.create_build({
             'branch_id': self.branch.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
         })
@@ -261,7 +238,7 @@ class Test_Build(common.TransactionCase):
     def test_build_from_branch_no_build(self):
         """test build is not even created when branch no_build is True"""
         self.branch.no_build = True
-        build = self.Build.create({
+        build = self.create_build({
             'branch_id': self.branch.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
         })
@@ -270,7 +247,7 @@ class Test_Build(common.TransactionCase):
     def test_build_config_can_be_set(self):
         """test build config_id can be set to something different than the one on the branch"""
         self.branch.config_id = self.env.ref('runbot.runbot_build_config_default')
-        build = self.Build.create({
+        build = self.create_build({
             'branch_id': self.branch.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'config_id': self.env.ref('runbot.runbot_build_config_default_no_run').id
@@ -280,7 +257,7 @@ class Test_Build(common.TransactionCase):
     @patch('odoo.addons.runbot.models.build._logger')
     def test_build_skip(self, mock_logger):
         """test build is skipped"""
-        build = self.Build.create({
+        build = self.create_build({
             'branch_id': self.branch.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'port': '1234',
@@ -289,7 +266,7 @@ class Test_Build(common.TransactionCase):
         self.assertEqual(build.local_state, 'done')
         self.assertEqual(build.local_result, 'skipped')
 
-        other_build = self.Build.create({
+        other_build = self.create_build({
             'branch_id': self.branch.id,
             'name': 'deadbeef0000ffffffffffffffffffffffffffff',
             'port': '1234',
@@ -302,13 +279,12 @@ class Test_Build(common.TransactionCase):
 
     def test_ask_kill_duplicate(self):
         """ Test that the _ask_kill method works on duplicate"""
-        #mock_is_on_remote.return_value = True
 
-        build1 = self.Build.create({
+        build1 = self.create_build({
             'branch_id': self.branch_10.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
         })
-        build2 = self.Build.create({
+        build2 = self.create_build({
             'branch_id': self.branch_10.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
         })
@@ -320,30 +296,30 @@ class Test_Build(common.TransactionCase):
         self.assertEqual(build1.local_result, 'skipped', 'A killed pending duplicate build should mark the real build as skipped')
 
     def test_children(self):
-        build1 = self.Build.create({
+        build1 = self.create_build({
             'branch_id': self.branch_10.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
         })
-        build1_1 = self.Build.create({
+        build1_1 = self.create_build({
             'branch_id': self.branch_10.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'parent_id': build1.id,
             'hidden': True,
             'extra_params': '2',  # avoid duplicate
         })
-        build1_2 = self.Build.create({
+        build1_2 = self.create_build({
             'branch_id': self.branch_10.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'parent_id': build1.id,
             'extra_params': '3',
         })
-        build1_1_1 = self.Build.create({
+        build1_1_1 = self.create_build({
             'branch_id': self.branch_10.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'parent_id': build1_1.id,
             'extra_params': '4',
         })
-        build1_1_2 = self.Build.create({
+        build1_1_2 = self.create_build({
             'branch_id': self.branch_10.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'parent_id': build1_1.id,
@@ -408,17 +384,17 @@ class Test_Build(common.TransactionCase):
         assert_state(0, 0, 0, 'done', build1_1_2)
 
     def test_duplicate_childrens(self):
-        build_old = self.Build.create({
+        build_old = self.create_build({
             'branch_id': self.branch_10.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'extra_params': '0',
         })
-        build_parent = self.Build.create({
+        build_parent = self.create_build({
             'branch_id': self.branch_10.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'extra_params': '1',
         })
-        build_child = self.Build.create({
+        build_child = self.create_build({
             'branch_id': self.branch_10.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'parent_id': build_parent.id,
@@ -431,7 +407,8 @@ class Test_Build(common.TransactionCase):
         self.assertEqual(build_parent.nb_testing, 0)
         self.assertEqual(build_parent.global_state, 'done')
 
-class TestClosestBranch(common.TransactionCase):
+
+class TestClosestBranch(RunbotCase):
 
     def branch_description(self, branch):
         branch_type = 'pull' if 'pull' in branch.name else 'branch'
@@ -453,7 +430,7 @@ class TestClosestBranch(common.TransactionCase):
         }
         for b1, b2 in [(branch1, branch2), (branch2, branch1)]:
             hash = '%s%s' % (b1.name, b2.name)
-            build1 = self.Build.create({
+            build1 = self.create_build({
                 'branch_id': b1.id,
                 'name': hash,
             })
@@ -461,7 +438,7 @@ class TestClosestBranch(common.TransactionCase):
             if b1_closest:
                 self.assertClosest(b1, closest[b1])
 
-            build2 = self.Build.create({
+            build2 = self.create_build({
                 'branch_id': b2.id,
                 'name': hash,
             })
@@ -533,10 +510,10 @@ class TestClosestBranch(common.TransactionCase):
 
         self.Build = self.env['runbot.build']
 
-    @patch('odoo.addons.runbot.models.repo.runbot_repo._github')
-    def test_pr_is_duplicate(self, mock_github):
+    def test_pr_is_duplicate(self):
         """ test PR is a duplicate of a dev branch build """
 
+        mock_github = self.patchers['github_patcher']
         mock_github.return_value = {
             'head': {'label': 'odoo-dev:10.0-fix-thing-moc'},
             'base': {'ref': '10.0'},
@@ -553,10 +530,8 @@ class TestClosestBranch(common.TransactionCase):
         })
         self.assertDuplicate(dev_branch, pr)
 
-    @patch('odoo.addons.runbot.models.branch.runbot_branch._is_on_remote')
-    def test_closest_branch_01(self, mock_is_on_remote):
+    def test_closest_branch_01(self):
         """ test find a matching branch in a target repo based on branch name """
-        mock_is_on_remote.return_value = True
 
         self.Branch.create({
             'repo_id': self.community_dev_repo.id,
@@ -569,10 +544,10 @@ class TestClosestBranch(common.TransactionCase):
 
         self.assertEqual((addons_branch, 'exact'), addons_branch._get_closest_branch(self.enterprise_dev_repo.id))
 
-    @patch('odoo.addons.runbot.models.repo.runbot_repo._github')
-    def test_closest_branch_02(self, mock_github):
-
+    def test_closest_branch_02(self):
         """ test find two matching PR having the same head name """
+
+        mock_github = self.patchers['github_patcher']
         mock_github.return_value = {
             # "head label" is the repo:branch where the PR comes from
             # "base ref" is the target of the PR
@@ -601,13 +576,11 @@ class TestClosestBranch(common.TransactionCase):
         })
         self.assertEqual((community_branch, 'exact PR'), enterprise_pr._get_closest_branch(self.community_repo.id))
 
-    @patch('odoo.addons.runbot.models.repo.runbot_repo._github')
-    @patch('odoo.addons.runbot.models.branch.runbot_branch._is_on_remote')
-    def test_closest_branch_02_improved(self, mock_is_on_remote, mock_github):
+    def test_closest_branch_02_improved(self):
         """ test that a PR in enterprise with a matching PR in Community
         uses the matching one"""
 
-        mock_is_on_remote.return_value = True
+        mock_github = self.patchers['github_patcher']
 
         com_dev_branch = self.Branch.create({
             'repo_id': self.community_dev_repo.id,
@@ -656,22 +629,18 @@ class TestClosestBranch(common.TransactionCase):
                 (com_dev_branch, 'exact PR')
             )
 
-    @patch('odoo.addons.runbot.models.branch.runbot_branch._is_on_remote')
-    def test_closest_branch_03(self, mock_is_on_remote):
+    def test_closest_branch_03(self):
         """ test find a branch based on dashed prefix"""
-        mock_is_on_remote.return_value = True
         addons_branch = self.Branch.create({
             'repo_id': self.enterprise_dev_repo.id,
             'name': 'refs/heads/10.0-fix-blah-blah-moc'
         })
         self.assertEqual((self.branch_odoo_10, 'prefix'), addons_branch._get_closest_branch(self.community_repo.id))
 
-    @patch('odoo.addons.runbot.models.repo.runbot_repo._github')
-    @patch('odoo.addons.runbot.models.branch.runbot_branch._is_on_remote')
-    def test_closest_branch_03_05(self, mock_is_on_remote, mock_github):
+    def test_closest_branch_03_05(self):
         """ test that a PR in enterprise without a matching PR in Community
         and no branch in community"""
-        mock_is_on_remote.return_value = True
+        mock_github = self.patchers['github_patcher']
         # comm_repo = self.repo
         # self.repo.write({'token': 1})
 
@@ -715,12 +684,10 @@ class TestClosestBranch(common.TransactionCase):
                 (com_branch, 'prefix'),
             )
 
-    @patch('odoo.addons.runbot.models.repo.runbot_repo._github')
-    @patch('odoo.addons.runbot.models.branch.runbot_branch._is_on_remote')
-    def test_closest_branch_04(self, mock_is_on_remote, mock_github):
+    def test_closest_branch_04(self):
         """ test that a PR in enterprise without a matching PR in Community
         uses the corresponding exact branch in community"""
-        mock_is_on_remote.return_value = True
+        mock_github = self.patchers['github_patcher']
 
         com_dev_branch = self.Branch.create({
             'repo_id': self.community_dev_repo.id,
@@ -753,9 +720,9 @@ class TestClosestBranch(common.TransactionCase):
                 (com_dev_branch, 'no PR')
             )
 
-    @patch('odoo.addons.runbot.models.repo.runbot_repo._github')
-    def test_closest_branch_05(self, mock_github):
+    def test_closest_branch_05(self):
         """ test last resort value """
+        mock_github = self.patchers['github_patcher']
         mock_github.return_value = {
             'head': {'label': 'foo-dev:bar_branch'},
             'base': {'ref': '10.0'},
@@ -786,10 +753,8 @@ class TestClosestBranch(common.TransactionCase):
         })
         self.assertEqual((self.branch_odoo_master, 'default'), addons_branch._get_closest_branch(self.community_repo.id))
 
-    @patch('odoo.addons.runbot.models.branch.runbot_branch._is_on_remote')
-    def test_no_duplicate_update(self, mock_is_on_remote):
+    def test_no_duplicate_update(self):
         """push a dev branch in enterprise with same head as sticky, but with a matching branch in community"""
-        mock_is_on_remote.return_value = True
         community_sticky_branch = self.Branch.create({
             'repo_id': self.community_repo.id,
             'name': 'refs/heads/saas-12.2',
@@ -811,7 +776,7 @@ class TestClosestBranch(common.TransactionCase):
         # we shouldn't have duplicate since community_dev_branch exists
         with patch('odoo.addons.runbot.models.repo.runbot_repo._git_rev_parse', new=rev_parse):
             # lets create an old enterprise build
-            self.Build.create({
+            self.create_build({
                 'branch_id': enterprise_sticky_branch.id,
                 'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             })
@@ -822,9 +787,9 @@ class TestClosestBranch(common.TransactionCase):
                 (community_dev_branch, 'exact'),
             )
 
-    @patch('odoo.addons.runbot.models.repo.runbot_repo._github')
-    def test_external_pr_closest_branch(self, mock_github):
+    def test_external_pr_closest_branch(self):
         """ test last resort value target_name"""
+        mock_github = self.patchers['github_patcher']
         mock_github.return_value = {
             'head': {'label': 'external_repo:11.0-fix'},
             'base': {'ref': '11.0'},
@@ -838,9 +803,9 @@ class TestClosestBranch(common.TransactionCase):
         closest_branch = enterprise_pr._get_closest_branch(dependency_repo.id)
         self.assertEqual(enterprise_pr._get_closest_branch(dependency_repo.id), (self.branch_odoo_11, 'pr_target'))
 
-    @patch('odoo.addons.runbot.models.repo.runbot_repo._github')
-    def test_external_pr_with_comunity_pr_closest_branch(self, mock_github):
+    def test_external_pr_with_comunity_pr_closest_branch(self):
         """ test matching external pr """
+        mock_github = self.patchers['github_patcher']
         mock_github.return_value = {
             'head': {'label': 'external_dev_repo:11.0-fix'},
             'base': {'ref': '11.0'},
@@ -860,7 +825,7 @@ class TestClosestBranch(common.TransactionCase):
             'name': 'refs/pull/123'
         })
         with patch('odoo.addons.runbot.models.repo.runbot_repo._git_rev_parse', new=rev_parse):
-            build = self.Build.create({
+            build = self.create_build({
                 'branch_id': enterprise_pr.id,
                 'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             })

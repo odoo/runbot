@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 from unittest.mock import patch
 from odoo.tests import common
+from .common import RunbotCase
 
-class Test_Branch(common.TransactionCase):
+class Test_Branch(RunbotCase):
 
     def setUp(self):
         super(Test_Branch, self).setUp()
@@ -24,8 +25,8 @@ class Test_Branch(common.TransactionCase):
         self.assertEqual(branch.branch_url, 'https://example.com/foo/bar/tree/master')
         self.assertEqual(branch.config_id, self.env.ref('runbot.runbot_build_config_default'))
 
-    @patch('odoo.addons.runbot.models.repo.runbot_repo._github')
-    def test_pull_request(self, mock_github):
+    def test_pull_request(self):
+        mock_github = self.patchers['github_patcher']
         mock_github.return_value = {
             'head' : {'label': 'foo-dev:bar_branch'},
             'base' : {'ref': 'master'},

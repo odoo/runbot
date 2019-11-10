@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
 from unittest.mock import patch
 from odoo.tests import common
+from .common import RunbotCase
 
 
-class TestIrLogging(common.TransactionCase):
+class TestIrLogging(RunbotCase):
 
     def setUp(self):
         super(TestIrLogging, self).setUp()
-        self.Repo = self.env['runbot.repo']
         self.repo = self.Repo.create({'name': 'bla@example.com:foo/bar', 'server_files': 'server.py', 'addons_paths': 'addons,core/addons'})
-        self.Branch = self.env['runbot.branch']
         self.branch = self.Branch.create({
             'repo_id': self.repo.id,
             'name': 'refs/heads/master'
@@ -26,10 +25,8 @@ class TestIrLogging(common.TransactionCase):
                 VALUES (NOW() at time zone 'UTC', %s, %s, %s, %s, %s, %s, %s, %s)
             """, val)
 
-    @patch('odoo.addons.runbot.models.build.runbot_build._get_params')
-    @patch('odoo.addons.runbot.models.build.fqdn')
-    def test_ir_logging(self, mock_fqdn, mock_get_params):
-        build = self.Build.create({
+    def test_ir_logging(self):
+        build = self.create_build({
             'branch_id': self.branch.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'port': '1234',

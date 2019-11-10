@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
+from collections import defaultdict
 from itertools import cycle
 from unittest.mock import patch
 from werkzeug.wrappers import Response
 from odoo.tests import common
 from odoo.addons.runbot.controllers import frontend
+from .common import RunbotCase
 
 
-class Test_Frontend(common.HttpCase):
+class Test_Frontend(RunbotCase):
 
     def setUp(self):
         super(Test_Frontend, self).setUp()

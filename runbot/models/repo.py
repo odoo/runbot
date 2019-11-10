@@ -3,7 +3,6 @@ import datetime
 import dateutil
 import json
 import logging
-import os
 import random
 import re
 import requests
@@ -18,7 +17,7 @@ from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT
 from odoo import models, fields, api, registry
 from odoo.modules.module import get_module_resource
 from odoo.tools import config
-from ..common import fqdn, dt2time, Commit, dest_reg
+from ..common import fqdn, dt2time, Commit, dest_reg, os
 from ..container import docker_ps, docker_stop
 from psycopg2.extensions import TransactionRollbackError
 _logger = logging.getLogger(__name__)
@@ -538,6 +537,7 @@ class runbot_repo(models.Model):
         """This method have to be called from a dedicated cron on a runbot
         in charge of orchestration.
         """
+
         if hostname != fqdn():
             return 'Not for me'
 
@@ -558,8 +558,10 @@ class runbot_repo(models.Model):
         """ This method have to be called from a dedicated cron
         created on each runbot instance.
         """
+
         if hostname != fqdn():
             return 'Not for me'
+
         host = self.env['runbot.host']._get_current()
         host.set_psql_conn_count()
         host.last_start_loop = fields.Datetime.now()
