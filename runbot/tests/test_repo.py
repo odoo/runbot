@@ -57,7 +57,7 @@ class Test_Repo(common.TransactionCase):
             'name': 'refs/heads/bidon'
         })
 
-        self.commit_list = [('refs/heads/bidon',
+        first_commit = [('refs/heads/bidon',
                              'd0d0caca',
                              datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
                              'Marc Bidule',
@@ -65,7 +65,15 @@ class Test_Repo(common.TransactionCase):
                              'A nice subject',
                              'Marc Bidule',
                              '<marc.bidule@somewhere.com>')]
-        mock_fetch_head_time.side_effect = [100000.0, 100001.0, 100002.0]
+        self.commit_list = first_commit
+
+        def counter():
+            i = 100000
+            while True:
+                i += 1
+                yield i
+
+        mock_fetch_head_time.side_effect = counter()
 
         with patch('odoo.addons.runbot.models.repo.runbot_repo._git', new=self.mock_git_helper()):
             repo._create_pending_builds()
@@ -117,6 +125,7 @@ class Test_Repo(common.TransactionCase):
         self.assertEqual(branch_count, 1, 'No new branch should have been created')
 
         build = self.env['runbot.build'].search([('repo_id', '=', repo.id), ('branch_id', '=', branch.id), ('name', '=', 'b00b')])
+        self.assertEqual(len(build), 1)
         self.assertEqual(build.subject, 'Another subject')
         self.assertEqual(build.local_state, 'pending')
         self.assertFalse(build.local_result)
@@ -124,6 +133,23 @@ class Test_Repo(common.TransactionCase):
         previous_build = self.env['runbot.build'].search([('repo_id', '=', repo.id), ('branch_id', '=', branch.id), ('name', '=', 'd0d0caca')])
         self.assertEqual(previous_build.local_state, 'done', 'Previous pending build should be done')
         self.assertEqual(previous_build.local_result, 'skipped', 'Previous pending build result should be skipped')
+
+        self.commit_list = first_commit  # branch reseted hard to an old commit
+        builds = self.env['runbot.build'].search([('repo_id', '=', repo.id), ('branch_id', '=', branch.id), ('name', '=', 'd0d0caca')])
+        self.assertEqual(len(builds), 1)
+        with patch('odoo.addons.runbot.models.repo.runbot_repo._git', new=self.mock_git_helper()):
+            repo._create_pending_builds()
+
+        last_build = self.env['runbot.build'].search([], limit=1)
+        self.assertEqual(last_build.name, 'd0d0caca')
+        builds = self.env['runbot.build'].search([('repo_id', '=', repo.id), ('branch_id', '=', branch.id), ('name', '=', 'd0d0caca')])
+        self.assertEqual(len(builds), 2)
+        # self.assertEqual(last_build.duplicate_id, previous_build) False because previous_build is skipped
+        with patch('odoo.addons.runbot.models.repo.runbot_repo._git', new=self.mock_git_helper()):
+            other_repo._create_pending_builds()
+        builds = self.env['runbot.build'].search([('repo_id', '=', repo.id), ('branch_id', '=', branch.id), ('name', '=', 'd0d0caca')])
+        self.assertEqual(len(builds), 2)
+
 
     @skip('This test is for performances. It needs a lot of real branches in DB to mean something')
     @patch('odoo.addons.runbot.models.repo.runbot_repo._root')
