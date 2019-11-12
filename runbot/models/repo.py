@@ -270,10 +270,9 @@ class runbot_repo(models.Model):
         max_age = int(icp.get_param('runbot.runbot_max_age', default=30))
 
         self.env.cr.execute("""
-            WITH t (build, branch_id) AS (SELECT unnest(%s), unnest(%s))
-          SELECT b.name, b.branch_id
-            FROM t LEFT JOIN runbot_build b ON (b.name = t.build) AND (b.branch_id = t.branch_id)
-        """, ([r[1] for r in refs], [ref_branches[r[0]] for r in refs]))
+            SELECT DISTINCT ON (branch_id) name, branch_id
+            FROM runbot_build WHERE branch_id in %s ORDER BY branch_id,id DESC;
+        """, (tuple([ref_branches[r[0]] for r in refs]),))
         # generate a set of tuples (branch_id, sha)
         builds_candidates = {(r[1], r[0]) for r in self.env.cr.fetchall()}
 
