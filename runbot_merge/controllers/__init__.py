@@ -8,6 +8,7 @@ import werkzeug.exceptions
 from odoo.http import Controller, request, route
 
 from . import dashboard
+from .. import utils, github
 
 _logger = logging.getLogger(__name__)
 
@@ -16,6 +17,8 @@ class MergebotController(Controller):
     def index(self):
         req = request.httprequest
         event = req.headers['X-Github-Event']
+
+        github._gh.info(self._format(req))
 
         c = EVENTS.get(event)
         if not c:
@@ -36,6 +39,19 @@ class MergebotController(Controller):
                 return werkzeug.exceptions.Forbidden()
 
         return c(env, request.jsonrequest)
+
+    def _format(self, request):
+        return """<= {r.method} {r.full_path}
+{headers}
+{body}
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+""".format(
+            r=request,
+            headers='\n'.join(
+                '\t%s: %s' % entry for entry in request.headers.items()
+            ),
+            body=utils.shorten(request.get_data(as_text=True).strip(), 400)
+        )
 
 def handle_pr(env, event):
     if event['action'] in [

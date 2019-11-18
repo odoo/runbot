@@ -2,17 +2,57 @@ import collections
 import itertools
 import json as json_
 import logging
+import logging.handlers
+import os
+import pathlib
+import pprint
+import textwrap
+import unicodedata
 
 import requests
-import werkzeug.exceptions
+import werkzeug.urls
 
-from odoo.tools import topological_sort
+import odoo.netsvc
+from odoo.tools import topological_sort, config
 from . import exceptions, utils
+
 
 def _is_json(r):
     return r and r.headers.get('content-type', '').startswith(('application/json', 'application/javascript'))
 
 _logger = logging.getLogger(__name__)
+_gh = logging.getLogger('github_requests')
+def _init_gh_logger():
+    """ Log all GH requests / responses so we have full tracking, but put them
+    in a separate file if we're logging to a file
+    """
+    if not config['logfile']:
+        return
+    original = pathlib.Path(config['logfile'])
+    new = original.with_name('github_requests')\
+                  .with_suffix(original.suffix)
+
+    if os.name == 'posix':
+        handler = logging.handlers.WatchedFileHandler(str(new))
+    else:
+        handler = logging.FileHandler(str(new))
+
+    handler.setFormatter(odoo.netsvc.DBFormatter(
+        '%(asctime)s %(pid)s %(levelname)s %(dbname)s %(name)s: %(message)s'
+    ))
+    _gh.addHandler(handler)
+    _gh.propagate = False
+
+if odoo.netsvc._logger_init:
+    _init_gh_logger()
+
+GH_LOG_PATTERN = """=> {method} /{self._repo}/{path}{qs}{body}
+
+<= {r.status_code} {r.reason}
+{headers}
+{body2}
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"""
 class GH(object):
     def __init__(self, token, repo):
         self._url = 'https://api.github.com'
@@ -20,6 +60,45 @@ class GH(object):
         session = self._session = requests.Session()
         session.headers['Authorization'] = 'token {}'.format(token)
         session.headers['Accept'] = 'application/vnd.github.symmetra-preview+json'
+
+    def _log_gh(self, logger, method, path, params, json, response, level=logging.INFO):
+        """ Logs a pair of request / response to github, to the specified
+        logger, at the specified level.
+
+        Tries to format all the information (including request / response
+        bodies, at least in part) so we have as much information as possible
+        for post-mortems.
+        """
+        body = body2 = ''
+
+        if json:
+            body = '\n' + textwrap.indent('\t', pprint.pformat(json, indent=3))
+
+        if response.content:
+            if _is_json(response):
+                body2 = pprint.pformat(response.json(), depth=4)
+            elif response.encoding is not None:
+                body2 = response.text
+            else: # fallback: universal decoding & replace nonprintables
+                body2 = ''.join(
+                    '\N{REPLACEMENT CHARACTER}' if unicodedata.category(c) == 'Cc' else c
+                    for c in response.content.decode('iso-8859-1')
+                )
+
+        logger.log(level, GH_LOG_PATTERN.format(
+            self=self,
+            # requests data
+            method=method, path=path,
+            qs='' if not params else ('?' + werkzeug.urls.url_encode(params)),
+            body=utils.shorten(body.strip(), 400),
+            # response data
+            r=response,
+            headers='\n'.join(
+                '\t%s: %s' % (h, v) for h, v in response.headers.items()
+            ),
+            body2=utils.shorten(body2.strip(), 400)
+        ))
+        return body2
 
     def __call__(self, method, path, params=None, json=None, check=True):
         """
@@ -31,29 +110,15 @@ class GH(object):
             params=params,
             json=json
         )
+        self._log_gh(_gh, method, path, params, json, r)
         if check:
             if isinstance(check, collections.Mapping):
                 exc = check.get(r.status_code)
                 if exc:
                     raise exc(r.text)
             if r.status_code >= 400:
-                headers = '\n'.join('\t%s: %s' % (h, v) for h, v in r.headers.items())
-                if _is_json(r):
-                    body = r.json()
-                elif r.encoding is not None:
-                    body = utils.shorten(r.text, 200)
-                else:
-                    body = utils.shorten(r.content, 200)
-
-                _logger.error("%(method)s /%(repo)s/%(path)s\n=> %(status)d %(reason)s\n%(headers)s\n\n\t%(body)r\n====================", {
-                    'status': r.status_code,
-                    'reason': r.reason,
-                    'method': method,
-                    'repo': self._repo,
-                    'path': path,
-                    'headers': headers,
-                    'body': body
-                })
+                body = self._log_gh(
+                    _logger, method, path, params, json, r, level=logging.ERROR)
                 if not isinstance(body, (bytes, str)):
                     raise requests.HTTPError(
                         json_.dumps(body, indent=4),
