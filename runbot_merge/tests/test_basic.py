@@ -677,11 +677,11 @@ class TestPREdition:
         master = env['runbot_merge.branch'].search([('name', '=', 'master')])
 
         with repo:
-            # master is 1 commit in advance of 1.0
+            # master is 1 commit ahead of 1.0
             m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+            repo.make_ref('heads/1.0', m)
             m2 = repo.make_commit(m, 'second', None, tree={'m': 'm2'})
             repo.make_ref('heads/master', m2)
-            repo.make_ref('heads/1.0', m)
 
             # the PR builds on master, but is errorneously targeted to 1.0
             c = repo.make_commit(m2, 'first', None, tree={'m': 'm3'})
@@ -701,6 +701,17 @@ class TestPREdition:
             prx.base = '1.0'
         assert pr.target == branch_1
         assert not pr.squash
+
+        # check if things also work right when modifying the PR then
+        # retargeting (don't see why not but...)
+        with repo:
+            c2 = repo.make_commit(m2, 'xxx', None, tree={'m': 'm4'})
+            repo.update_ref(prx.ref, c2, force=True)
+        assert pr.head == c2
+        assert not pr.squash
+        with repo:
+            prx.base = 'master'
+        assert pr.squash
 
     def test_retarget_from_disabled(self, env, repo):
         """ Retargeting a PR from a disabled branch should not duplicate the PR
