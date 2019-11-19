@@ -334,7 +334,7 @@ class ConfigStep(models.Model):
             else:
                 build._log('test_all', 'Test tags given but not supported')
         elif self.enable_auto_tags and self.test_enable:
-            if grep(config_path, "test-tags"):
+            if grep(config_path, "[/module][:class]"):
                 auto_tags = self.env['runbot.build.error'].disabling_tags()
                 if auto_tags:
                     test_tags = ','.join(auto_tags)
