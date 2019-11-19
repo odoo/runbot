@@ -127,10 +127,16 @@ class Project(models.Model):
                 gh = ghs[(repo, f.token_field)] = repo.github(f.token_field)
 
             try:
+                message = f.message
                 if f.close:
-                    gh.close(f.pull_request, f.message)
-                else:
-                    gh.comment(f.pull_request, f.message)
+                    gh.close(f.pull_request)
+                    try:
+                        data, message = json.loads(message), None
+                        self._notify_pr_merged(gh, f.pull_request, data)
+                    except json.JSONDecodeError:
+                        pass
+                if message:
+                    gh.comment(f.pull_request, message)
             except Exception:
                 _logger.exception(
                     "Error while trying to %s %s:%s (%s)",
@@ -141,6 +147,29 @@ class Project(models.Model):
             else:
                 to_remove.append(f.id)
         self.env['runbot_merge.pull_requests.feedback'].browse(to_remove).unlink()
+
+    def _notify_pr_merged(self, gh, pr_number, payload):
+        pr = self.env['runbot_merge.pull_requests'].browse(pr_number).exists()
+        if not pr: # ???
+            return
+
+        deployment = gh('POST', 'deployments', json={
+            'ref': pr.head, 'environment': 'merge',
+            'description': "Merge %s into %s" % (pr, pr.target.name),
+            'task': 'merge',
+            'auto_merge': False,
+            'required_contexts': [],
+        }).json()
+        gh('POST', 'deployments/{}/statuses'.format(deployment['id']), json={
+            'state': 'success',
+            'target_url': 'https://github.com/{}/commit/{}'.format(
+                pr.repository.name,
+                payload['sha'],
+            ),
+            'description': "Merged %s in %s at %s" % (
+                pr, pr.target.name, payload['sha']
+            )
+        })
 
     def is_timed_out(self, staging):
         return fields.Datetime.from_string(staging.timeout_limit) < datetime.datetime.now()
@@ -1553,7 +1582,9 @@ class Stagings(models.Model):
                     self.env['runbot_merge.pull_requests.feedback'].create({
                         'repository': pr.repository.id,
                         'pull_request': pr.number,
-                        'message': "Merged at %s, thanks!" % json.loads(pr.commits_map)[''],
+                        'message': json.dumps({
+                            'sha': json.loads(pr.commits_map)[''],
+                        }),
                         'close': True,
                     })
             finally:

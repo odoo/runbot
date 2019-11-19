@@ -114,7 +114,6 @@ def test_straightforward_flow(env, config, make_repo, users):
     assert pr.comments == [
         (users['reviewer'], 'hansen r+ rebase-ff'),
         (users['user'], 'Merge method set to rebase and fast-forward'),
-        (users['user'], re_matches(r'Merged at [0-9a-f]{40}, thanks!')),
         (users['user'], 'This pull request has forward-port PRs awaiting action (not merged or closed): ' + ', '.join((pr1 | pr2).mapped('display_name'))),
     ]
 
@@ -613,7 +612,6 @@ def test_empty(env, config, make_repo, users):
 
     assert pr1.comments == [
         (users['reviewer'], 'hansen r+'),
-        (users['user'], re_matches(r'Merged at [0-9a-f]{40}, thanks!')),
         (users['other'], 'This pull request has forward-port PRs awaiting action (not merged or closed): ' + fail_id.display_name),
         (users['other'], 'This pull request has forward-port PRs awaiting action (not merged or closed): ' + fail_id.display_name),
     ], "each cron run should trigger a new message on the ancestor"
@@ -623,7 +621,6 @@ def test_empty(env, config, make_repo, users):
     env.run_crons('forwardport.reminder', 'runbot_merge.feedback_cron', context={'forwardport_updated_before': FAKE_PREV_WEEK})
     assert pr1.comments == [
         (users['reviewer'], 'hansen r+'),
-        (users['user'], re_matches(r'Merged at [0-9a-f]{40}, thanks!')),
         (users['other'], 'This pull request has forward-port PRs awaiting action (not merged or closed): ' + fail_id.display_name),
         (users['other'], 'This pull request has forward-port PRs awaiting action (not merged or closed): ' + fail_id.display_name),
     ]

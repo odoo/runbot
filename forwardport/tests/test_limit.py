@@ -243,7 +243,6 @@ def test_limit_after_merge(env, config, make_repo, users):
         "check that limit was not updated"
     assert pr1.comments == [
         (users['reviewer'], "hansen r+"),
-        (users['user'], re_matches(r'Merged at [0-9a-z]{40}, thanks!')),
         (users['reviewer'], bot_name + ' up to b'),
         (bot_name, "Sorry, forward-port limit can only be set before the PR is merged."),
     ]

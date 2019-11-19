@@ -163,8 +163,7 @@ class GH(object):
             raise
         _logger.debug('comment(%s, %s, %s)', self._repo, pr, shorten(message))
 
-    def close(self, pr, message):
-        self.comment(pr, message)
+    def close(self, pr):
         self('PATCH', 'pulls/{}'.format(pr), json={'state': 'closed'})
 
     def change_tags(self, pr, to_):
