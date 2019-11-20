@@ -17,6 +17,7 @@ import datetime
 import itertools
 import json
 import logging
+import operator
 import os
 import pathlib
 import re
@@ -659,9 +660,6 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
             branch=target_branch.name
         )
         project_id = self.repository.project_id
-        # configure local repo so commits automatically pickup bot identity
-        working_copy.config('--local', 'user.name', project_id.fp_github_name)
-        working_copy.config('--local', 'user.email', project_id.fp_github_email)
         # add target remote
         working_copy.remote(
             'add', 'target',
@@ -676,6 +674,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         root = self._get_root()
         try:
             root._cherry_pick(working_copy)
+            return None, working_copy
         except CherrypickError as e:
             # using git diff | git apply -3 to get the entire conflict set
             # turns out to not work correctly: in case files have been moved
@@ -687,23 +686,42 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
             working_copy.checkout('-bsquashed', root_branch)
             root_commits = root.commits()
 
+            to_tuple = operator.itemgetter('name', 'email', 'date')
+            to_dict = lambda term, vals: {
+                'GIT_%s_NAME' % term: vals[0],
+                'GIT_%s_EMAIL' % term: vals[1],
+                'GIT_%s_DATE' % term: vals[2],
+            }
+            authors, committers = set(), set()
+            for c in (c['commit'] for c in root_commits):
+                authors.add(to_tuple(c['author']))
+                committers.add(to_tuple(c['committer']))
+            fp_authorship = (project_id.fp_github_name, project_id.fp_github_email, '')
+            author = authors.pop() if len(authors) == 1 else fp_authorship
+            committer = committers.pop() if len(committers) == 1 else fp_authorship
+            conf = working_copy.with_config(env={
+                **to_dict('AUTHOR', author),
+                **to_dict('COMMITTER', committer),
+            })
             # squash to a single commit
-            working_copy.reset('--soft', root_commits[0]['parents'][0]['sha'])
-            working_copy.commit(a=True, message="temp")
-            squashed = working_copy.stdout().rev_parse('HEAD').stdout.strip().decode()
+            conf.reset('--soft', root_commits[0]['parents'][0]['sha'])
+            conf.commit(a=True, message="temp")
+            squashed = conf.stdout().rev_parse('HEAD').stdout.strip().decode()
 
             # switch back to the PR branch
-            working_copy.checkout(fp_branch_name)
-            # cherry-pick the squashed commit
-            working_copy.with_params('merge.renamelimit=0').with_config(check=False).cherry_pick(squashed)
+            conf.checkout(fp_branch_name)
+            # cherry-pick the squashed commit to generate the conflict
+            conf.with_params('merge.renamelimit=0').with_config(check=False).cherry_pick(squashed)
 
             # if there was a single commit, reuse its message when committing
             # the conflict
             # TODO: still add conflict information to this?
             if len(root_commits) == 1:
-                working_copy.commit(all=True, allow_empty=True, reuse_message=root_commits[0]['sha'])
+                msg = root._make_fp_message(root_commits[0])
+                conf.with_config(input=str(msg).encode())\
+                    .commit(all=True, allow_empty=True, file='-')
             else:
-                working_copy.commit(
+                conf.commit(
                     all=True, allow_empty=True,
                     message="""Cherry pick of %s failed
 
@@ -713,8 +731,6 @@ stderr:
 %s
 """ % e.args)
             return e.args, working_copy
-        else:
-            return None, working_copy
 
     def _cherry_pick(self, working_copy):
         """ Cherrypicks ``self`` into the working copy
@@ -723,7 +739,6 @@ stderr:
         """
         # <xxx>.cherrypick.<number>
         logger = _logger.getChild('cherrypick').getChild(str(self.number))
-        cmap = json.loads(self.commits_map)
 
         # original head so we can reset
         original_head = working_copy.stdout().rev_parse('HEAD').stdout.decode().strip()
@@ -735,19 +750,31 @@ stderr:
 
         for commit in commits:
             commit_sha = commit['sha']
-            conf = working_copy.with_config(stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+            # config (global -c) or commit options don't really give access to
+            # setting dates
+            cm = commit['commit'] # get the "git" commit object rather than the "github" commit resource
+            configured = working_copy.with_config(env={
+                'GIT_AUTHOR_NAME': cm['author']['name'],
+                'GIT_AUTHOR_EMAIL': cm['author']['email'],
+                'GIT_AUTHOR_DATE': cm['author']['date'],
+                'GIT_COMMITTER_NAME': cm['committer']['name'],
+                'GIT_COMMITTER_EMAIL': cm['committer']['email'],
+                'GIT_COMMITTER_DATE': cm['committer']['date'],
+            })
+
+            conf = configured.with_config(stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
             # first try with default / low renamelimit
             r = conf.cherry_pick(commit_sha)
             _logger.debug("Cherry-picked %s: %s\n%s\n%s", commit_sha, r.returncode, r.stdout.decode(), r.stderr.decode())
             if r.returncode:
                 # if it failed, retry with high renamelimit
-                working_copy.reset('--hard', original_head)
+                configured.reset('--hard', original_head)
                 r = conf.with_params('merge.renamelimit=0').cherry_pick(commit_sha)
                 _logger.debug("Cherry-picked %s (renamelimit=0): %s\n%s\n%s", commit_sha, r.returncode, r.stdout.decode(), r.stderr.decode())
 
             if r.returncode: # pick failed, reset and bail
                 logger.info("%s: failed", commit_sha)
-                working_copy.reset('--hard', original_head)
+                configured.reset('--hard', original_head)
                 raise CherrypickError(
                     commit_sha,
                     r.stdout.decode(),
@@ -760,26 +787,31 @@ stderr:
                     )
                 )
 
-            msg = self._parse_commit_message(commit['commit']['message'])
-
-            # original signed-off-er should be retained but didn't necessarily
-            # sign off here, so convert signed-off-by to something else
-            sob = msg.headers.getlist('signed-off-by')
-            if sob:
-                msg.headers.remove('signed-off-by')
-                msg.headers.extend(
-                    ('original-signed-off-by', v)
-                    for v in sob
-                )
-            # write the *merged* commit as "original", not the PR's
-            msg.headers['x-original-commit'] = cmap.get(commit_sha, commit_sha)
+            msg = self._make_fp_message(commit)
 
             # replace existing commit message with massaged one
-            working_copy\
+            configured \
                 .with_config(input=str(msg).encode())\
                 .commit(amend=True, file='-')
-            new = working_copy.stdout().rev_parse('HEAD').stdout.decode()
+            new = configured.stdout().rev_parse('HEAD').stdout.decode()
             logger.info('%s: success -> %s', commit_sha, new)
+
+    def _make_fp_message(self, commit):
+        cmap = json.loads(self.commits_map)
+        msg = self._parse_commit_message(commit['commit']['message'])
+        # original signed-off-er should be retained but didn't necessarily
+        # sign off here, so convert signed-off-by to something else
+        sob = msg.headers.getlist('signed-off-by')
+        if sob:
+            msg.headers.remove('signed-off-by')
+            msg.headers.extend(
+                ('original-signed-off-by', v)
+                for v in sob
+            )
+        # write the *merged* commit as "original", not the PR's
+        msg.headers['x-original-commit'] = cmap.get(commit['sha'], commit['sha'])
+        # don't stringify so caller can still perform alterations
+        return msg
 
     def _get_local_directory(self):
         repos_dir = pathlib.Path(user_cache_dir('forwardport'))
