@@ -239,6 +239,24 @@ class Repository(models.Model):
             })
             return
 
+        # if the PR is already loaded, check... if the heads match?
+        pr_id = self.env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', pr['base']['repo']['full_name']),
+            ('number', '=', pr['number']),
+        ])
+        if pr_id:
+            # TODO: edited, maybe (requires crafting a 'changes' object)
+            r = controllers.handle_pr(self.env, {
+                'action': 'synchronize',
+                'pull_request': pr,
+            })
+            self.env['runbot_merge.pull_requests.feedback'].create({
+                'repository': pr_id.repository.id,
+                'pull_request': self.number,
+                'message': r,
+            })
+            return
+
         controllers.handle_pr(self.env, {
             'action': 'opened',
             'pull_request': pr,
@@ -641,8 +659,8 @@ class PullRequests(models.Model):
             commandstring,
         ):
             name, flag, param = m.groups()
-            if name == 'retry':
-                yield ('retry', None)
+            if name in ('retry', 'check'):
+                yield (name, None)
             elif name in ('r', 'review'):
                 if flag == '+':
                     yield ('review', True)
@@ -736,6 +754,12 @@ class PullRequests(models.Model):
                         self.state = 'ready'
                     else:
                         msg = "Retry makes no sense when the PR is not in error."
+            elif command == 'check':
+                if is_author:
+                    self.env['runbot_merge.fetch_job'].create({
+                        'repository': self.repository.id,
+                        'number': self.number,
+                    })
             elif command == 'review':
                 if param and is_reviewer:
                     newstate = RPLUS.get(self.state)
@@ -1074,6 +1098,9 @@ class PullRequests(models.Model):
             "rebasing a PR of more than 50 commits is a tad excessive"
         assert commits < 250, "merging PRs of 250+ commits is not supported (https://developer.github.com/v3/pulls/#list-commits-on-a-pull-request)"
         pr_commits = gh.commits(self.number)
+        pr_head = pr_commits[-1]['sha']
+        if pr_head != self.head:
+            raise exceptions.Skip(self.head, pr_head, commits == 1)
 
         if self.reviewed_by and self.reviewed_by.name == self.reviewed_by.github_login:
             # XXX: find other trigger(s) to sync github name?
@@ -1716,12 +1743,31 @@ class Batch(models.Model):
                     original_head, new_heads[pr]
                 )
             except (exceptions.MergeError, AssertionError) as e:
-                _logger.exception("Failed to merge %s:%s into staging branch (error: %s)", pr.repository.name, pr.number, e)
-                pr.state = 'error'
+                if isinstance(e, exceptions.Skip):
+                    old_head, new_head, to_squash = e.args
+                    pr.write({
+                        'state': 'opened',
+                        'squash': to_squash,
+                        'head': new_head,
+                    })
+                    _logger.warning(
+                        "head mismatch on %s: had %s but found %s",
+                        pr.display_name, old_head, new_head
+                    )
+                    msg = "We apparently missed an update to this PR and" \
+                          " tried to stage it in a state which might not have" \
+                          " been approved. PR has been updated to %s, please" \
+                          " check and approve or re-approve." % new_head
+                else:
+                    _logger.exception("Failed to merge %s into staging branch (error: %s)",
+                                      pr.display_name, e)
+                    pr.state = 'error'
+                    msg = "Unable to stage PR (%s)" % e
+
                 self.env['runbot_merge.pull_requests.feedback'].create({
                     'repository': pr.repository.id,
                     'pull_request': pr.number,
-                    'message': "Unable to stage PR (%s)" % e,
+                    'message': msg,
                 })
 
                 # reset the head which failed, as rebase() may have partially
@@ -1746,8 +1792,8 @@ class FetchJob(models.Model):
     _name = 'runbot_merge.fetch_job'
 
     active = fields.Boolean(default=True)
-    repository = fields.Many2one('runbot_merge.repository', index=True, required=True)
-    number = fields.Integer(index=True, required=True)
+    repository = fields.Many2one('runbot_merge.repository', required=True)
+    number = fields.Integer(required=True)
 
 # The commit (and PR) statuses was originally a map of ``{context:state}``
 # however it turns out to clarify error messages it'd be useful to have

@@ -1959,6 +1959,70 @@ class TestPRUpdate(object):
         assert pr.head == c2
         assert pr.state == 'validated'
 
+    def test_update_missed(self, env, repo, config):
+        """ Sometimes github's webhooks don't trigger properly, a branch's HEAD
+        does not get updated and we might e.g. attempt to merge a PR despite it
+        now being unreviewed or failing CI or somesuch.
+
+        This is not a super frequent occurrence, and possibly not the most
+        problematic issue ever (e.g. if the branch doesn't CI it's not going to
+        pass staging, though we might still be staging a branch which had been
+        unreviewed).
+
+        So during the staging process, the heads should be checked, and the PR
+        will not be staged if the heads don't match (though it'll be reset to
+        open, rather than put in an error state as technically there's no
+        failure, we just want to notify users that something went odd with the
+        mergebot).
+
+        TODO: other cases / situations where we want to update the head?
+        """
+        with repo:
+            repo.make_commits(None, repo.Commit('m', tree={'a': '0'}), ref='heads/master')
+
+            [c] = repo.make_commits(
+                'heads/master', repo.Commit('c', tree={'a': '1'}), ref='heads/abranch')
+            pr = repo.make_pr(target='master', head='abranch')
+            repo.post_status(pr.head, 'success', 'legal/cla')
+            repo.post_status(pr.head, 'success', 'ci/runbot')
+            pr.post_comment('hansen r+', config['role_reviewer']['token'])
+        pr_id = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', pr.number),
+        ])
+        env.run_crons('runbot_merge.process_updated_commits')
+        assert pr_id.state == 'ready'
+
+        # TODO: find way to somehow skip / ignore the update_ref?
+        with repo:
+            # can't push a second commit because then the staging crashes due
+            # to the PR *actually* having more than 1 commit and thus needing
+            # a configuration
+            [c2] = repo.make_commits('heads/master', repo.Commit('c2', tree={'a': '2'}))
+            repo.post_status(c2, 'success', 'legal/cla')
+            repo.post_status(c2, 'success', 'ci/runbot')
+            repo.update_ref(pr.ref, c2, force=True)
+
+        # we missed the update notification so the db should still be at c and
+        # in a "ready" state
+        pr_id.write({
+            'head': c,
+            'state': 'ready',
+        })
+
+        env.run_crons()
+
+        # the PR should not get merged, and should be updated
+        assert pr_id.state == 'validated'
+        assert pr_id.head == c2
+
+        pr_id.write({'head': c, 'state': 'ready'})
+        with repo:
+            pr.post_comment('hansen check')
+        env.run_crons()
+        assert pr_id.state == 'validated'
+        assert pr_id.head == c2
+
 class TestBatching(object):
     def _pr(self, repo, prefix, trees, *, target='master', user, reviewer,
             statuses=(('ci/runbot', 'success'), ('legal/cla', 'success'))

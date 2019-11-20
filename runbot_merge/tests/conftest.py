@@ -14,13 +14,11 @@ def page(port):
         return r.content
     return get
 
-# env['runbot_merge.project']._check_fetch()
-# runbot_merge.fetch_prs_cron
 @pytest.fixture
 def default_crons():
     return [
         # env['runbot_merge.project']._check_fetch()
-        # 'runbot_merge.fetch_prs_cron',
+        'runbot_merge.fetch_prs_cron',
         # env['runbot_merge.commit']._notify()
         'runbot_merge.process_updated_commits',
         # env['runbot_merge.project']._check_progress()
