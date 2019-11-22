@@ -126,6 +126,17 @@ def test_stage_match(env, project, repo_a, repo_b, config):
     assert pr_a.staging_id == pr_b.staging_id, \
         "branch-matched PRs should be part of the same staging"
 
+    for repo in [repo_a, repo_b]:
+        with repo:
+            repo.post_status('staging.master', 'success', 'legal/cla')
+            repo.post_status('staging.master', 'success', 'ci/runbot')
+    env.run_crons()
+    assert pr_a.state == 'merged'
+    assert pr_b.state == 'merged'
+
+    assert 'Related: {}#{}'.format(repo_b.name, pr_b.number) in repo_a.commit('master').message
+    assert 'Related: {}#{}'.format(repo_a.name, pr_a.number) in repo_b.commit('master').message
+
 def test_unmatch_patch(env, project, repo_a, repo_b, config):
     """ When editing files via the UI for a project you don't have write
     access to, a branch called patch-XXX is automatically created in your
@@ -263,7 +274,12 @@ def test_merge_fail(env, project, repo_a, repo_b, users, config):
         for c in repo_a.log('heads/staging.master')
     ] == [
         re_matches('^force rebuild'),
-        'commit_do-b-thing_00\n\ncloses %s#2\n\nSigned-off-by: %s' % (repo_a.name, reviewer),
+        """commit_do-b-thing_00
+
+closes %s#%d
+
+Related: %s#%d
+Signed-off-by: %s""" % (repo_a.name, pr2a.number, repo_b.name, pr2b.number, reviewer),
         'initial'
     ], "dummy commit + squash-merged PR commit + root commit"
 

@@ -1074,7 +1074,7 @@ class PullRequests(models.Model):
         """
         return Message.from_message(message)
 
-    def _build_merge_message(self, message):
+    def _build_merge_message(self, message, related_prs=()):
         # handle co-authored commits (https://help.github.com/articles/creating-a-commit-with-multiple-authors/)
         m = self._parse_commit_message(message)
         pattern = r'( |{repository})#{pr.number}\b'.format(
@@ -1084,12 +1084,15 @@ class PullRequests(models.Model):
         if not re.search(pattern, m.body):
             m.body += '\n\ncloses {pr.display_name}'.format(pr=self)
 
+        for r in related_prs:
+            m.headers.add('Related', r.display_name)
+
         if self.reviewed_by:
             m.headers.add('signed-off-by', self.reviewed_by.formatted_email)
 
         return str(m)
 
-    def _stage(self, gh, target):
+    def _stage(self, gh, target, related_prs=()):
         # nb: pr_commits is oldest to newest so pr.head is pr_commits[-1]
         _, prdict = gh.pr(self.number)
         commits = prdict['commits']
@@ -1110,25 +1113,26 @@ class PullRequests(models.Model):
 
         # NOTE: lost merge v merge/copy distinction (head being
         #       a merge commit reused instead of being re-merged)
-        return method, getattr(self, '_stage_' + method.replace('-', '_'))(gh, target, pr_commits)
+        return method, getattr(self, '_stage_' + method.replace('-', '_'))(
+            gh, target, pr_commits, related_prs=related_prs)
 
-    def _stage_rebase_ff(self, gh, target, commits):
+    def _stage_rebase_ff(self, gh, target, commits, related_prs=()):
         # updates head commit with PR number (if necessary) then rebases
         # on top of target
-        msg = self._build_merge_message(commits[-1]['commit']['message'])
+        msg = self._build_merge_message(commits[-1]['commit']['message'], related_prs=related_prs)
         commits[-1]['commit']['message'] = msg
         head, mapping = gh.rebase(self.number, target, commits=commits)
         self.commits_map = json.dumps({**mapping, '': head})
         return head
 
-    def _stage_rebase_merge(self, gh, target, commits):
-        msg = self._build_merge_message(self.message)
+    def _stage_rebase_merge(self, gh, target, commits, related_prs=()):
+        msg = self._build_merge_message(self.message, related_prs=related_prs)
         h, mapping = gh.rebase(self.number, target, reset=True, commits=commits)
         merge_head = gh.merge(h, target, msg)['sha']
         self.commits_map = json.dumps({**mapping, '': merge_head})
         return merge_head
 
-    def _stage_merge(self, gh, target, commits):
+    def _stage_merge(self, gh, target, commits, related_prs=()):
         pr_head = commits[-1] # oldest to newest
         base_commit = None
         head_parents = {p['sha'] for p in pr_head['parents']}
@@ -1148,7 +1152,7 @@ class PullRequests(models.Model):
             original_head = gh.head(target)
             merge_tree = gh.merge(pr_head['sha'], target, 'temp merge')['tree']['sha']
             new_parents = [original_head] + list(head_parents - {base_commit})
-            msg = self._build_merge_message(pr_head['commit']['message'])
+            msg = self._build_merge_message(pr_head['commit']['message'], related_prs=related_prs)
             copy = gh('post', 'git/commits', json={
                 'message': msg,
                 'tree': merge_tree,
@@ -1735,7 +1739,7 @@ class Batch(models.Model):
             target = 'tmp.{}'.format(pr.target.name)
             original_head = gh.head(target)
             try:
-                method, new_heads[pr] = pr._stage(gh, target)
+                method, new_heads[pr] = pr._stage(gh, target, related_prs=(prs - pr))
                 _logger.info(
                     "Staged pr %s:%s to %s by %s: %s -> %s",
                     pr.repository.name, pr.number,
