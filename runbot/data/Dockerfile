@@ -27,6 +27,7 @@ RUN set -x ; \
     python3-wheel \
     sed \
     sudo \
+    unzip \
     xfonts-75dpi \
     zip \
     zlib1g-dev
