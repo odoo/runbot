@@ -131,10 +131,17 @@ class Project(models.Model):
                 if f.close:
                     gh.close(f.pull_request)
                     try:
-                        data, message = json.loads(message), None
-                        self._notify_pr_merged(gh, f.pull_request, data)
+                        data = json.loads(message)
                     except json.JSONDecodeError:
                         pass
+                    else:
+                        pr_to_notify = self.env['runbot_merge.pull_requests'].search([
+                            ('repository', '=', repo.id),
+                            ('number', '=', f.pull_request),
+                        ])
+                        if pr_to_notify:
+                            self._notify_pr_merged(gh, pr_to_notify, data)
+                            message = None
                 if message:
                     gh.comment(f.pull_request, message)
             except Exception:
@@ -148,11 +155,7 @@ class Project(models.Model):
                 to_remove.append(f.id)
         self.env['runbot_merge.pull_requests.feedback'].browse(to_remove).unlink()
 
-    def _notify_pr_merged(self, gh, pr_number, payload):
-        pr = self.env['runbot_merge.pull_requests'].browse(pr_number).exists()
-        if not pr: # ???
-            return
-
+    def _notify_pr_merged(self, gh, pr, payload):
         deployment = gh('POST', 'deployments', json={
             'ref': pr.head, 'environment': 'merge',
             'description': "Merge %s into %s" % (pr, pr.target.name),

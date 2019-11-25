@@ -72,7 +72,7 @@ class GH(object):
         body = body2 = ''
 
         if json:
-            body = '\n' + textwrap.indent('\t', pprint.pformat(json, indent=3))
+            body = '\n' + textwrap.indent('\t', pprint.pformat(json, indent=4))
 
         if response.content:
             if _is_json(response):
