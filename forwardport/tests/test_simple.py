@@ -341,11 +341,11 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     assert prod.read_tree(prod.commit(pr2.head)) == {
         'f': 'c',
         'g': 'a',
-        'h': re_matches(r'''<<<<<<< HEAD
+        'h': re_matches(r'''<<<\x3c<<< HEAD
 a
 =======
 0
->>>>>>> [0-9a-f]{7,}(...)? temp
+>>>\x3e>>> [0-9a-f]{7,}(...)? temp
 '''),
     }
 
@@ -392,11 +392,11 @@ def test_conflict(env, config, make_repo):
     assert c.committer == p.committer
     assert prod.read_tree(c) == {
         'f': 'c',
-        'g': re_matches(r'''<<<<<<< HEAD
+        'g': re_matches(r'''<<<\x3c<<< HEAD
 a
 =======
 xxx
->>>>>>> [0-9a-f]{7,}(...)? temp
+>>>\x3e>>> [0-9a-f]{7,}(...)? temp
 '''),
     }
 
