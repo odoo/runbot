@@ -1,45 +1,31 @@
 (function($) {
     "use strict";
 
+    // maps classes to URL segments
+    var CLASS_MAP = {
+        'runbot-rebuild': 'force',
+        'runbot-rebuild-exact': 'force/1',
+        'runbot-kill': 'kill',
+        'runbot-wakeup': 'wakeup'
+    };
     $(function() {
-        $('a.runbot-rebuild').click(function() {
-            var $f = $('<form method="POST">'),
-                url = _.str.sprintf('/runbot/build/%s/force', $(this).data('runbot-build')) + window.location.search;
-            $f.attr('action', url);
-            $f.appendTo($('body'));
+        var $f = $('<form method="POST">').appendTo($('body'));
+        // might be better to use a common selection class w/ a data attribute for the operation type
+        $(document).on('click', '.runbot-rebuild, .runbot-rebuild-exact, .runbot-kill, .runbot-wakeup', function (e) {
+            e.preventDefault();
+
+            var segment = _(this.getAttribute('class').split('/\s+/')).chain()
+                .map(function (c) { return CLASS_MAP[c]; })
+                .find(_.identity);
+            if (!segment) { return; }
+
+            $f.attr('action', _.str.sprintf(
+                '/runbot/build/%s/%s',
+                $(this).data('runbot-build'),
+                segment
+            ) + window.location.search);
             $f.submit();
-            return false;
-       });
-    });
-    $(function() {
-        $('a.runbot-rebuild-exact').click(function() {
-            var $f = $('<form method="POST">'),
-                url = _.str.sprintf('/runbot/build/%s/force/1', $(this).data('runbot-build')) + window.location.search;
-            $f.attr('action', url);
-            $f.appendTo($('body'));
-            $f.submit();
-            return false;
-       });
-    });
-    $(function() {
-        $('a.runbot-kill').click(function() {
-            var $f = $('<form method="POST">'),
-                url = _.str.sprintf('/runbot/build/%s/kill', $(this).data('runbot-build')) + window.location.search;
-            $f.attr('action', url);
-            $f.appendTo($('body'));
-            $f.submit();
-            return false;
-       });
-    });
-    $(function() {
-        $('a.runbot-wakeup').click(function() {
-            var $f = $('<form method="POST">'),
-                url = _.str.sprintf('/runbot/build/%s/wakeup', $(this).data('runbot-build')) + window.location.search;
-            $f.attr('action', url);
-            $f.appendTo($('body'));
-            $f.submit();
-            return false;
-       });
+        });
     });
     $(function() {
       new Clipboard('.clipbtn');

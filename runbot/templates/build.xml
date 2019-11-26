@@ -52,7 +52,7 @@
         <div t-attf-class="pull-right">
             <div t-attf-class="btn-group {{klass}}">
                 <a t-if="bu.real_build.local_state=='running'" t-attf-href="http://{{bu['domain']}}/?db={{bu.real_build.dest}}-all" class="btn btn-primary" title="Sign in on this build" aria-label="Sign in on this build"><i class="fa fa-sign-in"/></a>
-                <a t-if="bu.real_build.local_state=='done' and bu.real_build.requested_action != 'wake_up'" href="#" t-att-data-runbot-build="bu.real_build.id" class="btn btn-default runbot-wakeup" title="Wake up this build" aria-label="Wake up this build"><i class="fa fa-coffee"/></a>
+                <button t-if="bu.real_build.local_state=='done' and bu.real_build.requested_action != 'wake_up'" type="button" t-att-data-runbot-build="bu.real_build.id" class="btn btn-default runbot-wakeup" title="Wake up this build" aria-label="Wake up this build"><i class="fa fa-coffee"/></button>
                 <a t-attf-href="/runbot/build/{{bu['id']}}" class="btn btn-default" title="Build details" aria-label="Build details"><i class="fa fa-file-text-o"/></a>
                 <a t-attf-href="https://#{repo.base}/commit/#{bu['name']}" class="btn btn-default" title="Open commit on GitHub" aria-label="Open commit on GitHub"><i class="fa fa-github"/></a>
                 <button class="btn btn-default dropdown-toggle" data-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false"><i class="fa fa-cog"/><span class="caret"></span></button>
@@ -82,7 +82,7 @@
                         <span t-else="" class="runbot-kill" > Killing <i class="fa fa-spinner fa-spin"/> <i class="fa fa-crosshairs"/></span>
                     </li>
                     <li t-if="bu.global_state == 'done'" groups="base.group_user">
-                        <a t-if="bu.real_build.requested_action != 'wake_up'" href="#" class="runbot-wakeup" t-att-data-runbot-build="bu['id']">Wake up <i class="fa fa-coffee"/></a>
+                        <button t-if="bu.real_build.requested_action != 'wake_up'" type="button" class="runbot-wakeup" t-att-data-runbot-build="bu['id']">Wake up <i class="fa fa-coffee"/></button>
                         <span t-else="" class="runbot-wakeup" > Waking up <i class="fa fa-spinner fa-spin"/> <i class="fa fa-crosshairs"/></span>
                     </li>
 
@@ -238,7 +238,7 @@
                                       <t t-esc="child.global_state"/>
                                     </t>
                                     <a t-if="child.real_build.local_state=='running'" t-attf-href="http://{{child.domain}}/?db={{child.real_build.dest}}-all" title="Sign in on this build" aria-label="Sign in on this build"><i class="fa fa-sign-in"/></a>
-                                    <a t-if="child.real_build.local_state=='done' and child.real_build.requested_action != 'wake_up'" href="#" t-att-data-runbot-build="child.real_build.id" class="runbot-wakeup" title="Wake up this build" aria-label="Wake up this build"><i class="fa fa-coffee"/></a>
+                                    <button t-if="child.real_build.local_state=='done' and child.real_build.requested_action != 'wake_up'" type="button" t-att-data-runbot-build="child.real_build.id" class="runbot-wakeup" title="Wake up this build" aria-label="Wake up this build"><i class="fa fa-coffee"/></button>
                
                                   </td></tr>
                                 </t>
