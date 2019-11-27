@@ -376,9 +376,12 @@ class ConfigStep(models.Model):
             build._logger('Step %s finished in %s' % (self.name, s2human(build.job_time)))
             return
 
-        message = 'Step %s finished in %s $$fa-download$$' % (self.name, s2human(build.job_time))
-        link = '%s%s-%s.zip' % (build.http_log_url(), build.dest, self.db_name)
-        build._log('end_job', message, log_type='link', path=link)
+        kwargs = dict(message='Step %s finished in %s' % (self.name, s2human(build.job_time)))
+        if self.job_type == 'install_odoo':
+            kwargs['message'] += ' $$fa-download$$'
+            kwargs['path'] = '%s%s-%s.zip' % (build.http_log_url(), build.dest, self.db_name)
+            kwargs['log_type'] = 'link'
+        build._log('', **kwargs)
 
         if self.flamegraph:
             link = self._perf_data_url(build, 'log.gz')
