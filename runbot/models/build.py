@@ -11,7 +11,7 @@ import time
 import datetime
 from ..common import dt2time, fqdn, now, grep, uniq_list, local_pgadmin_cursor, s2human, Commit, dest_reg
 from ..container import docker_build, docker_stop, docker_is_running, Command
-from odoo.addons.runbot.models.repo import HashMissingException, ArchiveFailException
+from odoo.addons.runbot.models.repo import RunbotException
 from odoo import models, fields, api
 from odoo.exceptions import UserError, ValidationError
 from odoo.http import request
@@ -442,9 +442,7 @@ class runbot_build(models.Model):
                 new_build = build.with_context(force_rebuild=True).create(values)
                 forced_builds |= new_build
                 user = request.env.user if request else self.env.user
-                new_build._log('rebuild', 'Rebuild initiated by %s (%s)' % (user.name, 'exact' if exact else 'default'))
-                if message:
-                    new_build._log('rebuild', new_build)
+                new_build._log('rebuild', 'Rebuild initiated by %s (%s)%s' % (user.name, 'exact' if exact else 'default', (' :%s' % message) if message else ''))
         return forced_builds
 
     def _skip(self, reason=None):
@@ -661,7 +659,10 @@ class runbot_build(models.Model):
                     pid = build.active_step._run(build)  # run should be on build?
                     build.write({'pid': pid})  # no really usefull anymore with dockers
                 except Exception as e:
-                    message = '%s failed running step %s:\n %s' % (build.dest, build.job, str(e).replace('\\n', '\n').replace("\\'", "'"))
+                    if isinstance(e, RunbotException):
+                        message = e.args[0]
+                    else:
+                        message = '%s failed running step %s:\n %s' % (build.dest, build.job, str(e).replace('\\n', '\n').replace("\\'", "'"))
                     _logger.exception(message)
                     build._log("run", message, level='ERROR')
                     build._kill(result='ko')
@@ -713,14 +714,7 @@ class runbot_build(models.Model):
             if build_export_path in exports:
                 self._log('_checkout', 'Multiple repo have same export path in build, some source may be missing for %s' % build_export_path, level='ERROR')
                 self._kill(result='ko')
-            try:
-                exports[build_export_path] = commit.export()
-            except HashMissingException:
-                self._log('_checkout', "Commit %s is unreachable. Did you force push the branch since build creation?" % commit, level='ERROR')
-                self._kill(result='ko')
-            except ArchiveFailException:
-                self._log('_checkout', "Archive %s failed. Did you force push the branch since build creation?" % commit, level='ERROR')
-                self._kill(result='ko')
+            exports[build_export_path] = commit.export()
         return exports
 
     def _get_repo_available_modules(self, commits=None):
@@ -883,8 +877,8 @@ class runbot_build(models.Model):
         for server_file in commit.repo.server_files.split(','):
             if os.path.isfile(commit._source_path(server_file)):
                 return (commit, server_file)
-        self._log('server_info', 'No server found in %s' % commit, level='ERROR')
-        raise ValidationError('No server found in %s' % commit)
+        _logger.error('None of %s found in commit, actual commit content:\n %s' % (commit.repo.server_files, os.listdir(commit._source_path())))
+        raise RunbotException('No server found in %s' % commit)
 
     def _cmd(self, python_params=None, py_version=None, local_only=True):
         """Return a list describing the command to start the build

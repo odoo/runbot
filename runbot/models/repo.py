@@ -23,10 +23,7 @@ from ..container import docker_ps, docker_stop
 from psycopg2.extensions import TransactionRollbackError
 _logger = logging.getLogger(__name__)
 
-class HashMissingException(Exception):
-    pass
-
-class ArchiveFailException(Exception):
+class RunbotException(Exception):
     pass
 
 class runbot_repo(models.Model):
@@ -146,13 +143,13 @@ class runbot_repo(models.Model):
 
         if not self._hash_exists(sha):
             self._update(force=True)
-        if not self._hash_exists(sha):
-            try:
-                result = self._git(['fetch', 'origin', sha])
-            except:
-                pass
-        if not self._hash_exists(sha):
-            raise HashMissingException()
+            if not self._hash_exists(sha):
+                try:
+                    result = self._git(['fetch', 'origin', sha])
+                except:
+                    pass
+                if not self._hash_exists(sha):
+                    raise RunbotException("Commit %s is unreachable. Did you force push the branch since build creation?" % commit)
 
         _logger.info('git export: checkouting to %s (new)' % export_path)
         os.makedirs(export_path)
@@ -162,7 +159,7 @@ class runbot_repo(models.Model):
         p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
         (out, err) = p2.communicate()
         if err:
-            raise ArchiveFailException(err)
+            raise RunbotException("Archive %s failed. Did you force push the branch since build creation? (%s)" % (commit, err))
 
         # TODO get result and fallback on cleaing in case of problem
         return export_path
@@ -395,7 +392,7 @@ class runbot_repo(models.Model):
         """ Update the physical git reposotories on FS"""
         for repo in reversed(self):
             try:
-                repo._update_git(force)
+                repo._update_git(force) # TODO xdo, check gc log and log warning
             except Exception:
                 _logger.exception('Fail to update repo %s', repo.name)
 
