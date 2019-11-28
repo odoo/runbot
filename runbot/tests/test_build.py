@@ -105,7 +105,7 @@ class Test_Build(RunbotCase):
             'port': '1234',
         })
         cmd = build._cmd(py_version=3)
-        self.assertIn('log-db = %s' % uri, cmd.get_config())
+        self.assertIn('log_db = %s' % uri, cmd.get_config())
 
     def test_build_cmd_server_path_no_dep(self):
         """ test that the server path and addons path """
