@@ -910,24 +910,24 @@ class runbot_build(models.Model):
 
         if local_only:
             if grep(config_path, "--http-interface"):
-                command.add_config_tuple("http-interface", "127.0.0.1")
+                command.add_config_tuple("http_interface", "127.0.0.1")
             elif grep(config_path, "--xmlrpc-interface"):
-                command.add_config_tuple("xmlrpc-interface", "127.0.0.1")
+                command.add_config_tuple("xmlrpc_interface", "127.0.0.1")
 
         if grep(config_path, "log-db"):
             logdb_uri = self.env['ir.config_parameter'].get_param('runbot.runbot_logdb_uri')
             logdb = self.env.cr.dbname
             if logdb_uri and grep(build._server('sql_db.py'), 'allow_uri'):
                 logdb = '%s' % logdb_uri
-            command.add_config_tuple("log-db", "%s" % logdb)
+            command.add_config_tuple("log_db", "%s" % logdb)
             if grep(build._server('tools/config.py'), 'log-db-level'):
-                command.add_config_tuple("log-db-level", '25')
+                command.add_config_tuple("log_db_level", '25')
 
         if grep(config_path, "data-dir"):
             datadir = build._path('datadir')
             if not os.path.exists(datadir):
                 os.mkdir(datadir)
-            command.add_config_tuple("data-dir", '/data/build/datadir')
+            command.add_config_tuple("data_dir", '/data/build/datadir')
 
         return command
 

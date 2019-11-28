@@ -22,6 +22,8 @@ class Test_Command(common.TransactionCase):
 
         cmd = Command([pres], ['python3', 'odoo-bin'], [posts])
         cmd.add_config_tuple('a', 'b')
+        cmd += ['bar']
+        self.assertIn('bar', cmd.cmd)
         cmd.add_config_tuple('x', 'y')
 
         content = cmd.get_config(starting_config=CONFIG)
@@ -30,3 +32,6 @@ class Test_Command(common.TransactionCase):
         self.assertIn('foo = bar', content)
         self.assertIn('a = b', content)
         self.assertIn('x = y', content)
+
+        with self.assertRaises(AssertionError):
+            cmd.add_config_tuple('http-interface', '127.0.0.1')

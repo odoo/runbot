@@ -56,7 +56,7 @@ class Command():
         return self.cmd[key]
 
     def __add__(self, l):
-        return Command(self.pres, self.cmd + l, self.posts, self.finals)
+        return Command(self.pres, self.cmd + l, self.posts, self.finals, self.config_tuples)
 
     def __str__(self):
         return ' '.join(self)
@@ -74,6 +74,7 @@ class Command():
         return ' ; '.join(cmd_chain)
 
     def add_config_tuple(self, option, value):
+        assert '-' not in option
         self.config_tuples.append((option, value))
 
     def get_config(self, starting_config=''):
@@ -250,7 +251,7 @@ def tests(args):
         python_params = ['-m', 'flamegraph', '-o', flame_log]
     odoo_cmd = ['python%s' % py_version ] + python_params + ['/data/build/odoo-bin', '-d %s' % args.db_name, '--addons-path=/data/build/addons', '-i', args.odoo_modules,  '--test-enable', '--stop-after-init', '--max-cron-threads=0']
     cmd = Command(pres, odoo_cmd, posts)
-    cmd.add_config_tuple('data-dir', '/data/build/datadir')
+    cmd.add_config_tuple('data_dir', '/data/build/datadir')
     cmd.add_config_tuple('db_user', '%s' % os.getlogin())
 
     if args.dump:
