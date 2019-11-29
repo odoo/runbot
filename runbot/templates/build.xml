@@ -45,13 +45,13 @@
         <div t-attf-class="pull-right">
             <div t-attf-class="btn-group {{klass}}">
                 <a t-if="bu.real_build.local_state=='running'" t-attf-href="http://{{bu['domain']}}/?db={{bu.real_build.dest}}-all" class="btn btn-primary" title="Sign in on this build" aria-label="Sign in on this build"><i class="fa fa-sign-in"/></a>
-                <a t-if="bu.real_build.local_state=='done' and bu.real_build.requested_action != 'wake_up'" href="#" t-att-data-runbot-build="bu.real_build.id" class="btn btn-default runbot-wakeup" title="Wake up this build" aria-label="Wake up this build"><i class="fa fa-coffee"/></a>
+                <a t-if="bu.real_build.local_state=='done' and bu.real_build.requested_action != 'wake_up'" href="#" data-runbot="wakeup" t-att-data-runbot-build="bu.real_build.id" class="btn btn-default" title="Wake up this build" aria-label="Wake up this build"><i class="fa fa-coffee"/></a>
                 <a t-attf-href="/runbot/build/{{bu['id']}}" class="btn btn-default" title="Build details" aria-label="Build details"><i class="fa fa-file-text-o"/></a>
                 <a t-if="show_commit_button" t-attf-href="https://#{repo.base}/commit/#{bu['name']}" class="btn btn-default" title="Open commit on GitHub" aria-label="Open commit on GitHub"><i class="fa fa-github"/></a>
                 <button class="btn btn-default dropdown-toggle" data-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false"><i class="fa fa-cog"/><span class="caret"></span></button>
                 <ul class="dropdown-menu dropdown-menu-right" role="menu">
                     <li t-if="bu.global_result=='skipped'" groups="runbot.group_runbot_admin">
-                        <a href="#" class="runbot-rebuild" t-att-data-runbot-build="bu['id']">Force Build <i class="fa fa-level-up"></i></a>
+                        <a href="#" data-runbot="rebuild" t-att-data-runbot-build="bu['id']">Force Build <i class="fa fa-level-up"></i></a>
                     </li>
                     <t t-if="bu.local_state=='running'">
                         <li><a t-attf-href="http://{{bu['domain']}}/?db={{bu['real_build'].dest}}-all">Connect all <i class="fa fa-sign-in"></i></a></li>
@@ -60,23 +60,23 @@
                     </t>
                     <li t-if="bu.global_state in ['done','running'] or requested_action == 'deathrow'" groups="base.group_user">
                         <t t-if="show_rebuild_button">
-                          <a href="#" class="runbot-rebuild" t-att-data-runbot-build="bu['id']"
+                          <a href="#" data-runbot="rebuild" t-att-data-runbot-build="bu['id']"
                             title="Create a new build keeping build commit head, but will recompute all other info (config, dependencies, extra_params)">
                           Rebuild <i class="fa fa-refresh"/>
                           </a>
                         </t>
-                        <a href="#" class="runbot-rebuild-exact" t-att-data-runbot-build="bu['id']"
+                        <a href="#" data-runbot="rebuild-exact" t-att-data-runbot-build="bu['id']"
                           title="Create a new build keeping all build info (config, dependencies, extra_params)">
                         Exact Rebuild <i class="fa fa-refresh"/>
                         </a>
                     </li>
                     <li t-if="bu.global_state != 'done'" groups="base.group_user">
-                        <a t-if="bu.real_build.requested_action != 'deathrow'" href="#" class="runbot-kill" t-att-data-runbot-build="bu['id']">Kill <i class="fa fa-crosshairs"/></a>
-                        <span t-else="" class="runbot-kill" > Killing <i class="fa fa-spinner fa-spin"/> <i class="fa fa-crosshairs"/></span>
+                        <a t-if="bu.real_build.requested_action != 'deathrow'" href="#" data-runbot="kill" t-att-data-runbot-build="bu['id']">Kill <i class="fa fa-crosshairs"/></a>
+                        <span t-else="" data-runbot="kill" > Killing <i class="fa fa-spinner fa-spin"/> <i class="fa fa-crosshairs"/></span>
                     </li>
                     <li t-if="bu.global_state == 'done'" groups="base.group_user">
-                        <a t-if="bu.real_build.requested_action != 'wake_up'" href="#" class="runbot-wakeup" t-att-data-runbot-build="bu['id']">Wake up <i class="fa fa-coffee"/></a>
-                        <span t-else="" class="runbot-wakeup" > Waking up <i class="fa fa-spinner fa-spin"/> <i class="fa fa-crosshairs"/></span>
+                        <a t-if="bu.real_build.requested_action != 'wake_up'" href="#" data-runbot="wakeup" t-att-data-runbot-build="bu['id']">Wake up <i class="fa fa-coffee"/></a>
+                        <span t-else="" data-runbot="wakeup" > Waking up <i class="fa fa-spinner fa-spin"/> <i class="fa fa-crosshairs"/></span>
                     </li>
 
                     <li t-if="bu.global_state not in ('testing', 'waiting', 'pending')" class="divider"></li>
@@ -123,7 +123,7 @@
               </div>
             </form>
             <form class="form-inline" t-attf-action="/runbot/build/#{build['id']}/force" method='POST' t-if="request.params.get('ask_rebuild')" groups="runbot.group_user">
-              <a href='#' class="btn btn-danger runbot-rebuild" t-attf-data-runbot-build="#{build['id']}" > <i class='fa fa-refresh'/> Force Rebuild</a>
+              <a href='#' class="btn btn-danger" data-runbot="rebuild" t-attf-data-runbot-build="#{build['id']}" > <i class='fa fa-refresh'/> Force Rebuild</a>
             </form>
           </t>
                 <div class="row" >
