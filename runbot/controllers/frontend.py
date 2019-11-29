@@ -3,8 +3,12 @@ import operator
 import werkzeug
 from collections import OrderedDict
 
+import werkzeug.utils
+import werkzeug.urls
+
 from odoo.addons.http_routing.models.ir_http import slug
 from odoo.addons.website.controllers.main import QueryURL
+
 from odoo.http import Controller, request, route
 from ..common import uniq_list, flatten, fqdn
 from odoo.osv import expression
@@ -117,26 +121,23 @@ class Runbot(Controller):
         context.update({'message': request.env['ir.config_parameter'].sudo().get_param('runbot.runbot_message')})
         return request.render('runbot.repo', context)
 
-    @route(['/runbot/build/<int:build_id>/kill'], type='http', auth="user", methods=['POST'], csrf=False)
-    def build_ask_kill(self, build_id, search=None, **post):
-        build = request.env['runbot.build'].sudo().browse(build_id)
-        build._ask_kill()
-        return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id + ('?search=%s' % search if search else ''))
-
-    @route(['/runbot/build/<int:build_id>/wakeup'], type='http', auth="user", methods=['POST'], csrf=False)
-    def build_wake_up(self, build_id, search=None, **post):
-        build = request.env['runbot.build'].sudo().browse(build_id)
-        build._wake_up()
-        return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id + ('?search=%s' % search if search else ''))
-
     @route([
-        '/runbot/build/<int:build_id>/force',
-        '/runbot/build/<int:build_id>/force/<int:exact>',
+        '/runbot/build/<int:build_id>/<operation>',
+        '/runbot/build/<int:build_id>/<operation>/<int:exact>',
     ], type='http', auth="public", methods=['POST'], csrf=False)
-    def build_force(self, build_id, exact=0, search=None, **post):
+    def build_force(self, build_id, operation, exact=0, search=None, **post):
         build = request.env['runbot.build'].sudo().browse(build_id)
-        build._force(exact=bool(exact))
-        return werkzeug.utils.redirect('/runbot/repo/%s' % build.repo_id.id + ('?search=%s' % search if search else ''))
+        if operation == 'force':
+            build = build._force(exact=bool(exact))
+        elif operation == 'kill':
+            build._ask_kill()
+        elif operation == 'wakeup':
+            build._wake_up()
+
+        qs = ''
+        if search:
+            qs = '?' + werkzeug.urls.url_encode({'search': search})
+        return werkzeug.utils.redirect(build.build_url + qs)
 
     @route(['/runbot/build/<int:build_id>'], type='http', auth="public", website=True)
     def build(self, build_id, search=None, **post):
