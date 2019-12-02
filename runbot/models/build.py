@@ -447,61 +447,91 @@ class runbot_build(models.Model):
             self._logger('skip %s', reason)
         self.write({'local_state': 'done', 'local_result': 'skipped', 'duplicate_id': False})
 
-    def _local_cleanup(self):
+    def _build_from_dest(self, dest):
+        if dest_reg.match(dest):
+            return self.browse(int(dest.split('-')[0]))
+        return self.browse()
+
+    def _filter_to_clean(self, dest_list, label):
+        icp = self.env['ir.config_parameter']
+        max_days_main = int(icp.get_param('runbot.db_gc_days', default=30))
+        max_days_child = int(icp.get_param('runbot.db_gc_days_child', default=15))
+
+        dest_by_builds_ids = defaultdict(list)
+        ignored = set()
+        for dest in dest_list:
+            build = self._build_from_dest(dest)
+            if build:
+                dest_by_builds_ids[build.id].append(dest)
+            else:
+                ignored.add(dest)
+        if ignored:
+            _logger.debug('%s (%s) not deleted because not dest format', label, " ".join(list(ignored)))
+        builds = self.browse(dest_by_builds_ids)
+        existing = builds.exists()
+        remaining = (builds - existing)
+        if remaining:
+            dest_list = [dest for sublist in [dest_by_builds_ids[rem_id] for rem_id in remaining.ids] for dest in sublist]
+            _logger.debug('(%s) (%s) not deleted because no corresponding build found' % (label, " ".join(dest_list)))
+        for build in existing:
+            if fields.Datetime.from_string(build.job_end or build.create_date) + datetime.timedelta(days=(max_days_main if not build.parent_id else max_days_child)) < datetime.datetime.now():
+                if build.local_state == 'done':
+                    for db in dest_by_builds_ids[build.id]:
+                        yield db
+                elif build.local_state != 'running':
+                    _logger.warning('db (%s) not deleted because state is not done' % " ".join(dest_by_builds_ids[build.id]))
+
+    def _local_cleanup(self, force=False):
+        """
+        Remove datadir and drop databases of build older than db_gc_days or db_gc_days_child.
+        If force is set to True, does the same cleaning based on recordset without checking build age.
+        """
         if self.pool._init:
             return
         _logger.debug('Local cleaning')
 
-        def cleanup(dest_list, func, max_days_main, max_days_child, label):
-            dest_by_builds_ids = defaultdict(list)
-            ignored = set()
-            for dest in dest_list:
-                try:
-                    if not dest_reg.match(dest):
-                        raise Exception
-                    dest_by_builds_ids[int(dest.split('-')[0])].append(dest)
-                except:
-                    ignored.add(dest)
-            if ignored:
-                _logger.debug('%s (%s) not deleted because not dest format', label, " ".join(list(ignored)))
+        _filter = self._filter_to_clean
+        additionnal_condition_str = ''
 
-            builds = self.browse(dest_by_builds_ids)
-            existing = builds.exists()
-            remaining = (builds - existing)
-            if remaining:
-                dest_list = [dest for sublist in [dest_by_builds_ids[rem_id] for rem_id in remaining.ids] for dest in sublist]
-                _logger.debug('(%s) (%s) not deleted because no corresponding build found' % (label, " ".join(dest_list)))
-            for build in existing:
-                if fields.Datetime.from_string(build.job_end or build.create_date) + datetime.timedelta(days=(max_days_main if not build.parent_id else max_days_child)) < datetime.datetime.now():
-                    if build.local_state == 'done':
-                        for db in dest_by_builds_ids[build.id]:
-                            func(db)
-                    elif build.local_state != 'running':
-                        _logger.warning('db (%s) not deleted because state is not done' % " ".join(dest_by_builds_ids[build.id]))
+        if force is True:
+            def filter_ids(elems, label):
+                for dest in dest_list:
+                    build = self._build_from_dest(dest)
+                    if build and build in self:
+                        yield dest
+                    elif not build:
+                        _logger.debug('%s (%s) skipped because not dest format', label, elem)
+            _filter = filter_ids
+            additionnal_conditions = []
+            for _id in self.exists().ids:
+                additionnal_conditions.append("datname like '%s-%'" % _id)
+            if additionnal_conditions:
+                additionnal_condition_str = 'AND (%s)' % ' OR '.join(additionnal_conditions)
 
-        icp = self.env['ir.config_parameter']
-        max_days_main = int(icp.get_param('runbot.db_gc_days', default=30))
-        max_days_child = int(icp.get_param('runbot.db_gc_days_child', default=15))
         with local_pgadmin_cursor() as local_cr:
             local_cr.execute("""
                 SELECT datname
                     FROM pg_database
                     WHERE pg_get_userbyid(datdba) = current_user
-            """)
+                    %s
+            """ % additionnal_condition_str)
             existing_db = [d[0] for d in local_cr.fetchall()]
 
-        cleanup(dest_list=existing_db, func=self._local_pg_dropdb, max_days_main=max_days_main, max_days_child=max_days_child, label='db')
+        for db in _filter(dest_list=existing_db, label='db'):
+            self._local_pg_dropdb(db)
 
         root = self.env['runbot.repo']._root()
-        build_dir = os.path.join(root, 'build')
-        builds = os.listdir(build_dir)
+        builds_dir = os.path.join(root, 'build')
 
-        def rm(dest):
+        if force is True:
+            dests = [build.dest for build in self]
+        else:
+            dests = _filter(dest_list=os.listdir(builds_dir), label='workspace')
+
+        for dest in dests:
             path = os.path.join(build_dir, dest)
             if os.path.isdir(path) and os.path.isabs(path):
                 shutil.rmtree(path)
-
-        cleanup(dest_list=builds, func=rm, max_days_main=max_days_main, max_days_child=max_days_child, label='workspace')
 
     def _find_port(self):
         # currently used port
