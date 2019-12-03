@@ -148,7 +148,7 @@ class runbot_repo(models.Model):
                 except:
                     pass
                 if not self._hash_exists(sha):
-                    raise RunbotException("Commit %s is unreachable. Did you force push the branch since build creation?" % commit)
+                    raise RunbotException("Commit %s is unreachable. Did you force push the branch since build creation?" % sha)
 
         _logger.info('git export: checkouting to %s (new)' % export_path)
         os.makedirs(export_path)
@@ -158,7 +158,7 @@ class runbot_repo(models.Model):
         p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
         (out, err) = p2.communicate()
         if err:
-            raise RunbotException("Archive %s failed. Did you force push the branch since build creation? (%s)" % (commit, err))
+            raise RunbotException("Archive %s failed. Did you force push the branch since build creation? (%s)" % (sha, err))
 
         # TODO get result and fallback on cleaing in case of problem
         return export_path
