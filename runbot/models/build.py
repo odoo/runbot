@@ -494,17 +494,17 @@ class runbot_build(models.Model):
         additionnal_condition_str = ''
 
         if force is True:
-            def filter_ids(elems, label):
+            def filter_ids(dest_list, label):
                 for dest in dest_list:
                     build = self._build_from_dest(dest)
                     if build and build in self:
                         yield dest
                     elif not build:
-                        _logger.debug('%s (%s) skipped because not dest format', label, elem)
+                        _logger.debug('%s (%s) skipped because not dest format', label, dest)
             _filter = filter_ids
             additionnal_conditions = []
             for _id in self.exists().ids:
-                additionnal_conditions.append("datname like '%s-%'" % _id)
+                additionnal_conditions.append("datname like '%s-%%'" % _id)
             if additionnal_conditions:
                 additionnal_condition_str = 'AND (%s)' % ' OR '.join(additionnal_conditions)
 
@@ -518,6 +518,7 @@ class runbot_build(models.Model):
             existing_db = [d[0] for d in local_cr.fetchall()]
 
         for db in _filter(dest_list=existing_db, label='db'):
+            self._logger('Removing database')
             self._local_pg_dropdb(db)
 
         root = self.env['runbot.repo']._root()
@@ -531,6 +532,7 @@ class runbot_build(models.Model):
         for dest in dests:
             path = os.path.join(builds_dir, dest)
             if os.path.isdir(path) and os.path.isabs(path):
+                self._logger('Removing build directory')
                 shutil.rmtree(path)
 
     def _find_port(self):
