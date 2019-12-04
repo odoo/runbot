@@ -647,17 +647,16 @@ class runbot_repo(models.Model):
             # we are comparing cannot_be_deleted_path with to keep to sensure that the algorithm is working, we want to avoid to erase file by mistake
             # note: it is possible that a parent_build is in testing without checkouting sources, but it should be exceptions
             if to_delete:
-                if cannot_be_deleted_path == to_keep:
-                    to_delete = list(to_delete)
-                    to_keep = list(to_keep)
-                    cannot_be_deleted_path = list(cannot_be_deleted_path)
-                    for source_dir in to_delete:
-                        _logger.info('Deleting source: %s' % source_dir)
-                        assert 'static' in source_dir
-                        shutil.rmtree(source_dir)
-                    _logger.info('%s/%s source folder where deleted (%s kept)' % (len(to_delete), len(to_delete+to_keep), len(to_keep)))
-                else:
+                if cannot_be_deleted_path != to_keep:
                     _logger.warning('Inconsistency between sources and database: \n%s \n%s' % (cannot_be_deleted_path-to_keep, to_keep-cannot_be_deleted_path))
+                to_delete = list(to_delete)
+                to_keep = list(to_keep)
+                cannot_be_deleted_path = list(cannot_be_deleted_path)
+                for source_dir in to_delete:
+                    _logger.info('Deleting source: %s' % source_dir)
+                    assert 'static' in source_dir
+                    shutil.rmtree(source_dir)
+                _logger.info('%s/%s source folder where deleted (%s kept)' % (len(to_delete), len(to_delete+to_keep), len(to_keep)))
 
         except:
             _logger.error('An exception occured while cleaning sources')
