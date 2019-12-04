@@ -267,7 +267,7 @@ class runbot_repo(models.Model):
 
         self.env.cr.execute("""
             SELECT DISTINCT ON (branch_id) name, branch_id
-            FROM runbot_build WHERE branch_id in %s ORDER BY branch_id,id DESC;
+            FROM runbot_build WHERE branch_id in %s AND build_type = 'normal' ORDER BY branch_id,id DESC;
         """, (tuple([ref_branches[r[0]] for r in refs]),))
         # generate a set of tuples (branch_id, sha)
         builds_candidates = {(r[1], r[0]) for r in self.env.cr.fetchall()}
@@ -293,6 +293,7 @@ class runbot_repo(models.Model):
                     'committer_email': committer_email,
                     'subject': subject,
                     'date': dateutil.parser.parse(date[:19]),
+                    'build_type': 'normal',
                 }
                 if not branch.sticky:
                     # pending builds are skipped as we have a new ref
