@@ -530,10 +530,19 @@ class runbot_build(models.Model):
             dests = _filter(dest_list=os.listdir(builds_dir), label='workspace')
 
         for dest in dests:
-            path = os.path.join(builds_dir, dest)
-            if os.path.isdir(path) and os.path.isabs(path):
-                self._logger('Removing build directory')
-                shutil.rmtree(path)
+            build_dir = os.path.join(builds_dir, dest)
+            for f in os.listdir(build_dir):
+                path = os.path.join(build_dir, f)
+                if os.path.isdir(path) and f != 'logs':
+                    shutil.rmtree(path)
+                elif f == 'logs':
+                    log_path = os.path.join(build_dir, 'logs')
+                    for f in os.listdir(log_path):
+                        log_file_path = os.path.join(log_path, f)
+                        if os.path.isdir(log_file_path):
+                            shutil.rmtree(log_file_path)
+                        elif not f.endswith('.txt'):
+                            os.unlink(log_file_path)
 
     def _find_port(self):
         # currently used port
