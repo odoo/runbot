@@ -380,8 +380,10 @@ class runbot_build(models.Model):
                 build.build_age = int(time.time() - dt2time(build.build_start))
 
     def _get_params(self):
-        message = False
-        message = self.repo_id._git(['show', '-s', self.name])
+        try:
+            message = self.repo_id._git(['show', '-s', self.name])
+        except CalledProcessError:
+            message = ''
         params = defaultdict(lambda: defaultdict(str))
         if message:
             regex = re.compile(r'^[\t ]*Runbot-dependency: ([A-Za-z0-9\-_]+/[A-Za-z0-9\-_]+):([0-9A-Fa-f\-]*) *(#.*)?$', re.M)  # dep:repo:hash #comment
