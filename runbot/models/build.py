@@ -383,6 +383,7 @@ class runbot_build(models.Model):
         try:
             message = self.repo_id._git(['show', '-s', self.name])
         except CalledProcessError:
+            _logger.error('Error getting params for %s', self.name)
             message = ''
         params = defaultdict(lambda: defaultdict(str))
         if message:
