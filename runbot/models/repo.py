@@ -505,11 +505,14 @@ class runbot_repo(models.Model):
             nginx_config = self.env['ir.ui.view'].render_template("runbot.nginx_config", settings)
             os.makedirs(nginx_dir, exist_ok=True)
             content = None
-            with open(os.path.join(nginx_dir, 'nginx.conf'), 'rb') as f:
-                content = f.read()
+            nginx_conf_path = os.path.join(nginx_dir, 'nginx.conf')
+            content = ''
+            if os.path.isfile(nginx_conf_path):
+                with open(nginx_conf_path, 'rb') as f:
+                    content = f.read()
             if content != nginx_config:
                 _logger.debug('reload nginx')
-                with open(os.path.join(nginx_dir, 'nginx.conf'), 'wb') as f:
+                with open(nginx_conf_path, 'wb') as f:
                     f.write(nginx_config)
                 try:
                     pid = int(open(os.path.join(nginx_dir, 'nginx.pid')).read().strip(' \n'))
