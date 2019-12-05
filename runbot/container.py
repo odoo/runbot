@@ -128,7 +128,8 @@ def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None,
         cmd_object = Command([], run_cmd.split(' '), [])
     _logger.debug('Docker run command: %s', run_cmd)
     logs = open(log_path, 'w')
-    run_cmd = 'cd /data/build && %s' % run_cmd
+    run_cmd = 'cd /data/build;touch start-%s;%s;cd /data/build;touch end-%s' % (container_name, run_cmd, container_name)
+    docker_clear_state(container_name, build_dir)  # ensure that no state are remaining
     logs.write("Docker command:\n%s\n=================================================\n" % cmd_object)
     # create start script
     docker_command = [
@@ -173,9 +174,20 @@ def docker_stop(container_name):
     dstop = subprocess.run(['docker', 'stop', container_name])
 
 def docker_is_running(container_name):
-    """Return True if container is still running"""
     dinspect = subprocess.run(['docker', 'container', 'inspect', container_name], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
     return True if dinspect.returncode == 0 else False
+
+def docker_state(container_name, build_dir):
+    started = os.path.exists(os.path.join(build_dir, 'start-%s' % container_name))
+    ended = os.path.exists(os.path.join(build_dir, 'end-%s' % container_name))
+    return 'END' if ended else 'RUNNING' if started else 'UNKNOWN'
+
+def docker_clear_state(container_name, build_dir):
+    """Return True if container is still running"""
+    if os.path.exists(os.path.join(build_dir, 'start-%s' % container_name)):
+        os.remove(os.path.join(build_dir, 'start-%s' % container_name))
+    if os.path.exists(os.path.join(build_dir, 'end-%s' % container_name)):
+        os.remove(os.path.join(build_dir, 'end-%s' % container_name))
 
 def docker_get_gateway_ip():
     """Return the host ip of the docker default bridge gateway"""

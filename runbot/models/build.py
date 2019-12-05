@@ -9,7 +9,7 @@ import subprocess
 import time
 import datetime
 from ..common import dt2time, fqdn, now, grep, uniq_list, local_pgadmin_cursor, s2human, Commit, dest_reg, os
-from ..container import docker_build, docker_stop, docker_is_running, Command
+from ..container import docker_build, docker_stop, docker_state, Command
 from odoo.addons.runbot.models.repo import RunbotException
 from odoo import models, fields, api
 from odoo.exceptions import UserError, ValidationError
@@ -587,7 +587,7 @@ class runbot_build(models.Model):
                 continue
 
             if build.requested_action == 'wake_up':
-                if docker_is_running(build._get_docker_name()):
+                if docker_state(build._get_docker_name(), build._path()) == 'RUNNING':
                     build.write({'requested_action': False, 'local_state': 'running'})
                     build._log('wake_up', 'Waking up failed, docker is already running', level='SEPARATOR')
                 elif not os.path.exists(build._path()):
@@ -651,15 +651,19 @@ class runbot_build(models.Model):
                             build.local_result = build.triggered_result
                             build._github_status()  # failfast
                 # check if current job is finished
-                if docker_is_running(build._get_docker_name()):
+                _docker_state = docker_state(build._get_docker_name(), build._path())
+                if _docker_state == 'RUNNING':
                     timeout = min(build.active_step.cpu_limit, int(icp.get_param('runbot.runbot_timeout', default=10000)))
                     if build.local_state != 'running' and build.job_time > timeout:
                         build._log('_schedule', '%s time exceeded (%ss)' % (build.active_step.name if build.active_step else "?", build.job_time))
                         build._kill(result='killed')
                     continue
-                elif build.active_step._is_docker_step() and build.job_time < 15:
-                    _logger.debug('container "%s" seems too take a while to start', build._get_docker_name())
-                    continue
+                elif _docker_state == 'UNKNOWN' and build.active_step._is_docker_step():
+                    if build.job_time < 60:
+                        _logger.debug('container "%s" seems too take a while to start', build._get_docker_name())
+                        continue
+                    else:
+                        build._log('_schedule', 'Docker not started after 60 seconds, skipping', level='ERROR')
                 # No job running, make result and select nex job
                 build_values = {
                     'job_end': now(),
