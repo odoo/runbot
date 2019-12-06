@@ -537,12 +537,12 @@ class runbot_repo(models.Model):
         cron_timeout = cron_limit if cron_limit > -1 else req_limit
         return cron_timeout - (min_margin + random.randint(1, 60))
 
-    def _cron_fetch_and_schedule(self, hostname):
+    def _cron_fetch_and_schedule(self, hostname=None):
         """This method have to be called from a dedicated cron on a runbot
         in charge of orchestration.
         """
 
-        if hostname != fqdn():
+        if hostname and hostname and hostname != fqdn():
             return 'Not for me'
 
         start_time = time.time()
@@ -558,12 +558,12 @@ class runbot_repo(models.Model):
             self.invalidate_cache()
             time.sleep(update_frequency)
 
-    def _cron_fetch_and_build(self, hostname):
+    def _cron_fetch_and_build(self, hostname=None):
         """ This method have to be called from a dedicated cron
         created on each runbot instance.
         """
 
-        if hostname != fqdn():
+        if hostname and hostname != fqdn():
             return 'Not for me'
 
         host = self.env['runbot.host']._get_current()
