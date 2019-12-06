@@ -41,8 +41,8 @@ class runbot_repo(models.Model):
                              ('hook', 'Hook')],
                             default='poll',
                             string="Mode", required=True, help="hook: Wait for webhook on /runbot/hook/<id> i.e. github push event")
-    hook_time = fields.Float('Last hook time')
-    get_ref_time = fields.Float('Last refs db update')
+    hook_time = fields.Float('Last hook time', compute='_compute_hook_time')
+    get_ref_time = fields.Float('Last refs db update', compute='_compute_get_ref_time')
     duplicate_id = fields.Many2one('runbot.repo', 'Duplicate repo', help='Repository for finding duplicate builds')
     modules = fields.Char("Modules to install", help="Comma-separated list of modules to install and test.")
     modules_auto = fields.Selection([('none', 'None (only explicit modules list)'),
@@ -76,6 +76,58 @@ class runbot_repo(models.Model):
     def _inverse_config_id(self):
         for repo in self:
             repo.repo_config_id = repo.config_id
+
+    def _compute_get_ref_time(self):
+        self.env.cr.execute("""
+            SELECT repo_id, time FROM runbot_repo_reftime
+            WHERE id IN (
+                SELECT max(id) FROM runbot_repo_reftime 
+                WHERE repo_id = any(%s) GROUP BY repo_id
+            )
+        """, [self.ids])
+        times = dict(self.env.cr.fetchall())
+        for repo in self:
+            repo.get_ref_time = times.get(repo.id, 0)
+
+    def _compute_hook_time(self):
+        self.env.cr.execute("""
+            SELECT repo_id, time FROM runbot_repo_hooktime
+            WHERE id IN (
+                SELECT max(id) FROM runbot_repo_hooktime 
+                WHERE repo_id = any(%s) GROUP BY repo_id
+            )
+        """, [self.ids])
+        times = dict(self.env.cr.fetchall())
+
+        for repo in self:
+            repo.hook_time = times.get(repo.id, 0)
+
+    def write(self, values):
+        # hooktime and reftime table are here to avoid sql update on repo.
+        # using inverse will still trigger write_date and write_uid update.
+        # this hack allows to avoid that
+
+        hook_time = values.pop('hook_time', None)
+        get_ref_time = values.pop('get_ref_time', None)
+        for repo in self:
+            if hook_time:
+                self.env['runbot.repo.hooktime'].create({'time': hook_time, 'repo_id': repo.id})
+            if get_ref_time:
+                self.env['runbot.repo.reftime'].create({'time': get_ref_time, 'repo_id': repo.id})
+        if values:
+            super().write(values)
+
+    def _gc_times(self):
+        self.env.cr.execute("""
+            DELETE from runbot_repo_reftime WHERE id NOT IN (
+                SELECT max(id) FROM runbot_repo_reftime GROUP BY repo_id
+            )
+        """)
+        self.env.cr.execute("""
+            DELETE from runbot_repo_hooktime WHERE id NOT IN (
+                SELECT max(id) FROM runbot_repo_hooktime GROUP BY repo_id
+            )
+        """)
 
     def _root(self):
         """Return root directory of repository"""
@@ -665,3 +717,19 @@ class runbot_repo(models.Model):
         except:
             _logger.error('An exception occured while cleaning sources')
             pass
+
+
+    class RefTime(models.Model):
+        _name = "runbot.repo.reftime"
+        _log_access = False
+
+        time = fields.Float('Time', index=True, required=True)
+        repo_id = fields.Many2one('runbot.repo', 'Repository', required=True, ondelete='cascade')
+
+
+    class HookTime(models.Model):
+        _name = "runbot.repo.hooktime"
+        _log_access = False
+
+        time = fields.Float('Time')
+        repo_id = fields.Many2one('runbot.repo', 'Repository', required=True, ondelete='cascade')
