@@ -41,11 +41,12 @@ class TestSchedule(RunbotCase):
         domain = [('repo_id', 'in', (self.repo.id, ))]
         domain_host = domain + [('host', '=', 'runbotxx')]
         build_ids = self.Build.search(domain_host + [('local_state', 'in', ['testing', 'running'])])
-        mock_docker_state.return_value = 'RUNNING'
+        mock_docker_state.return_value = 'UNKNOWN'
         self.assertEqual(build.local_state, 'testing')
         build_ids._schedule()  # too fast, docker not started
         self.assertEqual(build.local_state, 'testing')
-        build_ids.write({'job_start': datetime.datetime.now() - datetime.timedelta(seconds=20)})  # job is now a little older
+
+        build_ids.write({'job_start': datetime.datetime.now() - datetime.timedelta(seconds=70)})  # docker never started
         build_ids._schedule()
         self.assertEqual(build.local_state, 'done')
         self.assertEqual(build.local_result, 'ok')
