@@ -176,6 +176,39 @@ class Test_Repo(RunbotCase):
 
         _logger.info('Create pending builds took: %ssec', (time.time() - inserted_time))
 
+    def test_times(self):
+        def _test_times(model, field_name):
+            repo1 = self.Repo.create({'name': 'bla@example.com:foo/bar'})
+            repo2 = self.Repo.create({'name': 'bla@example.com:foo2/bar2'})
+            count = self.cr.sql_log_count
+            repo1[field_name] = 1.1
+            self.assertEqual(self.cr.sql_log_count - count, 1, "Only one insert should have been triggered")
+            repo2[field_name] = 1.2
+            self.assertEqual(len(self.env[model].search([])), 2)
+            self.assertEqual(repo1[field_name], 1.1)
+            self.assertEqual(repo2[field_name], 1.2)
+
+            repo1[field_name] = 1.3
+            repo2[field_name] = 1.4
+
+            self.assertEqual(len(self.env[model].search([])), 4)
+            self.assertEqual(repo1[field_name], 1.3)
+            self.assertEqual(repo2[field_name], 1.4)
+
+            self.Repo.invalidate_cache()
+            self.assertEqual(repo1[field_name], 1.3)
+            self.assertEqual(repo2[field_name], 1.4)
+
+            self.Repo._gc_times()
+
+            self.assertEqual(len(self.env[model].search([])), 2)
+            self.assertEqual(repo1[field_name], 1.3)
+            self.assertEqual(repo2[field_name], 1.4)
+
+        _test_times('runbot.repo.hooktime', 'hook_time')
+        _test_times('runbot.repo.reftime', 'get_ref_time')
+
+
 
 class Test_Github(TransactionCase):
     def test_github(self):

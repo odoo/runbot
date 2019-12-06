@@ -31,3 +31,6 @@ access_runbot_host_manager,runbot_host_manager,runbot.model_runbot_host,runbot.g
 
 access_runbot_error_log_user,runbot_error_log_user,runbot.model_runbot_error_log,group_user,1,0,0,0
 access_runbot_error_log_manager,runbot_error_log_manager,runbot.model_runbot_error_log,runbot.group_runbot_admin,1,1,1,1
+
+access_runbot_repo_hooktime,runbot_repo_hooktime,runbot.model_runbot_repo_hooktime,group_user,1,0,0,0
+access_runbot_repo_reftime,runbot_repo_reftime,runbot.model_runbot_repo_reftime,group_user,1,0,0,0
