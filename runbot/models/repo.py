@@ -271,7 +271,7 @@ class runbot_repo(models.Model):
         """
         self.ensure_one()
 
-        get_ref_time = self._get_fetch_head_time()
+        get_ref_time = round(self._get_fetch_head_time(), 4)
         if not self.get_ref_time or get_ref_time > self.get_ref_time:
             self.get_ref_time = get_ref_time
             fields = ['refname', 'objectname', 'committerdate:iso8601', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail']
