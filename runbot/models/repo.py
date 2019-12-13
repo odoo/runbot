@@ -212,6 +212,14 @@ class runbot_repo(models.Model):
         if err:
             raise RunbotException("Archive %s failed. Did you force push the branch since build creation? (%s)" % (sha, err))
 
+        # migration scripts link if necessary
+        icp = self.env['ir.config_parameter']
+        ln_param = icp.get_param('runbot_migration_ln', default='')
+        migration_repo_id = int(icp.get_param('runbot_migration_repo_id', default=0))
+        if ln_param and migration_repo_id and self.server_files:
+            scripts_dir = self.env['runbot.repo'].browse(migration_repo_id)._get_repo_name_part()
+            os.symlink('/data/build/%s' % scripts_dir,  self._source_path(sha, ln_param))
+
         # TODO get result and fallback on cleaing in case of problem
         return export_path
 
@@ -368,7 +376,7 @@ class runbot_repo(models.Model):
                 new_build = Build.create(build_info)
                 # create a reverse dependency build if needed
                 if branch.sticky:
-                    for rev_repo in self.search([('dependency_ids', 'in', self.id)]):
+                    for rev_repo in self.search([('dependency_ids', 'in', self.id), ('no_build', '=', False)]):
                         # find the latest build with the same branch name
                         latest_rev_build = Build.search([('build_type', '=', 'normal'), ('hidden', '=', 'False'), ('repo_id.id', '=', rev_repo.id), ('branch_id.branch_name', '=', branch.branch_name)], order='id desc', limit=1)
                         if latest_rev_build:
