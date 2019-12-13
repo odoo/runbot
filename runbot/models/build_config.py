@@ -237,6 +237,7 @@ class ConfigStep(models.Model):
             'log_path': log_path,
             'glob': glob.glob,
             'Command': Command,
+            'Commit': Commit,
             'base64': base64,
             're': re,
             'time': time,
