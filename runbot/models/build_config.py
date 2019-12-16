@@ -9,6 +9,7 @@ from ..container import docker_run, docker_get_gateway_ip, Command
 from odoo import models, fields, api
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools.safe_eval import safe_eval, test_python_expr
+from odoo.addons.runbot.models.repo import RunbotException
 
 _logger = logging.getLogger(__name__)
 
@@ -113,6 +114,8 @@ class ConfigStep(models.Model):
     additionnal_env = fields.Char('Extra env', help='Example: foo="bar",bar="foo". Cannot contains \' ', track_visibility='onchange')
     # python
     python_code = fields.Text('Python code', track_visibility='onchange', default=PYTHON_DEFAULT)
+    python_result_code = fields.Text('Python code for result', track_visibility='onchange', default=PYTHON_DEFAULT)
+    ignore_triggered_result = fields.Boolean('Ignore error triggered in logs', track_visibility='onchange', default=False)
     running_job = fields.Boolean('Job final state is running', default=False, help="Docker won't be killed if checked")
     # create_build
     create_config_ids = fields.Many2many('runbot.build.config', 'runbot_build_config_step_ids_create_config_ids_rel', string='New Build Configs', track_visibility='onchange', index=True)
@@ -124,8 +127,15 @@ class ConfigStep(models.Model):
 
     @api.constrains('python_code')
     def _check_python_code(self):
-        for step in self.sudo().filtered('python_code'):
-            msg = test_python_expr(expr=step.python_code.strip(), mode="exec")
+        return self._check_python_field('python_code')
+
+    @api.constrains('python_result_code')
+    def _check_python_result_code(self):
+        return self._check_python_field('python_result_code')
+
+    def _check_python_field(self, field_name):
+        for step in self.sudo().filtered(field_name):
+            msg = test_python_expr(expr=step[field_name].strip(), mode="exec")
             if msg:
                 raise ValidationError(msg)
 
@@ -172,6 +182,8 @@ class ConfigStep(models.Model):
                 raise UserError('Name cannot contain special char or spaces exepts "_" and "-"')
         if not self.env.user.has_group('runbot.group_build_config_administrator'):
             if (values.get('job_type') == 'python' or ('python_code' in values and values['python_code'] and values['python_code'] != PYTHON_DEFAULT)):
+                raise UserError('cannot create or edit config step of type python code')
+            if (values.get('job_type') == 'python' or ('python_result_code' in values and values['python_result_code'] and values['python_result_code'] != PYTHON_DEFAULT)):
                 raise UserError('cannot create or edit config step of type python code')
             if (values.get('extra_params')):
                 reg = r'^[a-zA-Z0-9\-_ "]*$'
@@ -226,15 +238,15 @@ class ConfigStep(models.Model):
                 })
                 build._log('create_build', 'created with config %s' % create_config.name, log_type='subbuild', path=str(children.id))
 
-    def _run_python(self, build, log_path):
-        eval_ctx = {
+    def make_python_ctx(self, build):
+        return {
             'self': self,
             'fields': fields,
             'models': models,
             'build': build,
             'docker_run': docker_run,
             '_logger': _logger,
-            'log_path': log_path,
+            'log_path': build._path('logs', '%s.txt' % self.name),
             'glob': glob.glob,
             'Command': Command,
             'Commit': Commit,
@@ -244,7 +256,15 @@ class ConfigStep(models.Model):
             'grep': grep,
             'rfind': rfind,
         }
-        return safe_eval(self.sudo().python_code.strip(), eval_ctx, mode="exec", nocopy=True)
+    def _run_python(self, build, log_path):  # TODO rework log_path after checking python steps, compute on build
+        eval_ctx = self.make_python_ctx(build)
+        try:
+            safe_eval(self.python_code.strip(), eval_ctx, mode="exec", nocopy=True)
+        except RunbotException as e:
+            message = e.args[0]
+            build._log("run", message, level='ERROR')
+            build._kill(result='ko')
+
 
     def _is_docker_step(self):
         if not self:
@@ -425,12 +445,25 @@ class ConfigStep(models.Model):
 
     def _make_results(self, build):
         build_values = {}
-        if self.job_type in ['install_odoo', 'python']:
+        log_time = self._get_log_last_write(build)
+        if log_time:
+            build_values['job_end'] = log_time
+        if self.job_type == 'python' and self.python_result_code and self.python_result_code != PYTHON_DEFAULT:
+            build_values.update(self._make_python_results(build))
+        elif self.job_type in ['install_odoo', 'python']:
             if self.coverage:
                 build_values.update(self._make_coverage_results(build))
             if self.test_enable or self.test_tags:
                 build_values.update(self._make_tests_results(build))
         return build_values
+
+    def _make_python_results(self, build):
+        eval_ctx = self.make_python_ctx(build)
+        safe_eval(self.python_result_code.strip(), eval_ctx, mode="exec", nocopy=True)
+        return_value = eval_ctx.get('return_value')
+        if not isinstance(return_value, dict):
+            raise RunbotException('python_result_code must set return_value to a dict values on build')
+        return return_value
 
     def _make_coverage_results(self, build):
         build_values = {}
@@ -449,35 +482,69 @@ class ConfigStep(models.Model):
             build._log('coverage_result', 'Coverage file not found', level='WARNING')
         return build_values
 
+    def _check_log(self, build):
+        log_path = build._path('logs', '%s.txt' % self.name)
+        if not os.path.isfile(log_path):
+            build._log('_make_tests_results', "Log file not found at the end of test job", level="ERROR")
+            return 'ko'
+        return 'ok'
+
+    def _check_module_loaded(self, build):
+        log_path = build._path('logs', '%s.txt' % self.name)
+        if not grep(log_path, ".modules.loading: Modules loaded."):
+            build._log('_make_tests_results', "Modules loaded not found in logs", level="ERROR")
+            return 'ko'
+        return 'ok'
+
+    def _check_error(self, build, regex=None):
+        log_path = build._path('logs', '%s.txt' % self.name)
+        regex = regex or _re_error
+        if rfind(log_path, regex):
+            build._log('_make_tests_results', 'Error or traceback found in logs', level="ERROR")
+            return 'ko'
+        return 'ok'
+
+    def _check_warning(self, build, regex=None):
+        log_path = build._path('logs', '%s.txt' % self.name)
+        regex = regex or _re_warning
+        if rfind(log_path, regex):
+            build._log('_make_tests_results', 'Warning found in logs', level="WARNING")
+            return 'warn'
+        return 'ok'
+
+    def _check_build_ended(self, build):
+        log_path = build._path('logs', '%s.txt' % self.name)
+        if not grep(log_path, "Initiating shutdown"):
+            build._log('_make_tests_results', 'No "Initiating shutdown" found in logs, maybe because of cpu limit.', level="ERROR")
+            return 'ko'
+        return 'ok'
+
+    def _get_log_last_write(self, build):
+        log_path = build._path('logs', '%s.txt' % self.name)
+        if os.path.isfile(log_path):
+            return time2str(time.localtime(os.path.getmtime(log_path)))
+
+    def _get_checkers_result(self, build, checkers):
+        for checker in checkers:
+            result = checker(build)
+            if result != 'ok':
+                return result
+        return 'ok'
+
     def _make_tests_results(self, build):
         build_values = {}
-        if self.test_enable or self.test_tags:
-            build._log('run', 'Getting results for build %s' % build.dest)
-            log_file = build._path('logs', '%s.txt' % build.active_step.name)
-            if not os.path.isfile(log_file):
-                build_values['local_result'] = 'ko'
-                build._log('_checkout', "Log file not found at the end of test job", level="ERROR")
-            else:
-                log_time = time.localtime(os.path.getmtime(log_file))
-                build_values['job_end'] = time2str(log_time),
-                if not build.local_result or build.local_result in ['ok', "warn"]:
-                    if grep(log_file, ".modules.loading: Modules loaded."):
-                        local_result = False
-                        if rfind(log_file, _re_error):
-                            local_result = 'ko'
-                            build._log('_checkout', 'Error or traceback found in logs', level="ERROR")
-                        elif rfind(log_file, _re_warning):
-                            local_result = 'warn'
-                            build._log('_checkout', 'Warning found in logs', level="WARNING")
-                        elif not grep(log_file, "Initiating shutdown"):
-                            local_result = 'ko'
-                            build._log('_checkout', 'No "Initiating shutdown" found in logs, maybe because of cpu limit.', level="ERROR")
-                        else:
-                            local_result = 'ok'
-                        build_values['local_result'] = build._get_worst_result([build.local_result, local_result])
-                    else:
-                        build_values['local_result'] = 'ko'
-                        build._log('_checkout', "Module loaded not found in logs", level="ERROR")
+        build._log('run', 'Getting results for build %s' % build.dest)
+
+        if build.local_result != 'ko':
+            checkers = [
+                self._check_log,
+                self._check_module_loaded,
+                self._check_error,
+                self._check_warning,
+                self._check_build_ended
+            ]
+            local_result = self._get_checkers_result(build, checkers)
+            build_values['local_result'] = build._get_worst_result([build.local_result, local_result])
         return build_values
 
     def _step_state(self):
