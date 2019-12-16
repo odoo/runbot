@@ -27,7 +27,6 @@ class RunbotCase(TransactionCase):
 
         self.start_patcher('git_patcher', 'odoo.addons.runbot.models.repo.runbot_repo._git', side_effect=git_side_effect)
         self.start_patcher('fqdn_patcher', 'odoo.addons.runbot.common.socket.getfqdn', 'host.runbot.com')
-        self.start_patcher('find_patcher', 'odoo.addons.runbot.common.find', 0)
         self.start_patcher('github_patcher', 'odoo.addons.runbot.models.repo.runbot_repo._github', {})
         self.start_patcher('is_on_remote_patcher', 'odoo.addons.runbot.models.branch.runbot_branch._is_on_remote', True)
         self.start_patcher('repo_root_patcher', 'odoo.addons.runbot.models.repo.runbot_repo._root', '/tmp/runbot_test/static')

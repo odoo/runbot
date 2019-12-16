@@ -31,6 +31,7 @@ class Test_Build(RunbotCase):
             'repo_id': self.repo.id,
             'name': 'refs/heads/11.0'
         })
+        self.start_patcher('find_patcher', 'odoo.addons.runbot.common.find', 0)
 
     def test_base_fields(self):
         build = self.create_build({

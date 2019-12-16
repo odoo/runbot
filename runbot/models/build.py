@@ -647,7 +647,7 @@ class runbot_build(models.Model):
             else:  # testing/running build
                 if build.local_state == 'testing':
                     # failfast in case of docker error (triggered in database)
-                    if build.triggered_result:
+                    if build.triggered_result and not build.active_step.ignore_triggered_result:
                         worst_result = self._get_worst_result([build.triggered_result, build.local_result])
                         if  worst_result != build.local_result:
                             build.local_result = build.triggered_result
@@ -673,9 +673,13 @@ class runbot_build(models.Model):
                 # make result of previous job
                 try:
                     results = build.active_step._make_results(build)
-                except:
-                    _logger.exception('An error occured while computing results')
-                    build._log('_make_results', 'An error occured while computing results', level='ERROR')
+                except Exception as e:
+                    if isinstance(e, RunbotException):
+                        message = e.args[0]
+                    else:
+                        message = 'An error occured while computing results of %s:\n %s' % (build.job, str(e).replace('\\n', '\n').replace("\\'", "'"))
+                        _logger.exception(message)
+                    build._log('_make_results', message, level='ERROR')
                     results = {'local_result': 'ko'}
 
                 build_values.update(results)
