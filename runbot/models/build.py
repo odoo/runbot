@@ -67,7 +67,6 @@ class runbot_build(models.Model):
     nb_running = fields.Integer("Number of test slot use", default=0)
 
     # should we add a stored field for children results?
-    pid = fields.Integer('Pid')
     active_step = fields.Many2one('runbot.build.config.step', 'Active step')
     job = fields.Char('Active step display name', compute='_compute_job')
     job_start = fields.Datetime('Job start')
@@ -573,14 +572,40 @@ class runbot_build(models.Model):
         self.ensure_one()
         return '%s_%s' % (self.dest, self.active_step.name)
 
-    def _schedule(self):
-        """schedule the build"""
-        icp = self.env['ir.config_parameter']
-        # For retro-compatibility, keep this parameter in seconds
-
+    def _init_pendings(self, host):
         for build in self:
-            self.env.cr.commit()  # commit between each build to minimise transactionnal errors due to state computations
-            self.invalidate_cache()
+            if build.local_state != 'pending':
+                raise UserError("Build %s is not pending" % build.id)
+            if build.host != host.name:
+                raise UserError("Build %s does not have correct host" % build.id)
+            # allocate port and schedule first job
+            values = {
+                'port': self._find_port(),
+                'job_start': now(),
+                'build_start': now(),
+                'job_end': False,
+            }
+            values.update(build._next_job_values())
+            build.write(values)
+            if not build.active_step:
+                build._log('_schedule', 'No job in config, doing nothing')
+                continue
+            try:
+                build._log('_schedule', 'Init build environment with config %s ' % build.config_id.name)
+                # notify pending build - avoid confusing users by saying nothing
+                build._github_status()
+                os.makedirs(build._path('logs'), exist_ok=True)
+                build._log('_schedule', 'Building docker image')
+                docker_build(build._path('logs', 'docker_build.txt'), build._path())
+            except Exception:
+                _logger.exception('Failed initiating build %s', build.dest)
+                build._log('_schedule', 'Failed initiating build')
+                build._kill(result='ko')
+                continue
+            build._run_job()
+
+    def _process_requested_actions(self):
+        for build in self:
             if build.requested_action == 'deathrow':
                 result = None
                 if build.local_state != 'running' and build.global_result not in ('warn', 'ko'):
@@ -617,97 +642,76 @@ class runbot_build(models.Model):
                         build.write({'requested_action': False, 'local_state': 'done'})
                 continue
 
-            if build.local_state == 'pending':
-                # allocate port and schedule first job
-                port = self._find_port()
-                values = {
-                    'host': fqdn(), # or ip? of false? 
-                    'port': port,
-                    'job_start': now(),
-                    'build_start': now(),
-                    'job_end': False,
-                }
-                values.update(build._next_job_values())
-                build.write(values)
-                if not build.active_step:
-                    build._log('_schedule', 'No job in config, doing nothing')
+    def _schedule(self):
+        """schedule the build"""
+        icp = self.env['ir.config_parameter']
+        for build in self:
+            if build.local_state not in ['testing', 'running']:
+                raise UserError("Build %s is not testing/running: %s" % (build.id, build.local_state))
+            if build.local_state == 'testing':
+                # failfast in case of docker error (triggered in database)
+                if build.triggered_result and not build.active_step.ignore_triggered_result:
+                    worst_result = self._get_worst_result([build.triggered_result, build.local_result])
+                    if  worst_result != build.local_result:
+                        build.local_result = build.triggered_result
+                        build._github_status()  # failfast
+            # check if current job is finished
+            _docker_state = docker_state(build._get_docker_name(), build._path())
+            if _docker_state == 'RUNNING':
+                timeout = min(build.active_step.cpu_limit, int(icp.get_param('runbot.runbot_timeout', default=10000)))
+                if build.local_state != 'running' and build.job_time > timeout:
+                    build._log('_schedule', '%s time exceeded (%ss)' % (build.active_step.name if build.active_step else "?", build.job_time))
+                    build._kill(result='killed')
+                continue
+            elif _docker_state == 'UNKNOWN' and build.active_step._is_docker_step():
+                if build.job_time < 60:
+                    _logger.debug('container "%s" seems too take a while to start', build._get_docker_name())
                     continue
-                try:
-                    build._log('_schedule', 'Init build environment with config %s ' % build.config_id.name)
-                    # notify pending build - avoid confusing users by saying nothing
-                    build._github_status()
-                    os.makedirs(build._path('logs'), exist_ok=True)
-                    build._log('_schedule', 'Building docker image')
-                    docker_build(build._path('logs', 'docker_build.txt'), build._path())
-                except Exception:
-                    _logger.exception('Failed initiating build %s', build.dest)
-                    build._log('_schedule', 'Failed initiating build')
-                    build._kill(result='ko')
-                    continue
-            else:  # testing/running build
-                if build.local_state == 'testing':
-                    # failfast in case of docker error (triggered in database)
-                    if build.triggered_result and not build.active_step.ignore_triggered_result:
-                        worst_result = self._get_worst_result([build.triggered_result, build.local_result])
-                        if  worst_result != build.local_result:
-                            build.local_result = build.triggered_result
-                            build._github_status()  # failfast
-                # check if current job is finished
-                _docker_state = docker_state(build._get_docker_name(), build._path())
-                if _docker_state == 'RUNNING':
-                    timeout = min(build.active_step.cpu_limit, int(icp.get_param('runbot.runbot_timeout', default=10000)))
-                    if build.local_state != 'running' and build.job_time > timeout:
-                        build._log('_schedule', '%s time exceeded (%ss)' % (build.active_step.name if build.active_step else "?", build.job_time))
-                        build._kill(result='killed')
-                    continue
-                elif _docker_state == 'UNKNOWN' and build.active_step._is_docker_step():
-                    if build.job_time < 60:
-                        _logger.debug('container "%s" seems too take a while to start', build._get_docker_name())
-                        continue
-                    else:
-                        build._log('_schedule', 'Docker not started after 60 seconds, skipping', level='ERROR')
-                # No job running, make result and select nex job
-                build_values = {
-                    'job_end': now(),
-                }
-                # make result of previous job
-                try:
-                    results = build.active_step._make_results(build)
-                except Exception as e:
-                    if isinstance(e, RunbotException):
-                        message = e.args[0]
-                    else:
-                        message = 'An error occured while computing results of %s:\n %s' % (build.job, str(e).replace('\\n', '\n').replace("\\'", "'"))
-                        _logger.exception(message)
-                    build._log('_make_results', message, level='ERROR')
-                    results = {'local_result': 'ko'}
+                else:
+                    build._log('_schedule', 'Docker not started after 60 seconds, skipping', level='ERROR')
+            # No job running, make result and select nex job
+            build_values = {
+                'job_end': now(),
+            }
+            # make result of previous job
+            try:
+                results = build.active_step._make_results(build)
+            except Exception as e:
+                if isinstance(e, RunbotException):
+                    message = e.args[0]
+                else:
+                    message = 'An error occured while computing results of %s:\n %s' % (build.job, str(e).replace('\\n', '\n').replace("\\'", "'"))
+                    _logger.exception(message)
+                build._log('_make_results', message, level='ERROR')
+                results = {'local_result': 'ko'}
 
-                build_values.update(results)
+            build_values.update(results)
 
-                build.active_step.log_end(build)
+            build.active_step.log_end(build)
 
-                build_values.update(build._next_job_values())  # find next active_step or set to done
+            build_values.update(build._next_job_values())  # find next active_step or set to done
 
-                ending_build = build.local_state not in ('done', 'running') and build_values.get('local_state') in ('done', 'running')
-                if ending_build:
-                    build.update_build_end()
+            ending_build = build.local_state not in ('done', 'running') and build_values.get('local_state') in ('done', 'running')
+            if ending_build:
+                build.update_build_end()
 
-                build.write(build_values)
-                if ending_build:
-                    build._github_status()
-                    if not build.local_result:  # Set 'ok' result if no result set (no tests job on build)
-                        build.local_result = 'ok'
-                        build._logger("No result set, setting ok by default")
+            build.write(build_values)
+            if ending_build:
+                build._github_status()
+                if not build.local_result:  # Set 'ok' result if no result set (no tests job on build)
+                    build.local_result = 'ok'
+                    build._logger("No result set, setting ok by default")
+            build._run_job()
 
-            # run job
-            pid = None
+    def _run_job(self):
+        # run job
+        for build in self:
             if build.local_state != 'done':
                 build._logger('running %s', build.active_step.name)
                 os.makedirs(build._path('logs'), exist_ok=True)
                 os.makedirs(build._path('datadir'), exist_ok=True)
                 try:
-                    pid = build.active_step._run(build)  # run should be on build?
-                    build.write({'pid': pid})  # no really usefull anymore with dockers
+                    build.active_step._run(build)  # run should be on build?
                 except Exception as e:
                     if isinstance(e, RunbotException):
                         message = e.args[0]
@@ -716,10 +720,6 @@ class runbot_build(models.Model):
                     _logger.exception(message)
                     build._log("run", message, level='ERROR')
                     build._kill(result='ko')
-                    continue
-
-        self.env.cr.commit()
-        self.invalidate_cache()
 
     def _path(self, *l, **kw):
         """Return the repo build path"""
@@ -843,16 +843,6 @@ class runbot_build(models.Model):
             'func': func,
             'line': '0',
         })
-
-    def _reap(self):
-        while True:
-            try:
-                pid, status, rusage = os.wait3(os.WNOHANG)
-            except OSError:
-                break
-            if pid == 0:
-                break
-            _logger.debug('reaping: pid: %s status: %s', pid, status)
 
     def _kill(self, result=None):
         host = fqdn()

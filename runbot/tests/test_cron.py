@@ -56,7 +56,6 @@ class Test_Cron(RunbotCase):
         ret = self.Repo._cron_fetch_and_build(hostname)
         self.assertEqual(None, ret)
         mock_scheduler.assert_called()
-        self.assertTrue(mock_reload.called)
         host = self.env['runbot.host'].search([('name', '=', hostname)])
         self.assertEqual(host.name, hostname, 'A new host should have been created')
         self.assertGreater(host.psql_conn_count, 0, 'A least one connection should exist on the current psql instance')
