@@ -166,12 +166,13 @@ def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None,
     docker_command.extend(['odoo:runbot_tests', '/bin/bash', '-c', "%s" % run_cmd])
     docker_run = subprocess.Popen(docker_command, stdout=logs, stderr=logs, preexec_fn=preexec_fn, close_fds=False, cwd=build_dir)
     _logger.info('Started Docker container %s', container_name)
-    return docker_run.pid
+    return
 
 def docker_stop(container_name):
     """Stops the container named container_name"""
     _logger.info('Stopping container %s', container_name)
     dstop = subprocess.run(['docker', 'stop', container_name])
+    # todo delete os.path.join(build_dir, 'end-%s' % container_name)
 
 def docker_is_running(container_name):
     dinspect = subprocess.run(['docker', 'container', 'inspect', container_name], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)

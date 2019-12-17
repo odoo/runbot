@@ -18,10 +18,8 @@ _logger = logging.getLogger(__name__)
 
 class RunbotClient():
 
-    def __init__(self, env, args):
+    def __init__(self, env):
         self.env = env
-        self.args = args
-        self.fqdn = socket.getfqdn()
         self.ask_interrupt = threading.Event()
 
     def main_loop(self):
@@ -31,15 +29,17 @@ class RunbotClient():
         host = self.env['runbot.host']._get_current()
         count = 0
         while True:
+            host.last_start_loop = fields.Datetime.now()
             count = count % 60
             if count == 0:
                 logging.info('Host %s running with %s slots on pid %s%s', host.name, host.get_nb_worker(), os.getpid(), ' (assigned only)' if host.assigned_only else '')
                 self.env['runbot.repo']._source_cleanup()
                 self.env['runbot.build']._local_cleanup()
-                host.last_end_loop = host.last_start_loop = fields.Datetime.now()
+                self.env['runbot.repo']._docker_cleanup()
                 host.set_psql_conn_count()
             count += 1
             sleep_time = self.env['runbot.repo']._scheduler_loop_turn(host)
+            host.last_end_loop = fields.Datetime.now()
             self.env.cr.commit()
             self.env.reset()
             self.sleep(sleep_time)
@@ -97,7 +97,7 @@ def run():
     with odoo.api.Environment.manage():
         with registry.cursor() as cr:
             env = odoo.api.Environment(cr, odoo.SUPERUSER_ID, {})
-            runbot_client = RunbotClient(env, args)
+            runbot_client = RunbotClient(env)
             # run main loop
             runbot_client.main_loop()
 

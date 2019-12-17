@@ -257,10 +257,10 @@ class Test_Repo_Scheduler(RunbotCase):
             'name': 'refs/head/foo'
         })
 
-    @patch('odoo.addons.runbot.models.build.runbot_build._reap')
     @patch('odoo.addons.runbot.models.build.runbot_build._kill')
     @patch('odoo.addons.runbot.models.build.runbot_build._schedule')
-    def test_repo_scheduler(self, mock_schedule, mock_kill, mock_reap):
+    @patch('odoo.addons.runbot.models.build.runbot_build._init_pendings')
+    def test_repo_scheduler(self, mock_init_pendings, mock_schedule, mock_kill):
         self.env['ir.config_parameter'].set_param('runbot.runbot_workers', 6)
         builds = []
         # create 6 builds that are testing on the host to verify that
@@ -293,8 +293,8 @@ class Test_Repo_Scheduler(RunbotCase):
             'local_state': 'pending',
         })
         builds.append(build)
-
-        self.foo_repo._scheduler()
+        host = self.env['runbot.host']._get_current()
+        self.foo_repo._scheduler(host)
 
         build.invalidate_cache()
         scheduled_build.invalidate_cache()
@@ -304,7 +304,7 @@ class Test_Repo_Scheduler(RunbotCase):
         # give some room for the pending build
         self.Build.search([('name', '=', 'a')]).write({'local_state': 'done'})
 
-        self.foo_repo._scheduler()
+        self.foo_repo._scheduler(host)
         build.invalidate_cache()
         scheduled_build.invalidate_cache()
         self.assertEqual(build.host, 'host.runbot.com')
