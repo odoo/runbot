@@ -168,11 +168,15 @@ def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None,
     _logger.info('Started Docker container %s', container_name)
     return
 
-def docker_stop(container_name):
+def docker_stop(container_name, build_dir=None):
     """Stops the container named container_name"""
     _logger.info('Stopping container %s', container_name)
-    dstop = subprocess.run(['docker', 'stop', container_name])
-    # todo delete os.path.join(build_dir, 'end-%s' % container_name)
+    if build_dir:
+        end_file = os.path.join(build_dir, 'end-%s' % container_name)
+        subprocess.run(['touch', end_file])
+    else:
+        _logger.info('Stopping docker without defined build_dir')
+    subprocess.run(['docker', 'stop', container_name])
 
 def docker_is_running(container_name):
     dinspect = subprocess.run(['docker', 'container', 'inspect', container_name], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
