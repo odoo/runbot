@@ -37,6 +37,7 @@ class RunbotClient():
                 self.env['runbot.build']._local_cleanup()
                 self.env['runbot.repo']._docker_cleanup()
                 host.set_psql_conn_count()
+                _logger.debug('Scheduling...')
             count += 1
             sleep_time = self.env['runbot.repo']._scheduler_loop_turn(host)
             host.last_end_loop = fields.Datetime.now()

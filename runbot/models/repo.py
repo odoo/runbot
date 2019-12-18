@@ -748,13 +748,14 @@ class runbot_repo(models.Model):
             pass
 
     def _docker_cleanup(self):
+        _logger.info('Docker cleaning')
         docker_ps_result = docker_ps()
         containers = {int(dc.split('-', 1)[0]):dc for dc in docker_ps_result if dest_reg.match(dc)}
         if containers:
             candidates = self.env['runbot.build'].search([('id', 'in', list(containers.keys())), ('local_state', '=', 'done')])
             for c in candidates:
                 _logger.info('container %s found running with build state done', containers[c.id])
-                docker_stop(containers[c.id])
+                docker_stop(containers[c.id], c._path())
         ignored = {dc for dc in docker_ps_result if not dest_reg.match(dc)}
         if ignored:
             _logger.debug('docker (%s) not deleted because not dest format', " ".join(list(ignored)))
