@@ -663,8 +663,10 @@ class runbot_build(models.Model):
                     build._log('_schedule', '%s time exceeded (%ss)' % (build.active_step.name if build.active_step else "?", build.job_time))
                     build._kill(result='killed')
                 continue
-            elif _docker_state == 'UNKNOWN' and build.active_step._is_docker_step():
-                if build.job_time < 60:
+            elif _docker_state == 'UNKNOWN' and (build.local_state == 'running' or build.active_step._is_docker_step()):
+                if build.job_time < 5:
+                    continue
+                elif build.job_time < 60:
                     _logger.debug('container "%s" seems too take a while to start', build._get_docker_name())
                     continue
                 else:
@@ -850,7 +852,7 @@ class runbot_build(models.Model):
             if build.host != host:
                 continue
             build._log('kill', 'Kill build %s' % build.dest)
-            docker_stop(build._get_docker_name())
+            docker_stop(build._get_docker_name(), build._path())
             v = {'local_state': 'done', 'requested_action': False, 'active_step': False, 'duplicate_id': False, 'job_end': now()}  # what if duplicate? state done?
             if not build.build_end:
                 v['build_end'] = now()

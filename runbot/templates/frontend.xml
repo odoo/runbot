@@ -135,7 +135,10 @@
                                     <t t-if="bu.global_result in ['killed', 'manually_killed']"><t t-set="klass">killed</t></t>
                                   </t>
                                   <td t-attf-class="{{klass}}">
-                                     <t t-call="runbot.build_button"><t t-set="klass">btn-group-sm</t></t>
+                                     <t t-call="runbot.build_button">
+                                      <t t-set="klass">btn-group-sm</t>
+                                      <t t-set="show_rebuild_button" t-value="bu==br['builds'][0]"></t>
+                                     </t>
                                      <t t-if="bu['build_type']=='scheduled'"><i class="fa fa-moon-o" t-att-title="bu.build_type_label()" t-att-aria-label="bu.build_type_label()"/></t>
                                      <t t-if="bu['build_type'] in ('rebuild', 'indirect')"><i class="fa fa-recycle" t-att-title="bu.build_type_label()" t-att-aria-label="bu.build_type_label()"/></t>
                                      <t t-if="bu['subject']">
