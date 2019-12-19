@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 import re
+import time
 from subprocess import CalledProcessError
 from odoo import models, fields, api
 
@@ -27,6 +28,7 @@ class runbot_branch(models.Model):
     priority = fields.Boolean('Build priority', default=False)
     no_build = fields.Boolean("Forbid creation of build on this branch", default=False)
     no_auto_build = fields.Boolean("Don't automatically build commit on this branch", default=False)
+    rebuild_requested = fields.Boolean("Request a rebuild", help="Rebuild the latest commit even when no_auto_build is set.", default=False)
 
     branch_config_id = fields.Many2one('runbot.build.config', 'Run Config')
     config_id = fields.Many2one('runbot.build.config', 'Run Config', compute='_compute_config_id', inverse='_inverse_config_id')
@@ -233,3 +235,11 @@ class runbot_branch(models.Model):
         Branch = self.env['runbot.branch']
         branch = Branch.create({'repo_id': repo_id, 'name': name})
         return branch
+
+    def toggle_request_branch_rebuild(self):
+        for branch in self:
+            if not branch.rebuild_requested:
+                branch.rebuild_requested = True
+                branch.repo_id.write({'hook_time': time.time()})
+            else:
+                branch.rebuild_requested = False
