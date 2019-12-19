@@ -10,6 +10,7 @@
             <sheet>
               <group name="branch_group">
                 <field name="repo_id"/>
+                <field name="duplicate_repo_id" invisible='1'/>
                 <field name="name"/>
                 <field name="branch_name"/>
                 <field name="branch_url"/>
@@ -21,6 +22,10 @@
                 <field name="modules"/>
                 <field name="config_id"/>
                 <field name="no_build"/>
+                <field name="closest_sticky"/>
+                <field name="defined_sticky" domain="[('sticky', '=', True), ('repo_id', 'in', [repo_id, duplicate_repo_id])]"/>
+                <field name="previous_version"/>
+                <field name="intermediate_stickies" widget="many2many_tags"/>
               </group>
             </sheet>
           </form>

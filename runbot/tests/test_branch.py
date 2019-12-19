@@ -52,3 +52,103 @@ class Test_Branch(RunbotCase):
             'name': 'refs/head/foo-use-coverage-branch-bar'
         })
         self.assertEqual(cov_branch.config_id, self.env.ref('runbot.runbot_build_config_test_coverage'))
+
+
+class TestBranchRelations(RunbotCase):
+
+    def setUp(self):
+        super(TestBranchRelations, self).setUp()
+
+        self.repo = self.env['runbot.repo'].create({'name': 'bla@example.com:foo/bar'})
+        self.repodev = self.env['runbot.repo'].create({'name': 'bla@example.com:foo-dev/bar', 'duplicate_id':self.repo.id })
+        self.Branch = self.env['runbot.branch']
+
+        def create_sticky(name):
+            return self.Branch.create({
+                'repo_id': self.repo.id,
+                'name': 'refs/heads/%s' % name,
+                'sticky': True
+            })
+        self.master = create_sticky('master')
+        create_sticky('11.0')
+        create_sticky('saas-11.1')
+        create_sticky('12.0')
+        create_sticky('saas-12.3')
+        create_sticky('13.0')
+        create_sticky('saas-13.1')
+        self.last = create_sticky('saas-13.2')
+
+    def test_relations_master_dev(self):
+        b = self.Branch.create({
+                'repo_id': self.repodev.id,
+                'name': 'refs/heads/master-test-tri',
+            })
+        self.assertEqual(b.closest_sticky.branch_name, 'master')
+        self.assertEqual(b.previous_version.branch_name, '13.0')
+        self.assertEqual(sorted(b.intermediate_stickies.mapped('branch_name')), ['saas-13.1', 'saas-13.2'])
+
+    def test_relations_master(self):
+        b = self.master
+        self.assertEqual(b.closest_sticky.branch_name, 'master')
+        self.assertEqual(b.previous_version.branch_name, '13.0')
+        self.assertEqual(sorted(b.intermediate_stickies.mapped('branch_name')), ['saas-13.1', 'saas-13.2'])
+
+    def test_relations_no_intermediate(self):
+        b = self.Branch.create({
+                'repo_id': self.repodev.id,
+                'name': 'refs/heads/saas-13.1-test-tri',
+            })
+        self.assertEqual(b.closest_sticky.branch_name, 'saas-13.1')
+        self.assertEqual(b.previous_version.branch_name, '13.0')
+        self.assertEqual(sorted(b.intermediate_stickies.mapped('branch_name')), [])
+
+    def test_relations_old_branch(self):
+        b = self.Branch.create({
+                'repo_id': self.repodev.id,
+                'name': 'refs/heads/11.0-test-tri',
+            })
+        self.assertEqual(b.closest_sticky.branch_name, '11.0')
+        self.assertEqual(b.previous_version.branch_name, False)
+        self.assertEqual(sorted(b.intermediate_stickies.mapped('branch_name')), [])
+
+    def test_relations_closest_forced(self):
+        b = self.Branch.create({
+                'repo_id': self.repodev.id,
+                'name': 'refs/heads/master-test-tri',
+            })
+        self.assertEqual(b.closest_sticky.branch_name, 'master')
+        self.assertEqual(b.previous_version.branch_name, '13.0')
+        self.assertEqual(sorted(b.intermediate_stickies.mapped('branch_name')), ['saas-13.1', 'saas-13.2'])
+
+        b.closest_sticky = self.last
+
+        self.assertEqual(b.closest_sticky.branch_name, 'saas-13.2')
+        self.assertEqual(b.previous_version.branch_name, '13.0')
+        self.assertEqual(sorted(b.intermediate_stickies.mapped('branch_name')), ['saas-13.1'])
+
+    def test_relations_no_match(self):
+        b = self.Branch.create({
+                'repo_id': self.repodev.id,
+                'name': 'refs/heads/icantnamemybranches',
+            })
+
+        self.assertEqual(b.closest_sticky.branch_name, False)
+        self.assertEqual(b.previous_version.branch_name, False)
+        self.assertEqual(sorted(b.intermediate_stickies.mapped('branch_name')), [])
+
+    def test_relations_pr(self):
+        self.Branch.create({
+                'repo_id': self.repodev.id,
+                'name': 'refs/heads/master-test-tri',
+            })
+        b = self.Branch.create({
+                'repo_id': self.repodev.id,
+                'target_branch_name': 'master-test-tri',
+                'name': 'refs/pull/100',
+            })
+        b.target_branch_name = 'master-test-tri'
+        self.assertEqual(b.closest_sticky.branch_name, 'master')
+        self.assertEqual(b.previous_version.branch_name, '13.0')
+        self.assertEqual(sorted(b.intermediate_stickies.mapped('branch_name')), ['saas-13.1', 'saas-13.2'])
+
+
