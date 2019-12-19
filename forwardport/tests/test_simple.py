@@ -389,7 +389,9 @@ def test_conflict(env, config, make_repo):
     p = prod.commit(p_0)
     c = prod.commit(pr1.head)
     assert c.author == p.author
-    assert c.committer == p.committer
+    # ignore date as we're specifically not keeping the original's
+    without_date = itemgetter('name', 'email')
+    assert without_date(c.committer) == without_date(p.committer)
     assert prod.read_tree(c) == {
         'f': 'c',
         'g': re_matches(r'''<<<\x3c<<< HEAD

@@ -702,6 +702,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
             conf = working_copy.with_config(env={
                 **to_dict('AUTHOR', author),
                 **to_dict('COMMITTER', committer),
+                'GIT_COMMITTER_DATE': '',
             })
             # squash to a single commit
             conf.reset('--soft', root_commits[0]['parents'][0]['sha'])
@@ -759,7 +760,6 @@ stderr:
                 'GIT_AUTHOR_DATE': cm['author']['date'],
                 'GIT_COMMITTER_NAME': cm['committer']['name'],
                 'GIT_COMMITTER_EMAIL': cm['committer']['email'],
-                'GIT_COMMITTER_DATE': cm['committer']['date'],
             })
 
             conf = configured.with_config(stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
