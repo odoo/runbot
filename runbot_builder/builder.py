@@ -2,9 +2,7 @@
 import argparse
 import logging
 import os
-import socket
 import sys
-import time
 import threading
 import signal
 
@@ -29,21 +27,28 @@ class RunbotClient():
         host = self.env['runbot.host']._get_current()
         count = 0
         while True:
-            host.last_start_loop = fields.Datetime.now()
-            count = count % 60
-            if count == 0:
-                logging.info('Host %s running with %s slots on pid %s%s', host.name, host.get_nb_worker(), os.getpid(), ' (assigned only)' if host.assigned_only else '')
-                self.env['runbot.repo']._source_cleanup()
-                self.env['runbot.build']._local_cleanup()
-                self.env['runbot.repo']._docker_cleanup()
-                host.set_psql_conn_count()
-                _logger.info('Scheduling...')
-            count += 1
-            sleep_time = self.env['runbot.repo']._scheduler_loop_turn(host)
-            host.last_end_loop = fields.Datetime.now()
-            self.env.cr.commit()
-            self.env.reset()
-            self.sleep(sleep_time)
+            try:
+                host.last_start_loop = fields.Datetime.now()
+                count = count % 60
+                if count == 0:
+                    logging.info('Host %s running with %s slots on pid %s%s', host.name, host.get_nb_worker(), os.getpid(), ' (assigned only)' if host.assigned_only else '')
+                    self.env['runbot.repo']._source_cleanup()
+                    self.env['runbot.build']._local_cleanup()
+                    self.env['runbot.repo']._docker_cleanup()
+                    host.set_psql_conn_count()
+                    _logger.info('Scheduling...')
+                count += 1
+                sleep_time = self.env['runbot.repo']._scheduler_loop_turn(host)
+                host.last_end_loop = fields.Datetime.now()
+                self.env.cr.commit()
+                self.env.reset()
+                self.sleep(sleep_time)
+            except Exception as e:
+                _logger.exception('Builder main loop failed with: %s', e)
+                self.env.cr.rollback()
+                self.env.reset()
+                self.sleep(10)
+
             if self.ask_interrupt.is_set():
                 return
 
@@ -80,11 +85,10 @@ def run():
         handler.setFormatter(formatter)
         logging.getLogger().addHandler(handler)
 
-    _logger.info("Staring sheduler on database %s", args.database)
-
     # configure odoo
     sys.path.append(args.odoo_path)
     import odoo
+    _logger.info("Starting scheduler on database %s", args.database)
     odoo.tools.config['db_host'] = args.db_host
     odoo.tools.config['db_port'] = args.db_port
     odoo.tools.config['db_user'] = args.db_user
@@ -101,6 +105,7 @@ def run():
             runbot_client = RunbotClient(env)
             # run main loop
             runbot_client.main_loop()
+
 
 if __name__ == '__main__':
     run()
