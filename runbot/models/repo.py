@@ -343,8 +343,10 @@ class runbot_repo(models.Model):
 
             # create build (and mark previous builds as skipped) if not found
             if not (branch.id, sha) in builds_candidates:
-                if branch.no_auto_build or branch.no_build or branch.repo_id.no_build:
+                if branch.no_auto_build or branch.no_build or (branch.repo_id.no_build and not branch.rebuild_requested):
                     continue
+                if branch.rebuild_requested:
+                    branch.rebuild_requested = False
                 _logger.debug('repo %s branch %s new build found revno %s', self.name, branch.name, sha)
                 build_info = {
                     'branch_id': branch.id,
