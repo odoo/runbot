@@ -15,12 +15,17 @@ class runbot_branch(models.Model):
     _sql_constraints = [('branch_repo_uniq', 'unique (name,repo_id)', 'The branch must be unique per repository !')]
 
     repo_id = fields.Many2one('runbot.repo', 'Repository', required=True, ondelete='cascade')
+    duplicate_repo_id = fields.Many2one('runbot.repo', 'Duplicate Repository', related='repo_id.duplicate_id',)
     name = fields.Char('Ref Name', required=True)
     branch_name = fields.Char(compute='_get_branch_infos', string='Branch', readonly=1, store=True)
     branch_url = fields.Char(compute='_get_branch_url', string='Branch url', readonly=1)
     pull_head_name = fields.Char(compute='_get_branch_infos', string='PR HEAD name', readonly=1, store=True)
     target_branch_name = fields.Char(compute='_get_branch_infos', string='PR target branch', store=True)
     sticky = fields.Boolean('Sticky')
+    closest_sticky = fields.Many2one('runbot.branch', compute='_compute_closest_sticky', string='Closest sticky')
+    defined_sticky = fields.Many2one('runbot.branch', string='Force sticky')
+    previous_version = fields.Many2one('runbot.branch', compute='_compute_previous_version', string='Previous version branch')
+    intermediate_stickies = fields.Many2many('runbot.branch', compute='_compute_intermediate_stickies', string='Intermediates stickies')
     coverage_result = fields.Float(compute='_compute_coverage_result', type='Float', string='Last coverage', store=False)  # non optimal search in loop, could we store this result ? or optimise
     state = fields.Char('Status')
     modules = fields.Char("Modules to Install", help="Comma-separated list of modules to install and test.")
@@ -30,6 +35,48 @@ class runbot_branch(models.Model):
 
     branch_config_id = fields.Many2one('runbot.build.config', 'Run Config')
     config_id = fields.Many2one('runbot.build.config', 'Run Config', compute='_compute_config_id', inverse='_inverse_config_id')
+
+    @api.depends('sticky', 'defined_sticky', 'target_branch_name', 'name')
+    # won't be recompute if a new branch is marked as sticky or sticky is removed, but should be ok if not stored
+    def _compute_closest_sticky(self):
+        for branch in self:
+            if branch.sticky:
+                branch.closest_sticky = branch
+            elif branch.defined_sticky:
+                branch.closest_sticky = branch.defined_sticky # be carefull with loop
+            elif branch.target_branch_name:
+                corresping_branch = self.search([('branch_name', '=', branch.target_branch_name), ('repo_id', '=', branch.repo_id.id)])
+                branch.closest_sticky = corresping_branch.closest_sticky
+            else:
+                repo_ids = (branch.repo_id | branch.repo_id.duplicate_id).ids
+                self.env.cr.execute("select id from runbot_branch where sticky = 't' and repo_id = any(%s) and %s like name||'%%'", (repo_ids, branch.name or ''))
+                branch.closest_sticky = self.browse(self.env.cr.fetchone())
+
+    @api.depends('closest_sticky.previous_version')
+    def _compute_previous_version(self):
+        for branch in self:
+            if branch.closest_sticky == branch:
+                repo_ids = (branch.repo_id | branch.repo_id.duplicate_id).ids
+                domain = [('branch_name', 'like', '%.0'), ('sticky', '=', True), ('branch_name', '!=', 'master'), ('repo_id', 'in', repo_ids)]
+                if branch.branch_name != 'master':
+                    domain += [('id', '<', branch.id)]
+                branch.previous_version = self.search(domain, limit=1, order='id desc')
+            else:
+                branch.previous_version = branch.closest_sticky.previous_version
+
+    @api.depends('previous_version', 'closest_sticky.intermediate_stickies')
+    def _compute_intermediate_stickies(self):
+        for branch in self:
+            if branch.closest_sticky == branch:
+                if not branch.previous_version:
+                    continue
+                repo_ids = (branch.repo_id | branch.repo_id.duplicate_id).ids
+                domain = [('id', '>', branch.previous_version.id), ('sticky', '=', True), ('branch_name', '!=', 'master'), ('repo_id', 'in', repo_ids)]
+                if branch.closest_sticky.branch_name != 'master':
+                    domain += [('id', '<', branch.closest_sticky.id)]
+                branch.intermediate_stickies = [(6, 0, self.search(domain, order='id desc').ids)]
+            else:
+                branch.intermediate_stickies = [(6, 0, branch.closest_sticky.intermediate_stickies.ids)]
 
     def _compute_config_id(self):
         for branch in self:
