@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import fnmatch
 import glob
+import json
 import logging
 import pwd
 import re
@@ -53,6 +54,7 @@ class runbot_build(models.Model):
     sequence = fields.Integer('Sequence')
     log_ids = fields.One2many('ir.logging', 'build_id', string='Logs')
     error_log_ids = fields.One2many('ir.logging', 'build_id', domain=[('level', 'in', ['WARNING', 'ERROR', 'CRITICAL'])], string='Error Logs')
+    _json_data = fields.Char('Json Data')
 
     # state machine
 
@@ -1074,6 +1076,16 @@ class runbot_build(models.Model):
         except Exception as e:
             self._log('make_dirs', 'exception: %s' % e)
             return False
+
+    @property
+    def json_data(self):
+        self.ensure_one()
+        return json.loads(self._json_data) if self._json_data else {}
+
+    @json_data.setter
+    def json_data(self, data):
+        self.ensure_one()
+        self._json_data = json.dumps(data)
 
     def build_type_label(self):
         self.ensure_one()

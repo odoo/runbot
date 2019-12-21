@@ -53,6 +53,12 @@ class Test_Build(RunbotCase):
         build._compute_domain()
         self.assertEqual(build.domain, 'runbot99.example.org:1234')
 
+        # test json stored _data field and data property
+        self.assertEqual(build.json_data, {})
+        build.json_data = {'restore_url': 'foobar'}
+        self.assertEqual(build.json_data, {'restore_url': 'foobar'})
+        self.assertEqual(build._json_data, '{"restore_url": "foobar"}')
+
         other = self.create_build({
             'branch_id': self.branch.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
