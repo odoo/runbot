@@ -10,6 +10,7 @@ import time
 import datetime
 from ..common import dt2time, fqdn, now, grep, uniq_list, local_pgadmin_cursor, s2human, Commit, dest_reg, os
 from ..container import docker_build, docker_stop, docker_state, Command
+from ..fields import JsonDictField
 from odoo.addons.runbot.models.repo import RunbotException
 from odoo import models, fields, api
 from odoo.exceptions import UserError, ValidationError
@@ -54,6 +55,7 @@ class runbot_build(models.Model):
     sequence = fields.Integer('Sequence')
     log_ids = fields.One2many('ir.logging', 'build_id', string='Logs')
     error_log_ids = fields.One2many('ir.logging', 'build_id', domain=[('level', 'in', ['WARNING', 'ERROR', 'CRITICAL'])], string='Error Logs')
+    config_data = JsonDictField('Json Data')
 
     # state machine
 
