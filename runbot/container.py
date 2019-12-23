@@ -14,7 +14,10 @@ import datetime
 import io
 import json
 import logging
-from .common import os
+try:
+    from .common import os
+except ModuleNotFoundError:
+    import os
 import shutil
 import subprocess
 import time
@@ -266,7 +269,9 @@ def tests(args):
     elif args.flamegraph:
         flame_log = '/data/build/logs/flame.log'
         python_params = ['-m', 'flamegraph', '-o', flame_log]
-    odoo_cmd = ['python%s' % py_version ] + python_params + ['/data/build/odoo-bin', '-d %s' % args.db_name, '--addons-path=/data/build/addons', '-i', args.odoo_modules,  '--test-enable', '--stop-after-init', '--max-cron-threads=0']
+    odoo_cmd = ['python%s' % py_version ] + python_params + ['/data/build/odoo-bin', '-d %s' % args.db_name, '--addons-path=/data/build/addons', '-i', args.odoo_modules,  '--stop-after-init', '--max-cron-threads=0']
+    if args.test_enable:
+        odoo_cmd += ['--test-enable']
     cmd = Command(pres, odoo_cmd, posts)
     cmd.add_config_tuple('data_dir', '/data/build/datadir')
     cmd.add_config_tuple('db_user', '%s' % os.getlogin())
@@ -300,11 +305,16 @@ def tests(args):
     logfile = os.path.join(args.build_dir, 'logs', 'logs-full-test.txt')
     container_name = 'odoo-container-test-%s' % datetime.datetime.now().microsecond
     docker_run(cmd, logfile, args.build_dir, container_name)
-    time.sleep(1)  # give time for the container to start
 
-    while docker_is_running(container_name):
+    for i in range(15):
+        if docker_state(container_name, args.build_dir) == 'RUNNING':
+            break
+        _logger.info('Waiting for container %s to start', container_name)
+        time.sleep(1)  # give time for the container to start
+
+    while docker_state(container_name, args.build_dir) == 'RUNNING':
         time.sleep(10)
-        _logger.info("Waiting for %s to stop", container_name)
+        _logger.info("Waiting for container %s to stop", container_name)
 
     if args.run:
         # Test running
@@ -344,5 +354,6 @@ if __name__ == '__main__':
     p_test.add_argument('--dump', action='store_true', default=False, help='Test database export with pg_dump')
     p_test.add_argument('--run', action='store_true', default=False, help='Also test running (Warning: the container survives exit)')
     p_test.add_argument('--env', action='store_true', default=False, help='Test passing environment variables')
+    p_test.add_argument('--test-enable', dest='test_enable', action='store_true', default=False, help='Enable Odoo tests')
     args = parser.parse_args()
     args.func(args)
