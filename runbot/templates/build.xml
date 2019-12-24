@@ -132,6 +132,9 @@
                           <tr>
                             <t t-set="rowclass"><t t-call="runbot.build_class"><t t-set="build" t-value="build"/></t></t>
                             <td t-attf-class="bg-{{rowclass.strip()}}-light">
+                                <t t-if="build.description">
+                                  Description: <t t-esc="build['description']"/><br/>
+                                </t>
                                 Subject: <t t-esc="build['subject']"/><br/>
                                 Author: <t t-esc="build['author']"/><br/>
                                 Committer: <t t-esc="build['committer']"/><br/>
@@ -153,7 +156,12 @@
                                   <t t-set="rowclass"><t t-call="runbot.build_class"><t t-set="build" t-value="child"/></t></t>
                                   <tr><td t-attf-class="bg-{{rowclass.strip()}}-light">
                                     <a t-attf-href="/runbot/build/{{child.id}}" >Build <t t-esc="child.id"/></a>
-                                    with config <t t-esc="child.config_id.name"/>
+                                    <t t-if="child.description">
+                                      <t t-esc="child.description" />
+                                    </t>
+                                    <t t-else="">
+                                        with config <t t-esc="child.config_id.name"/>
+                                    </t>
                                     <a groups="runbot.group_build_config_user" t-attf-href="/web#id={{child.config_id.id}}&amp;view_type=form&amp;model=runbot.build.config">...</a>
                                     <t t-if="child.orphan_result"><i class="fa fa-chain-broken" title="Build result ignored for parent" /></t>
                                     <t t-if="child.job"> Running step: <t t-esc="child.job"/></t>
