@@ -57,7 +57,6 @@ class RunbotBuildError(models.Model):
         })
         return super().create(vals)
 
-    @api.multi
     def write(self, vals):
         if 'active' in vals:
             for build_error in self:

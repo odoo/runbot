@@ -392,7 +392,7 @@ class runbot_repo(models.Model):
                                 indirect.build_type = 'indirect'
                                 new_build.revdep_build_ids += indirect
 
-    @api.multi
+
     def _create_pending_builds(self):
         """ Find new commits in physical repos"""
         refs = {}
@@ -451,7 +451,6 @@ class runbot_repo(models.Model):
         repo = self
         repo._git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*', '+refs/pull/*/head:refs/pull/*'])
 
-    @api.multi
     def _update(self, force=True):
         """ Update the physical git reposotories on FS"""
         for repo in reversed(self):
@@ -465,7 +464,6 @@ class runbot_repo(models.Model):
         self.invalidate_cache()
         self.env.reset()
 
-    @api.multi
     def _scheduler(self, host):
         nb_workers = host.get_nb_worker()
 
