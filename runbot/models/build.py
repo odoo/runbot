@@ -66,7 +66,7 @@ class runbot_build(models.Model):
 
     nb_pending = fields.Integer("Number of pending in queue", default=0)
     nb_testing = fields.Integer("Number of test slot use", default=0)
-    nb_running = fields.Integer("Number of test slot use", default=0)
+    nb_running = fields.Integer("Number of run slot use", default=0)
 
     # should we add a stored field for children results?
     active_step = fields.Many2one('runbot.build.config.step', 'Active step')
@@ -76,7 +76,7 @@ class runbot_build(models.Model):
     build_start = fields.Datetime('Build start')
     build_end = fields.Datetime('Build end')
     job_time = fields.Integer(compute='_compute_job_time', string='Job time')
-    build_time = fields.Integer(compute='_compute_build_time', string='Job time')
+    build_time = fields.Integer(compute='_compute_build_time', string='Build time')
     build_age = fields.Integer(compute='_compute_build_age', string='Build age')
     duplicate_id = fields.Many2one('runbot.build', 'Corresponding Build', index=True)
     revdep_build_ids = fields.Many2many('runbot.build', 'runbot_rev_dep_builds',

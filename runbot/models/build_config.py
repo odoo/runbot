@@ -30,7 +30,7 @@ class Config(models.Model):
     update_github_state = fields.Boolean('Notify build state to github', default=False, track_visibility='onchange')
     protected = fields.Boolean('Protected', default=False, track_visibility='onchange')
     group = fields.Many2one('runbot.build.config', 'Configuration group', help="Group of config's and config steps")
-    group_name = fields.Char(related='group.name')
+    group_name = fields.Char('Group name', related='group.name')
 
     @api.model
     def create(self, values):

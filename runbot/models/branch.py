@@ -36,7 +36,7 @@ class runbot_branch(models.Model):
     no_auto_build = fields.Boolean("Don't automatically build commit on this branch", default=False)
     rebuild_requested = fields.Boolean("Request a rebuild", help="Rebuild the latest commit even when no_auto_build is set.", default=False)
 
-    branch_config_id = fields.Many2one('runbot.build.config', 'Run Config')
+    branch_config_id = fields.Many2one('runbot.build.config', 'Branch Config')
     config_id = fields.Many2one('runbot.build.config', 'Run Config', compute='_compute_config_id', inverse='_inverse_config_id')
 
     @api.depends('sticky', 'defined_sticky', 'target_branch_name', 'name')

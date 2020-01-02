@@ -34,7 +34,7 @@ class runbot_repo(models.Model):
     _order = 'sequence, id'
 
     name = fields.Char('Repository', required=True)
-    short_name = fields.Char('Repository', compute='_compute_short_name', store=False, readonly=True)
+    short_name = fields.Char('Short name', compute='_compute_short_name', store=False, readonly=True)
     sequence = fields.Integer('Sequence')
     path = fields.Char(compute='_get_path', string='Directory', readonly=True)
     base = fields.Char(compute='_get_base_url', string='Base URL', readonly=True)  # Could be renamed to a more explicit name like base_url
@@ -61,7 +61,7 @@ class runbot_repo(models.Model):
     token = fields.Char("Github token", groups="runbot.group_runbot_admin")
     group_ids = fields.Many2many('res.groups', string='Limited to groups')
 
-    repo_config_id = fields.Many2one('runbot.build.config', 'Run Config')
+    repo_config_id = fields.Many2one('runbot.build.config', 'Repo Config')
     config_id = fields.Many2one('runbot.build.config', 'Run Config', compute='_compute_config_id', inverse='_inverse_config_id')
 
     server_files = fields.Char('Server files', help='Comma separated list of possible server files')  # odoo-bin,openerp-server,openerp-server.py
