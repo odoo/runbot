@@ -13,6 +13,8 @@ _logger = logging.getLogger(__name__)
 class RunbotBuildError(models.Model):
 
     _name = "runbot.build.error"
+    _description = "Build error"
+
     _inherit = "mail.thread"
     _rec_name = "id"
 
@@ -171,6 +173,7 @@ class RunbotBuildError(models.Model):
 class RunbotBuildErrorTag(models.Model):
 
     _name = "runbot.build.error.tag"
+    _description = "Build error tag"
 
     name = fields.Char('Tag')
     error_ids = fields.Many2many('runbot.build.error', string='Errors')
@@ -179,6 +182,7 @@ class RunbotBuildErrorTag(models.Model):
 class RunbotErrorRegex(models.Model):
 
     _name = "runbot.error.regex"
+    _description = "Build error regex"
     _inherit = "mail.thread"
     _rec_name = 'id'
     _order = 'sequence, id'

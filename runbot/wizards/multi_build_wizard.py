@@ -6,6 +6,7 @@ from odoo import fields, models, api
 class MultiBuildWizard(models.TransientModel):
 
     _name = 'runbot.build.config.multi.wizard'
+    _description = "Multi wizard"
 
     base_name = fields.Char('Generic name', required=True)
     prefix = fields.Char('Prefix', help="Leave blank to use login.")

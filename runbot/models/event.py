@@ -74,6 +74,7 @@ FOR EACH ROW EXECUTE PROCEDURE runbot_set_logging_build();
 
 class RunbotErrorLog(models.Model):
     _name = "runbot.error.log"
+    _description = "Error log"
     _auto = False
     _order = 'id desc'
 

@@ -32,6 +32,8 @@ def make_selection(array):
 
 class runbot_build(models.Model):
     _name = "runbot.build"
+    _description = "Build"
+
     _order = 'id desc'
     _rec_name = 'id'
 

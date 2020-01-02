@@ -21,6 +21,7 @@ PYTHON_DEFAULT = "# type python code here\n\n\n\n\n\n"
 
 class Config(models.Model):
     _name = "runbot.build.config"
+    _description = "Build config"
     _inherit = "mail.thread"
 
     name = fields.Char('Config name', required=True, unique=True, track_visibility='onchange', help="Unique name for config please use trigram as postfix for custom configs")
@@ -84,6 +85,7 @@ class Config(models.Model):
 
 class ConfigStep(models.Model):
     _name = 'runbot.build.config.step'
+    _description = "Config step"
     _inherit = 'mail.thread'
 
     # general info
@@ -560,6 +562,7 @@ class ConfigStep(models.Model):
 
 class ConfigStepOrder(models.Model):
     _name = 'runbot.build.config.step.order'
+    _description = "Config step order"
     _order = 'sequence, id'
     # a kind of many2many rel with sequence
 

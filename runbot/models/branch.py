@@ -12,6 +12,7 @@ _re_patch = re.compile(r'.*patch-\d+$')
 class runbot_branch(models.Model):
 
     _name = "runbot.branch"
+    _description = "Branch"
     _order = 'name'
     _sql_constraints = [('branch_repo_uniq', 'unique (name,repo_id)', 'The branch must be unique per repository !')]
 

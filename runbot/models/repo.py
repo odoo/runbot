@@ -30,6 +30,7 @@ class RunbotException(Exception):
 class runbot_repo(models.Model):
 
     _name = "runbot.repo"
+    _description = "Repo"
     _order = 'sequence, id'
 
     name = fields.Char('Repository', required=True)
@@ -763,6 +764,7 @@ class runbot_repo(models.Model):
 
 class RefTime(models.Model):
     _name = "runbot.repo.reftime"
+    _description = "Repo reftime"
     _log_access = False
 
     time = fields.Float('Time', index=True, required=True)
@@ -771,6 +773,7 @@ class RefTime(models.Model):
 
 class HookTime(models.Model):
     _name = "runbot.repo.hooktime"
+    _description = "Repo hooktime"
     _log_access = False
 
     time = fields.Float('Time')
