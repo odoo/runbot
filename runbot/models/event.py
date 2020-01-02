@@ -18,7 +18,6 @@ class runbot_event(models.Model):
     active_step_id = fields.Many2one('runbot.build.config.step', 'Active step', index=True)
     type = fields.Selection(TYPES, string='Type', required=True, index=True)
 
-    @api.model_cr
     def init(self):
         parent_class = super(runbot_event, self)
         if hasattr(parent_class, 'init'):
@@ -130,7 +129,6 @@ class RunbotErrorLog(models.Model):
         BuildError._parse_logs(self)
 
 
-    @api.model_cr
     def init(self):
         """ Create an SQL view for ir.logging """
         tools.drop_view_if_exists(self._cr, 'runbot_error_log')
