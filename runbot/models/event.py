@@ -16,7 +16,7 @@ class runbot_event(models.Model):
 
     build_id = fields.Many2one('runbot.build', 'Build', index=True, ondelete='cascade')
     active_step_id = fields.Many2one('runbot.build.config.step', 'Active step', index=True)
-    type = fields.Selection(TYPES, string='Type', required=True, index=True)
+    type = fields.Selection(selection_add=TYPES, string='Type', required=True, index=True)
 
     def init(self):
         parent_class = super(runbot_event, self)

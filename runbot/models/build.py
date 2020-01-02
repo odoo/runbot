@@ -57,9 +57,9 @@ class runbot_build(models.Model):
     # state machine
 
     global_state = fields.Selection(make_selection(state_order), string='Status', compute='_compute_global_state', store=True)
-    local_state = fields.Selection(make_selection(state_order), string='Build Status', default='pending', required=True, oldname='state', index=True)
+    local_state = fields.Selection(make_selection(state_order), string='Build Status', default='pending', required=True, index=True)
     global_result = fields.Selection(make_selection(result_order), string='Result', compute='_compute_global_result', store=True)
-    local_result = fields.Selection(make_selection(result_order), string='Build Result', oldname='result')
+    local_result = fields.Selection(make_selection(result_order), string='Build Result')
     triggered_result = fields.Selection(make_selection(result_order), string='Triggered Result')  # triggered by db only
 
     requested_action = fields.Selection([('wake_up', 'To wake up'), ('deathrow', 'To kill')], string='Action requested', index=True)
