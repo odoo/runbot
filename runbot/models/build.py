@@ -185,7 +185,7 @@ class runbot_build(models.Model):
             if record.parent_id:
                 record.parent_id._update_nb_children(new_state, old_state)
 
-    @api.depends('real_build.active_step')
+    @api.depends('active_step', 'duplicate_id.active_step')
     def _compute_job(self):
         for build in self:
             build.job = build.real_build.active_step.name
@@ -320,6 +320,8 @@ class runbot_build(models.Model):
         res = super(runbot_build, self).write(values)
         for build in self:
             assert bool(not build.duplicate_id) ^ (build.local_state == 'duplicate')  # don't change duplicate state without removing duplicate id.
+        if 'log_counter' in values: # not 100% usefull but more correct ( see test_ir_logging)
+            self.flush()
         return res
 
     def update_build_end(self):

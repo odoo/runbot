@@ -55,7 +55,7 @@ class runbot_branch(models.Model):
                 self.env.cr.execute("select id from runbot_branch where sticky = 't' and repo_id = any(%s) and %s like name||'%%'", (repo_ids, branch.name or ''))
                 branch.closest_sticky = self.browse(self.env.cr.fetchone())
 
-    @api.depends('closest_sticky.previous_version')
+    @api.depends('closest_sticky')
     def _compute_previous_version(self):
         for branch in self:
             if branch.closest_sticky == branch:
@@ -67,11 +67,12 @@ class runbot_branch(models.Model):
             else:
                 branch.previous_version = branch.closest_sticky.previous_version
 
-    @api.depends('previous_version', 'closest_sticky.intermediate_stickies')
+    @api.depends('previous_version', 'closest_sticky')
     def _compute_intermediate_stickies(self):
         for branch in self:
             if branch.closest_sticky == branch:
                 if not branch.previous_version:
+                    branch.intermediate_stickies = [(5, 0, 0)]
                     continue
                 repo_ids = (branch.repo_id | branch.repo_id.duplicate_id).ids
                 domain = [('id', '>', branch.previous_version.id), ('sticky', '=', True), ('branch_name', '!=', 'master'), ('repo_id', 'in', repo_ids)]
@@ -288,6 +289,6 @@ class runbot_branch(models.Model):
         for branch in self:
             if not branch.rebuild_requested:
                 branch.rebuild_requested = True
-                branch.repo_id.write({'hook_time': time.time()})
+                branch.repo_id.set_hook_time(time.time())
             else:
                 branch.rebuild_requested = False

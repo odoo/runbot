@@ -105,20 +105,15 @@ class runbot_repo(models.Model):
         for repo in self:
             repo.hook_time = times.get(repo.id, 0)
 
-    def write(self, values):
-        # hooktime and reftime table are here to avoid sql update on repo.
-        # using inverse will still trigger write_date and write_uid update.
-        # this hack allows to avoid that
-
-        hook_time = values.pop('hook_time', None)
-        get_ref_time = values.pop('get_ref_time', None)
+    def set_hook_time(self, value):
         for repo in self:
-            if hook_time:
-                self.env['runbot.repo.hooktime'].create({'time': hook_time, 'repo_id': repo.id})
-            if get_ref_time:
-                self.env['runbot.repo.reftime'].create({'time': get_ref_time, 'repo_id': repo.id})
-        if values:
-            super().write(values)
+            self.env['runbot.repo.hooktime'].create({'time': value, 'repo_id': repo.id})
+        self.invalidate_cache()
+
+    def set_ref_time(self, value):
+        for repo in self:
+            self.env['runbot.repo.reftime'].create({'time': value, 'repo_id': repo.id})
+        self.invalidate_cache()
 
     def _gc_times(self):
         self.env.cr.execute("""
@@ -284,7 +279,7 @@ class runbot_repo(models.Model):
 
         get_ref_time = round(self._get_fetch_head_time(), 4)
         if not self.get_ref_time or get_ref_time > self.get_ref_time:
-            self.get_ref_time = get_ref_time
+            self.set_ref_time(get_ref_time)
             fields = ['refname', 'objectname', 'committerdate:iso8601', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail']
             fmt = "%00".join(["%(" + field + ")" for field in fields])
             git_refs = self._git(['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/heads', 'refs/pull'])

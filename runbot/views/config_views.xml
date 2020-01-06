@@ -113,7 +113,7 @@
         <search string="Search config">
           <field name="name"/>
           <field name="group_name"/>
-          <filter string="Is in a group" domain="[(['group', '!=', False])]"/>
+          <filter string="Is in a group" name='is_in_group' domain="[(['group', '!=', False])]"/>
           <filter string="No step's defined" name="no_step" domain="[(['step_order_ids', '=', False])]"/>
         </search>
       </field>
@@ -126,12 +126,12 @@
         <search string="Search config step">
           <field name="name"/>
           <field name="group_name"/>
-          <filter string="Install job" domain="[(['job_type', '=', 'install_odoo'])]"/>
-          <filter string="Run job" domain="[(['job_type', '=', 'run_odoo'])]"/>
-          <filter string="Python job" domain="[(['job_type', '=', 'python'])]"/>
-          <filter string="Create job" domain="[(['job_type', '=', 'create_build'])]"/>
+          <filter string="Install job" name='install_job' domain="[(['job_type', '=', 'install_odoo'])]"/>
+          <filter string="Run job" name='run_job' domain="[(['job_type', '=', 'run_odoo'])]"/>
+          <filter string="Python job" name='python_job' domain="[(['job_type', '=', 'python'])]"/>
+          <filter string="Create job" name='create_job' domain="[(['job_type', '=', 'create_build'])]"/>
           <separator/>
-          <filter string="Is in a group" domain="[(['group', '!=', False])]"/>
+          <filter string="Is in a group" name='is_in_group' domain="[(['group', '!=', False])]"/>
           <separator/>
           <filter string="No config defined" name="no_step" domain="[(['step_order_ids', '=', False])]"/>
         </search>

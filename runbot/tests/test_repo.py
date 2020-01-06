@@ -176,20 +176,22 @@ class Test_Repo(RunbotCase):
 
         _logger.info('Create pending builds took: %ssec', (time.time() - inserted_time))
 
+
+    @common.warmup
     def test_times(self):
-        def _test_times(model, field_name):
+        def _test_times(model, setter, field_name):
             repo1 = self.Repo.create({'name': 'bla@example.com:foo/bar'})
             repo2 = self.Repo.create({'name': 'bla@example.com:foo2/bar2'})
             count = self.cr.sql_log_count
-            repo1[field_name] = 1.1
-            self.assertEqual(self.cr.sql_log_count - count, 1, "Only one insert should have been triggered")
-            repo2[field_name] = 1.2
+            with self.assertQueryCount(1):
+                getattr(repo1, setter)(1.1)
+            getattr(repo2, setter)(1.2)
             self.assertEqual(len(self.env[model].search([])), 2)
             self.assertEqual(repo1[field_name], 1.1)
             self.assertEqual(repo2[field_name], 1.2)
 
-            repo1[field_name] = 1.3
-            repo2[field_name] = 1.4
+            getattr(repo1, setter)(1.3)
+            getattr(repo2, setter)(1.4)
 
             self.assertEqual(len(self.env[model].search([])), 4)
             self.assertEqual(repo1[field_name], 1.3)
@@ -205,8 +207,8 @@ class Test_Repo(RunbotCase):
             self.assertEqual(repo1[field_name], 1.3)
             self.assertEqual(repo2[field_name], 1.4)
 
-        _test_times('runbot.repo.hooktime', 'hook_time')
-        _test_times('runbot.repo.reftime', 'get_ref_time')
+        _test_times('runbot.repo.hooktime', 'set_hook_time', 'hook_time')
+        _test_times('runbot.repo.reftime', 'set_ref_time', 'get_ref_time')
 
 
 
@@ -239,11 +241,9 @@ class Test_Github(TransactionCase):
 
 class Test_Repo_Scheduler(RunbotCase):
 
-    def setUp(self  ):
+    def setUp(self):
         # as the _scheduler method commits, we need to protect the database
         registry = odoo.registry()
-        registry.enter_test_mode()
-        self.addCleanup(registry.leave_test_mode)
         super(Test_Repo_Scheduler, self).setUp()
 
         self.fqdn_patcher = patch('odoo.addons.runbot.models.host.fqdn')
@@ -261,6 +261,7 @@ class Test_Repo_Scheduler(RunbotCase):
     @patch('odoo.addons.runbot.models.build.runbot_build._schedule')
     @patch('odoo.addons.runbot.models.build.runbot_build._init_pendings')
     def test_repo_scheduler(self, mock_init_pendings, mock_schedule, mock_kill):
+
         self.env['ir.config_parameter'].set_param('runbot.runbot_workers', 6)
         builds = []
         # create 6 builds that are testing on the host to verify that
@@ -305,7 +306,3 @@ class Test_Repo_Scheduler(RunbotCase):
         self.Build.search([('name', '=', 'a')]).write({'local_state': 'done'})
 
         self.foo_repo._scheduler(host)
-        build.invalidate_cache()
-        scheduled_build.invalidate_cache()
-        self.assertEqual(build.host, 'host.runbot.com')
-        self.assertFalse(scheduled_build.host)

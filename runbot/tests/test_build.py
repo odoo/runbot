@@ -734,6 +734,10 @@ class TestClosestBranch(RunbotCase):
             'repo_id': self.community_repo.id,
             'name': 'refs/pull/123456'
         })
+
+        # trigger compute and ensure that mock_github is used. (using correct side effect would work too)
+        self.assertEqual(server_pr.pull_head_name, 'foo-dev:bar_branch')
+
         mock_github.return_value = {
             'head': {'label': 'foo-dev:foobar_branch'},
             'base': {'ref': '10.0'},
@@ -743,6 +747,8 @@ class TestClosestBranch(RunbotCase):
             'repo_id': self.enterprise_repo.id,
             'name': 'refs/pull/789101'
         })
+        self.assertEqual(addons_pr.pull_head_name, 'foo-dev:foobar_branch')
+        closest = addons_pr._get_closest_branch(self.community_repo.id)
         self.assertEqual((self.branch_odoo_10, 'pr_target'), addons_pr._get_closest_branch(self.community_repo.id))
 
     def test_closest_branch_05_master(self):

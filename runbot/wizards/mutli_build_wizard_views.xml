@@ -30,7 +30,6 @@
             <field name="name">Generate Multi Build Config</field>
             <field name="type">ir.actions.act_window</field>
             <field name="res_model">runbot.build.config.multi.wizard</field>
-            <field name="view_type">form</field>
             <field name="view_mode">form</field>
             <field name="view_id" ref="runbot_multi_build_wizard_form"/>
             <field name="target">new</field>

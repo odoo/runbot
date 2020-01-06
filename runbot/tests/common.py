@@ -39,6 +39,8 @@ class RunbotCase(TransactionCase):
         self.start_patcher('docker_build', 'odoo.addons.runbot.models.build.docker_build')
         self.start_patcher('docker_ps', 'odoo.addons.runbot.models.repo.docker_ps', [])
         self.start_patcher('docker_stop', 'odoo.addons.runbot.models.repo.docker_stop')
+        self.start_patcher('cr_commit', 'odoo.sql_db.Cursor.commit', None)
+        self.start_patcher('repo_commit', 'odoo.addons.runbot.models.repo.runbot_repo._commit', None)
 
     def start_patcher(self, patcher_name, patcher_path, return_value=Dummy, side_effect=Dummy):
         patcher = patch(patcher_path)

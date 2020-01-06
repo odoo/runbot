@@ -54,7 +54,7 @@ def time2str(t):
 
 def dt2time(datetime):
     """Convert datetime to time"""
-    return time.mktime(time.strptime(datetime, DEFAULT_SERVER_DATETIME_FORMAT))
+    return time.mktime(datetime.timetuple())
 
 
 def now():

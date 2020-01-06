@@ -92,6 +92,7 @@ class TestBuildError(RunbotCase):
         self.assertIn(ko_build_new, new_build_error.build_ids, 'The parsed build with a re-apearing error should generate a new runbot.build.error')
         self.assertIn(build_error, new_build_error.error_history_ids, 'The old error should appear in history')
 
+
     def test_build_error_links(self):
         build_a = self.create_test_build({'local_result': 'ko'})
         build_b = self.create_test_build({'local_result': 'ko'})
@@ -111,8 +112,7 @@ class TestBuildError(RunbotCase):
         #  test that the random bug is parent when linking errors
         all_errors = error_a | error_b
         all_errors.link_errors()
-
-        self.assertIn(error_b.child_ids, error_a, 'Random error should be the parent')
+        self.assertEqual(error_b.child_ids, error_a, 'Random error should be the parent')
 
         #  Test that changing bug resolution is propagated to children
         error_b.active = True

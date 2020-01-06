@@ -82,21 +82,19 @@
                 <field name="name"/>
                 <field name="global_state"/>
                 <field name="dest"/>
-                <separator/>
-                <filter string="Pending" domain="[('global_state','=', 'pending')]"/>
-                <filter string="Testing" domain="[('global_state','in', ('testing', 'waiting'))]"/>
-                <filter string="Running" domain="[('global_state','=', 'running')]"/>
-                <filter string="Done" domain="[('global_state','=','done')]"/>
-                <filter string="Duplicate" domain="[('local_state','=', 'duplicate')]"/>
-                <separator />
+                <filter string="Pending" name='pending' domain="[('global_state','=', 'pending')]"/>
+                <filter string="Testing" name='testing' domain="[('global_state','in', ('testing', 'waiting'))]"/>
+                <filter string="Running" name='running' domain="[('global_state','=', 'running')]"/>
+                <filter string="Done" name='done' domain="[('global_state','=','done')]"/>
+                <filter string="Duplicate" name='duplicate' domain="[('local_state','=', 'duplicate')]"/>
                 <group expand="0" string="Group By...">
-                    <filter string="Repo" domain="[]" context="{'group_by':'repo_id'}"/>
-                    <filter string="Branch" domain="[]" context="{'group_by':'branch_id'}"/>
-                    <filter string="Status" domain="[]" context="{'group_by':'global_state'}"/>
-                    <filter string="Result" domain="[]" context="{'group_by':'global_result'}"/>
-                    <filter string="Start" domain="[]" context="{'group_by':'job_start'}"/>
-                    <filter string="Host" domain="[]" context="{'group_by':'host'}"/>
-                    <filter string="Create Date" domain="[]" context="{'group_by':'create_date'}"/>
+                    <filter string="Repo" name='repo' domain="[]" context="{'group_by':'repo_id'}"/>
+                    <filter string="Branch" name='branch' domain="[]" context="{'group_by':'branch_id'}"/>
+                    <filter string="Status" name='status' domain="[]" context="{'group_by':'global_state'}"/>
+                    <filter string="Result" name='result' domain="[]" context="{'group_by':'global_result'}"/>
+                    <filter string="Start" name='start' domain="[]" context="{'group_by':'job_start'}"/>
+                    <filter string="Host" name='host' domain="[]" context="{'group_by':'host'}"/>
+                    <filter string="Create Date" name='create_date' domain="[]" context="{'group_by':'create_date'}"/>
                 </group>
             </search>
         </field>
@@ -105,7 +103,6 @@
         <field name="name">Builds</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">runbot.build</field>
-        <field name="view_type">form</field>
         <field name="view_mode">tree,form,graph,pivot</field>
     </record>
     <menuitem id="menu_build" action="action_build" parent="runbot_menu_root"/>

@@ -36,7 +36,7 @@ class RunbotBuildError(models.Model):
     parent_id = fields.Many2one('runbot.build.error', 'Linked to')
     child_ids = fields.One2many('runbot.build.error', 'parent_id', string='Child Errors', context={'active_test': False})
     children_build_ids = fields.Many2many('runbot.build', compute='_compute_children_build_ids', string='Children builds')
-    error_history_ids = fields.One2many('runbot.build.error', compute='_compute_error_history_ids', string='Old errors')
+    error_history_ids = fields.Many2many('runbot.build.error', compute='_compute_error_history_ids', string='Old errors', context={'active_test': False})
     first_seen_build_id = fields.Many2one('runbot.build', compute='_compute_first_seen_build_id', string='First Seen build')
     first_seen_date = fields.Datetime(string='First Seen Date', related='first_seen_build_id.create_date')
     last_seen_build_id = fields.Many2one('runbot.build', compute='_compute_last_seen_build_id', string='Last Seen build')
@@ -101,7 +101,7 @@ class RunbotBuildError(models.Model):
         for build_error in self:
             build_error.first_seen_build_id = build_error.children_build_ids and build_error.children_build_ids[-1] or False
 
-    @api.depends('fingerprint')
+    @api.depends('fingerprint', 'child_ids.fingerprint')
     def _compute_error_history_ids(self):
         for error in self:
             fingerprints = [error.fingerprint] + [rec.fingerprint for rec in error.child_ids]
