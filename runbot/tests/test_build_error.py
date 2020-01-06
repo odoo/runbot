@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from unittest.mock import patch
 from odoo.tests import common
+from odoo.exceptions import ValidationError
 from .common import RunbotCase
 
 RTE_ERROR = """FAIL: TestUiTranslate.test_admin_tour_rte_translator
@@ -128,3 +129,36 @@ class TestBuildError(RunbotCase):
         self.assertIn(build_a, error_b.children_build_ids)
         self.assertEqual(error_a.build_count, 1)
         self.assertEqual(error_b.build_count, 2)
+
+    def test_build_error_test_tags(self):
+        build_a = self.create_test_build({'local_result': 'ko'})
+        build_b = self.create_test_build({'local_result': 'ko'})
+
+        error_a = self.BuildError.create({
+            'content': 'foo',
+            'build_ids': [(6, 0, [build_a.id])],
+            'random': True,
+            'active': True
+        })
+
+        error_b = self.BuildError.create({
+            'content': 'bar',
+            'build_ids': [(6, 0, [build_b.id])],
+            'random': True,
+            'active': False
+        })
+
+        # test that a test tag with a dash raise an Vamlidation error
+        with self.assertRaises(ValidationError):
+            error_a.test_tags = '-foo'
+
+        error_a.test_tags = 'foo,bar'
+        error_b.test_tags = 'blah'
+        self.assertIn('foo', self.BuildError.test_tags_list())
+        self.assertIn('bar', self.BuildError.test_tags_list())
+        self.assertIn('-foo', self.BuildError.disabling_tags())
+        self.assertIn('-bar', self.BuildError.disabling_tags())
+
+        # test that test tags on fixed errors are not taken into account
+        self.assertNotIn('blah', self.BuildError.test_tags_list())
+        self.assertNotIn('-blah', self.BuildError.disabling_tags())

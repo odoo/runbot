@@ -5,6 +5,7 @@ import re
 
 from collections import defaultdict
 from odoo import models, fields, api
+from odoo.exceptions import ValidationError
 
 _logger = logging.getLogger(__name__)
 
@@ -40,11 +41,10 @@ class RunbotBuildError(models.Model):
     last_seen_date = fields.Datetime(string='Last Seen Date', related='last_seen_build_id.create_date')
     test_tags = fields.Char(string='Test tags', help="Comma separated list of test_tags to use to reproduce/remove this error")
 
-
     @api.constrains('test_tags')
     def _check_test_tags(self):
-        for step in self:
-            if '-' in step.test_tags:
+        for build_error in self:
+            if build_error.test_tags and '-' in build_error.test_tags:
                 raise ValidationError('Build error test_tags should not be negated')
 
     @api.model
