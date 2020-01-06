@@ -6,6 +6,8 @@ import sys
 import threading
 import signal
 
+from logging.handlers import WatchedFileHandler
+
 LOG_FORMAT = '%(asctime)s %(levelname)s %(name)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 logging.getLogger('odoo.addons.runbot').setLevel(logging.DEBUG)
@@ -80,7 +82,7 @@ def run():
         if dirname and not os.path.isdir(dirname):
             os.makedirs(dirname)
 
-        handler = logging.FileHandler(args.logfile)
+        handler = WatchedFileHandler(args.logfile)
         formatter = logging.Formatter(LOG_FORMAT)
         handler.setFormatter(formatter)
         logging.getLogger().addHandler(handler)
