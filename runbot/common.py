@@ -97,6 +97,7 @@ def s2human(time):
         threshold=2.1,
     )
 
+
 @contextlib.contextmanager
 def local_pgadmin_cursor():
     cnx = None
@@ -107,3 +108,17 @@ def local_pgadmin_cursor():
     finally:
         if cnx:
             cnx.close()
+
+
+def list_local_dbs(additionnal_conditions=None):
+    additionnal_condition_str = ''
+    if additionnal_conditions:
+        additionnal_condition_str = 'AND (%s)' % ' OR '.join(additionnal_conditions)
+    with local_pgadmin_cursor() as local_cr:
+        local_cr.execute("""
+            SELECT datname
+                FROM pg_database
+                WHERE pg_get_userbyid(datdba) = current_user
+                %s
+        """ % additionnal_condition_str)
+        return [d[0] for d in local_cr.fetchall()]

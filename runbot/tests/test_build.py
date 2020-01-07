@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-from collections import defaultdict
-from unittest.mock import patch
-from odoo.tests import common
+import datetime
 
+from unittest.mock import patch
+
+from odoo import fields
 from .common import RunbotCase
+
 
 def rev_parse(repo, branch_name):
     """
@@ -13,6 +15,7 @@ def rev_parse(repo, branch_name):
     """
     head_hash = 'rp_%s_%s_head' % (repo.name.split(':')[1], branch_name.split('/')[-1])
     return head_hash
+
 
 class Test_Build(RunbotCase):
 
@@ -299,6 +302,47 @@ class Test_Build(RunbotCase):
             'config_id': self.env.ref('runbot.runbot_build_config_default_no_run').id
         })
         self.assertEqual(build.config_id, self.env.ref('runbot.runbot_build_config_default_no_run'), "config_id should be the one set on the build")
+
+    def test_build_gc_date(self):
+        """ test build gc date and gc_delay"""
+        self.branch.config_id = self.env.ref('runbot.runbot_build_config_default')
+        build = self.create_build({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'local_state': 'done'
+        })
+
+        child_build = self.create_build({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'extra_params': '2',
+            'parent_id': build.id,
+            'local_state': 'done'
+        })
+
+        # verify that the gc_day is set 30 days later (29 days since we should be a few microseconds later)
+        delta = fields.Datetime.from_string(build.gc_date) - datetime.datetime.now()
+        self.assertEqual(delta.days, 29)
+        child_delta = fields.Datetime.from_string(child_build.gc_date) - datetime.datetime.now()
+        self.assertEqual(child_delta.days, 14)
+
+        # Keep child build ten days more
+        child_build.gc_delay = 10
+        child_delta = fields.Datetime.from_string(child_build.gc_date) - datetime.datetime.now()
+        self.assertEqual(child_delta.days, 24)
+
+        # test the real _local_cleanup method
+        self.stop_patcher('_local_cleanup_patcher')
+        self.start_patcher('build_local_pgadmin_cursor_patcher', 'odoo.addons.runbot.models.build.local_pgadmin_cursor')
+        self.start_patcher('build_os_listdirr_patcher', 'odoo.addons.runbot.models.build.os.listdir')
+        dbname = '%s-foobar' % build.dest
+        self.start_patcher('list_local_dbs_patcher', 'odoo.addons.runbot.models.build.list_local_dbs', return_value=[dbname])
+
+        build._local_cleanup()
+        self.assertFalse(self.patchers['_local_pg_dropdb_patcher'].called)
+        build.job_end = datetime.datetime.now() - datetime.timedelta(days=31)
+        build._local_cleanup()
+        self.patchers['_local_pg_dropdb_patcher'].assert_called_with(dbname)
 
     @patch('odoo.addons.runbot.models.build._logger')
     def test_build_skip(self, mock_logger):
