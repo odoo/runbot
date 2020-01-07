@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import time
 import datetime
-from ..common import dt2time, fqdn, now, grep, uniq_list, local_pgadmin_cursor, s2human, Commit, dest_reg, os
+from ..common import dt2time, fqdn, now, grep, local_pgadmin_cursor, s2human, Commit, dest_reg, os, list_local_dbs
 from ..container import docker_build, docker_stop, docker_state, Command
 from ..fields import JsonDictField
 from odoo.addons.runbot.models.repo import RunbotException
@@ -99,6 +99,8 @@ class runbot_build(models.Model):
     job = fields.Char('Active step display name', compute='_compute_job')
     job_start = fields.Datetime('Job start')
     job_end = fields.Datetime('Job end')
+    gc_date = fields.Datetime('Local cleanup date', compute='_compute_gc_date')
+    gc_delay = fields.Integer('Cleanup Delay', help='Used to compute gc_date')
     build_start = fields.Datetime('Build start')
     build_end = fields.Datetime('Build end')
     job_time = fields.Integer(compute='_compute_job_time', string='Job time')
@@ -164,6 +166,17 @@ class runbot_build(models.Model):
                         record.global_state = 'waiting'
                 else:
                     record.global_state = record.local_state
+
+    @api.depends('gc_delay', 'job_end')
+    def _compute_gc_date(self):
+        icp = self.env['ir.config_parameter']
+        max_days_main = int(icp.get_param('runbot.db_gc_days', default=30))
+        max_days_child = int(icp.get_param('runbot.db_gc_days_child', default=15))
+        for build in self:
+            ref_date = fields.Datetime.from_string(build.job_end or build.create_date or fields.Datetime.now())
+            max_days = max_days_main if not build.parent_id else max_days_child
+            max_days += int(build.gc_delay if build.gc_delay else 0)
+            build.gc_date = ref_date + datetime.timedelta(days=(max_days))
 
     def _get_youngest_state(self, states):
         index = min([self._get_state_score(state) for state in states])
@@ -496,10 +509,6 @@ class runbot_build(models.Model):
         return self.browse()
 
     def _filter_to_clean(self, dest_list, label):
-        icp = self.env['ir.config_parameter']
-        max_days_main = int(icp.get_param('runbot.db_gc_days', default=30))
-        max_days_child = int(icp.get_param('runbot.db_gc_days_child', default=15))
-
         dest_by_builds_ids = defaultdict(list)
         ignored = set()
         for dest in dest_list:
@@ -517,7 +526,7 @@ class runbot_build(models.Model):
             dest_list = [dest for sublist in [dest_by_builds_ids[rem_id] for rem_id in remaining.ids] for dest in sublist]
             _logger.debug('(%s) (%s) not deleted because no corresponding build found' % (label, " ".join(dest_list)))
         for build in existing:
-            if fields.Datetime.from_string(build.job_end or build.create_date) + datetime.timedelta(days=(max_days_main if not build.parent_id else max_days_child)) < datetime.datetime.now():
+            if fields.Datetime.from_string(build.gc_date) < datetime.datetime.now():
                 if build.local_state == 'done':
                     for db in dest_by_builds_ids[build.id]:
                         yield db
@@ -529,12 +538,9 @@ class runbot_build(models.Model):
         Remove datadir and drop databases of build older than db_gc_days or db_gc_days_child.
         If force is set to True, does the same cleaning based on recordset without checking build age.
         """
-        if self.pool._init:
-            return
         _logger.debug('Local cleaning')
-
         _filter = self._filter_to_clean
-        additionnal_condition_str = ''
+        additionnal_conditions = []
 
         if force is True:
             def filter_ids(dest_list, label):
@@ -545,20 +551,10 @@ class runbot_build(models.Model):
                     elif not build:
                         _logger.debug('%s (%s) skipped because not dest format', label, dest)
             _filter = filter_ids
-            additionnal_conditions = []
             for _id in self.exists().ids:
                 additionnal_conditions.append("datname like '%s-%%'" % _id)
-            if additionnal_conditions:
-                additionnal_condition_str = 'AND (%s)' % ' OR '.join(additionnal_conditions)
 
-        with local_pgadmin_cursor() as local_cr:
-            local_cr.execute("""
-                SELECT datname
-                    FROM pg_database
-                    WHERE pg_get_userbyid(datdba) = current_user
-                    %s
-            """ % additionnal_condition_str)
-            existing_db = [d[0] for d in local_cr.fetchall()]
+        existing_db = list_local_dbs(additionnal_conditions=additionnal_conditions)
 
         for db in _filter(dest_list=existing_db, label='db'):
             self._logger('Removing database')
