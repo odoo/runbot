@@ -344,6 +344,55 @@ class Test_Build(RunbotCase):
         build._local_cleanup()
         self.patchers['_local_pg_dropdb_patcher'].assert_called_with(dbname)
 
+    def test_repo_gc_testing(self):
+        """ test that builds are killed when room is needed on a host """
+        host = self.env['runbot.host'].create({
+            'name': 'runbot_xxx',
+            'nb_worker': 2
+        })
+
+        build_other_host = self.create_build({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'local_state': 'testing',
+            'host': 'runbot_yyy'
+        })
+
+        child_build = self.create_build({
+            'branch_id': self.branch.id,
+            'name': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            'local_state': 'testing',
+            'host': 'runbot_xxx',
+            'extra_params': '2',
+            'parent_id': build_other_host.id
+        })
+
+        self.branch.repo_id._gc_testing(host)
+        self.assertFalse(build_other_host.requested_action)
+        self.assertFalse(child_build.requested_action)
+
+        build_same_branch = self.create_build({
+            'branch_id': self.branch_11.id,
+            'name': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+            'local_state': 'testing',
+            'host': 'runbot_xxx',
+        })
+
+        self.branch.repo_id._gc_testing(host)
+        self.assertFalse(build_same_branch.requested_action)
+
+        build_pending = self.create_build({
+            'branch_id': self.branch.id,
+            'name': 'deadbeafffffffffffffffffffffffffffffffff',
+            'local_state': 'pending',
+        })
+
+        self.branch.repo_id._gc_testing(host)
+        self.assertEqual(build_other_host.requested_action, 'deathrow')
+        self.assertEqual(child_build.requested_action, 'deathrow')
+        self.assertFalse(build_same_branch.requested_action)
+        self.assertFalse(build_pending.requested_action)
+
     @patch('odoo.addons.runbot.models.build._logger')
     def test_build_skip(self, mock_logger):
         """test build is skipped"""
@@ -368,14 +417,25 @@ class Test_Build(RunbotCase):
         mock_logger.debug.assert_called_with(log_first_part, 'A good reason')
 
     def test_ask_kill_duplicate(self):
-        """ Test that the _ask_kill method works on duplicate"""
+        """ Test that the _ask_kill method works on duplicate when they are related PR/branch"""
+
+        branch = self.Branch.create({
+            'repo_id': self.repo.id,
+            'name': 'refs/heads/master-test-branch-xxx'
+        })
+
+        pr = self.Branch.create({
+            'repo_id': self.repo.id,
+            'name': 'refs/pull/1234',
+            'pull_head_name': 'odoo:master-test-branch-xxx'
+        })
 
         build1 = self.create_build({
-            'branch_id': self.branch_10.id,
+            'branch_id': branch.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
         })
         build2 = self.create_build({
-            'branch_id': self.branch_10.id,
+            'branch_id': pr.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
         })
         build2.write({'local_state': 'duplicate', 'duplicate_id': build1.id}) # this may not be usefull if we detect duplicate in same repo.
