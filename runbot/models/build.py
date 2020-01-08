@@ -178,6 +178,13 @@ class runbot_build(models.Model):
             max_days += int(build.gc_delay if build.gc_delay else 0)
             build.gc_date = ref_date + datetime.timedelta(days=(max_days))
 
+    def _get_top_parent(self):
+        self.ensure_one()
+        build = self
+        while build.parent_id:
+            build = build.parent_id
+        return build
+
     def _get_youngest_state(self, states):
         index = min([self._get_state_score(state) for state in states])
         return state_order[index]
@@ -898,25 +905,25 @@ class runbot_build(models.Model):
             build._github_status()
             self.invalidate_cache()
 
-    def _ask_kill(self, lock=True):
+    def _ask_kill(self, lock=True, message=None):
         if lock:
             self.env.cr.execute("""SELECT id FROM runbot_build WHERE parent_path like %s FOR UPDATE""", ['%s%%' % self.parent_path])
         self.ensure_one()
         user = request.env.user if request else self.env.user
         uid = user.id
         build = self
+        message = message or 'Killing build %s, requested by %s (user #%s)' % (build.dest, user.name, uid)
+        build._log('_ask_kill', message)
         if build.duplicate_id:
-            if build.duplicate_id.branch_id.sticky:
+            if self.branch_id.pull_branch_name == self.duplicate_id.branch_id.pull_branch_name:
+                build = build.duplicate_id
+            else:
                 build._skip()
-                build._log('_ask_kill', 'Skipping build %s, requested by %s (user #%s)(duplicate of sticky, kill duplicate)' % (build.dest, user.name, uid))
                 return
-            build = build.duplicate_id  # if duplicate is not sticky, most likely a pr, kill other build
         if build.local_state == 'pending':
             build._skip()
-            build._log('_ask_kill', 'Skipping build %s, requested by %s (user #%s)' % (build.dest, user.name, uid))
         elif build.local_state in ['testing', 'running']:
             build.requested_action = 'deathrow'
-            build._log('_ask_kill', 'Killing build %s, requested by %s (user #%s)' % (build.dest, user.name, uid))
         for child in build.children_ids:  # should we filter build that are target of a duplicate_id?
             if not child.duplicate_id:
                 child._ask_kill(lock=False)

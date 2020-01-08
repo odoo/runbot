@@ -366,15 +366,6 @@ class runbot_repo(models.Model):
                     builds_to_skip._skip(reason='New ref found')
                     if builds_to_skip:
                         build_info['sequence'] = builds_to_skip[0].sequence
-                    # testing builds are killed
-                    builds_to_kill = Build.search([
-                        ('branch_id', '=', branch.id),
-                        ('local_state', '=', 'testing'),
-                        ('committer', '=', committer)
-                    ])
-                    for btk in builds_to_kill:
-                        btk._log('repo._update_git', 'Build automatically killed, newer build found.', level='WARNING')
-                    builds_to_kill.write({'requested_action': 'deathrow'})
 
                 new_build = Build.create(build_info)
                 # create a reverse dependency build if needed
@@ -466,6 +457,8 @@ class runbot_repo(models.Model):
     def _scheduler(self, host):
         nb_workers = host.get_nb_worker()
 
+        self._gc_testing(host)
+        self._commit()
         for build in self._get_builds_with_requested_actions(host):
             build._process_requested_actions()
             self._commit()
@@ -546,6 +539,33 @@ class runbot_repo(models.Model):
 
         build_ids = Build.search(domain_host + [('local_state', '=', 'running'), ('id', 'not in', cannot_be_killed_ids)], order='job_start desc').ids
         Build.browse(build_ids)[running_max:]._kill()
+
+    def _gc_testing(self, host):
+        """garbage collect builds that could be killed"""
+        # decide if we need room
+        Build = self.env['runbot.build']
+        domain_host = self.build_domain_host(host)
+        testing_builds = Build.search(domain_host + [('local_state', 'in', ['testing', 'pending'])])
+        used_slots = len(testing_builds)
+        available_slots = host.get_nb_worker() - used_slots
+        nb_pending = Build.search_count([('local_state', '=', 'pending'), ('host', '=', False)])
+        if available_slots > 0 or nb_pending == 0:
+            return
+        builds_to_kill = self.env['runbot.build']
+        builds_to_skip = self.env['runbot.build']
+        for build in testing_builds:
+            top_parent = build._get_top_parent()
+            if not build.branch_id.sticky:
+                newer_candidates = Build.search([
+                    ('id', '>', build.id),
+                    ('branch_id', '=', build.branch_id.id),
+                    ('build_type', '=', 'normal'),
+                    ('parent_id', '=', False),
+                    ('hidden', '=', False),
+                    ('config_id', '=', top_parent.config_id.id)
+                ])
+                if newer_candidates:
+                    top_parent._ask_kill(message='Build automatically killed, newer build found %s.' % newer_candidates.ids)
 
     def _allocate_builds(self, host, nb_slots, domain=None):
         if nb_slots <= 0:
