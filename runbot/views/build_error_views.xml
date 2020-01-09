@@ -99,7 +99,7 @@
                 <field name="last_seen_date" string="Last Seen"/>
                 <field name="build_count"/>
                 <field name="responsible"/>
-                <field name="fixing_commit"/>
+                <field name="test_tags"/>
             </tree>
         </field>
     </record>
@@ -122,6 +122,8 @@
           <filter string="Not Fixed" name="not_fixed_errors" domain="[('active', '=', True)]"/>
           <separator/>
           <filter string="Not Assigned" name="not_assigned_errors" domain="[('responsible', '=', False)]"/>
+          <separator/>
+          <filter string="Test Tags" name="test_tagged_errors" domain="[('test_tags', '!=', False)]"/>
         </search>
       </field>
     </record>
