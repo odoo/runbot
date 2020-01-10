@@ -198,6 +198,7 @@ class runbot_build(models.Model):
     def copy(self, values=None):
         raise UserError("Cannot duplicate build!")
 
+    @api.model_create_single
     def create(self, vals):
         branch = self.env['runbot.branch'].search([('id', '=', vals.get('branch_id', False))])  # branche 10174?
         if branch.no_build:

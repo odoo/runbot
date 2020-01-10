@@ -38,7 +38,7 @@ class RunboHost(models.Model):
             host.nb_testing = count_by_host_state[host.name].get('testing', 0)
             host.nb_running = count_by_host_state[host.name].get('running', 0)
 
-    @api.model
+    @api.model_create_single
     def create(self, values):
         if not 'disp_name' in values:
             values['disp_name'] = values['name']

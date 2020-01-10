@@ -49,7 +49,7 @@ class RunbotBuildError(models.Model):
             if build_error.test_tags and '-' in build_error.test_tags:
                 raise ValidationError('Build error test_tags should not be negated')
 
-    @api.model
+    @api.model_create_single
     def create(self, vals):
         cleaners = self.env['runbot.error.regex'].search([('re_type', '=', 'cleaning')])
         content = vals.get('content')

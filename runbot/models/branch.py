@@ -135,7 +135,7 @@ class runbot_branch(models.Model):
             return False
         return True
 
-    @api.model
+    @api.model_create_single
     def create(self, vals):
         if not vals.get('config_id') and ('use-coverage' in (vals.get('name') or '')):
             coverage_config = self.env.ref('runbot.runbot_build_config_test_coverage', raise_if_not_found=False)
