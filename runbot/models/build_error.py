@@ -161,9 +161,9 @@ class RunbotBuildError(models.Model):
 
     @api.model
     def test_tags_list(self):
-        active_errors = self.search([('test_tags', '!=', 'False'), ('random', '=', True)])
+        active_errors = self.search([('test_tags', '!=', False), ('random', '=', True)])
         test_tag_list = active_errors.mapped('test_tags')
-        return [test_tag for error_tags in test_tag_list for test_tag in (error_tags or '').split(',')]
+        return [test_tag for error_tags in test_tag_list for test_tag in (error_tags).split(',')]
 
     @api.model
     def disabling_tags(self):
