@@ -2,13 +2,48 @@
 <odoo>
     <data>
       <!-- Replace default menu ( Home / Contactus and co...) with 5 first repos) -->
-      <template id="inherits_branch_in_menu" inherit_id="website.layout" name="Inherits Show top 5 branches in menu">
-          <xpath expr="//t[@t-foreach=&quot;website.menu_id.child_id&quot;][@t-as=&quot;submenu&quot;]" position="replace">
-              <t t-if="repos" >
-                   <t t-foreach="repos[:5]" t-as="re">
-                       <li><a t-attf-href="/runbot/repo/{{slug(re)}}?search={{request.params.get('search', '')}}"><i class='fa fa-github' /> <t t-esc="re.short_name"/></a></li>
-                   </t>
-              </t>
+      <template id="inherits_branch_in_menu" inherit_id="website.layout" name="Inherits Show top 6 repo in menu and dropdown">
+          <xpath expr="//footer" position="replace">
+          </xpath>
+          <xpath expr="//nav" position="replace">
+            <nav class="navbar navbar-expand-md navbar-light bg-light">
+                  <a t-if="repo" t-attf-href="/runbot/repo/{{slug(repo)}}?search={{request.params.get('search', '')}}">
+                    <b style="color:#777;"><t t-esc="repo.short_name"/></b>
+                  </a>
+                  <button type="button" class="navbar-toggler" data-toggle="collapse" data-target="#top_menu_collapse">
+                      <span class="navbar-toggler-icon"/>
+                  </button>
+                  <div class="collapse navbar-collapse" id="top_menu_collapse">
+                      <ul class="nav navbar-nav ml-auto text-right" id="top_menu">
+                         <t t-if="repos" >
+                              <t t-foreach="repos[:6]" t-as="re">
+                                  <li ><a t-attf-href="/runbot/repo/{{slug(re)}}?search={{request.params.get('search', '')}}"><i class='fa fa-github' /> <t t-esc="re.short_name"/></a></li>
+                              </t>
+                              <li t-if="len(repos)>6" class="dropdown">
+                                <a href="#" class="dropdown-toggle" data-toggle="dropdown" aria-expanded="false"><i class="fa fa-plus"/></a>
+                                <ul class="dropdown-menu">
+                                  <t t-foreach='repos[6:]' t-as='re'>
+                                      <li><a t-attf-href="/runbot/repo/{{slug(re)}}"><t t-esc="re.short_name"/></a></li>
+                                  </t>
+                                </ul>
+                              </li>
+                          </t>
+                          <li class="nav-item divider" t-ignore="true" t-if="not user_id._is_public()"/>
+                          <li class="nav-item dropdown" t-ignore="true" t-if="not user_id._is_public()">
+                              <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown">
+                                  <b>
+                                      <span t-esc="user_id.name[:23] + '...' if user_id.name and len(user_id.name) &gt; 25 else user_id.name"/>
+                                  </b>
+                              </a>
+                              <div class="dropdown-menu js_usermenu" role="menu">
+                                  <a id="o_logout" class="dropdown-item" t-attf-href="/web/session/logout?redirect=/" role="menuitem">Logout</a>
+                              </div>
+                          </li>
+                      </ul>
+                      <t t-raw="nav_form or ''">
+                      </t>
+                  </div>
+            </nav>
           </xpath>
       </template>
 
@@ -21,6 +56,18 @@
               <attribute name="t-value">'o_connected_user' if env['ir.ui.view'].user_has_groups('base.group_website_publisher') else None</attribute>
           </xpath>
       </template>
+
+      <template id="runbot.slots_infos" name="Hosts slot nb pending/testing/slots">
+        <span t-attf-class="label label-{{pending_level}}">Pending: <t t-esc="pending_total"/></span>
+        <t t-set="testing" t-value="hosts_data._total_testing()"/>
+        <t t-set="workers" t-value="hosts_data._total_workers()"/>
+        <t t-set="klass">success</t>
+        <t t-if="int(testing)/workers > 0"><t t-set="klass">info</t></t>
+        <t t-if="int(testing)/workers > 0.75"><t t-set="klass">warning</t></t>
+        <t t-if="int(testing)/workers >= 1"><t t-set="klass">danger</t></t>
+        <span t-attf-class="label label-{{klass}}">Testing: <t t-esc="testing"/>/<t t-esc="workers"/></span>
+      </template>
+
       <!-- Frontend repository block -->
       <template id="runbot.repo">
           <t t-call='website.layout'>
@@ -28,58 +75,20 @@
                   <t t-if="refresh">
                       <meta http-equiv="refresh" t-att-content="refresh"/>
                   </t>
-                  <style>
-                    .killed {
-                      background-color: #aaa;
-                    }
-                  </style>
+              </t>
+              <t t-set="nav_form">
+                <form class="form-inline my-2 my-lg-0" role="search" t-att-action="qu(search='')" method="get">
+                  <div class="input-group md-form form-sm form-2 pl-0">
+                    <input class="form-control my-0 py-1 red-border" type="text" placeholder="Search" aria-label="Search" name="search" t-att-value="search"/>
+                    <div class="input-group-append">
+                      <button type='submit' class="input-group-text red lighten-3" id="basic-text1"><i class="fa fa-search text-grey"></i></button>
+                    </div>
+                  </div>
+                </form>
               </t>
               <div class="container-fluid">
                   <div class="row">
                       <div class='col-md-12'>
-                          <nav class="navbar navbar-default" role="navigation">
-                            <div class="container-fluid">
-                              <div class="navbar-header">
-                                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
-                                  <span class="sr-only">Toggle navigation</span>
-                                  <span class="icon-bar"></span>
-                                  <span class="icon-bar"></span>
-                                  <span class="icon-bar"></span>
-                                </button>
-                                <t t-if="repo">
-                                    <ul class="nav navbar-nav">
-                                      <li class="dropdown">
-                                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" aria-expanded="false"><b style="font-size: 18px;"><t t-esc="repo.base"/></b><b class="caret"></b></a>
-                                        <ul class="dropdown-menu">
-                                          <t t-foreach='repos' t-as='re'>
-                                              <li><a t-attf-href="/runbot/repo/{{slug(re)}}"><t t-esc="re.base"/></a></li>
-                                          </t>
-                                        </ul>
-                                      </li>
-                                    </ul>
-
-                                </t>
-                              </div>
-                              <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-                                <t t-if="repo">
-                                  <form class="navbar-form navbar-right" role="search" t-att-action="qu(search='')" method="get">
-                                    <div class="form-group">
-                                      <input type="search" name="search" class="form-control" placeholder="Search" t-att-value="search"/>
-                                      <button type="submit" class="btn btn-default">Search</button>
-                                    </div>
-                                  </form>
-                                </t>
-                              </div>
-                              <p class="text-center">
-                                  <t  t-foreach="host_stats" t-as="hs">
-                                  <span class="label label-default">
-                                      <t t-esc="hs['host']"/>: <t t-esc="hs['testing']"/> testing
-                                  </span>&amp;nbsp;
-                                  </t>
-                                  <span t-attf-class="label label-{{pending_level}}">Pending: <t t-esc="pending_total"/></span>
-                              </p>
-                            </div>
-                          </nav>
                           <div t-if="message" class="alert alert-warning" role="alert">
                             <t t-esc="message" />
                           </div>
@@ -90,21 +99,16 @@
                           <table t-if="repo" class="table table-condensed table-bordered" style="table-layout: initial;">
                           <tr>
                               <th>Branch</th>
-                              <td colspan="4" class="text-right">
-                                  <t t-esc="repo.base"/>: 
-                                  <t t-esc="testing"/> testing,
-                                  <t t-esc="running"/> running,
-                                  <t t-esc="pending"/> pending.
+                              <td colspan="4">
+                                <span class="pull-right" t-call="runbot.slots_infos"/>
                               </td>
-
                           </tr>
                           <tr t-foreach="branches" t-as="br">
-                              <td>
-                                  <i t-if="br['branch'].sticky" class="fa fa-star" style="color: #f0ad4e" />
-                                  <a t-attf-href="/runbot/branch/#{br['branch'].id}"><b t-esc="br['branch'].branch_name"/></a>
-                                  <small><t t-esc="br['builds'] and br['builds'][0].get_formated_build_time()"/></small><br/>
-                                  <div class="btn-group btn-group-xs">
-                                      <a t-attf-href="{{br['branch'].branch_url}}" class="btn btn-default btn-xs">Branch or pull <i class="fa fa-github"/></a>
+                              <td style="width:12%">
+                                  <small class="branch_time" ><t t-esc="br['builds'] and br['builds'][0].get_formated_build_time()"/></small>
+                                  <div class="branch_name"><i t-if="br['branch'].sticky" class="fa fa-star" style="color: #f0ad4e" /><a t-attf-href="/runbot/branch/#{br['branch'].id}"><b t-esc="br['branch'].branch_name"/></a></div>
+                                         <div class="btn-group btn-group-xs">
+                                      <a t-attf-href="{{br['branch'].branch_url}}" class="btn btn-default btn-xs"><t t-esc="'Branch ' if not br['branch'].pull_head_name else 'Pull '"/><i class="fa fa-github"/></a>
                                       <a t-attf-href="/runbot/quick_connect/#{br['branch'].id}" class="btn btn-default btn-xs" aria-label="Quick Connect"><i class="fa fa-fast-forward" title="Quick Connect"/></a>
                                   </div>
                                   <t t-if="br['branch'].sticky">
@@ -134,20 +138,21 @@
                                     <t t-if="bu.global_result == 'skipped'"><t t-set="klass">default</t></t>
                                     <t t-if="bu.global_result in ['killed', 'manually_killed']"><t t-set="klass">killed</t></t>
                                   </t>
-                                  <td t-attf-class="{{klass}}">
+                                  <td t-attf-class="bg-{{klass}}-light" style="width:22%">
                                      <t t-call="runbot.build_button">
                                       <t t-set="klass">btn-group-sm</t>
                                       <t t-set="show_rebuild_button" t-value="bu==br['builds'][0]"></t>
+                                      <t t-set="show_commit_button" t-value="True"/>
                                      </t>
                                      <t t-if="bu['build_type']=='scheduled'"><i class="fa fa-moon-o" t-att-title="bu.build_type_label()" t-att-aria-label="bu.build_type_label()"/></t>
                                      <t t-if="bu['build_type'] in ('rebuild', 'indirect')"><i class="fa fa-recycle" t-att-title="bu.build_type_label()" t-att-aria-label="bu.build_type_label()"/></t>
-                                     <t t-if="bu['subject']">
+                                     <span t-if="bu['subject']" class="build_subject">
                                           <t t-if="bu.config_id != bu.branch_id.config_id">
                                             <b t-esc="bu.config_id.name"/>
                                           </t>
                                           <span t-esc="bu['subject'][:32] + ('...' if bu['subject'][32:] else '') " t-att-title="bu['subject']"/>
                                            <br/>
-                                      </t>
+                                     </span>
                                      <t t-id="bu['author']">
                                           <t t-esc="bu['author']"/>
                                           <t t-if="bu['committer'] and bu['author'] != bu['committer']" t-id="bu['committer']">

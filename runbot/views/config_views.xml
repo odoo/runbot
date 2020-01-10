@@ -23,6 +23,7 @@
                         <field name="update_github_state" groups="base.group_no_one"/>
                         <field name="protected" groups="base.group_no_one"/>
                         <field name="group" groups="base.group_no_one"/>
+                        <field name="monitoring_view_id" groups="base.group_no_one"/>
                     </group>
                 </sheet>
                 <div class="oe_chatter">

@@ -365,6 +365,8 @@ class runbot_build(models.Model):
                 build.job_time = int(dt2time(build.job_end) - dt2time(build.job_start))
             elif build.job_start:
                 build.job_time = int(time.time() - dt2time(build.job_start))
+            else:
+                build.job_time = 0
 
     @api.depends('build_start', 'build_end', 'duplicate_id.build_time')
     def _compute_build_time(self):
@@ -375,6 +377,8 @@ class runbot_build(models.Model):
                 build.build_time = int(dt2time(build.build_end) - dt2time(build.build_start))
             elif build.build_start:
                 build.build_time = int(time.time() - dt2time(build.build_start))
+            else:
+                build.build_time = 0
 
     @api.depends('job_start', 'duplicate_id.build_age')
     def _compute_build_age(self):
@@ -384,6 +388,8 @@ class runbot_build(models.Model):
                 build.build_age = build.duplicate_id.build_age
             elif build.job_start:
                 build.build_age = int(time.time() - dt2time(build.build_start))
+            else:
+                build.build_age = 0
 
     def _get_params(self):
         try:

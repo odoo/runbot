@@ -33,7 +33,7 @@
                                 <t t-if="build.global_result == 'skipped'"><t t-set="rowclass">default</t></t>
                                 <t t-if="build.global_result in ['killed', 'manually_killed']"><t t-set="rowclass">killed</t></t>
                             </t>
-                            <tr t-attf-class="{{rowclass}}">
+                            <tr t-attf-class="bg-{{rowclass}}-light">
                                 <td><t t-esc="build.create_date" /></td>
                                 <td><a t-attf-href="/runbot/build/{{build['id']}}" title="Build details" aria-label="Build details"><t t-esc="build.dest" /></a></td>
                                 <td>

@@ -31,6 +31,7 @@ class Config(models.Model):
     protected = fields.Boolean('Protected', default=False, track_visibility='onchange')
     group = fields.Many2one('runbot.build.config', 'Configuration group', help="Group of config's and config steps")
     group_name = fields.Char('Group name', related='group.name')
+    monitoring_view_id = fields.Many2one('ir.ui.view', 'Monitoring view')
 
     @api.model_create_single
     def create(self, values):

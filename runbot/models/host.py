@@ -58,10 +58,15 @@ class RunboHost(models.Model):
         return int(icp.get_param('runbot.runbot_running_max', default=75))
 
     def set_psql_conn_count(self):
-
         _logger.debug('Updating psql connection count...')
         self.ensure_one()
         with local_pgadmin_cursor() as local_cr:
             local_cr.execute("SELECT sum(numbackends) FROM pg_stat_database;")
             res = local_cr.fetchone()
         self.psql_conn_count = res and res[0] or 0
+
+    def _total_testing(self):
+        return sum(host.nb_testing for host in self)
+
+    def _total_workers(self):
+        return sum(host.get_nb_worker() for host in self)

@@ -389,6 +389,7 @@ class Test_Build(RunbotCase):
             'branch_id': self.branch_10.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'extra_params': '0',
+            'local_state': 'done'
         })
         build_parent = self.create_build({
             'branch_id': self.branch_10.id,
@@ -404,6 +405,7 @@ class Test_Build(RunbotCase):
         build_parent.local_state = 'done'
         self.assertEqual(build_child.local_state, 'duplicate')
         self.assertEqual(build_child.duplicate_id, build_old)
+        self.assertEqual(build_child.global_state, 'done')
         self.assertEqual(build_parent.nb_pending, 0)
         self.assertEqual(build_parent.nb_testing, 0)
         self.assertEqual(build_parent.global_state, 'done')
