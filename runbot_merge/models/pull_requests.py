@@ -574,10 +574,10 @@ class PullRequests(models.Model):
         return super(PullRequests, self)._compute_display_name()
 
     def name_get(self):
-        return {
-            p.id: '%s#%s' % (p.repository.name, p.number)
+        return [
+            (p.id, '%s#%d' % (p.repository.name, p.number))
             for p in self
-        }
+        ]
 
     def __str__(self):
         if len(self) == 0:
