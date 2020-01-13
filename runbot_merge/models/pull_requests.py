@@ -965,7 +965,6 @@ class PullRequests(models.Model):
             'message': message,
         })
 
-    @api.multi
     def write(self, vals):
         oldstate = { pr: pr._tagstate for pr in self }
 
@@ -988,7 +987,6 @@ class PullRequests(models.Model):
                 })
         return w
 
-    @api.multi
     def unlink(self):
         for pr in self:
             self.env['runbot_merge.pull_requests.tagging'].create({
@@ -1466,7 +1464,6 @@ class Stagings(models.Model):
                 vals['timeout_limit'] = fields.Datetime.to_string(datetime.datetime.now() + datetime.timedelta(minutes=s.target.project_id.ci_timeout))
             s.write(vals)
 
-    @api.multi
     def action_cancel(self):
         self.cancel("explicitly cancelled by %s", self.env.user.display_name)
         return { 'type': 'ir.actions.act_window_close' }
