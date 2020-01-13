@@ -544,11 +544,7 @@ class PullRequests(models.Model):
 
     reviewed_by = fields.Many2one('res.partner')
     delegates = fields.Many2many('res.partner', help="Delegate reviewers, not intrinsically reviewers but can review this PR")
-    priority = fields.Selection([
-        (0, 'Urgent'),
-        (1, 'Pressing'),
-        (2, 'Normal'),
-    ], default=2, index=True)
+    priority = fields.Integer(default=2, index=True)
 
     statuses = fields.Text(compute='_compute_statuses')
     status = fields.Char(compute='_compute_statuses')
