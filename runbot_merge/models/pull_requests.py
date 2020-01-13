@@ -554,8 +554,8 @@ class PullRequests(models.Model):
     status = fields.Char(compute='_compute_statuses')
     previous_failure = fields.Char(default='{}')
 
-    batch_id = fields.Many2one('runbot_merge.batch',compute='_compute_active_batch', store=True)
-    batch_ids = fields.Many2many('runbot_merge.batch')
+    batch_id = fields.Many2one('runbot_merge.batch', string="Active Batch", compute='_compute_active_batch', store=True)
+    batch_ids = fields.Many2many('runbot_merge.batch', string="Batches")
     staging_id = fields.Many2one(related='batch_id.staging_id', store=True)
     commits_map = fields.Char(help="JSON-encoded mapping of PR commits to actually integrated commits. The integration head (either a merge commit or the PR's topmost) is mapped from the 'empty' pr commit (the key is an empty string, because you can't put a null key in json maps).", default='{}')
 

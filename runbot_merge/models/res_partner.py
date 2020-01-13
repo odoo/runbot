@@ -8,7 +8,7 @@ class Partner(models.Model):
     reviewer = fields.Boolean(default=False, help="Can review PRs (maybe m2m to repos/branches?)")
     self_reviewer = fields.Boolean(default=False, help="Can review own PRs (independent from reviewer)")
     delegate_reviewer = fields.Many2many('runbot_merge.pull_requests')
-    formatted_email = fields.Char(compute='_rfc5322_formatted')
+    formatted_email = fields.Char(string="commit email", compute='_rfc5322_formatted')
 
     def _auto_init(self):
         res = super(Partner, self)._auto_init()
