@@ -1207,7 +1207,7 @@ class PullRequests(models.Model):
         WHERE id = %s AND state != 'merged'
         ''', [self.id])
         self.env.cr.commit()
-        self.invalidate_cache(fnames=['state'], ids=[self.id])
+        self.modified(['state'])
         if self.env.cr.rowcount:
             self.env['runbot_merge.pull_requests.tagging'].create({
                 'pull_request': self.number,
