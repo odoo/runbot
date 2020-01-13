@@ -604,6 +604,7 @@ class PullRequests(models.Model):
         for s in self:
             c = Commits.search([('sha', '=', s.head)])
             if not (c and c.statuses):
+                s.status = s.statuses = False
                 continue
 
             statuses = json.loads(c.statuses)
