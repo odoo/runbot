@@ -458,7 +458,7 @@ class runbot_repo(models.Model):
     def _commit(self):
         self.env.cr.commit()
         self.invalidate_cache()
-        self.env.reset()
+        self.env.clear()
 
     def _scheduler(self, host):
         nb_workers = host.get_nb_worker()
@@ -687,7 +687,7 @@ class runbot_repo(models.Model):
             self._commit()
         except Exception as e:
             self.env.cr.rollback()
-            self.env.reset()
+            self.env.clear()
             _logger.exception(e)
             message = str(e)
             if host.last_exception == message:

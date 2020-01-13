@@ -43,12 +43,12 @@ class RunbotClient():
                 sleep_time = self.env['runbot.repo']._scheduler_loop_turn(host)
                 host.last_end_loop = fields.Datetime.now()
                 self.env.cr.commit()
-                self.env.reset()
+                self.env.clear()
                 self.sleep(sleep_time)
             except Exception as e:
                 _logger.exception('Builder main loop failed with: %s', e)
                 self.env.cr.rollback()
-                self.env.reset()
+                self.env.clear()
                 self.sleep(10)
 
             if self.ask_interrupt.is_set():
