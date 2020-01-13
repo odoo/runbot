@@ -120,7 +120,6 @@ class runbot_build(models.Model):
 
     @api.depends('children_ids.global_state', 'local_state', 'duplicate_id.global_state')
     def _compute_global_state(self):
-        # could we use nb_pending / nb_testing ? not in a compute, but in a update state method
         for record in self:
             if record.duplicate_id:
                 record.global_state = record.duplicate_id.global_state
@@ -172,23 +171,6 @@ class runbot_build(models.Model):
     def _get_result_score(self, result):
         return result_order.index(result)
 
-    def _update_nb_children(self, new_state, old_state=None):
-        # could be interresting to update state in batches.
-        tracked_count_list = ['pending', 'testing', 'running']
-        if (new_state not in tracked_count_list and old_state not in tracked_count_list) or new_state == old_state:
-            return
-
-        for record in self:
-            values = {}
-            if old_state in tracked_count_list:
-                values['nb_%s' % old_state] = record['nb_%s' % old_state] - 1
-            if new_state in tracked_count_list:
-                values['nb_%s' % new_state] = record['nb_%s' % new_state] + 1
-
-            record.write(values)
-            if record.parent_id:
-                record.parent_id._update_nb_children(new_state, old_state)
-
     @api.depends('active_step', 'duplicate_id.active_step')
     def _compute_job(self):
         for build in self:
@@ -209,7 +191,6 @@ class runbot_build(models.Model):
             return self.env['runbot.build']
         vals['config_id'] = vals['config_id'] if 'config_id' in vals else branch.config_id.id
         build_id = super(runbot_build, self).create(vals)
-        build_id._update_nb_children(build_id.local_state)
         extra_info = {'sequence': build_id.id if not build_id.sequence else build_id.sequence}
         context = self.env.context
 
@@ -316,8 +297,6 @@ class runbot_build(models.Model):
             build_by_old_values = defaultdict(lambda: self.env['runbot.build'])
             for record in self:
                 build_by_old_values[record.local_state] += record
-            for local_state, builds in build_by_old_values.items():
-                builds._update_nb_children(values.get('local_state'), local_state)
         assert 'state' not in values
         local_result = values.get('local_result')
         for build in self:

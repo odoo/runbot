@@ -148,9 +148,6 @@
                             </td>
                             <td t-if="build.real_build.children_ids">
                               Children:
-                              <t t-if="build.real_build.nb_pending > 0"><t t-esc="build.real_build.nb_pending"/> pending </t>
-                              <t t-if="build.real_build.nb_testing > 0"><t t-esc="build.real_build.nb_testing"/> testing </t>
-                              <t t-if="build.real_build.nb_running > 0"><t t-esc="build.real_build.nb_running"/> running </t>
                               <table class="table table-condensed">
                                 <t t-foreach="build.real_build.children_ids.sorted('id')" t-as="child">
                                   <t t-set="rowclass"><t t-call="runbot.build_class"><t t-set="build" t-value="child"/></t></t>

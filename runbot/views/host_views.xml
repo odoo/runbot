@@ -16,8 +16,6 @@
                         <field name="last_success" readonly='1'/>
                         <field name="assigned_only"/>
                         <field name="nb_worker"/>
-                        <field name="nb_testing"/>
-                        <field name="nb_running"/>
                         <field name="last_exception" readonly='1'/>
                         <field name="exception_count" readonly='1'/>
                     </group>
