@@ -26,7 +26,7 @@ WAIT_FOR_VISIBILITY = [10, 10, 10, 10]
 
 _logger = logging.getLogger(__name__)
 class Project(models.Model):
-    _name = 'runbot_merge.project'
+    _name = _description = 'runbot_merge.project'
 
     name = fields.Char(required=True, index=True)
     repo_ids = fields.One2many(
@@ -213,7 +213,7 @@ class Project(models.Model):
         return bool(self.env.cr.rowcount)
 
 class Repository(models.Model):
-    _name = 'runbot_merge.repository'
+    _name = _description = 'runbot_merge.repository'
 
     name = fields.Char(required=True)
     project_id = fields.Many2one('runbot_merge.project', required=True)
@@ -285,7 +285,7 @@ class Repository(models.Model):
             })
 
 class Branch(models.Model):
-    _name = 'runbot_merge.branch'
+    _name = _description = 'runbot_merge.branch'
     _order = 'sequence, name'
 
     name = fields.Char(required=True)
@@ -507,7 +507,7 @@ class Branch(models.Model):
 
 ACL = collections.namedtuple('ACL', 'is_admin is_reviewer is_author')
 class PullRequests(models.Model):
-    _name = 'runbot_merge.pull_requests'
+    _name = _description = 'runbot_merge.pull_requests'
     _order = 'number desc'
 
     target = fields.Many2one('runbot_merge.branch', required=True, index=True)
@@ -1259,7 +1259,7 @@ class Tagging(models.Model):
     way of that. Instead, queue tagging changes into this table whose
     execution can be cron-driven.
     """
-    _name = 'runbot_merge.pull_requests.tagging'
+    _name = _description = 'runbot_merge.pull_requests.tagging'
 
     repository = fields.Many2one('runbot_merge.repository', required=True)
     # store the PR number (not id) as we need a Tagging for PR objects
@@ -1290,7 +1290,7 @@ class Tagging(models.Model):
 class Feedback(models.Model):
     """ Queue of feedback comments to send to PR users
     """
-    _name = 'runbot_merge.pull_requests.feedback'
+    _name = _description = 'runbot_merge.pull_requests.feedback'
 
     repository = fields.Many2one('runbot_merge.repository', required=True)
     # store the PR number (not id) as we may want to send feedback to PR
@@ -1310,7 +1310,7 @@ class Commit(models.Model):
     independent of everything else as commits can be created by
     statuses only, by PR pushes, by branch updates, ...
     """
-    _name = 'runbot_merge.commit'
+    _name = _description = 'runbot_merge.commit'
 
     sha = fields.Char(required=True)
     statuses = fields.Char(help="json-encoded mapping of status contexts to states", default="{}")
@@ -1366,7 +1366,7 @@ class Commit(models.Model):
         return res
 
 class Stagings(models.Model):
-    _name = 'runbot_merge.stagings'
+    _name = _description = 'runbot_merge.stagings'
 
     target = fields.Many2one('runbot_merge.branch', required=True)
 
@@ -1691,7 +1691,7 @@ class Stagings(models.Model):
         return repo_name
 
 class Split(models.Model):
-    _name = 'runbot_merge.split'
+    _name = _description = 'runbot_merge.split'
 
     target = fields.Many2one('runbot_merge.branch', required=True)
     batch_ids = fields.One2many('runbot_merge.batch', 'split_id', context={'active_test': False})
@@ -1703,7 +1703,7 @@ class Batch(models.Model):
     repositories e.g. change an API in repo1, this breaks use of that API
     in repo2 which now needs to be updated.
     """
-    _name = 'runbot_merge.batch'
+    _name = _description = 'runbot_merge.batch'
 
     target = fields.Many2one('runbot_merge.branch', required=True)
     staging_id = fields.Many2one('runbot_merge.stagings')
@@ -1796,7 +1796,7 @@ class Batch(models.Model):
         })
 
 class FetchJob(models.Model):
-    _name = 'runbot_merge.fetch_job'
+    _name = _description = 'runbot_merge.fetch_job'
 
     active = fields.Boolean(default=True)
     repository = fields.Many2one('runbot_merge.repository', required=True)
