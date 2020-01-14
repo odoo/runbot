@@ -83,4 +83,4 @@ RUN pip install -U setuptools wheel \
 ADD https://raw.githubusercontent.com/odoo/odoo/master/requirements.txt /root/p3-requirements.txt
 ADD https://raw.githubusercontent.com/odoo/odoo/10.0/requirements.txt /root/p2-requirements.txt
 RUN pip install --no-cache-dir -r /root/p2-requirements.txt coverage flanker==0.4.38 pylint==1.7.2 phonenumbers redis \
-    && pip3 install --no-cache-dir -r /root/p3-requirements.txt coverage websocket-client astroid==2.0.4 pylint==1.7.2 phonenumbers pyCrypto dbfread==2.0.7 firebase-admin==2.17.0 flamegraph
+    && pip3 install --no-cache-dir -r /root/p3-requirements.txt coverage==4.5.4 websocket-client astroid==2.0.4 pylint==1.7.2 phonenumbers pyCrypto dbfread==2.0.7 firebase-admin==2.17.0 flamegraph
