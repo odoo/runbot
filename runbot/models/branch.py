@@ -48,16 +48,24 @@ class runbot_branch(models.Model):
             elif branch.defined_sticky:
                 branch.closest_sticky = branch.defined_sticky # be carefull with loop
             elif branch.target_branch_name:
-                corresping_branch = self.search([('branch_name', '=', branch.target_branch_name), ('repo_id', '=', branch.repo_id.id)])
-                branch.closest_sticky = corresping_branch.closest_sticky
+                corresponding_branch = self.search([('branch_name', '=', branch.target_branch_name), ('repo_id', '=', branch.repo_id.id)])
+                branch.closest_sticky = corresponding_branch.closest_sticky
             else:
                 repo_ids = (branch.repo_id | branch.repo_id.duplicate_id).ids
                 self.env.cr.execute("select id from runbot_branch where sticky = 't' and repo_id = any(%s) and %s like name||'%%'", (repo_ids, branch.name or ''))
                 branch.closest_sticky = self.browse(self.env.cr.fetchone())
 
-    @api.depends('closest_sticky')
+    @api.depends('closest_sticky') #, 'closest_sticky.previous_version')
     def _compute_previous_version(self):
-        for branch in self:
+        for branch in self.sorted(key='sticky', reverse=True):
+            # orm does not support non_searchable.non_stored dependency.
+            # thus, the closest_sticky.previous_version dependency will log an error
+            # when previous_version is written.
+            # this dependency is usefull to make the compute recursive, avoiding to have 
+            # both record and record.closest_sticky in self, in that order, making the record.previous_version
+            # empty in all cases.
+            # Sorting self on sticky will mitigate the problem. but it is still posible to
+            # have computation errors if defined_sticky is not sticky. (which is not a normal use case)
             if branch.closest_sticky == branch:
                 repo_ids = (branch.repo_id | branch.repo_id.duplicate_id).ids
                 domain = [('branch_name', 'like', '%.0'), ('sticky', '=', True), ('branch_name', '!=', 'master'), ('repo_id', 'in', repo_ids)]
@@ -69,7 +77,7 @@ class runbot_branch(models.Model):
 
     @api.depends('previous_version', 'closest_sticky')
     def _compute_intermediate_stickies(self):
-        for branch in self:
+        for branch in self.sorted(key='sticky', reverse=True):
             if branch.closest_sticky == branch:
                 if not branch.previous_version:
                     branch.intermediate_stickies = [(5, 0, 0)]
