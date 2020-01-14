@@ -457,7 +457,7 @@ class runbot_repo(models.Model):
 
     def _commit(self):
         self.env.cr.commit()
-        self.invalidate_cache()
+        self.env.cache.invalidate()
         self.env.clear()
 
     def _scheduler(self, host):
