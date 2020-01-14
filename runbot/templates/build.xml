@@ -136,7 +136,7 @@
                                 Author: <t t-esc="build['author']"/><br/>
                                 Committer: <t t-esc="build['committer']"/><br/>
                                 Commit: <a t-attf-href="https://{{build.repo_id.base}}/commit/{{build.name}}"><t t-esc="build.name"/></a><br/>
-                                <t t-foreach="build.dependency_ids" t-as="dep">
+                                <t t-foreach="build.sudo().dependency_ids" t-as="dep">
                                   Dep: <t t-esc="dep.dependecy_repo_id.short_name"/>:<a t-attf-href="https://{{dep.dependecy_repo_id.base}}/commit/{{dep.dependency_hash}}"><t t-esc="dep.dependency_hash"/></a>
                                   <t t-if='dep.closest_branch_id'> from branch <t t-esc="dep.closest_branch_id.name"/></t>
                                   <br/>
@@ -189,9 +189,9 @@
                                 <td style="white-space: nowrap; width:1%;"><t t-esc="l.create_date"/></td>
                                 <td style="white-space: nowrap; width:1%;"><b t-if="l.level != 'SEPARATOR' and l.type != 'link'" t-esc="l.level"/></td>
                                 <td style="white-space: nowrap; width:1%;"><t t-if="l.level != 'SEPARATOR' and l.type != 'link'" t-esc="l.type"/></td>
-                                <t t-set="message_class" t-value="logclass"/>
+                                <t t-set="message_class" t-value="''"/>
                                 <t t-if="subbuild" t-set="message_class"><t t-call="runbot.build_class"><t t-set="build" t-value="subbuild"/></t></t>
-                                <td t-attf-class="bg-{{message_class.strip()}}-light">
+                                <td t-attf-class="bg-{{message_class.strip() or logclass}}-light">
                                     <t t-if="l.type not in ('runbot', 'link')">
                                       <t t-if="l.type == 'subbuild'">
                                          <a t-attf-href="/runbot/build/{{l.path}}">Build #<t t-esc="l.path"/></a>
