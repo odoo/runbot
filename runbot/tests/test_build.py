@@ -57,8 +57,10 @@ class Test_Build(RunbotCase):
         self.assertEqual(build.json_data, {})
         build.json_data = {'restore_url': 'foobar'}
         self.assertEqual(build.json_data, {'restore_url': 'foobar'})
-        self.assertEqual(build._json_data, '{"restore_url": "foobar"}')
-
+        build.json_data['test_info'] = 'dummy'
+        self.assertEqual(build.json_data, {"restore_url": "foobar", "test_info": "dummy"})
+        del build.json_data['restore_url']
+        self.assertEqual(build.json_data, {"test_info": "dummy"})
         other = self.create_build({
             'branch_id': self.branch.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
@@ -74,6 +76,18 @@ class Test_Build(RunbotCase):
         # test that a build cannot have local state 'duplicate' without a duplicate_id
         with self.assertRaises(AssertionError):
             builds.write({'local_state': 'duplicate'})
+
+        # test non initialized json stored _data field and data property
+        other.json_data['test_info'] = 'foo'
+        self.assertEqual(other.json_data, {'test_info': 'foo'})
+        (build|other).write({'json_data': {'test_write': 'written'}})
+        build.json_data['test_build'] = 'foo'
+        other.json_data['test_other'] = 'bar'
+        self.assertEqual(build.json_data, {'test_write': 'written', 'test_build': 'foo'})
+        self.assertEqual(other.json_data, {'test_write': 'written', 'test_other': 'bar'})
+        build.flush()
+        build.env.cr.execute("SELECT json_data, json_data->'test_write' AS written, json_data->'test_build' AS test_build FROM runbot_build WHERE id = %s", [build.id])
+        self.assertEqual([({'test_write': 'written', 'test_build': 'foo'}, 'written', 'foo')], self.env.cr.fetchall())
 
     @patch('odoo.addons.runbot.models.build.runbot_build._get_repo_available_modules')
     def test_filter_modules(self, mock_get_repo_mods):

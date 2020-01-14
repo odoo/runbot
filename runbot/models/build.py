@@ -11,6 +11,7 @@ import time
 import datetime
 from ..common import dt2time, fqdn, now, grep, uniq_list, local_pgadmin_cursor, s2human, Commit, dest_reg, os
 from ..container import docker_build, docker_stop, docker_state, Command
+from ..fields import JsonDictField
 from odoo.addons.runbot.models.repo import RunbotException
 from odoo import models, fields, api
 from odoo.exceptions import UserError, ValidationError
@@ -54,7 +55,7 @@ class runbot_build(models.Model):
     sequence = fields.Integer('Sequence')
     log_ids = fields.One2many('ir.logging', 'build_id', string='Logs')
     error_log_ids = fields.One2many('ir.logging', 'build_id', domain=[('level', 'in', ['WARNING', 'ERROR', 'CRITICAL'])], string='Error Logs')
-    _json_data = fields.Char('Json Data')
+    json_data = JsonDictField('Json Data')
 
     # state machine
 
@@ -1076,16 +1077,6 @@ class runbot_build(models.Model):
         except Exception as e:
             self._log('make_dirs', 'exception: %s' % e)
             return False
-
-    @property
-    def json_data(self):
-        self.ensure_one()
-        return json.loads(self._json_data) if self._json_data else {}
-
-    @json_data.setter
-    def json_data(self, data):
-        self.ensure_one()
-        self._json_data = json.dumps(data)
 
     def build_type_label(self):
         self.ensure_one()
