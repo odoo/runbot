@@ -30,10 +30,11 @@ class RunbotException(Exception):
 class runbot_repo(models.Model):
 
     _name = "runbot.repo"
+    _description = "Repo"
     _order = 'sequence, id'
 
     name = fields.Char('Repository', required=True)
-    short_name = fields.Char('Repository', compute='_compute_short_name', store=False, readonly=True)
+    short_name = fields.Char('Short name', compute='_compute_short_name', store=False, readonly=True)
     sequence = fields.Integer('Sequence')
     path = fields.Char(compute='_get_path', string='Directory', readonly=True)
     base = fields.Char(compute='_get_base_url', string='Base URL', readonly=True)  # Could be renamed to a more explicit name like base_url
@@ -60,7 +61,7 @@ class runbot_repo(models.Model):
     token = fields.Char("Github token", groups="runbot.group_runbot_admin")
     group_ids = fields.Many2many('res.groups', string='Limited to groups')
 
-    repo_config_id = fields.Many2one('runbot.build.config', 'Run Config')
+    repo_config_id = fields.Many2one('runbot.build.config', 'Repo Config')
     config_id = fields.Many2one('runbot.build.config', 'Run Config', compute='_compute_config_id', inverse='_inverse_config_id')
 
     server_files = fields.Char('Server files', help='Comma separated list of possible server files')  # odoo-bin,openerp-server,openerp-server.py
@@ -104,20 +105,15 @@ class runbot_repo(models.Model):
         for repo in self:
             repo.hook_time = times.get(repo.id, 0)
 
-    def write(self, values):
-        # hooktime and reftime table are here to avoid sql update on repo.
-        # using inverse will still trigger write_date and write_uid update.
-        # this hack allows to avoid that
-
-        hook_time = values.pop('hook_time', None)
-        get_ref_time = values.pop('get_ref_time', None)
+    def set_hook_time(self, value):
         for repo in self:
-            if hook_time:
-                self.env['runbot.repo.hooktime'].create({'time': hook_time, 'repo_id': repo.id})
-            if get_ref_time:
-                self.env['runbot.repo.reftime'].create({'time': get_ref_time, 'repo_id': repo.id})
-        if values:
-            super().write(values)
+            self.env['runbot.repo.hooktime'].create({'time': value, 'repo_id': repo.id})
+        self.invalidate_cache()
+
+    def set_ref_time(self, value):
+        for repo in self:
+            self.env['runbot.repo.reftime'].create({'time': value, 'repo_id': repo.id})
+        self.invalidate_cache()
 
     def _gc_times(self):
         self.env.cr.execute("""
@@ -283,7 +279,7 @@ class runbot_repo(models.Model):
 
         get_ref_time = round(self._get_fetch_head_time(), 4)
         if not self.get_ref_time or get_ref_time > self.get_ref_time:
-            self.get_ref_time = get_ref_time
+            self.set_ref_time(get_ref_time)
             fields = ['refname', 'objectname', 'committerdate:iso8601', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail']
             fmt = "%00".join(["%(" + field + ")" for field in fields])
             git_refs = self._git(['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/heads', 'refs/pull'])
@@ -392,7 +388,7 @@ class runbot_repo(models.Model):
                                 indirect.build_type = 'indirect'
                                 new_build.revdep_build_ids += indirect
 
-    @api.multi
+
     def _create_pending_builds(self):
         """ Find new commits in physical repos"""
         refs = {}
@@ -451,7 +447,6 @@ class runbot_repo(models.Model):
         repo = self
         repo._git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*', '+refs/pull/*/head:refs/pull/*'])
 
-    @api.multi
     def _update(self, force=True):
         """ Update the physical git reposotories on FS"""
         for repo in reversed(self):
@@ -462,10 +457,9 @@ class runbot_repo(models.Model):
 
     def _commit(self):
         self.env.cr.commit()
-        self.invalidate_cache()
-        self.env.reset()
+        self.env.cache.invalidate()
+        self.env.clear()
 
-    @api.multi
     def _scheduler(self, host):
         nb_workers = host.get_nb_worker()
 
@@ -693,7 +687,7 @@ class runbot_repo(models.Model):
             self._commit()
         except Exception as e:
             self.env.cr.rollback()
-            self.env.reset()
+            self.env.clear()
             _logger.exception(e)
             message = str(e)
             if host.last_exception == message:
@@ -765,6 +759,7 @@ class runbot_repo(models.Model):
 
 class RefTime(models.Model):
     _name = "runbot.repo.reftime"
+    _description = "Repo reftime"
     _log_access = False
 
     time = fields.Float('Time', index=True, required=True)
@@ -773,6 +768,7 @@ class RefTime(models.Model):
 
 class HookTime(models.Model):
     _name = "runbot.repo.hooktime"
+    _description = "Repo hooktime"
     _log_access = False
 
     time = fields.Float('Time')

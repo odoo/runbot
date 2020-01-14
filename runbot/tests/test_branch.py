@@ -120,7 +120,7 @@ class TestBranchRelations(RunbotCase):
         self.assertEqual(b.previous_version.branch_name, '13.0')
         self.assertEqual(sorted(b.intermediate_stickies.mapped('branch_name')), ['saas-13.1', 'saas-13.2'])
 
-        b.closest_sticky = self.last
+        b.defined_sticky = self.last
 
         self.assertEqual(b.closest_sticky.branch_name, 'saas-13.2')
         self.assertEqual(b.previous_version.branch_name, '13.0')

@@ -21,6 +21,7 @@ PYTHON_DEFAULT = "# type python code here\n\n\n\n\n\n"
 
 class Config(models.Model):
     _name = "runbot.build.config"
+    _description = "Build config"
     _inherit = "mail.thread"
 
     name = fields.Char('Config name', required=True, unique=True, track_visibility='onchange', help="Unique name for config please use trigram as postfix for custom configs")
@@ -29,9 +30,10 @@ class Config(models.Model):
     update_github_state = fields.Boolean('Notify build state to github', default=False, track_visibility='onchange')
     protected = fields.Boolean('Protected', default=False, track_visibility='onchange')
     group = fields.Many2one('runbot.build.config', 'Configuration group', help="Group of config's and config steps")
-    group_name = fields.Char(related='group.name')
+    group_name = fields.Char('Group name', related='group.name')
+    monitoring_view_id = fields.Many2one('ir.ui.view', 'Monitoring view')
 
-    @api.model
+    @api.model_create_single
     def create(self, values):
         res = super(Config, self).create(values)
         res._check_step_ids_order()
@@ -84,6 +86,7 @@ class Config(models.Model):
 
 class ConfigStep(models.Model):
     _name = 'runbot.build.config.step'
+    _description = "Config step"
     _inherit = 'mail.thread'
 
     # general info
@@ -161,7 +164,7 @@ class ConfigStep(models.Model):
         copy._write({'protected': False})
         return copy
 
-    @api.model
+    @api.model_create_single
     def create(self, values):
         self._check(values)
         return super(ConfigStep, self).create(values)
@@ -560,6 +563,7 @@ class ConfigStep(models.Model):
 
 class ConfigStepOrder(models.Model):
     _name = 'runbot.build.config.step.order'
+    _description = "Config step order"
     _order = 'sequence, id'
     # a kind of many2many rel with sequence
 
@@ -571,7 +575,7 @@ class ConfigStepOrder(models.Model):
     def _onchange_step_id(self):
         self.sequence = self.step_id.default_sequence
 
-    @api.model
+    @api.model_create_single
     def create(self, values):
         if 'sequence' not in values and values.get('step_id'):
             values['sequence'] = self.env['runbot.build.config.step'].browse(values.get('step_id')).default_sequence

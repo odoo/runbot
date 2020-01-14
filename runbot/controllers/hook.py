@@ -31,7 +31,7 @@ class RunbotHook(http.Controller):
 
         # force update of dependencies to in case a hook is lost
         if not payload or event == 'push' or (event == 'pull_request' and payload.get('action') in ('synchronize', 'opened', 'reopened')):
-            (repo | repo.dependency_ids).write({'hook_time': time.time()})
+            (repo | repo.dependency_ids).set_hook_time(time.time())
         else:
             _logger.debug('Ignoring unsupported hook %s %s', event, payload.get('action', ''))
         return ""

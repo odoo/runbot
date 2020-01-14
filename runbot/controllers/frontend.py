@@ -39,6 +39,7 @@ class Runbot(Controller):
             'host_stats': [],
             'pending_total': pending[0],
             'pending_level': pending[1],
+            'hosts_data': request.env['runbot.host'].search([]),
             'search': search,
             'refresh': refresh,
         }
@@ -101,29 +102,17 @@ class Runbot(Controller):
             def branch_info(branch):
                 return {
                     'branch': branch,
-                    'fqdn': fqdn(),
                     'builds': [build_dict[build_id] for build_id in build_by_branch_ids.get(branch.id) or []]
                 }
 
             context.update({
                 'branches': [branch_info(b) for b in branches],
-                'testing': build_obj.search_count([('repo_id', '=', repo.id), ('local_state', '=', 'testing')]),
-                'running': build_obj.search_count([('repo_id', '=', repo.id), ('local_state', '=', 'running')]),
-                'pending': build_obj.search_count([('repo_id', '=', repo.id), ('local_state', '=', 'pending')]),
                 'qu': QueryURL('/runbot/repo/' + slug(repo), search=search, refresh=refresh),
                 'fqdn': fqdn(),
             })
 
         # consider host gone if no build in last 100
         build_threshold = max(build_ids or [0]) - 100
-
-        for result in build_obj.read_group([('id', '>', build_threshold)], ['host'], ['host']):
-            if result['host']:
-                context['host_stats'].append({
-                    'host': result['host'],
-                    'testing': build_obj.search_count([('local_state', '=', 'testing'), ('host', '=', result['host'])]),
-                    'running': build_obj.search_count([('local_state', '=', 'running'), ('host', '=', result['host'])]),
-                })
 
         context.update({'message': request.env['ir.config_parameter'].sudo().get_param('runbot.runbot_message')})
         return request.render('runbot.repo', context)
@@ -302,21 +291,27 @@ class Runbot(Controller):
         return request.render("runbot.glances", qctx)
 
     @route('/runbot/monitoring', type='http', auth='user', website=True)
-    def monitoring(self, refresh=None):
+    @route('/runbot/monitoring/<int:config_id>', type='http', auth='user', website=True)
+    @route('/runbot/monitoring/<int:config_id>/<int:view_id>', type='http', auth='user', website=True)
+    def monitoring(self, config_id=None, view_id=None, refresh=None):
         glances_ctx = self._glances_ctx()
         pending = self._pending()
         hosts_data = request.env['runbot.host'].search([])
 
-        monitored_config_id = int(request.env['ir.config_parameter'].sudo().get_param('runbot.monitored_config_id', 1))
-        request.env.cr.execute("""SELECT DISTINCT ON (branch_id) branch_id, id FROM runbot_build
-                                WHERE config_id = %s
-                                AND global_state in ('running', 'done')
-                                AND branch_id in (SELECT id FROM runbot_branch where sticky='t')
-                                AND local_state != 'duplicate'
-                                ORDER BY branch_id ASC, id DESC""", [int(monitored_config_id)])
-        last_monitored = request.env['runbot.build'].browse([r[1] for r in request.env.cr.fetchall()])
+        last_monitored = None
+        if config_id or config_id is None:
+            monitored_config_id = config_id or int(request.env['ir.config_parameter'].sudo().get_param('runbot.monitored_config_id', 1))
+            request.env.cr.execute("""SELECT DISTINCT ON (branch_id) branch_id, id FROM runbot_build
+                                    WHERE config_id = %s
+                                    AND global_state in ('running', 'done')
+                                    AND branch_id in (SELECT id FROM runbot_branch where sticky='t')
+                                    AND local_state != 'duplicate'
+                                    ORDER BY branch_id ASC, id DESC""", [int(monitored_config_id)])
+            last_monitored = request.env['runbot.build'].browse([r[1] for r in request.env.cr.fetchall()])
 
+        config = request.env['runbot.build.config'].browse(monitored_config_id)
         qctx = {
+            'config': config,
             'refresh': refresh,
             'pending_total': pending[0],
             'pending_level': pending[1],
@@ -326,7 +321,7 @@ class Runbot(Controller):
             'auto_tags': request.env['runbot.build.error'].disabling_tags(),
             'build_errors': request.env['runbot.build.error'].search([('random', '=', True)])
         }
-        return request.render("runbot.monitoring", qctx)
+        return request.render(request.env['ir.ui.view'].browse('view_id') if view_id else config.monitoring_view_id.id or "runbot.monitoring", qctx)
 
     @route(['/runbot/branch/<int:branch_id>', '/runbot/branch/<int:branch_id>/page/<int:page>'], website=True, auth='public', type='http')
     def branch_builds(self, branch_id=None, search='', page=1, limit=50, refresh='', **kwargs):
@@ -337,9 +332,9 @@ class Runbot(Controller):
             url='/runbot/branch/%s' % branch_id,
             total=builds_count,
             page=page,
-            step=50
+            step=50,
         )
         builds = request.env['runbot.build'].search(domain, limit=limit, offset=pager.get('offset',0))
 
-        context = {'pager': pager, 'builds': builds}
+        context = {'pager': pager, 'builds': builds, 'repo': request.env['runbot.branch'].browse(branch_id).repo_id}
         return request.render("runbot.branch", context)

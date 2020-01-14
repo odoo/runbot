@@ -1,0 +1,5 @@
+<odoo>
+    <record id="website.homepage_page" model="website.page">
+        <field name="url">/home</field>
+    </record>
+</odoo>

@@ -35,7 +35,7 @@ class RunbotBadge(Controller):
 
         build = builds[0]
         etag = request.httprequest.headers.get('If-None-Match')
-        retag = hashlib.md5(build[last_update].encode()).hexdigest()
+        retag = hashlib.md5(str(build[last_update]).encode()).hexdigest()
 
         if etag == retag:
             return werkzeug.wrappers.Response(status=304)

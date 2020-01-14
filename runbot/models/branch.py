@@ -12,6 +12,7 @@ _re_patch = re.compile(r'.*patch-\d+$')
 class runbot_branch(models.Model):
 
     _name = "runbot.branch"
+    _description = "Branch"
     _order = 'name'
     _sql_constraints = [('branch_repo_uniq', 'unique (name,repo_id)', 'The branch must be unique per repository !')]
 
@@ -35,7 +36,7 @@ class runbot_branch(models.Model):
     no_auto_build = fields.Boolean("Don't automatically build commit on this branch", default=False)
     rebuild_requested = fields.Boolean("Request a rebuild", help="Rebuild the latest commit even when no_auto_build is set.", default=False)
 
-    branch_config_id = fields.Many2one('runbot.build.config', 'Run Config')
+    branch_config_id = fields.Many2one('runbot.build.config', 'Branch Config')
     config_id = fields.Many2one('runbot.build.config', 'Run Config', compute='_compute_config_id', inverse='_inverse_config_id')
 
     @api.depends('sticky', 'defined_sticky', 'target_branch_name', 'name')
@@ -47,16 +48,24 @@ class runbot_branch(models.Model):
             elif branch.defined_sticky:
                 branch.closest_sticky = branch.defined_sticky # be carefull with loop
             elif branch.target_branch_name:
-                corresping_branch = self.search([('branch_name', '=', branch.target_branch_name), ('repo_id', '=', branch.repo_id.id)])
-                branch.closest_sticky = corresping_branch.closest_sticky
+                corresponding_branch = self.search([('branch_name', '=', branch.target_branch_name), ('repo_id', '=', branch.repo_id.id)])
+                branch.closest_sticky = corresponding_branch.closest_sticky
             else:
                 repo_ids = (branch.repo_id | branch.repo_id.duplicate_id).ids
                 self.env.cr.execute("select id from runbot_branch where sticky = 't' and repo_id = any(%s) and %s like name||'%%'", (repo_ids, branch.name or ''))
                 branch.closest_sticky = self.browse(self.env.cr.fetchone())
 
-    @api.depends('closest_sticky.previous_version')
+    @api.depends('closest_sticky') #, 'closest_sticky.previous_version')
     def _compute_previous_version(self):
-        for branch in self:
+        for branch in self.sorted(key='sticky', reverse=True):
+            # orm does not support non_searchable.non_stored dependency.
+            # thus, the closest_sticky.previous_version dependency will log an error
+            # when previous_version is written.
+            # this dependency is usefull to make the compute recursive, avoiding to have 
+            # both record and record.closest_sticky in self, in that order, making the record.previous_version
+            # empty in all cases.
+            # Sorting self on sticky will mitigate the problem. but it is still posible to
+            # have computation errors if defined_sticky is not sticky. (which is not a normal use case)
             if branch.closest_sticky == branch:
                 repo_ids = (branch.repo_id | branch.repo_id.duplicate_id).ids
                 domain = [('branch_name', 'like', '%.0'), ('sticky', '=', True), ('branch_name', '!=', 'master'), ('repo_id', 'in', repo_ids)]
@@ -66,11 +75,12 @@ class runbot_branch(models.Model):
             else:
                 branch.previous_version = branch.closest_sticky.previous_version
 
-    @api.depends('previous_version', 'closest_sticky.intermediate_stickies')
+    @api.depends('previous_version', 'closest_sticky')
     def _compute_intermediate_stickies(self):
-        for branch in self:
+        for branch in self.sorted(key='sticky', reverse=True):
             if branch.closest_sticky == branch:
                 if not branch.previous_version:
+                    branch.intermediate_stickies = [(5, 0, 0)]
                     continue
                 repo_ids = (branch.repo_id | branch.repo_id.duplicate_id).ids
                 domain = [('id', '>', branch.previous_version.id), ('sticky', '=', True), ('branch_name', '!=', 'master'), ('repo_id', 'in', repo_ids)]
@@ -133,7 +143,7 @@ class runbot_branch(models.Model):
             return False
         return True
 
-    @api.model
+    @api.model_create_single
     def create(self, vals):
         if not vals.get('config_id') and ('use-coverage' in (vals.get('name') or '')):
             coverage_config = self.env.ref('runbot.runbot_build_config_test_coverage', raise_if_not_found=False)
@@ -287,6 +297,6 @@ class runbot_branch(models.Model):
         for branch in self:
             if not branch.rebuild_requested:
                 branch.rebuild_requested = True
-                branch.repo_id.write({'hook_time': time.time()})
+                branch.repo_id.set_hook_time(time.time())
             else:
                 branch.rebuild_requested = False

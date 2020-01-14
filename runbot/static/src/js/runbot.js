@@ -41,7 +41,7 @@
             return false;
        });
     });
-    $(function() {
-      new Clipboard('.clipbtn');
-    });
+    //$(function() {
+    //  new Clipboard('.clipbtn');
+    //});
 })(jQuery);

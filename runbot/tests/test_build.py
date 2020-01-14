@@ -327,68 +327,66 @@ class Test_Build(RunbotCase):
             'extra_params': '5',
         })
 
-        def assert_state(nb_pending, nb_testing, nb_running, global_state, build):
-            self.assertEqual(build.nb_pending, nb_pending)
-            self.assertEqual(build.nb_testing, nb_testing)
-            self.assertEqual(build.nb_running, nb_running)
+        def assert_state(global_state, build):
             self.assertEqual(build.global_state, global_state)
 
-        assert_state(5, 0, 0, 'pending', build1)
-        assert_state(3, 0, 0, 'pending', build1_1)
-        assert_state(1, 0, 0, 'pending', build1_2)
-        assert_state(1, 0, 0, 'pending', build1_1_1)
-        assert_state(1, 0, 0, 'pending', build1_1_2)
+        assert_state('pending', build1)
+        assert_state('pending', build1_1)
+        assert_state('pending', build1_2)
+        assert_state('pending', build1_1_1)
+        assert_state('pending', build1_1_2)
 
         build1.local_state = 'testing'
         build1_1.local_state = 'testing'
         build1.local_state = 'done'
         build1_1.local_state = 'done'
 
-        assert_state(3, 0, 0, 'waiting', build1)
-        assert_state(2, 0, 0, 'waiting', build1_1)
-        assert_state(1, 0, 0, 'pending', build1_2)
-        assert_state(1, 0, 0, 'pending', build1_1_1)
-        assert_state(1, 0, 0, 'pending', build1_1_2)
+        assert_state('waiting', build1)
+        assert_state('waiting', build1_1)
+        assert_state('pending', build1_2)
+        assert_state('pending', build1_1_1)
+        assert_state('pending', build1_1_2)
 
         build1_1_1.local_state = 'testing'
 
-        assert_state(2, 1, 0, 'waiting', build1)
-        assert_state(1, 1, 0, 'waiting', build1_1)
-        assert_state(1, 0, 0, 'pending', build1_2)
-        assert_state(0, 1, 0, 'testing', build1_1_1)
-        assert_state(1, 0, 0, 'pending', build1_1_2)
+        assert_state('waiting', build1)
+        assert_state('waiting', build1_1)
+        assert_state('pending', build1_2)
+        assert_state('testing', build1_1_1)
+        assert_state('pending', build1_1_2)
 
         build1_2.local_state = 'testing'
 
-        assert_state(1, 2, 0, 'waiting', build1)
-        assert_state(1, 1, 0, 'waiting', build1_1)
-        assert_state(0, 1, 0, 'testing', build1_2)
-        assert_state(0, 1, 0, 'testing', build1_1_1)
-        assert_state(1, 0, 0, 'pending', build1_1_2)
+        assert_state('waiting', build1)
+        assert_state('waiting', build1_1)
+        assert_state('testing', build1_2)
+        assert_state('testing', build1_1_1)
+        assert_state('pending', build1_1_2)
 
         build1_2.local_state = 'testing'  # writing same state a second time
 
-        assert_state(1, 2, 0, 'waiting', build1)
-        assert_state(1, 1, 0, 'waiting', build1_1)
-        assert_state(0, 1, 0, 'testing', build1_2)
-        assert_state(0, 1, 0, 'testing', build1_1_1)
-        assert_state(1, 0, 0, 'pending', build1_1_2)
+        assert_state('waiting', build1)
+        assert_state('waiting', build1_1)
+        assert_state('testing', build1_2)
+        assert_state('testing', build1_1_1)
+        assert_state('pending', build1_1_2)
 
         build1_1_2.local_state = 'done'
         build1_1_1.local_state = 'done'
         build1_2.local_state = 'done'
 
-        assert_state(0, 0, 0, 'done', build1)
-        assert_state(0, 0, 0, 'done', build1_1)
-        assert_state(0, 0, 0, 'done', build1_2)
-        assert_state(0, 0, 0, 'done', build1_1_1)
-        assert_state(0, 0, 0, 'done', build1_1_2)
+        assert_state('done', build1)
+        assert_state('done', build1_1)
+        assert_state('done', build1_2)
+        assert_state('done', build1_1_1)
+        assert_state('done', build1_1_2)
 
     def test_duplicate_childrens(self):
         build_old = self.create_build({
             'branch_id': self.branch_10.id,
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'extra_params': '0',
+            'local_state': 'done'
         })
         build_parent = self.create_build({
             'branch_id': self.branch_10.id,
@@ -404,8 +402,7 @@ class Test_Build(RunbotCase):
         build_parent.local_state = 'done'
         self.assertEqual(build_child.local_state, 'duplicate')
         self.assertEqual(build_child.duplicate_id, build_old)
-        self.assertEqual(build_parent.nb_pending, 0)
-        self.assertEqual(build_parent.nb_testing, 0)
+        self.assertEqual(build_child.global_state, 'done')
         self.assertEqual(build_parent.global_state, 'done')
 
 
@@ -734,6 +731,10 @@ class TestClosestBranch(RunbotCase):
             'repo_id': self.community_repo.id,
             'name': 'refs/pull/123456'
         })
+
+        # trigger compute and ensure that mock_github is used. (using correct side effect would work too)
+        self.assertEqual(server_pr.pull_head_name, 'foo-dev:bar_branch')
+
         mock_github.return_value = {
             'head': {'label': 'foo-dev:foobar_branch'},
             'base': {'ref': '10.0'},
@@ -743,6 +744,8 @@ class TestClosestBranch(RunbotCase):
             'repo_id': self.enterprise_repo.id,
             'name': 'refs/pull/789101'
         })
+        self.assertEqual(addons_pr.pull_head_name, 'foo-dev:foobar_branch')
+        closest = addons_pr._get_closest_branch(self.community_repo.id)
         self.assertEqual((self.branch_odoo_10, 'pr_target'), addons_pr._get_closest_branch(self.community_repo.id))
 
     def test_closest_branch_05_master(self):

@@ -11,8 +11,6 @@ class TestSchedule(RunbotCase):
     def setUp(self):
         # entering test mode to avoid that the _schedule method commits records
         registry = odoo.registry()
-        registry.enter_test_mode()
-        self.addCleanup(registry.leave_test_mode)
         super(TestSchedule, self).setUp()
 
         self.repo = self.Repo.create({'name': 'bla@example.com:foo/bar'})

@@ -3,7 +3,7 @@
     <data>
         <template id="assets_front_end" inherit_id="web.assets_frontend" name="runbot assets">
             <xpath expr="." position="inside">
-                <link rel="stylesheet" href="/runbot/static/src/less/runbot.less"/>
+                <link rel="stylesheet" href="/runbot/static/src/css/runbot.css"/>
             </xpath>
         </template>
     </data>

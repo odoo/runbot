@@ -32,6 +32,8 @@ def make_selection(array):
 
 class runbot_build(models.Model):
     _name = "runbot.build"
+    _description = "Build"
+
     _order = 'id desc'
     _rec_name = 'id'
 
@@ -55,16 +57,16 @@ class runbot_build(models.Model):
     # state machine
 
     global_state = fields.Selection(make_selection(state_order), string='Status', compute='_compute_global_state', store=True)
-    local_state = fields.Selection(make_selection(state_order), string='Build Status', default='pending', required=True, oldname='state', index=True)
+    local_state = fields.Selection(make_selection(state_order), string='Build Status', default='pending', required=True, index=True)
     global_result = fields.Selection(make_selection(result_order), string='Result', compute='_compute_global_result', store=True)
-    local_result = fields.Selection(make_selection(result_order), string='Build Result', oldname='result')
+    local_result = fields.Selection(make_selection(result_order), string='Build Result')
     triggered_result = fields.Selection(make_selection(result_order), string='Triggered Result')  # triggered by db only
 
     requested_action = fields.Selection([('wake_up', 'To wake up'), ('deathrow', 'To kill')], string='Action requested', index=True)
 
     nb_pending = fields.Integer("Number of pending in queue", default=0)
     nb_testing = fields.Integer("Number of test slot use", default=0)
-    nb_running = fields.Integer("Number of test slot use", default=0)
+    nb_running = fields.Integer("Number of run slot use", default=0)
 
     # should we add a stored field for children results?
     active_step = fields.Many2one('runbot.build.config.step', 'Active step')
@@ -74,7 +76,7 @@ class runbot_build(models.Model):
     build_start = fields.Datetime('Build start')
     build_end = fields.Datetime('Build end')
     job_time = fields.Integer(compute='_compute_job_time', string='Job time')
-    build_time = fields.Integer(compute='_compute_build_time', string='Job time')
+    build_time = fields.Integer(compute='_compute_build_time', string='Build time')
     build_age = fields.Integer(compute='_compute_build_age', string='Build age')
     duplicate_id = fields.Many2one('runbot.build', 'Corresponding Build', index=True)
     revdep_build_ids = fields.Many2many('runbot.build', 'runbot_rev_dep_builds',
@@ -116,18 +118,21 @@ class runbot_build(models.Model):
         for build in self:
             build.log_list = ','.join({step.name for step in build.config_id.step_ids() if step._has_log()})
 
-    @api.depends('nb_testing', 'nb_pending', 'local_state', 'duplicate_id.global_state')
+    @api.depends('children_ids.global_state', 'local_state', 'duplicate_id.global_state')
     def _compute_global_state(self):
-        # could we use nb_pending / nb_testing ? not in a compute, but in a update state method
         for record in self:
             if record.duplicate_id:
                 record.global_state = record.duplicate_id.global_state
             else:
                 waiting_score = record._get_state_score('waiting')
-                if record._get_state_score(record.local_state) < waiting_score or record.nb_pending + record.nb_testing == 0:
-                    record.global_state = record.local_state
+                if record._get_state_score(record.local_state) > waiting_score and record.children_ids:  # if finish, check children
+                    children_state = record._get_youngest_state([child.global_state for child in record.children_ids])
+                    if record._get_state_score(children_state) > waiting_score:
+                        record.global_state = record.local_state
+                    else:
+                        record.global_state = 'waiting'
                 else:
-                    record.global_state = 'waiting'
+                    record.global_state = record.local_state
 
     def _get_youngest_state(self, states):
         index = min([self._get_state_score(state) for state in states])
@@ -166,24 +171,7 @@ class runbot_build(models.Model):
     def _get_result_score(self, result):
         return result_order.index(result)
 
-    def _update_nb_children(self, new_state, old_state=None):
-        # could be interresting to update state in batches.
-        tracked_count_list = ['pending', 'testing', 'running']
-        if (new_state not in tracked_count_list and old_state not in tracked_count_list) or new_state == old_state:
-            return
-
-        for record in self:
-            values = {}
-            if old_state in tracked_count_list:
-                values['nb_%s' % old_state] = record['nb_%s' % old_state] - 1
-            if new_state in tracked_count_list:
-                values['nb_%s' % new_state] = record['nb_%s' % new_state] + 1
-
-            record.write(values)
-            if record.parent_id:
-                record.parent_id._update_nb_children(new_state, old_state)
-
-    @api.depends('real_build.active_step')
+    @api.depends('active_step', 'duplicate_id.active_step')
     def _compute_job(self):
         for build in self:
             build.job = build.real_build.active_step.name
@@ -196,13 +184,13 @@ class runbot_build(models.Model):
     def copy(self, values=None):
         raise UserError("Cannot duplicate build!")
 
+    @api.model_create_single
     def create(self, vals):
         branch = self.env['runbot.branch'].search([('id', '=', vals.get('branch_id', False))])  # branche 10174?
         if branch.no_build:
             return self.env['runbot.build']
         vals['config_id'] = vals['config_id'] if 'config_id' in vals else branch.config_id.id
         build_id = super(runbot_build, self).create(vals)
-        build_id._update_nb_children(build_id.local_state)
         extra_info = {'sequence': build_id.id if not build_id.sequence else build_id.sequence}
         context = self.env.context
 
@@ -309,8 +297,6 @@ class runbot_build(models.Model):
             build_by_old_values = defaultdict(lambda: self.env['runbot.build'])
             for record in self:
                 build_by_old_values[record.local_state] += record
-            for local_state, builds in build_by_old_values.items():
-                builds._update_nb_children(values.get('local_state'), local_state)
         assert 'state' not in values
         local_result = values.get('local_result')
         for build in self:
@@ -318,6 +304,8 @@ class runbot_build(models.Model):
         res = super(runbot_build, self).write(values)
         for build in self:
             assert bool(not build.duplicate_id) ^ (build.local_state == 'duplicate')  # don't change duplicate state without removing duplicate id.
+        if 'log_counter' in values: # not 100% usefull but more correct ( see test_ir_logging)
+            self.flush()
         return res
 
     def update_build_end(self):
@@ -360,6 +348,8 @@ class runbot_build(models.Model):
                 build.job_time = int(dt2time(build.job_end) - dt2time(build.job_start))
             elif build.job_start:
                 build.job_time = int(time.time() - dt2time(build.job_start))
+            else:
+                build.job_time = 0
 
     @api.depends('build_start', 'build_end', 'duplicate_id.build_time')
     def _compute_build_time(self):
@@ -370,6 +360,8 @@ class runbot_build(models.Model):
                 build.build_time = int(dt2time(build.build_end) - dt2time(build.build_start))
             elif build.build_start:
                 build.build_time = int(time.time() - dt2time(build.build_start))
+            else:
+                build.build_time = 0
 
     @api.depends('job_start', 'duplicate_id.build_age')
     def _compute_build_age(self):
@@ -379,6 +371,8 @@ class runbot_build(models.Model):
                 build.build_age = build.duplicate_id.build_age
             elif build.job_start:
                 build.build_age = int(time.time() - dt2time(build.build_start))
+            else:
+                build.build_age = 0
 
     def _get_params(self):
         try:

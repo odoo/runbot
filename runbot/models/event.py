@@ -16,9 +16,8 @@ class runbot_event(models.Model):
 
     build_id = fields.Many2one('runbot.build', 'Build', index=True, ondelete='cascade')
     active_step_id = fields.Many2one('runbot.build.config.step', 'Active step', index=True)
-    type = fields.Selection(TYPES, string='Type', required=True, index=True)
+    type = fields.Selection(selection_add=TYPES, string='Type', required=True, index=True)
 
-    @api.model_cr
     def init(self):
         parent_class = super(runbot_event, self)
         if hasattr(parent_class, 'init'):
@@ -75,6 +74,7 @@ FOR EACH ROW EXECUTE PROCEDURE runbot_set_logging_build();
 
 class RunbotErrorLog(models.Model):
     _name = "runbot.error.log"
+    _description = "Error log"
     _auto = False
     _order = 'id desc'
 
@@ -130,7 +130,6 @@ class RunbotErrorLog(models.Model):
         BuildError._parse_logs(self)
 
 
-    @api.model_cr
     def init(self):
         """ Create an SQL view for ir.logging """
         tools.drop_view_if_exists(self._cr, 'runbot_error_log')
