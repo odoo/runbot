@@ -69,7 +69,7 @@ class runbot_branch(models.Model):
             if branch.closest_sticky == branch:
                 repo_ids = (branch.repo_id | branch.repo_id.duplicate_id).ids
                 domain = [('branch_name', 'like', '%.0'), ('sticky', '=', True), ('branch_name', '!=', 'master'), ('repo_id', 'in', repo_ids)]
-                if branch.branch_name != 'master':
+                if branch.branch_name != 'master' and branch.id:
                     domain += [('id', '<', branch.id)]
                 branch.previous_version = self.search(domain, limit=1, order='id desc')
             else:
@@ -84,7 +84,7 @@ class runbot_branch(models.Model):
                     continue
                 repo_ids = (branch.repo_id | branch.repo_id.duplicate_id).ids
                 domain = [('id', '>', branch.previous_version.id), ('sticky', '=', True), ('branch_name', '!=', 'master'), ('repo_id', 'in', repo_ids)]
-                if branch.closest_sticky.branch_name != 'master':
+                if branch.closest_sticky.branch_name != 'master' and branch.closest_sticky.id:
                     domain += [('id', '<', branch.closest_sticky.id)]
                 branch.intermediate_stickies = [(6, 0, self.search(domain, order='id desc').ids)]
             else:
