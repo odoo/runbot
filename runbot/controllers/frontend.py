@@ -290,24 +290,24 @@ class Runbot(Controller):
         }
         return request.render("runbot.glances", qctx)
 
-    @route('/runbot/monitoring', type='http', auth='user', website=True)
-    @route('/runbot/monitoring/<int:config_id>', type='http', auth='user', website=True)
-    @route('/runbot/monitoring/<int:config_id>/<int:view_id>', type='http', auth='user', website=True)
+    @route(['/runbot/monitoring',
+            '/runbot/monitoring/<int:config_id>',
+            '/runbot/monitoring/<int:config_id>/<int:view_id>'], type='http', auth='user', website=True)
     def monitoring(self, config_id=None, view_id=None, refresh=None):
         glances_ctx = self._glances_ctx()
         pending = self._pending()
         hosts_data = request.env['runbot.host'].search([])
 
         last_monitored = None
-        if config_id or config_id is None:
-            monitored_config_id = config_id or int(request.env['ir.config_parameter'].sudo().get_param('runbot.monitored_config_id', 1))
-            request.env.cr.execute("""SELECT DISTINCT ON (branch_id) branch_id, id FROM runbot_build
-                                    WHERE config_id = %s
-                                    AND global_state in ('running', 'done')
-                                    AND branch_id in (SELECT id FROM runbot_branch where sticky='t')
-                                    AND local_state != 'duplicate'
-                                    ORDER BY branch_id ASC, id DESC""", [int(monitored_config_id)])
-            last_monitored = request.env['runbot.build'].browse([r[1] for r in request.env.cr.fetchall()])
+
+        monitored_config_id = config_id or int(request.env['ir.config_parameter'].sudo().get_param('runbot.monitored_config_id', 1))
+        request.env.cr.execute("""SELECT DISTINCT ON (branch_id) branch_id, id FROM runbot_build
+                                WHERE config_id = %s
+                                AND global_state in ('running', 'done')
+                                AND branch_id in (SELECT id FROM runbot_branch where sticky='t')
+                                AND local_state != 'duplicate'
+                                ORDER BY branch_id ASC, id DESC""", [int(monitored_config_id)])
+        last_monitored = request.env['runbot.build'].browse([r[1] for r in request.env.cr.fetchall()])
 
         config = request.env['runbot.build.config'].browse(monitored_config_id)
         qctx = {
@@ -321,7 +321,7 @@ class Runbot(Controller):
             'auto_tags': request.env['runbot.build.error'].disabling_tags(),
             'build_errors': request.env['runbot.build.error'].search([('random', '=', True)])
         }
-        return request.render(request.env['ir.ui.view'].browse('view_id') if view_id else config.monitoring_view_id.id or "runbot.monitoring", qctx)
+        return request.render(view_id if view_id else config.monitoring_view_id.id or "runbot.monitoring", qctx)
 
     @route(['/runbot/branch/<int:branch_id>', '/runbot/branch/<int:branch_id>/page/<int:page>'], website=True, auth='public', type='http')
     def branch_builds(self, branch_id=None, search='', page=1, limit=50, refresh='', **kwargs):
