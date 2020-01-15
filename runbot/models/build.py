@@ -248,6 +248,7 @@ class runbot_build(models.Model):
                 '|', ('local_result', '=', False), ('local_result', '!=', 'skipped'),  # had to reintroduce False posibility for selections
                 ('config_id', '=', build_id.config_id.id),
                 ('extra_params', '=', build_id.extra_params),
+                ('config_data', '=', build_id.config_data),
             ]
             candidates = self.search(domain)
             if candidates and nb_deps:
@@ -425,6 +426,7 @@ class runbot_build(models.Model):
                     values.update({
                         'config_id': build.config_id.id,
                         'extra_params': build.extra_params,
+                        'config_data': build.config_data,
                         'orphan_result': build.orphan_result,
                         'dependency_ids': build._copy_dependency_ids(),
                     })
