@@ -297,6 +297,6 @@ class runbot_branch(models.Model):
         for branch in self:
             if not branch.rebuild_requested:
                 branch.rebuild_requested = True
-                branch.repo_id.set_hook_time(time.time())
+                branch.repo_id.sudo().set_hook_time(time.time())
             else:
                 branch.rebuild_requested = False
