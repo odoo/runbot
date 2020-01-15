@@ -293,7 +293,7 @@ class Runbot(Controller):
     @route(['/runbot/monitoring',
             '/runbot/monitoring/<int:config_id>',
             '/runbot/monitoring/<int:config_id>/<int:view_id>'], type='http', auth='user', website=True)
-    def monitoring(self, config_id=None, view_id=None, refresh=None):
+    def monitoring(self, config_id=None, view_id=None, refresh=None, **kwargs):
         glances_ctx = self._glances_ctx()
         pending = self._pending()
         hosts_data = request.env['runbot.host'].search([])
@@ -319,7 +319,8 @@ class Runbot(Controller):
             'hosts_data': hosts_data,
             'last_monitored': last_monitored,  # nightly
             'auto_tags': request.env['runbot.build.error'].disabling_tags(),
-            'build_errors': request.env['runbot.build.error'].search([('random', '=', True)])
+            'build_errors': request.env['runbot.build.error'].search([('random', '=', True)]),
+            'kwargs': kwargs
         }
         return request.render(view_id if view_id else config.monitoring_view_id.id or "runbot.monitoring", qctx)
 
