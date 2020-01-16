@@ -666,14 +666,14 @@ class runbot_build(models.Model):
                     build._log('_schedule', '%s time exceeded (%ss)' % (build.active_step.name if build.active_step else "?", build.job_time))
                     build._kill(result='killed')
                 continue
-            elif _docker_state == 'UNKNOWN' and (build.local_state == 'running' or build.active_step._is_docker_step()):
+            elif _docker_state in ('UNKNOWN', 'GHOST') and (build.local_state == 'running' or build.active_step._is_docker_step()):
                 if build.job_time < 5:
                     continue
                 elif build.job_time < 60:
-                    _logger.debug('container "%s" seems too take a while to start', build._get_docker_name())
+                    _logger.debug('container "%s" seems too take a while to start :%s' % (build.job_time, build._get_docker_name()))
                     continue
                 else:
-                    build._log('_schedule', 'Docker not started after 60 seconds, skipping', level='ERROR')
+                    build._log('_schedule', 'Docker with state %s not started after 60 seconds, skipping' % _docker_state, level='ERROR')
             # No job running, make result and select nex job
             build_values = {
                 'job_end': now(),
