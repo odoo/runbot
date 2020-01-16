@@ -185,7 +185,16 @@ def docker_is_running(container_name):
 def docker_state(container_name, build_dir):
     started = os.path.exists(os.path.join(build_dir, 'start-%s' % container_name))
     ended = os.path.exists(os.path.join(build_dir, 'end-%s' % container_name))
-    return 'END' if ended else 'RUNNING' if started else 'UNKNOWN'
+    if ended:
+        return 'END'
+
+    if started:
+        if docker_is_running(container_name):
+            return 'RUNNING'
+        else:
+            return 'GHOST'
+
+    return 'UNKNOWN'
 
 def docker_clear_state(container_name, build_dir):
     """Return True if container is still running"""
