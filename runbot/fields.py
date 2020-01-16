@@ -14,7 +14,7 @@ class JsonDictField(Field):
 
     def convert_to_column(self, value, record, values=None, validate=True):
         val = self.convert_to_cache(value, record, validate=validate)
-        return Json(value) if val else val
+        return Json(val) if val else False
 
     def convert_to_cache(self, value, record, validate=True):
         return value.dict if isinstance(value, FieldDict) else value if isinstance(value, dict) else None

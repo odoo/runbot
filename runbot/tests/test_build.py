@@ -89,6 +89,40 @@ class Test_Build(RunbotCase):
         build.env.cr.execute("SELECT config_data, config_data->'test_write' AS written, config_data->'test_build' AS test_build FROM runbot_build WHERE id = %s", [build.id])
         self.assertEqual([({'test_write': 'written', 'test_build': 'foo'}, 'written', 'foo')], self.env.cr.fetchall())
 
+    def test_config_data_duplicate(self):
+
+        build = self.create_build({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+        })
+
+        build2 = self.create_build({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+        })
+        self.assertEqual(build2.duplicate_id, build)
+
+        build3 = self.create_build({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'config_data': {'test':'aa'},
+        })
+        self.assertFalse(build3.duplicate_id)
+        build4 = self.create_build({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'config_data': {'test':'aa'},
+        })
+        self.assertEqual(build4.duplicate_id, build3)
+
+        build5 = self.create_build({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'config_data': {'test':'bb'},
+        })
+        self.assertFalse(build5.duplicate_id)
+
+
     @patch('odoo.addons.runbot.models.build.runbot_build._get_repo_available_modules')
     def test_filter_modules(self, mock_get_repo_mods):
         """ test module filtering """

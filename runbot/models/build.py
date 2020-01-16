@@ -126,10 +126,14 @@ class runbot_build(models.Model):
         for record in self:
             if record.duplicate_id:
                 record.global_state = record.duplicate_id.global_state
+            elif record.global_state == 'done' and self.local_state == 'done':
+                # avoid to recompute if done, mostly important whith many orphan childrens
+                record.global_state = 'done'
             else:
                 waiting_score = record._get_state_score('waiting')
-                if record._get_state_score(record.local_state) > waiting_score and record.children_ids:  # if finish, check children
-                    children_state = record._get_youngest_state([child.global_state for child in record.children_ids])
+                children_ids = [child for child in record.children_ids if not child.orphan_result]
+                if record._get_state_score(record.local_state) > waiting_score and children_ids:  # if finish, check children
+                    children_state = record._get_youngest_state([child.global_state for child in children_ids])
                     if record._get_state_score(children_state) > waiting_score:
                         record.global_state = record.local_state
                     else:
@@ -248,7 +252,7 @@ class runbot_build(models.Model):
                 '|', ('local_result', '=', False), ('local_result', '!=', 'skipped'),  # had to reintroduce False posibility for selections
                 ('config_id', '=', build_id.config_id.id),
                 ('extra_params', '=', build_id.extra_params),
-                ('config_data', '=', build_id.config_data),
+                ('config_data', '=', build_id.config_data or False),
             ]
             candidates = self.search(domain)
             if candidates and nb_deps:
