@@ -195,21 +195,20 @@ class runbot_build(models.Model):
 
     @api.model_create_single
     def create(self, vals):
-        branch = self.env['runbot.branch'].search([('id', '=', vals.get('branch_id', False))])  # branche 10174?
-        if branch.no_build:
-            return self.env['runbot.build']
-        vals['config_id'] = vals['config_id'] if 'config_id' in vals else branch.config_id.id
+        if not 'config_id' in vals:
+            branch = self.env['runbot.branch'].browse(vals.get('branch_id'))
+            vals['config_id'] = branch.config_id.id
         build_id = super(runbot_build, self).create(vals)
-        extra_info = {'sequence': build_id.id if not build_id.sequence else build_id.sequence}
-        context = self.env.context
+        extra_info = {}
+        if not build_id.sequence:
+            extra_info['sequence'] = build_id.id
 
         # compute dependencies
         repo = build_id.repo_id
         dep_create_vals = []
-        nb_deps = len(repo.dependency_ids)
-        params = build_id._get_params()
         build_id._log('create', 'Build created') # mainly usefull to log creation time
         if not vals.get('dependency_ids'):
+            params = build_id._get_params() # calling git show, dont call that if not usefull.
             for extra_repo in repo.dependency_ids:
                 repo_name = extra_repo.short_name
                 last_commit = params['dep'][repo_name]  # not name
@@ -238,11 +237,10 @@ class runbot_build(models.Model):
                     'dependency_hash': last_commit,
                     'match_type': match_type,
                 })
+            for dep_vals in dep_create_vals:
+                self.env['runbot.build.dependency'].sudo().create(dep_vals)
 
-        for dep_vals in dep_create_vals:
-            self.env['runbot.build.dependency'].sudo().create(dep_vals)
-
-        if not context.get('force_rebuild') and not vals.get('build_type') == 'rebuild':
+        if not self.env.context.get('force_rebuild') and not vals.get('build_type') == 'rebuild':
             # detect duplicate
             duplicate_id = None
             domain = [
@@ -257,6 +255,8 @@ class runbot_build(models.Model):
                 ('config_data', '=', build_id.config_data or False),
             ]
             candidates = self.search(domain)
+
+            nb_deps = len(repo.dependency_ids)
             if candidates and nb_deps:
                 # check that all depedencies are matching.
 
@@ -296,7 +296,9 @@ class runbot_build(models.Model):
                     continue
                 docker_source_folders.add(docker_source_folder)
 
-        build_id.write(extra_info)
+        if extra_info:
+            build_id.write(extra_info)
+
         if build_id.local_state == 'duplicate' and build_id.duplicate_id.global_state in ('running', 'done'):
             build_id._github_status()
         return build_id
@@ -307,7 +309,6 @@ class runbot_build(models.Model):
             build_by_old_values = defaultdict(lambda: self.env['runbot.build'])
             for record in self:
                 build_by_old_values[record.local_state] += record
-        assert 'state' not in values
         local_result = values.get('local_result')
         for build in self:
             assert not local_result or local_result == self._get_worst_result([build.local_result, local_result])  # dont write ok on a warn/error build

@@ -290,15 +290,6 @@ class Test_Build(RunbotCase):
         })
         self.assertEqual(build.config_id, self.branch.config_id, "config_id should be the same as the branch")
 
-    def test_build_from_branch_no_build(self):
-        """test build is not even created when branch no_build is True"""
-        self.branch.no_build = True
-        build = self.create_build({
-            'branch_id': self.branch.id,
-            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
-        })
-        self.assertEqual(build, self.Build, "build should be an empty recordset")
-
     def test_build_config_can_be_set(self):
         """test build config_id can be set to something different than the one on the branch"""
         self.branch.config_id = self.env.ref('runbot.runbot_build_config_default')
