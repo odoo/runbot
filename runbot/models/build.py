@@ -833,7 +833,7 @@ class runbot_build(models.Model):
         self._local_pg_dropdb(dbname)
         _logger.debug("createdb %s", dbname)
         with local_pgadmin_cursor() as local_cr:
-            local_cr.execute("""CREATE DATABASE "%s" TEMPLATE template0 LC_COLLATE 'C' ENCODING 'unicode'""" % dbname)
+            local_cr.execute("""CREATE DATABASE "%s" TEMPLATE template1 LC_COLLATE 'C' ENCODING 'unicode'""" % dbname)
 
     def _log(self, func, message, level='INFO', log_type='runbot', path='runbot'):
         self.ensure_one()
