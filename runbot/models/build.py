@@ -240,7 +240,7 @@ class runbot_build(models.Model):
         for dep_vals in dep_create_vals:
             self.env['runbot.build.dependency'].sudo().create(dep_vals)
 
-        if not context.get('force_rebuild'):  # not vals.get('build_type') == rebuild': could be enough, but some cron on runbot are using this ctx key, to do later
+        if not context.get('force_rebuild') and not vals.get('build_type') == 'rebuild':
             # detect duplicate
             duplicate_id = None
             domain = [
