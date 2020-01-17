@@ -9,6 +9,7 @@ RUN set -x ; \
     build-essential \
     ca-certificates \
     curl \
+    file \
     fonts-freefont-ttf \
     fonts-noto-cjk \
     gawk \
