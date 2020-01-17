@@ -35,6 +35,7 @@ class runbot_build(models.Model):
     _name = "runbot.build"
     _description = "Build"
 
+    _parent_store = True
     _order = 'id desc'
     _rec_name = 'id'
 
@@ -96,6 +97,7 @@ class runbot_build(models.Model):
                                   default='normal',
                                   string='Build type')
     parent_id = fields.Many2one('runbot.build', 'Parent Build', index=True)
+    parent_path = fields.Char('Parent path', index=True)
     # should we add a has children stored boolean?
     hidden = fields.Boolean("Don't show build on main page", default=False)  # index?
     children_ids = fields.One2many('runbot.build', 'parent_id')
