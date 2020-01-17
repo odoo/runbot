@@ -868,8 +868,9 @@ class runbot_build(models.Model):
             build._github_status()
             self.invalidate_cache()
 
-    def _ask_kill(self):
-        # todo xdo, should we kill or skip children builds? it looks like yes, but we need to be carefull if subbuild can be duplicates
+    def _ask_kill(self, lock=True):
+        if lock:
+            self.env.cr.execute("""SELECT id FROM runbot_build WHERE parent_path like %s FOR UPDATE""", ['%s%%' % self.parent_path])
         self.ensure_one()
         user = request.env.user if request else self.env.user
         uid = user.id
@@ -888,7 +889,7 @@ class runbot_build(models.Model):
             build._log('_ask_kill', 'Killing build %s, requested by %s (user #%s)' % (build.dest, user.name, uid))
         for child in build.children_ids:  # should we filter build that are target of a duplicate_id?
             if not child.duplicate_id:
-                child._ask_kill()
+                child._ask_kill(lock=False)
 
     def _wake_up(self):
         build = self.real_build
