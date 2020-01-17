@@ -216,7 +216,10 @@ class runbot_repo(models.Model):
         migration_repo_id = int(icp.get_param('runbot_migration_repo_id', default=0))
         if ln_param and migration_repo_id and self.server_files:
             scripts_dir = self.env['runbot.repo'].browse(migration_repo_id)._get_repo_name_part()
-            os.symlink('/data/build/%s' % scripts_dir,  self._source_path(sha, ln_param))
+            try:
+                os.symlink('/data/build/%s' % scripts_dir,  self._source_path(sha, ln_param))
+            except FileNotFoundError:
+                _logger.warning('Impossible to create migration symlink')
 
         # TODO get result and fallback on cleaing in case of problem
         return export_path
