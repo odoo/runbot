@@ -306,6 +306,7 @@ class Runbot(Controller):
                                 AND global_state in ('running', 'done')
                                 AND branch_id in (SELECT id FROM runbot_branch where sticky='t')
                                 AND local_state != 'duplicate'
+                                AND hidden = false
                                 ORDER BY branch_id ASC, id DESC""", [int(monitored_config_id)])
         last_monitored = request.env['runbot.build'].browse([r[1] for r in request.env.cr.fetchall()])
 
