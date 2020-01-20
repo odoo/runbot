@@ -44,9 +44,11 @@ class Test_Cron(RunbotCase):
         mock_update.assert_called_with(force=False)
         mock_create.assert_called_with()
 
+    @patch('odoo.addons.runbot.models.host.RunboHost._docker_build')
+    @patch('odoo.addons.runbot.models.host.RunboHost._bootstrap')
     @patch('odoo.addons.runbot.models.repo.runbot_repo._reload_nginx')
     @patch('odoo.addons.runbot.models.repo.runbot_repo._scheduler')
-    def test_cron_build(self, mock_scheduler, mock_reload):
+    def test_cron_build(self, mock_scheduler, mock_reload, mock_host_bootstrap, mock_host_docker_build):
         """ test that cron_fetch_and_build do its work """
         hostname = 'host.runbot.com'
         self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_update_frequency', 1)
@@ -56,6 +58,8 @@ class Test_Cron(RunbotCase):
         ret = self.Repo._cron_fetch_and_build(hostname)
         self.assertEqual(None, ret)
         mock_scheduler.assert_called()
+        mock_host_bootstrap.assert_called()
+        mock_host_docker_build.assert_called()
         host = self.env['runbot.host'].search([('name', '=', hostname)])
         self.assertEqual(host.name, hostname, 'A new host should have been created')
         self.assertGreater(host.psql_conn_count, 0, 'A least one connection should exist on the current psql instance')

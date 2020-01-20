@@ -27,6 +27,7 @@ class RunbotClient():
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
         host = self.env['runbot.host']._get_current()
+        host._bootstrap()
         count = 0
         while True:
             try:
@@ -38,6 +39,7 @@ class RunbotClient():
                     self.env['runbot.build']._local_cleanup()
                     self.env['runbot.repo']._docker_cleanup()
                     host.set_psql_conn_count()
+                    host._docker_build()
                     _logger.info('Scheduling...')
                 count += 1
                 sleep_time = self.env['runbot.repo']._scheduler_loop_turn(host)

@@ -602,8 +602,6 @@ class runbot_build(models.Model):
                 # notify pending build - avoid confusing users by saying nothing
                 build._github_status()
                 os.makedirs(build._path('logs'), exist_ok=True)
-                build._log('_schedule', 'Building docker image')
-                docker_build(build._path('logs', 'docker_build.txt'), build._path())
             except Exception:
                 _logger.exception('Failed initiating build %s', build.dest)
                 build._log('_schedule', 'Failed initiating build')
