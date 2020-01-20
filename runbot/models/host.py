@@ -1,6 +1,9 @@
 import logging
+import os
+
 from odoo import models, fields, api
 from ..common import fqdn, local_pgadmin_cursor
+from ..container import docker_build
 _logger = logging.getLogger(__name__)
 
 
@@ -43,6 +46,23 @@ class RunboHost(models.Model):
         if not 'disp_name' in values:
             values['disp_name'] = values['name']
         return super().create(values)
+
+    def _bootstrap(self):
+        """ Create needed directories in static """
+        dirs = ['build', 'nginx', 'repo', 'sources', 'src', 'docker']
+        static_path = self._get_work_path()
+        static_dirs = {d: os.path.join(static_path, d) for d in dirs}
+        for dir, path in static_dirs.items():
+            os.makedirs(path, exist_ok=True)
+
+    def _docker_build(self):
+        """ build docker image """
+        static_path = self._get_work_path()
+        log_path = os.path.join(static_path, 'docker', 'docker_build.txt')
+        docker_build(log_path, static_path)
+
+    def _get_work_path(self):
+        return os.path.abspath(os.path.join(os.path.dirname(__file__), '../static'))
 
     @api.model
     def _get_current(self):

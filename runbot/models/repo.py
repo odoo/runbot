@@ -660,6 +660,7 @@ class runbot_repo(models.Model):
 
         host = self.env['runbot.host']._get_current()
         host.set_psql_conn_count()
+        host._bootstrap()
         host.last_start_loop = fields.Datetime.now()
         
         self._commit()
@@ -673,6 +674,7 @@ class runbot_repo(models.Model):
         self.env['runbot.build']._local_cleanup()
         # 3. docker cleanup
         self.env['runbot.repo']._docker_cleanup()
+        host._docker_build()
 
         timeout = self._get_cron_period()
         icp = self.env['ir.config_parameter']
