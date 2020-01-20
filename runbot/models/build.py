@@ -436,6 +436,7 @@ class runbot_build(models.Model):
                         'config_data': build.config_data,
                         'orphan_result': build.orphan_result,
                         'dependency_ids': build._copy_dependency_ids(),
+                        'description': build.description,
                     })
                     #  if replace: ?
                     if build.parent_id:
