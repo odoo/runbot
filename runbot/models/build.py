@@ -544,7 +544,7 @@ class runbot_build(models.Model):
             build_dir = os.path.join(builds_dir, dest)
             for f in os.listdir(build_dir):
                 path = os.path.join(build_dir, f)
-                if os.path.isdir(path) and f != 'logs':
+                if os.path.isdir(path) and f not in ('logs', 'tests'):
                     shutil.rmtree(path)
                 elif f == 'logs':
                     log_path = os.path.join(build_dir, 'logs')
