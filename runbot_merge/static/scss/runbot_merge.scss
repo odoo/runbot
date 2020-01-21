@@ -1,0 +1,61 @@
+// FIX: bs4 shit-heap colors and styles
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #666666;
+}
+h1, h2, h3, h4, h5, h6{
+  color: inherit;
+  margin-top: 0.66em;
+  margin-bottom: 0.33em;
+}
+h5 { font-size: 1em; }
+.bg-success, .bg-info, .bg-warning, .bg-danger, .bg-gray-lighter {
+  color: inherit;
+}
+.dropdown-item, .dropdown-menu, .dropdown-menu a {
+  color: inherit;
+}
+.bg-success {
+  background-color: #dff0d8 !important;
+}
+.bg-info {
+  background-color: #d9edf7 !important;
+}
+.bg-warning {
+  background-color: #fcf8e3 !important;
+}
+.bg-danger {
+  background-color: #f2dede !important;
+}
+.list-inline {
+  margin-bottom: 10px;
+}
+.list-inline > li {
+  padding: 0 5px;
+  margin-right: 0;
+}
+
+// mergebot layouting
+.stagings {
+    display: flex;
+    align-items: stretch;
+}
+.stagings > li {
+    flex: 1;
+
+    padding: 0.1em;
+    padding-left: 0.5em;
+}
+.stagings > li:not(:last-child) {
+    border-right: 1px solid lightgray;
+}
+.batch:not(:last-child) {
+    border-bottom: 1px solid lightgray;
+}
+.batch a:not(:last-of-type) a:after {
+    content: ",";
+}
+.pr-listing > * { display: inline-block; }
+.pr-awaiting { opacity: 0.8; }
+.pr-blocked { opacity: 0.6; }
+.pr-failed { opacity: 0.9; }
