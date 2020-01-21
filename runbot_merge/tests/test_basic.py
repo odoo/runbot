@@ -15,7 +15,10 @@ from test_utils import re_matches, get_partner, _simple_init
 @pytest.fixture
 def repo(project, make_repo):
     r = make_repo('repo')
-    project.write({'repo_ids': [(0, 0, {'name': r.name})]})
+    project.write({'repo_ids': [(0, 0, {
+        'name': r.name,
+        'required_statuses': 'legal/cla,ci/runbot'
+    })]})
     return r
 
 def test_trivial_flow(env, repo, page, users, config):
@@ -937,7 +940,7 @@ def test_reopen_state(env, repo):
 def test_no_required_statuses(env, repo, config):
     """ check that mergebot can work on a repo with no CI at all
     """
-    env['runbot_merge.project'].search([]).required_statuses = ''
+    env['runbot_merge.repository'].search([('name', '=', repo.name)]).required_statuses = ''
     with repo:
         m = repo.make_commit(None, 'initial', None, tree={'0': '0'})
         repo.make_ref('heads/master', m)

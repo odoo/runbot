@@ -25,7 +25,6 @@ def make_basic(env, config, make_repo, *, fp_token, fp_remote):
             'github_token': config['github']['token'],
             'github_prefix': 'hansen',
             'fp_github_token': fp_token and config['github']['token'],
-            'required_statuses': 'legal/cla,ci/runbot',
             'branch_ids': [
                 (0, 0, {'name': 'a', 'fp_sequence': 2, 'fp_target': True}),
                 (0, 0, {'name': 'b', 'fp_sequence': 1, 'fp_target': True}),
@@ -59,6 +58,7 @@ def make_basic(env, config, make_repo, *, fp_token, fp_remote):
     project.write({
         'repo_ids': [(0, 0, {
             'name': prod.name,
+            'required_statuses': 'legal/cla,ci/runbot',
             'fp_remote_target': fp_remote and other.name,
         })],
     })

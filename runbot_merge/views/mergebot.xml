@@ -19,9 +19,6 @@
                         <group>
                             <field name="github_prefix" string="bot name"/>
                         </group>
-                        <group>
-                            <field name="required_statuses"/>
-                        </group>
                     </group>
                     <group>
                         <group>
@@ -38,6 +35,7 @@
                     <field name="repo_ids">
                         <tree editable="bottom">
                             <field name="name"/>
+                            <field name="required_statuses"/>
                         </tree>
                     </field>
                     <separator string="Branches"/>

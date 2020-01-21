@@ -36,5 +36,4 @@ def project(env, config):
         'github_token': config['github']['token'],
         'github_prefix': 'hansen',
         'branch_ids': [(0, 0, {'name': 'master'})],
-        'required_statuses': 'legal/cla,ci/runbot',
     })
