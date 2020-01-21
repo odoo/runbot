@@ -41,11 +41,6 @@ class Project(models.Model):
         "target branches of PR this project handles."
     )
 
-    required_statuses = fields.Char(
-        help="Comma-separated list of status contexts which must be "\
-        "`success` for a PR or staging to be valid",
-        default='legal/cla,ci/runbot'
-    )
     ci_timeout = fields.Integer(
         default=60, required=True,
         help="Delay (in minutes) before a staging is considered timed out and failed"
@@ -217,6 +212,11 @@ class Repository(models.Model):
 
     name = fields.Char(required=True)
     project_id = fields.Many2one('runbot_merge.project', required=True)
+    required_statuses = fields.Char(
+        help="Comma-separated list of status contexts which must be "\
+        "`success` for a PR or staging to be valid",
+        default='legal/cla,ci/runbot'
+    )
 
     def github(self, token_field='github_token'):
         return github.GH(self.project_id[token_field], self.name)
@@ -586,7 +586,7 @@ class PullRequests(models.Model):
         for pr in self:
             pr.blocked = pr.id not in stageable
 
-    @api.depends('head', 'repository.project_id.required_statuses')
+    @api.depends('head', 'repository.required_statuses')
     def _compute_statuses(self):
         Commits = self.env['runbot_merge.commit']
         for s in self:
@@ -599,7 +599,7 @@ class PullRequests(models.Model):
             s.statuses = pprint.pformat(statuses)
 
             st = 'success'
-            for ci in s.repository.project_id.required_statuses.split(','):
+            for ci in s.repository.required_statuses.split(','):
                 v = state_(statuses, ci) or 'pending'
                 if v in ('error', 'failure'):
                     st = 'failure'
@@ -851,7 +851,7 @@ class PullRequests(models.Model):
         # targets
         failed = self.browse(())
         for pr in self:
-            required = filter(None, pr.repository.project_id.required_statuses.split(','))
+            required = filter(None, pr.repository.required_statuses.split(','))
 
             success = True
             for ci in required:
@@ -1416,18 +1416,23 @@ class Stagings(models.Model):
             if s.state != 'pending':
                 continue
 
-            heads = [
-                head for repo, head in json.loads(s.heads).items()
+            repos = {
+                repo.name: repo
+                for repo in self.env['runbot_merge.repository'].search([])
+            }
+            repomap = {
+                head: repos[repo]
+                for repo, head in json.loads(s.heads).items()
                 if not repo.endswith('^')
-            ]
+            }
             commits = Commits.search([
-                ('sha', 'in', heads)
+                ('sha', 'in', list(repomap))
             ])
 
             update_timeout_limit = False
-            reqs = [r.strip() for r in s.target.project_id.required_statuses.split(',')]
             st = 'success'
             for c in commits:
+                reqs = [r.strip() for r in repomap[c.sha].required_statuses.split(',')]
                 statuses = json.loads(c.statuses)
                 for v in map(lambda n: state_(statuses, n), reqs):
                     if st == 'failure' or v in ('error', 'failure'):
@@ -1441,7 +1446,7 @@ class Stagings(models.Model):
                         assert v == 'success'
             # mark failure as soon as we find a failed status, but wait until
             # all commits are known & not pending to mark a success
-            if st == 'success' and len(commits) < len(heads):
+            if st == 'success' and len(commits) < len(repomap):
                 st = 'pending'
 
             vals = {'state': st}

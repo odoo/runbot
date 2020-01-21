@@ -14,19 +14,28 @@ from test_utils import re_matches, get_partner
 @pytest.fixture
 def repo_a(project, make_repo):
     repo = make_repo('a')
-    project.write({'repo_ids': [(0, 0, {'name': repo.name})]})
+    project.write({'repo_ids': [(0, 0, {
+        'name': repo.name,
+        'required_statuses': 'legal/cla,ci/runbot'
+    })]})
     return repo
 
 @pytest.fixture
 def repo_b(project, make_repo):
     repo = make_repo('b')
-    project.write({'repo_ids': [(0, 0, {'name': repo.name})]})
+    project.write({'repo_ids': [(0, 0, {
+        'name': repo.name,
+        'required_statuses': 'legal/cla,ci/runbot'
+    })]})
     return repo
 
 @pytest.fixture
 def repo_c(project, make_repo):
     repo = make_repo('c')
-    project.write({'repo_ids': [(0, 0, {'name': repo.name})]})
+    project.write({'repo_ids': [(0, 0, {
+        'name': repo.name,
+        'required_statuses': 'legal/cla,ci/runbot'
+    })]})
     return repo
 
 def make_pr(repo, prefix, trees, *, target='master', user,
@@ -136,6 +145,48 @@ def test_stage_match(env, project, repo_a, repo_b, config):
 
     assert 'Related: {}#{}'.format(repo_b.name, pr_b.number) in repo_a.commit('master').message
     assert 'Related: {}#{}'.format(repo_a.name, pr_a.number) in repo_b.commit('master').message
+
+def test_stage_different_statuses(env, project, repo_a, repo_b, config):
+    project.batch_limit = 1
+
+    env['runbot_merge.repository'].search([
+        ('name', '=', repo_b.name)
+    ]).write({
+        'required_statuses': 'foo/bar',
+    })
+
+    with repo_a:
+        make_branch(repo_a, 'master', 'initial', {'a': 'a_0'})
+        pr_a = make_pr(
+            repo_a, 'do-a-thing', [{'a': 'a_1'}],
+            user=config['role_user']['token'],
+            reviewer=config['role_reviewer']['token'],
+        )
+        repo_a.post_status(pr_a.head, 'success', 'foo/bar')
+    with repo_b:
+        make_branch(repo_b, 'master', 'initial', {'a': 'b_0'})
+        pr_b = make_pr(repo_b, 'do-a-thing', [{'a': 'b_1'}],
+            user=config['role_user']['token'],
+            reviewer=config['role_reviewer']['token'],
+        )
+    env.run_crons()
+    # since the labels are the same but the statuses on pr_b are not the
+    # expected ones, pr_a should be blocked on pr_b, which should be approved
+    # but not validated / ready
+    pr_a_id = to_pr(env, pr_a)
+    pr_b_id = to_pr(env, pr_b)
+    assert pr_a_id.state == 'ready'
+    assert not pr_a_id.staging_id
+    assert pr_a_id.blocked
+    assert pr_b_id.state == 'approved'
+    assert not pr_b_id.staging_id
+
+    with repo_b:
+        repo_b.post_status(pr_b.head, 'success', 'foo/bar')
+    env.run_crons()
+
+    assert pr_a_id.state == pr_b_id.state == 'ready'
+    assert pr_a_id.staging_id == pr_b_id.staging_id
 
 def test_unmatch_patch(env, project, repo_a, repo_b, config):
     """ When editing files via the UI for a project you don't have write
