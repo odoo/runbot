@@ -66,7 +66,6 @@ NGROK_CLI = [
 
 def pytest_addoption(parser):
     parser.addoption('--addons-path')
-    parser.addoption('--db', help="DB to run the tests against", default='template_%s' % uuid.uuid4())
     parser.addoption("--no-delete", action="store_true", help="Don't delete repo after a failed run")
 
     parser.addoption(
@@ -78,9 +77,6 @@ def pytest_addoption(parser):
              "queries per minute, free is 40, multi-repo batching tests will "
              "blow through the former); localtunnel has no rate-limiting but "
              "the servers are way less reliable")
-
-def pytest_report_header(config):
-    return 'Running against database ' + config.getoption('--db')
 
 @pytest.fixture(scope='session', autouse=True)
 def _set_socket_timeout():
@@ -220,26 +216,36 @@ def tunnel(pytestconfig, port):
     else:
         raise ValueError("Unsupported %s tunnel method" % tunnel)
 
+class DbDict(dict):
+    def __init__(self, adpath):
+        super().__init__()
+        self._adpath = adpath
+    def __missing__(self, module):
+        db = 'template_%s' % uuid.uuid4()
+        subprocess.run([
+            'odoo', '--no-http',
+            '--addons-path', self._adpath,
+            '-d', db, '-i', module,
+            '--max-cron-threads', '0',
+            '--stop-after-init'
+        ])
+        self[module] = db
+        return db
+
 @pytest.fixture(scope='session')
-def dbcache(request, module):
+def dbcache(request):
     """ Creates template DB once per run, then just duplicates it before
     starting odoo and running the testcase
     """
-    db = request.config.getoption('--db')
-    subprocess.run([
-        'odoo', '--no-http',
-        '--addons-path', request.config.getoption('--addons-path'),
-        '-d', db, '-i', module,
-        '--max-cron-threads', '0',
-        '--stop-after-init'
-    ], check=True)
-    yield db
-    subprocess.run(['dropdb', db], check=True)
+    dbs = DbDict(request.config.getoption('--addons-path'))
+    yield dbs
+    for db in dbs.values():
+        subprocess.run(['dropdb', db], check=True)
 
 @pytest.fixture
-def db(request, dbcache):
+def db(request, module, dbcache):
     rundb = str(uuid.uuid4())
-    subprocess.run(['createdb', '-T', dbcache, rundb], check=True)
+    subprocess.run(['createdb', '-T', dbcache[module], rundb], check=True)
 
     yield rundb
 

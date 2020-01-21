@@ -1,7 +1,7 @@
 import pytest
 import requests
 
-@pytest.fixture(scope='session')
+@pytest.fixture()
 def module():
     return 'runbot_merge'
 

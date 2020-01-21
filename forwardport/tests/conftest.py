@@ -60,7 +60,7 @@ def _cleanup_cache(config, users):
     for login in users.values():
         rmtree(cache_root / login, ignore_errors=True)
 
-@pytest.fixture(scope='session')
+@pytest.fixture()
 def module():
     """ When a test function is (going to be) run, selects the containing
     module (as needing to be installed)
