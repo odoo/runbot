@@ -1,3 +1,4 @@
+import ast
 import base64
 import collections
 import datetime
@@ -217,6 +218,7 @@ class Repository(models.Model):
         "`success` for a PR or staging to be valid",
         default='legal/cla,ci/runbot'
     )
+    branch_filter = fields.Char(default='[(1, "=", 1)]', help="Filter branches valid for this repository")
 
     def github(self, token_field='github_token'):
         return github.GH(self.project_id[token_field], self.name)
@@ -283,6 +285,10 @@ class Repository(models.Model):
                 'pull_request': pr,
                 'repository': {'full_name': self.name},
             })
+
+    def having_branch(self, branch):
+        branches = self.env['runbot_merge.branch'].search
+        return self.filtered(lambda r: branch in branches(ast.literal_eval(r.branch_filter)))
 
 class Branch(models.Model):
     _name = _description = 'runbot_merge.branch'
@@ -388,7 +394,7 @@ class Branch(models.Model):
 
         Batch = self.env['runbot_merge.batch']
         staged = Batch
-        meta = {repo: {} for repo in self.project_id.repo_ids}
+        meta = {repo: {} for repo in self.project_id.repo_ids.having_branch(self)}
         for repo, it in meta.items():
             gh = it['gh'] = repo.github()
             it['head'] = gh.head(self.name)
@@ -435,7 +441,7 @@ class Branch(models.Model):
         })
         # create staging branch from tmp
         token = self.project_id.github_token
-        for r in self.project_id.repo_ids:
+        for r in self.project_id.repo_ids.having_branch(self):
             it = meta[r]
             staging_head = heads[r.name]
             _logger.info(
@@ -1573,7 +1579,7 @@ class Stagings(models.Model):
         logger.info("Checking active staging %s (state=%s)", self, self.state)
         project = self.target.project_id
         if self.state == 'success':
-            gh = {repo.name: repo.github() for repo in project.repo_ids}
+            gh = {repo.name: repo.github() for repo in project.repo_ids.having_branch(self.target)}
             staging_heads = json.loads(self.heads)
             self.env.cr.execute('''
             SELECT 1 FROM runbot_merge_pull_requests
