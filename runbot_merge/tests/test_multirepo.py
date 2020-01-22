@@ -716,3 +716,31 @@ class TestBlocked:
 
         with repo_b: b.post_comment('hansen p=0', config['role_reviewer']['token'])
         assert not pr_a.blocked
+
+def test_different_branches(env, project, repo_a, repo_b, config):
+    project.write({
+        'branch_ids': [(0, 0, {'name': 'dev'})]
+    })
+    # repo_b only works with master
+    env['runbot_merge.repository'].search([('name', '=', repo_b.name)])\
+        .branch_filter = '[("name", "=", "master")]'
+    with repo_a, repo_b:
+        make_branch(repo_a, 'dev', 'initial', {'a': '0'})
+        make_branch(repo_a, 'master', 'initial', {'b': '0'})
+        make_branch(repo_b, 'master', 'initial', {'b': '0'})
+
+        pr_a = make_pr(
+            repo_a, 'xxx', [{'a': '1'}],
+            target='dev',
+            user=config['role_user']['token'],
+            reviewer=config['role_reviewer']['token']
+        )
+    env.run_crons()
+
+    with repo_a:
+        pr_a.post_comment('hansen r+', config['role_reviewer']['token'])
+        repo_a.post_status('heads/staging.dev', 'success', 'legal/cla')
+        repo_a.post_status('heads/staging.dev', 'success', 'ci/runbot')
+    env.run_crons()
+
+    assert to_pr(env, pr_a).state == 'merged'
