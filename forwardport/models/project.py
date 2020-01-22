@@ -11,6 +11,7 @@ means PR creation is trickier (as mergebot assumes opened event will always
 lead to PR creation but fpbot wants to attach meaning to the PR when setting
 it up), ...
 """
+import ast
 import base64
 import contextlib
 import datetime
@@ -122,11 +123,11 @@ class Branch(models.Model):
             b.fp_enabled = b.active and b.fp_target
 
     # FIXME: this should be per-project...
-    def _forward_port_ordered(self):
+    def _forward_port_ordered(self, domain=[]):
         """ Returns all branches in forward port order (from the lowest to
         the highest — usually master)
         """
-        return self.search([], order=self._forward_port_ordering())
+        return self.search(domain, order=self._forward_port_ordering())
 
     def _forward_port_ordering(self):
         return ','.join(
@@ -352,24 +353,6 @@ class PullRequests(models.Model):
             })
         return failed
 
-    def _forward_port_sequence(self):
-        # risk: we assume disabled branches are still at the correct location
-        # in the FP sequence (in case a PR was merged to a branch which is now
-        # disabled, could happen right around the end of the support window)
-        # (or maybe we can ignore this entirely and assume all relevant
-        # branches are active?)
-        fp_complete = self.env['runbot_merge.branch'].with_context(active_test=False)._forward_port_ordered()
-        candidates = iter(fp_complete)
-        for b in candidates:
-            if b == self.target:
-                break
-        # the candidates iterator is just past the current branch's target
-        for target in candidates:
-            if target.fp_enabled:
-                yield target
-            if target == self.limit_id:
-                break
-
     def _find_next_target(self, reference):
         """ Finds the branch between target and limit_id which follows
         reference
@@ -378,7 +361,9 @@ class PullRequests(models.Model):
             return
         # NOTE: assumes even disabled branches are properly sequenced, would
         #       probably be a good idea to have the FP view show all branches
-        branches = list(self.env['runbot_merge.branch'].with_context(active_test=False)._forward_port_ordered())
+        branches = list(self.env['runbot_merge.branch']
+            .with_context(active_test=False)
+            ._forward_port_ordered(ast.literal_eval(self.repository.branch_filter)))
 
         # get all branches between max(root.target, ref.target) (excluded) and limit (included)
         from_ = max(branches.index(self.target), branches.index(reference.target))
@@ -446,13 +431,40 @@ class PullRequests(models.Model):
         ref = self[0]
 
         base = ref.source_id or ref._get_root()
-        target = base._find_next_target(ref)
+        all_targets = [(p.source_id or p._get_root())._find_next_target(p) for p in self]
+        target = all_targets[0]
         if target is None:
             _logger.info(
                 "Will not forward-port %s: no next target",
                 ref.display_name,
             )
             return  # QUESTION: do the prs need to be updated?
+
+        # check if all PRs in the batch have the same "next target" , bail if
+        # that's not the case as it doesn't make sense for forward one PR from
+        # a to b and a linked pr from a to c
+        different_target = next((t for t in all_targets if t != target), None)
+        if different_target:
+            different_pr = next(p for p, t in zip(self, all_targets) if t == different_target)
+            for pr, t in zip(self, all_targets):
+                linked, other = different_pr, different_target
+                if t != target:
+                    linked, other = ref, target
+                self.env['runbot_merge.pull_requests.feedback'].create({
+                    'repository': pr.repository.id,
+                    'pull_request': pr.number,
+                    'token_field': 'fp_github_token',
+                    'message': "This pull request can not be forward ported: "
+                               "next branch is %r but linked pull request %s "
+                               "has a next branch %r." % (
+                        t.name, linked.display_name, other.name
+                    )
+                })
+            _logger.warning(
+                "Cancelling forward-port of %s: found different next branches (%s)",
+                self, all_targets
+            )
+            return
 
         proj = self.mapped('target.project_id')
         if not proj.fp_github_token:

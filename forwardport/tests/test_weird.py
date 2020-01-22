@@ -20,7 +20,7 @@ def make_basic(env, config, make_repo, *, fp_token, fp_remote):
     Projects = env['runbot_merge.project']
     project = Projects.search([('name', '=', 'myproject')])
     if not project:
-        project = env['runbot_merge.project'].create({
+        project = Projects.create({
             'name': 'myproject',
             'github_token': config['github']['token'],
             'github_prefix': 'hansen',
@@ -204,3 +204,204 @@ def test_failed_staging(env, config, make_repo):
     assert pr3_head.to_check, "check that the commit was updated as to process"
     env.run_crons()
     assert not pr3_head.to_check, "check that the commit was processed"
+
+class TestNotAllBranches:
+    """ Check that forward-ports don't behave completely insanely when not all
+    branches are supported on all repositories.
+
+    repo A branches a -> b -> c
+    a0 -> a1 -> a2       branch a
+          `-> a11 -> a22 branch b
+              `-> a111   branch c
+    repo B branches a ->      c
+    b0 -> b1 -> b2       branch a
+          |
+          `-> b000       branch c
+    """
+    @pytest.fixture
+    def repos(self, env, config, make_repo):
+        project = env['runbot_merge.project'].create({
+            'name': 'proj',
+            'github_token': config['github']['token'],
+            'github_prefix': 'hansen',
+            'fp_github_token': config['github']['token'],
+            'branch_ids': [
+                (0, 0, {'name': 'a', 'fp_sequence': 2, 'fp_target': True}),
+                (0, 0, {'name': 'b', 'fp_sequence': 1, 'fp_target': True}),
+                (0, 0, {'name': 'c', 'fp_sequence': 0, 'fp_target': True}),
+            ]
+        })
+
+        a = make_repo('A')
+        with a:
+            _, a_, _ = a.make_commits(
+                None,
+                Commit('a0', tree={'a': '0'}),
+                Commit('a1', tree={'a': '1'}),
+                Commit('a2', tree={'a': '2'}),
+                ref='heads/a'
+            )
+            b_, _ = a.make_commits(
+                a_,
+                Commit('a11', tree={'b': '11'}),
+                Commit('a22', tree={'b': '22'}),
+                ref='heads/b'
+            )
+            a.make_commits(b_, Commit('a111', tree={'c': '111'}), ref='heads/c')
+        a_dev = a.fork()
+        b = make_repo('B')
+        with b:
+            _, _a, _ = b.make_commits(
+                None,
+                Commit('b0', tree={'a': 'x'}),
+                Commit('b1', tree={'a': 'y'}),
+                Commit('b2', tree={'a': 'z'}),
+                ref='heads/a'
+            )
+            b.make_commits(_a, Commit('b000', tree={'c': 'x'}), ref='heads/c')
+        b_dev = b.fork()
+        project.write({
+            'repo_ids': [
+                (0, 0, {
+                    'name': a.name,
+                    'required_statuses': 'ci/runbot',
+                    'fp_remote_target': a_dev.name,
+                }),
+                (0, 0, {
+                    'name': b.name,
+                    'required_statuses': 'ci/runbot',
+                    'fp_remote_target': b_dev.name,
+                    'branch_filter': '[("name", "in", ["a", "c"])]',
+                })
+            ]
+        })
+        return project, a, a_dev, b, b_dev
+
+    def test_single_first(self, env, repos, config):
+        """ A merge in A.a should be forward-ported to A.b and A.c
+        """
+        project, a, a_dev, b, _ = repos
+        with a, a_dev:
+            [c] = a_dev.make_commits('a', Commit('pr', tree={'pr': '1'}), ref='heads/change')
+            pr = a.make_pr(target='a', title="a pr", head=a_dev.owner + ':change')
+            a.post_status(c, 'success', 'ci/runbot')
+            pr.post_comment('hansen r+', config['role_reviewer']['token'])
+        p = env['runbot_merge.pull_requests'].search([('repository.name', '=', a.name), ('number', '=', pr.number)])
+        env.run_crons()
+        assert p.staging_id
+        with a, b:
+            for repo in a, b:
+                repo.post_status('staging.a', 'success', 'ci/runbot')
+        env.run_crons()
+
+        a_head = a.commit('a')
+        assert a_head.message.startswith('pr\n\n')
+        assert a.read_tree(a_head) == {'a': '2', 'pr': '1'}
+
+        pr0, pr1 = env['runbot_merge.pull_requests'].search([], order='number')
+        with a:
+            a.post_status(pr1.head, 'success', 'ci/runbot')
+        env.run_crons()
+
+        pr0, pr1, pr2 = env['runbot_merge.pull_requests'].search([], order='number')
+        with a:
+            a.post_status(pr2.head, 'success', 'ci/runbot')
+            a.get_pr(pr2.number).post_comment(
+                '%s r+' % project.fp_github_name,
+                config['role_reviewer']['token'])
+        env.run_crons()
+        assert pr1.staging_id
+        assert pr2.staging_id
+        with a, b:
+            a.post_status('staging.b', 'success', 'ci/runbot')
+            a.post_status('staging.c', 'success', 'ci/runbot')
+            b.post_status('staging.c', 'success', 'ci/runbot')
+        env.run_crons()
+
+        assert pr0.state == 'merged'
+        assert pr1.state == 'merged'
+        assert pr2.state == 'merged'
+        assert a.read_tree(a.commit('b')) == {'a': '1', 'b': '22',             'pr': '1'}
+        assert a.read_tree(a.commit('c')) == {'a': '1', 'b': '11', 'c': '111', 'pr': '1'}
+
+    def test_single_second(self, env, repos, config):
+        """ A merge in B.a should "skip ahead" to B.c
+        """
+        project, a, _, b, b_dev = repos
+        with b, b_dev:
+            [c] = b_dev.make_commits('a', Commit('pr', tree={'pr': '1'}), ref='heads/change')
+            pr = b.make_pr(target='a', title="a pr", head=b_dev.owner + ':change')
+            b.post_status(c, 'success', 'ci/runbot')
+            pr.post_comment('hansen r+', config['role_reviewer']['token'])
+        env.run_crons()
+
+        with a, b:
+            a.post_status('staging.a', 'success', 'ci/runbot')
+            b.post_status('staging.a', 'success', 'ci/runbot')
+        env.run_crons()
+
+        assert b.read_tree(b.commit('a')) == {'a': 'z', 'pr': '1'}
+
+        pr0, pr1 = env['runbot_merge.pull_requests'].search([], order='number')
+        with b:
+            b.post_status(pr1.head, 'success', 'ci/runbot')
+            b.get_pr(pr1.number).post_comment(
+                '%s r+' % project.fp_github_name,
+                config['role_reviewer']['token'])
+        env.run_crons()
+        with a, b:
+            a.post_status('staging.c', 'success', 'ci/runbot')
+            b.post_status('staging.c', 'success', 'ci/runbot')
+        env.run_crons()
+
+        assert pr0.state == 'merged'
+        assert pr1.state == 'merged'
+        assert b.read_tree(b.commit('c')) == {'a': 'y', 'c': 'x', 'pr': '1'}
+
+    def test_both_first(self, env, repos, config, users):
+        """ A merge in A.a, B.a should... not be forward-ported at all?
+        """
+        project, a, a_dev, b, b_dev = repos
+        with a, a_dev:
+            [c_a] = a_dev.make_commits('a', Commit('pr a', tree={'pr': 'a'}), ref='heads/change')
+            pr_a = a.make_pr(target='a', title='a pr', head=a_dev.owner + ':change')
+            a.post_status(c_a, 'success', 'ci/runbot')
+            pr_a.post_comment('hansen r+', config['role_reviewer']['token'])
+        with b, b_dev:
+            [c_b] = b_dev.make_commits('a', Commit('pr b', tree={'pr': 'b'}), ref='heads/change')
+            pr_b = b.make_pr(target='a', title='b pr', head=b_dev.owner + ':change')
+            b.post_status(c_b, 'success', 'ci/runbot')
+            pr_b.post_comment('hansen r+', config['role_reviewer']['token'])
+        env.run_crons()
+
+        with a, b:
+            for repo in a, b:
+                repo.post_status('staging.a', 'success', 'ci/runbot')
+        env.run_crons()
+
+        pr_a_id = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', a.name),
+            ('number', '=', pr_a.number),
+        ])
+        pr_b_id = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', b.name),
+            ('number', '=', pr_b.number)
+        ])
+        assert pr_a_id.state == pr_b_id.state == 'merged'
+        assert env['runbot_merge.pull_requests'].search([]) == pr_a_id | pr_b_id
+        # should have refused to create a forward port because the PRs have
+        # different next target
+        assert pr_a.comments == [
+            (users['reviewer'], 'hansen r+'),
+            (users['user'], "This pull request can not be forward ported: next "
+                            "branch is 'b' but linked pull request %s#%d has a"
+                            " next branch 'c'." % (b.name, pr_b.number)
+            )
+        ]
+        assert pr_b.comments == [
+            (users['reviewer'], 'hansen r+'),
+            (users['user'], "This pull request can not be forward ported: next "
+                            "branch is 'c' but linked pull request %s#%d has a"
+                            " next branch 'b'." % (a.name, pr_a.number)
+            )
+        ]
