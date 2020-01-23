@@ -575,18 +575,6 @@ class PullRequests(models.Model):
             for p in self
         ]
 
-    def __str__(self):
-        if len(self) == 0:
-            separator = ''
-        elif len(self) == 1:
-            separator = ' '
-        else:
-            separator = 's '
-        return '<pull_request%s%s>' % (separator, ' '.join(
-            '{0.id} ({0.display_name})'.format(p)
-            for p in self
-        ))
-
     # missing link to other PRs
     @api.depends('priority', 'state', 'squash', 'merge_method', 'batch_id.active', 'label')
     def _compute_is_blocked(self):
