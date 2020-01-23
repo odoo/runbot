@@ -26,7 +26,7 @@ WAIT_FOR_VISIBILITY = [10, 10, 10, 10]
 
 _logger = logging.getLogger(__name__)
 class Project(models.Model):
-    _name = 'runbot_merge.project'
+    _name = _description = 'runbot_merge.project'
 
     name = fields.Char(required=True, index=True)
     repo_ids = fields.One2many(
@@ -213,7 +213,7 @@ class Project(models.Model):
         return bool(self.env.cr.rowcount)
 
 class Repository(models.Model):
-    _name = 'runbot_merge.repository'
+    _name = _description = 'runbot_merge.repository'
 
     name = fields.Char(required=True)
     project_id = fields.Many2one('runbot_merge.project', required=True)
@@ -285,7 +285,7 @@ class Repository(models.Model):
             })
 
 class Branch(models.Model):
-    _name = 'runbot_merge.branch'
+    _name = _description = 'runbot_merge.branch'
     _order = 'sequence, name'
 
     name = fields.Char(required=True)
@@ -507,7 +507,7 @@ class Branch(models.Model):
 
 ACL = collections.namedtuple('ACL', 'is_admin is_reviewer is_author')
 class PullRequests(models.Model):
-    _name = 'runbot_merge.pull_requests'
+    _name = _description = 'runbot_merge.pull_requests'
     _order = 'number desc'
 
     target = fields.Many2one('runbot_merge.branch', required=True, index=True)
@@ -544,18 +544,14 @@ class PullRequests(models.Model):
 
     reviewed_by = fields.Many2one('res.partner')
     delegates = fields.Many2many('res.partner', help="Delegate reviewers, not intrinsically reviewers but can review this PR")
-    priority = fields.Selection([
-        (0, 'Urgent'),
-        (1, 'Pressing'),
-        (2, 'Normal'),
-    ], default=2, index=True)
+    priority = fields.Integer(default=2, index=True)
 
     statuses = fields.Text(compute='_compute_statuses')
     status = fields.Char(compute='_compute_statuses')
     previous_failure = fields.Char(default='{}')
 
-    batch_id = fields.Many2one('runbot_merge.batch',compute='_compute_active_batch', store=True)
-    batch_ids = fields.Many2many('runbot_merge.batch')
+    batch_id = fields.Many2one('runbot_merge.batch', string="Active Batch", compute='_compute_active_batch', store=True)
+    batch_ids = fields.Many2many('runbot_merge.batch', string="Batches")
     staging_id = fields.Many2one(related='batch_id.staging_id', store=True)
     commits_map = fields.Char(help="JSON-encoded mapping of PR commits to actually integrated commits. The integration head (either a merge commit or the PR's topmost) is mapped from the 'empty' pr commit (the key is an empty string, because you can't put a null key in json maps).", default='{}')
 
@@ -574,22 +570,10 @@ class PullRequests(models.Model):
         return super(PullRequests, self)._compute_display_name()
 
     def name_get(self):
-        return {
-            p.id: '%s#%s' % (p.repository.name, p.number)
+        return [
+            (p.id, '%s#%d' % (p.repository.name, p.number))
             for p in self
-        }
-
-    def __str__(self):
-        if len(self) == 0:
-            separator = ''
-        elif len(self) == 1:
-            separator = ' '
-        else:
-            separator = 's '
-        return '<pull_request%s%s>' % (separator, ' '.join(
-            '{0.id} ({0.display_name})'.format(p)
-            for p in self
-        ))
+        ]
 
     # missing link to other PRs
     @api.depends('priority', 'state', 'squash', 'merge_method', 'batch_id.active', 'label')
@@ -608,6 +592,7 @@ class PullRequests(models.Model):
         for s in self:
             c = Commits.search([('sha', '=', s.head)])
             if not (c and c.statuses):
+                s.status = s.statuses = False
                 continue
 
             statuses = json.loads(c.statuses)
@@ -965,7 +950,6 @@ class PullRequests(models.Model):
             'message': message,
         })
 
-    @api.multi
     def write(self, vals):
         oldstate = { pr: pr._tagstate for pr in self }
 
@@ -988,7 +972,6 @@ class PullRequests(models.Model):
                 })
         return w
 
-    @api.multi
     def unlink(self):
         for pr in self:
             self.env['runbot_merge.pull_requests.tagging'].create({
@@ -1212,7 +1195,7 @@ class PullRequests(models.Model):
         WHERE id = %s AND state != 'merged'
         ''', [self.id])
         self.env.cr.commit()
-        self.invalidate_cache(fnames=['state'], ids=[self.id])
+        self.modified(['state'])
         if self.env.cr.rowcount:
             self.env['runbot_merge.pull_requests.tagging'].create({
                 'pull_request': self.number,
@@ -1259,7 +1242,7 @@ class Tagging(models.Model):
     way of that. Instead, queue tagging changes into this table whose
     execution can be cron-driven.
     """
-    _name = 'runbot_merge.pull_requests.tagging'
+    _name = _description = 'runbot_merge.pull_requests.tagging'
 
     repository = fields.Many2one('runbot_merge.repository', required=True)
     # store the PR number (not id) as we need a Tagging for PR objects
@@ -1290,7 +1273,7 @@ class Tagging(models.Model):
 class Feedback(models.Model):
     """ Queue of feedback comments to send to PR users
     """
-    _name = 'runbot_merge.pull_requests.feedback'
+    _name = _description = 'runbot_merge.pull_requests.feedback'
 
     repository = fields.Many2one('runbot_merge.repository', required=True)
     # store the PR number (not id) as we may want to send feedback to PR
@@ -1310,7 +1293,7 @@ class Commit(models.Model):
     independent of everything else as commits can be created by
     statuses only, by PR pushes, by branch updates, ...
     """
-    _name = 'runbot_merge.commit'
+    _name = _description = 'runbot_merge.commit'
 
     sha = fields.Char(required=True)
     statuses = fields.Char(help="json-encoded mapping of status contexts to states", default="{}")
@@ -1366,7 +1349,7 @@ class Commit(models.Model):
         return res
 
 class Stagings(models.Model):
-    _name = 'runbot_merge.stagings'
+    _name = _description = 'runbot_merge.stagings'
 
     target = fields.Many2one('runbot_merge.branch', required=True)
 
@@ -1466,7 +1449,6 @@ class Stagings(models.Model):
                 vals['timeout_limit'] = fields.Datetime.to_string(datetime.datetime.now() + datetime.timedelta(minutes=s.target.project_id.ci_timeout))
             s.write(vals)
 
-    @api.multi
     def action_cancel(self):
         self.cancel("explicitly cancelled by %s", self.env.user.display_name)
         return { 'type': 'ir.actions.act_window_close' }
@@ -1691,7 +1673,7 @@ class Stagings(models.Model):
         return repo_name
 
 class Split(models.Model):
-    _name = 'runbot_merge.split'
+    _name = _description = 'runbot_merge.split'
 
     target = fields.Many2one('runbot_merge.branch', required=True)
     batch_ids = fields.One2many('runbot_merge.batch', 'split_id', context={'active_test': False})
@@ -1703,7 +1685,7 @@ class Batch(models.Model):
     repositories e.g. change an API in repo1, this breaks use of that API
     in repo2 which now needs to be updated.
     """
-    _name = 'runbot_merge.batch'
+    _name = _description = 'runbot_merge.batch'
 
     target = fields.Many2one('runbot_merge.branch', required=True)
     staging_id = fields.Many2one('runbot_merge.stagings')
@@ -1796,7 +1778,7 @@ class Batch(models.Model):
         })
 
 class FetchJob(models.Model):
-    _name = 'runbot_merge.fetch_job'
+    _name = _description = 'runbot_merge.fetch_job'
 
     active = fields.Boolean(default=True)
     repository = fields.Many2one('runbot_merge.repository', required=True)

@@ -1,34 +1,17 @@
 <odoo>
-    <template id="dashboard" name="mergebot dashboard">
-        <t t-set="styles">
-            <style>
-            .stagings {
-                display: flex;
-                align-items: stretch;
-            }
-            .stagings > li {
-                flex: 1;
+    <function model="website.page" name="write">
+        <value eval="ref('website.homepage_page')"/>
+        <value eval="{'active': False}"/>
+    </function>
 
-                padding: 0.1em;
-                padding-left: 0.5em;
-            }
-            .stagings > li:not(:last-child) {
-                border-right: 1px solid lightgray;
-            }
-            .batch:not(:last-child) {
-                border-bottom: 1px solid lightgray;
-            }
-            .batch a:not(:last-of-type) a:after {
-                content: ",";
-            }
-            .pr-listing > * { display: inline-block; }
-            .pr-awaiting { opacity: 0.8; }
-            .pr-blocked { opacity: 0.6; }
-            .pr-failed { opacity: 0.9; }
-            </style>
-        </t>
+    <template id="assets_frontend" inherit_id="web.assets_frontend">
+        <xpath expr="link[last()]" position="after">
+            <link rel="stylesheet" type="text/scss" href="/runbot_merge/static/scss/runbot_merge.scss"/>
+        </xpath>
+    </template>
+
+    <template id="dashboard" name="mergebot dashboard">
         <t t-call="website.layout">
-            <t t-set="head" t-value="(head or '') + styles"/>
             <div id="wrap"><div class="container-fluid">
                 <section t-foreach="projects.with_context(active_test=False)" t-as="project" class="row">
                     <h1 class="col-md-12"><t t-esc="project.name"/></h1>

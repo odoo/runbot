@@ -886,6 +886,7 @@ class Feedback(models.Model):
 
 class Tagging(models.Model):
     _name = 'forwardport.tagging'
+    _description = "ad-hoc forwardport tagging commands"
 
     token_field = fields.Selection([
         ('github_token', 'Mergebot'),
