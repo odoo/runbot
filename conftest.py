@@ -45,6 +45,8 @@ import configparser
 import copy
 import itertools
 import logging
+import os
+import random
 import re
 import socket
 import subprocess
@@ -149,6 +151,8 @@ def tunnel(pytestconfig, port):
         addr = 'localhost:%d' % port
         # if ngrok is not running, start it
         try:
+            # FIXME: use lockfile instead
+            time.sleep(random.randint(1, 10))
             # FIXME: use config file so we can set web_addr to something else
             #        than localhost:4040 (otherwise we can't disambiguate
             #        between the ngrok we started and an ngrok started by
@@ -321,17 +325,9 @@ def make_repo(request, config, tunnel, users):
 
     repos = []
     def repomaker(name):
+        name = 'ignore_%s_%s' % (name, base64.b64encode(os.urandom(6), b'-_').decode())
         fullname = '{}/{}'.format(owner, name)
         repo_url = 'https://api.github.com/repos/{}'.format(fullname)
-        if request.config.getoption('--no-delete'):
-            if github.head(repo_url).ok:
-                pytest.skip("Repository {} already exists".format(fullname))
-        else:
-            # just try to delete the repo, we don't really care
-            if github.delete(repo_url).ok:
-                # if we did delete a repo, wait a bit as gh might need to
-                # propagate the thing?
-                time.sleep(30)
 
         # create repo
         r = github.post(endpoint, json={
