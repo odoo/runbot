@@ -263,10 +263,15 @@ class ConfigStep(models.Model):
         eval_ctx = self.make_python_ctx(build)
         try:
             safe_eval(self.python_code.strip(), eval_ctx, mode="exec", nocopy=True)
-        except RunbotException as e:
+        except ValueError as e:
+            save_eval_value_error_re = r'<class \'odoo.addons.runbot.models.repo.RunbotException\'>: "(.*)" while evaluating\n.*'
             message = e.args[0]
-            build._log("run", message, level='ERROR')
-            build._kill(result='ko')
+            groups = re.match(save_eval_value_error_re, message)
+            if groups:
+                build._log("run", groups[1], level='ERROR')
+                build._kill(result='ko')
+            else:
+                raise
 
 
     def _is_docker_step(self):
