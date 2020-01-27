@@ -67,6 +67,7 @@ NGROK_CLI = [
 def pytest_addoption(parser):
     parser.addoption('--addons-path')
     parser.addoption("--no-delete", action="store_true", help="Don't delete repo after a failed run")
+    parser.addoption('--log-github', action='store_true')
 
     parser.addoption(
         '--tunnel', action="store", type="choice", choices=['ngrok', 'localtunnel'], default='ngrok',
@@ -290,10 +291,14 @@ def port():
 
 @pytest.fixture
 def server(request, db, port, module):
+    opts = ['--log-handler', 'github_requests:WARNING']
+    if request.config.getoption('--log-github'):
+        opts = []
+
     p = subprocess.Popen([
         'odoo', '--http-port', str(port),
         '--addons-path', request.config.getoption('--addons-path'),
-        '-d', db,
+        '-d', db, *opts,
         '--max-cron-threads', '0', # disable cron threads (we're running crons by hand)
     ])
 
