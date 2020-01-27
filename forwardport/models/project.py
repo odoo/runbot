@@ -343,22 +343,22 @@ class PullRequests(models.Model):
             # otherwise check if we already have a pending forward port
             _logger.info("%s %s %s", pr, batch, batch.prs)
             if self.env['forwardport.batches'].search_count([('batch_id', '=', batch.id)]):
-                _logger.warn('-> already recorded')
+                _logger.warning('-> already recorded')
                 continue
 
             # check if batch-mate are all valid
             mates = batch.prs
             # wait until all of them are validated or ready
             if any(pr.state not in ('validated', 'ready') for pr in mates):
-                _logger.warn("-> not ready (%s)", [(pr.number, pr.state) for pr in mates])
+                _logger.warning("-> not ready (%s)", [(pr.number, pr.state) for pr in mates])
                 continue
 
             # check that there's no weird-ass state
             if not all(pr.parent_id for pr in mates):
-                _logger.warn("Found a batch (%s) with only some PRs having parents, ignoring", mates)
+                _logger.warning("Found a batch (%s) with only some PRs having parents, ignoring", mates)
                 continue
             if self.search_count([('parent_id', 'in', mates.ids)]):
-                _logger.warn("Found a batch (%s) with only some of the PRs having children", mates)
+                _logger.warning("Found a batch (%s) with only some of the PRs having children", mates)
                 continue
 
             _logger.info('-> ok')
