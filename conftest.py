@@ -996,6 +996,8 @@ class Model:
         return Model(self._env, self._model, ids, fields=self._fields)
 
     def __getattr__(self, fieldname):
+        if fieldname in ['__dataclass_fields__', '__attrs_attrs__']:
+            raise AttributeError('%r is invalid on %s' % (fieldname, self._model))
         if not self._ids:
             return False
 
@@ -1003,7 +1005,10 @@ class Model:
         if fieldname == 'id':
             return self._ids[0]
 
-        val = self.read([fieldname])[0][fieldname]
+        try:
+            val = self.read([fieldname])[0][fieldname]
+        except Exception:
+            raise AttributeError('%r is invalid on %s' % (fieldname, self._model))
         field_description = self._fields[fieldname]
         if field_description['type'] in ('many2one', 'one2many', 'many2many'):
             val = val or []
