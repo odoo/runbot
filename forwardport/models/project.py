@@ -29,6 +29,7 @@ import dateutil
 import requests
 
 from odoo import _, models, fields, api
+from odoo.osv import expression
 from odoo.exceptions import UserError
 from odoo.tools import topological_sort, groupby
 from odoo.tools.appdirs import user_cache_dir
@@ -106,6 +107,82 @@ class Project(models.Model):
         if to_remove:
             self.env['forwardport.tagging'].browse(to_remove).unlink()
 
+    def write(self, vals):
+        Branches = self.env['runbot_merge.branch']
+        # check on branches both active and inactive so disabling branches doesn't
+        # make it look like the sequence changed.
+        self_ = self.with_context(active_test=False)
+        branches_before = {project: project._forward_port_ordered() for project in self_}
+
+        r = super().write(vals)
+        for p in self_:
+            # check if the branches sequence has been modified
+            bbefore = branches_before[p]
+            bafter = p._forward_port_ordered()
+            if bafter.ids == bbefore.ids:
+                continue
+            # if it's just that a branch was inserted at the end forwardport
+            # should keep on keeping normally
+            if bafter.ids[:-1] == bbefore.ids:
+                continue
+
+            if bafter <= bbefore:
+                raise UserError("Branches can not be reordered or removed after saving.")
+
+            # Last possibility: branch was inserted but not at end, get all
+            # branches before and all branches after
+            before = new = after = Branches
+            for b in bafter:
+                if b in bbefore:
+                    if new:
+                        after += b
+                    else:
+                        before += b
+                else:
+                    if new:
+                        raise UserError("Inserting multiple branches at the same time is not supported")
+                    new = b
+            # find all FPs whose ancestry spans the insertion
+            leaves = self.env['runbot_merge.pull_requests'].search([
+                ('state', 'not in', ['closed', 'merged']),
+                ('target', 'in', after.ids),
+                ('source_id.target', 'in', before.ids),
+            ])
+            # get all PRs just preceding the insertion point which either are
+            # sources of the above or have the same source
+            candidates = self.env['runbot_merge.pull_requests'].search([
+                ('target', '=', before[-1].id),
+                '|', ('id', 'in', leaves.mapped('source_id').ids),
+                     ('source_id', 'in', leaves.mapped('source_id').ids),
+            ])
+            # enqueue the creation of a new forward-port based on our candidates
+            # but it should only create a single step and needs to stitch batch
+            # the parents linked list, so it has a special type
+            for c in candidates:
+                self.env['forwardport.batches'].create({
+                    'batch_id': self.env['runbot_merge.batch'].create({
+                        'target': before[-1].id,
+                        'prs': [(4, c.id, 0)],
+                        'active': False,
+                    }).id,
+                    'source': 'insert',
+                })
+        return r
+
+    def _forward_port_ordered(self, domain=()):
+        Branches = self.env['runbot_merge.branch']
+        ordering_items = re.split(r',\s*', 'fp_sequence,' + Branches._order)
+        ordering = ','.join(
+            # reverse order (desc -> asc, asc -> desc) as we want the "lower"
+            # branches to be first in the ordering
+            f[:-5] if f.lower().endswith(' desc') else f + ' desc'
+            for f in ordering_items
+        )
+        return Branches.search(expression.AND([
+            [('project_id', '=', self.id)],
+            domain or [],
+        ]), order=ordering)
+
 class Repository(models.Model):
     _inherit = 'runbot_merge.repository'
     fp_remote_target = fields.Char(help="where FP branches get pushed")
@@ -122,19 +199,6 @@ class Branch(models.Model):
         for b in self:
             b.fp_enabled = b.active and b.fp_target
 
-    # FIXME: this should be per-project...
-    def _forward_port_ordered(self, domain=[]):
-        """ Returns all branches in forward port order (from the lowest to
-        the highest — usually master)
-        """
-        return self.search(domain, order=self._forward_port_ordering())
-
-    def _forward_port_ordering(self):
-        return ','.join(
-            f[:-5] if f.lower().endswith(' desc') else f + ' desc'
-            for f in re.split(r',\s*', 'fp_sequence,' + self._order)
-        )
-
 class PullRequests(models.Model):
     _inherit = 'runbot_merge.pull_requests'
 
@@ -142,11 +206,7 @@ class PullRequests(models.Model):
 
     # QUESTION: should the limit be copied on each child, or should it be inferred from the parent? Also what happens when detaching, is the detached PR configured independently?
     # QUESTION: what happens if the limit_id is deactivated with extant PRs?
-    limit_id = fields.Many2one(
-        'runbot_merge.branch',
-        default=lambda self: self.env['runbot_merge.branch']._forward_port_ordered()[-1],
-        help="Up to which branch should this PR be forward-ported"
-    )
+    limit_id = fields.Many2one('runbot_merge.branch', help="Up to which branch should this PR be forward-ported")
 
     parent_id = fields.Many2one(
         'runbot_merge.pull_requests', index=True,
@@ -169,6 +229,12 @@ class PullRequests(models.Model):
         if existing:
             return existing
 
+        if 'limit_id' not in vals:
+            branch = self.env['runbot_merge.branch'].browse(vals['target'])
+            repo = self.env['runbot_merge.repository'].browse(vals['repository'])
+            vals['limit_id'] = branch.project_id._forward_port_ordered(
+                ast.literal_eval(repo.branch_filter or '[]')
+            )[-1].id
         if vals.get('parent_id') and 'source_id' not in vals:
             vals['source_id'] = self.browse(vals['parent_id'])._get_root().id
         return super().create(vals)
@@ -376,9 +442,9 @@ class PullRequests(models.Model):
             return
         # NOTE: assumes even disabled branches are properly sequenced, would
         #       probably be a good idea to have the FP view show all branches
-        branches = list(self.env['runbot_merge.branch']
+        branches = list(self.target.project_id
             .with_context(active_test=False)
-            ._forward_port_ordered(ast.literal_eval(self.repository.branch_filter)))
+            ._forward_port_ordered(ast.literal_eval(self.repository.branch_filter or '[]')))
 
         # get all branches between max(root.target, ref.target) (excluded) and limit (included)
         from_ = max(branches.index(self.target), branches.index(reference.target))

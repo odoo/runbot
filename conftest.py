@@ -84,7 +84,7 @@ def _set_socket_timeout():
     """ Avoid unlimited wait on standard sockets during tests, this is mostly
     an issue for non-trivial cron calls
     """
-    socket.setdefaulttimeout(60.0)
+    socket.setdefaulttimeout(120.0)
 
 @pytest.fixture(scope="session")
 def config(pytestconfig):
@@ -961,6 +961,9 @@ class Model:
 
     def __repr__(self):
         return "{}({})".format(self._model, ', '.join(str(id_) for id_ in self._ids))
+
+    def browse(self, ids):
+        return Model(self._env, self._model, ids)
 
     def exists(self):
         ids = self._env(self._model, 'exists', self._ids)

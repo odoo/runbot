@@ -43,12 +43,25 @@ class BatchQueue(models.Model, Queue):
     source = fields.Selection([
         ('merge', 'Merge'),
         ('fp', 'Forward Port Followup'),
+        ('insert', 'New branch port')
     ], required=True)
 
     def _process_item(self):
         batch = self.batch_id
 
         newbatch = batch.prs._port_forward()
+        # insert new barch in ancestry sequence unless conflict (= no parent)
+        if self.source == 'insert':
+            for pr in newbatch.prs:
+                if not pr.parent_id:
+                    break
+                newchild = pr.search([
+                    ('parent_id', '=', pr.parent_id.id),
+                    ('id', '!=', pr.id),
+                ])
+                if newchild:
+                    newchild.parent_id = pr.id
+
         if newbatch:
             _logger.info(
                 "Processing %s (from %s): %s (%s) -> %s (%s)",
