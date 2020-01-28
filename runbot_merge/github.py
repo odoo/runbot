@@ -158,7 +158,7 @@ class GH(object):
             if _is_json(r.response):
                 body = r.response.json()
                 if any(e.message == 'User is blocked' for e in (body.get('errors') or [])):
-                    _logger.warning("comment(%s:%s) failed: user likely blocked", self._repo, pr)
+                    _logger.warning("comment(%s#%s) failed: user likely blocked", self._repo, pr)
                     return
             raise
         _logger.debug('comment(%s, %s, %s)', self._repo, pr, shorten(message))

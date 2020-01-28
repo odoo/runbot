@@ -60,7 +60,7 @@ def handle_pr(env, event):
         'labeled', 'unlabeled'
     ]:
         _logger.debug(
-            'Ignoring pull_request[%s] on %s:%s',
+            'Ignoring pull_request[%s] on %s#%s',
             event['action'],
             event['pull_request']['base']['repo']['full_name'],
             event['pull_request']['number'],
@@ -129,7 +129,7 @@ def handle_pr(env, event):
         return "Nothing to update ({})".format(event['changes'].keys())
 
     if not branch:
-        _logger.info("Ignoring PR for un-managed branch %s:%s", r, b)
+        _logger.info("Ignoring PR for un-managed branch %s#%s", r, b)
         return "Not set up to care about {}:{}".format(r, b)
 
     author_name = pr['user']['login']
@@ -140,21 +140,21 @@ def handle_pr(env, event):
             'github_login': author_name,
         })
 
-    _logger.info("%s: %s:%s (%s) (%s)", event['action'], repo.name, pr['number'], pr['title'].strip(), author.github_login)
+    _logger.info("%s: %s#%s (%s) (%s)", event['action'], repo.name, pr['number'], pr['title'].strip(), author.github_login)
     if event['action'] == 'opened':
         pr_obj = env['runbot_merge.pull_requests']._from_gh(pr)
         return "Tracking PR as {}".format(pr_obj.id)
 
     pr_obj = env['runbot_merge.pull_requests']._get_or_schedule(r, pr['number'])
     if not pr_obj:
-        _logger.warning("webhook %s on unknown PR %s:%s, scheduled fetch", event['action'], repo.name, pr['number'])
+        _logger.warning("webhook %s on unknown PR %s#%s, scheduled fetch", event['action'], repo.name, pr['number'])
         return "Unknown PR {}:{}, scheduling fetch".format(repo.name, pr['number'])
     if event['action'] == 'synchronize':
         if pr_obj.head == pr['head']['sha']:
             return 'No update to pr head'
 
         if pr_obj.state in ('closed', 'merged'):
-            _logger.error("Tentative sync to closed PR %s:%s", repo.name, pr['number'])
+            _logger.error("Tentative sync to closed PR %s", pr.display_name)
             return "It's my understanding that closed/merged PRs don't get sync'd"
 
         if pr_obj.state == 'ready':
@@ -245,7 +245,7 @@ def handle_comment(env, event):
     issue = event['issue']['number']
     author = event['comment']['user']['login']
     comment = event['comment']['body']
-    _logger.info('comment[%s]: %s %s:%s "%s"', event['action'], author, repo, issue, comment)
+    _logger.info('comment[%s]: %s %s#%s "%s"', event['action'], author, repo, issue, comment)
     if event['action'] != 'created':
         return "Ignored: action (%r) is not 'created'" % event['action']
 
@@ -257,7 +257,7 @@ def handle_review(env, event):
     author = event['review']['user']['login']
     comment = event['review']['body'] or ''
 
-    _logger.info('review[%s]: %s %s:%s "%s"', event['action'], author, repo, pr, comment)
+    _logger.info('review[%s]: %s %s#%s "%s"', event['action'], author, repo, pr, comment)
     if event['action'] != 'submitted':
         return "Ignored: action (%r) is not 'submitted'" % event['action']
 

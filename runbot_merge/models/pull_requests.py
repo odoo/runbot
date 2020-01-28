@@ -108,7 +108,7 @@ class Project(models.Model):
                 gh.change_tags(pr, to_tags)
             except Exception:
                 _logger.exception(
-                    "Error while trying to change the tags of %s:%s from %s to %s",
+                    "Error while trying to change the tags of %s#%s from %s to %s",
                     repo.name, pr, _TAGS[from_ or False], to_tags,
                 )
             else:
@@ -142,7 +142,7 @@ class Project(models.Model):
                     gh.comment(f.pull_request, message)
             except Exception:
                 _logger.exception(
-                    "Error while trying to %s %s:%s (%s)",
+                    "Error while trying to %s %s#%s (%s)",
                     'close' if f.close else 'send a comment to',
                     repo.name, f.pull_request,
                     utils.shorten(f.message, 200)
@@ -715,9 +715,8 @@ class PullRequests(models.Model):
         Feedback = self.env['runbot_merge.pull_requests.feedback']
         if not is_author:
             # no point even parsing commands
-            _logger.info("ignoring comment of %s (%s): no ACL to %s:%s",
-                          login, name,
-                          self.repository.name, self.number)
+            _logger.info("ignoring comment of %s (%s): no ACL to %s",
+                          login, name, self.display_name)
             Feedback.create({
                 'repository': self.repository.id,
                 'pull_request': self.number,
@@ -798,8 +797,8 @@ class PullRequests(models.Model):
                     self.priority = param
                     if param == 0:
                         self.target.active_staging_id.cancel(
-                            "P=0 on %s:%s by %s, unstaging target %s",
-                            self.repository.name, self.number,
+                            "P=0 on %s by %s, unstaging target %s",
+                            self.display_name,
                             author.github_login, self.target.name,
                         )
             elif command == 'method':
@@ -814,10 +813,9 @@ class PullRequests(models.Model):
                     })
 
             _logger.info(
-                "%s %s(%s) on %s:%s by %s (%s)",
+                "%s %s(%s) on %s by %s (%s)",
                 "applied" if ok else "ignored",
-                command, param,
-                self.repository.name, self.number,
+                command, param, self.display_name,
                 author.github_login, author.display_name,
             )
             if ok:
@@ -1210,8 +1208,8 @@ class PullRequests(models.Model):
                 'state_to': 'closed',
             })
             self.unstage(
-                "PR %s:%s closed by %s",
-                self.repository.name, self.number,
+                "PR %s closed by %s",
+                self.display_name,
                 by
             )
         return True
@@ -1728,8 +1726,8 @@ class Batch(models.Model):
             gh = meta[pr.repository]['gh']
 
             _logger.info(
-                "Staging pr %s:%s for target %s; squash=%s",
-                pr.repository.name, pr.number, pr.target.name, pr.squash
+                "Staging pr %s for target %s; squash=%s",
+                pr.display_name, pr.target.name, pr.squash
             )
 
             target = 'tmp.{}'.format(pr.target.name)
@@ -1737,9 +1735,8 @@ class Batch(models.Model):
             try:
                 method, new_heads[pr] = pr._stage(gh, target, related_prs=(prs - pr))
                 _logger.info(
-                    "Staged pr %s:%s to %s by %s: %s -> %s",
-                    pr.repository.name, pr.number,
-                    pr.target.name, method,
+                    "Staged pr %s to %s by %s: %s -> %s",
+                    pr.display_name, pr.target.name, method,
                     original_head, new_heads[pr]
                 )
             except (exceptions.MergeError, AssertionError) as e:
