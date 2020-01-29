@@ -231,6 +231,7 @@ class PullRequests(models.Model):
             )
             return
 
+        Feedback = self.env['runbot_merge.pull_requests.feedback']
         # TODO: don't use a mutable tokens iterator
         tokens = iter(tokens)
         while True:
@@ -242,7 +243,14 @@ class PullRequests(models.Model):
                 token = 'up'
                 tokens = itertools.chain(['to', self.target.name], tokens)
 
-            if token in ('r+', 'review+') and self.source_id._pr_acl(author).is_reviewer:
+            if token in ('r+', 'review+'):
+                if not self.source_id._pr_acl(author).is_reviewer:
+                    Feedback.create({
+                        'repository': self.repository.id,
+                        'pull_request': self.number,
+                        'message': "I'm sorry, @{}. You can't review+.".format(login),
+                    })
+                    continue
                 # don't update the root ever
                 for pr in filter(lambda p: p.parent_id, self._iter_ancestors()):
                     newstate = RPLUS.get(pr.state)
@@ -250,8 +258,15 @@ class PullRequests(models.Model):
                         pr.state = newstate
                         pr.reviewed_by = author
                         # TODO: logging & feedback
-            elif token == 'up' and next(tokens, None) == 'to' and self._pr_acl(author).is_author:
+            elif token == 'up' and next(tokens, None) == 'to':
                 limit = next(tokens, None)
+                if not self._pr_acl(author).is_author:
+                    Feedback.create({
+                        'repository': self.repository.id,
+                        'pull_request': self.number,
+                        'message': "I'm sorry, @{}. You can't set a forward-port limit.".format(login),
+                    })
+                    continue
                 if not limit:
                     msg = "Please provide a branch to forward-port to."
                 else:
