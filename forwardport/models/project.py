@@ -590,6 +590,15 @@ class PullRequests(models.Model):
                 ]
             })
 
+            footer = '\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port'
+            if has_conflicts and not h:
+                footer = '\nWarning: at least one co-dependent PR (%s) did ' \
+                         'not properly forward-port, you will need to fix it ' \
+                         'before this can be merged\n%s' % (
+                    ', '.join(p.display_name for p in conflicts),
+                    footer
+                )
+
             if h:
                 sout = serr = ''
                 if out.strip():
@@ -598,12 +607,12 @@ class PullRequests(models.Model):
                     serr = "\nstderr:\n```\n%s\n```\n" % err
 
                 message = source._pingline() + """
-Cherrypicking %s of source #%d failed
+Cherrypicking %s of source %s failed
 %s%s
 Either perform the forward-port manually (and push to this branch, proceeding as usual) or close this PR (maybe?).
 
 In the former case, you may want to edit this PR message as well.
-""" % (h, source.number, sout, serr)
+""" % (h, source.display_name, sout, serr)
             elif base._find_next_target(new_pr) is None:
                 ancestors = "".join(
                     "* %s\n" % p.display_name
@@ -615,15 +624,11 @@ This PR targets %s and is the last of the forward-port chain%s
 %s
 To merge the full chain, say
 > @%s r+
-
-More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
-""" % (target.name, ' containing:' if ancestors else '.', ancestors, pr.repository.project_id.fp_github_name)
+%s""" % (target.name, ' containing:' if ancestors else '.', ancestors, pr.repository.project_id.fp_github_name, footer)
             else:
                 message = """\
 This PR targets %s and is part of the forward-port chain. Further PRs will be created up to %s.
-
-More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
-""" % (target.name, base.limit_id.name)
+%s""" % (target.name, base.limit_id.name, footer)
             self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': new_pr.repository.id,
                 'pull_request': new_pr.number,
