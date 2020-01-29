@@ -515,6 +515,8 @@ class PullRequests(models.Model):
 
                 working_copy.push('target', new_branch)
 
+        gh = requests.Session()
+        gh.headers['Authorization'] = 'token %s' % proj.fp_github_token
         has_conflicts = any(conflicts.values())
         # problemo: this should forward port a batch at a time, if porting
         # one of the PRs in the batch fails is huge problem, though this loop
@@ -541,20 +543,25 @@ class PullRequests(models.Model):
             if not body:
                 body = None
 
-            r = requests.post(
-                'https://api.github.com/repos/{}/pulls'.format(pr.repository.name), json={
-                    'title': title,
-                    'body': body,
-                    'head': '%s:%s' % (owner, new_branch),
-                    'base': target.name,
-                    #'draft': has_conflicts, draft mode is not supported on private repos so remove it (again)
-                }, headers={
-                    'Accept': 'application/vnd.github.shadow-cat-preview+json',
-                    'Authorization': 'token %s' % pr.repository.project_id.fp_github_token,
-                }
-            )
-            assert 200 <= r.status_code < 300, r.json()
-            r = r.json()
+            r = gh.post('https://api.github.com/repos/{}/pulls'.format(pr.repository.name), json={
+                'base': target.name, 'head': '%s:%s' % (owner, new_branch),
+                'title': title, 'body': body,
+            })
+            results = r.json()
+            if not (200 <= r.status_code < 300):
+                _logger.warning("Failed to create forward-port PR for %s, deleting branches", pr.display_name)
+                # delete all the branches this should automatically close the
+                # PRs if we've created any. Using the API here is probably
+                # simpler than going through the working copies
+                for repo in self.mapped('repository'):
+                    r = gh.delete('https://api.github.com/repos/{}/git/refs/heads/{}'.format(repo.fp_remote_target, new_branch))
+                    if r.ok:
+                        _logger.info("Deleting %s:%s=success", repo.fp_remote_target, new_branch)
+                    else:
+                        _logger.warning("Deleting %s:%s=%s", repo.fp_remote_target, new_branch, r.json())
+                raise RuntimeError("Forwardport failure: %s (%s)" % (pr.display_name, results))
+
+            r = results
             self.env.cr.commit()
 
             new_pr = self.search([
