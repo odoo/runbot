@@ -602,8 +602,6 @@ class PullRequests(models.Model):
                 for p in root | source
             )
 
-            (h, out, err) = conflicts.get(pr) or (None, None, None)
-
             title, body = re.match(r'(?P<title>[^\n]+)\n*(?P<body>.*)', message, flags=re.DOTALL).groups()
             title = '[FW]' + title
             if not body:
@@ -655,13 +653,24 @@ class PullRequests(models.Model):
                     (4, new_pr.id, False),
                 ]
             })
+            # not great but we probably want to avoid the risk of the webhook
+            # creating the PR from under us. There's still a "hole" between
+            # the POST being executed on gh and the commit but...
+            self.env.cr.commit()
+
+        for pr, new_pr in zip(self, new_batch):
+            source = pr.source_id or pr
+            (h, out, err) = conflicts.get(pr) or (None, None, None)
 
             footer = '\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'
             if has_conflicts and not h:
-                footer = '\nWarning: at least one co-dependent PR (%s) did ' \
-                         'not properly forward-port, you will need to fix it ' \
-                         'before this can be merged\n%s' % (
-                    ', '.join(p.display_name for p in conflicts),
+                footer = '\n**WARNING** at least one co-dependent PR (%s) ' \
+                         'did not properly forward-port, you will need to ' \
+                         'fix it before this can be merged. Both this PR and ' \
+                         'the others will need to be approved via `@%s r+` ' \
+                         'as they are all considered "in conflict".\n%s' % (
+                    ', '.join(p.display_name for p in (new_batch - new_pr)),
+                    proj.github_prefix,
                     footer
                 )
 
@@ -710,10 +719,6 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
                 'to_add': json.dumps(labels),
                 'token_field': 'fp_github_token',
             })
-            # not great but we probably want to avoid the risk of the webhook
-            # creating the PR from under us. There's still a "hole" between
-            # the POST being executed on gh and the commit but...
-            self.env.cr.commit()
 
         # batch the PRs so _validate can perform the followup FP properly
         # (with the entire batch). If there are conflict then create a
