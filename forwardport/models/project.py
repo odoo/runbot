@@ -656,7 +656,7 @@ class PullRequests(models.Model):
                 ]
             })
 
-            footer = '\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port'
+            footer = '\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'
             if has_conflicts and not h:
                 footer = '\nWarning: at least one co-dependent PR (%s) did ' \
                          'not properly forward-port, you will need to fix it ' \
