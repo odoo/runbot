@@ -879,9 +879,18 @@ class PullRequests(models.Model):
         # only sending notification if the newly failed status is different than
         # the old one
         prev = json.loads(self.previous_failure)
-        if st != prev:
+        if not self._statuses_equivalent(st, prev):
             self.previous_failure = json.dumps(st)
             self._notify_ci_failed(ci)
+
+    def _statuses_equivalent(self, a, b):
+        """ Check if two statuses are *equivalent* meaning the description field
+        is ignored (check only state and target_url). This is because the
+        description seems to vary even if the rest does not, and generates
+        unnecessary notififcations as a result
+        """
+        return a.get('state') == b.get('state') \
+           and a.get('target_url')  == b.get('target_url')
 
     def _notify_ci_failed(self, ci):
         # only report an issue of the PR is already approved (r+'d)

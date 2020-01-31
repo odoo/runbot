@@ -207,7 +207,7 @@ def handle_pr(env, event):
 
 def handle_status(env, event):
     _logger.info(
-        'status %(context)s:%(state)s on commit %(sha)s (%(target_url)s)',
+        'status on %(sha)s %(context)s:%(state)s (%(target_url)s) [%(description)r]',
         event
     )
     Commits = env['runbot_merge.commit']

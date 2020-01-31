@@ -261,6 +261,9 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         with prod:
             prod.post_status(pr1.head, st, ctx)
         env.run_crons()
+    with prod: # should be ignored because the description doesn't matter
+        prod.post_status(pr1.head, 'failure', 'ci/runbot', description="HAHAHAHAHA")
+    env.run_crons()
     # check that FP did not resume & we have a ping on the PR
     assert env['runbot_merge.pull_requests'].search([], order='number') == pr0 | pr1,\
         "forward port should not continue on CI failure"
