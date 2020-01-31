@@ -324,14 +324,12 @@ class Branch(models.Model):
         for b in self:
             b.active_staging_id = b.with_context(active_test=True).staging_ids
 
-    def _stageable(self):
-        # noinspection SqlResolve
+    def _ready(self):
         self.env.cr.execute("""
         SELECT
           min(pr.priority) as priority,
           array_agg(pr.id) AS match
         FROM runbot_merge_pull_requests pr
-        LEFT JOIN runbot_merge_batch batch ON pr.batch_id = batch.id AND batch.active
         WHERE pr.target = any(%s)
           -- exclude terminal states (so there's no issue when
           -- deleting branches & reusing labels)
@@ -344,16 +342,18 @@ class Branch(models.Model):
                 ELSE pr.label
             END
         HAVING
-            -- all PRs in a group need to specify their merge method
-            bool_and(pr.squash or pr.merge_method IS NOT NULL)
-            AND (
-                (bool_or(pr.priority = 0) AND NOT bool_or(pr.state = 'error'))
-                OR bool_and(pr.state = 'ready')
-            )
+            bool_or(pr.state = 'ready') or bool_or(pr.priority = 0)
         ORDER BY min(pr.priority), min(pr.id)
         """, [self.ids])
-        # result: [(priority, [pr_id for repo in repos])]
-        return self.env.cr.fetchall()
+        browse = self.env['runbot_merge.pull_requests'].browse
+        return [(p, browse(ids)) for p, ids in self.env.cr.fetchall()]
+
+    def _stageable(self):
+        return [
+            (p, prs)
+            for p, prs in self._ready()
+            if not any(prs.mapped('blocked'))
+        ]
 
     def try_staging(self):
         """ Tries to create a staging if the current branch does not already
@@ -371,8 +371,6 @@ class Branch(models.Model):
         if self.active_staging_id:
             return
 
-        PRs = self.env['runbot_merge.pull_requests']
-
         rows = self._stageable()
         priority = rows[0][0] if rows else -1
         if priority == 0 or priority == 1:
@@ -380,14 +378,14 @@ class Branch(models.Model):
             # p=1 allows merging a fix inside / ahead of a split (e.g. branch
             # is broken or widespread false positive) without having to cancel
             # the existing staging
-            batched_prs = [PRs.browse(pr_ids) for _, pr_ids in takewhile(lambda r: r[0] == priority, rows)]
+            batched_prs = [pr_ids for _, pr_ids in takewhile(lambda r: r[0] == priority, rows)]
         elif self.split_ids:
             split_ids = self.split_ids[0]
             logger.info("Found split of PRs %s, re-staging", split_ids.mapped('batch_ids.prs'))
             batched_prs = [batch.prs for batch in split_ids.batch_ids]
             split_ids.unlink()
         else: # p=2
-            batched_prs = [PRs.browse(pr_ids) for _, pr_ids in takewhile(lambda r: r[0] == priority, rows)]
+            batched_prs = [pr_ids for _, pr_ids in takewhile(lambda r: r[0] == priority, rows)]
 
         if not batched_prs:
             return
@@ -566,7 +564,7 @@ class PullRequests(models.Model):
                             " PR is linked to an other non-ready PR"
     )
 
-    blocked = fields.Boolean(
+    blocked = fields.Char(
         compute='_compute_is_blocked',
         help="PR is not currently stageable for some reason (mostly an issue if status is ready)"
     )
@@ -584,13 +582,47 @@ class PullRequests(models.Model):
     # missing link to other PRs
     @api.depends('priority', 'state', 'squash', 'merge_method', 'batch_id.active', 'label')
     def _compute_is_blocked(self):
-        stageable = {
-            pr_id
-            for _, pr_ids in self.mapped('target')._stageable()
-            for pr_id in pr_ids
-        }
+        self.blocked = False
         for pr in self:
-            pr.blocked = pr.id not in stageable
+            if pr.state in ('merged', 'closed'):
+                continue
+
+            batch = pr
+            if not re.search(r':patch-\d+', pr.label):
+                batch = self.search([
+                    ('label', '=', pr.label),
+                    ('state', 'not in', ('merged', 'closed')),
+                ])
+
+            # check if PRs are configured (single commit or merge method set)
+            if not (pr.squash or pr.merge_method):
+                pr.blocked = 'has no merge'
+                continue
+            other_unset = next((p for p in batch if not (p.squash or p.merge_method)), None)
+            if other_unset:
+                pr.blocked = "linked PR %s has no merge method" % other_unset.display_name
+                continue
+
+            # check if any PR in the batch is p=0 and none is in error
+            if any(p.priority == 0 for p in batch):
+                in_error = next((p for p in batch if p.state == 'error'), None)
+                if in_error:
+                    if pr == in_error:
+                        pr.blocked = "in error"
+                    else:
+                        pr.blocked = "linked pr %s in error" % in_error.display_name
+                # if none is in error then none is blocked because p=0
+                # "unblocks" the entire batch
+                continue
+
+            if pr.state != 'ready':
+                pr.blocked = 'not ready'
+                continue
+
+            unready = next((p for p in batch if p.state != 'ready'), None)
+            if unready:
+                pr.blocked = 'linked pr %s is not ready' % unready.display_name
+                continue
 
     @api.depends('head', 'repository.required_statuses')
     def _compute_statuses(self):
