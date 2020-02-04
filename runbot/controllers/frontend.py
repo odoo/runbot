@@ -20,9 +20,10 @@ class Runbot(Controller):
         ICP = request.env['ir.config_parameter'].sudo().get_param
         warn = int(ICP('runbot.pending.warning', 5))
         crit = int(ICP('runbot.pending.critical', 12))
-        count = request.env['runbot.build'].search_count([('local_state', '=', 'pending')])
-        level = ['info', 'warning', 'danger'][int(count > warn) + int(count > crit)]
-        return count, level
+        pending_count = request.env['runbot.build'].search_count([('local_state', '=', 'pending'), ('build_type', '!=', 'scheduled')])
+        scheduled_count = request.env['runbot.build'].search_count([('local_state', '=', 'pending'), ('build_type', '=', 'scheduled')])
+        level = ['info', 'warning', 'danger'][int(pending_count > warn) + int(pending_count > crit)]
+        return pending_count, level, scheduled_count
 
     @route(['/runbot', '/runbot/repo/<model("runbot.repo"):repo>'], website=True, auth='public', type='http')
     def repo(self, repo=None, search='', refresh='', **kwargs):
@@ -43,6 +44,7 @@ class Runbot(Controller):
             'host_stats': [],
             'pending_total': pending[0],
             'pending_level': pending[1],
+            'scheduled_count': pending[2],
             'hosts_data': request.env['runbot.host'].search([]),
             'search': search,
             'refresh': refresh,
@@ -317,6 +319,7 @@ class Runbot(Controller):
             'refresh': refresh,
             'pending_total': pending[0],
             'pending_level': pending[1],
+            'scheduled_count': pending[2],
             'glances_data': glances_ctx,
             'hosts_data': hosts_data,
             'last_monitored': last_monitored,  # nightly
