@@ -34,8 +34,10 @@
                     <separator string="Repositories"/>
                     <field name="repo_ids">
                         <tree editable="bottom">
+                            <field name="sequence"/>
                             <field name="name"/>
                             <field name="required_statuses"/>
+                            <field name="branch_filter"/>
                         </tree>
                     </field>
                     <separator string="Branches"/>

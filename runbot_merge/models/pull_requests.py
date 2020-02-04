@@ -210,7 +210,9 @@ class Project(models.Model):
 
 class Repository(models.Model):
     _name = _description = 'runbot_merge.repository'
+    _order = 'sequence, id'
 
+    sequence = fields.Integer(default=50)
     name = fields.Char(required=True)
     project_id = fields.Many2one('runbot_merge.project', required=True)
     required_statuses = fields.Char(
