@@ -24,6 +24,27 @@ _logger = logging.getLogger(__name__)
 result_order = ['ok', 'warn', 'ko', 'skipped', 'killed', 'manually_killed']
 state_order = ['pending', 'testing', 'waiting', 'running', 'duplicate', 'done']
 
+COPY_WHITELIST = [
+    "branch_id",
+    "repo_id",
+    "name",
+    "description",
+    "date",
+    "author",
+    "author_email",
+    "committer",
+    "committer_email",
+    "subject",
+    "config_data",
+    "extra_params",
+    "build_type",
+    "parent_id",
+    "hidden",
+    "dependency_ids",
+    "config_id",
+    "orphan_result",
+    "commit_path_mode",
+]
 
 def make_selection(array):
     def format(string):
@@ -56,7 +77,7 @@ class runbot_build(models.Model):
     sequence = fields.Integer('Sequence')
     log_ids = fields.One2many('ir.logging', 'build_id', string='Logs')
     error_log_ids = fields.One2many('ir.logging', 'build_id', domain=[('level', 'in', ['WARNING', 'ERROR', 'CRITICAL'])], string='Error Logs')
-    config_data = JsonDictField('Json Data')
+    config_data = JsonDictField('Config Data')
 
     # state machine
 
@@ -101,7 +122,7 @@ class runbot_build(models.Model):
     # should we add a has children stored boolean?
     hidden = fields.Boolean("Don't show build on main page", default=False)  # index?
     children_ids = fields.One2many('runbot.build', 'parent_id')
-    dependency_ids = fields.One2many('runbot.build.dependency', 'build_id')
+    dependency_ids = fields.One2many('runbot.build.dependency', 'build_id', copy=True)
 
     config_id = fields.Many2one('runbot.build.config', 'Run Config', required=True, default=lambda self: self.env.ref('runbot.runbot_build_config_default', raise_if_not_found=False))
     real_build = fields.Many2one('runbot.build', 'Real Build', help="duplicate_id or self", compute='_compute_real_build')
@@ -190,8 +211,18 @@ class runbot_build(models.Model):
         for build in self:
             build.real_build = build.duplicate_id or build
 
-    def copy(self, values=None):
-        raise UserError("Cannot duplicate build!")
+    def copy_data(self, default=None):
+        values = super().copy_data(default)[0]
+        values = {key: value for key, value in values.items() if key in COPY_WHITELIST}
+        values.update({
+            'host': 'PAUSED', # hack to keep the build in pending waiting for a manual update. Todo: add a paused state instead
+            'local_state': 'pending',
+        })
+        return [values]
+
+    def copy(self, default=None):
+        return super(runbot_build, self.with_context(force_rebuild=True)).copy(default)
+
 
     @api.model_create_single
     def create(self, vals):
@@ -355,14 +386,14 @@ class runbot_build(models.Model):
         for build in self:
             if build.duplicate_id:
                 build.job_time = build.duplicate_id.job_time
-            elif build.job_end:
+            elif build.job_end and build.job_start:
                 build.job_time = int(dt2time(build.job_end) - dt2time(build.job_start))
             elif build.job_start:
                 build.job_time = int(time.time() - dt2time(build.job_start))
             else:
                 build.job_time = 0
 
-    @api.depends('build_start', 'build_end', 'duplicate_id.build_time')
+    @api.depends('build_start', 'build_end', 'global_state', 'duplicate_id.build_time')
     def _compute_build_time(self):
         for build in self:
             if build.duplicate_id:
