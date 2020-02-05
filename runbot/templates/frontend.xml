@@ -62,9 +62,12 @@
         <t t-set="testing" t-value="hosts_data._total_testing()"/>
         <t t-set="workers" t-value="hosts_data._total_workers()"/>
         <t t-set="klass">success</t>
-        <t t-if="int(testing)/workers > 0"><t t-set="klass">info</t></t>
-        <t t-if="int(testing)/workers > 0.75"><t t-set="klass">warning</t></t>
-        <t t-if="int(testing)/workers >= 1"><t t-set="klass">danger</t></t>
+        <t t-if="not workers" t-set="klass">danger</t>
+        <t t-else="">
+          <t t-if="int(testing)/workers > 0" t-set="klass">info</t>
+          <t t-if="int(testing)/workers > 0.75" t-set="klass">warning</t>
+          <t t-if="int(testing)/workers >= 1" t-set="klass">danger</t>
+        </t>
         <span t-attf-class="label label-{{klass}}">Testing: <t t-esc="testing"/>/<t t-esc="workers"/></span>
       </template>
 
