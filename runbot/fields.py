@@ -22,6 +22,9 @@ class JsonDictField(Field):
     def convert_to_record(self, value, record):
         return FieldDict(value or {}, self, record)
 
+    def convert_to_read(self, value, record, use_name_get=True):
+        return self.convert_to_cache(value, record)
+
 
 class FieldDict(MutableMapping):
 
