@@ -113,6 +113,8 @@ class runbot_branch(models.Model):
                     if not _re_patch.match(pi['head']['label']):
                         # label is used to disambiguate PR with same branch name
                         branch.pull_head_name = pi['head']['label']
+            else:
+                branch.branch_name = ''
 
     @api.depends('branch_name')
     def _get_branch_url(self):
@@ -123,6 +125,8 @@ class runbot_branch(models.Model):
                     branch.branch_url = "https://%s/pull/%s" % (branch.repo_id.base, branch.branch_name)
                 else:
                     branch.branch_url = "https://%s/tree/%s" % (branch.repo_id.base, branch.branch_name)
+            else:
+                branch.branch_url = ''
 
     def _get_pull_info(self):
         self.ensure_one()

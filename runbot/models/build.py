@@ -332,7 +332,7 @@ class runbot_build(models.Model):
                 nickname = build.branch_id.name.split('/')[2]
                 nickname = re.sub(r'"|\'|~|\:', '', nickname)
                 nickname = re.sub(r'_|/|\.', '-', nickname)
-                build.dest = ("%05d-%s-%s" % (build.id, nickname[:32], build.name[:6])).lower()
+                build.dest = ("%05d-%s-%s" % (build.id or 0, nickname[:32], build.name[:6])).lower()
 
     @api.depends('repo_id', 'port', 'dest', 'host', 'duplicate_id.domain')
     def _compute_domain(self):
