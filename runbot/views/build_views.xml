@@ -9,16 +9,25 @@
                         <field name="repo_id"/>
                         <field name="branch_id"/>
                         <field name="name"/>
+                        <field name="dependency_ids">
+                            <tree>
+                                <field name="dependecy_repo_id"/>
+                                <field name="dependency_hash"/>
+                                <field name="closest_branch_id"/>
+                                <field name="match_type"/>
+                            </tree>
+                        </field>
                         <field name="date"/>
                         <field name="author"/>
-                        <field name="author_email"/>
-                        <field name="committer"/>
-                        <field name="committer_email"/>
+                        <field name="author_email" groups="base.group_no_one"/>
+                        <field name="committer" groups="base.group_no_one"/>
+                        <field name="committer_email" groups="base.group_no_one"/>
                         <field name="subject"/>
-                        <field name="port"/>
+                        <field name="port" groups="base.group_no_one"/>
                         <field name="dest"/>
                         <field name="local_state"/>
                         <field name="global_state"/>
+                        <field name="requested_action" groups="base.group_no_one"/>
                         <field name="local_result"/>
                         <field name="global_result"/>
                         <field name="triggered_result" groups="base.group_no_one"/>
@@ -26,15 +35,16 @@
                         <field name="job_start" groups="base.group_no_one"/>
                         <field name="job_end" groups="base.group_no_one"/>
                         <field name="job_time" groups="base.group_no_one"/>
-                        <field name="build_start"/>
-                        <field name="build_end"/>
-                        <field name="build_time"/>
-                        <field name="build_age"/>
+                        <field name="build_start" groups="base.group_no_one"/>
+                        <field name="build_end" groups="base.group_no_one"/>
+                        <field name="build_time" groups="base.group_no_one"/>
+                        <field name="build_age" groups="base.group_no_one"/>
                         <field name="duplicate_id"/>
-                        <field name="build_type" groups="base.group_no_one"/>
-                        <field name="config_id" readonly="1"/>
-                        <field name="config_id" groups="base.group_no_one"/>
-                        <field name="orphan_result" readonly="1"/>
+                        <field name="build_type"/>
+                        <field name="config_id"/>
+                        <field name="config_data"/>
+                        <field name="parent_id"/>
+                        <field name="orphan_result"/>
                         <field name="hidden" groups="base.group_no_one"/>
                         <field name="build_url" widget="url" readonly="1"/>
                         <field name="keep_running"/>
