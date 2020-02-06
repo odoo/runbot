@@ -760,7 +760,7 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
         working_copy = source.clone(
             cleanup.enter_context(
                 tempfile.TemporaryDirectory(
-                    prefix='%s:%d-to-%s' % (
+                    prefix='%s:%d-to-%s-' % (
                         self.repository.name,
                         self.number,
                         target_branch.name
