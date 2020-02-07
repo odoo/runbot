@@ -21,8 +21,10 @@ def default_crons():
         'runbot_merge.fetch_prs_cron',
         # env['runbot_merge.commit']._notify()
         'runbot_merge.process_updated_commits',
-        # env['runbot_merge.project']._check_progress()
+        # env['runbot_merge.project']._check_stagings()
         'runbot_merge.merge_cron',
+        # env['runbot_merge.project']._create_stagings()
+        'runbot_merge.staging_cron',
         # env['runbot_merge.pull_requests']._check_linked_prs_statuses()
         'runbot_merge.check_linked_prs_status',
         # env['runbot_merge.project']._send_feedback()

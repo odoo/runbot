@@ -464,7 +464,7 @@ def test_staging_ci_timeout(env, repo, config):
     timeout = env['runbot_merge.project'].search([]).ci_timeout
 
     pr1.staging_id.staged_at = odoo.fields.Datetime.to_string(datetime.datetime.now() - datetime.timedelta(minutes=2*timeout))
-    env.run_crons('runbot_merge.merge_cron')
+    env.run_crons('runbot_merge.merge_cron', 'runbot_merge.staging_cron')
     assert pr1.state == 'error', "timeout should fail the PR"
 
 def test_timeout_bump_on_pending(env, repo, config):
@@ -1068,7 +1068,7 @@ class TestRetry:
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'ready'
-        env.run_crons('runbot_merge.merge_cron')
+        env.run_crons('runbot_merge.merge_cron', 'runbot_merge.staging_cron')
 
         staging_head2 = repo.commit('heads/staging.master')
         assert staging_head2 != staging_head
@@ -1496,7 +1496,7 @@ class TestMergeMethod:
 
             c0 = repo.make_commit(m, 'C0', None, tree={'a': 'b'})
             prx = repo.make_pr(title="gibberish", body="blahblah", target='master', head=c0)
-        env.run_crons('runbot_merge.merge_cron')
+        env.run_crons('runbot_merge.merge_cron', 'runbot_merge.staging_cron')
 
         with repo:
             repo.post_status(prx.head, 'success', 'legal/cla')
@@ -1538,7 +1538,7 @@ class TestMergeMethod:
 
             c0 = repo.make_commit(m, 'C0', None, tree={'a': 'b'})
             prx = repo.make_pr(title="gibberish", body=None, target='master', head=c0)
-        env.run_crons('runbot_merge.merge_cron')
+        env.run_crons('runbot_merge.merge_cron', 'runbot_merge.staging_cron')
 
         with repo:
             repo.post_status(prx.head, 'success', 'legal/cla')
@@ -2379,7 +2379,7 @@ class TestBatching(object):
         with repo:
             repo.post_status(h, 'success', 'ci/runbot')
             repo.post_status(h, 'success', 'legal/cla')
-        env.run_crons('runbot_merge.process_updated_commits', 'runbot_merge.merge_cron')
+        env.run_crons('runbot_merge.process_updated_commits', 'runbot_merge.merge_cron', 'runbot_merge.staging_cron')
         assert pr2.state == 'merged'
 
 class TestReviewing(object):
@@ -2630,7 +2630,7 @@ class TestUnknownPR:
         ])
         assert pr.state == 'ready'
 
-        env.run_crons('runbot_merge.merge_cron')
+        env.run_crons('runbot_merge.merge_cron', 'runbot_merge.staging_cron')
         assert pr.staging_id
 
     def test_rplus_unmanaged(self, env, repo, users, config):
