@@ -13,6 +13,16 @@
     <template id="dashboard" name="mergebot dashboard">
         <t t-call="website.layout">
             <div id="wrap"><div class="container-fluid">
+                <div id="alerts" class="row text-center">
+                    <t t-set="stagingcron" t-value="env(user=1).ref('runbot_merge.staging_cron')"/>
+                    <div t-if="not stagingcron.active" class="alert alert-warning col-12" role="alert">
+                        Staging is disabled, "ready" pull requests will not be staged.
+                    </div>
+                    <t t-set="mergecron" t-value="env(user=1).ref('runbot_merge.merge_cron')"/>
+                    <div t-if="not mergecron.active" class="alert alert-warning col-12" role="alert">
+                        Merging is disabled, stagings will not be disabled.
+                    </div>
+                </div>
                 <section t-foreach="projects.with_context(active_test=False)" t-as="project" class="row">
                     <h1 class="col-md-12"><t t-esc="project.name"/></h1>
                     <div class="col-md-12">

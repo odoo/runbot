@@ -1,4 +1,13 @@
 <odoo>
+    <template id="dashboard" inherit_id="runbot_merge.dashboard">
+        <xpath expr="//div[@id='alerts']">
+            <t t-set="fpcron" t-value="env(user=1).ref('forwardport.port_forward')"/>
+            <div t-if="not fpcron.active" class="alert alert-warning col-12" role="alert">
+                Forward-port is disabled, merged pull requests will not be forward-ported.
+            </div>
+        </xpath>
+    </template>
+
     <record model="ir.ui.view" id="project">
         <field name="name">Show forwardport project fields</field>
         <field name="inherit_id" ref="runbot_merge.runbot_merge_form_project"/>
