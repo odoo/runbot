@@ -643,7 +643,7 @@ class PullRequests(models.Model):
             s.statuses = pprint.pformat(statuses)
 
             st = 'success'
-            for ci in s.repository.required_statuses.split(','):
+            for ci in filter(None, (s.repository.required_statuses or '').split(',')):
                 v = state_(statuses, ci) or 'pending'
                 if v in ('error', 'failure'):
                     st = 'failure'
