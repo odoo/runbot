@@ -893,7 +893,7 @@ class PullRequests(models.Model):
         # targets
         failed = self.browse(())
         for pr in self:
-            required = filter(None, pr.repository.required_statuses.split(','))
+            required = filter(None, (pr.repository.required_statuses or '').split(','))
 
             success = True
             for ci in required:
@@ -1477,6 +1477,7 @@ class Stagings(models.Model):
                 (head, repos[repo].required_statuses.split(','))
                 for repo, head in json.loads(s.heads).items()
                 if not repo.endswith('^')
+                if repos[repo].required_statuses
             ]
             # maps commits to their statuses
             cmap = {
@@ -1488,7 +1489,7 @@ class Stagings(models.Model):
             st = 'success'
             for head, reqs in required_statuses:
                 statuses = cmap.get(head) or {}
-                for v in map(lambda n: state_(statuses, n), filter(None, reqs)):
+                for v in map(lambda n: state_(statuses, n), reqs):
                     if st == 'failure' or v in ('error', 'failure'):
                         st = 'failure'
                     elif v is None:

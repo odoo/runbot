@@ -940,7 +940,7 @@ def test_reopen_state(env, repo):
 def test_no_required_statuses(env, repo, config):
     """ check that mergebot can work on a repo with no CI at all
     """
-    env['runbot_merge.repository'].search([('name', '=', repo.name)]).required_statuses = ''
+    env['runbot_merge.repository'].search([('name', '=', repo.name)]).required_statuses = False
     with repo:
         m = repo.make_commit(None, 'initial', None, tree={'0': '0'})
         repo.make_ref('heads/master', m)
