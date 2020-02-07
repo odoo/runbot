@@ -937,29 +937,64 @@ def test_reopen_state(env, repo):
     assert pr.state == 'validated', \
         "if a PR is reopened and had a CI'd head, it should be validated immediately"
 
-def test_no_required_statuses(env, repo, config):
-    """ check that mergebot can work on a repo with no CI at all
-    """
-    env['runbot_merge.repository'].search([('name', '=', repo.name)]).required_statuses = False
-    with repo:
-        m = repo.make_commit(None, 'initial', None, tree={'0': '0'})
-        repo.make_ref('heads/master', m)
+class TestNoRequiredStatus:
+    def test_basic(self, env, repo, config):
+        """ check that mergebot can work on a repo with no CI at all
+        """
+        env['runbot_merge.repository'].search([('name', '=', repo.name)]).required_statuses = False
+        with repo:
+            m = repo.make_commit(None, 'initial', None, tree={'0': '0'})
+            repo.make_ref('heads/master', m)
 
-        c = repo.make_commit(m, 'first', None, tree={'0': '1'})
-        prx = repo.make_pr(title='title', body='body', target='master', head=c)
-        prx.post_comment('hansen r+', config['role_reviewer']['token'])
-    env.run_crons()
+            c = repo.make_commit(m, 'first', None, tree={'0': '1'})
+            prx = repo.make_pr(title='title', body='body', target='master', head=c)
+            prx.post_comment('hansen r+', config['role_reviewer']['token'])
+        env.run_crons()
 
-    pr = env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', repo.name),
-        ('number', '=', prx.number)
-    ])
-    assert pr.state == 'ready'
-    st = pr.staging_id
-    assert st
-    env.run_crons()
-    assert st.state == 'success'
-    assert pr.state == 'merged'
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number)
+        ])
+        assert pr.state == 'ready'
+        st = pr.staging_id
+        assert st
+        env.run_crons()
+        assert st.state == 'success'
+        assert pr.state == 'merged'
+
+    def test_updated(self, env, repo, config):
+        env['runbot_merge.repository'].search([('name', '=', repo.name)]).required_statuses = False
+        with repo:
+            m = repo.make_commit(None, 'initial', None, tree={'0': '0'})
+            repo.make_ref('heads/master', m)
+
+            c = repo.make_commit(m, 'first', None, tree={'0': '1'})
+            prx = repo.make_pr(title='title', body='body', target='master', head=c)
+        env.run_crons()
+
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number)
+        ])
+        assert pr.state == 'validated'
+
+        # normal push
+        with repo:
+            repo.make_commits(c, repo.Commit('second', tree={'0': '2'}), ref=prx.ref)
+        env.run_crons()
+        assert pr.state == 'validated'
+        with repo:
+            prx.post_comment('hansen r+', config['role_reviewer']['token'])
+        assert pr.state == 'ready'
+
+        # force push
+        with repo:
+            repo.make_commits(m, repo.Commit('xxx', tree={'0': 'm'}), ref=prx.ref)
+        env.run_crons()
+        assert pr.state == 'validated'
+        with repo:
+            prx.post_comment('hansen r+', config['role_reviewer']['token'])
+        assert pr.state == 'ready'
 
 class TestRetry:
     @pytest.mark.xfail(reason="This may not be a good idea as it could lead to tons of rebuild spam")

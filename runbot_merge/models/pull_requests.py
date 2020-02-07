@@ -1009,8 +1009,7 @@ class PullRequests(models.Model):
         newhead = vals.get('head')
         if newhead:
             c = self.env['runbot_merge.commit'].search([('sha', '=', newhead)])
-            if c.statuses:
-                self._validate(json.loads(c.statuses))
+            self._validate(json.loads(c.statuses or '{}'))
 
         for pr in self:
             before, after = oldstate[pr], pr._tagstate
