@@ -716,6 +716,31 @@ class TestPREdition:
             prx.base = 'master'
         assert pr.squash
 
+    @pytest.mark.xfail(reason="github doesn't allow retargeting closed PRs", strict=True)
+    def test_retarget_closed(self, env, repo):
+        branch_1 = env['runbot_merge.branch'].create({
+            'name': '1.0',
+            'project_id': env['runbot_merge.project'].search([]).id,
+        })
+
+        with repo:
+            # master is 1 commit ahead of 1.0
+            [m] = repo.make_commits(None, repo.Commit('initial', tree={'1': '1'}), ref='heads/1.0')
+            repo.make_commits(m, repo.Commit('second', tree={'m': 'm'}), ref='heads/master')
+
+            [c] = repo.make_commits(m, repo.Commit('first', tree={'m': 'm3'}), ref='heads/abranch')
+            prx = repo.make_pr(title='title', body='body', target='1.0', head=c)
+        env.run_crons()
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number)
+        ])
+        assert pr.target == branch_1
+        with repo:
+            prx.close()
+        with repo:
+            prx.base = 'master'
+
     def test_retarget_from_disabled(self, env, repo):
         """ Retargeting a PR from a disabled branch should not duplicate the PR
         """
@@ -2066,6 +2091,55 @@ class TestPRUpdate(object):
         env.run_crons()
         assert pr_id.state == 'validated'
         assert pr_id.head == c2
+
+    def test_update_closed(self, env, repo):
+        with repo:
+            [m] = repo.make_commits(None, repo.Commit('initial', tree={'m': 'm'}), ref='heads/master')
+
+            [c] = repo.make_commits(m, repo.Commit('first', tree={'m': 'm3'}), ref='heads/abranch')
+            prx = repo.make_pr(title='title', body='body', target='master', head=c)
+        env.run_crons()
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number)
+        ])
+        with repo:
+            prx.close()
+
+        with repo:
+            c2 = repo.make_commit(c, 'xxx', None, tree={'m': 'm4'})
+            repo.update_ref(prx.ref, c2)
+
+        assert pr.state == 'closed'
+        assert pr.head == c
+
+        with repo:
+            prx.open()
+        assert pr.state == 'opened'
+        assert pr.head == c2
+
+    @pytest.mark.xfail(reason="github doesn't allow reopening force-pushed PRs", strict=True)
+    def test_force_update_closed(self, env, repo):
+        with repo:
+            [m] = repo.make_commits(None, repo.Commit('initial', tree={'m': 'm'}), ref='heads/master')
+
+            [c] = repo.make_commits(m, repo.Commit('first', tree={'m': 'm3'}), ref='heads/abranch')
+            prx = repo.make_pr(title='title', body='body', target='master', head=c)
+        env.run_crons()
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number)
+        ])
+        with repo:
+            prx.close()
+
+        with repo:
+            c2 = repo.make_commit(m, 'xxx', None, tree={'m': 'm4'})
+            repo.update_ref(prx.ref, c2, force=True)
+
+        with repo:
+            prx.open()
+        assert pr.head == c2
 
 class TestBatching(object):
     def _pr(self, repo, prefix, trees, *, target='master', user, reviewer,
