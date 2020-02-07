@@ -64,22 +64,21 @@ class Project(models.Model):
              "will lead to webhook rejection. Should only use ASCII."
     )
 
-    def _check_progress(self, commit=False):
-        for project in self.search([]):
-            for staging in project.mapped('branch_ids.active_staging_id'):
-                staging.check_status()
-                if commit:
-                    self.env.cr.commit()
+    def _create_stagings(self, commit=False):
+        pass
 
-            for branch in project.branch_ids:
+    def _check_stagings(self, commit=False):
+        for staging in self.search([]).mapped('branch_ids.active_staging_id'):
+            staging.check_status()
+            if commit:
+                self.env.cr.commit()
+
+    def _create_stagings(self, commit=False):
+        for branch in self.search([]).mapped('branch_ids'):
+            if not branch.active_staging_id:
                 branch.try_staging()
                 if commit:
                     self.env.cr.commit()
-
-        # I have no idea why this is necessary for tests to pass, the only
-        # DB update done not through the ORM is when receiving a notification
-        # that a PR has been closed
-        self.invalidate_cache()
 
     def _send_feedback(self):
         Repos = self.env['runbot_merge.repository']
