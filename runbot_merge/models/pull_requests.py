@@ -432,6 +432,10 @@ class Branch(models.Model):
             # $repo is the head to check, $repo^ is the head to merge
             heads[repo.name + '^'] = it['head']
             heads[repo.name] = dummy_head['sha']
+            self.env['runbot_merge.commit'].create({
+                'sha': dummy_head['sha'],
+                'statuses': '{}',
+            })
 
         # create actual staging object
         st = self.env['runbot_merge.stagings'].create({
@@ -1466,22 +1470,25 @@ class Stagings(models.Model):
             repos = {
                 repo.name: repo
                 for repo in self.env['runbot_merge.repository'].search([])
+                    .having_branch(s.target)
             }
-            repomap = {
-                head: repos[repo]
+            # maps commits to the statuses they need
+            required_statuses = [
+                (head, repos[repo].required_statuses.split(','))
                 for repo, head in json.loads(s.heads).items()
                 if not repo.endswith('^')
+            ]
+            # maps commits to their statuses
+            cmap = {
+                c.sha: json.loads(c.statuses)
+                for c in Commits.search([('sha', 'in', [h for h, _ in required_statuses])])
             }
-            commits = Commits.search([
-                ('sha', 'in', list(repomap))
-            ])
 
             update_timeout_limit = False
             st = 'success'
-            for c in commits:
-                reqs = [r.strip() for r in repomap[c.sha].required_statuses.split(',')]
-                statuses = json.loads(c.statuses)
-                for v in map(lambda n: state_(statuses, n), reqs):
+            for head, reqs in required_statuses:
+                statuses = cmap.get(head) or {}
+                for v in map(lambda n: state_(statuses, n), filter(None, reqs)):
                     if st == 'failure' or v in ('error', 'failure'):
                         st = 'failure'
                     elif v is None:
@@ -1491,10 +1498,6 @@ class Stagings(models.Model):
                         update_timeout_limit = True
                     else:
                         assert v == 'success'
-            # mark failure as soon as we find a failed status, but wait until
-            # all commits are known & not pending to mark a success
-            if st == 'success' and len(commits) < len(repomap):
-                st = 'pending'
 
             vals = {'state': st}
             if update_timeout_limit:

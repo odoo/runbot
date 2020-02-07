@@ -950,10 +950,16 @@ def test_no_required_statuses(env, repo, config):
         prx.post_comment('hansen r+', config['role_reviewer']['token'])
     env.run_crons()
 
-    assert env['runbot_merge.pull_requests'].search([
+    pr = env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', repo.name),
         ('number', '=', prx.number)
-    ]).state == 'ready'
+    ])
+    assert pr.state == 'ready'
+    st = pr.staging_id
+    assert st
+    env.run_crons()
+    assert st.state == 'success'
+    assert pr.state == 'merged'
 
 class TestRetry:
     @pytest.mark.xfail(reason="This may not be a good idea as it could lead to tons of rebuild spam")
