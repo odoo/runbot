@@ -287,7 +287,7 @@ class runbot_build(models.Model):
             ]
             candidates = self.search(domain)
 
-            nb_deps = len(repo.dependency_ids)
+            nb_deps = len(build_id.dependency_ids)
             if candidates and nb_deps:
                 # check that all depedencies are matching.
 
