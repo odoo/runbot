@@ -85,12 +85,21 @@ def make_basic(env, config, make_repo, *, reponame='proj', project_name='myproje
             ref='heads/c',
         )
     other = prod.fork()
-    project.write({
-        'repo_ids': [(0, 0, {
-            'name': prod.name,
-            'required_statuses': 'legal/cla,ci/runbot',
-            'fp_remote_target': other.name,
-        })],
+    repo = env['runbot_merge.repository'].create({
+        'project_id': project.id,
+        'name': prod.name,
+        'required_statuses': 'legal/cla,ci/runbot',
+        'fp_remote_target': other.name,
+    })
+    env['res.partner'].search([
+        ('github_login', '=', config['role_reviewer']['user'])
+    ]).write({
+        'review_rights': [(0, 0, {'repository_id': repo.id, 'review': True})]
+    })
+    env['res.partner'].search([
+        ('github_login', '=', config['role_self_reviewer']['user'])
+    ]).write({
+        'review_rights': [(0, 0, {'repository_id': repo.id, 'self_review': True})]
     })
 
     return prod, other

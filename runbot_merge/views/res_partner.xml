@@ -10,9 +10,16 @@
                         <group>
                             <field name="github_login"/>
                         </group>
-                        <group>
-                            <field name="reviewer"/>
-                            <field name="self_reviewer"/>
+                    </group>
+                    <group>
+                        <group colspan="4" string="Review Rights">
+                            <field name="review_rights" nolabel="1">
+                                <tree string="Review ACLs" editable="bottom">
+                                    <field name="repository_id"/>
+                                    <field name="review"/>
+                                    <field name="self_review"/>
+                                </tree>
+                            </field>
                         </group>
                     </group>
                     <group>

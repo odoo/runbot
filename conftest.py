@@ -123,18 +123,37 @@ def rolemap(config):
     return rolemap
 
 @pytest.fixture
-def users(env, config, rolemap):
+def partners(env, config, rolemap):
+    m = dict.fromkeys(rolemap.keys(), env['res.partner'])
     for role, login in rolemap.items():
         if role in ('user', 'other'):
             continue
 
-        env['res.partner'].create({
+        m[role] = env['res.partner'].create({
             'name': config['role_' + role].get('name', login),
             'github_login': login,
-            'reviewer': role == 'reviewer',
-            'self_reviewer': role == 'self_reviewer',
         })
+    return m
 
+@pytest.fixture
+def setreviewers(partners):
+    def _(*repos):
+        partners['reviewer'].write({
+            'review_rights': [
+                (0, 0, {'repository_id': repo.id, 'review': True})
+                for repo in repos
+            ]
+        })
+        partners['self_reviewer'].write({
+            'review_rights': [
+                (0, 0, {'repository_id': repo.id, 'self_review': True})
+                for repo in repos
+            ]
+        })
+    return _
+
+@pytest.fixture
+def users(partners, rolemap):
     return rolemap
 
 @pytest.fixture(scope='session')
@@ -953,17 +972,23 @@ class Environment:
         wait_for_hook()
 
 class Model:
-    __slots__ = ['_env', '_model', '_ids', '_fields']
+    __slots__ = ['env', '_name', '_ids', '_fields']
     def __init__(self, env, model, ids=(), fields=None):
-        object.__setattr__(self, '_env', env)
-        object.__setattr__(self, '_model', model)
+        object.__setattr__(self, 'env', env)
+        object.__setattr__(self, '_name', model)
         object.__setattr__(self, '_ids', tuple(ids or ()))
 
-        object.__setattr__(self, '_fields', fields or self._env(self._model, 'fields_get', attributes=['type', 'relation']))
+        object.__setattr__(self, '_fields', fields or self.env(self._name, 'fields_get', attributes=['type', 'relation']))
 
     @property
     def ids(self):
         return self._ids
+
+    @property
+    def _env(self): return self.env
+
+    @property
+    def _model(self): return self._name
 
     def __bool__(self):
         return bool(self._ids)

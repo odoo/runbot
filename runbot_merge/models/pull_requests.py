@@ -888,7 +888,11 @@ class PullRequests(models.Model):
         if not self:
             return ACL(False, False, False)
 
-        is_admin = (user.reviewer and self.author != user) or (user.self_reviewer and self.author == user)
+        is_admin = self.env['res.partner.review'].search_count([
+            ('partner_id', '=', user.id),
+            ('repository_id', '=', self.repository.id),
+            ('review', '=', True) if self.author != user else ('self_review', '=', True),
+        ]) == 1
         is_reviewer = is_admin or self in user.delegate_reviewer
         # TODO: should delegate reviewers be able to retry PRs?
         is_author = is_reviewer or self.author == user

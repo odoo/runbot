@@ -12,30 +12,36 @@ import pytest
 from test_utils import re_matches, get_partner
 
 @pytest.fixture
-def repo_a(project, make_repo):
+def repo_a(project, make_repo, setreviewers):
     repo = make_repo('a')
-    project.write({'repo_ids': [(0, 0, {
+    r = project.env['runbot_merge.repository'].create({
+        'project_id': project.id,
         'name': repo.name,
         'required_statuses': 'legal/cla,ci/runbot'
-    })]})
+    })
+    setreviewers(r)
     return repo
 
 @pytest.fixture
-def repo_b(project, make_repo):
+def repo_b(project, make_repo, setreviewers):
     repo = make_repo('b')
-    project.write({'repo_ids': [(0, 0, {
+    r = project.env['runbot_merge.repository'].create({
+        'project_id': project.id,
         'name': repo.name,
         'required_statuses': 'legal/cla,ci/runbot'
-    })]})
+    })
+    setreviewers(r)
     return repo
 
 @pytest.fixture
-def repo_c(project, make_repo):
+def repo_c(project, make_repo, setreviewers):
     repo = make_repo('c')
-    project.write({'repo_ids': [(0, 0, {
+    r = project.env['runbot_merge.repository'].create({
+        'project_id': project.id,
         'name': repo.name,
         'required_statuses': 'legal/cla,ci/runbot'
-    })]})
+    })
+    setreviewers(r)
     return repo
 
 def make_pr(repo, prefix, trees, *, target='master', user,
@@ -744,3 +750,11 @@ def test_different_branches(env, project, repo_a, repo_b, config):
     env.run_crons()
 
     assert to_pr(env, pr_a).state == 'merged'
+
+def test_remove_acl(env, partners, repo_a, repo_b, repo_c):
+    """ Check that our way of deprovisioning works correctly
+    """
+    r = partners['self_reviewer']
+    assert r.mapped('review_rights.repository_id') == repo_a | repo_b | repo_c
+    r.write({'review_rights': [(5, 0, 0)]})
+    assert r.mapped('review_rights.repository_id') == env['runbot_merge.repository']
