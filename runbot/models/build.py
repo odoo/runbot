@@ -17,6 +17,7 @@ from odoo.exceptions import UserError, ValidationError
 from odoo.http import request
 from odoo.tools import appdirs
 from collections import defaultdict
+from psycopg2 import sql
 from subprocess import CalledProcessError
 
 _logger = logging.getLogger(__name__)
@@ -863,10 +864,12 @@ class runbot_build(models.Model):
         subprocess.call(cmd)
 
     def _local_pg_createdb(self, dbname):
+        icp = self.env['ir.config_parameter']
+        db_template = icp.get_param('runbot.runbot_db_template', default='template1')
         self._local_pg_dropdb(dbname)
         _logger.debug("createdb %s", dbname)
         with local_pgadmin_cursor() as local_cr:
-            local_cr.execute("""CREATE DATABASE "%s" TEMPLATE template1 LC_COLLATE 'C' ENCODING 'unicode'""" % dbname)
+            local_cr.execute(sql.SQL("""CREATE DATABASE {} TEMPLATE %s LC_COLLATE 'C' ENCODING 'unicode'""").format(sql.Identifier(dbname)), (db_template,))
 
     def _log(self, func, message, level='INFO', log_type='runbot', path='runbot'):
         self.ensure_one()

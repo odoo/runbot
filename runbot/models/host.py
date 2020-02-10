@@ -47,6 +47,18 @@ class RunboHost(models.Model):
             values['disp_name'] = values['name']
         return super().create(values)
 
+    def _bootstrap_db_template(self):
+        """ boostrap template database if needed """
+        icp = self.env['ir.config_parameter']
+        db_template = icp.get_param('runbot.runbot_db_template', default='template1')
+        if db_template and db_template != 'template1':
+            with local_pgadmin_cursor() as local_cr:
+                local_cr.execute("""SELECT datname FROM pg_catalog.pg_database WHERE datname = '%s';""" % db_template)
+                res = local_cr.fetchone()
+                if not res:
+                    local_cr.execute("""CREATE DATABASE "%s" TEMPLATE template1 LC_COLLATE 'C' ENCODING 'unicode'""" % db_template)
+                    # TODO UPDATE pg_database set datallowconn = false, datistemplate = true (but not enough privileges)
+
     def _bootstrap(self):
         """ Create needed directories in static """
         dirs = ['build', 'nginx', 'repo', 'sources', 'src', 'docker']
@@ -54,6 +66,7 @@ class RunboHost(models.Model):
         static_dirs = {d: os.path.join(static_path, d) for d in dirs}
         for dir, path in static_dirs.items():
             os.makedirs(path, exist_ok=True)
+        self._bootstrap_db_template()
 
     def _docker_build(self):
         """ build docker image """
