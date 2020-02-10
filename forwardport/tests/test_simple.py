@@ -725,10 +725,15 @@ def test_access_rights(env, config, make_repo, users, author, reviewer, delegate
     project = env['runbot_merge.project'].search([])
 
     # create a partner for `user`
-    env['res.partner'].create({
+    c = env['res.partner'].create({
         'name': users['user'],
         'github_login': users['user'],
-        'reviewer': True,
+    })
+    c.write({
+        'review_rights': [
+            (0, 0, {'repository_id': repo.id, 'review': True})
+            for repo in project.repo_ids
+        ]
     })
 
     author_token = config['role_' + author]['token']

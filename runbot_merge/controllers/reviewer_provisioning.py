@@ -14,18 +14,18 @@ class MergebotReviewerProvisioning(http.Controller):
     @from_role('accounts')
     @http.route(['/runbot_merge/get_reviewers'], type='json', auth='public')
     def fetch_reviewers(self, **kwargs):
-        partners = request.env['res.partner'].sudo().search(['|', ('self_reviewer', '=', True), ('reviewer', '=', True)])
-        return partners.mapped('github_login')
+        reviewers = request.env['res.partner.review'].sudo().search([
+            '|', ('review', '=', True), ('self_review', '=', True)
+        ]).mapped('partner_id.github_login')
+        return reviewers
 
     @from_role('accounts')
     @http.route(['/runbot_merge/remove_reviewers'], type='json', auth='public', methods=['POST'])
     def update_reviewers(self, github_logins, **kwargs):
         partners = request.env['res.partner'].sudo().search([('github_login', 'in', github_logins)])
-
-        # remove reviewer flag from the partner
         partners.write({
-            'reviewer': False,
-            'self_reviewer': False,
+            'review_rights': [(5, 0, 0)],
+            'delegate_reviewer': [(5, 0, 0)],
         })
 
         # Assign the linked users as portal users

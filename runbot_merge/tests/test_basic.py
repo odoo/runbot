@@ -13,12 +13,13 @@ import odoo
 from test_utils import re_matches, get_partner, _simple_init
 
 @pytest.fixture
-def repo(project, make_repo):
+def repo(env, project, make_repo, users, setreviewers):
     r = make_repo('repo')
     project.write({'repo_ids': [(0, 0, {
         'name': r.name,
         'required_statuses': 'legal/cla,ci/runbot'
     })]})
+    setreviewers(*project.repo_ids)
     return r
 
 def test_trivial_flow(env, repo, page, users, config):

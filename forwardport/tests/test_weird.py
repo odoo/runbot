@@ -55,12 +55,21 @@ def make_basic(env, config, make_repo, *, fp_token, fp_remote):
             ref='heads/c',
         )
     other = prod.fork()
-    project.write({
-        'repo_ids': [(0, 0, {
-            'name': prod.name,
-            'required_statuses': 'legal/cla,ci/runbot',
-            'fp_remote_target': fp_remote and other.name,
-        })],
+    repo = env['runbot_merge.repository'].create({
+        'project_id': project.id,
+        'name': prod.name,
+        'required_statuses': 'legal/cla,ci/runbot',
+        'fp_remote_target': fp_remote and other.name,
+    })
+    env['res.partner'].search([
+        ('github_login', '=', config['role_reviewer']['user'])
+    ]).write({
+        'review_rights': [(0, 0, {'repository_id': repo.id, 'review': True})]
+    })
+    env['res.partner'].search([
+        ('github_login', '=', config['role_self_reviewer']['user'])
+    ]).write({
+        'review_rights': [(0, 0, {'repository_id': repo.id, 'self_review': True})]
     })
 
     return project, prod, other
@@ -219,19 +228,7 @@ class TestNotAllBranches:
           `-> b000       branch c
     """
     @pytest.fixture
-    def repos(self, env, config, make_repo):
-        project = env['runbot_merge.project'].create({
-            'name': 'proj',
-            'github_token': config['github']['token'],
-            'github_prefix': 'hansen',
-            'fp_github_token': config['github']['token'],
-            'branch_ids': [
-                (0, 0, {'name': 'a', 'fp_sequence': 2, 'fp_target': True}),
-                (0, 0, {'name': 'b', 'fp_sequence': 1, 'fp_target': True}),
-                (0, 0, {'name': 'c', 'fp_sequence': 0, 'fp_target': True}),
-            ]
-        })
-
+    def repos(self, env, config, make_repo, setreviewers):
         a = make_repo('A')
         with a:
             _, a_, _ = a.make_commits(
@@ -260,21 +257,32 @@ class TestNotAllBranches:
             )
             b.make_commits(_a, Commit('b000', tree={'c': 'x'}), ref='heads/c')
         b_dev = b.fork()
-        project.write({
-            'repo_ids': [
-                (0, 0, {
-                    'name': a.name,
-                    'required_statuses': 'ci/runbot',
-                    'fp_remote_target': a_dev.name,
-                }),
-                (0, 0, {
-                    'name': b.name,
-                    'required_statuses': 'ci/runbot',
-                    'fp_remote_target': b_dev.name,
-                    'branch_filter': '[("name", "in", ["a", "c"])]',
-                })
+
+        project = env['runbot_merge.project'].create({
+            'name': 'proj',
+            'github_token': config['github']['token'],
+            'github_prefix': 'hansen',
+            'fp_github_token': config['github']['token'],
+            'branch_ids': [
+                (0, 0, {'name': 'a', 'fp_sequence': 2, 'fp_target': True}),
+                (0, 0, {'name': 'b', 'fp_sequence': 1, 'fp_target': True}),
+                (0, 0, {'name': 'c', 'fp_sequence': 0, 'fp_target': True}),
             ]
         })
+        repo_a = env['runbot_merge.repository'].create({
+            'project_id': project.id,
+            'name': a.name,
+            'required_statuses': 'ci/runbot',
+            'fp_remote_target': a_dev.name,
+        })
+        repo_b = env['runbot_merge.repository'].create({
+            'project_id': project.id,
+            'name': b.name,
+            'required_statuses': 'ci/runbot',
+            'fp_remote_target': b_dev.name,
+            'branch_filter': '[("name", "in", ["a", "c"])]',
+        })
+        setreviewers(repo_a, repo_b)
         return project, a, a_dev, b, b_dev
 
     def test_single_first(self, env, repos, config):
