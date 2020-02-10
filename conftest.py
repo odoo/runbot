@@ -402,6 +402,20 @@ class Repo:
             'ignored': True,
         })
 
+    def add_collaborator(self, login, token):
+        # send invitation to user
+        r = self._session.put('https://api.github.com/repos/{}/collaborators/{}'.format(self.name, login))
+        assert r.ok, r.json()
+        # accept invitation on behalf of user
+        r = requests.patch('https://api.github.com/user/repository_invitations/{}'.format(r.json()['id']), headers={
+            'Authorization': 'token ' + token
+        })
+        assert r.ok, r.json()
+        # sanity check that user is part of collaborators
+        r = self._session.get('https://api.github.com/repos/{}/collaborators'.format(self.name))
+        assert r.ok, r.json()
+        assert any(login == c['login'] for c in r.json())
+
     def _get_session(self, token):
         s = self._session
         if token:
@@ -809,15 +823,18 @@ class PR:
         )
         assert r.status_code == 204, r.json()
 
-    def _set_prop(self, prop, value):
+    def _set_prop(self, prop, value, token=None):
         assert self.repo.hook
+        headers = {}
+        if token:
+            headers['Authorization'] = 'token ' + token
         r = self.repo._session.patch('https://api.github.com/repos/{}/pulls/{}'.format(self.repo.name, self.number), json={
             prop: value
-        })
+        }, headers=headers)
         assert 200 <= r.status_code < 300, r.json()
 
-    def open(self):
-        self._set_prop('state', 'open')
+    def open(self, token=None):
+        self._set_prop('state', 'open', token=token)
 
     def close(self):
         self._set_prop('state', 'closed')

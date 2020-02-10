@@ -192,15 +192,24 @@ def handle_pr(env, event):
         else:
             return 'Ignored: could not lock rows (probably being merged)'
 
-    if event['action'] == 'reopened' and pr_obj.state == 'closed':
-        _logger.info('%s reopening %s', event['sender']['login'], pr_obj.display_name)
-        pr_obj.write({
-            'state': 'opened',
-            # updating the head triggers a revalidation
-            'head': pr['head']['sha'],
-        })
+    if event['action'] == 'reopened' :
+        if pr_obj.state == 'merged':
+            env['runbot_merge.pull_requests.feedback'].create({
+                'repository': pr_obj.repository.id,
+                'pull_request': pr_obj.number,
+                'close': True,
+                'message': "@%s ya silly goose you can't reopen a PR that's been merged PR." % event['sender']['login']
+            })
 
-        return 'Reopened {}'.format(pr_obj.id)
+        if pr_obj.state == 'closed':
+            _logger.info('%s reopening %s', event['sender']['login'], pr_obj.display_name)
+            pr_obj.write({
+                'state': 'opened',
+                # updating the head triggers a revalidation
+                'head': pr['head']['sha'],
+            })
+
+            return 'Reopened {}'.format(pr_obj.id)
 
     _logger.info("Ignoring event %s on PR %s", event['action'], pr['number'])
     return "Not handling {} yet".format(event['action'])

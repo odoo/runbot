@@ -962,6 +962,49 @@ def test_reopen_state(env, repo):
     assert pr.state == 'validated', \
         "if a PR is reopened and had a CI'd head, it should be validated immediately"
 
+def test_reopen_merged_pr(env, repo, config, users):
+    """ Reopening a *merged* PR should cause us to immediately close it again,
+    and insult whoever did it
+    """
+    with repo:
+        [m] = repo.make_commits(
+            None,
+            repo.Commit('initial', tree={'0': '0'}),
+            ref = 'heads/master'
+        )
+
+        [c] = repo.make_commits(
+            m, repo.Commit('second', tree={'0': '1'}),
+            ref='heads/abranch'
+        )
+        prx = repo.make_pr(target='master', head='abranch')
+        repo.post_status(c, 'success', 'legal/cla')
+        repo.post_status(c, 'success', 'ci/runbot')
+        prx.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+
+    with repo:
+        repo.post_status('staging.master', 'success', 'legal/cla')
+        repo.post_status('staging.master', 'success', 'ci/runbot')
+    env.run_crons()
+    pr = env['runbot_merge.pull_requests'].search([
+        ('repository.name', '=', repo.name),
+        ('number', '=', prx.number)
+    ])
+    assert prx.state == 'closed'
+    assert pr.state == 'merged'
+
+    repo.add_collaborator(users['other'], config['role_other']['token'])
+    with repo:
+        prx.open(config['role_other']['token'])
+    env.run_crons()
+    assert prx.state == 'closed'
+    assert pr.state == 'merged'
+    assert prx.comments == [
+        (users['reviewer'], 'hansen r+'),
+        (users['user'], "@%s ya silly goose you can't reopen a PR that's been merged PR." % users['other'])
+    ]
+
 class TestNoRequiredStatus:
     def test_basic(self, env, repo, config):
         """ check that mergebot can work on a repo with no CI at all
