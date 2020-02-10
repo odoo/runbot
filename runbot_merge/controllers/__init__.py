@@ -154,7 +154,7 @@ def handle_pr(env, event):
             return 'No update to pr head'
 
         if pr_obj.state in ('closed', 'merged'):
-            _logger.error("Tentative sync to closed PR %s", pr.display_name)
+            _logger.error("Tentative sync to closed PR %s", pr_obj.display_name)
             return "It's my understanding that closed/merged PRs don't get sync'd"
 
         if pr_obj.state == 'ready':
