@@ -3020,6 +3020,40 @@ class TestRMinus:
         assert pr2.state == 'validated', "state should have been reset"
         assert not env['runbot_merge.split'].search([]), "there should be no split left"
 
+    def test_rminus_p0(self, env, repo, config, users):
+        """ In and of itself r- doesn't do anything on p=0 since they bypass
+        approval, so unstage and downgrade to p=1.
+        """
+
+        with repo:
+            m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+            repo.make_ref('heads/master', m)
+
+            c = repo.make_commit(m, 'first', None, tree={'m': 'c'})
+            prx = repo.make_pr(title='title', body=None, target='master', head=c)
+            repo.post_status(prx.head, 'success', 'ci/runbot')
+            repo.post_status(prx.head, 'success', 'legal/cla')
+            prx.post_comment('hansen p=0', config['role_reviewer']['token'])
+        env.run_crons()
+
+        pr = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', prx.number),
+        ])
+        assert pr.priority == 0
+        assert pr.staging_id
+
+        with repo:
+            prx.post_comment('hansen r-', config['role_reviewer']['token'])
+        env.run_crons()
+        assert not pr.staging_id, "pr should have been unstaged"
+        assert pr.priority == 1, "priority should have been downgraded"
+        assert prx.comments == [
+            (users['reviewer'], 'hansen p=0'),
+            (users['reviewer'], 'hansen r-'),
+            (users['user'], "PR priority reset to 1, as pull requests with priority 0 ignore review state."),
+        ]
+
 class TestComments:
     def test_address_method(self, repo, env, config):
         with repo:

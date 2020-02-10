@@ -809,8 +809,16 @@ class PullRequests(models.Model):
                         msg = "This PR is already reviewed, reviewing it again is useless."
                 elif not param and is_author:
                     newstate = RMINUS.get(self.state)
-                    if newstate:
-                        self.state = newstate
+                    if self.priority == 0 or newstate:
+                        if newstate:
+                            self.state = newstate
+                        if self.priority == 0:
+                            self.priority = 1
+                            Feedback.create({
+                                'repository': self.repository.id,
+                                'pull_request': self.number,
+                                'message': "PR priority reset to 1, as pull requests with priority 0 ignore review state.",
+                            })
                         self.unstage("unreview (r-) by %s", author.github_login)
                         ok = True
                     else:
