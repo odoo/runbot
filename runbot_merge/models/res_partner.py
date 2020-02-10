@@ -10,6 +10,12 @@ class Partner(models.Model):
     delegate_reviewer = fields.Many2many('runbot_merge.pull_requests')
     formatted_email = fields.Char(string="commit email", compute='_rfc5322_formatted')
 
+    _sql_constraints = [
+        ('reviewer_required_fields',
+            "CHECK(coalesce(github_login, '') != '' OR (reviewer = false AND self_reviewer = false))",
+            "A reviewer must have a Github login!"),
+    ]
+
     def _auto_init(self):
         res = super(Partner, self)._auto_init()
         tools.create_unique_index(
