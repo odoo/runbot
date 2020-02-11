@@ -248,7 +248,7 @@ class DbDict(dict):
             '-d', db, '-i', module,
             '--max-cron-threads', '0',
             '--stop-after-init'
-        ])
+        ], check=True)
         self[module] = db
         return db
 

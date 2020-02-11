@@ -1,10 +1,15 @@
 from email.utils import parseaddr
 from odoo import fields, models, tools, api
 
+class CIText(fields.Char):
+    type = 'char'
+    column_type = ('citext', 'citext')
+    column_cast_from = ('varchar', 'text')
+
 class Partner(models.Model):
     _inherit = 'res.partner'
 
-    github_login = fields.Char()
+    github_login = CIText()
     delegate_reviewer = fields.Many2many('runbot_merge.pull_requests')
     formatted_email = fields.Char(string="commit email", compute='_rfc5322_formatted')
     review_rights = fields.One2many('res.partner.review', 'partner_id')

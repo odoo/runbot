@@ -2625,10 +2625,14 @@ class TestReviewing(object):
             prx = repo.make_pr(title='title', body='body', target='master', head=c1)
             repo.post_status(prx.head, 'success', 'legal/cla')
             repo.post_status(prx.head, 'success', 'ci/runbot')
-            prx.post_comment('hansen delegate=%s' % users['other'], config['role_reviewer']['token'])
-            prx.post_comment('hansen r+', config['role_user']['token'])
+            # flip case to check that github login is case-insensitive
+            other = ''.join(c.lower() if c.isupper() else c.upper() for c in users['other'])
+            prx.post_comment('hansen delegate=%s' % other, config['role_reviewer']['token'])
         env.run_crons()
 
+        with repo:
+            # check this is ignored
+            prx.post_comment('hansen r+', config['role_user']['token'])
         assert prx.user == users['user']
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
@@ -2636,6 +2640,7 @@ class TestReviewing(object):
         ]).state == 'validated'
 
         with repo:
+            # check this works
             prx.post_comment('hansen r+', config['role_other']['token'])
         assert env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),

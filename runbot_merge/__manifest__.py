@@ -1,6 +1,6 @@
 {
     'name': 'merge bot',
-    'version': '1.2',
+    'version': '1.3',
     'depends': ['contacts', 'website'],
     'data': [
         'security/security.xml',
@@ -12,4 +12,5 @@
         'views/templates.xml',
     ],
     'post_load': 'enable_sentry',
+    'pre_init_hook': '_check_citext',
 }
