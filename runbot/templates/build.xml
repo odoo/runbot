@@ -133,28 +133,45 @@
                             <t t-set="rowclass"><t t-call="runbot.build_class"><t t-set="build" t-value="build"/></t></t>
                             <td t-attf-class="bg-{{rowclass.strip()}}-light">
                                 <t t-if="build.description">
-                                  Description: <t t-esc="build['description']"/><br/>
+                                <b>Description:</b> <t t-esc="build.description"/><br/>
                                 </t>
-                                Subject: <t t-esc="build['subject']"/><br/>
-                                Author: <t t-esc="build['author']"/><br/>
-                                Committer: <t t-esc="build['committer']"/><br/>
-                                Commit: <a t-attf-href="https://{{build.repo_id.base}}/commit/{{build.name}}"><t t-esc="build.name"/></a><br/>
+                                <b>Subject:</b>  <t t-esc="build.subject"/><br/>
+                                <b>Author:</b>  <t t-esc="build.author"/><br/>
+                                <b>Committer:</b>  <t t-esc="build.committer"/><br/>
+                                <b>Commit:</b>  <a title="Go to github commit page" t-attf-href="https://{{build.repo_id.base}}/commit/{{build.name}}"><t t-esc="build.name"/></a><br/>
                                 <t t-foreach="build.sudo().dependency_ids" t-as="dep">
-                                  Dep: <t t-esc="dep.dependecy_repo_id.short_name"/>:<a t-attf-href="https://{{dep.dependecy_repo_id.base}}/commit/{{dep.dependency_hash}}"><t t-esc="dep.dependency_hash"/></a>
+                                  <b>Dep:</b> <t t-esc="dep.dependecy_repo_id.short_name"/>:<a t-attf-href="https://{{dep.dependecy_repo_id.base}}/commit/{{dep.dependency_hash}}"><t t-esc="dep.dependency_hash"/></a>
                                   <t t-if='dep.closest_branch_id'> from branch <t t-esc="dep.closest_branch_id.name"/></t>
                                   <br/>
                                 </t>
-                                Branch: <span id="branchclp"><t t-esc="build.branch_id.branch_name"/></span>
-                                <a href="#" class="clipbtn octicon octicon-clippy" data-clipboard-target="#branchclp" title="Copy branch name to clipboard"/><br/>
-                                Build host: <t t-esc="build.real_build.host"/><br/>
-                                Build dest: <t t-esc="build['dest']"/><br/>
+                                <b>Branch:</b>  <span id="branchclp"><a title="Go to branch build list" t-attf-href="/runbot/branch/{{build.branch_id.id}}" t-esc="build.branch_id.branch_name"/></span>
+                                <t t-if="build.branch_id.pull_head_name" t-esc="'(%s)' % build.branch_id.pull_branch_name"/>
+                                <!--<a href="#" class="clipbtn octicon octicon-clippy" data-clipboard-target="#branchclp" title="Copy branch name to clipboard"/>--><br/>
+                                <b>Host:</b>  <t t-esc="build.real_build.host"/><br/>
+                                <b>Dest:</b>  <t t-esc="build.dest"/><br/>
+                                <b>Total time:</b>  <t t-esc="build.get_formated_build_time()"/><br/>
+
+                            <br/>
+                            <t t-set="branch_name_builds" t-value="build.branch_id._get_last_branch_name_builds()"/>
+                            <t t-if="branch_name_builds">
+                              <b>Latest branch builds:</b>
+                              <t t-foreach="branch_name_builds" t-as="cbu">
+                                <t t-set="klass">info</t>
+                          
+                                <t t-if="cbu.global_result == 'ko'"><t t-set="klass">danger</t></t>
+                                <t t-if="cbu.global_result == 'warn'"><t t-set="klass">warning</t></t>
+                                <t t-if="cbu.global_result in ('killed', 'manually_killed')"><t t-set="klass">killed</t></t>
+                                <t t-if="cbu.global_result == 'ok' and cbu.global_state in ('running','done')"><t t-set="klass">success</t></t>
+                                <a t-attf-href='/runbot/build/{{cbu.id}}'><span t-attf-class="label label-{{klass}}"><t t-esc="cbu.repo_id._get_repo_name_part()"/></span></a>
+                              </t><br/>
+                            </t>
                             </td>
                             <td t-if="build.real_build.children_ids">
                               Children:
                               <table class="table table-condensed">
                                 <t t-foreach="build.real_build.children_ids.sorted('id')" t-as="child">
                                   <t t-set="rowclass"><t t-call="runbot.build_class"><t t-set="build" t-value="child"/></t></t>
-                                  <tr><td t-attf-class="bg-{{rowclass.strip()}}-light">
+                                  <tr t-attf-class="bg-{{rowclass.strip()}}-light"><td>
                                     <a t-attf-href="/runbot/build/{{child.id}}" >Build <t t-esc="child.id"/></a>
                                     <t t-if="child.description">
                                       <t t-esc="child.description" />
@@ -169,6 +186,10 @@
                                       <i class="fa fa-spinner fa-spin"/>
                                       <t t-esc="child.global_state"/>
                                     </t>
+                                  </td>
+                                  <td> <span t-attf-class="label label-info" t-esc="child.get_formated_build_time()"/>
+                                  </td>
+                                  <td>
                                     <t t-call="runbot.build_button">
                                         <t t-set="bu" t-value="child"/>
                                         <t t-set="klass" t-value="'btn-group-ssm'"/>

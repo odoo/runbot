@@ -78,3 +78,11 @@ body, .table{
 .build_buttons {
     margin-left: auto
 }
+
+.bg-killed {
+    background-color: #aaa;
+}
+
+.label-killed {
+    background-color: #aaa;
+}
