@@ -337,6 +337,7 @@ class Branch(models.Model):
           AND pr.state != 'merged'
           AND pr.state != 'closed'
         GROUP BY
+            pr.target,
             CASE
                 WHEN pr.label SIMILAR TO '%%:patch-[[:digit:]]+'
                     THEN pr.id::text
