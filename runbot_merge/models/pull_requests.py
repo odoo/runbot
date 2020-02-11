@@ -298,9 +298,7 @@ All substitutions are tentatively applied sequentially to the input.
         return self.filtered(lambda r: branch in branches(ast.literal_eval(r.branch_filter)))
 
     def _remap_label(self, label):
-        print(self.substitutions)
         for line in filter(None, (self.substitutions or '').splitlines()):
-            print(line)
             sep = line[0]
             _, pattern, repl, flags = line.split(sep)
             label = re.sub(
