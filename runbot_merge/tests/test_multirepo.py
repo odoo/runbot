@@ -8,6 +8,7 @@ are staged concurrently in all repos
 import json
 
 import pytest
+import requests
 
 from test_utils import re_matches, get_partner
 
@@ -758,3 +759,109 @@ def test_remove_acl(env, partners, repo_a, repo_b, repo_c):
     assert r.mapped('review_rights.repository_id') == repo_a | repo_b | repo_c
     r.write({'review_rights': [(5, 0, 0)]})
     assert r.mapped('review_rights.repository_id') == env['runbot_merge.repository']
+
+class TestSubstitutions:
+    def test_substitution_patterns(self, env, port):
+        p = env['runbot_merge.project'].create({
+            'name': 'proj',
+            'github_token': 'wheeee',
+            'repo_ids': [(0, 0, {'name': 'xxx/xxx'})],
+            'branch_ids': [(0, 0, {'name': 'master'})]
+        })
+        r = p.repo_ids
+        # replacement pattern, pr label, stored label
+        cases = [
+            ('/^foo:/foo-dev:/', 'foo:bar', 'foo-dev:bar'),
+            ('/^foo:/foo-dev:/', 'foox:bar', 'foox:bar'),
+            ('/^foo:/foo-dev:/i', 'FOO:bar', 'foo-dev:bar'),
+            ('/o/x/g', 'foo:bar', 'fxx:bar'),
+            ('@foo:@bar:@', 'foo:bar', 'bar:bar'),
+            ('/foo:/bar:/\n/bar:/baz:/', 'foo:bar', 'baz:bar'),
+        ]
+        for pr_number, (pattern, original, target) in enumerate(cases, start=1):
+            r.substitutions = pattern
+            requests.post(
+                'http://localhost:{}/runbot_merge/hooks'.format(port),
+                headers={'X-Github-Event': 'pull_request'},
+                json={
+                    'action': 'opened',
+                    'repository': {
+                        'full_name': r.name,
+                    },
+                    'pull_request': {
+                        'user': {'login': 'bob'},
+                        'base': {
+                            'repo': {'full_name': r.name},
+                            'ref': p.branch_ids.name,
+                        },
+                        'number': pr_number,
+                        'title': "a pr",
+                        'body': None,
+                        'commits': 1,
+                        'head': {
+                            'label': original,
+                            'sha': format(pr_number, 'x')*40,
+                        }
+                    }
+                }
+            )
+            pr = env['runbot_merge.pull_requests'].search([
+                ('repository', '=', r.id),
+                ('number', '=', pr_number)
+            ])
+            assert pr.label == target
+
+
+    def test_substitutions_staging(self, env, repo_a, repo_b, config):
+        """ Different repos from the same project may have different policies for
+        sourcing PRs. So allow for remapping labels on input in order to match.
+        """
+        repo_b_id = env['runbot_merge.repository'].search([
+            ('name', '=', repo_b.name)
+        ])
+        # in repo b, replace owner part by repo_a's owner
+        repo_b_id.substitutions = r"/.+:/%s:/" % repo_a.owner
+
+        with repo_a:
+            make_branch(repo_a, 'master', 'initial', {'a': '0'})
+        with repo_b:
+            make_branch(repo_b, 'master', 'initial', {'b': '0'})
+
+        # policy is that repo_a PRs are created in the same repo while repo_b PRs
+        # are created in personal forks
+        with repo_a:
+            repo_a.make_commits('master', repo_a.Commit('bop', tree={'a': '1'}), ref='heads/abranch')
+            pra = repo_a.make_pr(target='master', head='abranch')
+        b_fork = repo_b.fork()
+        with b_fork, repo_b:
+            b_fork.make_commits('master', b_fork.Commit('pob', tree={'b': '1'}), ref='heads/abranch')
+            prb = repo_b.make_pr(
+                title="a pr",
+                target='master', head='%s:abranch' % b_fork.owner
+            )
+
+        pra_id = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo_a.name),
+            ('number', '=', pra.number)
+        ])
+        prb_id = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo_b.name),
+            ('number', '=', prb.number)
+        ])
+        assert pra_id.label.endswith(':abranch')
+        assert prb_id.label.endswith(':abranch')
+
+        with repo_a, repo_b:
+            repo_a.post_status(pra.head, 'success', 'legal/cla')
+            repo_a.post_status(pra.head, 'success', 'ci/runbot')
+            pra.post_comment('hansen r+', config['role_reviewer']['token'])
+
+            repo_b.post_status(prb.head, 'success', 'legal/cla')
+            repo_b.post_status(prb.head, 'success', 'ci/runbot')
+            prb.post_comment('hansen r+', config['role_reviewer']['token'])
+        env.run_crons()
+
+        assert pra_id.staging_id, 'PR A should be staged'
+        assert prb_id.staging_id, "PR B should be staged"
+        assert pra_id.staging_id == prb_id.staging_id, "both prs should be staged together"
+        assert pra_id.batch_id == prb_id.batch_id, "both prs should be part of the same batch"
