@@ -32,6 +32,11 @@ class RunbotHook(http.Controller):
         # force update of dependencies to in case a hook is lost
         if not payload or event == 'push' or (event == 'pull_request' and payload.get('action') in ('synchronize', 'opened', 'reopened')):
             (repo | repo.dependency_ids).set_hook_time(time.time())
+        elif event == 'pull_request' and payload and payload.get('action', '') == 'edited' and 'base' in payload.get('changes'):
+            # handle PR that have been re-targeted
+            pr_number = payload.get('pull_request', {}).get('number', '')
+            branch = request.env['runbot.branch'].sudo().search([('repo_id', '=', repo.id), ('name', '=', 'refs/pull/%s' % pr_number)])
+            branch._get_branch_infos(payload.get('pull_request', {}))
         else:
             _logger.debug('Ignoring unsupported hook %s %s', event, payload.get('action', ''))
         return ""
