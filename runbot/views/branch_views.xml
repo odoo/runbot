@@ -6,6 +6,7 @@
         <field name="arch" type="xml">
           <form>
             <header>
+              <button name="recompute_infos" string="Recompute Infos" type="object" class="oe_highlight"/>
             </header>
             <sheet>
               <div class="oe_button_box" name="button_box">

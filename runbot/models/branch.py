@@ -102,12 +102,12 @@ class runbot_branch(models.Model):
             branch.branch_config_id = branch.config_id
 
     @api.depends('name')
-    def _get_branch_infos(self):
+    def _get_branch_infos(self, pull_info=None):
         """compute branch_name, branch_url, pull_head_name and target_branch_name based on name"""
         for branch in self:
             if branch.name:
                 branch.branch_name = branch.name.split('/')[-1]
-                pi = branch._get_pull_info()
+                pi = pull_info or branch._get_pull_info()
                 if pi:
                     branch.target_branch_name = pi['base']['ref']
                     if not _re_patch.match(pi['head']['label']):
@@ -115,6 +115,10 @@ class runbot_branch(models.Model):
                         branch.pull_head_name = pi['head']['label']
             else:
                 branch.branch_name = ''
+
+    def recompute_infos(self):
+        """ public method to recompute infos on demand """
+        self._get_branch_infos()
 
     @api.depends('branch_name')
     def _get_branch_url(self):
