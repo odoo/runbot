@@ -1,4 +1,18 @@
 <odoo>
+    <record id="runbot_merge_tree_partner" model="ir.ui.view">
+        <field name="name">Configure partners list to be useful</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//tree" position="replace">
+                <tree string="Contacts">
+                    <field name="display_name" string="Name"/>
+                    <field name="github_login"/>
+                    <field name="review_rights" widget="many2many_tags"/>
+                </tree>
+            </xpath>
+        </field>
+    </record>
     <record id="runbot_merge_form_partner" model="ir.ui.view">
         <field name="name">Add mergebot/GH info to partners form</field>
         <field name="model">res.partner</field>

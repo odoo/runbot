@@ -44,3 +44,15 @@ class ReviewRights(models.Model):
         res = super()._auto_init()
         tools.create_unique_index(self._cr, 'runbot_merge_review_m2m', self._table, ['partner_id', 'repository_id'])
         return res
+
+    def name_get(self):
+        return [
+            (r.id, '%s: %s' % (r.repository_id.name, ', '.join(filter(None, [
+                r.review and "reviewer",
+                r.self_review and "self-reviewer"
+            ]))))
+            for r in self
+        ]
+
+    def name_search(self, name='', args=None, operator='ilike', limit=100):
+        return self.search(args + [('repository_id.name', operator, name)], limit=limit).name_get()
