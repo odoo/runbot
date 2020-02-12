@@ -174,11 +174,16 @@ class runbot_branch(models.Model):
         query = """
             SELECT max(b.id)
             FROM runbot_build b
+            JOIN runbot_branch br ON br.id = b.branch_id
+
             WHERE b.branch_id IN (
                 SELECT id from runbot_branch WHERE %s
             )
             AND b.build_type IN ('normal', 'rebuild')
             AND b.repo_id in %%s
+            AND (b.hidden = false OR b.hidden IS NULL)
+            AND b.parent_id IS NULL
+            AND (br.no_build = false OR br.no_build IS NULL)
             GROUP BY b.repo_id
         """ % where_clause
 
