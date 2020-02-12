@@ -582,13 +582,13 @@ This PR targets %s and is the last of the forward-port chain%s
 To merge the full chain, say
 > @%s r+
 
-More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
+More info at https://github.com/odoo/odoo/wiki/Mergebot-and-Forwardbot#forward-port
 """ % (target.name, ' containing:' if ancestors else '.', ancestors, pr.repository.project_id.fp_github_name)
             else:
                 message = """\
 This PR targets %s and is part of the forward-port chain. Further PRs will be created up to %s.
 
-More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
+More info at https://github.com/odoo/odoo/wiki/Mergebot-and-Forwardbot#forward-port
 """ % (target.name, base.limit_id.name)
             self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': new_pr.repository.id,
