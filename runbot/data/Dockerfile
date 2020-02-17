@@ -37,7 +37,7 @@ RUN set -x ; \
 RUN curl -sSL http://nightly.odoo.com/odoo.key | apt-key add - \
     && echo "deb http://nightly.odoo.com/deb/bionic ./" > /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \ 
-    && apt-get install -y -qq google-chrome-stable
+    && apt-get install -y -qq google-chrome-stable=71.0.3578.98-1
 
 # Install phantomjs
 RUN curl -sSL https://bitbucket.org/ariya/phantomjs/downloads/phantomjs-2.1.1-linux-x86_64.tar.bz2  -o /tmp/phantomjs.tar.bz2 \
