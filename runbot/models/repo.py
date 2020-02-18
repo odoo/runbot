@@ -545,14 +545,12 @@ class runbot_repo(models.Model):
         # decide if we need room
         Build = self.env['runbot.build']
         domain_host = self.build_domain_host(host)
-        testing_builds = Build.search(domain_host + [('local_state', 'in', ['testing', 'pending'])])
+        testing_builds = Build.search(domain_host + [('local_state', 'in', ['testing', 'pending']), ('requested_action', '!=', 'deathrow')])
         used_slots = len(testing_builds)
         available_slots = host.get_nb_worker() - used_slots
         nb_pending = Build.search_count([('local_state', '=', 'pending'), ('host', '=', False)])
         if available_slots > 0 or nb_pending == 0:
             return
-        builds_to_kill = self.env['runbot.build']
-        builds_to_skip = self.env['runbot.build']
         for build in testing_builds:
             top_parent = build._get_top_parent()
             if not build.branch_id.sticky:
