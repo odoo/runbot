@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import collections
+import sys
 import time
 from datetime import datetime, timedelta
 from operator import itemgetter
@@ -351,6 +352,98 @@ a
 >>>\x3e>>> [0-9a-f]{7,}(...)? temp
 '''),
     }
+
+def test_update_merged(env, make_repo, config, users):
+    """ Strange things happen when an FP gets closed / merged but then its
+    parent is modified and the forwardport tries to update the (now merged)
+    child.
+
+    Turns out the issue is the followup: given a PR a and forward port targets
+    B -> C -> D. When a is merged we get b, c and d. If c gets merged *then*
+    b gets updated, the fwbot will update c in turn, then it will look for the
+    head of the updated c in order to create d.
+
+    However it *will not* find that head, as update events don't get propagated
+    on closed PRs (this is generally a good thing). As a result, the sanity
+    check when trying to port c to d will fail.
+
+    After checking with nim, the safest behaviour seems to be:
+
+    * stop at the update of the first closed or merged PR
+    * signal on that PR that something fucky happened
+    * also maybe disable or exponentially backoff the update job after some
+      number of attempts?
+    """
+    prod, other = make_basic(env, config, make_repo)
+    # add a 4th branch
+    with prod:
+        prod.make_ref('heads/d', prod.commit('c').id)
+    env['runbot_merge.project'].search([]).write({
+        'branch_ids': [(0, 0, {
+            'name': 'd', 'fp_sequence': -1, 'fp_target': True,
+        })]
+    })
+
+    with prod:
+        [c] = prod.make_commits('a', Commit('p_0', tree={'0': '0'}), ref='heads/hugechange')
+        pr = prod.make_pr(target='a', head='hugechange')
+        prod.post_status(c, 'success', 'legal/cla')
+        prod.post_status(c, 'success', 'ci/runbot')
+        pr.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+    with prod:
+        prod.post_status('staging.a', 'success', 'legal/cla')
+        prod.post_status('staging.a', 'success', 'ci/runbot')
+    env.run_crons()
+
+    pr0, pr1 = env['runbot_merge.pull_requests'].search([], order='number')
+    with prod:
+        prod.post_status(pr1.head, 'success', 'legal/cla')
+        prod.post_status(pr1.head, 'success', 'ci/runbot')
+    env.run_crons()
+
+    pr0, pr1, pr2 = env['runbot_merge.pull_requests'].search([], order='number')
+    with prod:
+        prod.get_pr(pr2.number).post_comment('hansen r+', config['role_reviewer']['token'])
+        prod.post_status(pr2.head, 'success', 'legal/cla')
+        prod.post_status(pr2.head, 'success', 'ci/runbot')
+    env.run_crons()
+
+    assert pr2.staging_id
+    with prod:
+        prod.post_status('staging.c', 'success', 'legal/cla')
+        prod.post_status('staging.c', 'success', 'ci/runbot')
+    env.run_crons()
+    assert pr2.state == 'merged'
+    assert prod.get_pr(pr2.number).state == 'closed'
+
+    # now we can try updating pr1 and see what happens
+    repo, ref = prod.get_pr(pr1.number).branch
+    with repo:
+        repo.make_commits(
+            pr1.target.name,
+            Commit('2', tree={'0': '0', '1': '1'}),
+            ref='heads/%s' % ref,
+            make=False
+        )
+    updates = env['forwardport.updates'].search([])
+    assert updates
+    assert updates.original_root == pr0
+    assert updates.new_root == pr1
+    env.run_crons()
+    assert not pr1.parent_id
+    assert not env['forwardport.updates'].search([])
+
+    assert prod.get_pr(pr2.number).comments == [
+        (users['user'], '''This PR targets c and is part of the forward-port chain. Further PRs will be created up to d.
+
+More info at https://github.com/odoo/odoo/wiki/Mergebot-and-Forwardbot#forward-port
+'''),
+        (users['reviewer'], 'hansen r+'),
+        (users['user'], """Ancestor PR %s has been updated but this PR is merged and can't be updated to match.
+
+You may want or need to manually update any followup PR.""" % pr1.display_name)
+    ]
 
 def test_conflict(env, config, make_repo):
     prod, other = make_basic(env, config, make_repo)

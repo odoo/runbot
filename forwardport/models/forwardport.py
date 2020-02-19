@@ -91,6 +91,27 @@ class UpdateQueue(models.Model, Queue):
         previous = self.new_root
         with ExitStack() as s:
             for child in self.new_root._iter_descendants():
+                _logger.info(
+                    "Re-port %s from %s (changed root %s -> %s)",
+                    child.display_name,
+                    previous.display_name,
+                    self.original_root.display_name,
+                    self.new_root.display_name
+                )
+                if child.state in ('closed', 'merged'):
+                    self.env['runbot_merge.pull_requests.feedback'].create({
+                        'repository': child.repository.id,
+                        'pull_request': child.number,
+                        'message': "Ancestor PR %s has been updated but this PR"
+                                   " is %s and can't be updated to match."
+                                   "\n\n"
+                                   "You may want or need to manually update any"
+                                   " followup PR." % (
+                            self.new_root.display_name,
+                            child.state,
+                        )
+                    })
+                    return
                 # QUESTION: update PR to draft if there are conflicts?
                 _, working_copy = previous._create_fp_branch(
                     child.target, child.refname, s)
