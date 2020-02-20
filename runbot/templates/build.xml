@@ -24,22 +24,6 @@
             <t t-if="bu.global_result=='manually_killed'"><i class="text-danger fa fa-times"/> manually killed</t>
           </t>
         </t>
-        <t t-if="bu.revdep_build_ids">
-            <small class="pull-right">Dep builds:
-                <t t-foreach="bu.sorted_revdep_build_ids()" t-as="rbu">
-                            <a t-attf-href="/runbot/build/{{rbu['id']}}" aria-label="Build details" data-toggle="tooltip" t-attf-title="{{rbu['repo_id']['name']}}">
-                            <t t-if="rbu.global_result=='ok'"><i class="text-success fa fa-thumbs-up"/></t>
-                            <t t-if="rbu.global_result=='ko'"><i class="text-danger fa fa-thumbs-down"/></t>
-                            <t t-if="rbu.global_result=='warn'"><i class="text-warning fa fa-warning"/></t>
-                            <t t-if="rbu.global_result=='skipped'"><i class="text-danger fa fa-ban"/></t>
-                            <t t-if="rbu.global_result=='killed'"><i class="text-danger fa fa-times"/>&#x1f480;</t>
-                            <t t-if="rbu.global_result=='manually_killed'"><i class="text-danger fa fa-times"/>&#x1f52b;</t>
-                            <t t-if="rbu.global_state=='pending'"><i class="fa fa-pause" style="color: #666666;"/></t>
-                            <t t-if="rbu.global_state in ('testing', 'waiting')"><i class="fa fa-spinner fa-spin" style="color: #666666;"/></t>
-                            </a>
-                </t>
-            </small>
-        </t>
     </template>
     <template id="runbot.build_button">
         <div t-attf-class="pull-right">
