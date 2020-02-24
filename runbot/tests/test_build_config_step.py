@@ -158,6 +158,33 @@ class TestBuildConfigStep(RunbotCase):
         config_step._run_odoo_install(self.parent_build, 'dev/null/logpath')
 
 
+    @patch('odoo.addons.runbot.models.build.runbot_build._checkout')
+    def test_db_name(self, mock_checkout):
+        config_step = self.ConfigStep.create({
+            'name': 'default',
+            'job_type': 'install_odoo',
+            'custom_db_name': 'custom',
+        })
+        call_count = 0
+        assert_db_name = 'custom'
+        def docker_run(cmd, log_path, *args, **kwargs):
+            db_sufgfix = cmd.cmd[cmd.index('-d')+1].split('-')[-1]
+            self.assertEqual(db_sufgfix, assert_db_name)
+            nonlocal call_count
+            call_count += 1
+
+        self.patchers['docker_run'].side_effect = docker_run
+
+        config_step._run_odoo_install(self.parent_build, 'dev/null/logpath')
+
+        assert_db_name = 'custom_build'
+        self.parent_build.config_data = {'db_name': 'custom_build'}
+        config_step._run_odoo_install(self.parent_build, 'dev/null/logpath')
+
+        config_step._run_odoo_run(self.parent_build, 'dev/null/logpath')
+
+        self.assertEqual(call_count, 3)
+
 class TestMakeResult(RunbotCase):
 
     def setUp(self):
