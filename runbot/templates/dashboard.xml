@@ -120,6 +120,41 @@
         </xpath>
     </template>
 
+    <template id="runbot.config_monitoring">
+      <t t-call="runbot.frontend_no_nav">
+        <t t-set="head">
+          <t t-if="refresh">
+            <meta http-equiv="refresh" t-att-content="refresh"/>
+          </t>
+        </t>
+          <table>
+            <tr t-foreach="last_monitored" t-as="build">
+              <t t-set="build" t-value="build.real_build"/>
+              <td>
+                <t t-esc="build.repo_id.short_name"/>/<t t-esc="build.branch_id.branch_name"/>
+              </td>
+              <t t-if="build.local_result == 'ko'"><t t-set="klass">danger</t></t>
+              <t t-if="build.local_result == 'warn'"><t t-set="klass">warning</t></t>
+              <t t-if="build.local_result == 'ok'"><t t-set="klass">success</t></t>
+              <t t-if="build.local_result == 'killed'"><t t-set="klass">killed</t></t>
+              <td>
+                <a t-attf-href='/runbot/build/{{build.id}}'><span t-attf-class="label label-{{klass}}"><t t-esc="build.config_id.name"/></span></a>
+              </td>
+              <td>
+              <span t-foreach="build.children_ids.sorted(key=lambda c:c.config_id.name, reverse=True).filtered(lambda c: c.local_result != 'ok' and not c.orphan_result)" t-as="child">
+                <t t-if="child.global_result == 'ko'"><t t-set="klass">danger</t></t>
+                <t t-if="child.global_result == 'warn'"><t t-set="klass">warning</t></t>
+                <t t-if="child.global_result == 'ok'"><t t-set="klass">success</t></t>
+                <t t-if="child.global_result == 'killed'"><t t-set="klass">killed</t></t>
+                <a t-attf-href='/runbot/build/{{child.id}}'><span t-attf-class="label label-{{klass}}"><t t-esc="child.config_data.get('db_name') or child.config_id.name"/></span></a>
+              </span>
+              </td>
+            </tr>
+          </table>
+
+      </t>
+    </template>
+
     <template id="runbot.monitoring">
        <t t-call="runbot.frontend_no_nav">
         <t t-set="head">
