@@ -103,3 +103,11 @@ class RunboHost(models.Model):
 
     def _total_workers(self):
         return sum(host.get_nb_worker() for host in self)
+
+    def disable(self):
+        """ Reserve host if possible """
+        self.ensure_one()
+        nb_hosts = self.env['runbot.host'].search_count([])
+        nb_reserved = self.env['runbot.host'].search_count([('assigned_only', '=', True)])
+        if nb_reserved < (nb_hosts / 2):
+            self.assigned_only = True

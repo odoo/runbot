@@ -425,7 +425,13 @@ class runbot_repo(models.Model):
         # Extracted from update_git to be easily overriden in external module
         self.ensure_one()
         repo = self
-        repo._git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*', '+refs/pull/*/head:refs/pull/*'])
+        try:
+            repo._git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*', '+refs/pull/*/head:refs/pull/*'])
+        except subprocess.CalledProcessError as e:
+            message = 'Failed to fetch repo %s with return code %s. Original command was %s' % (repo.name, e.returncode, e.cmd)
+            _logger.exception(message)
+            host = self.env['runbot.host'].search([('name', '=', fqdn())])
+            host.disable()
 
     def _update(self, force=True):
         """ Update the physical git reposotories on FS"""
