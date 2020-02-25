@@ -219,7 +219,7 @@
                                       <t t-if="'\n' not in l.message" t-esc="l.message"/>
                                       <pre t-if="'\n' in l.message" style="margin:0;padding:0; border: none;"><t t-esc="l.message"/></pre>
                                       <t t-if="l.type == 'subbuild' and subbuild.sudo().error_log_ids">
-                                         <a data-toggle="collapse" t-attf-data-target="#subbuild-{{subbuild.id}}"><i class="fa"></i></a>
+                                         <a class="show" data-toggle="collapse" t-attf-data-target="#subbuild-{{subbuild.id}}"><i class="fa"></i></a>
                                          <div t-attf-id="subbuild-{{subbuild.id}}" class="collapse in">
                                           <table class="table table-condensed" style="margin-bottom:0;">
                                             <t t-foreach="subbuild.sudo().error_log_ids" t-as="sl">
