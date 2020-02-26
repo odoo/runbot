@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import contextlib
-import fcntl
 import itertools
 import logging
 import os
@@ -14,6 +13,7 @@ from collections import OrderedDict
 from datetime import timedelta
 
 from babel.dates import format_timedelta
+from werkzeug import utils
 
 from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT
 
@@ -122,3 +122,25 @@ def list_local_dbs(additionnal_conditions=None):
                 %s
         """ % additionnal_condition_str)
         return [d[0] for d in local_cr.fetchall()]
+
+
+def pseudo_markdown(text):
+    text = utils.escape(text)
+    patterns = {
+            r'\*\*(.+?)\*\*': '<strong>\g<1></strong>',
+            r'~~(.+?)~~': '<del>\g<1></del>',  # it's not official markdown but who cares
+            r'__(.+?)__': '<ins>\g<1></ins>',  # same here, maybe we should change the method name
+            r'`(.+?)`': '<code>\g<1></code>',
+    }
+
+    for p, b in patterns.items():
+        text = re.sub(p, b, text, flags=re.DOTALL)
+
+    # icons
+    re_icon = re.compile(r'@icon-([a-z0-9-]+)')
+    text = re_icon.sub('<i class="fa fa-\g<1>"></i>', text)
+
+    # links
+    re_links = re.compile(r'\[(.+?)\]\((.+?)\)')
+    text = re_links.sub('<a href="\g<2>">\g<1></a>', text)
+    return text

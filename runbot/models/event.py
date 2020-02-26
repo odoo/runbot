@@ -2,11 +2,12 @@
 
 import logging
 
-from odoo import models, fields, api, tools
+from ..common import pseudo_markdown
+from odoo import models, fields, tools
 
 _logger = logging.getLogger(__name__)
 
-TYPES = [(t, t.capitalize()) for t in 'client server runbot subbuild link'.split()]
+TYPES = [(t, t.capitalize()) for t in 'client server runbot subbuild link markdown'.split()]
 
 
 class runbot_event(models.Model):
@@ -70,6 +71,12 @@ CREATE TRIGGER runbot_new_logging BEFORE INSERT ON ir_logging
 FOR EACH ROW EXECUTE PROCEDURE runbot_set_logging_build();
 
         """)
+
+    def _markdown(self):
+        """ Apply pseudo markdown parser for message.
+        """
+        self.ensure_one()
+        return pseudo_markdown(self.message)
 
 
 class RunbotErrorLog(models.Model):
