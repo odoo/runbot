@@ -756,7 +756,7 @@ def test_remove_acl(env, partners, repo_a, repo_b, repo_c):
     """ Check that our way of deprovisioning works correctly
     """
     r = partners['self_reviewer']
-    assert r.mapped('review_rights.repository_id') == repo_a | repo_b | repo_c
+    assert r.mapped('review_rights.repository_id.name') == [repo_a.name, repo_b.name, repo_c.name]
     r.write({'review_rights': [(5, 0, 0)]})
     assert r.mapped('review_rights.repository_id') == env['runbot_merge.repository']
 
