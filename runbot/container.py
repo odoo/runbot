@@ -270,7 +270,7 @@ def tests(args):
     if args.coverage:
         omit = ['--omit', '*__manifest__.py']
         python_params = [ '-m', 'coverage', 'run', '--branch', '--source', '/data/build'] + omit
-        posts = [['python%s' % py_version, "-m", "coverage", "html", "-d", "/data/build/coverage", "--ignore-errors"]]
+        posts = [['python%s' % py_version, "-m", "coverage", "html", "-d", "/data/build/coverage", "--ignore-errors"], ['python%s' % py_version, "-m", "coverage", "xml", "--ignore-errors"]]
         os.makedirs(os.path.join(args.build_dir, 'coverage'), exist_ok=True)
     elif args.flamegraph:
         flame_log = '/data/build/logs/flame.log'

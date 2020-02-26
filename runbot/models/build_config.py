@@ -380,7 +380,7 @@ class ConfigStep(models.Model):
         if extra_params:
             cmd.extend(shlex.split(extra_params))
 
-        cmd.posts.append(self._post_install_command(build, modules_to_install, py_version))  # coverage post, extra-checks, ...
+        cmd.posts.extend(self._post_install_commands(build, modules_to_install, py_version))  # coverage post, extra-checks, ...
         dump_dir = '/data/build/logs/%s/' % db_name
         sql_dest = '%s/dump.sql' % dump_dir
         filestore_path = '/data/build/datadir/filestore/%s' % db_name
@@ -413,6 +413,10 @@ class ConfigStep(models.Model):
             kwargs['log_type'] = 'link'
         build._log('', **kwargs)
 
+        if self.coverage:
+            message = 'Coverage xml: $$fa-download'
+            build._log('end_job', message, log_type='link', path='/data/build/logs/coverage.xml')
+
         if self.flamegraph:
             link = self._perf_data_url(build, 'log.gz')
             message = 'Flamegraph data: $$fa-download$$'
@@ -425,14 +429,16 @@ class ConfigStep(models.Model):
     def _modules_to_install(self, build):
         return set(build._get_modules_to_test(modules_patterns=self.install_modules))
 
-    def _post_install_command(self, build, modules_to_install, py_version=None):
+    def _post_install_commands(self, build, modules_to_install, py_version=None):
+        cmds = []
         if self.coverage:
             py_version = py_version if py_version is not None else build._get_py_version()
             # prepare coverage result
             cov_path = build._path('coverage')
             os.makedirs(cov_path, exist_ok=True)
-            return ['python%s' % py_version, "-m", "coverage", "html", "-d", "/data/build/coverage", "--ignore-errors"]
-        return []
+            cmds.append(['python%s' % py_version, "-m", "coverage", "html", "-d", "/data/build/coverage", "--ignore-errors"])
+            cmds.append(['python%s' % py_version, "-m", "coverage", "xml", "-o", "/data/build/logs/coverage.xml", "--ignore-errors"])
+        return cmds
 
     def _perfs_data_path(self, ext='log'):
         return '/data/build/logs/flame_%s.%s' % (self.name, ext)
