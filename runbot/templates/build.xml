@@ -117,7 +117,7 @@
                             <t t-set="rowclass"><t t-call="runbot.build_class"><t t-set="build" t-value="build"/></t></t>
                             <td t-attf-class="bg-{{rowclass.strip()}}-light">
                                 <t t-if="build.description">
-                                <b>Description:</b> <t t-esc="build.description"/><br/>
+                                <b>Description:</b> <t t-raw="build.md_description"/><br/>
                                 </t>
                                 <b>Subject:</b>  <t t-esc="build.subject"/><br/>
                                 <b>Author:</b>  <t t-esc="build.author"/><br/>
@@ -158,7 +158,7 @@
                                   <tr t-attf-class="bg-{{rowclass.strip()}}-light"><td>
                                     <a t-attf-href="/runbot/build/{{child.id}}" >Build <t t-esc="child.id"/></a>
                                     <t t-if="child.description">
-                                      <t t-esc="child.description" />
+                                      <t t-raw="child.md_description" />
                                     </t>
                                     <t t-else="">
                                         with config <t t-esc="child.config_id.name"/>
@@ -199,13 +199,13 @@
                             <t t-set="subbuild" t-value="(([child for child in build.real_build.children_ids if child.id == int(l.path)] if l.type == 'subbuild' else False) or [build.browse()])[0]"/>
                             <t t-set="logclass" t-value="dict(CRITICAL='danger', ERROR='danger', WARNING='warning', OK='success', SEPARATOR='separator').get(l.level)"/>
                             <tr t-attf-class="'bg-%s-light' % {{logclass}} if {{logclass}} != 'separator' else {{logclass}}">
-                                <td style="white-space: nowrap; width:1%;"><t t-esc="l.create_date"/></td>
-                                <td style="white-space: nowrap; width:1%;"><b t-if="l.level != 'SEPARATOR' and l.type != 'link'" t-esc="l.level"/></td>
-                                <td style="white-space: nowrap; width:1%;"><t t-if="l.level != 'SEPARATOR' and l.type != 'link'" t-esc="l.type"/></td>
+                                <td style="white-space: nowrap; width:1%;"><t t-esc="l.create_date.strftime('%Y-%m-%d %H:%M:%S')"/></td>
+                                <td style="white-space: nowrap; width:1%;"><b t-if="l.level != 'SEPARATOR' and l.type not in ['link', 'markdown']" t-esc="l.level"/></td>
+                                <td style="white-space: nowrap; width:1%;"><t t-if="l.level != 'SEPARATOR' and l.type not in ['link', 'markdown']" t-esc="l.type"/></td>
                                 <t t-set="message_class" t-value="''"/>
                                 <t t-if="subbuild" t-set="message_class"><t t-call="runbot.build_class"><t t-set="build" t-value="subbuild"/></t></t>
                                 <td t-attf-class="bg-{{message_class.strip() or logclass}}-light">
-                                    <t t-if="l.type not in ('runbot', 'link')">
+                                    <t t-if="l.type not in ('runbot', 'link', 'markdown')">
                                       <t t-if="l.type == 'subbuild'">
                                          <a t-attf-href="/runbot/build/{{l.path}}">Build #<t t-esc="l.path"/></a>
                                       </t>
@@ -220,6 +220,7 @@
                                           <t t-esc="message[0]"/><a t-attf-href="{{l.path}}"><t t-esc="message[1]"/></a><t t-esc="message[2]"/>
                                       </t>
                                     </t>
+                                    <t t-elif="l.type == 'markdown'" t-raw="l._markdown()"/>
                                     <t t-else="">
                                       <t t-if="'\n' not in l.message" t-esc="l.message"/>
                                       <pre t-if="'\n' in l.message" style="margin:0;padding:0; border: none;"><t t-esc="l.message"/></pre>

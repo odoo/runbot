@@ -92,6 +92,18 @@ class Test_Build(RunbotCase):
         build.env.cr.execute("SELECT config_data, config_data->'test_write' AS written, config_data->'test_build' AS test_build FROM runbot_build WHERE id = %s", [build.id])
         self.assertEqual([({'test_write': 'written', 'test_build': 'foo'}, 'written', 'foo')], self.env.cr.fetchall())
 
+    def test_markdown_description(self):
+        build = self.create_build({
+            'branch_id': self.branch.id,
+            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'port': '1234',
+            'description': 'A nice **description**'
+        })
+        self.assertEqual(build.md_description, 'A nice <strong>description</strong>')
+
+        build.description = "<script>console.log('foo')</script>"
+        self.assertEqual(build.md_description, "&lt;script&gt;console.log('foo')&lt;/script&gt;")
+
     def test_config_data_duplicate(self):
 
         build = self.create_build({

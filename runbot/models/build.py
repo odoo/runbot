@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import time
 import datetime
-from ..common import dt2time, fqdn, now, grep, local_pgadmin_cursor, s2human, Commit, dest_reg, os, list_local_dbs
+from ..common import dt2time, fqdn, now, grep, local_pgadmin_cursor, s2human, Commit, dest_reg, os, list_local_dbs, pseudo_markdown
 from ..container import docker_build, docker_stop, docker_state, Command
 from ..fields import JsonDictField
 from odoo.addons.runbot.models.repo import RunbotException
@@ -65,6 +65,7 @@ class runbot_build(models.Model):
     repo_id = fields.Many2one(related='branch_id.repo_id', readonly=True, store=True)
     name = fields.Char('Revno', required=True)
     description = fields.Char('Description', help='Informative description')
+    md_description = fields.Char(compute='_compute_md_description', String='MD Parsed Description', help='Informative description mardown parsed')
     host = fields.Char('Host')
     port = fields.Integer('Port')
     dest = fields.Char(compute='_compute_dest', type='char', string='Dest', readonly=1, store=True)
@@ -177,6 +178,11 @@ class runbot_build(models.Model):
             max_days = max_days_main if not build.parent_id else max_days_child
             max_days += int(build.gc_delay if build.gc_delay else 0)
             build.gc_date = ref_date + datetime.timedelta(days=(max_days))
+
+    @api.depends('description')
+    def _compute_md_description(self):
+        for build in self:
+            build.md_description = pseudo_markdown(build.description)
 
     def _get_top_parent(self):
         self.ensure_one()
@@ -656,10 +662,10 @@ class runbot_build(models.Model):
             if build.requested_action == 'wake_up':
                 if docker_state(build._get_docker_name(), build._path()) == 'RUNNING':
                     build.write({'requested_action': False, 'local_state': 'running'})
-                    build._log('wake_up', 'Waking up failed, docker is already running', level='SEPARATOR')
+                    build._log('wake_up', 'Waking up failed, **docker is already running**', type='markdown', level='SEPARATOR')
                 elif not os.path.exists(build._path()):
                     build.write({'requested_action': False, 'local_state': 'done'})
-                    build._log('wake_up', 'Impossible to wake-up, build dir does not exists anymore', level='SEPARATOR')
+                    build._log('wake_up', 'Impossible to wake-up, **build dir does not exists anymore**', type='markdown', level='SEPARATOR')
                 else:
                     try:
                         log_path = build._path('logs', 'wake_up.txt')
@@ -673,7 +679,7 @@ class runbot_build(models.Model):
                             'local_state': 'running',
                             'port': port,
                         })
-                        build._log('wake_up', 'Waking up build', level='SEPARATOR')
+                        build._log('wake_up', '**Waking up build**', type='markdown', level='SEPARATOR')
                         self.env['runbot.build.config.step']._run_odoo_run(build, log_path)
                         # reload_nginx will be triggered by _run_odoo_run
                     except Exception:
