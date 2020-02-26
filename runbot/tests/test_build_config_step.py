@@ -153,12 +153,10 @@ class TestBuildConfigStep(RunbotCase):
         })
 
         def docker_run(cmd, log_path, *args, **kwargs):
-            cmds = cmd.build().split(' && ')
-            dest = self.parent_build.dest
             self.assertEqual(cmd.pres, [['sudo', 'pip3', 'install', '-r', 'bar/requirements.txt']])
             self.assertEqual(cmd.cmd[:10], ['python3', '-m', 'coverage', 'run', '--branch', '--source', '/data/build', '--omit', '*__manifest__.py', 'bar/server.py'])
-            #['bar/server.py', '--addons-path', 'bar', '--no-xmlrpcs', '--no-netrpc', '-d', '08732-master-d0d0ca-coverage', '--test-enable', '--stop-after-init', '--log-level=test', '--max-cron-threads=0']
-            self.assertEqual(cmd.posts, [['python3', '-m', 'coverage', 'html', '-d', '/data/build/coverage', '--ignore-errors']])
+            self.assertIn(['python3', '-m', 'coverage', 'html', '-d', '/data/build/coverage', '--ignore-errors'], cmd.posts)
+            self.assertIn(['python3', '-m', 'coverage', 'xml', '-o', '/data/build/logs/coverage.xml', '--ignore-errors'], cmd.posts)
             self.assertEqual(log_path, 'dev/null/logpath')
 
         self.patchers['docker_run'].side_effect = docker_run
