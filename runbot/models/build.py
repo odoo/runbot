@@ -965,7 +965,7 @@ class runbot_build(models.Model):
         _logger.error('None of %s found in commit, actual commit content:\n %s' % (commit.repo.server_files, os.listdir(commit._source_path())))
         raise RunbotException('No server found in %s' % commit)
 
-    def _cmd(self, python_params=None, py_version=None, local_only=True):
+    def _cmd(self, python_params=None, py_version=None, local_only=True, sub_command=None):
         """Return a list describing the command to start the build
         """
         self.ensure_one()
@@ -984,7 +984,10 @@ class runbot_build(models.Model):
         server_dir = self._docker_source_folder(server_commit)
 
         # commandline
-        cmd = ['python%s' % py_version] + python_params + [os.path.join(server_dir, server_file), '--addons-path', ",".join(addons_paths)]
+        cmd = ['python%s' % py_version] + python_params + [os.path.join(server_dir, server_file)]
+        if sub_command:
+            cmd += [sub_command]
+        cmd += ['--addons-path', ",".join(addons_paths)]
         # options
         config_path = build._server("tools/config.py")
         if grep(config_path, "no-xmlrpcs"):  # move that to configs ?

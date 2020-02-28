@@ -185,6 +185,27 @@ class TestBuildConfigStep(RunbotCase):
 
         self.assertEqual(call_count, 3)
 
+
+    @patch('odoo.addons.runbot.models.build.runbot_build._checkout')
+    def test_sub_command(self, mock_checkout):
+        config_step = self.ConfigStep.create({
+            'name': 'default',
+            'job_type': 'install_odoo',
+            'sub_command': 'subcommand',
+        })
+        call_count = 0
+        def docker_run(cmd, log_path, *args, **kwargs):
+            nonlocal call_count
+            sub_command = cmd.cmd[cmd.index('bar/server.py')+1]
+            self.assertEqual(sub_command, 'subcommand')
+            call_count += 1
+
+        self.patchers['docker_run'].side_effect = docker_run
+        config_step._run_odoo_install(self.parent_build, 'dev/null/logpath')
+
+        self.assertEqual(call_count, 1)
+
+
 class TestMakeResult(RunbotCase):
 
     def setUp(self):
