@@ -113,6 +113,7 @@ class ConfigStep(models.Model):
     test_enable = fields.Boolean('Test enable', default=True, track_visibility='onchange')
     test_tags = fields.Char('Test tags', help="comma separated list of test tags", track_visibility='onchange')
     enable_auto_tags = fields.Boolean('Allow auto tag', default=False, track_visibility='onchange')
+    sub_command = fields.Char('Subcommand', track_visibility='onchange')
     extra_params = fields.Char('Extra cmd args', track_visibility='onchange')
     additionnal_env = fields.Char('Extra env', help='Example: foo="bar",bar="foo". Cannot contains \' ', track_visibility='onchange')
     # python
@@ -148,6 +149,13 @@ class ConfigStep(models.Model):
             self.force_build = True
         else:
             self.force_build = False
+
+    @api.onchange('sub_command')
+    def _onchange_number_builds(self):
+        if self.sub_command:
+            self.install_modules = '-*'
+            self.test_enable = False
+            self.create_db = False
 
     @api.depends('name', 'custom_db_name')
     def _compute_db_name(self):
@@ -334,7 +342,7 @@ class ConfigStep(models.Model):
             python_params = ['-m', 'coverage', 'run', '--branch', '--source', '/data/build'] + coverage_extra_params
         elif self.flamegraph:
             python_params = ['-m', 'flamegraph', '-o', self._perfs_data_path()]
-        cmd = build._cmd(python_params, py_version)
+        cmd = build._cmd(python_params, py_version, sub_command=self.sub_command)
         # create db if needed
         db_suffix = build.config_data.get('db_name') or self.db_name
         db_name = "%s-%s" % (build.dest, db_suffix)

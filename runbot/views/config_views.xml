@@ -64,7 +64,8 @@
                         <field name="test_enable"/>
                         <field name="test_tags"/>
                         <field name="enable_auto_tags"/>
-                        <field name="extra_params"/>
+                        <field name="sub_command"/>
+                        <field name="extra_params" groups="base.group_no_one"/>
                         <field name="additionnal_env"/>
                     </group>
                     <group string="Create settings" attrs="{'invisible': [('job_type', 'not in', ('python', 'create_build'))]}">
