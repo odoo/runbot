@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from unittest.mock import patch, mock_open
-from odoo.tests import common
+from odoo.exceptions import UserError
 from odoo.addons.runbot.models.repo import RunbotException
 from .common import RunbotCase
 
@@ -82,6 +82,67 @@ class TestBuildConfigStep(RunbotCase):
             child_build.local_result = 'ko'
 
         self.assertFalse(self.parent_build.global_result)
+
+    def test_config_step_raises(self):
+        """ Test a config raises when run step position is wrong"""
+
+        run_step = self.ConfigStep.create({
+            'name': 'run_step',
+            'job_type': 'run_odoo',
+        })
+
+        create_step = self.ConfigStep.create({
+            'name': 'test_step',
+            'job_type': 'create_build',
+        })
+
+        config = self.Config.create({'name': 'test_config'})
+
+        # test that the run_odoo step has to be the last one
+        with self.assertRaises(UserError):
+            config.write({
+                 'step_order_ids': [
+                     (0, 0, {'sequence': 10, 'step_id': run_step.id}),
+                     (0, 0, {'sequence': 15, 'step_id': create_step.id}),
+                 ]
+             })
+
+        # test that the run_odoo step should be preceded by an install step
+        with self.assertRaises(UserError):
+            config.write({
+                'step_order_ids': [
+                    (0, 0, {'sequence': 15, 'step_id': run_step.id}),
+                    (0, 0, {'sequence': 10, 'step_id': create_step.id}),
+                ]
+            })
+
+    def test_config_step_copy(self):
+        """ Test a config copy with step_order_ids """
+
+        install_step = self.ConfigStep.create({
+            'name': 'install_step',
+            'job_type': 'install_odoo'
+        })
+
+        run_step = self.ConfigStep.create({
+            'name': 'run_step',
+            'job_type': 'run_odoo',
+        })
+
+        create_step = self.ConfigStep.create({
+            'name': 'test_step',
+            'job_type': 'create_build',
+        })
+
+        config = self.Config.create({'name': 'test_config'})
+        StepOrder = self.env['runbot.build.config.step.order']
+        # Creation order is impoortant to reproduce the Odoo copy bug/feature :-)
+        StepOrder.create({'sequence': 15, 'step_id': run_step.id, 'config_id': config.id})
+        StepOrder.create({'sequence': 10, 'step_id': create_step.id, 'config_id': config.id})
+        StepOrder.create({'sequence': 12, 'step_id': install_step.id, 'config_id': config.id})
+
+        dup_config = config.copy()
+        self.assertEqual(dup_config.step_order_ids.mapped('step_id'), config.step_order_ids.mapped('step_id'))
 
     @patch('odoo.addons.runbot.models.build.runbot_build._checkout')
     def test_coverage(self, mock_checkout):
