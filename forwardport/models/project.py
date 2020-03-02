@@ -324,6 +324,20 @@ class PullRequests(models.Model):
                         pr.state = newstate
                         pr.reviewed_by = author
                         # TODO: logging & feedback
+            elif token == 'close':
+                close = False
+                message = "I'm sorry, @{}. I can't close this PR for you."
+                if self.source_id._pr_acl(author).is_reviewer:
+                    close = True
+                    message = None
+
+                Feedback.create({
+                    'repository': self.repository.id,
+                    'pull_request': self.number,
+                    'message': message,
+                    'close': close,
+                    'token_field': 'fp_github_token',
+                })
             elif token == 'up' and next(tokens, None) == 'to':
                 limit = next(tokens, None)
                 if not self._pr_acl(author).is_author:

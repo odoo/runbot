@@ -855,8 +855,8 @@ class PR:
     def open(self, token=None):
         self._set_prop('state', 'open', token=token)
 
-    def close(self):
-        self._set_prop('state', 'closed')
+    def close(self, token=None):
+        self._set_prop('state', 'closed', token=token)
 
     @property
     def branch(self):

@@ -557,3 +557,44 @@ def test_new_intermediate_branch(env, config, make_repo):
         '0': '0', '1': '1', '2': '2', # updates from PRs
         'x': 'x',
     }, "check that new got all the updates (should be in the same state as c really)"
+
+def test_author_can_close_via_fwbot(env, config, make_repo, users):
+    project, prod, xxx = make_basic(env, config, make_repo, fp_token=True, fp_remote=True)
+    other_user = config['role_other']
+    other_token = other_user['token']
+    other = prod.fork(token=other_token)
+
+    with prod, other:
+        [c] = other.make_commits('a', Commit('c', tree={'0': '0'}), ref='heads/change')
+        pr = prod.make_pr(
+            target='a', title='my change',
+            head=other_user['user'] + ':change',
+            token=other_token
+        )
+        # should be able to close and open own PR
+        pr.close(other_token)
+        pr.open(other_token)
+        prod.post_status(c, 'success', 'legal/cla')
+        prod.post_status(c, 'success', 'ci/runbot')
+        pr.post_comment('%s close' % project.fp_github_name, other_token)
+        pr.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+    assert pr.state == 'open'
+
+    with prod:
+        prod.post_status('staging.a', 'success', 'legal/cla')
+        prod.post_status('staging.a', 'success', 'ci/runbot')
+    env.run_crons()
+
+    pr0_id, pr1_id = env['runbot_merge.pull_requests'].search([], order='number')
+    assert pr0_id.number == pr.number
+    pr1 = prod.get_pr(pr1_id.number)
+    # user can't close PR directly
+    with prod, pytest.raises(Exception):
+        pr1.close(other_token) # what the fuck?
+    # use can close via fwbot
+    with prod:
+        pr1.post_comment('%s close' % project.fp_github_name, other_token)
+    env.run_crons()
+    assert pr1.state == 'closed'
+    assert pr1_id.state == 'closed'
