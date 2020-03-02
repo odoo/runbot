@@ -1160,7 +1160,7 @@ class PullRequests(models.Model):
         if self.reviewed_by:
             m.headers.add('signed-off-by', self.reviewed_by.formatted_email)
 
-        return str(m)
+        return m
 
     def _stage(self, gh, target, related_prs=()):
         # nb: pr_commits is oldest to newest so pr.head is pr_commits[-1]
@@ -1190,7 +1190,7 @@ class PullRequests(models.Model):
         # updates head commit with PR number (if necessary) then rebases
         # on top of target
         msg = self._build_merge_message(commits[-1]['commit']['message'], related_prs=related_prs)
-        commits[-1]['commit']['message'] = msg
+        commits[-1]['commit']['message'] = str(msg)
         head, mapping = gh.rebase(self.number, target, commits=commits)
         self.commits_map = json.dumps({**mapping, '': head})
         return head
@@ -1198,7 +1198,7 @@ class PullRequests(models.Model):
     def _stage_rebase_merge(self, gh, target, commits, related_prs=()):
         msg = self._build_merge_message(self.message, related_prs=related_prs)
         h, mapping = gh.rebase(self.number, target, reset=True, commits=commits)
-        merge_head = gh.merge(h, target, msg)['sha']
+        merge_head = gh.merge(h, target, str(msg))['sha']
         self.commits_map = json.dumps({**mapping, '': merge_head})
         return merge_head
 
@@ -1224,7 +1224,7 @@ class PullRequests(models.Model):
             new_parents = [original_head] + list(head_parents - {base_commit})
             msg = self._build_merge_message(pr_head['commit']['message'], related_prs=related_prs)
             copy = gh('post', 'git/commits', json={
-                'message': msg,
+                'message': str(msg),
                 'tree': merge_tree,
                 'author': pr_head['commit']['author'],
                 'committer': pr_head['commit']['committer'],
@@ -1238,7 +1238,7 @@ class PullRequests(models.Model):
         else:
             # otherwise do a regular merge
             msg = self._build_merge_message(self.message)
-            merge_head = gh.merge(self.head, target, msg)['sha']
+            merge_head = gh.merge(self.head, target, str(msg))['sha']
             # and the merge commit is the normal merge head
             commits_map[''] = merge_head
             self.commits_map = json.dumps(commits_map)

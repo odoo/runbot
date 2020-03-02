@@ -869,9 +869,23 @@ def test_access_rights(env, config, make_repo, users, author, reviewer, delegate
     if success:
         assert pr1.staging_id and pr2.staging_id,\
             "%s should have approved FP of PRs by %s" % (reviewer, author)
+        st = prod.commit('staging.b')
+        c = prod.commit(st.parents[0])
+        # Should be signed-off by both original reviewer and forward port reviewer
+        original_signoff = signoff(config['role_user'], c.message)
+        forward_signoff = signoff(config['role_' + reviewer], c.message)
+        assert c.message.index(original_signoff) <= c.message.index(forward_signoff),\
+            "Check that FP approver is after original PR approver as that's " \
+            "the review path for the PR"
     else:
         assert not (pr1.staging_id or pr2.staging_id),\
             "%s should *not* have approved FP of PRs by %s" % (reviewer, author)
+def signoff(conf, message):
+    for n in filter(None, [conf.get('name'), conf.get('user')]):
+        signoff = 'Signed-off-by: ' + n
+        if signoff in message:
+            return signoff
+    raise AssertionError("Failed to find signoff by %s in %s" % (conf, message))
 
 def test_batched(env, config, make_repo, users):
     """ Tests for projects with multiple repos & sync'd branches. Batches
