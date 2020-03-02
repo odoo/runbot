@@ -150,8 +150,8 @@ def test_stage_match(env, project, repo_a, repo_b, config):
     assert pr_a.state == 'merged'
     assert pr_b.state == 'merged'
 
-    assert 'Related: {}#{}'.format(repo_b.name, pr_b.number) in repo_a.commit('master').message
-    assert 'Related: {}#{}'.format(repo_a.name, pr_a.number) in repo_b.commit('master').message
+    assert 'Related: {}'.format(pr_b.display_name) in repo_a.commit('master').message
+    assert 'Related: {}'.format(pr_a.display_name) in repo_b.commit('master').message
 
 def test_stage_different_statuses(env, project, repo_a, repo_b, config):
     project.batch_limit = 1
@@ -172,10 +172,17 @@ def test_stage_different_statuses(env, project, repo_a, repo_b, config):
         repo_a.post_status(pr_a.head, 'success', 'foo/bar')
     with repo_b:
         make_branch(repo_b, 'master', 'initial', {'a': 'b_0'})
-        pr_b = make_pr(repo_b, 'do-a-thing', [{'a': 'b_1'}],
-            user=config['role_user']['token'],
-            reviewer=config['role_reviewer']['token'],
+        [c] = repo_b.make_commits(
+            'heads/master',
+            repo_b.Commit('some_commit\n\nSee also %s#%d' % (repo_a.name, pr_a.number), tree={'a': 'b_1'}),
+            ref='heads/do-a-thing'
         )
+        pr_b = repo_b.make_pr(
+            title="title", body="body", target='master', head='do-a-thing',
+            token=config['role_user']['token'])
+        repo_b.post_status(c, 'success', 'ci/runbot')
+        repo_b.post_status(c, 'success', 'legal/cla')
+        pr_b.post_comment('hansen r+', config['role_reviewer']['token'])
     env.run_crons()
     # since the labels are the same but the statuses on pr_b are not the
     # expected ones, pr_a should be blocked on pr_b, which should be approved
@@ -194,6 +201,25 @@ def test_stage_different_statuses(env, project, repo_a, repo_b, config):
 
     assert pr_a_id.state == pr_b_id.state == 'ready'
     assert pr_a_id.staging_id == pr_b_id.staging_id
+
+    # do the actual merge to check for the Related header
+    for repo in [repo_a, repo_b]:
+        with repo:
+            repo.post_status('staging.master', 'success', 'legal/cla')
+            repo.post_status('staging.master', 'success', 'ci/runbot')
+            repo.post_status('staging.master', 'success', 'foo/bar')
+    env.run_crons()
+
+    pr_a_ref = to_pr(env, pr_a).display_name
+    pr_b_ref = to_pr(env, pr_b).display_name
+    master_a = repo_a.commit('master')
+    master_b = repo_b.commit('master')
+
+    assert 'Related: {}'.format(pr_b_ref) in master_a.message,\
+        "related should be in PR A's message"
+    assert 'Related: {}'.format(pr_a_ref) not in master_b.message,\
+        "related should not be in PR B's message since the ref' was added explicitly"
+    assert pr_a_ref in master_b.message, "the ref' should still be there though"
 
 def test_unmatch_patch(env, project, repo_a, repo_b, config):
     """ When editing files via the UI for a project you don't have write
@@ -334,10 +360,10 @@ def test_merge_fail(env, project, repo_a, repo_b, users, config):
         re_matches('^force rebuild'),
         """commit_do-b-thing_00
 
-closes %s#%d
+closes %s
 
-Related: %s#%d
-Signed-off-by: %s""" % (repo_a.name, pr2a.number, repo_b.name, pr2b.number, reviewer),
+Related: %s
+Signed-off-by: %s""" % (s2[0].display_name, s2[1].display_name, reviewer),
         'initial'
     ], "dummy commit + squash-merged PR commit + root commit"
 

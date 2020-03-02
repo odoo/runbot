@@ -1155,7 +1155,8 @@ class PullRequests(models.Model):
             m.body += '\n\ncloses {pr.display_name}'.format(pr=self)
 
         for r in related_prs:
-            m.headers.add('Related', r.display_name)
+            if r.display_name not in m.body:
+                m.headers.add('Related', r.display_name)
 
         if self.reviewed_by:
             m.headers.add('signed-off-by', self.reviewed_by.formatted_email)
