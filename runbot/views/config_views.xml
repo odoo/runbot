@@ -45,9 +45,19 @@
                     <group string="General settings">
                         <field name="name"/>
                         <field name="job_type"/>
+                        <field name="make_stats"/>
                         <field name="protected" groups="base.group_no_one"/>
                         <field name="default_sequence" groups="base.group_no_one"/>
                         <field name="group" groups="base.group_no_one"/>
+                    </group>
+                    <group string="Stats regexes" attrs="{'invisible': [('make_stats', '=', False)]}">
+                      <field name="build_stat_regex_ids">
+                          <tree string="Regexes" editable="bottom">
+                              <field name="name"/>
+                              <field name="regex"/>
+                              <field name="description"/>
+                          </tree>
+                      </field>
                     </group>
                     <group string="Python settings" attrs="{'invisible': [('job_type', 'not in', ('python'))]}">
                         <field name="python_code" widget="ace" options="{'mode': 'python'}"/>

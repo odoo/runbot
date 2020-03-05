@@ -65,7 +65,7 @@ class runbot_build(models.Model):
     repo_id = fields.Many2one(related='branch_id.repo_id', readonly=True, store=True)
     name = fields.Char('Revno', required=True)
     description = fields.Char('Description', help='Informative description')
-    md_description = fields.Char(compute='_compute_md_description', String='MD Parsed Description', help='Informative description mardown parsed')
+    md_description = fields.Char(compute='_compute_md_description', String='MD Parsed Description', help='Informative description markdown parsed')
     host = fields.Char('Host')
     port = fields.Integer('Port')
     dest = fields.Char(compute='_compute_dest', type='char', string='Dest', readonly=1, store=True)
@@ -80,6 +80,7 @@ class runbot_build(models.Model):
     log_ids = fields.One2many('ir.logging', 'build_id', string='Logs')
     error_log_ids = fields.One2many('ir.logging', 'build_id', domain=[('level', 'in', ['WARNING', 'ERROR', 'CRITICAL'])], string='Error Logs')
     config_data = JsonDictField('Config Data')
+    stat_ids = fields.One2many('runbot.build.stat', 'build_id', strings='Statistics values')
 
     # state machine
 
@@ -737,6 +738,9 @@ class runbot_build(models.Model):
                 results = {'local_result': 'ko'}
 
             build_values.update(results)
+
+            # compute statistics before starting next job
+            build.active_step._make_stats(build)
 
             build.active_step.log_end(build)
 

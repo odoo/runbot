@@ -102,6 +102,8 @@ class ConfigStep(models.Model):
     step_order_ids = fields.One2many('runbot.build.config.step.order', 'step_id')
     group = fields.Many2one('runbot.build.config', 'Configuration group', help="Group of config's and config steps")
     group_name = fields.Char('Group name', related='group.name')
+    make_stats = fields.Boolean('Make stats', default=False)
+    build_stat_regex_ids = fields.Many2many('runbot.build.stat.regex', string='Stats Regexes')
     # install_odoo
     create_db = fields.Boolean('Create Db', default=True, track_visibility='onchange')  # future
     custom_db_name = fields.Char('Custom Db Name', track_visibility='onchange')  # future
@@ -570,6 +572,23 @@ class ConfigStep(models.Model):
             local_result = self._get_checkers_result(build, checkers)
             build_values['local_result'] = build._get_worst_result([build.local_result, local_result])
         return build_values
+
+    def _make_stats(self, build):
+        build._log('make_stats', 'Getting stats from log file')
+        log_path = build._path('logs', '%s.txt' % self.name)
+        if not os.path.exists(log_path):
+            build._log('make_stats', 'Log **%s.txt** file not found' % self.name, level='INFO', log_type='markdown')
+            return
+        if (build.branch_id.make_stats or build.config_data.get('make_stats')) and self.make_stats:
+            try:
+                regex_ids = self.build_stat_regex_ids
+                if not regex_ids:
+                    regex_ids = regex_ids.search([('generic', '=', True)])
+                key_values = regex_ids._find_in_file(log_path)
+                self.env['runbot.build.stat']._write_key_values(build, self, key_values)
+            except Exception as e:
+                message = '**An error occured while computing statistics of %s:**\n`%s`' % (build.job, str(e).replace('\\n', '\n').replace("\\'", "'"))
+                build._log('make_stats', message, level='INFO', log_type='markdown')
 
     def _step_state(self):
         self.ensure_one()
