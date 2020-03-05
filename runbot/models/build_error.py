@@ -59,6 +59,10 @@ class RunbotBuildError(models.Model):
         })
         return super().create(vals)
 
+    @api.onchange('active')
+    def _onchange_active(self):
+        self.child_ids.write({'active': self.active})
+
     def write(self, vals):
         if 'active' in vals:
             for build_error in self:
