@@ -815,21 +815,28 @@ class PullRequests(models.Model):
                     })
             elif command == 'review':
                 if param and is_reviewer:
+                    oldstate = self.state
                     newstate = RPLUS.get(self.state)
                     if newstate:
                         self.state = newstate
                         self.reviewed_by = author
                         ok = True
-                        if self.status == 'failure':
-                            # the normal infrastructure is for failure and
-                            # prefixes messages with "I'm sorry"
-                            Feedback.create({
-                                'repository': self.repository.id,
-                                'pull_request': self.number,
-                                'message': "You may want to rebuild or fix this PR as it has failed CI.",
-                            })
                     else:
                         msg = "This PR is already reviewed, reviewing it again is useless."
+                    _logger.debug(
+                        "r+ on %s by %s (%s->%s) status=%s message? %s",
+                        self.display_name, author.github_login,
+                        oldstate, newstate or oldstate,
+                        self.status, self.status == 'failure'
+                    )
+                    if self.status == 'failure':
+                        # the normal infrastructure is for failure and
+                        # prefixes messages with "I'm sorry"
+                        Feedback.create({
+                            'repository': self.repository.id,
+                            'pull_request': self.number,
+                            'message': "@{}, you may want to rebuild or fix this PR as it has failed CI.".format(author.github_login),
+                        })
                 elif not param and is_author:
                     newstate = RMINUS.get(self.state)
                     if self.priority == 0 or newstate:

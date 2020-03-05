@@ -317,13 +317,11 @@ class PullRequests(models.Model):
                         'message': "I'm sorry, @{}. You can't review+.".format(login),
                     })
                     continue
+                merge_bot = self.repository.project_id.github_prefix
                 # don't update the root ever
                 for pr in filter(lambda p: p.parent_id, self._iter_ancestors()):
-                    newstate = RPLUS.get(pr.state)
-                    if newstate:
-                        pr.state = newstate
-                        pr.reviewed_by = author
-                        # TODO: logging & feedback
+                    # only the author is delegated explicitely on the
+                    pr._parse_commands(author, merge_bot + ' r+', login)
             elif token == 'close':
                 close = False
                 message = "I'm sorry, @{}. I can't close this PR for you."
@@ -653,19 +651,16 @@ class PullRequests(models.Model):
                 _logger.info("Created forward-port PR %s", new_pr)
             new_batch |= new_pr
 
+            # delegate original author on merged original PR & on new PR so
+            # they can r+ the forward ports (via mergebot or forwardbot)
+            source.delegates |= source.author
             new_pr.write({
                 'merge_method': pr.merge_method,
                 'source_id': source.id,
                 # only link to previous PR of sequence if cherrypick passed
                 'parent_id': pr.id if not has_conflicts else False,
-            })
-            # delegate original author on merged original PR & on new PR so
-            # they can r+ the forward ports (via mergebot or forwardbot)
-            source.author.write({
-                'delegate_reviewer': [
-                    (4, source.id, False),
-                    (4, new_pr.id, False),
-                ]
+                # copy all delegates of source to new
+                'delegates': [(6, False, source.delegates.ids)]
             })
             # not great but we probably want to avoid the risk of the webhook
             # creating the PR from under us. There's still a "hole" between

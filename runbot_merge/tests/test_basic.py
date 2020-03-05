@@ -3158,7 +3158,7 @@ class TestFeedback:
             (users['user'], "'ci/runbot' failed on this reviewed PR.")
         ]
 
-    def test_review_unvalidated(self, repo, env, users, config):
+    def test_review_failed(self, repo, env, users, config):
         """r+-ing a PR with failed CI sends feedback"""
         with repo:
             m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
@@ -3184,7 +3184,7 @@ class TestFeedback:
 
         assert prx.comments == [
             (users['reviewer'], 'hansen r+'),
-            (users['user'], "You may want to rebuild or fix this PR as it has failed CI.")
+            (users['user'], "@%s, you may want to rebuild or fix this PR as it has failed CI." % users['reviewer'])
         ]
 class TestInfrastructure:
     def test_protection(self, repo):

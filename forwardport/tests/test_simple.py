@@ -246,7 +246,7 @@ def test_update_pr(env, config, make_repo, users):
     # should merge the staging then create the FP PR
     env.run_crons()
 
-    pr0, pr1 = env['runbot_merge.pull_requests'].search([], order='number')
+    pr0_id, pr1_id = env['runbot_merge.pull_requests'].search([], order='number')
 
     fp_intermediate = (users['user'], '''\
 This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
@@ -260,23 +260,23 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot-and-Forwardbot#forward-p
     # some delivery lag allowing for the cron to run between each delivery
     for st, ctx in [('failure', 'ci/runbot'), ('failure', 'ci/runbot'), ('success', 'legal/cla'), ('success', 'legal/cla')]:
         with prod:
-            prod.post_status(pr1.head, st, ctx)
+            prod.post_status(pr1_id.head, st, ctx)
         env.run_crons()
     with prod: # should be ignored because the description doesn't matter
-        prod.post_status(pr1.head, 'failure', 'ci/runbot', description="HAHAHAHAHA")
+        prod.post_status(pr1_id.head, 'failure', 'ci/runbot', description="HAHAHAHAHA")
     env.run_crons()
     # check that FP did not resume & we have a ping on the PR
-    assert env['runbot_merge.pull_requests'].search([], order='number') == pr0 | pr1,\
+    assert env['runbot_merge.pull_requests'].search([], order='number') == pr0_id | pr1_id,\
         "forward port should not continue on CI failure"
-    pr1_remote = prod.get_pr(pr1.number)
+    pr1_remote = prod.get_pr(pr1_id.number)
     assert pr1_remote.comments == [fp_intermediate, ci_warning]
 
     # it was a false positive, rebuild... it fails again!
     with prod:
-        prod.post_status(pr1.head, 'failure', 'ci/runbot', target_url='http://example.org/4567890')
+        prod.post_status(pr1_id.head, 'failure', 'ci/runbot', target_url='http://example.org/4567890')
     env.run_crons()
     # check that FP did not resume & we have a ping on the PR
-    assert env['runbot_merge.pull_requests'].search([], order='number') == pr0 | pr1,\
+    assert env['runbot_merge.pull_requests'].search([], order='number') == pr0_id | pr1_id,\
         "ensure it still hasn't restarted"
     assert pr1_remote.comments == [fp_intermediate, ci_warning, ci_warning]
 
@@ -285,44 +285,44 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot-and-Forwardbot#forward-p
 
     # rebuild again, finally passes
     with prod:
-        prod.post_status(pr1.head, 'success', 'ci/runbot')
+        prod.post_status(pr1_id.head, 'success', 'ci/runbot')
     env.run_crons()
 
-    pr0, pr1, pr2 = env['runbot_merge.pull_requests'].search([], order='number')
-    assert pr1.parent_id == pr0
-    assert pr2.parent_id == pr1
-    pr1_head = pr1.head
-    pr2_head = pr2.head
+    pr0_id, pr1_id, pr2_id = env['runbot_merge.pull_requests'].search([], order='number')
+    assert pr1_id.parent_id == pr0_id
+    assert pr2_id.parent_id == pr1_id
+    pr1_head = pr1_id.head
+    pr2_head = pr2_id.head
 
     # turns out branch b is syntactically but not semantically compatible! It
     # needs x to be 5!
-    pr_repo, pr_ref = prod.get_pr(pr1.number).branch
+    pr_repo, pr_ref = prod.get_pr(pr1_id.number).branch
     with pr_repo:
         # force-push correct commit to PR's branch
         [new_c] = pr_repo.make_commits(
-            pr1.target.name,
+            pr1_id.target.name,
             Commit('whop whop', tree={'x': '5'}),
             ref='heads/%s' % pr_ref,
             make=False
         )
     env.run_crons()
 
-    assert pr1.head == new_c != pr1_head, "the FP PR should be updated"
-    assert not pr1.parent_id, "the FP PR should be detached from the original"
+    assert pr1_id.head == new_c != pr1_head, "the FP PR should be updated"
+    assert not pr1_id.parent_id, "the FP PR should be detached from the original"
     assert pr1_remote.comments == [
         fp_intermediate, ci_warning, ci_warning,
-        (users['user'], "This PR was modified / updated and has become a normal PR. It should be merged the normal way (via @%s)" % pr1.repository.project_id.github_prefix),
+        (users['user'], "This PR was modified / updated and has become a normal PR. It should be merged the normal way (via @%s)" % pr1_id.repository.project_id.github_prefix),
     ], "users should be warned that the PR has become non-FP"
     # NOTE: should the followup PR wait for pr1 CI or not?
-    assert pr2.head != pr2_head
-    assert pr2.parent_id == pr1, "the followup PR should still be linked"
+    assert pr2_id.head != pr2_head
+    assert pr2_id.parent_id == pr1_id, "the followup PR should still be linked"
 
-    assert prod.read_tree(prod.commit(pr1.head)) == {
+    assert prod.read_tree(prod.commit(pr1_id.head)) == {
         'f': 'c',
         'g': 'b',
         'x': '5'
     }, "the FP PR should have the new code"
-    assert prod.read_tree(prod.commit(pr2.head)) == {
+    assert prod.read_tree(prod.commit(pr2_id.head)) == {
         'f': 'c',
         'g': 'a',
         'h': 'a',
@@ -331,18 +331,18 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot-and-Forwardbot#forward-p
 
     with pr_repo:
         pr_repo.make_commits(
-            pr1.target.name,
+            pr1_id.target.name,
             Commit('fire!', tree={'h': '0'}),
             ref='heads/%s' % pr_ref,
         )
     env.run_crons()
     # since there are PRs, this is going to update pr2 as broken
-    assert prod.read_tree(prod.commit(pr1.head)) == {
+    assert prod.read_tree(prod.commit(pr1_id.head)) == {
         'f': 'c',
         'g': 'b',
         'h': '0'
     }
-    assert prod.read_tree(prod.commit(pr2.head)) == {
+    assert prod.read_tree(prod.commit(pr2_id.head)) == {
         'f': 'c',
         'g': 'a',
         'h': re_matches(r'''<<<\x3c<<< HEAD
@@ -352,6 +352,32 @@ a
 >>>\x3e>>> [0-9a-f]{7,}(...)? temp
 '''),
     }
+    [project] = env['runbot_merge.project'].search([])
+    pr2 = prod.get_pr(pr2_id.number)
+    # fail pr2 then fwbot r+ to check that we get a warning
+    with prod:
+        prod.post_status(pr2_id.head, 'failure', 'ci/runbot')
+    env.run_crons() # parse commit statuses
+    with prod:
+        pr2.post_comment(project.fp_github_name + ' r+', config['role_reviewer']['token'])
+    env.run_crons() # send feedback
+
+    assert pr2.comments == [
+        (users['user'], """Ping @{}, @{}
+This PR targets c and is the last of the forward-port chain containing:
+* {}
+
+To merge the full chain, say
+> @{} r+
+
+More info at https://github.com/odoo/odoo/wiki/Mergebot-and-Forwardbot#forward-port
+""".format(users['user'], users['reviewer'], pr1_id.display_name, project.fp_github_name)),
+        (users['user'], 'Ping @{}, @{}\n\nci/runbot failed on this forward-port PR'.format(
+            users['user'], users['reviewer']
+        )),
+        (users['reviewer'], project.fp_github_name + ' r+'),
+        (users['user'], '@{}, you may want to rebuild or fix this PR as it has failed CI.'.format(users['reviewer'])),
+    ]
 
 def test_update_merged(env, make_repo, config, users):
     """ Strange things happen when an FP gets closed / merged but then its
