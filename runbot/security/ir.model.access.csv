@@ -34,3 +34,12 @@ access_runbot_error_log_manager,runbot_error_log_manager,runbot.model_runbot_err
 
 access_runbot_repo_hooktime,runbot_repo_hooktime,runbot.model_runbot_repo_hooktime,group_user,1,0,0,0
 access_runbot_repo_reftime,runbot_repo_reftime,runbot.model_runbot_repo_reftime,group_user,1,0,0,0
+
+access_runbot_build_stat_user,runbot_build_stat_user,runbot.model_runbot_build_stat,group_user,1,0,0,0
+access_runbot_build_stat_admin,runbot_build_stat_admin,runbot.model_runbot_build_stat,runbot.group_runbot_admin,1,1,1,1
+
+access_runbot_build_stat_sql_user,runbot_build_stat_sql_user,runbot.model_runbot_build_stat_sql,group_user,1,0,0,0
+access_runbot_build_stat_sql_admin,runbot_build_stat_sql_admin,runbot.model_runbot_build_stat_sql,runbot.group_runbot_admin,1,0,0,0
+
+access_runbot_build_stat_regex_user,access_runbot_build_stat_regex_user,model_runbot_build_stat_regex,runbot.group_user,1,0,0,0
+access_runbot_build_stat_regex_admin,access_runbot_build_stat_regex_admin,model_runbot_build_stat_regex,runbot.group_runbot_admin,1,1,1,1

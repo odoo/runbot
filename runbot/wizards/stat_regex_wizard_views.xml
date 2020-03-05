@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <data>
+        <record model="ir.ui.view" id="runbot_stat_regex_wizard_form">
+            <field name="name">runbot_stat_regex_wizard</field>
+            <field name="model">runbot.build.stat.regex.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Regex">
+                    <group>
+                        <field name="name"/>
+                        <field name="regex"/>
+                        <field name="description"/>
+                        <field name="generic"/>
+                        <field name="test_text"/>
+                    </group>
+                    <group>
+                      <field name="key" readonly="1"/>
+                      <field name="value" readonly="1"/>
+                      <field name="message" readonly="1"/>
+                    </group>
+                    <footer>
+                        <button name="save" string="Save" type="object" class="btn-primary"/>
+                        <button string="Cancel" special="cancel" class="btn-default"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record model="ir.actions.act_window" id="runbot_stat_regex_wizard_action">
+            <field name="name">Generate Stat Regex</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">runbot.build.stat.regex.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="view_id" ref="runbot_stat_regex_wizard_form"/>
+            <field name="target">new</field>
+        </record>
+
+        <menuitem
+            name="Stat Regex Wizard"
+            id="runbot_menu_stat_regex_wizard"
+            parent="runbot_menu_stat_root"
+            sequence="150"
+            action="runbot_stat_regex_wizard_action"
+            />
+  </data>
+</odoo>
