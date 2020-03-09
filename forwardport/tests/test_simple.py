@@ -142,7 +142,7 @@ This PR targets c and is the last of the forward-port chain containing:
 To merge the full chain, say
 > @%s r+
 
-More info at https://github.com/odoo/odoo/wiki/Mergebot-and-Forwardbot#forward-port
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """ % (
             users['other'], users['reviewer'],
             pr1.display_name,
@@ -251,7 +251,7 @@ def test_update_pr(env, config, make_repo, users):
     fp_intermediate = (users['user'], '''\
 This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
 
-More info at https://github.com/odoo/odoo/wiki/Mergebot-and-Forwardbot#forward-port
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 ''')
     ci_warning = (users['user'], 'Ping @%(user)s, @%(reviewer)s\n\nci/runbot failed on this forward-port PR' % users)
 
@@ -437,7 +437,7 @@ def test_update_merged(env, make_repo, config, users):
     assert prod.get_pr(pr2.number).comments == [
         (users['user'], '''This PR targets c and is part of the forward-port chain. Further PRs will be created up to d.
 
-More info at https://github.com/odoo/odoo/wiki/Mergebot-and-Forwardbot#forward-port
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 '''),
         (users['reviewer'], 'hansen r+'),
         (users['user'], """Ancestor PR %s has been updated but this PR is merged and can't be updated to match.
@@ -956,7 +956,7 @@ def test_batched(env, config, make_repo, users):
         (users['user'], """\
 This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
 
-More info at https://github.com/odoo/odoo/wiki/Mergebot-and-Forwardbot#forward-port
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """),
     ]
     pr_remote_1b = main1.get_pr(pr1b.number)
@@ -1052,7 +1052,7 @@ class TestClosing:
             (users['user'], """\
 This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
 
-More info at https://github.com/odoo/odoo/wiki/Mergebot-and-Forwardbot#forward-port
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """)
         ]
 

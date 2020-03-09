@@ -676,7 +676,7 @@ class PullRequests(models.Model):
             source = pr.source_id or pr
             (h, out, err) = conflicts.get(pr) or (None, None, None)
 
-            footer = '\nMore info at https://github.com/odoo/odoo/wiki/Mergebot-and-Forwardbot#forward-port\n'
+            footer = '\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'
             if has_conflicts and not h:
                 footer = '\n**WARNING** at least one co-dependent PR (%s) ' \
                          'did not properly forward-port, you will need to ' \
