@@ -205,7 +205,7 @@ This PR targets b and is the last of the forward-port chain.
 To merge the full chain, say
 > @%s r+
 
-More info at https://github.com/odoo/odoo/wiki/Mergebot-and-Forwardbot#forward-port
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """ % (users['user'], users['reviewer'], users['user'])),
     ]
 
@@ -250,7 +250,7 @@ def test_limit_after_merge(env, config, make_repo, users):
         (users['user'], """\
 This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
 
-More info at https://github.com/odoo/odoo/wiki/Mergebot-and-Forwardbot#forward-port
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """),
         (users['reviewer'], bot_name + ' up to b'),
         (bot_name, "Sorry, forward-port limit can only be set on an origin PR"
