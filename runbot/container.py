@@ -324,7 +324,7 @@ def tests(args):
             '--db-filter', '%s.*$' % args.db_name, '--addons-path=/data/build/addons',
             '-r %s' % os.getlogin(), '-i', 'web',  '--max-cron-threads=1',
             '--data-dir', '/data/build/datadir', '--workers', '2',
-            '--longpolling-port', '8070']
+            '--longpolling-port', '8070', '--unaccent']
         smtp_host = docker_get_gateway_ip()
         if smtp_host:
             odoo_cmd.extend(['--smtp', smtp_host])
