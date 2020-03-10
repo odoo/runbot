@@ -662,10 +662,10 @@ class runbot_build(models.Model):
             if build.requested_action == 'wake_up':
                 if docker_state(build._get_docker_name(), build._path()) == 'RUNNING':
                     build.write({'requested_action': False, 'local_state': 'running'})
-                    build._log('wake_up', 'Waking up failed, **docker is already running**', type='markdown', level='SEPARATOR')
+                    build._log('wake_up', 'Waking up failed, **docker is already running**', log_type='markdown', level='SEPARATOR')
                 elif not os.path.exists(build._path()):
                     build.write({'requested_action': False, 'local_state': 'done'})
-                    build._log('wake_up', 'Impossible to wake-up, **build dir does not exists anymore**', type='markdown', level='SEPARATOR')
+                    build._log('wake_up', 'Impossible to wake-up, **build dir does not exists anymore**', log_type='markdown', level='SEPARATOR')
                 else:
                     try:
                         log_path = build._path('logs', 'wake_up.txt')
@@ -679,7 +679,7 @@ class runbot_build(models.Model):
                             'local_state': 'running',
                             'port': port,
                         })
-                        build._log('wake_up', '**Waking up build**', type='markdown', level='SEPARATOR')
+                        build._log('wake_up', '**Waking up build**', log_type='markdown', level='SEPARATOR')
                         self.env['runbot.build.config.step']._run_odoo_run(build, log_path)
                         # reload_nginx will be triggered by _run_odoo_run
                     except Exception:

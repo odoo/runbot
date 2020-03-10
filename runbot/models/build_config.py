@@ -205,7 +205,7 @@ class ConfigStep(models.Model):
     def _run(self, build):
         log_path = build._path('logs', '%s.txt' % self.name)
         build.write({'job_start': now(), 'job_end': False})  # state, ...
-        build._log('run', 'Starting step **%s** from config **%s**' % (self.name, build.config_id.name), type='markdown', level='SEPARATOR')
+        build._log('run', 'Starting step **%s** from config **%s**' % (self.name, build.config_id.name), log_type='markdown', level='SEPARATOR')
         return self._run_step(build, log_path)
 
     def _run_step(self, build, log_path):
