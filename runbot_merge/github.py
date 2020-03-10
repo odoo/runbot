@@ -166,13 +166,10 @@ class GH(object):
     def close(self, pr):
         self('PATCH', 'pulls/{}'.format(pr), json={'state': 'closed'})
 
-    def change_tags(self, pr, to_):
+    def change_tags(self, pr, remove, add):
         labels_endpoint = 'issues/{}/labels'.format(pr)
-        from .models.pull_requests import _TAGS
-        mergebot_tags = set.union(*_TAGS.values())
         tags_before = {label['name'] for label in self('GET', labels_endpoint).json()}
-        # remove all mergebot tags from the PR, then add just the ones which should be set
-        tags_after = (tags_before - mergebot_tags) | to_
+        tags_after = (tags_before - remove) | add
         # replace labels entirely
         self('PUT', labels_endpoint, json={'labels': list(tags_after)})
 

@@ -89,26 +89,27 @@ class Project(models.Model):
             t.repository as repo_id,
             t.pull_request as pr_number,
             array_agg(t.id) as ids,
-            (array_agg(t.state_from ORDER BY t.id))[1] as state_from,
-            (array_agg(t.state_to ORDER BY t.id DESC))[1] as state_to
+            array_agg(t.tags_remove::json) as to_remove,
+            array_agg(t.tags_add::json) as to_add
         FROM runbot_merge_pull_requests_tagging t
         GROUP BY t.repository, t.pull_request
         """)
         to_remove = []
-        for repo_id, pr, ids, from_, to_ in self.env.cr.fetchall():
+        for repo_id, pr, ids, remove, add in self.env.cr.fetchall():
             repo = Repos.browse(repo_id)
-            to_tags = _TAGS[to_ or False]
 
             gh = ghs.get(repo)
             if not gh:
                 gh = ghs[repo] = repo.github()
 
+            remove = set().union(*remove)
+            add = set().union(*add)
             try:
-                gh.change_tags(pr, to_tags)
+                gh.change_tags(pr, remove, add)
             except Exception:
                 _logger.exception(
                     "Error while trying to change the tags of %s#%s from %s to %s",
-                    repo.name, pr, _TAGS[from_ or False], to_tags,
+                    repo.name, pr.display_name, remove, add,
                 )
             else:
                 to_remove.extend(ids)
@@ -1324,6 +1325,7 @@ _TAGS['staged'] = _TAGS['ready'] | {'merging 👷'}
 _TAGS['merged'] = _TAGS['ready'] | {'merged 🎉'}
 _TAGS['error'] = _TAGS['opened'] | {'error 🙅'}
 _TAGS['closed'] = _TAGS['opened'] | {'closed 💔'}
+ALL_TAGS = set.union(*_TAGS.values())
 
 class Tagging(models.Model):
     """
@@ -1341,26 +1343,20 @@ class Tagging(models.Model):
     # being deleted (retargeted to non-managed branches)
     pull_request = fields.Integer()
 
-    state_from = fields.Selection([
-        ('opened', 'Opened'),
-        ('closed', 'Closed'),
-        ('validated', 'Validated'),
-        ('approved', 'Approved'),
-        ('ready', 'Ready'),
-        ('staged', 'Staged'),
-        ('merged', 'Merged'),
-        ('error', 'Error'),
-    ])
-    state_to = fields.Selection([
-        ('opened', 'Opened'),
-        ('closed', 'Closed'),
-        ('validated', 'Validated'),
-        ('approved', 'Approved'),
-        ('ready', 'Ready'),
-        ('staged', 'Staged'),
-        ('merged', 'Merged'),
-        ('error', 'Error'),
-    ])
+    tags_remove = fields.Char(required=True, default='[]')
+    tags_add = fields.Char(required=True, defualt='[]')
+
+    def create(self, values):
+        values.pop('state_from', None)
+        state_to = values.pop('state_to', None)
+        if state_to:
+            values['tags_remove'] = ALL_TAGS
+            values['tags_add'] = _TAGS[state_to]
+        if not isinstance(values.get('tags_remove', ''), str):
+            values['tags_remove'] = json.dumps(list(values['tags_remove']))
+        if not isinstance(values.get('tags_add', ''), str):
+            values['tags_add'] = json.dumps(list(values['tags_add']))
+        return super().create(values)
 
 class Feedback(models.Model):
     """ Queue of feedback comments to send to PR users
