@@ -121,7 +121,7 @@
                 <t t-set="failure" t-value="staging.state == 'failure'"/>
                 <t t-set="pending" t-value="staging.active and (not staging.state or staging.state == 'pending')"/>
                 <t t-set="stateclass">
-                    <t t-if="success">bg-success</t>
+                    <t t-if="success">bg-success <t t-if="staging.active">bg-unmerged</t></t>
                     <t t-if="failure">bg-danger</t>
                     <t t-if="pending">bg-info</t>
                     <t t-if="not (success or failure or pending)">bg-gray-lighter</t>
