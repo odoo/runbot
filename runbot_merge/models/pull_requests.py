@@ -1687,7 +1687,7 @@ class Stagings(models.Model):
                 )
                 self.write({
                     'state': 'ff_failed',
-                    'reason': str(e.__cause__ or e.__context__ or '')
+                    'reason': str(e.__cause__ or e.__context__ or e)
                 })
             else:
                 prs = self.mapped('batch_ids.prs')
