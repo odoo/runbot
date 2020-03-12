@@ -2,6 +2,7 @@ import ast
 import base64
 import collections
 import datetime
+import functools
 import io
 import itertools
 import json
@@ -102,10 +103,18 @@ class Project(models.Model):
             if not gh:
                 gh = ghs[repo] = repo.github()
 
-            remove = set().union(*remove)
-            add = set().union(*add)
+            # fold all grouped PRs'
+            tags_remove, tags_add = set(), set()
+            for minus, plus in zip(remove, add):
+                tags_remove.update(minus)
+                # need to remove minuses from to_add in case we get e.g.
+                # -foo +bar; -bar +baz, if we don't remove the minus, we'll end
+                # up with -foo +bar +baz instead of -foo +baz
+                tags_add.difference_update(minus)
+                tags_add.update(plus)
+
             try:
-                gh.change_tags(pr, remove, add)
+                gh.change_tags(pr, tags_remove, tags_add)
             except Exception:
                 _logger.exception(
                     "Error while trying to change the tags of %s#%s from %s to %s",
@@ -1347,11 +1356,11 @@ class Tagging(models.Model):
     tags_add = fields.Char(required=True, defualt='[]')
 
     def create(self, values):
-        values.pop('state_from', None)
-        state_to = values.pop('state_to', None)
-        if state_to:
+        before = str(values)
+        if values.pop('state_from', None):
             values['tags_remove'] = ALL_TAGS
-            values['tags_add'] = _TAGS[state_to]
+        if 'state_to' in values:
+            values['tags_add'] = _TAGS[values.pop('state_to')]
         if not isinstance(values.get('tags_remove', ''), str):
             values['tags_remove'] = json.dumps(list(values['tags_remove']))
         if not isinstance(values.get('tags_add', ''), str):

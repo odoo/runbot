@@ -39,11 +39,11 @@ class re_matches:
 def make_basic(env, config, make_repo, *, reponame='proj', project_name='myproject'):
     """ Creates a basic repo with 3 forking branches
 
-    0 -- 1 -- 2 -- 3 -- 4  : a
-              |
-              `-- 11 -- 22 : b
+    f = 0 -- 1 -- 2 -- 3 -- 4  : a
                   |
-                  `-- 111  : c
+    g =           `-- 11 -- 22 : b
+                     |
+    h =               `-- 111  : c
     each branch just adds and modifies a file (resp. f, g and h) through the
     contents sequence a b c d e
     """
@@ -56,9 +56,9 @@ def make_basic(env, config, make_repo, *, reponame='proj', project_name='myproje
             'github_prefix': 'hansen',
             'fp_github_token': config['github']['token'],
             'branch_ids': [
-                (0, 0, {'name': 'a', 'fp_sequence': 2, 'fp_target': True}),
-                (0, 0, {'name': 'b', 'fp_sequence': 1, 'fp_target': True}),
-                (0, 0, {'name': 'c', 'fp_sequence': 0, 'fp_target': True}),
+                (0, 0, {'name': 'a', 'fp_sequence': 10, 'fp_target': True}),
+                (0, 0, {'name': 'b', 'fp_sequence': 8, 'fp_target': True}),
+                (0, 0, {'name': 'c', 'fp_sequence': 6, 'fp_target': True}),
             ],
         })
 

@@ -36,6 +36,8 @@ from odoo.tools.appdirs import user_cache_dir
 from odoo.addons.runbot_merge import utils
 from odoo.addons.runbot_merge.models.pull_requests import RPLUS
 
+FOOTER = '\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'
+
 DEFAULT_DELTA = dateutil.relativedelta.relativedelta(days=3)
 
 _logger = logging.getLogger('odoo.addons.forwardport')
@@ -638,6 +640,18 @@ class PullRequests(models.Model):
                 # copy all delegates of source to new
                 'delegates': [(6, False, source.delegates.ids)]
             })
+            if has_conflicts and pr.parent_id and pr.state not in ('merged', 'closed'):
+                message = source._pingline() + """
+The next pull request (%s) is in conflict. You can merge the chain up to here by saying
+> @%s r+
+%s
+""" % (new_pr.display_name, pr.repository.project_id.fp_github_name, FOOTER)
+                self.env['runbot_merge.pull_requests.feedback'].create({
+                    'repository': pr.repository.id,
+                    'pull_request': pr.number,
+                    'message': message,
+                    'token_field': 'fp_github_token',
+                })
             # not great but we probably want to avoid the risk of the webhook
             # creating the PR from under us. There's still a "hole" between
             # the POST being executed on gh and the commit but...
@@ -647,7 +661,7 @@ class PullRequests(models.Model):
             source = pr.source_id or pr
             (h, out, err) = conflicts.get(pr) or (None, None, None)
 
-            footer = '\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'
+            footer = FOOTER
             if has_conflicts and not h:
                 footer = '\n**WARNING** at least one co-dependent PR (%s) ' \
                          'did not properly forward-port, you will need to ' \

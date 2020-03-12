@@ -370,7 +370,7 @@ This PR targets c and is the last of the forward-port chain containing:
 To merge the full chain, say
 > @{} r+
 
-More info at https://github.com/odoo/odoo/wiki/Mergebot-and-Forwardbot#forward-port
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """.format(users['user'], users['reviewer'], pr1_id.display_name, project.fp_github_name)),
         (users['user'], 'Ping @{}, @{}\n\nci/runbot failed on this forward-port PR'.format(
             users['user'], users['reviewer']
@@ -471,117 +471,144 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 You may want or need to manually update any followup PR.""" % pr1.display_name)
     ]
 
-def test_conflict(env, config, make_repo):
+def test_conflict(env, config, make_repo, users):
+    """ Create a PR to A which will (eventually) conflict with C when
+    forward-ported.
+    """
     prod, other = make_basic(env, config, make_repo)
-    # reset b to b~1 (g=a) parent so there's no b -> c conflict
+    # create a d branch
     with prod:
-        prod.update_ref('heads/b', prod.commit('b').parents[0], force=True)
+        prod.make_commits('c', Commit('1111', tree={'i': 'a'}), ref='heads/d')
+    project = env['runbot_merge.project'].search([])
+    project.write({
+        'branch_ids': [
+            (0, 0, {'name': 'd', 'fp_sequence': 4, 'fp_target': True})
+        ]
+    })
 
-    # generate a conflict: create a g file in a PR to a
+    # generate a conflict: create a h file in a PR to a
     with prod:
         [p_0] = prod.make_commits(
-            'a', Commit('p_0', tree={'g': 'xxx'}),
+            'a', Commit('p_0', tree={'h': 'xxx'}),
             ref='heads/conflicting'
         )
         pr = prod.make_pr(target='a', head='conflicting')
         prod.post_status(p_0, 'success', 'legal/cla')
         prod.post_status(p_0, 'success', 'ci/runbot')
         pr.post_comment('hansen r+', config['role_reviewer']['token'])
-
     env.run_crons()
+
     with prod:
         prod.post_status('staging.a', 'success', 'legal/cla')
         prod.post_status('staging.a', 'success', 'ci/runbot')
-
     env.run_crons()
-    # wait a bit for PR webhook... ?
-    time.sleep(5)
+    pra_id, prb_id = env['runbot_merge.pull_requests'].search([], order='number')
+    # mark pr b as OK so it gets ported to c
+    with prod:
+        validate_all([prod], [prb_id.head])
     env.run_crons()
 
+    pra_id, prb_id, prc_id = env['runbot_merge.pull_requests'].search([], order='number')
     # should have created a new PR
-    pr0, pr1 = env['runbot_merge.pull_requests'].search([], order='number')
     # but it should not have a parent, and there should be conflict markers
-    assert not pr1.parent_id
-    assert pr1.source_id == pr0
-    assert prod.read_tree(prod.commit('b')) == {
-        'f': 'c',
-        'g': 'a',
-    }
-    assert pr1.state == 'opened'
+    assert not prc_id.parent_id
+    assert prc_id.source_id == pra_id
+    assert prc_id.state == 'opened'
+
     p = prod.commit(p_0)
-    c = prod.commit(pr1.head)
+    c = prod.commit(prc_id.head)
     assert c.author == p.author
     # ignore date as we're specifically not keeping the original's
     without_date = itemgetter('name', 'email')
     assert without_date(c.committer) == without_date(p.committer)
     assert prod.read_tree(c) == {
         'f': 'c',
-        'g': re_matches(r'''<<<\x3c<<< HEAD
+        'g': 'a',
+        'h': re_matches(r'''<<<\x3c<<< HEAD
 a
 =======
 xxx
 >>>\x3e>>> [0-9a-f]{7,}(...)? temp
 '''),
     }
+    assert prod.get_pr(prb_id.number).comments == [
+        (users['user'], '''\
+This PR targets b and is part of the forward-port chain. Further PRs will be created up to d.
+
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
+'''),
+        (users['user'], """Ping @%s, @%s
+The next pull request (%s) is in conflict. You can merge the chain up to here by saying
+> @%s r+
+
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
+""" % (
+            users['user'], users['reviewer'],
+            prc_id.display_name,
+            project.fp_github_name
+        ))
+    ]
 
     # check that CI passing does not create more PRs
     with prod:
-        validate_all([prod], [pr1.head])
+        validate_all([prod], [prc_id.head])
     env.run_crons()
     time.sleep(5)
     env.run_crons()
-    assert pr0 | pr1 == env['runbot_merge.pull_requests'].search([], order='number'),\
+    assert pra_id | prb_id | prc_id == env['runbot_merge.pull_requests'].search([], order='number'),\
         "CI passing should not have resumed the FP process on a conflicting / draft PR"
 
     # fix the PR, should behave as if this were a normal PR
-    get_pr = prod.get_pr(pr1.number)
-    pr_repo, pr_ref = get_pr.branch
+    prc = prod.get_pr(prc_id.number)
+    pr_repo, pr_ref = prc.branch
     with pr_repo:
         pr_repo.make_commits(
             # if just given a branch name, goes and gets it from pr_repo whose
             # "b" was cloned before that branch got rolled back
-            prod.commit('b').id,
-            Commit('g should indeed b xxx', tree={'g': 'xxx'}),
+            'c',
+            Commit('h should indeed be xxx', tree={'h': 'xxx'}),
             ref='heads/%s' % pr_ref,
             make=False,
         )
     env.run_crons()
-    assert prod.read_tree(prod.commit(pr1.head)) == {
+    assert prod.read_tree(prod.commit(prc_id.head)) == {
         'f': 'c',
-        'g': 'xxx',
+        'g': 'a',
+        'h': 'xxx',
     }
-    assert pr1.state == 'opened', "state should be open still"
-    assert ('#%d' % pr.number) in pr1.message
+    assert prc_id.state == 'opened', "state should be open still"
+    assert ('#%d' % pra_id.number) in prc_id.message
 
     # check that merging the fixed PR fixes the flow and restarts a forward
     # port process
     with prod:
-        prod.post_status(pr1.head, 'success', 'legal/cla')
-        prod.post_status(pr1.head, 'success', 'ci/runbot')
-        get_pr.post_comment('hansen r+', config['role_reviewer']['token'])
+        prod.post_status(prc.head, 'success', 'legal/cla')
+        prod.post_status(prc.head, 'success', 'ci/runbot')
+        prc.post_comment('hansen r+', config['role_reviewer']['token'])
     env.run_crons()
 
-    assert pr1.staging_id
+    assert prc_id.staging_id
     with prod:
-        prod.post_status('staging.b', 'success', 'legal/cla')
-        prod.post_status('staging.b', 'success', 'ci/runbot')
+        prod.post_status('staging.c', 'success', 'legal/cla')
+        prod.post_status('staging.c', 'success', 'ci/runbot')
     env.run_crons()
 
-    *_, pr2 = env['runbot_merge.pull_requests'].search([], order='number')
-    assert ('#%d' % pr.number) in pr2.message, \
-        "check that source / pr0 is referenced by resume PR"
-    assert ('#%d' % pr1.number) in pr2.message, \
-        "check that parent / pr1 is referenced by resume PR"
-    assert pr2.parent_id == pr1
-    assert pr2.source_id == pr0
+    *_, prd_id = env['runbot_merge.pull_requests'].search([], order='number')
+    assert ('#%d' % pra_id.number) in prd_id.message, \
+        "check that source / PR A is referenced by resume PR"
+    assert ('#%d' % prc_id.number) in prd_id.message, \
+        "check that parent / PR C is referenced by resume PR"
+    assert prd_id.parent_id == prc_id
+    assert prd_id.source_id == pra_id
     assert re.match(
-        REF_PATTERN.format(target='c', source='conflicting'),
-        pr2.refname
+        REF_PATTERN.format(target='d', source='conflicting'),
+        prd_id.refname
     )
-    assert prod.read_tree(prod.commit(pr2.head)) == {
+    assert prod.read_tree(prod.commit(prd_id.head)) == {
         'f': 'c',
-        'g': 'xxx',
-        'h': 'a',
+        'g': 'a',
+        'h': 'xxx',
+        'i': 'a',
     }
 
 def test_conflict_deleted(env, config, make_repo):
