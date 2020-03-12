@@ -971,7 +971,7 @@ stderr:
             ('state', 'not in', ['merged', 'closed']),
             # last updated more than <cutoff> ago
             ('write_date', '<', cutoff),
-        ]), lambda p: p.source_id):
+        ], order='source_id, id'), lambda p: p.source_id):
             self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': source.repository.id,
                 'pull_request': source.number,
