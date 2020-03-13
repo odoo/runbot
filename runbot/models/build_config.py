@@ -573,7 +573,7 @@ class ConfigStep(models.Model):
 
     def _has_log(self):
         self.ensure_one()
-        return self.job_type != 'create_build'
+        return self._is_docker_step()
 
 
 class ConfigStepOrder(models.Model):
