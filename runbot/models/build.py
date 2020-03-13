@@ -524,11 +524,14 @@ class runbot_build(models.Model):
     def _filter_to_clean(self, dest_list, label):
         dest_by_builds_ids = defaultdict(list)
         ignored = set()
+        icp = self.env['ir.config_parameter']
+        hide_in_logs = icp.get_param('runbot.runbot_db_template', default='template1')
+
         for dest in dest_list:
             build = self._build_from_dest(dest)
             if build:
                 dest_by_builds_ids[build.id].append(dest)
-            else:
+            elif dest != hide_in_logs:
                 ignored.add(dest)
         if ignored:
             _logger.debug('%s (%s) not deleted because not dest format', label, " ".join(list(ignored)))
