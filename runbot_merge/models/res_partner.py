@@ -31,6 +31,22 @@ class Partner(models.Model):
                 email = ''
             partner.formatted_email = '%s <%s>' % (partner.name, email)
 
+class PartnerMerge(models.TransientModel):
+    _inherit = 'base.partner.merge.automatic.wizard'
+
+    @api.model
+    def _update_values(self, src_partners, dst_partner):
+        # sift down through src partners, removing all github_login and keeping
+        # the last one
+        new_login = None
+        for p in src_partners:
+            new_login = p.github_login or new_login
+        if new_login:
+            src_partners.write({'github_login': False})
+        if new_login and not dst_partner.github_login:
+            dst_partner.github_login = new_login
+        super()._update_values(src_partners, dst_partner)
+
 class ReviewRights(models.Model):
     _name = 'res.partner.review'
     _description = "mapping of review rights between partners and repos"
