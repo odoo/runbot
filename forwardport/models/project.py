@@ -180,10 +180,6 @@ class Branch(models.Model):
 class PullRequests(models.Model):
     _inherit = 'runbot_merge.pull_requests'
 
-    # TODO: delete remote branches of merged FP PRs
-
-    # QUESTION: should the limit be copied on each child, or should it be inferred from the parent? Also what happens when detaching, is the detached PR configured independently?
-    # QUESTION: what happens if the limit_id is deactivated with extant PRs?
     limit_id = fields.Many2one('runbot_merge.branch', help="Up to which branch should this PR be forward-ported")
 
     parent_id = fields.Many2one(
@@ -191,6 +187,7 @@ class PullRequests(models.Model):
         help="a PR with a parent is an automatic forward port"
     )
     source_id = fields.Many2one('runbot_merge.pull_requests', index=True, help="the original source of this FP even if parents were detached along the way")
+    reminder_backoff_factor = fields.Integer(default=-4)
 
     refname = fields.Char(compute='_compute_refname')
     @api.depends('label')
@@ -644,8 +641,7 @@ class PullRequests(models.Model):
                 message = source._pingline() + """
 The next pull request (%s) is in conflict. You can merge the chain up to here by saying
 > @%s r+
-%s
-""" % (new_pr.display_name, pr.repository.project_id.fp_github_name, FOOTER)
+%s""" % (new_pr.display_name, pr.repository.project_id.fp_github_name, FOOTER)
                 self.env['runbot_merge.pull_requests.feedback'].create({
                     'repository': pr.repository.id,
                     'pull_request': pr.number,
@@ -962,7 +958,9 @@ stderr:
             return repo
 
     def _reminder(self):
-        cutoff = self.env.context.get('forwardport_updated_before') or fields.Datetime.to_string(datetime.datetime.now() - DEFAULT_DELTA)
+        now = datetime.datetime.now()
+        cutoff = self.env.context.get('forwardport_updated_before') or fields.Datetime.to_string(now - DEFAULT_DELTA)
+        cutoff_dt = fields.Datetime.from_string(cutoff)
 
         for source, prs in groupby(self.env['runbot_merge.pull_requests'].search([
             # only FP PRs
@@ -972,6 +970,11 @@ stderr:
             # last updated more than <cutoff> ago
             ('write_date', '<', cutoff),
         ], order='source_id, id'), lambda p: p.source_id):
+            backoff = dateutil.relativedelta.relativedelta(days=2**source.reminder_backoff_factor)
+            prs = list(prs)
+            if all(p.write_date > (cutoff_dt - backoff) for p in prs):
+                continue
+            source.reminder_backoff_factor += 1
             self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': source.repository.id,
                 'pull_request': source.number,
