@@ -1353,7 +1353,7 @@ class Tagging(models.Model):
     pull_request = fields.Integer()
 
     tags_remove = fields.Char(required=True, default='[]')
-    tags_add = fields.Char(required=True, defualt='[]')
+    tags_add = fields.Char(required=True, default='[]')
 
     def create(self, values):
         before = str(values)
