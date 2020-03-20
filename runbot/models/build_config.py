@@ -574,21 +574,22 @@ class ConfigStep(models.Model):
         return build_values
 
     def _make_stats(self, build):
+        if not ((build.branch_id.make_stats or build.config_data.get('make_stats')) and self.make_stats):
+            return
         build._log('make_stats', 'Getting stats from log file')
         log_path = build._path('logs', '%s.txt' % self.name)
         if not os.path.exists(log_path):
             build._log('make_stats', 'Log **%s.txt** file not found' % self.name, level='INFO', log_type='markdown')
             return
-        if (build.branch_id.make_stats or build.config_data.get('make_stats')) and self.make_stats:
-            try:
-                regex_ids = self.build_stat_regex_ids
-                if not regex_ids:
-                    regex_ids = regex_ids.search([('generic', '=', True)])
-                key_values = regex_ids._find_in_file(log_path)
-                self.env['runbot.build.stat']._write_key_values(build, self, key_values)
-            except Exception as e:
-                message = '**An error occured while computing statistics of %s:**\n`%s`' % (build.job, str(e).replace('\\n', '\n').replace("\\'", "'"))
-                build._log('make_stats', message, level='INFO', log_type='markdown')
+        try:
+            regex_ids = self.build_stat_regex_ids
+            if not regex_ids:
+                regex_ids = regex_ids.search([('generic', '=', True)])
+            key_values = regex_ids._find_in_file(log_path)
+            self.env['runbot.build.stat']._write_key_values(build, self, key_values)
+        except Exception as e:
+            message = '**An error occured while computing statistics of %s:**\n`%s`' % (build.job, str(e).replace('\\n', '\n').replace("\\'", "'"))
+            build._log('make_stats', message, level='INFO', log_type='markdown')
 
     def _step_state(self):
         self.ensure_one()
