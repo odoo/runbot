@@ -56,7 +56,7 @@ class RunbotBuildStatSql(models.Model):
     build_config_id = fields.Many2one("runbot.build.config", string="Config", readonly=True)
     build_name = fields.Char(String="Build name", readonly=True)
     build_parent_path = fields.Char('Build Parent path')
-    host = fields.Char(string="Host", readonly=True)
+    build_host = fields.Char(string="Host", readonly=True)
     branch_id = fields.Many2one("runbot.branch", string="Branch", readonly=True)
     branch_name = fields.Char(string="Branch name", readonly=True)
     branch_sticky = fields.Boolean(string="Sticky", readonly=True)
