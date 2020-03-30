@@ -25,10 +25,16 @@ autoindex on;
 gzip on;
 gzip_types text/css text/plain application/xml application/json application/javascript;
 
+map $http_x_forwarded_proto $real_scheme {
+  default $http_x_forwarded_proto;
+  ''      $scheme;
+}
+
 proxy_temp_path <t t-esc="nginx_dir"/>;
 proxy_read_timeout 600;
 proxy_connect_timeout 600;
 proxy_set_header X-Forwarded-Host $host;
+proxy_set_header X-Forwarded-Proto $real_scheme;
 proxy_set_header Host $host;
 
 server {
