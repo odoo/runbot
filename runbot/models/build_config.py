@@ -311,6 +311,9 @@ class ConfigStep(models.Model):
         # we need to have at least one job of type install_odoo to run odoo, take the last one for db_name.
         cmd += ['-d', '%s-%s' % (build.dest, db_name)]
 
+        if grep(build._server("tools/config.py"), "proxy-mode") and build.repo_id.nginx:
+            cmd += ["--proxy-mode"]
+
         if grep(build._server("tools/config.py"), "db-filter"):
             if build.repo_id.nginx:
                 cmd += ['--db-filter', '%d.*$']
