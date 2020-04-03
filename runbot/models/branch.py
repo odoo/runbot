@@ -7,7 +7,6 @@ from odoo import models, fields, api
 from odoo.osv import expression
 
 _logger = logging.getLogger(__name__)
-_re_patch = re.compile(r'.*patch-\d+$')
 
 
 class runbot_branch(models.Model):
@@ -123,9 +122,7 @@ class runbot_branch(models.Model):
                 pi = pull_info or branch._get_pull_info()
                 if pi:
                     branch.target_branch_name = pi['base']['ref']
-                    if not _re_patch.match(pi['head']['label']):
-                        # label is used to disambiguate PR with same branch name
-                        branch.pull_head_name = pi['head']['label']
+                    branch.pull_head_name = pi['head']['label']
             else:
                 branch.branch_name = ''
 
