@@ -12,7 +12,7 @@ from ..common import dt2time, fqdn, now, grep, local_pgadmin_cursor, s2human, Co
 from ..container import docker_build, docker_stop, docker_state, Command
 from ..fields import JsonDictField
 from odoo.addons.runbot.models.repo import RunbotException
-from odoo import models, fields, api
+from odoo import models, fields, api, registry
 from odoo.exceptions import UserError, ValidationError
 from odoo.http import request
 from odoo.tools import appdirs
@@ -89,6 +89,7 @@ class runbot_build(models.Model):
     global_result = fields.Selection(make_selection(result_order), string='Result', compute='_compute_global_result', store=True)
     local_result = fields.Selection(make_selection(result_order), string='Build Result')
     triggered_result = fields.Selection(make_selection(result_order), string='Triggered Result')  # triggered by db only
+    last_github_state = fields.Char('Last github status', readonly=True)
 
     requested_action = fields.Selection([('wake_up', 'To wake up'), ('deathrow', 'To kill')], string='Action requested', index=True)
 
@@ -1040,19 +1041,36 @@ class runbot_build(models.Model):
         """Notify each repo with a status"""
         self.ensure_one()
         if self.config_id.update_github_state:
-            repos = {b.repo_id for b in self.search([('name', '=', self.name)])}
-            for repo in repos:
-                _logger.debug("github updating %s status %s to %s in repo %s", status['context'], self.name, status['state'], repo.name)
+            repos_ids = {b.repo_id.id for b in self.search([('name', '=', self.name)])}
+            build_name = self.name
+            user_id = self.env.user.id
+            _dbname = self.env.cr.dbname
+            _context = self.env.context
+            build_id = self.id
+            def send_github_status():
                 try:
-                    repo._github('/repos/:owner/:repo/statuses/%s' % self.name, status, ignore_errors=True)
-                except Exception:
-                    self._log('_github_status_notify_all', 'Status notification failed for "%s" in repo "%s"' % (self.name, repo.name))
+                    db_registry = registry(_dbname)
+                    with api.Environment.manage(), db_registry.cursor() as cr:
+                        env = api.Environment(cr, user_id, _context)
+                        repos = env['runbot.repo'].browse(repos_ids)
+                        for repo in repos:
+                            _logger.debug(
+                                "github updating %s status %s to %s in repo %s",
+                                status['context'], build_name, status['state'], repo.name)
+                            repo._github('/repos/:owner/:repo/statuses/%s' % build_name, status, ignore_errors=True)
+                except:
+                    _logger.exception('Something went wrong sending notification for %s', build_id)
+            self._cr.after('commit', send_github_status)
+
 
     def _github_status(self):
         """Notify github of failed/successful builds"""
         for build in self:
             if build.parent_id:
-                build.parent_id._github_status()
+                if build.orphan_result:
+                    _logger.debug('Skipping result for orphan build %s', self.id)
+                else:
+                    build.parent_id._github_status()
             elif build.config_id.update_github_state:
                 runbot_domain = self.env['runbot.repo']._domain()
                 desc = "runbot build %s" % (build.dest,)
@@ -1076,7 +1094,11 @@ class runbot_build(models.Model):
                     "description": desc,
                     "context": "ci/runbot"
                 }
-                build._github_status_notify_all(status)
+                if self.last_github_state != state:
+                    build._github_status_notify_all(status)
+                    self.last_github_state = state
+                else:
+                    _logger.debug('Skipping unchanged status for %s', self.id)
 
     def _next_job_values(self):
         self.ensure_one()
