@@ -594,6 +594,7 @@ class PullRequests(models.Model):
             if not body:
                 body = None
 
+            self.env.cr.execute('LOCK runbot_merge_pull_requests IN SHARE MODE')
             r = gh.post('https://api.github.com/repos/{}/pulls'.format(pr.repository.name), json={
                 'base': target.name, 'head': '%s:%s' % (owner, new_branch),
                 'title': title, 'body': body,
@@ -613,17 +614,9 @@ class PullRequests(models.Model):
                 raise RuntimeError("Forwardport failure: %s (%s)" % (pr.display_name, results))
 
             r = results
-            self.env.cr.commit()
 
-            new_pr = self.search([
-                ('number', '=', r['number']),
-                ('repository.name', '=', r['base']['repo']['full_name']),
-            ], limit=1)
-            if new_pr:
-                _logger.info("Received forward-port PR %s", new_pr)
-            else:
-                new_pr = self._from_gh(r)
-                _logger.info("Created forward-port PR %s", new_pr)
+            new_pr = self._from_gh(r)
+            _logger.info("Created forward-port PR %s", new_pr)
             new_batch |= new_pr
 
             # delegate original author on merged original PR & on new PR so
