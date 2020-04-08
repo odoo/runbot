@@ -1034,6 +1034,9 @@ class runbot_build(models.Model):
                 os.mkdir(datadir)
             command.add_config_tuple("data_dir", '/data/build/datadir')
 
+        if grep(config_path, "--unaccent"):
+            command.add_config_tuple('unaccent', 'True')
+
         return command
 
     def _github_status_notify_all(self, status):
