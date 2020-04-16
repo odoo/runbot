@@ -189,6 +189,12 @@ class PullRequests(models.Model):
     source_id = fields.Many2one('runbot_merge.pull_requests', index=True, help="the original source of this FP even if parents were detached along the way")
     reminder_backoff_factor = fields.Integer(default=-4)
 
+    fw_policy = fields.Selection([
+        ('ci', "Normal"),
+        ('skipci', "Skip CI"),
+        # ('skipmerge', "Skip merge"),
+    ], required=True, default="ci")
+
     refname = fields.Char(compute='_compute_refname')
     @api.depends('label')
     def _compute_refname(self):
@@ -250,6 +256,12 @@ class PullRequests(models.Model):
                 self.env['forwardport.branch_remover'].create({
                     'pr_id': p.id,
                 })
+        # if we change the policy to skip CI, schedule followups on existing FPs
+        if vals.get('fw_policy') == 'skipci' and self.state == 'merged':
+            self.env['runbot_merge.pull_requests'].search([
+                ('source_id', '=', self.id),
+                ('state', 'not in', ('closed', 'merged')),
+            ])._schedule_fp_followup()
         return r
 
     def _try_closing(self, by):
@@ -280,6 +292,16 @@ class PullRequests(models.Model):
             if token is None:
                 break
 
+            close = False
+            msg = None
+            if token in ('ci', 'skipci'):
+                pr = (self.source_id or self)
+                if pr._pr_acl(author).is_reviewer:
+                    pr.fw_policy = token
+                    msg = "Not waiting for CI to create followup forward-ports, sure." if token == 'skipci' else "Waiting for CI to create followup forward-ports, sure."
+                else:
+                    msg = "I don't trust you enough to do that @{}.".format(login)
+
             if token == 'ignore': # replace 'ignore' by 'up to <pr_branch>'
                 token = 'up'
                 tokens = itertools.chain(['to', self.target.name], tokens)
@@ -298,19 +320,10 @@ class PullRequests(models.Model):
                     # only the author is delegated explicitely on the
                     pr._parse_commands(author, merge_bot + ' r+', login)
             elif token == 'close':
-                close = False
-                message = "I'm sorry, @{}. I can't close this PR for you."
+                msg = "I'm sorry, @{}. I can't close this PR for you."
                 if self.source_id._pr_acl(author).is_reviewer:
                     close = True
-                    message = None
-
-                Feedback.create({
-                    'repository': self.repository.id,
-                    'pull_request': self.number,
-                    'message': message,
-                    'close': close,
-                    'token_field': 'fp_github_token',
-                })
+                    msg = None
             elif token == 'up' and next(tokens, None) == 'to':
                 limit = next(tokens, None)
                 if not self._pr_acl(author).is_author:
@@ -345,11 +358,16 @@ class PullRequests(models.Model):
                         msg = "Forward-porting to %r." % limit_id.name
                         self.limit_id = limit_id
 
-                _logger.info("%s: %s", author, msg)
+            if msg or close:
+                if msg:
+                    _logger.info("%s [%s]: %s", self.display_name, login, msg)
+                else:
+                    _logger.info("%s [%s]: closing", self.display_name, login)
                 self.env['runbot_merge.pull_requests.feedback'].create({
                     'repository': self.repository.id,
                     'pull_request': self.number,
                     'message': msg,
+                    'close': close,
                     'token_field': 'fp_github_token',
                 })
 
@@ -370,16 +388,20 @@ class PullRequests(models.Model):
         })
 
     def _validate(self, statuses):
-        _logger = logging.getLogger(__name__).getChild('forwardport.next')
         failed = super()._validate(statuses)
+        self._schedule_fp_followup()
+        return failed
+
+    def _schedule_fp_followup(self):
+        _logger = logging.getLogger(__name__).getChild('forwardport.next')
         # if the PR has a parent and is CI-validated, enqueue the next PR
         for pr in self:
-            _logger.info('Checking if forward-port %s (%s)', pr, pr.number)
+            _logger.info('Checking if forward-port %s (%s)', pr.display_name, pr)
             if not pr.parent_id:
-                _logger.info('-> no parent (%s)', pr)
+                _logger.info('-> no parent %s (%s)', pr.display_name, pr.parent_id)
                 continue
-            if pr.state not in ['validated', 'ready']:
-                _logger.info('-> wrong state (%s)', pr.state)
+            if self.source_id.fw_policy != 'skipci' and pr.state not in ['validated', 'ready']:
+                _logger.info('-> wrong state %s (%s)', pr.display_name, pr.state)
                 continue
 
             # check if we've already forward-ported this branch:
@@ -391,10 +413,11 @@ class PullRequests(models.Model):
             # if the batch is inactive, the forward-port has been done *or*
             # the PR's own forward port is in error, so bail
             if not batch.active:
+                _logger.info('-> forward port done or in error (%s.active=%s)', batch, batch.active)
                 continue
 
             # otherwise check if we already have a pending forward port
-            _logger.info("%s %s %s", pr, batch, batch.prs)
+            _logger.info("%s %s %s", pr.display_name, batch, ', '.join(batch.mapped('prs.display_name')))
             if self.env['forwardport.batches'].search_count([('batch_id', '=', batch.id)]):
                 _logger.warning('-> already recorded')
                 continue
@@ -402,8 +425,8 @@ class PullRequests(models.Model):
             # check if batch-mate are all valid
             mates = batch.prs
             # wait until all of them are validated or ready
-            if any(pr.state not in ('validated', 'ready') for pr in mates):
-                _logger.warning("-> not ready (%s)", [(pr.number, pr.state) for pr in mates])
+            if any(pr.source_id.fw_policy != 'skipci' and pr.state not in ('validated', 'ready') for pr in mates):
+                _logger.warning("-> not ready (%s)", [(pr.display_name, pr.state) for pr in mates])
                 continue
 
             # check that there's no weird-ass state
@@ -419,7 +442,6 @@ class PullRequests(models.Model):
                 'batch_id': batch.id,
                 'source': 'fp',
             })
-        return failed
 
     def _find_next_target(self, reference):
         """ Finds the branch between target and limit_id which follows
@@ -711,11 +733,15 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
         # (with the entire batch). If there are conflict then create a
         # deactivated batch so the interface is coherent but we don't pickup
         # an active batch we're never going to deactivate.
-        return self.env['runbot_merge.batch'].create({
+        b = self.env['runbot_merge.batch'].create({
             'target': target.id,
             'prs': [(6, 0, new_batch.ids)],
             'active': not has_conflicts,
         })
+        # if we're not waiting for CI, schedule followup immediately
+        if any(p.source_id.fw_policy == 'skipci' for p in b.prs):
+            b.prs[0]._schedule_fp_followup()
+        return b
 
     def _pingline(self):
         assignees = (self.author | self.reviewed_by).mapped('github_login')
