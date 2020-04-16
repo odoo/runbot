@@ -558,7 +558,7 @@ def test_new_intermediate_branch(env, config, make_repo):
         'x': 'x',
     }, "check that new got all the updates (should be in the same state as c really)"
 
-def test_author_can_close_via_fwbot(env, config, make_repo, users):
+def test_author_can_close_via_fwbot(env, config, make_repo):
     project, prod, xxx = make_basic(env, config, make_repo, fp_token=True, fp_remote=True)
     other_user = config['role_other']
     other_token = other_user['token']
@@ -598,3 +598,64 @@ def test_author_can_close_via_fwbot(env, config, make_repo, users):
     env.run_crons()
     assert pr1.state == 'closed'
     assert pr1_id.state == 'closed'
+
+def test_skip_ci_all(env, config, make_repo):
+    project, prod, _ = make_basic(env, config, make_repo, fp_token=True, fp_remote=True)
+
+    with prod:
+        prod.make_commits('a', Commit('x', tree={'x': '0'}), ref='heads/change')
+        pr = prod.make_pr(target='a', head='change')
+        prod.post_status(pr.head, 'success', 'legal/cla')
+        prod.post_status(pr.head, 'success', 'ci/runbot')
+        pr.post_comment('%s skipci' % project.fp_github_name, config['role_reviewer']['token'])
+        pr.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+    assert env['runbot_merge.pull_requests'].search([
+        ('repository.name', '=', prod.name),
+        ('number', '=', pr.number)
+    ]).fw_policy == 'skipci'
+
+    with prod:
+        prod.post_status('staging.a', 'success', 'legal/cla')
+        prod.post_status('staging.a', 'success', 'ci/runbot')
+    env.run_crons()
+
+    # run cron a few more times for the fps
+    env.run_crons()
+    env.run_crons()
+    env.run_crons()
+
+    pr0_id, pr1_id, pr2_id = env['runbot_merge.pull_requests'].search([], order='number')
+    assert pr1_id.state == 'opened'
+    assert pr1_id.source_id == pr0_id
+    assert pr2_id.state == 'opened'
+    assert pr2_id.source_id == pr0_id
+
+def test_skip_ci_next(env, config, make_repo):
+    project, prod, _ = make_basic(env, config, make_repo, fp_token=True, fp_remote=True)
+
+    with prod:
+        prod.make_commits('a', Commit('x', tree={'x': '0'}), ref='heads/change')
+        pr = prod.make_pr(target='a', head='change')
+        prod.post_status(pr.head, 'success', 'legal/cla')
+        prod.post_status(pr.head, 'success', 'ci/runbot')
+        pr.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+
+    with prod:
+        prod.post_status('staging.a', 'success', 'legal/cla')
+        prod.post_status('staging.a', 'success', 'ci/runbot')
+    env.run_crons()
+
+    pr0_id, pr1_id = env['runbot_merge.pull_requests'].search([], order='number')
+    with prod:
+        prod.get_pr(pr1_id.number).post_comment(
+            '%s skipci' % project.fp_github_name,
+            config['role_user']['token']
+        )
+    assert pr0_id.fw_policy == 'skipci'
+    env.run_crons()
+
+    _, _, pr2_id = env['runbot_merge.pull_requests'].search([], order='number')
+    assert pr1_id.state == 'opened'
+    assert pr2_id.state == 'opened'
