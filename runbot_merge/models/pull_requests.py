@@ -118,7 +118,7 @@ class Project(models.Model):
             except Exception:
                 _logger.exception(
                     "Error while trying to change the tags of %s#%s from %s to %s",
-                    repo.name, pr.display_name, remove, add,
+                    repo.name, pr, remove, add,
                 )
             else:
                 to_remove.extend(ids)
