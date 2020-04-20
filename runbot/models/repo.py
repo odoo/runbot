@@ -175,7 +175,7 @@ class runbot_repo(models.Model):
         self.ensure_one()
         _logger.debug("git command: git (dir %s) %s", self.short_name, ' '.join(cmd))
         cmd = ['git', '--git-dir=%s' % self.path] + cmd
-        return subprocess.check_output(cmd).decode('utf-8')
+        return subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode()
 
     def _git_rev_parse(self, branch_name):
         return self._git(['rev-parse', branch_name]).strip()
@@ -425,13 +425,23 @@ class runbot_repo(models.Model):
         # Extracted from update_git to be easily overriden in external module
         self.ensure_one()
         repo = self
-        try:
-            repo._git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*', '+refs/pull/*/head:refs/pull/*'])
-        except subprocess.CalledProcessError as e:
-            message = 'Failed to fetch repo %s with return code %s. Original command was %s' % (repo.name, e.returncode, e.cmd)
-            _logger.exception(message)
-            host = self.env['runbot.host'].search([('name', '=', fqdn())])
-            host.disable()
+        try_count = 0
+        failure = True
+        delay = 0
+
+        while failure and try_count < 5:
+            time.sleep(delay)
+            try:
+                repo._git(['fetch', '-p', 'origin', '+refs/heads/*:refs/heads/*', '+refs/pull/*/head:refs/pull/*'])
+                failure = False
+            except subprocess.CalledProcessError as e:
+                try_count += 1
+                delay = delay * 1.5 if delay else 0.5
+                if try_count > 4:
+                    message = 'Failed to fetch repo %s: %s' % (repo.name, e.output.decode())
+                    _logger.exception(message)
+                    host = self.env['runbot.host']._get_current()
+                    host.disable()
 
     def _update(self, force=True):
         """ Update the physical git reposotories on FS"""

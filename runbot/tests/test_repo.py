@@ -2,7 +2,9 @@
 import datetime
 from unittest import skip
 from unittest.mock import patch, Mock
+from subprocess import CalledProcessError
 from odoo.tests import common, TransactionCase
+from odoo.tools import mute_logger
 import logging
 import odoo
 import time
@@ -211,7 +213,6 @@ class Test_Repo(RunbotCase):
         _test_times('runbot.repo.reftime', 'set_ref_time', 'get_ref_time')
 
 
-
 class Test_Github(TransactionCase):
     def test_github(self):
         """ Test different github responses or failures"""
@@ -237,6 +238,48 @@ class Test_Github(TransactionCase):
                 self.assertIn('Success after 2 tries', assert_log.output[0])
 
             self.assertEqual(2, mock_session.return_value.post.call_count, "_github method should try two times by default")
+
+
+class TestFetch(RunbotCase):
+
+    def setUp(self):
+        super(TestFetch, self).setUp()
+        self.mock_root = self.patchers['repo_root_patcher']
+
+    def test_update_fetch_cmd(self):
+        """ Test that git fetch is tried multiple times before disabling host """
+
+        fetch_count = 0
+        force_failure = False
+
+        def git_side_effect(cmd):
+            nonlocal fetch_count
+            fetch_count += 1
+            if fetch_count < 3 or force_failure:
+                raise CalledProcessError(128, cmd, 'Dummy Error'.encode('utf-8'))
+            else:
+                return True
+
+        git_patcher = self.patchers['git_patcher']
+        git_patcher.side_effect = git_side_effect
+
+        repo = self.Repo.create({'name': 'bla@example.com:foo/bar'})
+        host = self.env['runbot.host']._get_current()
+
+        self.assertFalse(host.assigned_only)
+        # Ensure that Host is not disabled if fetch succeeds after 3 tries
+        with mute_logger("odoo.addons.runbot.models.repo"):
+            repo._update_fetch_cmd()
+        self.assertFalse(host.assigned_only, "Host should not be disabled when fetch succeeds")
+        self.assertEqual(fetch_count, 3)
+
+        # Now ensure that host is disabled after 5 unsuccesful tries
+        force_failure = True
+        fetch_count = 0
+        with mute_logger("odoo.addons.runbot.models.repo"):
+            repo._update_fetch_cmd()
+        self.assertTrue(host.assigned_only)
+        self.assertEqual(fetch_count, 5)
 
 
 class Test_Repo_Scheduler(RunbotCase):
