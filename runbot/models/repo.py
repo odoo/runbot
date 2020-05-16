@@ -203,10 +203,13 @@ class runbot_repo(models.Model):
         _logger.info('git export: checkouting to %s (new)' % export_path)
         os.makedirs(export_path)
 
-        p1 = subprocess.Popen(['git', '--git-dir=%s' % self.path, 'archive', sha], stdout=subprocess.PIPE)
+        p1 = subprocess.Popen(['git', '--git-dir=%s' % self.path, 'archive', sha], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         p2 = subprocess.Popen(['tar', '-xmC', export_path], stdin=p1.stdout, stdout=subprocess.PIPE)
         p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
         (out, err) = p2.communicate()
+        p1.poll()  # fill the returncode
+        if p1.returncode:
+            raise RunbotException("Git archive failed for %s with error code %s. (%s)" % (sha, p1.returncode, p1.stderr.read().decode()))
         if err:
             raise RunbotException("Archive %s failed. Did you force push the branch since build creation? (%s)" % (sha, err))
 
