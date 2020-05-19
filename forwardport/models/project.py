@@ -36,7 +36,7 @@ from odoo.tools.appdirs import user_cache_dir
 from odoo.addons.runbot_merge import utils
 from odoo.addons.runbot_merge.models.pull_requests import RPLUS
 
-FOOTER = '\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'
+footer = '\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'
 
 DEFAULT_DELTA = dateutil.relativedelta.relativedelta(days=3)
 
@@ -656,7 +656,7 @@ class PullRequests(models.Model):
                 message = source._pingline() + """
 The next pull request (%s) is in conflict. You can merge the chain up to here by saying
 > @%s r+
-%s""" % (new_pr.display_name, pr.repository.project_id.fp_github_name, FOOTER)
+%s""" % (new_pr.display_name, pr.repository.project_id.fp_github_name, footer)
                 self.env['runbot_merge.pull_requests.feedback'].create({
                     'repository': pr.repository.id,
                     'pull_request': pr.number,
@@ -672,18 +672,6 @@ The next pull request (%s) is in conflict. You can merge the chain up to here by
             source = pr.source_id or pr
             (h, out, err) = conflicts.get(pr) or (None, None, None)
 
-            footer = FOOTER
-            if has_conflicts and not h:
-                footer = '\n**WARNING** at least one co-dependent PR (%s) ' \
-                         'did not properly forward-port, you will need to ' \
-                         'fix it before this can be merged. Both this PR and ' \
-                         'the others will need to be approved via `@%s r+` ' \
-                         'as they are all considered "in conflict".\n%s' % (
-                    ', '.join(p.display_name for p in (new_batch - new_pr)),
-                    proj.github_prefix,
-                    footer
-                )
-
             if h:
                 sout = serr = ''
                 if out.strip():
@@ -698,6 +686,17 @@ Either perform the forward-port manually (and push to this branch, proceeding as
 
 In the former case, you may want to edit this PR message as well.
 """ % (h, source.display_name, sout, serr)
+            elif has_conflicts:
+                message = """%s
+While this was properly forward-ported, at least one co-dependent PR (%s) did not succeed. You will need to fix it before this can be merged.
+
+Both this PR and the others will need to be approved via `@%s r+` as they are all considered "in conflict".
+%s""" % (
+                    source._pingline(),
+                    ', '.join(p.display_name for p in (new_batch - new_pr)),
+                    proj.github_prefix,
+                    footer
+                )
             elif base._find_next_target(new_pr) is None:
                 ancestors = "".join(
                     "* %s\n" % p.display_name
