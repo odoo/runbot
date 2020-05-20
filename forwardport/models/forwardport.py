@@ -141,7 +141,7 @@ class DeleteBranches(models.Model, Queue):
     def _search_domain(self):
         cutoff = self.env.context.get('forwardport_merged_before') \
              or fields.Datetime.to_string(datetime.now() - MERGE_AGE)
-        return [('pr_id.write_date', '<', cutoff)]
+        return [('pr_id.merge_date', '<', cutoff)]
 
     def _process_item(self):
         _deleter.info(
