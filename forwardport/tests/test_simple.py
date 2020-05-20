@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import collections
-import sys
 import time
 from datetime import datetime, timedelta
 from operator import itemgetter
@@ -9,7 +8,8 @@ import pytest
 
 from utils import *
 
-FAKE_PREV_WEEK = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+FMT = '%Y-%m-%d %H:%M:%S'
+FAKE_PREV_WEEK = (datetime.now() + timedelta(days=1)).strftime(FMT)
 
 # need:
 # * an odoo server
@@ -56,6 +56,12 @@ def test_straightforward_flow(env, config, make_repo, users):
         # use rebase-ff (instead of rebase-merge) so we don't have to dig in
         # parents of the merge commit to find the cherrypicks
         pr.post_comment('hansen r+ rebase-ff', config['role_reviewer']['token'])
+    pr_id = env['runbot_merge.pull_requests'].search([
+        ('repository.name', '=', prod.name),
+        ('number', '=', pr.number),
+    ])
+    assert not pr_id.merge_date,\
+        "PR obviously shouldn't have a merge date before being merged"
 
     env.run_crons()
     with prod:
@@ -64,6 +70,10 @@ def test_straightforward_flow(env, config, make_repo, users):
 
     # should merge the staging then create the FP PR
     env.run_crons()
+
+    assert datetime.now() - datetime.strptime(pr_id.merge_date, FMT) <= timedelta(minutes=1),\
+        "check if merge date was set about now (within a minute as crons and " \
+        "RPC calls yield various delays before we're back)"
 
     p_1_merged = prod.commit('a')
 

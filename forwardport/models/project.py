@@ -25,7 +25,7 @@ import re
 import subprocess
 import tempfile
 
-import dateutil
+import dateutil.relativedelta
 import requests
 
 from odoo import _, models, fields, api
@@ -188,6 +188,7 @@ class PullRequests(models.Model):
     )
     source_id = fields.Many2one('runbot_merge.pull_requests', index=True, help="the original source of this FP even if parents were detached along the way")
     reminder_backoff_factor = fields.Integer(default=-4)
+    merge_date = fields.Datetime()
 
     fw_policy = fields.Selection([
         ('ci', "Normal"),
@@ -218,6 +219,8 @@ class PullRequests(models.Model):
             )[-1].id
         if vals.get('parent_id') and 'source_id' not in vals:
             vals['source_id'] = self.browse(vals['parent_id'])._get_root().id
+        if vals.get('state') == 'merged':
+            vals['merge_date'] = fields.Datetime.now()
         return super().create(vals)
 
     def write(self, vals):
@@ -240,6 +243,8 @@ class PullRequests(models.Model):
 
         if vals.get('parent_id') and 'source_id' not in vals:
             vals['source_id'] = self.browse(vals['parent_id'])._get_root().id
+        if vals.get('state') == 'merged':
+            vals['merge_date'] = fields.Datetime.now()
         r = super().write(vals)
         if self.env.context.get('forwardport_detach_warn', True):
             for p in with_parents:
@@ -985,12 +990,12 @@ stderr:
             ('source_id', '!=', False),
             # active
             ('state', 'not in', ['merged', 'closed']),
-            # last updated more than <cutoff> ago
-            ('write_date', '<', cutoff),
+            # original merged more than <cutoff> ago
+            ('source_id.merge_date', '<', cutoff),
         ], order='source_id, id'), lambda p: p.source_id):
             backoff = dateutil.relativedelta.relativedelta(days=2**source.reminder_backoff_factor)
             prs = list(prs)
-            if all(p.write_date > (cutoff_dt - backoff) for p in prs):
+            if source.merge_date > (cutoff_dt - backoff):
                 continue
             source.reminder_backoff_factor += 1
             self.env['runbot_merge.pull_requests.feedback'].create({
