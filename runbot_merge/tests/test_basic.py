@@ -1269,6 +1269,7 @@ class TestMergeMethod:
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number),
         ])
+        pr.merge_method = 'rebase-merge'
         assert not pr.squash, "a PR with a single commit should not be squashed"
 
         with repo:
@@ -1278,6 +1279,8 @@ class TestMergeMethod:
                 force=True
             )
         assert pr.squash, "a PR with a single commit should be squashed"
+        assert not pr.merge_method, \
+            "resetting a PR to a single commit should remove the merge method"
 
     def test_pr_no_method(self, repo, env, users, config):
         """ a multi-repo PR should not be staged by default, should also get
