@@ -207,6 +207,7 @@ def handle_pr(env, event):
                 'state': 'opened',
                 # updating the head triggers a revalidation
                 'head': pr['head']['sha'],
+                'squash': pr['commits'] == 1,
             })
 
             return 'Reopened {}'.format(pr_obj.id)
