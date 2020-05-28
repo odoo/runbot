@@ -71,12 +71,24 @@ RUN apt-get update \
 ADD https://raw.githubusercontent.com/brendangregg/FlameGraph/master/flamegraph.pl /usr/local/bin/flamegraph.pl
 RUN chmod +rx /usr/local/bin/flamegraph.pl
 
+# Install postgresql-client-12
+RUN curl -sSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
+    && echo "deb http://apt.postgresql.org/pub/repos/apt/ bionic-pgdg main" > /etc/apt/sources.list.d/pgclient.list \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-client-12 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Odoo Debian dependencies
 ADD https://raw.githubusercontent.com/odoo/odoo/10.0/debian/control /tmp/p2-control
 ADD https://raw.githubusercontent.com/odoo/odoo/master/debian/control /tmp/p3-control
 RUN pip install -U setuptools wheel \
     && apt-get update \
-    && sed -n '/^Depends:/,/^[A-Z]/p' /tmp/p2-control /tmp/p3-control | awk '/^ [a-z]/ { gsub(/,/,"") ; print }' | sort -u | sed 's/python-imaging/python-pil/'| sed 's/python-pypdf/python-pypdf2/' | DEBIAN_FRONTEND=noninteractive xargs apt-get install -y -qq \
+    && sed -n '/^Depends:/,/^[A-Z]/p' /tmp/p2-control /tmp/p3-control \
+       | awk '/^ [a-z]/ { gsub(/,/,"") ; print }' | sort -u \
+       | egrep -v 'postgresql-client' \
+       | sed 's/python-imaging/python-pil/'| sed 's/python-pypdf/python-pypdf2/' \
+       | DEBIAN_FRONTEND=noninteractive xargs apt-get install -y -qq \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
