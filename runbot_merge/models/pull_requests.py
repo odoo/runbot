@@ -1055,6 +1055,9 @@ class PullRequests(models.Model):
     def write(self, vals):
         oldstate = { pr: pr._tagstate for pr in self }
 
+        if vals.get('squash'):
+            vals['merge_method'] = False
+
         w = super().write(vals)
 
         newhead = vals.get('head')
