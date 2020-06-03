@@ -303,7 +303,7 @@ class PullRequests(models.Model):
                 pr = (self.source_id or self)
                 if pr._pr_acl(author).is_reviewer:
                     pr.fw_policy = token
-                    msg = "Not waiting for CI to create followup forward-ports, sure." if token == 'skipci' else "Waiting for CI to create followup forward-ports, sure."
+                    msg = "Not waiting for CI to create followup forward-ports." if token == 'skipci' else "Waiting for CI to create followup forward-ports."
                 else:
                     msg = "I don't trust you enough to do that @{}.".format(login)
 
