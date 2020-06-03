@@ -3,7 +3,7 @@
 
 def migrate(cr, version):
 
-    repo_modules = '-auth_ldap,-document_ftp,-base_gengo,-website_gengo,-website_instantclick,-pad,-pad_project,-note_pad,-pos_cache,-pos_blackbox_be,-hw_*,-theme_*,-l10n_*,'
+    repo_modules = '-auth_ldap,-document_ftp,-base_gengo,-website_gengo,-website_instantclick,-pad,-pad_bundle,-note_pad,-pos_cache,-pos_blackbox_be,-hw_*,-theme_*,-l10n_*,'
     cr.execute("UPDATE runbot_repo SET modules = CONCAT(%s, modules) WHERE modules_auto = 'all' or modules_auto = 'repo';", (repo_modules,))
 
     # ceux qui n'ont pas d'étoile on prefix par '-*,'

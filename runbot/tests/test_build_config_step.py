@@ -1,37 +1,26 @@
 # -*- coding: utf-8 -*-
 from unittest.mock import patch, mock_open
 from odoo.exceptions import UserError
-from odoo.addons.runbot.models.repo import RunbotException
+from odoo.addons.runbot.common import RunbotException
 from .common import RunbotCase
+
 
 class TestBuildConfigStep(RunbotCase):
 
     def setUp(self):
         super(TestBuildConfigStep, self).setUp()
-        self.repo = self.Repo.create({'name': 'bla@example.com:foo/bar', 'server_files': 'server.py'})
-        self.branch = self.Branch.create({
-            'repo_id': self.repo.id,
-            'name': 'refs/heads/master'
-        })
-        self.branch_10 = self.Branch.create({
-            'repo_id': self.repo.id,
-            'name': 'refs/heads/10.0'
-        })
-        self.branch_11 = self.Branch.create({
-            'repo_id': self.repo.id,
-            'name': 'refs/heads/11.0'
-        })
+
         self.Build = self.env['runbot.build']
         self.ConfigStep = self.env['runbot.build.config.step']
         self.Config = self.env['runbot.build.config']
 
-        self.parent_build = self.Build.create({
-            'branch_id': self.branch.id,
-            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
-            'port': '1234',
+        server_commit = self.Commit.create({
+            'name': 'dfdfcfcf0000ffffffffffffffffffffffffffff',
+            'repo_id': self.repo_server.id
         })
-        self.start_patcher('_local_pg_createdb', 'odoo.addons.runbot.models.build.runbot_build._local_pg_createdb', True)
-        self.start_patcher('_get_py_version', 'odoo.addons.runbot.models.build.runbot_build._get_py_version', 3)
+        self.parent_build = self.Build.create({
+            'params_id': self.base_params.copy({'commit_link_ids': [(0, 0, {'commit_id': server_commit.id})]}).id,
+        })
         self.start_patcher('find_patcher', 'odoo.addons.runbot.common.find', 0)
 
     def test_config_step_create_results(self):
@@ -42,13 +31,12 @@ class TestBuildConfigStep(RunbotCase):
             'job_type': 'create_build',
             'number_builds': 2,
             'make_orphan': False,
-            'force_build': True,
         })
 
         config = self.Config.create({'name': 'test_config'})
         config_step.create_config_ids = [config.id]
 
-        config_step._create_build(self.parent_build, '/tmp/essai')
+        config_step._run_create_build(self.parent_build, '/tmp/essai')
         self.assertEqual(len(self.parent_build.children_ids), 2, 'Two sub-builds should have been generated')
 
         # check that the result will be ignored by parent build
@@ -67,13 +55,12 @@ class TestBuildConfigStep(RunbotCase):
             'job_type': 'create_build',
             'number_builds': 2,
             'make_orphan': True,
-            'force_build': True,
         })
 
         config = self.Config.create({'name': 'test_config'})
         config_step.create_config_ids = [config.id]
 
-        config_step._create_build(self.parent_build, '/tmp/essai')
+        config_step._run_create_build(self.parent_build, '/tmp/essai')
         self.assertEqual(len(self.parent_build.children_ids), 2, 'Two sub-builds should have been generated')
 
         # check that the result will be ignored by parent build
@@ -144,7 +131,7 @@ class TestBuildConfigStep(RunbotCase):
         dup_config = config.copy()
         self.assertEqual(dup_config.step_order_ids.mapped('step_id'), config.step_order_ids.mapped('step_id'))
 
-    @patch('odoo.addons.runbot.models.build.runbot_build._checkout')
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
     def test_coverage(self, mock_checkout):
         config_step = self.ConfigStep.create({
             'name': 'coverage',
@@ -153,25 +140,25 @@ class TestBuildConfigStep(RunbotCase):
         })
 
         def docker_run(cmd, log_path, *args, **kwargs):
-            self.assertEqual(cmd.pres, [['sudo', 'pip3', 'install', '-r', 'bar/requirements.txt']])
-            self.assertEqual(cmd.cmd[:10], ['python3', '-m', 'coverage', 'run', '--branch', '--source', '/data/build', '--omit', '*__manifest__.py', 'bar/server.py'])
+            self.assertEqual(cmd.pres, [['sudo', 'pip3', 'install', '-r', 'server/requirements.txt']])
+            self.assertEqual(cmd.cmd[:10], ['python3', '-m', 'coverage', 'run', '--branch', '--source', '/data/build', '--omit', '*__manifest__.py', 'server/server.py'])
             self.assertIn(['python3', '-m', 'coverage', 'html', '-d', '/data/build/coverage', '--ignore-errors'], cmd.posts)
             self.assertIn(['python3', '-m', 'coverage', 'xml', '-o', '/data/build/logs/coverage.xml', '--ignore-errors'], cmd.posts)
             self.assertEqual(log_path, 'dev/null/logpath')
 
         self.patchers['docker_run'].side_effect = docker_run
+        config_step._run_install_odoo(self.parent_build, 'dev/null/logpath')
 
-        config_step._run_odoo_install(self.parent_build, 'dev/null/logpath')
-
-    @patch('odoo.addons.runbot.models.build.runbot_build._checkout')
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
     def test_dump(self, mock_checkout):
         config_step = self.ConfigStep.create({
             'name': 'all',
             'job_type': 'install_odoo',
         })
+
         def docker_run(cmd, log_path, *args, **kwargs):
             dest = self.parent_build.dest
-            self.assertEqual(cmd.cmd[:2], ['python3', 'bar/server.py'])
+            self.assertEqual(cmd.cmd[:2], ['python3', 'server/server.py'])
             self.assertEqual(cmd.finals[0], ['pg_dump', '%s-all' % dest, '>', '/data/build/logs/%s-all//dump.sql' % dest])
             self.assertEqual(cmd.finals[1], ['cp', '-r', '/data/build/datadir/filestore/%s-all' % dest, '/data/build/logs/%s-all//filestore/' % dest])
             self.assertEqual(cmd.finals[2], ['cd', '/data/build/logs/%s-all/' % dest, '&&', 'zip', '-rmq9', '/data/build/logs/%s-all.zip' % dest, '*'])
@@ -179,10 +166,9 @@ class TestBuildConfigStep(RunbotCase):
 
         self.patchers['docker_run'].side_effect = docker_run
 
-        config_step._run_odoo_install(self.parent_build, 'dev/null/logpath')
+        config_step._run_install_odoo(self.parent_build, 'dev/null/logpath')
 
-
-    @patch('odoo.addons.runbot.models.build.runbot_build._checkout')
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
     def test_install_tags(self, mock_checkout):
         config_step = self.ConfigStep.create({
             'name': 'all',
@@ -198,26 +184,25 @@ class TestBuildConfigStep(RunbotCase):
 
         def docker_run(cmd, *args, **kwargs):
             cmds = cmd.build().split(' && ')
-            self.assertEqual(cmds[1].split(' bar/server.py')[0], 'python3')
+            self.assertEqual(cmds[1].split(' server/server.py')[0], 'python3')
             tags = cmds[1].split('--test-tags ')[1].split(' ')[0]
             self.assertEqual(tags, '/module,:class.method')
 
         self.patchers['docker_run'].side_effect = docker_run
-        config_step._run_odoo_install(self.parent_build, 'dev/null/logpath')
+        config_step._run_install_odoo(self.parent_build, 'dev/null/logpath')
 
         config_step.enable_auto_tags = True
 
         def docker_run2(cmd, *args, **kwargs):
             cmds = cmd.build().split(' && ')
-            self.assertEqual(cmds[1].split(' bar/server.py')[0], 'python3')
+            self.assertEqual(cmds[1].split(' server/server.py')[0], 'python3')
             tags = cmds[1].split('--test-tags ')[1].split(' ')[0]
             self.assertEqual(tags, '/module,:class.method,-:otherclass.othertest')
 
         self.patchers['docker_run'].side_effect = docker_run2
-        config_step._run_odoo_install(self.parent_build, 'dev/null/logpath')
+        config_step._run_install_odoo(self.parent_build, 'dev/null/logpath')
 
-
-    @patch('odoo.addons.runbot.models.build.runbot_build._checkout')
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
     def test_db_name(self, mock_checkout):
         config_step = self.ConfigStep.create({
             'name': 'default',
@@ -226,6 +211,7 @@ class TestBuildConfigStep(RunbotCase):
         })
         call_count = 0
         assert_db_name = 'custom'
+
         def docker_run(cmd, log_path, *args, **kwargs):
             db_sufgfix = cmd.cmd[cmd.index('-d')+1].split('-')[-1]
             self.assertEqual(db_sufgfix, assert_db_name)
@@ -234,18 +220,41 @@ class TestBuildConfigStep(RunbotCase):
 
         self.patchers['docker_run'].side_effect = docker_run
 
-        config_step._run_odoo_install(self.parent_build, 'dev/null/logpath')
+        config_step._run_install_odoo(self.parent_build, 'dev/null/logpath')
 
         assert_db_name = 'custom_build'
-        self.parent_build.config_data = {'db_name': 'custom_build'}
-        config_step._run_odoo_install(self.parent_build, 'dev/null/logpath')
+        parent_build_params = self.parent_build.params_id.copy({'config_data': {'db_name': 'custom_build'}})
+        parent_build = self.parent_build.copy({'params_id': parent_build_params.id})
+        config_step._run_install_odoo(parent_build, 'dev/null/logpath')
 
-        config_step._run_odoo_run(self.parent_build, 'dev/null/logpath')
+        config_step._run_run_odoo(parent_build, 'dev/null/logpath')
 
         self.assertEqual(call_count, 3)
 
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
+    def test_run_python(self, mock_checkout):
+        """minimal test for python steps. Also test that `-d` in cmd creates a database"""
+        test_code = """cmd = build._cmd()
+cmd += ['-d', 'test_database']
+docker_run(cmd)
+        """
+        config_step = self.ConfigStep.create({
+            'name': 'default',
+            'job_type': 'python',
+            'python_code': test_code,
+        })
 
-    @patch('odoo.addons.runbot.models.build.runbot_build._checkout')
+        def docker_run(cmd, *args, **kwargs):
+            run_cmd = cmd.build()
+            self.assertIn('-d test_database', run_cmd)
+
+        self.patchers['docker_run'].side_effect = docker_run
+        config_step._run_python(self.parent_build, 'dev/null/logpath')
+        self.patchers['docker_run'].assert_called_once()
+        db = self.env['runbot.database'].search([('name', '=', 'test_database')])
+        self.assertEqual(db.build_id, self.parent_build)
+
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
     def test_sub_command(self, mock_checkout):
         config_step = self.ConfigStep.create({
             'name': 'default',
@@ -253,14 +262,15 @@ class TestBuildConfigStep(RunbotCase):
             'sub_command': 'subcommand',
         })
         call_count = 0
+
         def docker_run(cmd, log_path, *args, **kwargs):
             nonlocal call_count
-            sub_command = cmd.cmd[cmd.index('bar/server.py')+1]
+            sub_command = cmd.cmd[cmd.index('server/server.py')+1]
             self.assertEqual(sub_command, 'subcommand')
             call_count += 1
 
         self.patchers['docker_run'].side_effect = docker_run
-        config_step._run_odoo_install(self.parent_build, 'dev/null/logpath')
+        config_step._run_install_odoo(self.parent_build, 'dev/null/logpath')
 
         self.assertEqual(call_count, 1)
 
@@ -271,14 +281,9 @@ class TestMakeResult(RunbotCase):
         super(TestMakeResult, self).setUp()
         self.ConfigStep = self.env['runbot.build.config.step']
         self.Config = self.env['runbot.build.config']
-        self.repo = self.Repo.create({'name': 'bla@example.com:foo/bar', 'server_files': 'server.py'})
-        self.branch = self.Branch.create({
-            'repo_id': self.repo.id,
-            'name': 'refs/heads/master'
-        })
 
     @patch('odoo.addons.runbot.models.build_config.os.path.getmtime')
-    @patch('odoo.addons.runbot.models.build.runbot_build._log')
+    @patch('odoo.addons.runbot.models.build.BuildResult._log')
     def test_make_result(self, mock_log, mock_getmtime):
         file_content = """
 Loading stuff
@@ -300,9 +305,7 @@ Initiating shutdown
             'test_tags': '/module,:class.method',
         })
         build = self.Build.create({
-            'branch_id': self.branch.id,
-            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
-            'port': '1234',
+            'params_id': self.base_params.id,
         })
         logs = []
         with patch('builtins.open', mock_open(read_data=file_content)):
@@ -384,14 +387,14 @@ Initiating shutdown
             ('ERROR', 'Log file not found at the end of test job')
         ])
 
-        #no error but build was already in warn
+        # no error but build was already in warn
         logs = []
         file_content = """
 Loading stuff
 odoo.stuff.modules.loading: Modules loaded.
 Some post install stuff
 Initiating shutdown
-"""     
+"""
         self.patchers['isfile'].return_value = True
         build.local_result = 'warn'
         with patch('builtins.open', mock_open(read_data=file_content)):
@@ -410,11 +413,9 @@ Initiating shutdown
             'python_result_code': """a = 2*5\nreturn_value = {'local_result': 'ok'}"""
         })
         build = self.Build.create({
-            'branch_id': self.branch.id,
-            'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
-            'port': '1234',
+            'params_id': self.base_params.id,
         })
-        build.state = 'testing'
+        build.state = 'testing'  # what ??
         self.patchers['isfile'].return_value = False
         result = config_step._make_results(build)
         self.assertEqual(result, {'local_result': 'ok'})
@@ -430,4 +431,4 @@ Initiating shutdown
         result = config_step._make_results(build)
         self.assertEqual(result, {'local_result': 'warning'})
 
-
+# TODO add generic test to copy_paste _run_* in a python step

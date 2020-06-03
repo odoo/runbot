@@ -26,6 +26,7 @@ class RunbotClient():
         from odoo import fields
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
+        signal.signal(signal.SIGQUIT, self.dump_stack)
         host = self.env['runbot.host']._get_current()
         host._bootstrap()
         count = 0
@@ -34,15 +35,16 @@ class RunbotClient():
                 host.last_start_loop = fields.Datetime.now()
                 count = count % 60
                 if count == 0:
-                    logging.info('Host %s running with %s slots on pid %s%s', host.name, host.get_nb_worker(), os.getpid(), ' (assigned only)' if host.assigned_only else '')
-                    self.env['runbot.repo']._source_cleanup()
+                    logging.info('Host %s running with %s slots on pid %s%s', host.name, host.nb_worker, os.getpid(), ' (assigned only)' if host.assigned_only else '')
+                    self.env['runbot.runbot']._source_cleanup()
                     self.env['runbot.build']._local_cleanup()
-                    self.env['runbot.repo']._docker_cleanup()
+                    self.env['runbot.runbot']._docker_cleanup()
                     host.set_psql_conn_count()
+                    _logger.info('Building docker image...')
                     host._docker_build()
                     _logger.info('Scheduling...')
                 count += 1
-                sleep_time = self.env['runbot.repo']._scheduler_loop_turn(host)
+                sleep_time = self.env['runbot.runbot']._scheduler_loop_turn(host)
                 host.last_end_loop = fields.Datetime.now()
                 self.env.cr.commit()
                 self.env.clear()
@@ -63,6 +65,10 @@ class RunbotClient():
 
         _logger.info("Interrupt detected")
         self.ask_interrupt.set()
+
+    def dump_stack(self, signal, frame):
+        import odoo
+        odoo.tools.misc.dumpstacks()
 
     def sleep(self, t):
         self.ask_interrupt.wait(t)

@@ -80,7 +80,7 @@ FOR EACH ROW EXECUTE PROCEDURE runbot_set_logging_build();
 
 
 class RunbotErrorLog(models.Model):
-    _name = "runbot.error.log"
+    _name = 'runbot.error.log'
     _description = "Error log"
     _auto = False
     _order = 'id desc'
@@ -95,30 +95,23 @@ class RunbotErrorLog(models.Model):
     path = fields.Char(string='Path', readonly=True)
     line = fields.Char(string='Line', readonly=True)
     build_id = fields.Many2one('runbot.build', string='Build', readonly=True)
-    bu_name = fields.Char(String='Build name', readonly=True)
+    #bu_name = fields.Char(String='Build name', readonly=True) as aggregate
     dest = fields.Char(String='Build dest', readonly=True)
     local_state = fields.Char(string='Local state', readonly=True)
     local_result = fields.Char(string='Local result', readonly=True)
     global_state = fields.Char(string='Global state', readonly=True)
     global_result = fields.Char(string='Global result', readonly=True)
     bu_create_date = fields.Datetime(string='Build create date', readonly=True)
-    committer = fields.Char(string='committer', readonly=True)
-    author = fields.Char(string='Author', readonly=True)
     host = fields.Char(string='Host', readonly=True)
-    config_id = fields.Many2one('runbot.build.config', string='Config', readonly=True)
     parent_id = fields.Many2one('runbot.build', string='Parent build', readonly=True)
-    hidden = fields.Boolean(string='Hidden', readonly=True)
-    branch_id = fields.Many2one('runbot.branch', string='Branch', readonly=True)
-    branch_name = fields.Char(string='Branch name', readonly=True)
-    branch_sticky = fields.Boolean(string='Sticky', readonly=True)
-    repo_id = fields.Many2one('runbot.repo', string='Repo', readonly=True)
-    repo_name = fields.Char(string='Repo name', readonly=True)
-    repo_short_name = fields.Char(compute='_compute_repo_short_name', readonly=True)
+    #bundle_id = fields.Many2one('runbot.bundle', string='Bundle', readonly=True)
+    #bundle_name = fields.Char(string='Bundle name', readonly=True)
+    #bundle_sticky = fields.Boolean(string='Sticky', readonly=True)
     build_url = fields.Char(compute='_compute_build_url', readonly=True)
 
     def _compute_repo_short_name(self):
         for l in self:
-            l.repo_short_name = '/'.join(l.repo_id.base.split('/')[-2:])
+            l.repo_short_name = '%s/%s' % (l.repo_id.owner, l.repo_id.repo_name)
 
     def _compute_build_url(self):
         for l in self:
@@ -152,32 +145,18 @@ class RunbotErrorLog(models.Model):
                 l.path  AS path,
                 l.line  AS line,
                 bu.id  AS build_id,
-                bu.name AS bu_name,
                 bu.dest AS dest,
                 bu.local_state  AS local_state,
                 bu.local_result  AS local_result,
                 bu.global_state  AS global_state,
                 bu.global_result  AS global_result,
                 bu.create_date  AS bu_create_date,
-                bu.committer  AS committer,
-                bu.author  AS author,
                 bu.host  AS host,
-                bu.config_id  AS config_id,
-                bu.parent_id  AS parent_id,
-                bu.hidden  AS hidden,
-                br.id  AS branch_id,
-                br.branch_name  AS branch_name,
-                br.sticky AS branch_sticky,
-                re.id  AS repo_id,
-                re.name  AS repo_name
+                bu.parent_id  AS parent_id
             FROM
                 ir_logging AS l
             JOIN
                 runbot_build bu ON l.build_id = bu.id
-            JOIN
-                runbot_branch br ON br.id = bu.branch_id
-            JOIN
-                runbot_repo re ON br.repo_id = re.id
             WHERE
                 l.level = 'ERROR'
         )""")

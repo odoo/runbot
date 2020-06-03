@@ -1,28 +1,44 @@
 <odoo>
   <data>
+    <record id="build_form_params" model="ir.ui.view">
+        <field name="model">runbot.build.params</field>
+        <field name="arch" type="xml">
+            <form string="Build Params">
+                <sheet>
+                    <group>
+                        <field name="config_id"/>
+                        <field name="config_data"/>
+                        <field name="version_id"/>
+                        <field name="extra_params"/>
+                        <field name="commit_link_ids">
+                            <tree>
+                                <field name="commit_id"/>
+                                <field name="match_type"/>
+                            </tree>
+                        </field>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_build_params_tree" model="ir.ui.view">
+        <field name="model">runbot.build.params</field>
+        <field name="arch" type="xml">
+            <tree string="Build params">
+                <field name="config_id"/>
+                <field name="version_id"/>
+                <field name="commit_link_ids"/>
+            </tree>
+        </field>
+    </record>
     <record id="build_form" model="ir.ui.view">
         <field name="model">runbot.build</field>
         <field name="arch" type="xml">
             <form string="Build">
                 <sheet>
                     <group>
-                        <field name="repo_id"/>
-                        <field name="branch_id"/>
-                        <field name="name"/>
-                        <field name="dependency_ids">
-                            <tree>
-                                <field name="dependecy_repo_id"/>
-                                <field name="dependency_hash"/>
-                                <field name="closest_branch_id"/>
-                                <field name="match_type"/>
-                            </tree>
-                        </field>
-                        <field name="date"/>
-                        <field name="author"/>
-                        <field name="author_email" groups="base.group_no_one"/>
-                        <field name="committer" groups="base.group_no_one"/>
-                        <field name="committer_email" groups="base.group_no_one"/>
-                        <field name="subject"/>
+                        <field name="description"/>
+                        <field name="params_id"/>
                         <field name="port" groups="base.group_no_one"/>
                         <field name="dest"/>
                         <field name="local_state"/>
@@ -39,13 +55,9 @@
                         <field name="build_end" groups="base.group_no_one"/>
                         <field name="build_time" groups="base.group_no_one"/>
                         <field name="build_age" groups="base.group_no_one"/>
-                        <field name="duplicate_id"/>
                         <field name="build_type"/>
-                        <field name="config_id"/>
-                        <field name="config_data"/>
                         <field name="parent_id"/>
                         <field name="orphan_result"/>
-                        <field name="hidden" groups="base.group_no_one"/>
                         <field name="build_url" widget="url" readonly="1"/>
                         <field name="keep_running"/>
                         <field name="gc_date" readonly="1"/>
@@ -70,11 +82,7 @@
         <field name="model">runbot.build</field>
         <field name="arch" type="xml">
             <tree string="Builds">
-                <field name="repo_id"/>
                 <field name="dest"/>
-                <field name="date"/>
-                <field name="author"/>
-                <field name="committer"/>
                 <field name="global_state"/>
                 <field name="global_result"/>
                 <field name="port"/>
@@ -101,8 +109,6 @@
         <field name="arch" type="xml">
             <search string="Search builds">
                 <field name="id"/>
-                <field name="branch_id"/>
-                <field name="name"/>
                 <field name="global_state"/>
                 <field name="dest"/>
                 <filter string="Pending" name='pending' domain="[('global_state','=', 'pending')]"/>
@@ -111,8 +117,6 @@
                 <filter string="Done" name='done' domain="[('global_state','=','done')]"/>
                 <filter string="Duplicate" name='duplicate' domain="[('local_state','=', 'duplicate')]"/>
                 <group expand="0" string="Group By...">
-                    <filter string="Repo" name='repo' domain="[]" context="{'group_by':'repo_id'}"/>
-                    <filter string="Branch" name='branch' domain="[]" context="{'group_by':'branch_id'}"/>
                     <filter string="Status" name='status' domain="[]" context="{'group_by':'global_state'}"/>
                     <filter string="Result" name='result' domain="[]" context="{'group_by':'global_result'}"/>
                     <filter string="Start" name='start' domain="[]" context="{'group_by':'job_start'}"/>
@@ -128,6 +132,14 @@
         <field name="res_model">runbot.build</field>
         <field name="view_mode">tree,form,graph,pivot</field>
     </record>
-    <menuitem id="menu_build" action="action_build" parent="runbot_menu_root"/>
+    <record id="action_build_params" model="ir.actions.act_window">
+        <field name="name">Builds Params</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">runbot.build.params</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+    <menuitem id="menu_build" name="Build" parent="runbot_menu_root"/>
+    <menuitem id="menu_build_build" action="action_build" parent="menu_build"/>
+    <menuitem id="menu_build_params" action="action_build_params" parent="menu_build"/>
   </data>
 </odoo>

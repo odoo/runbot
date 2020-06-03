@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import fnmatch
-import glob
 import logging
 import pwd
 import re
@@ -8,14 +7,15 @@ import shutil
 import subprocess
 import time
 import datetime
-from ..common import dt2time, fqdn, now, grep, local_pgadmin_cursor, s2human, Commit, dest_reg, os, list_local_dbs, pseudo_markdown
-from ..container import docker_build, docker_stop, docker_state, Command
+import hashlib
+from ..common import dt2time, fqdn, now, grep, local_pgadmin_cursor, s2human, dest_reg, os, list_local_dbs, pseudo_markdown, RunbotException
+from ..container import docker_stop, docker_state, Command
 from ..fields import JsonDictField
-from odoo.addons.runbot.models.repo import RunbotException
-from odoo import models, fields, api, registry
+from odoo import models, fields, api
 from odoo.exceptions import UserError, ValidationError
 from odoo.http import request
 from odoo.tools import appdirs
+from odoo.tools.safe_eval import safe_eval
 from collections import defaultdict
 from psycopg2 import sql
 from subprocess import CalledProcessError
@@ -23,152 +23,209 @@ from subprocess import CalledProcessError
 _logger = logging.getLogger(__name__)
 
 result_order = ['ok', 'warn', 'ko', 'skipped', 'killed', 'manually_killed']
-state_order = ['pending', 'testing', 'waiting', 'running', 'duplicate', 'done']
+state_order = ['pending', 'testing', 'waiting', 'running', 'done']
 
 COPY_WHITELIST = [
-    "branch_id",
-    "repo_id",
-    "name",
+    "params_id",
     "description",
-    "date",
-    "author",
-    "author_email",
-    "committer",
-    "committer_email",
-    "subject",
-    "config_data",
-    "extra_params",
     "build_type",
     "parent_id",
-    "hidden",
-    "dependency_ids",
-    "config_id",
     "orphan_result",
-    "commit_path_mode",
 ]
 
+
 def make_selection(array):
-    def format(string):
-        return (string, string.replace('_', ' ').capitalize())
-    return [format(elem) if isinstance(elem, str) else elem for elem in array]
+    return [(elem, elem.replace('_', ' ').capitalize()) if isinstance(elem, str) else elem for elem in array]
 
 
-class runbot_build(models.Model):
-    _name = "runbot.build"
+class BuildParameters(models.Model):
+    _name = 'runbot.build.params'
+    _description = "All information used by a build to run, should be unique and set on create only"
+
+    # on param or on build?
+    # execution parametter
+    commit_link_ids = fields.Many2many('runbot.commit.link', copy=True)
+    commit_ids = fields.Many2many('runbot.commit', compute='_compute_commit_ids')
+    version_id = fields.Many2one('runbot.version', required=True, index=True)
+    project_id = fields.Many2one('runbot.project', required=True, index=True)  # for access rights
+    trigger_id = fields.Many2one('runbot.trigger', index=True)  # for access rights
+    category = fields.Char('Category', index=True)  # normal vs nightly vs weekly, ...
+    # other informations
+    extra_params = fields.Char('Extra cmd args')
+    config_id = fields.Many2one('runbot.build.config', 'Run Config', required=True,
+                                default=lambda self: self.env.ref('runbot.runbot_build_config_default', raise_if_not_found=False), index=True)
+    config_data = JsonDictField('Config Data')
+
+    build_ids = fields.One2many('runbot.build', 'params_id')
+    builds_reference_ids = fields.Many2many('runbot.build', relation='runbot_build_params_references', copy=True)
+    modules = fields.Char('Modules')
+
+    upgrade_to_build_id = fields.Many2one('runbot.build', index=True)  # use to define sources to use with upgrade script
+    upgrade_from_build_id = fields.Many2one('runbot.build', index=True)  # use to download db
+    dump_db = fields.Many2one('runbot.database', index=True)  # use to define db to download
+
+    fingerprint = fields.Char('Fingerprint', compute='_compute_fingerprint', store=True, index=True)
+
+    _sql_constraints = [
+        ('unique_fingerprint', 'unique (fingerprint)', 'avoid duplicate params'),
+    ]
+
+    # @api.depends('version_id', 'project_id', 'extra_params', 'config_id', 'config_data', 'modules', 'commit_link_ids', 'builds_reference_ids')
+    def _compute_fingerprint(self):
+        for param in self:
+            cleaned_vals = {
+                'version_id': param.version_id.id,
+                'project_id': param.project_id.id,
+                'trigger_id': param.trigger_id.id,
+                'extra_params': param.extra_params or '',
+                'config_id': param.config_id.id,
+                'config_data': param.config_data.dict,
+                'modules': param.modules or '',
+                'commit_link_ids': sorted(param.commit_link_ids.commit_id.ids),
+                'builds_reference_ids': sorted(param.builds_reference_ids.ids),
+                'upgrade_from_build_id': param.upgrade_from_build_id.id,
+                'upgrade_to_build_id': param.upgrade_to_build_id.id,
+                'dump_db': param.dump_db.id,
+            }
+            param.fingerprint = hashlib.sha256(str(cleaned_vals).encode('utf8')).hexdigest()
+
+    @api.depends('commit_link_ids')
+    def _compute_commit_ids(self):
+        for params in self:
+            params.commit_ids = params.commit_link_ids.commit_id
+
+    def create(self, values):
+        params = self.new(values)
+        match = self._find_existing(params.fingerprint)
+        if match:
+            return match
+        values = self._convert_to_write(params._cache)
+        return super().create(values)
+
+    def _find_existing(self, fingerprint):
+        return self.env['runbot.build.params'].search([('fingerprint', '=', fingerprint)], limit=1)
+
+    def write(self, vals):
+        raise UserError('Params cannot be modified')
+
+
+class BuildResult(models.Model):
+    # remove duplicate management
+    # instead, link between bundle_batch and build
+    # kill -> only available from bundle.
+    # kill -> actually detach the build from the bundle
+    # rebuild: detach and create a new link (a little like exact rebuild),
+    # if a build is detached from all bundle, kill it
+    # nigktly?
+
+    _name = 'runbot.build'
     _description = "Build"
 
     _parent_store = True
     _order = 'id desc'
     _rec_name = 'id'
 
-    branch_id = fields.Many2one('runbot.branch', 'Branch', required=True, ondelete='cascade', index=True)
-    repo_id = fields.Many2one(related='branch_id.repo_id', readonly=True, store=True)
-    name = fields.Char('Revno', required=True)
+    # all displayed info removed. How to replace that?
+    # -> commit corresponding to repo of trigger_id5
+    # -> display all?
+
+    params_id = fields.Many2one('runbot.build.params', required=True, index=True, auto_join=True)
+    no_auto_run = fields.Boolean('No run')
+    # could be a default value, but possible to change it to allow duplicate accros branches
+
     description = fields.Char('Description', help='Informative description')
     md_description = fields.Char(compute='_compute_md_description', String='MD Parsed Description', help='Informative description markdown parsed')
-    host = fields.Char('Host')
-    port = fields.Integer('Port')
-    dest = fields.Char(compute='_compute_dest', type='char', string='Dest', readonly=1, store=True)
-    domain = fields.Char(compute='_compute_domain', type='char', string='URL')
-    date = fields.Datetime('Commit date')
-    author = fields.Char('Author')
-    author_email = fields.Char('Author Email')
-    committer = fields.Char('Committer')
-    committer_email = fields.Char('Committer Email')
-    subject = fields.Text('Subject')
-    sequence = fields.Integer('Sequence')
-    log_ids = fields.One2many('ir.logging', 'build_id', string='Logs')
-    error_log_ids = fields.One2many('ir.logging', 'build_id', domain=[('level', 'in', ['WARNING', 'ERROR', 'CRITICAL'])], string='Error Logs')
-    config_data = JsonDictField('Config Data')
-    stat_ids = fields.One2many('runbot.build.stat', 'build_id', strings='Statistics values')
+
+    # Related fields for convenience
+    version_id = fields.Many2one('runbot.version', related='params_id.version_id', store=True, index=True)
+    config_id = fields.Many2one('runbot.build.config', related='params_id.config_id', store=True, index=True)
+    trigger_id = fields.Many2one('runbot.trigger', related='params_id.trigger_id', store=True, index=True)
 
     # state machine
-
     global_state = fields.Selection(make_selection(state_order), string='Status', compute='_compute_global_state', store=True)
     local_state = fields.Selection(make_selection(state_order), string='Build Status', default='pending', required=True, index=True)
     global_result = fields.Selection(make_selection(result_order), string='Result', compute='_compute_global_result', store=True)
     local_result = fields.Selection(make_selection(result_order), string='Build Result')
     triggered_result = fields.Selection(make_selection(result_order), string='Triggered Result')  # triggered by db only
-    last_github_state = fields.Char('Last github status', readonly=True)
 
     requested_action = fields.Selection([('wake_up', 'To wake up'), ('deathrow', 'To kill')], string='Action requested', index=True)
+    # web infos
+    host = fields.Char('Host')
+    port = fields.Integer('Port')
+    dest = fields.Char(compute='_compute_dest', type='char', string='Dest', readonly=1, store=True)
+    domain = fields.Char(compute='_compute_domain', type='char', string='URL')
+    # logs and stats
+    log_ids = fields.One2many('ir.logging', 'build_id', string='Logs')
+    error_log_ids = fields.One2many('ir.logging', 'build_id', domain=[('level', 'in', ['WARNING', 'ERROR', 'CRITICAL'])], string='Error Logs')
+    stat_ids = fields.One2many('runbot.build.stat', 'build_id', strings='Statistics values')
+    log_list = fields.Char('Comma separted list of step_ids names with logs', compute="_compute_log_list", store=True)
 
-    nb_pending = fields.Integer("Number of pending in queue", default=0)
-    nb_testing = fields.Integer("Number of test slot use", default=0)
-    nb_running = fields.Integer("Number of run slot use", default=0)
-
-    # should we add a stored field for children results?
     active_step = fields.Many2one('runbot.build.config.step', 'Active step')
     job = fields.Char('Active step display name', compute='_compute_job')
     job_start = fields.Datetime('Job start')
     job_end = fields.Datetime('Job end')
-    gc_date = fields.Datetime('Local cleanup date', compute='_compute_gc_date')
-    gc_delay = fields.Integer('Cleanup Delay', help='Used to compute gc_date')
     build_start = fields.Datetime('Build start')
     build_end = fields.Datetime('Build end')
     job_time = fields.Integer(compute='_compute_job_time', string='Job time')
     build_time = fields.Integer(compute='_compute_build_time', string='Build time')
+
+    gc_date = fields.Datetime('Local cleanup date', compute='_compute_gc_date')
+    gc_delay = fields.Integer('Cleanup Delay', help='Used to compute gc_date')
+
     build_age = fields.Integer(compute='_compute_build_age', string='Build age')
-    duplicate_id = fields.Many2one('runbot.build', 'Corresponding Build', index=True)
-    revdep_build_ids = fields.Many2many('runbot.build', 'runbot_rev_dep_builds',
-                                        column1='rev_dep_id', column2='dependent_id',
-                                        string='Builds that depends on this build')
-    extra_params = fields.Char('Extra cmd args')
+
     coverage = fields.Boolean('Code coverage was computed for this build')
     coverage_result = fields.Float('Coverage result', digits=(5, 2))
     build_type = fields.Selection([('scheduled', 'This build was automatically scheduled'),
                                    ('rebuild', 'This build is a rebuild'),
                                    ('normal', 'normal build'),
-                                   ('indirect', 'Automatic rebuild'),
+                                   ('indirect', 'Automatic rebuild'), # TODO cleanup remove
                                    ],
                                   default='normal',
                                   string='Build type')
+
+    # what about parent_id and duplmicates?
+    # -> always create build, no duplicate? (make sence since duplicate should be the parent and params should be inherited)
+    # -> build_link ?
+
     parent_id = fields.Many2one('runbot.build', 'Parent Build', index=True)
     parent_path = fields.Char('Parent path', index=True)
     # should we add a has children stored boolean?
-    hidden = fields.Boolean("Don't show build on main page", default=False)  # index?
     children_ids = fields.One2many('runbot.build', 'parent_id')
-    dependency_ids = fields.One2many('runbot.build.dependency', 'build_id', copy=True)
 
-    config_id = fields.Many2one('runbot.build.config', 'Run Config', required=True, default=lambda self: self.env.ref('runbot.runbot_build_config_default', raise_if_not_found=False))
-    real_build = fields.Many2one('runbot.build', 'Real Build', help="duplicate_id or self", compute='_compute_real_build')
-    log_list = fields.Char('Comma separted list of step_ids names with logs', compute="_compute_log_list", store=True)
+    # config of top_build is inherithed from params, but subbuild will have different configs
+
     orphan_result = fields.Boolean('No effect on the parent result', default=False)
 
-    commit_path_mode = fields.Selection([('rep_sha', 'repo name + sha'),
-                                         ('soft', 'repo name only'),
-                                         ],
-                                        default='soft',
-                                        string='Source export path mode')
     build_url = fields.Char('Build url', compute='_compute_build_url', store=False)
     build_error_ids = fields.Many2many('runbot.build.error', 'runbot_build_error_ids_runbot_build_rel', string='Errors')
     keep_running = fields.Boolean('Keep running', help='Keep running')
     log_counter = fields.Integer('Log Lines counter', default=100)
 
-    @api.depends('config_id')
+    slot_ids = fields.One2many('runbot.batch.slot', 'build_id')
+    killable = fields.Boolean('Killable')
+
+    database_ids = fields.One2many('runbot.database', 'build_id')
+
+    @api.depends('params_id.config_id')
     def _compute_log_list(self):  # storing this field because it will be access trhoug repo viewn and keep track of the list at create
         for build in self:
-            build.log_list = ','.join({step.name for step in build.config_id.step_ids() if step._has_log()})
+            build.log_list = ','.join({step.name for step in build.params_id.config_id.step_ids() if step._has_log()})
+        # should be moved
 
-    @api.depends('children_ids.global_state', 'local_state', 'duplicate_id.global_state')
+    @api.depends('children_ids.global_state', 'local_state')
     def _compute_global_state(self):
         for record in self:
-            if record.duplicate_id:
-                record.global_state = record.duplicate_id.global_state
-            elif record.global_state == 'done' and self.local_state == 'done':
-                # avoid to recompute if done, mostly important whith many orphan childrens
-                record.global_state = 'done'
-            else:
-                waiting_score = record._get_state_score('waiting')
-                children_ids = [child for child in record.children_ids if not child.orphan_result]
-                if record._get_state_score(record.local_state) > waiting_score and children_ids:  # if finish, check children
-                    children_state = record._get_youngest_state([child.global_state for child in children_ids])
-                    if record._get_state_score(children_state) > waiting_score:
-                        record.global_state = record.local_state
-                    else:
-                        record.global_state = 'waiting'
-                else:
+            waiting_score = record._get_state_score('waiting')
+            children_ids = [child for child in record.children_ids if not child.orphan_result]
+            if record._get_state_score(record.local_state) > waiting_score and children_ids:  # if finish, check children
+                children_state = record._get_youngest_state([child.global_state for child in children_ids])
+                if record._get_state_score(children_state) > waiting_score:
                     record.global_state = record.local_state
+                else:
+                    record.global_state = 'waiting'
+            else:
+                record.global_state = record.local_state
 
     @api.depends('gc_delay', 'job_end')
     def _compute_gc_date(self):
@@ -200,14 +257,10 @@ class runbot_build(models.Model):
     def _get_state_score(self, result):
         return state_order.index(result)
 
-    # random note: need to count hidden in pending and testing build displayed in frontend
-
-    @api.depends('children_ids.global_result', 'local_result', 'duplicate_id.global_result', 'children_ids.orphan_result')
+    @api.depends('children_ids.global_result', 'local_result', 'children_ids.orphan_result')
     def _compute_global_result(self):
         for record in self:
-            if record.duplicate_id:
-                record.global_result = record.duplicate_id.global_result
-            elif record.local_result and record._get_result_score(record.local_result) >= record._get_result_score('ko'):
+            if record.local_result and record._get_result_score(record.local_result) >= record._get_result_score('ko'):
                 record.global_result = record.local_result
             else:
                 children_ids = [child for child in record.children_ids if not child.orphan_result]
@@ -230,138 +283,20 @@ class runbot_build(models.Model):
     def _get_result_score(self, result):
         return result_order.index(result)
 
-    @api.depends('active_step', 'duplicate_id.active_step')
+    @api.depends('active_step')
     def _compute_job(self):
         for build in self:
-            build.job = build.real_build.active_step.name
-
-    @api.depends('duplicate_id')
-    def _compute_real_build(self):
-        for build in self:
-            build.real_build = build.duplicate_id or build
+            build.job = build.active_step.name
 
     def copy_data(self, default=None):
-        values = super().copy_data(default)[0]
-        values = {key: value for key, value in values.items() if key in COPY_WHITELIST}
+        values = super().copy_data(default)[0] or {}
+        default = dict(default or [])
+        values = {key: value for key, value in values.items() if (key in COPY_WHITELIST or key in default)}
         values.update({
-            'host': 'PAUSED', # hack to keep the build in pending waiting for a manual update. Todo: add a paused state instead
+            'host': 'PAUSED',  # hack to keep the build in pending waiting for a manual update. Todo: add a paused flag instead
             'local_state': 'pending',
         })
         return [values]
-
-    def copy(self, default=None):
-        return super(runbot_build, self.with_context(force_rebuild=True)).copy(default)
-
-
-    @api.model_create_single
-    def create(self, vals):
-        if not 'config_id' in vals:
-            branch = self.env['runbot.branch'].browse(vals.get('branch_id'))
-            vals['config_id'] = branch.config_id.id
-        build_id = super(runbot_build, self).create(vals)
-        extra_info = {}
-        if not build_id.sequence:
-            extra_info['sequence'] = build_id.id
-
-        # compute dependencies
-        repo = build_id.repo_id
-        dep_create_vals = []
-        build_id._log('create', 'Build created') # mainly usefull to log creation time
-        if not vals.get('dependency_ids'):
-            params = build_id._get_params() # calling git show, dont call that if not usefull.
-            for extra_repo in repo.dependency_ids:
-                repo_name = extra_repo.short_name
-                last_commit = params['dep'][repo_name]  # not name
-                if last_commit:
-                    match_type = 'params'
-                    build_closest_branch = False
-                    message = 'Dependency for repo %s defined in commit message' % (repo_name)
-                else:
-                    (build_closest_branch, match_type) = build_id.branch_id._get_closest_branch(extra_repo.id)
-                    closest_name = build_closest_branch.name
-                    closest_branch_repo = build_closest_branch.repo_id
-                    last_commit = closest_branch_repo._git_rev_parse(closest_name)
-                    message = 'Dependency for repo %s defined from closest branch %s' % (repo_name, closest_name)
-                try:
-                    commit_oneline = extra_repo._git(['show', '--pretty="%H -- %s"', '-s', last_commit]).strip()
-                except CalledProcessError:
-                    commit_oneline = 'Commit %s not found on build creation' % last_commit
-                    # possible that oneline fail if given from commit message. Do it on build? or keep this information
-
-                build_id._log('create', '%s: %s' % (message, commit_oneline))
-
-                dep_create_vals.append({
-                    'build_id': build_id.id,
-                    'dependecy_repo_id': extra_repo.id,
-                    'closest_branch_id': build_closest_branch and build_closest_branch.id,
-                    'dependency_hash': last_commit,
-                    'match_type': match_type,
-                })
-            for dep_vals in dep_create_vals:
-                self.env['runbot.build.dependency'].sudo().create(dep_vals)
-
-        if not self.env.context.get('force_rebuild') and not vals.get('build_type') == 'rebuild':
-            # detect duplicate
-            duplicate_id = None
-            domain = [
-                ('repo_id', 'in', (build_id.repo_id.duplicate_id.id, build_id.repo_id.id)),  # before, was only looking in repo.duplicate_id looks a little better to search in both
-                ('id', '!=', build_id.id),
-                ('name', '=', build_id.name),
-                ('duplicate_id', '=', False),
-                # ('build_type', '!=', 'indirect'),  # in case of performance issue, this little fix may improve performance a little but less duplicate will be detected when pushing an empty branch on repo with duplicates
-                '|', ('local_result', '=', False), ('local_result', '!=', 'skipped'),  # had to reintroduce False posibility for selections
-                ('config_id', '=', build_id.config_id.id),
-                ('extra_params', '=', build_id.extra_params),
-                ('config_data', '=', build_id.config_data or False),
-            ]
-            candidates = self.search(domain)
-
-            nb_deps = len(build_id.dependency_ids)
-            if candidates and nb_deps:
-                # check that all depedencies are matching.
-
-                # Note: We avoid to compare closest_branch_id, because the same hash could be found on
-                # 2 different branches (pr + branch).
-                # But we may want to ensure that the hash is comming from the right repo, we dont want to compare community
-                # hash with enterprise hash.
-                # this is unlikely to happen so branch comparaison is disabled
-                self.env.cr.execute("""
-                    SELECT DUPLIDEPS.build_id
-                    FROM runbot_build_dependency as DUPLIDEPS
-                    JOIN runbot_build_dependency as BUILDDEPS
-                    ON BUILDDEPS.dependency_hash = DUPLIDEPS.dependency_hash
-                    AND BUILDDEPS.build_id = %s
-                    AND DUPLIDEPS.build_id in %s
-                    GROUP BY DUPLIDEPS.build_id
-                    HAVING COUNT(DUPLIDEPS.*) = %s
-                    ORDER BY DUPLIDEPS.build_id  -- remove this in case of performance issue, not so usefull
-                    LIMIT 1
-                """, (build_id.id, tuple(candidates.ids), nb_deps))
-                filtered_candidates_ids = self.env.cr.fetchall()
-
-                if filtered_candidates_ids:
-                    duplicate_id = filtered_candidates_ids[0]
-            else:
-                duplicate_id = candidates[0].id if candidates else False
-
-            if duplicate_id:
-                extra_info.update({'local_state': 'duplicate', 'duplicate_id': duplicate_id})
-                # maybe update duplicate priority if needed
-
-            docker_source_folders = set()
-            for commit in build_id._get_all_commit():
-                docker_source_folder = build_id._docker_source_folder(commit)
-                if docker_source_folder in docker_source_folders:
-                    extra_info['commit_path_mode'] = 'rep_sha'
-                    continue
-                docker_source_folders.add(docker_source_folder)
-
-        if extra_info:
-            build_id.write(extra_info)
-
-        if build_id.local_state == 'duplicate' and build_id.duplicate_id.global_state in ('running', 'done'):
-            build_id._github_status()
-        return build_id
 
     def write(self, values):
         # some validation to ensure db consistency
@@ -372,35 +307,57 @@ class runbot_build(models.Model):
         local_result = values.get('local_result')
         for build in self:
             assert not local_result or local_result == self._get_worst_result([build.local_result, local_result])  # dont write ok on a warn/error build
-        res = super(runbot_build, self).write(values)
-        for build in self:
-            assert bool(not build.duplicate_id) ^ (build.local_state == 'duplicate')  # don't change duplicate state without removing duplicate id.
-        if 'log_counter' in values: # not 100% usefull but more correct ( see test_ir_logging)
+        res = super(BuildResult, self).write(values)
+        if 'log_counter' in values:  # not 100% usefull but more correct ( see test_ir_logging)
             self.flush()
         return res
+
+    def _add_child(self, param_values, orphan=False, description=False, additionnal_commit_links=False):
+        if additionnal_commit_links:
+            commit_link_ids = self.params_id.commit_link_ids
+            commit_link_ids |= additionnal_commit_links
+            param_values['commit_link_ids'] = commit_link_ids
+        return self.create({
+            'params_id': self.params_id.copy(param_values).id,
+            'parent_id': self.id,
+            'build_type': self.build_type,
+            'description': description,
+            'orphan_result': orphan,
+        })
+
+    def result_multi(self):
+        if all(build.global_result == 'ok' or not build.global_result for build in self):
+            return 'ok'
+        if any(build.global_result in ('skipped', 'killed', 'manually_killed') for build in self):
+            return 'killed'
+        if any(build.global_result == 'ko' for build in self):
+            return 'ko'
+        if any(build.global_result == 'warning' for build in self):
+            return 'warning'
+        return 'ko'  # ?
 
     def update_build_end(self):
         for build in self:
             build.build_end = now()
             if build.parent_id and build.parent_id.local_state in ('running', 'done'):
-                    build.parent_id.update_build_end()
+                build.parent_id.update_build_end()
 
-    @api.depends('name', 'branch_id.name')
+    @api.depends('params_id.version_id.name')
     def _compute_dest(self):
         for build in self:
-            if build.name:
-                nickname = build.branch_id.name.split('/')[2]
+            if build.id:
+                nickname = build.params_id.version_id.name
                 nickname = re.sub(r'"|\'|~|\:', '', nickname)
                 nickname = re.sub(r'_|/|\.', '-', nickname)
-                build.dest = ("%05d-%s-%s" % (build.id or 0, nickname[:32], build.name[:6])).lower()
+                build.dest = ("%05d-%s" % (build.id or 0, nickname[:32])).lower()
 
-    @api.depends('repo_id', 'port', 'dest', 'host', 'duplicate_id.domain')
+    @api.depends('port', 'dest', 'host')
     def _compute_domain(self):
-        domain = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_domain', fqdn())
+        icp = self.env['ir.config_parameter'].sudo()
+        nginx = icp.get_param('runbot.runbot_nginx', False)  # or just force nginx?
+        domain = icp.get_param('runbot.runbot_domain', fqdn())
         for build in self:
-            if build.duplicate_id:
-                build.domain = build.duplicate_id.domain
-            elif build.repo_id.nginx:
+            if nginx:
                 build.domain = "%s.%s" % (build.dest, build.host)
             else:
                 build.domain = "%s:%s" % (domain, build.port)
@@ -409,42 +366,37 @@ class runbot_build(models.Model):
         for build in self:
             build.build_url = "/runbot/build/%s" % build.id
 
-    @api.depends('job_start', 'job_end', 'duplicate_id.job_time')
+    @api.depends('job_start', 'job_end')
     def _compute_job_time(self):
         """Return the time taken by the tests"""
         for build in self:
-            if build.duplicate_id:
-                build.job_time = build.duplicate_id.job_time
-            elif build.job_end and build.job_start:
+            if build.job_end and build.job_start:
                 build.job_time = int(dt2time(build.job_end) - dt2time(build.job_start))
             elif build.job_start:
                 build.job_time = int(time.time() - dt2time(build.job_start))
             else:
                 build.job_time = 0
 
-    @api.depends('build_start', 'build_end', 'global_state', 'duplicate_id.build_time')
+    @api.depends('build_start', 'build_end', 'global_state')
     def _compute_build_time(self):
         for build in self:
-            if build.duplicate_id:
-                build.build_time = build.duplicate_id.build_time
-            elif build.build_end and build.global_state != 'waiting':
+            if build.build_end and build.global_state != 'waiting':
                 build.build_time = int(dt2time(build.build_end) - dt2time(build.build_start))
             elif build.build_start:
                 build.build_time = int(time.time() - dt2time(build.build_start))
             else:
                 build.build_time = 0
 
-    @api.depends('job_start', 'duplicate_id.build_age')
+    @api.depends('job_start')
     def _compute_build_age(self):
         """Return the time between job start and now"""
         for build in self:
-            if build.duplicate_id:
-                build.build_age = build.duplicate_id.build_age
-            elif build.job_start:
+            if build.job_start:
                 build.build_age = int(time.time() - dt2time(build.build_start))
             else:
                 build.build_age = 0
 
+    # TODO move this logic to batch: use param to check consistency of found commits
     def _get_params(self):
         try:
             message = self.repo_id._git(['show', '-s', self.name])
@@ -458,65 +410,45 @@ class runbot_build(models.Model):
                 params['dep'][result[0]] = result[1]
         return params
 
-    def _copy_dependency_ids(self):
-        return [(0, 0, {
-            'match_type': dep.match_type,
-            'closest_branch_id': dep.closest_branch_id and dep.closest_branch_id.id,
-            'dependency_hash': dep.dependency_hash,
-            'dependecy_repo_id': dep.dependecy_repo_id.id,
-        }) for dep in self.dependency_ids]
+    def _rebuild(self, message=None):
+        """Force a rebuild and return a recordset of builds"""
+        self.ensure_one()
+        # TODO don't rebuild if there is a more recent build for this params?
+        values = {
+            'params_id': self.params_id.id,
+            'build_type': 'rebuild',
+        }
+        if self.parent_id:
+            values.update({
+                'parent_id': self.parent_id.id,
+                'description': self.description,
+            })
+            self.orphan_result = True
 
-    def _force(self, message=None, exact=False):
-        """Force a rebuild and return a recordset of forced builds"""
-        forced_builds = self.env['runbot.build']
-        for build in self:
-            pending_ids = self.search([('local_state', '=', 'pending')], order='id', limit=1)
-            if pending_ids:
-                sequence = pending_ids[0].id
-            else:
-                sequence = self.search([], order='id desc', limit=1)[0].id
-            # Force it now
-            if build.local_state in ['running', 'done', 'duplicate']:
-                values = {
-                    'sequence': sequence,
-                    'branch_id': build.branch_id.id,
-                    'name': build.name,
-                    'date': build.date,
-                    'author': build.author,
-                    'author_email': build.author_email,
-                    'committer': build.committer,
-                    'committer_email': build.committer_email,
-                    'subject': build.subject,
-                    'build_type': 'rebuild',
-                }
-                if exact:
-                    values.update({
-                        'config_id': build.config_id.id,
-                        'extra_params': build.extra_params,
-                        'config_data': build.config_data,
-                        'orphan_result': build.orphan_result,
-                        'dependency_ids': build._copy_dependency_ids(),
-                        'description': build.description,
-                    })
-                    #  if replace: ?
-                    if build.parent_id:
-                        values.update({
-                            'parent_id': build.parent_id.id,  # attach it to parent
-                            'hidden': build.hidden,
-                        })
-                        build.orphan_result = True  # set result of build as orphan
+        new_build = self.create(values)
+        if self.parent_id:
+            new_build._github_status()
+        user = request.env.user if request else self.env.user
+        new_build._log('rebuild', 'Rebuild initiated by %s%s' % (user.name, (' :%s' % message) if message else ''))
 
-                new_build = build.with_context(force_rebuild=True).create(values)
-                forced_builds |= new_build
-                user = request.env.user if request else self.env.user
-                new_build._log('rebuild', 'Rebuild initiated by %s (%s)%s' % (user.name, 'exact' if exact else 'default', (' :%s' % message) if message else ''))
-        return forced_builds
+        if self.local_state != 'done':
+            self._ask_kill('Killed by rebuild requested by %s (%s) (new build:%s)' % (user.name, user.id, new_build.id))
+
+        if not self.parent_id:
+            slots = self.env['runbot.batch.slot'].search([('build_id', '=', self.id)])
+            for slot in slots:
+                slot.copy({
+                    'build_id': new_build.id,
+                    'link_type': 'rebuild',
+                })
+                slot.active = False
+        return new_build
 
     def _skip(self, reason=None):
         """Mark builds ids as skipped"""
         if reason:
             self._logger('skip %s', reason)
-        self.write({'local_state': 'done', 'local_result': 'skipped', 'duplicate_id': False})
+        self.write({'local_state': 'done', 'local_result': 'skipped'})
 
     def _build_from_dest(self, dest):
         if dest_reg.match(dest):
@@ -527,7 +459,7 @@ class runbot_build(models.Model):
         dest_by_builds_ids = defaultdict(list)
         ignored = set()
         icp = self.env['ir.config_parameter']
-        hide_in_logs = icp.get_param('runbot.runbot_db_template', default='template1')
+        hide_in_logs = icp.get_param('runbot.runbot_db_template', default='template0')
 
         for dest in dest_list:
             build = self._build_from_dest(dest)
@@ -536,20 +468,20 @@ class runbot_build(models.Model):
             elif dest != hide_in_logs:
                 ignored.add(dest)
         if ignored:
-            _logger.debug('%s (%s) not deleted because not dest format', label, " ".join(list(ignored)))
+            _logger.debug('%s (%s) not deleted because not dest format', label, list(ignored))
         builds = self.browse(dest_by_builds_ids)
         existing = builds.exists()
         remaining = (builds - existing)
         if remaining:
             dest_list = [dest for sublist in [dest_by_builds_ids[rem_id] for rem_id in remaining.ids] for dest in sublist]
-            _logger.debug('(%s) (%s) not deleted because no corresponding build found' % (label, " ".join(dest_list)))
+            _logger.debug('(%s) (%s) not deleted because no corresponding build found', label, " ".join(dest_list))
         for build in existing:
             if fields.Datetime.from_string(build.gc_date) < datetime.datetime.now():
                 if build.local_state == 'done':
                     for db in dest_by_builds_ids[build.id]:
                         yield db
                 elif build.local_state != 'running':
-                    _logger.warning('db (%s) not deleted because state is not done' % " ".join(dest_by_builds_ids[build.id]))
+                    _logger.warning('db (%s) not deleted because state is not done', " ".join(dest_by_builds_ids[build.id]))
 
     def _local_cleanup(self, force=False):
         """
@@ -578,7 +510,7 @@ class runbot_build(models.Model):
             self._logger('Removing database')
             self._local_pg_dropdb(db)
 
-        root = self.env['runbot.repo']._root()
+        root = self.env['runbot.runbot']._root()
         builds_dir = os.path.join(root, 'build')
 
         if force is True:
@@ -642,11 +574,10 @@ class runbot_build(models.Model):
             build.write(values)
             if not build.active_step:
                 build._log('_schedule', 'No job in config, doing nothing')
+                build.local_result = 'warn'
                 continue
             try:
-                build._log('_schedule', 'Init build environment with config %s ' % build.config_id.name)
-                # notify pending build - avoid confusing users by saying nothing
-                build._github_status()
+                build._log('_schedule', 'Init build environment with config %s ' % build.params_id.config_id.name)
                 os.makedirs(build._path('logs'), exist_ok=True)
             except Exception:
                 _logger.exception('Failed initiating build %s', build.dest)
@@ -685,8 +616,8 @@ class runbot_build(models.Model):
                             'port': port,
                         })
                         build._log('wake_up', '**Waking up build**', log_type='markdown', level='SEPARATOR')
-                        self.env['runbot.build.config.step']._run_odoo_run(build, log_path)
-                        # reload_nginx will be triggered by _run_odoo_run
+                        self.env['runbot.build.config.step']._run_run_odoo(build, log_path, force=True)
+                        # reload_nginx will be triggered by _run_run_odoo
                     except Exception:
                         _logger.exception('Failed to wake up build %s', build.dest)
                         build._log('_schedule', 'Failed waking up build', level='ERROR')
@@ -703,7 +634,7 @@ class runbot_build(models.Model):
                 # failfast in case of docker error (triggered in database)
                 if build.triggered_result and not build.active_step.ignore_triggered_result:
                     worst_result = self._get_worst_result([build.triggered_result, build.local_result])
-                    if  worst_result != build.local_result:
+                    if worst_result != build.local_result:
                         build.local_result = build.triggered_result
                         build._github_status()  # failfast
             # check if current job is finished
@@ -753,10 +684,10 @@ class runbot_build(models.Model):
 
             build.write(build_values)
             if ending_build:
-                build._github_status()
                 if not build.local_result:  # Set 'ok' result if no result set (no tests job on build)
                     build.local_result = 'ok'
                     build._logger("No result set, setting ok by default")
+                build._github_status()
             build._run_job()
 
     def _run_job(self):
@@ -781,7 +712,7 @@ class runbot_build(models.Model):
         """Return the repo build path"""
         self.ensure_one()
         build = self
-        root = self.env['runbot.repo']._root()
+        root = self.env['runbot.runbot']._root()
         return os.path.join(root, 'build', build.dest, *l)
 
     def http_log_url(self):
@@ -795,27 +726,14 @@ class runbot_build(models.Model):
             return commit._source_path('odoo', *path)
         return commit._source_path('openerp', *path)
 
-    def _get_available_modules(self, commit):
-        for manifest_file_name in commit.repo.manifest_files.split(','):  # '__manifest__.py' '__openerp__.py'
-            for addons_path in (commit.repo.addons_paths or '').split(','):  # '' 'addons' 'odoo/addons'
-                sep = os.path.join(addons_path, '*')
-                for manifest_path in glob.glob(commit._source_path(sep, manifest_file_name)):
-                    module = os.path.basename(os.path.dirname(manifest_path))
-                    yield (addons_path, module, manifest_file_name)
-
     def _docker_source_folder(self, commit):
-        # in case some build have commits with the same repo name (ex: foo/bar, foo-ent/bar)
-        # it can be usefull to uniquify commit export path using hash
-        if self.commit_path_mode == 'rep_sha':
-            return '%s-%s' % (commit.repo._get_repo_name_part(), commit.sha[:8])
-        else:
-            return commit.repo._get_repo_name_part()
+        return commit.repo_id.name
 
-    def _checkout(self, commits=None):
+    def _checkout(self):
         self.ensure_one()  # will raise exception if hash not found, we don't want to fail for all build.
         # checkout branch
         exports = {}
-        for commit in commits or self._get_all_commit():
+        for commit in self.env.context.get('defined_commit_ids') or self.params_id.commit_ids:
             build_export_path = self._docker_source_folder(commit)
             if build_export_path in exports:
                 self._log('_checkout', 'Multiple repo have same export path in build, some source may be missing for %s' % build_export_path, level='ERROR')
@@ -823,13 +741,11 @@ class runbot_build(models.Model):
             exports[build_export_path] = commit.export()
         return exports
 
-    def _get_repo_available_modules(self, commits=None):
-        available_modules = []
-        repo_modules = []
-        for commit in commits or self._get_all_commit():
-            for (addons_path, module, manifest_file_name) in self._get_available_modules(commit):
-                if commit.repo == self.repo_id:
-                    repo_modules.append(module)
+    def _get_available_modules(self):
+        available_modules = defaultdict(list)
+        # repo_modules = []
+        for commit in self.env.context.get('defined_commit_ids') or self.params_id.commit_ids:
+            for (addons_path, module, manifest_file_name) in commit._get_available_modules():
                 if module in available_modules:
                     self._log(
                         'Building environment',
@@ -837,33 +753,33 @@ class runbot_build(models.Model):
                         level='WARNING'
                     )
                 else:
-                    available_modules.append(module)
-        return repo_modules, available_modules
+                    available_modules[commit.repo_id].append(module)
+        # return repo_modules, available_modules
+        return available_modules
 
-    def _get_modules_to_test(self, commits=None, modules_patterns=''):
-        self.ensure_one()  # will raise exception if hash not found, we don't want to fail for all build.
+    def _get_modules_to_test(self, modules_patterns=''):
+        self.ensure_one()
 
-        # checkout branch
-        repo_modules, available_modules = self._get_repo_available_modules(commits=commits)
+        def filter_patterns(patterns, default, all):
+            default = set(default)
+            patterns_list = (patterns or '').split(',')
+            patterns_list = [p.strip() for p in patterns_list]
+            for pat in patterns_list:
+                if pat.startswith('-'):
+                    pat = pat.strip('- ')
+                    default -= {mod for mod in default if fnmatch.fnmatch(mod, pat)}
+                elif pat:
+                    default |= {mod for mod in all if fnmatch.fnmatch(mod, pat)}
+            return default
 
-        patterns_list = []
-        for pats in [self.repo_id.modules, self.branch_id.modules, modules_patterns]:
-            patterns_list += [p.strip() for p in (pats or '').split(',')]
+        available_modules = []
+        modules_to_install = set()
+        for repo, module_list in self._get_available_modules().items():
+            available_modules += module_list
+            modules_to_install |= filter_patterns(repo.modules, module_list, module_list)
 
-        if self.repo_id.modules_auto == 'all':
-            default_repo_modules = available_modules
-        elif self.repo_id.modules_auto == 'repo':
-            default_repo_modules = repo_modules
-        else:
-            default_repo_modules = []
-
-        modules_to_install = set(default_repo_modules)
-        for pat in patterns_list:
-            if pat.startswith('-'):
-                pat = pat.strip('- ')
-                modules_to_install -= {mod for mod in modules_to_install if fnmatch.fnmatch(mod, pat)}
-            else:
-                modules_to_install |= {mod for mod in available_modules if fnmatch.fnmatch(mod, pat)}
+        modules_to_install = filter_patterns(self.params_id.modules, modules_to_install, available_modules)
+        modules_to_install = filter_patterns(modules_patterns, modules_to_install, available_modules)
 
         return sorted(modules_to_install)
 
@@ -882,11 +798,12 @@ class runbot_build(models.Model):
 
     def _local_pg_createdb(self, dbname):
         icp = self.env['ir.config_parameter']
-        db_template = icp.get_param('runbot.runbot_db_template', default='template1')
+        db_template = icp.get_param('runbot.runbot_db_template', default='template0')
         self._local_pg_dropdb(dbname)
         _logger.debug("createdb %s", dbname)
         with local_pgadmin_cursor() as local_cr:
             local_cr.execute(sql.SQL("""CREATE DATABASE {} TEMPLATE %s LC_COLLATE 'C' ENCODING 'unicode'""").format(sql.Identifier(dbname)), (db_template,))
+        self.env['runbot.database'].create({'name': dbname, 'build_id': self.id})
 
     def _log(self, func, message, level='INFO', log_type='runbot', path='runbot'):
         self.ensure_one()
@@ -909,7 +826,7 @@ class runbot_build(models.Model):
                 continue
             build._log('kill', 'Kill build %s' % build.dest)
             docker_stop(build._get_docker_name(), build._path())
-            v = {'local_state': 'done', 'requested_action': False, 'active_step': False, 'duplicate_id': False, 'job_end': now()}  # what if duplicate? state done?
+            v = {'local_state': 'done', 'requested_action': False, 'active_step': False, 'job_end': now()}
             if not build.build_end:
                 v['build_end'] = now()
             if result:
@@ -920,6 +837,8 @@ class runbot_build(models.Model):
             self.invalidate_cache()
 
     def _ask_kill(self, lock=True, message=None):
+        # if build remains in same bundle, it's ok like that
+        # if build can be cross bundle, need to check number of ref to build
         if lock:
             self.env.cr.execute("""SELECT id FROM runbot_build WHERE parent_path like %s FOR UPDATE""", ['%s%%' % self.parent_path])
         self.ensure_one()
@@ -928,56 +847,45 @@ class runbot_build(models.Model):
         build = self
         message = message or 'Killing build %s, requested by %s (user #%s)' % (build.dest, user.name, uid)
         build._log('_ask_kill', message)
-        if build.duplicate_id:
-            if self.branch_id.pull_branch_name == self.duplicate_id.branch_id.pull_branch_name:
-                build = build.duplicate_id
-            else:
-                build._skip()
-                return
         if build.local_state == 'pending':
             build._skip()
         elif build.local_state in ['testing', 'running']:
             build.requested_action = 'deathrow'
-        for child in build.children_ids:  # should we filter build that are target of a duplicate_id?
-            if not child.duplicate_id:
-                child._ask_kill(lock=False)
+        for child in build.children_ids:
+            child._ask_kill(lock=False)
 
     def _wake_up(self):
-        build = self.real_build
-        if build.local_state != 'done':
-            build._log('wake_up', 'Impossibe to wake up, state is not done')
+        if self.local_state != 'done':
+            self._log('wake_up', 'Impossibe to wake up, state is not done')
         else:
-            build.requested_action = 'wake_up'
+            self.requested_action = 'wake_up'
 
-    def _get_all_commit(self):
-        return [Commit(self.repo_id, self.name)] + [Commit(dep._get_repo(), dep.dependency_hash) for dep in self.dependency_ids]
-
-    def _get_server_commit(self, commits=None):
+    def _get_server_commit(self):
         """
-        returns a Commit() of the first repo containing server files found in commits or in build commits
+        returns a commit of the first repo containing server files found in commits or in build commits
         the commits param is not used in code base but could be usefull for jobs and crons
         """
-        for commit in (commits or self._get_all_commit()):
-            if commit.repo.server_files:
+        for commit in (self.env.context.get('defined_commit_ids') or self.params_id.commit_ids):
+            if commit.repo_id.server_files:
                 return commit
         raise ValidationError('No repo found with defined server_files')
 
-    def _get_addons_path(self, commits=None):
-        for commit in (commits or self._get_all_commit()):
+    def _get_addons_path(self):
+        for commit in (self.env.context.get('defined_commit_ids') or self.params_id.commit_ids):
+            if not commit.repo_id.manifest_files:
+                continue  # skip repo without addons
             source_path = self._docker_source_folder(commit)
-            for addons_path in (commit.repo.addons_paths or '').split(','):
+            for addons_path in (commit.repo_id.addons_paths or '').split(','):
                 if os.path.isdir(commit._source_path(addons_path)):
                     yield os.path.join(source_path, addons_path).strip(os.sep)
 
     def _get_server_info(self, commit=None):
-        server_dir = False
-        server = False
         commit = commit or self._get_server_commit()
-        for server_file in commit.repo.server_files.split(','):
+        for server_file in commit.repo_id.server_files.split(','):
             if os.path.isfile(commit._source_path(server_file)):
                 return (commit, server_file)
-        _logger.error('None of %s found in commit, actual commit content:\n %s' % (commit.repo.server_files, os.listdir(commit._source_path())))
-        raise RunbotException('No server found in %s' % commit)
+        _logger.error('None of %s found in commit, actual commit content:\n %s' % (commit.repo_id.server_files, os.listdir(commit._source_path())))
+        raise RunbotException('No server found in %s' % commit.dname)
 
     def _cmd(self, python_params=None, py_version=None, local_only=True, sub_command=None):
         """Return a list describing the command to start the build
@@ -987,9 +895,9 @@ class runbot_build(models.Model):
         python_params = python_params or []
         py_version = py_version if py_version is not None else build._get_py_version()
         pres = []
-        for commit in self._get_all_commit():
-            if os.path.isfile(commit._source_path('requirements.txt')):
-                repo_dir = self._docker_source_folder(commit)
+        for commit_id in self.env.context.get('defined_commit_ids') or self.params_id.commit_ids:
+            if os.path.isfile(commit_id._source_path('requirements.txt')):  # this is a change I think
+                repo_dir = self._docker_source_folder(commit_id)
                 requirement_path = os.path.join(repo_dir, 'requirements.txt')
                 pres.append(['sudo', 'pip%s' % py_version, 'install', '-r', '%s' % requirement_path])
 
@@ -1009,7 +917,7 @@ class runbot_build(models.Model):
         if grep(config_path, "no-netrpc"):
             cmd.append("--no-netrpc")
 
-        command = Command(pres, cmd, [])
+        command = Command(pres, cmd, [], cmd_checker=build)
 
         # use the username of the runbot host to connect to the databases
         command.add_config_tuple('db_user', '%s' % pwd.getpwuid(os.getuid()).pw_name)
@@ -1037,72 +945,23 @@ class runbot_build(models.Model):
 
         return command
 
-    def _github_status_notify_all(self, status):
-        """Notify each repo with a status"""
-        self.ensure_one()
-        if self.config_id.update_github_state:
-            repos_ids = {b.repo_id.id for b in self.search([('name', '=', self.name)])}
-            build_name = self.name
-            user_id = self.env.user.id
-            _dbname = self.env.cr.dbname
-            _context = self.env.context
-            build_id = self.id
-            def send_github_status():
-                try:
-                    db_registry = registry(_dbname)
-                    with api.Environment.manage(), db_registry.cursor() as cr:
-                        env = api.Environment(cr, user_id, _context)
-                        repos = env['runbot.repo'].browse(repos_ids)
-                        for repo in repos:
-                            _logger.debug(
-                                "github updating %s status %s to %s in repo %s",
-                                status['context'], build_name, status['state'], repo.name)
-                            repo._github('/repos/:owner/:repo/statuses/%s' % build_name, status, ignore_errors=True)
-                except:
-                    _logger.exception('Something went wrong sending notification for %s', build_id)
-            self._cr.after('commit', send_github_status)
-
-
-    def _github_status(self):
-        """Notify github of failed/successful builds"""
-        for build in self:
-            if build.parent_id:
-                if build.orphan_result:
-                    _logger.debug('Skipping result for orphan build %s', self.id)
-                else:
-                    build.parent_id._github_status()
-            elif build.config_id.update_github_state:
-                runbot_domain = self.env['runbot.repo']._domain()
-                desc = "runbot build %s" % (build.dest,)
-
-                if build.global_result in ('ko', 'warn'):
-                    state = 'failure'
-                elif build.global_state == 'testing':
-                    state = 'pending'
-                elif build.global_state in ('running', 'done'):
-                    state = 'error'
-                    if build.global_result == 'ok':
-                        state = 'success'
-                else:
-                    _logger.debug("skipping github status for build %s ", build.id)
-                    continue
-                desc += " (runtime %ss)" % (build.job_time,)
-
-                status = {
-                    "state": state,
-                    "target_url": "http://%s/runbot/build/%s" % (runbot_domain, build.id),
-                    "description": desc,
-                    "context": "ci/runbot"
-                }
-                if self.last_github_state != state:
-                    build._github_status_notify_all(status)
-                    self.last_github_state = state
-                else:
-                    _logger.debug('Skipping unchanged status for %s', self.id)
+    def _cmd_check(self, cmd):
+        """
+        Check the cmd right before creating the build command line executed in
+        a Docker container. If a database creation is found in the cmd, a
+        'runbot.database' is created.
+        This method is intended to be called from cmd itself
+        """
+        if '-d' in cmd:
+            dbname = cmd[cmd.index('-d') + 1]
+            self.env['runbot.database'].create({
+                'name': dbname,
+                'build_id': self.id
+            })
 
     def _next_job_values(self):
         self.ensure_one()
-        step_ids = self.config_id.step_ids()
+        step_ids = self.params_id.config_id.step_ids()
         if not step_ids:  # no job to do, build is done
             return {'active_step': False, 'local_state': 'done'}
 
@@ -1111,14 +970,21 @@ class runbot_build(models.Model):
             return {'active_step': False, 'local_state': 'done'}
 
         next_index = step_ids.index(self.active_step) + 1 if self.active_step else 0
-        if next_index >= len(step_ids):  # final job, build is done
-            return {'active_step': False, 'local_state': 'done'}
 
-        new_step = step_ids[next_index]  # job to do, state is job_state (testing or running)
+        while True:
+            if next_index >= len(step_ids):  # final job, build is done
+                return {'active_step': False, 'local_state': 'done'}
+            new_step = step_ids[next_index]  # job to do, state is job_state (testing or running)
+            if new_step.domain_filter and not self.filtered_domain(safe_eval(new_step.domain_filter)):
+
+                self._log('run', '**Skipping** step ~~%s~~ from config **%s**' % (new_step.name, self.params_id.config_id.name), log_type='markdown', level='SEPARATOR')
+                next_index += 1
+                continue
+            break
         return {'active_step': new_step.id, 'local_state': new_step._step_state()}
 
     def _get_py_version(self):
-        """return the python name to use from build instance"""
+        """return the python name to use from build batch"""
         (server_commit, server_file) = self._get_server_info()
         server_path = server_commit._source_path(server_file)
         with open(server_path, 'r') as f:
@@ -1133,6 +999,10 @@ class runbot_build(models.Model):
         builds_to_scan = self.search([('id', 'in', self.ids), ('local_result', '=', 'ko'), ('build_error_ids', '=', False)])
         ir_logs = self.env['ir.logging'].search([('level', '=', 'ERROR'), ('type', '=', 'server'), ('build_id', 'in', builds_to_scan.ids)])
         BuildError._parse_logs(ir_logs)
+
+    def is_file(self, file, mode='r'):
+        file_path = self._path(file)
+        return os.path.exists(file_path)
 
     def read_file(self, file, mode='r'):
         file_path = self._path(file)
@@ -1175,5 +1045,52 @@ class runbot_build(models.Model):
     def get_formated_build_age(self):
         return s2human(self.build_age)
 
-    def sorted_revdep_build_ids(self):
-        return sorted(self.revdep_build_ids, key=lambda build: build.repo_id.name)
+    def get_color_class(self):
+
+        if self.global_result == 'ko':
+            return 'danger'
+        if self.global_result == 'warn':
+            return 'warning'
+
+        if self.global_state == 'pending':
+            return 'default'
+        if self.global_state in ('testing', 'waiting'):
+            return 'info'
+
+        if self.global_result == 'ok':
+            return 'success'
+
+        if self.global_result in ('skipped', 'killed', 'manually_killed'):
+            return 'killed'
+
+    def _github_status(self, post_commit=True):
+        """Notify github of failed/successful builds"""
+        for build in self:
+            # TODO maybe avoid to send status if build is killable (another new build exist and will send the status)
+            if build.parent_id:
+                if build.orphan_result:
+                    _logger.debug('Skipping result for orphan build %s', self.id)
+                else:
+                    build.parent_id._github_status(post_commit)
+            elif build.params_id.config_id == build.params_id.trigger_id.config_id: 
+                if build.global_result in ('ko', 'warn'):
+                    state = 'failure'
+                elif build.global_state in ('pending', 'testing'):
+                    state = 'pending'
+                elif build.global_state in ('running', 'done'):
+                    state = 'error'
+                    if build.global_result == 'ok':
+                        state = 'success'
+                else:
+                    _logger.debug("skipping github status for build %s ", build.id)
+                    continue
+
+                runbot_domain = self.env['runbot.runbot']._domain()
+                trigger = self.params_id.trigger_id
+                target_url = trigger.ci_url or "http://%s/runbot/build/%s" % (runbot_domain, build.id)
+                desc = trigger.ci_description or " (runtime %ss)" % (build.job_time,)
+                if trigger.ci_context:
+                    for build_commit in self.params_id.commit_link_ids:
+                        commit = build_commit.commit_id
+                        if build_commit.match_type != 'default' and commit.repo_id in trigger.repo_ids:
+                            commit._github_status(build, trigger.ci_context, state, target_url, desc, post_commit)

@@ -1,112 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
   <data>
-    <template id="runbot.sticky-dashboard">
-      <t t-call='website.layout'>
-        <t t-set="head">
-          <t t-if="refresh">
-            <meta http-equiv="refresh" t-att-content="refresh"/>
-          </t>
-          <style>
-            .bg-killed {
-              background-color: #aaa;
-            }
-            h4 {
-              padding: 3px 0;
-              border-bottom: 1px solid grey;
-            }
-            .r-mb02 { margin-bottom: 0.2em; }
-          </style>
-        </t>
-        <div class="container-fluid">
-          <div class="row">
-            <div class='col-md-12'>
-              <div class="container-fluid">
-                <p class="text-center">
-                  <t  t-foreach="host_stats" t-as="hs">
-                    <span class="label label-default">
-                      <t t-esc="hs['host']"/>: <t t-esc="hs['testing']"/> testing, <t t-esc="hs['running']"/> running
-                    </span>&amp;nbsp;
-                  </t>
-                  <span t-attf-class="label label-{{pending_level}}">Pending: <t t-esc="pending_total"/></span>
-                </p>
-              </div>
-              <t t-foreach="repo_dict.values()" t-as="repo">
-                <h4><span><t t-esc="repo['name']"/></span>
-                  <small class="pull-right">
-                    <t t-esc="repo['testing']"/> testing,
-                    <t t-esc="repo['running']"/> running,
-                    <t t-esc="repo['pending']"/> pending.
-                </small></h4>
-                <div t-foreach="repo['branches'].values()" t-as="br">
-                  <div class="col-md-1">
-                    <b t-esc="br['name']"/><br/>
-                    <small><t t-esc="br['builds'][0].get_formated_build_time()"/></small>
-                  </div>
-                  <div class="col-md-11 r-mb02">
-                    <t t-foreach="br['builds']" t-as="bu">
-                      <t t-if="bu.global_state=='pending'"><t t-set="klass">default</t></t>
-                      <t t-if="bu.global_state in ('testing', 'waiting')"><t t-set="klass">info</t></t>
-                      <t t-if="bu.global_state in ['running','done'] and bu.global_result == 'ko'"><t t-set="klass">danger</t></t>
-                      <t t-if="bu.global_state in ['running','done'] and bu.global_result == 'warn'"><t t-set="klass">warning</t></t>
-                      <t t-if="bu.global_state in ['running','done'] and bu.global_result == 'ok'"><t t-set="klass">success</t></t>
-                      <t t-if="bu.global_state in ['running','done'] and bu.global_result == 'skipped'"><t t-set="klass">default</t></t>
-                      <t t-if="bu.global_state in ['running','done'] and bu.global_result in ['killed', 'manually_killed']"><t t-set="klass">killed</t></t>
-                      <div t-attf-class="bg-{{klass}} col-md-4">
-                        <i class="fa fa-at"></i>
-                        <t t-esc="bu['author']"/>
-                        <t t-if="bu['committer'] and bu['author'] != bu['committer']" t-id="bu['committer']">
-                          (<i class="fa fa-sign-out"></i>&amp;nbsp;<t t-esc="bu['committer']"/>)
-                        </t>
-                        <br/>
-                        <i class="fa fa-envelope-o"></i>
-                        <t t-if="bu['build_type']=='scheduled'"><i class="fa fa-moon-o" t-att-title="bu.build_type_label()" t-att-aria-label="bu.build_type_label()"/></t>
-                        <t t-if="bu['build_type'] in ('rebuild', 'redirect')"><i class="fa fa-recycle" t-att-title="bu.build_type_label()" t-att-aria-label="bu.build_type_label()"/></t>
-                        <a t-attf-href="https://#{repo['base']}/commit/#{bu['name']}"><t t-esc="bu['subject'][:32] + ('...' if bu['subject'][32:] else '') " t-att-title="bu['subject']"/></a>
-                        <br/>
-                        <t t-call="runbot.build_name"/> — <small><a t-attf-href="/runbot/build/{{bu['id']}}"><t t-esc="bu['dest']"/></a> on <t t-esc="bu.real_build.host"/> <a t-if="bu.local_state == 'running'" t-attf-href="http://{{bu['domain']}}/?db={{bu['dest']}}-all"><i class="fa fa-sign-in"></i></a></small>
-                      </div>
-                    </t>
-                  </div>
-                </div>
-              </t>
-            </div>
-          </div>
-        </div>
-      </t>
-    </template>
     <template id="runbot.glances">
       <t t-call='portal.frontend_layout'>
         <t t-set="head">
           <t t-if="refresh">
             <meta http-equiv="refresh" t-att-content="refresh"/>
           </t>
-          <style>
-            .label-killed {
-              background-color: #aaa;
-            }
-            h4 {
-              padding: 3px 0;
-              border-bottom: 1px solid grey;
-            }
-            .r-mb02 { margin-bottom: 0.2em; }
-          </style>
         </t>
         <div class="container-fluid">
           <div class="row">
             <div class='col-md-12'>
               <div>
-                <span t-attf-class="label label-{{pending_level}}">Pending: <t t-esc="pending_total"/></span>
+                <span t-attf-class="badge badge-{{pending_level}}">
+                  Pending:
+                  <t t-esc="pending_total"/>
+                </span>
               </div>
-              <t t-foreach="glances_data.keys()" t-as="repo">
-                <h4><t t-esc="repo"/>
+              <t t-set="project_id"/>
+              <t t-set="nb_project" t-value="len(bundles.mapped('project_id'))"/>
+              <t t-foreach="bundles.sorted(lambda b: (-b.project_id.id, b.version_id.number), reverse=True)" t-as="bundle">
+                <h3 t-if="nb_project > 1 and project_id != bundle.project_id.id" t-esc="bundle.project_id.name"/>
+                <t t-set="project_id" t-value="bundle.project_id.id"/>
+                <h4>
+                  <t t-esc="bundle.name"/>
                 </h4>
-                <t t-foreach="glances_data[repo]" t-as="br">
-                  <t t-if="br[1] == 'ko'"><t t-set="klass">danger</t></t>
-                  <t t-if="br[1] == 'warn'"><t t-set="klass">warning</t></t>
-                  <t t-if="br[1] == 'ok'"><t t-set="klass">success</t></t>
-                  <t t-if="br[1] == 'killed'"><t t-set="klass">killed</t></t>
-                  <span t-attf-class="label label-{{klass}}"><t t-esc="br[0]"/></span>
+                <t t-foreach="bundle.last_done_batch.slot_ids" t-as="slot">
+                  <span t-attf-class="badge badge-{{slot.build_id.get_color_class()}}">
+                    <t t-esc="slot.trigger_id.name"/>
+                  </span>
                 </t>
               </t>
             </div>
@@ -116,8 +38,8 @@
     </template>
 
     <template id="frontend_no_nav" inherit_id="portal.frontend_layout" primary="True">
-        <xpath expr="//header" position="replace">
-        </xpath>
+      <xpath expr="//header" position="replace">
+      </xpath>
     </template>
 
     <template id="runbot.config_monitoring">
@@ -127,47 +49,19 @@
             <meta http-equiv="refresh" t-att-content="refresh"/>
           </t>
         </t>
-          <table>
-            <tr t-foreach="last_monitored" t-as="build">
-              <t t-set="build" t-value="build.real_build"/>
-              <td>
-                <t t-esc="build.repo_id.short_name"/>/<t t-esc="build.branch_id.branch_name"/>
-              </td>
-              <t t-if="build.local_result == 'ko'"><t t-set="klass">danger</t></t>
-              <t t-if="build.local_result == 'warn'"><t t-set="klass">warning</t></t>
-              <t t-if="build.local_result == 'ok'"><t t-set="klass">success</t></t>
-              <t t-if="build.local_result == 'killed'"><t t-set="klass">killed</t></t>
-              <td>
-                <a t-attf-href='/runbot/build/{{build.id}}'><span t-attf-class="label label-{{klass}}"><t t-esc="build.config_id.name"/></span></a>
-              </td>
-              <td>
-              <span t-foreach="build.children_ids.sorted(key=lambda c:c.config_id.name, reverse=True).filtered(lambda c: c.local_result != 'ok' and not c.orphan_result)" t-as="child">
-                <t t-if="child.global_result == 'ko'"><t t-set="klass">danger</t></t>
-                <t t-if="child.global_result == 'warn'"><t t-set="klass">warning</t></t>
-                <t t-if="child.global_result == 'ok'"><t t-set="klass">success</t></t>
-                <t t-if="child.global_result == 'killed'"><t t-set="klass">killed</t></t>
-                <a t-attf-href='/runbot/build/{{child.id}}'><span t-attf-class="label label-{{klass}}"><t t-esc="child.config_data.get('db_name') or child.config_id.name"/></span></a>
-              </span>
-              </td>
-            </tr>
-          </table>
-
       </t>
     </template>
 
     <template id="runbot.monitoring">
-       <t t-call="runbot.frontend_no_nav">
+      <t t-call="runbot.frontend_no_nav">
         <t t-set="head">
           <t t-if="refresh">
             <meta http-equiv="refresh" t-att-content="refresh"/>
           </t>
           <style>
-            .label-killed {
-              background-color: #aaa;
-            }
             h4 {
-              padding: 3px 0;
-              border-bottom: 1px solid grey;
+            padding: 3px 0;
+            border-bottom: 1px solid grey;
             }
             .r-mb02 { margin-bottom: 0.2em; }
           </style>
@@ -176,59 +70,114 @@
           <div class="row">
             <div class="col-md-12">
               <div>
-               <t t-call="slots_infos"/>
+                <t t-call="runbot.slots_infos"/>
               </div>
-              <t t-foreach="glances_data.keys()" t-as="repo">
-                <div>
-                  <span t-esc="repo"/>
-                  <t t-foreach="glances_data[repo]" t-as="br">
-                    <t t-if="br[1] == 'ko'"><t t-set="klass">danger</t></t>
-                    <t t-if="br[1] == 'warn'"><t t-set="klass">warning</t></t>
-                    <t t-if="br[1] == 'ok'"><t t-set="klass">success</t></t>
-                    <t t-if="br[1] == 'killed'"><t t-set="klass">killed</t></t>
-                    <span t-attf-class="label label-{{klass}}"><t t-esc="br[0]"/></span>
-                  </t>
-                </div>
-              </t>
               <t t-foreach="hosts_data.sorted(key=lambda h:h.name)" t-as="host">
                 <div>
                   <span t-esc="host.name.split('.')[0]"/>
-                  <t t-if="host.nb_testing == 0"><t t-set="klass">success</t></t>
-                  <t t-if="host.nb_testing > 0"><t t-set="klass">info</t></t>
-                  <t t-if="host.nb_testing == host.sudo().get_nb_worker()"><t t-set="klass">warning</t></t>
-                  <t t-if="host.nb_testing > host.sudo().get_nb_worker()"><t t-set="klass">danger</t></t>
-                  <span t-attf-class="label label-{{klass}}"><span t-esc="host.nb_testing"/>/<span t-esc="host.sudo().get_nb_worker()"/></span>
+                  <t t-if="host.nb_testing == 0">
+                    <t t-set="klass">success</t>
+                  </t>
+                  <t t-if="host.nb_testing > 0">
+                    <t t-set="klass">info</t>
+                  </t>
+                  <t t-if="host.nb_testing == host.nb_worker">
+                    <t t-set="klass">warning</t>
+                  </t>
+                  <t t-if="host.nb_testing > host.nb_worker">
+                    <t t-set="klass">danger</t>
+                  </t>
+                  <span t-attf-class="badge badge-{{klass}}">
+                    <span t-esc="host.nb_testing"/>
+                    /
+                    <span t-esc="host.nb_worker"/>
+                  </span>
                   <t t-esc="host.nb_running"/>
                   <t t-set="succes_time" t-value="int(datetime.datetime.now().timestamp() - host.last_success.timestamp())"/>
                   <t t-set="start_time" t-value="int(datetime.datetime.now().timestamp() - host.last_start_loop.timestamp())"/>
                   <t t-set="end_time" t-value="int(datetime.datetime.now().timestamp() - host.last_end_loop.timestamp())"/>
 
                   <t t-set="klass">success</t>
-                  <t t-if="succes_time > 30"><t t-set="klass">info</t></t>
-                  <t t-if="succes_time > 180"><t t-set="klass">danger</t></t>
+                  <t t-if="succes_time > 30">
+                    <t t-set="klass">info</t>
+                  </t>
+                  <t t-if="succes_time > 180">
+                    <t t-set="klass">danger</t>
+                  </t>
 
-                  <span t-attf-class="label label-{{klass}}"><span t-esc="succes_time"/></span>
+                  <span t-attf-class="badge badge-{{klass}}">
+                    <span t-esc="succes_time"/>
+                  </span>
 
                   <t t-set="klass">success</t>
-                  <t t-if="start_time > 60*10"><t t-set="klass">info</t></t>
-                  <t t-if="start_time > 60*15"><t t-set="klass">danger</t></t>
+                  <t t-if="start_time > 60*10">
+                    <t t-set="klass">info</t>
+                  </t>
+                  <t t-if="start_time > 60*15">
+                    <t t-set="klass">danger</t>
+                  </t>
 
-                  <span t-attf-class="label label-{{klass}}"><span t-esc="start_time"/></span>
+                  <span t-attf-class="badge badge-{{klass}}">
+                    <span t-esc="start_time"/>
+                  </span>
 
                   <t t-set="klass">success</t>
-                  <t t-if="end_time > 60*10"><t t-set="klass">info</t></t>
-                  <t t-if="end_time > 60*15"><t t-set="klass">danger</t></t>
+                  <t t-if="end_time > 60*10">
+                    <t t-set="klass">info</t>
+                  </t>
+                  <t t-if="end_time > 60*15">
+                    <t t-set="klass">danger</t>
+                  </t>
 
-                  <span t-attf-class="label label-{{klass}}"><span t-esc="end_time"/></span>
+                  <span t-attf-class="badge badge-{{klass}}">
+                    <span t-esc="end_time"/>
+                  </span>
 
                   <t t-set="cron_time" t-value="end_time-start_time"/>
                   <t t-set="klass">success</t>
-                  <t t-if="abs(cron_time) > 10"><t t-set="klass">info</t></t>
-                  <t t-if="abs(cron_time) > 60"><t t-set="klass">danger</t></t>
-                  <span t-attf-class="label label-{{klass}}"><span t-esc="cron_time"/></span>
+                  <t t-if="abs(cron_time) > 10">
+                    <t t-set="klass">info</t>
+                  </t>
+                  <t t-if="abs(cron_time) > 60">
+                    <t t-set="klass">danger</t>
+                  </t>
+                  <span t-attf-class="badge badge-{{klass}}">
+                    <span t-esc="cron_time"/>
+                  </span>
 
                 </div>
               </t>
+
+              <table>
+                <tr t-foreach="bundles.sorted(lambda b: b.version_id.number, reverse=True)" t-as="bundle">
+                  <td>
+                    <t t-esc="bundle.version_id.number"/>
+                  </td>
+                  <td>
+                    <t t-set='batch' t-value="bundle.with_context({'category_id': category.id}).last_done_batch"/>
+                    <table>
+                      <t t-foreach="batch.slot_ids" t-as='slot'>
+                        <tr>
+                          <td>
+                            <t t-esc="slot.trigger_id.name[:4]"/>
+                          </td>
+                          <t t-set="build" t-value="slot.build_id"/>
+                          <td>
+                            <span t-attf-class="badge badge-{{slot.build_id.get_color_class()}}">
+                              <i t-attf-class="fa fa-{{category.icon}}"/>
+                            </span>
+                          </td>
+                          <td t-foreach="build.children_ids" t-as="child">
+                            <span t-attf-class="badge badge-{{slot.build_id.get_color_class()}}">
+                              <t t-esc="child.params_id.config_id.name[:4]"/>
+                            </span>
+                          </td>
+                        </tr>
+                      </t>
+                    </table>
+                  </td>
+                </tr>
+              </table>
             </div>
           </div>
         </div>

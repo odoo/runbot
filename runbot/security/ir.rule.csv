@@ -1,7 +1,14 @@
 id,name,model_id/id,groups/id,domain_force,perm_read,perm_create,perm_write,perm_unlink
-rule_repo,"limited to groups",model_runbot_repo,group_user,"['|', ('group_ids', '=', False), ('group_ids', 'in', [g.id for g in user.groups_id])]",1,1,1,1
+
+
+rule_project,"limited to groups",model_runbot_project,group_user,"['|', ('group_ids', '=', False), ('group_ids', 'in', [g.id for g in user.groups_id])]",1,1,1,1
+rule_project_mgmt,"manager can see all",model_runbot_project,group_runbot_admin,"[(1, '=', 1)]",1,1,1,1
+
+rule_repo,"limited to groups",model_runbot_repo,group_user,"['|', ('project_id.group_ids', '=', False), ('project_id.group_ids', 'in', [g.id for g in user.groups_id])]",1,1,1,1
 rule_repo_mgmt,"manager can see all",model_runbot_repo,group_runbot_admin,"[(1, '=', 1)]",1,1,1,1
-rule_branch,"limited to groups",model_runbot_branch,group_user,"['|', ('repo_id.group_ids', '=', False), ('repo_id.group_ids', 'in', [g.id for g in user.groups_id])]",1,1,1,1
+rule_branch,"limited to groups",model_runbot_branch,group_user,"['|', ('remote_id.repo_id.project_id.group_ids', '=', False), ('remote_id.repo_id.project_id.group_ids', 'in', [g.id for g in user.groups_id])]",1,1,1,1
 rule_branch_mgmt,"manager can see all",model_runbot_branch,group_runbot_admin,"[(1, '=', 1)]",1,1,1,1
-rule_build,"limited to groups",model_runbot_build,group_user,"['|', ('repo_id.group_ids', '=', False), ('repo_id.group_ids', 'in', [g.id for g in user.groups_id])]",1,1,1,1
+rule_commit,"limited to groups",model_runbot_commit,group_user,"['|', ('repo_id.project_id.group_ids', '=', False), ('repo_id.project_id.group_ids', 'in', [g.id for g in user.groups_id])]",1,1,1,1
+rule_commit_mgmt,"manager can see all",model_runbot_commit,group_runbot_admin,"[(1, '=', 1)]",1,1,1,1
+rule_build,"limited to groups",model_runbot_build,group_user,"['|', ('params_id.project_id.group_ids', '=', False), ('params_id.project_id.group_ids', 'in', [g.id for g in user.groups_id])]",1,1,1,1
 rule_build_mgmt,"manager can see all",model_runbot_build,group_runbot_admin,"[(1, '=', 1)]",1,1,1,1

@@ -1,5 +1,4 @@
-from odoo.fields import Field, pycompat
-import json
+from odoo.fields import Field
 from collections import MutableMapping
 from psycopg2.extras import Json
 

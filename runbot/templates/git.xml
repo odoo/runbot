@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+      <template id="runbot.git_config">[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+<t t-foreach="repo.remote_ids" t-as="remote_id">
+[remote "<t t-esc="remote_id.remote_name"/>"]
+	url = <t t-esc="remote_id.name"/>
+<t t-if = "remote_id.fetch_heads">	fetch = +refs/heads/*:refs/<t t-esc='remote_id.remote_name'/>/heads/*</t>
+<t t-if = "remote_id.fetch_pull">	fetch = +refs/pull/*/head:refs/<t t-esc='remote_id.remote_name'/>/pull/*</t>
+</t></template>
+    </data>
+</odoo>

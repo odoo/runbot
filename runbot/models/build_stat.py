@@ -5,7 +5,7 @@ from odoo import models, fields, api, tools
 _logger = logging.getLogger(__name__)
 
 
-class RunbotBuildStat(models.Model):
+class BuildStat(models.Model):
     _name = "runbot.build.stat"
     _description = "Statistics"
     _sql_constraints = [
@@ -45,54 +45,64 @@ class RunbotBuildStatSql(models.Model):
     _description = "Build stat sql view"
     _auto = False
 
-    id = fields.Many2one("runbot.build.stat", readonly=True)
+    bundle_id = fields.Many2one("runbot.bundle", string="Bundle", readonly=True)
+    bundle_name = fields.Char(string="Bundle name", readonly=True)
+    bundle_sticky = fields.Boolean(string="Sticky", readonly=True)
+    batch_id = fields.Many2one("runbot.bundle", string="Batch", readonly=True)
+    trigger_id = fields.Many2one("runbot.trigger", string="Trigger", readonly=True)
+    trigger_name = fields.Char(string="Trigger name", readonly=True)
+
+    stat_id = fields.Many2one("runbot.build.stat", string="Stat", readonly=True)
     key = fields.Char("Key", readonly=True)
     value = fields.Float("Value", readonly=True)
+
     config_step_id = fields.Many2one(
         "runbot.build.config.step", string="Config Step", readonly=True
     )
     config_step_name = fields.Char(String="Config Step name", readonly=True)
+
     build_id = fields.Many2one("runbot.build", string="Build", readonly=True)
     build_config_id = fields.Many2one("runbot.build.config", string="Config", readonly=True)
-    build_name = fields.Char(String="Build name", readonly=True)
     build_parent_path = fields.Char('Build Parent path')
     build_host = fields.Char(string="Host", readonly=True)
-    branch_id = fields.Many2one("runbot.branch", string="Branch", readonly=True)
-    branch_name = fields.Char(string="Branch name", readonly=True)
-    branch_sticky = fields.Boolean(string="Sticky", readonly=True)
-    repo_id = fields.Many2one("runbot.repo", string="Repo", readonly=True)
-    repo_name = fields.Char(string="Repo name", readonly=True)
 
     def init(self):
         """ Create SQL view for build stat """
         tools.drop_view_if_exists(self._cr, "runbot_build_stat_sql")
         self._cr.execute(
-            """ CREATE VIEW runbot_build_stat_sql AS (
+            """ CREATE OR REPLACE VIEW runbot_build_stat_sql AS (
             SELECT
-                stat.id AS id,
+                (stat.id::bigint*(2^32)+bun.id::bigint) AS id,
+                stat.id AS stat_id,
                 stat.key AS key,
                 stat.value AS value,
                 step.id AS config_step_id,
                 step.name AS config_step_name,
                 bu.id AS build_id,
-                bu.config_id AS build_config_id,
+                bp.config_id AS build_config_id,
                 bu.parent_path AS build_parent_path,
-                bu.name AS build_name,
                 bu.host AS build_host,
-                br.id AS branch_id,
-                br.branch_name AS branch_name,
-                br.sticky AS branch_sticky,
-                repo.id AS repo_id,
-                repo.name AS repo_name
+                bun.id AS bundle_id,
+                bun.name AS bundle_name,
+                bun.sticky AS bundle_sticky,
+                ba.id AS batch_id,
+                tr.id AS trigger_id,
+                tr.name AS trigger_name
             FROM
                 runbot_build_stat AS stat
             JOIN
                 runbot_build_config_step step ON stat.config_step_id = step.id
             JOIN
-                runbot_build bu ON stat.build_id = bu.id
+                runbot_build bu ON bu.id = stat.build_id
             JOIN
-                runbot_branch br ON br.id = bu.branch_id
+                runbot_build_params bp ON bp.id =bu.params_id
             JOIN
-                runbot_repo repo ON br.repo_id = repo.id
+                runbot_batch_slot bas ON bas.build_id = stat.build_id
+            JOIN
+                runbot_trigger tr ON tr.id = bas.trigger_id
+            JOIN
+                runbot_batch ba ON ba.id = bas.batch_id
+            JOIN
+                runbot_bundle bun ON bun.id = ba.bundle_id
         )"""
         )

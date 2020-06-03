@@ -1,0 +1,64 @@
+<odoo>
+  <data>
+    <record model="ir.actions.server" id="action_parse_upgrade_errors">
+        <field name="name">Parse upgrade errors</field>
+        <field name="model_id" ref="runbot.model_runbot_build" />
+         <field name="binding_model_id" ref="runbot.model_runbot_build" />
+        <field name="type">ir.actions.server</field>
+        <field name="state">code</field>
+        <field name="code">
+            action = records._parse_upgrade_errors()
+        </field>
+    </record>
+
+    <record id="upgrade_exception_tree" model="ir.ui.view">
+        <field name="name">runbot.upgrade.exception</field>
+        <field name="model">runbot.upgrade.exception</field>
+        <field name="arch" type="xml">
+            <tree string="Upgrade Exceptions">
+                <field name="bundle_id"/>
+                <field name="elements"/>
+                <field name="info"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="upgrade_regex_tree" model="ir.ui.view">
+        <field name="name">runbot.upgrade.regex</field>
+        <field name="model">runbot.upgrade.regex</field>
+        <field name="arch" type="xml">
+            <tree string="Upgrade Regex">
+                <field name="prefix"/>
+                <field name="regex"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="open_view_upgrade_exception_tree" model="ir.actions.act_window">
+        <field name="name">Upgrade Exceptions</field>
+        <field name="res_model">runbot.upgrade.exception</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="open_view_upgrade_regex_tree" model="ir.actions.act_window">
+        <field name="name">Upgrade Regexes</field>
+        <field name="res_model">runbot.upgrade.regex</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem
+        name="Upgrade Exceptions"
+        id="runbot_menu_upgrade_exceptions_tree"
+        parent="runbot_menu_configs"
+        sequence="30"
+        action="open_view_upgrade_exception_tree"
+        />
+    <menuitem
+        name="Upgrade Regexes"
+        id="runbot_menu_upgrade_regex_tree"
+        parent="runbot_menu_configs"
+        sequence="30"
+        action="open_view_upgrade_regex_tree"
+        />
+  </data>
+</odoo>

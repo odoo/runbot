@@ -1,19 +1,67 @@
 # -*- coding: utf-8 -*-
-import operator
+import datetime
 import werkzeug
-from collections import OrderedDict
+import logging
+import functools
 
 import werkzeug.utils
 import werkzeug.urls
 
+from werkzeug.exceptions import NotFound, Forbidden
+
 from odoo.addons.http_routing.models.ir_http import slug
 from odoo.addons.website.controllers.main import QueryURL
 
-from odoo.http import Controller, request, route
-from ..common import uniq_list, flatten, fqdn
+from odoo.http import Controller, Response, request, route as o_route
 from odoo.osv import expression
 
-from odoo.exceptions import UserError
+_logger = logging.getLogger(__name__)
+
+
+def route(routes, **kw):
+    def decorator(f):
+        @o_route(routes, **kw)
+        @functools.wraps(f)
+        def response_wrap(*args, **kwargs):
+            projects = request.env['runbot.project'].search([])
+            more = request.httprequest.cookies.get('more', False) == '1'
+            filter_mode = request.httprequest.cookies.get('filter_mode', 'all')
+            keep_search = request.httprequest.cookies.get('keep_search', False) == '1'
+            cookie_search = request.httprequest.cookies.get('search', '')
+            refresh = kwargs.get('refresh', False)
+            nb_build_errors = request.env['runbot.build.error'].search_count([('random', '=', True), ('parent_id', '=', False)])
+            nb_assigned_errors = request.env['runbot.build.error'].search_count([('responsible', '=', request.env.user.id)])
+            kwargs['more'] = more
+            kwargs['projects'] = projects
+
+            response = f(*args, **kwargs)
+            if isinstance(response, Response):
+                if keep_search and cookie_search and 'search' not in kwargs:
+                    search = cookie_search
+                else:
+                    search = kwargs.get('search', '')
+                if keep_search and cookie_search != search:
+                    response.set_cookie('search', search)
+
+                project = response.qcontext.get('project') or projects[0]
+
+                response.qcontext['projects'] = projects
+                response.qcontext['more'] = more
+                response.qcontext['keep_search'] = keep_search
+                response.qcontext['search'] = search
+                response.qcontext['current_path'] = request.httprequest.full_path
+                response.qcontext['refresh'] = refresh
+                response.qcontext['filter_mode'] = filter_mode
+                response.qcontext['qu'] = QueryURL('/runbot/%s' % (slug(project)), path_args=['search'], search=search, refresh=refresh)
+                if 'title' not in response.qcontext:
+                    response.qcontext['title'] = 'Runbot %s' % project.name or ''
+                response.qcontext['nb_build_errors'] = nb_build_errors
+                response.qcontext['nb_assigned_errors'] = nb_assigned_errors
+
+            return response
+        return response_wrap
+    return decorator
+
 
 class Runbot(Controller):
 
@@ -26,354 +74,293 @@ class Runbot(Controller):
         level = ['info', 'warning', 'danger'][int(pending_count > warn) + int(pending_count > crit)]
         return pending_count, level, scheduled_count
 
-    @route(['/runbot', '/runbot/repo/<model("runbot.repo"):repo>'], website=True, auth='public', type='http')
-    def repo(self, repo=None, search='', refresh='', **kwargs):
+    @o_route([
+        '/runbot/submit'
+    ], type='http', auth="public", methods=['GET', 'POST'], csrf=False)
+    def submit(self, more=False, redirect='/', keep_search=False, category=False, filter_mode=False, update_triggers=False, **kwargs):
+        response = werkzeug.utils.redirect(redirect)
+        response.set_cookie('more', '1' if more else '0')
+        response.set_cookie('keep_search', '1' if keep_search else '0')
+        response.set_cookie('filter_mode', filter_mode or 'all')
+        response.set_cookie('category', category or '0')
+        if update_triggers:
+            enabled_triggers = []
+            project_id = int(update_triggers)
+            for key in kwargs.keys():
+                if key.startswith('trigger_'):
+                    enabled_triggers.append(key.replace('trigger_', ''))
+
+            key = 'trigger_display_%s' % project_id
+            if len(request.env['runbot.trigger'].search([('project_id', '=', project_id)])) == len(enabled_triggers):
+                response.delete_cookie(key)
+            else:
+                response.set_cookie(key, '-'.join(enabled_triggers))
+        return response
+
+    @route(['/',
+            '/runbot',
+            '/runbot/<model("runbot.project"):project>',
+            '/runbot/<model("runbot.project"):project>/search/<search>'], website=True, auth='public', type='http')
+    def bundles(self, project=None, search='', projects=False, refresh=False, **kwargs):
         search = search if len(search) < 60 else search[:60]
-        branch_obj = request.env['runbot.branch']
-        build_obj = request.env['runbot.build']
-        repo_obj = request.env['runbot.repo']
+        env = request.env
+        categories = env['runbot.category'].search([])
+        if not project and projects:
+            project = projects[0]
 
-        repo_ids = repo_obj.search([])
-        repos = repo_obj.browse(repo_ids)
-        if not repo and repos:
-            repo = repos[0].id
-
-        pending = self._pending()
+        pending_count, level, scheduled_count = self._pending()
         context = {
-            'repos': repos.ids,
-            'repo': repo,
-            'host_stats': [],
-            'pending_total': pending[0],
-            'pending_level': pending[1],
-            'scheduled_count': pending[2],
-            'hosts_data': request.env['runbot.host'].search([]),
+            'categories': categories,
             'search': search,
-            'refresh': refresh,
+            'message': request.env['ir.config_parameter'].sudo().get_param('runbot.runbot_message'),
+            'pending_total': pending_count,
+            'pending_level': level,
+            'scheduled_count': scheduled_count,
+            'hosts_data': request.env['runbot.host'].search([]),
         }
+        if project:
+            domain = [('last_batch', '!=', False), ('project_id', '=', project.id), ('no_build', '=', False)]
 
-        build_ids = []
-        if repo:
-            domain = [('repo_id', '=', repo.id)]
+            filter_mode = request.httprequest.cookies.get('filter_mode', False)
+            if filter_mode == 'sticky':
+                domain.append(('sticky', '=', True))
+            elif filter_mode == 'nosticky':
+                domain.append(('sticky', '=', False))
+
             if search:
-                search_domain = []
-                for to_search in search.split("|"):
-                    search_domain = ['|', '|', '|'] + search_domain
-                    search_domain += [('dest', 'ilike', to_search), ('subject', 'ilike', to_search), ('branch_id.branch_name', 'ilike', to_search)]
-                domain += search_domain[1:]
-            domain = expression.AND([domain, [('hidden', '=', False)]]) # don't display children builds on repo view
-            build_ids = build_obj.search(domain, limit=100)
-            branch_ids, build_by_branch_ids = [], {}
+                search_domains = []
+                pr_numbers = []
+                for search_elem in search.split("|"):
+                    if search_elem.isnumeric():
+                        pr_numbers.append(int(search_elem))
+                    else:
+                        search_domains.append([('name', 'like', search_elem)])
+                if pr_numbers:
+                    res = request.env['runbot.branch'].search([('name', 'in', pr_numbers)])
+                    if res:
+                        search_domains.append([('id', 'in', res.mapped('bundle_id').ids)])
+                search_domain = expression.OR(search_domains)
+                print(search_domain)
+                domain = expression.AND([domain, search_domain])
 
-            if build_ids:
-                branch_query = """
-                SELECT br.id FROM runbot_branch br INNER JOIN runbot_build bu ON br.id=bu.branch_id WHERE bu.id in %s
-                ORDER BY bu.sequence DESC
-                """
-                sticky_dom = [('repo_id', '=', repo.id), ('sticky', '=', True)]
-                sticky_branch_ids = [] if search else branch_obj.search(sticky_dom).sorted(key=lambda b: (b.branch_name == 'master', b.id), reverse=True).ids
-                request._cr.execute(branch_query, (tuple(build_ids.ids),))
-                branch_ids = uniq_list(sticky_branch_ids + [br[0] for br in request._cr.fetchall()])
+            e = expression.expression(domain, request.env['runbot.bundle'])
+            where_clause, where_params = e.to_sql()
 
-                build_query = """
-                    SELECT 
-                        branch_id, 
-                        max(case when br_bu.row = 1 then br_bu.build_id end),
-                        max(case when br_bu.row = 2 then br_bu.build_id end),
-                        max(case when br_bu.row = 3 then br_bu.build_id end),
-                        max(case when br_bu.row = 4 then br_bu.build_id end)
-                    FROM (
-                        SELECT 
-                            br.id AS branch_id, 
-                            bu.id AS build_id,
-                            row_number() OVER (PARTITION BY branch_id) AS row
-                        FROM 
-                            runbot_branch br INNER JOIN runbot_build bu ON br.id=bu.branch_id 
-                        WHERE 
-                            br.id in %s AND (bu.hidden = 'f' OR bu.hidden IS NULL)
-                        GROUP BY br.id, bu.id
-                        ORDER BY br.id, bu.id DESC
-                    ) AS br_bu
-                    WHERE
-                        row <= 4
-                    GROUP BY br_bu.branch_id;
-                """
-                request._cr.execute(build_query, (tuple(branch_ids),))
-                build_by_branch_ids = {
-                    rec[0]: [r for r in rec[1:] if r is not None] for rec in request._cr.fetchall()
-                }
+            env.cr.execute("""
+                SELECT id FROM runbot_bundle
+                WHERE {where_clause}
+                ORDER BY
+                    (case when sticky then 1 when sticky is null then 2 else 2 end),
+                    case when sticky then version_number end collate "C" desc,
+                    last_batch desc
+                LIMIT 40""".format(where_clause=where_clause), where_params)
+            bundles = env['runbot.bundle'].browse([r[0] for r in env.cr.fetchall()])
 
-            branches = branch_obj.browse(branch_ids)
-            build_ids = flatten(build_by_branch_ids.values())
-            build_dict = {build.id: build for build in build_obj.browse(build_ids)}
+            category_id = int(request.httprequest.cookies.get('category') or 0) or request.env['ir.model.data'].xmlid_to_res_id('runbot.default_category')
 
-            def branch_info(branch):
-                return {
-                    'branch': branch,
-                    'builds': [build_dict[build_id] for build_id in build_by_branch_ids.get(branch.id) or []]
-                }
+            trigger_display = request.httprequest.cookies.get('trigger_display_%s' % project.id, None)
+            if trigger_display is not None:
+                trigger_display = [int(td) for td in trigger_display.split('-') if td]
+            bundles = bundles.with_context(category_id=category_id)
 
+            triggers = env['runbot.trigger'].search([('project_id', '=', project.id)])
             context.update({
-                'branches': [branch_info(b) for b in branches],
-                'qu': QueryURL('/runbot/repo/' + slug(repo), search=search, refresh=refresh),
-                'fqdn': fqdn(),
+                'active_category_id': category_id,
+                'bundles': bundles,
+                'project': project,
+                'triggers': triggers,
+                'trigger_display': trigger_display,
             })
 
-        # consider host gone if no build in last 100
-        build_threshold = max(build_ids or [0]) - 100
-
         context.update({'message': request.env['ir.config_parameter'].sudo().get_param('runbot.runbot_message')})
-        return request.render('runbot.repo', context)
+        res = request.render('runbot.bundles', context)
+        return res
 
     @route([
+        '/runbot/bundle/<model("runbot.bundle"):bundle>',
+        '/runbot/bundle/<model("runbot.bundle"):bundle>/page/<int:page>'
+        ], website=True, auth='public', type='http')
+    def bundle(self, bundle=None, page=1, limit=50, **kwargs):
+        domain = [('bundle_id', '=', bundle.id), ('hidden', '=', False)]
+        batch_count = request.env['runbot.batch'].search_count(domain)
+        pager = request.website.pager(
+            url='/runbot/bundle/%s' % bundle.id,
+            total=batch_count,
+            page=page,
+            step=50,
+        )
+        batchs = request.env['runbot.batch'].search(domain, limit=limit, offset=pager.get('offset', 0), order='id desc')
+
+        context = {
+            'bundle': bundle,
+            'batchs': batchs,
+            'pager': pager,
+            'project': bundle.project_id,
+            'title': 'Bundle %s' % bundle.name
+            }
+
+        return request.render('runbot.bundle', context)
+
+    @o_route([
+        '/runbot/bundle/<model("runbot.bundle"):bundle>/force',
+        '/runbot/bundle/<model("runbot.bundle"):bundle>/force/<int:auto_rebase>',
+    ], type='http', auth="user", methods=['GET', 'POST'], csrf=False)
+    def force_bundle(self, bundle, auto_rebase=False, **post):
+        _logger.info('user %s forcing bundle %s', request.env.user.name, bundle.name)  # user must be able to read bundle
+        batch = bundle.sudo()._force(auto_rebase=auto_rebase)
+        return werkzeug.utils.redirect('/runbot/batch/%s' % batch.id)
+
+    @route(['/runbot/batch/<int:batch_id>'], website=True, auth='public', type='http')
+    def batch(self, batch_id=None, **kwargs):
+        batch = request.env['runbot.batch'].browse(batch_id)
+        context = {
+            'batch': batch,
+            'project': batch.bundle_id.project_id,
+            'title': 'Batch %s (%s)' % (batch.id, batch.bundle_id.name)
+        }
+        return request.render('runbot.batch', context)
+
+    @o_route(['/runbot/batch/slot/<model("runbot.batch.slot"):slot>/build'], auth='user', type='http')
+    def slot_create_build(self, slot=None, **kwargs):
+        build = slot.sudo()._create_missing_build()
+        return werkzeug.utils.redirect('/runbot/build/%s' % build.id)
+
+    @route(['/runbot/commit/<model("runbot.commit"):commit>'], website=True, auth='public', type='http')
+    def commit(self, commit=None, **kwargs):
+        status_list = request.env['runbot.commit.status'].search([('commit_id', '=', commit.id)], order='id desc')
+        last_status_by_context = dict()
+        for status in status_list:
+            if status.context in last_status_by_context:
+                continue
+            last_status_by_context[status.context] = status
+        context = {
+            'commit': commit,
+            'project': commit.repo_id.project_id,
+            'reflogs': request.env['runbot.ref.log'].search([('commit_id', '=', commit.id)]),
+            'status_list': status_list,
+            'last_status_by_context': last_status_by_context,
+            'title': 'Commit %s' % commit.name[:8]
+        }
+        return request.render('runbot.commit', context)
+
+    @o_route(['/runbot/commit/resend/<int:status_id>'], website=True, auth='user', type='http')
+    def resend_status(self, status_id=None, **kwargs):
+        CommitStatus = request.env['runbot.commit.status']
+        status = CommitStatus.browse(status_id)
+        if not status.exists():
+            raise NotFound()
+        last_status = CommitStatus.search([('commit_id', '=', status.commit_id.id), ('context', '=', status.context)], order='id desc', limit=1)
+        if status != last_status:
+            raise Forbidden("Only the last status can be resent")
+        if last_status.sent_date and (datetime.datetime.now() - last_status.sent_date).seconds > 60:  # ensure at least 60sec between two resend
+            new_status = status.sudo().copy()
+            new_status.description = 'Status resent by %s' % request.env.user.name
+            new_status._send()
+            _logger.info('github status %s resent by %s', status_id, request.env.user.name)
+        return werkzeug.utils.redirect('/runbot/commit/%s' % status.commit_id.id)
+
+    @o_route([
         '/runbot/build/<int:build_id>/<operation>',
-        '/runbot/build/<int:build_id>/<operation>/<int:exact>',
     ], type='http', auth="public", methods=['POST'], csrf=False)
-    def build_force(self, build_id, operation, exact=0, search=None, **post):
+    def build_operations(self, build_id, operation, **post):
         build = request.env['runbot.build'].sudo().browse(build_id)
-        if operation == 'force':
-            build = build._force(exact=bool(exact))
+        if operation == 'rebuild':
+            build = build._rebuild()
         elif operation == 'kill':
             build._ask_kill()
         elif operation == 'wakeup':
             build._wake_up()
 
-        qs = ''
-        if search:
-            qs = '?' + werkzeug.urls.url_encode({'search': search})
-        return werkzeug.utils.redirect(build.build_url + qs)
+        return werkzeug.utils.redirect(build.build_url)
 
     @route(['/runbot/build/<int:build_id>'], type='http', auth="public", website=True)
     def build(self, build_id, search=None, **post):
         """Events/Logs"""
 
         Build = request.env['runbot.build']
-        Logging = request.env['ir.logging']
 
         build = Build.browse([build_id])[0]
         if not build.exists():
             return request.not_found()
 
-        show_rebuild_button = Build.search([('branch_id', '=', build.branch_id.id), ('parent_id', '=', False)], limit=1) == build
-
         context = {
-            'repo': build.repo_id,
             'build': build,
-            'fqdn': fqdn(),
-            'br': {'branch': build.branch_id},
-            'show_rebuild_button': show_rebuild_button,
+            'default_category': request.env['ir.model.data'].xmlid_to_res_id('runbot.default_category'),
+            'project': build.params_id.trigger_id.project_id,
+            'title': 'Build %s' % build.id
         }
         return request.render("runbot.build", context)
 
-    @route(['/runbot/quick_connect/<model("runbot.branch"):branch>'], type='http', auth="public", website=True)
-    def fast_launch(self, branch, **post):
-        """Connect to the running Odoo instance"""
-        Build = request.env['runbot.build']
-        domain = [('branch_id', '=', branch.id), ('config_id', '=', branch.config_id.id)]
+    @route([
+        '/runbot/branch/<model("runbot.branch"):branch>',
+        ], website=True, auth='public', type='http')
+    def branch(self, branch=None, **kwargs):
+        pr_branch = branch.bundle_id.branch_ids.filtered(lambda rec: not rec.is_pr and rec.id != branch.id and rec.remote_id.repo_id == branch.remote_id.repo_id)[:1]
+        branch_pr = branch.bundle_id.branch_ids.filtered(lambda rec: rec.is_pr and rec.id != branch.id and rec.remote_id.repo_id == branch.remote_id.repo_id)[:1]
+        context = {
+            'branch': branch,
+            'project': branch.remote_id.repo_id.project_id,
+            'title': 'Branch %s' % branch.name,
+            'pr_branch': pr_branch,
+            'branch_pr': branch_pr
+            }
 
-        # Take the 10 lasts builds to find at least 1 running... Else no luck
-        builds = Build.search(domain, order='sequence desc', limit=10)
+        return request.render('runbot.branch', context)
 
-        if builds:
-            last_build = False
-            for build in builds:
-                if build.real_build.local_state == 'running':
-                    last_build = build.real_build
-                    break
-
-            if not last_build:
-                # Find the last build regardless the state to propose a rebuild
-                last_build = builds[0]
-
-            if last_build.local_state != 'running':
-                url = "/runbot/build/%s?ask_rebuild=1" % last_build.id
-            else:
-                url = "http://%s/web/login?db=%s-all&login=admin&redirect=/web?debug=1" % (last_build.domain, last_build.dest)
-        else:
-            return request.not_found()
-        return werkzeug.utils.redirect(url)
-
-    @route(['/runbot/dashboard'], type='http', auth="public", website=True)
-    def dashboard(self, refresh=None):
-        cr = request.cr
-        RB = request.env['runbot.build']
-        repos = request.env['runbot.repo'].search([])   # respect record rules
-
-        cr.execute("""SELECT bu.id
-                        FROM runbot_branch br
-                        JOIN LATERAL (SELECT *
-                                        FROM runbot_build bu
-                                       WHERE bu.branch_id = br.id
-                                    ORDER BY id DESC
-                                       LIMIT 3
-                                     ) bu ON (true)
-                        JOIN runbot_repo r ON (r.id = br.repo_id)
-                       WHERE br.sticky
-                         AND br.repo_id in %s
-                    ORDER BY r.sequence, r.name, br.branch_name, bu.id DESC
-                   """, [tuple(repos._ids)])
-
-        builds = RB.browse(map(operator.itemgetter(0), cr.fetchall()))
-
-        count = RB.search_count
+    @route([
+        '/runbot/glances',
+        '/runbot/glances/<int:project_id>'
+        ], type='http', auth='public', website=True)
+    def glances(self, project_id=None, **kwargs):
+        project_ids = [project_id] if project_id else request.env['runbot.project'].search([]).ids # search for access rights
+        bundles = request.env['runbot.bundle'].search([('sticky', '=', True), ('project_id', 'in', project_ids)])
         pending = self._pending()
         qctx = {
-            'refresh': refresh,
-            'host_stats': [],
             'pending_total': pending[0],
             'pending_level': pending[1],
-        }
-
-        repos_values = qctx['repo_dict'] = OrderedDict()
-        for build in builds:
-            repo = build.repo_id
-            branch = build.branch_id
-            r = repos_values.setdefault(repo.id, {'branches': OrderedDict()})
-            if 'name' not in r:
-                r.update({
-                    'name': repo.name,
-                    'base': repo.base,
-                    'testing': count([('repo_id', '=', repo.id), ('local_state', '=', 'testing')]),
-                    'running': count([('repo_id', '=', repo.id), ('local_state', '=', 'running')]),
-                    'pending': count([('repo_id', '=', repo.id), ('local_state', '=', 'pending')]),
-                })
-            b = r['branches'].setdefault(branch.id, {'name': branch.branch_name, 'builds': list()})
-            b['builds'].append(build)
-
-        # consider host gone if no build in last 100
-        build_threshold = max(builds.ids or [0]) - 100
-        for result in RB.read_group([('id', '>', build_threshold)], ['host'], ['host']):
-            if result['host']:
-                qctx['host_stats'].append({
-                    'fqdn': fqdn(),
-                    'host': result['host'],
-                    'testing': count([('local_state', '=', 'testing'), ('host', '=', result['host'])]),
-                    'running': count([('local_state', '=', 'running'), ('host', '=', result['host'])]),
-                })
-
-        return request.render("runbot.sticky-dashboard", qctx)
-
-    def _glances_ctx(self):
-        repos = request.env['runbot.repo'].search([])   # respect record rules
-        default_config_id = request.env.ref('runbot.runbot_build_config_default').id
-        query = """
-            SELECT split_part(r.name, ':', 2),
-                   br.branch_name,
-                   (array_agg(bu.global_result order by bu.id desc))[1]
-              FROM runbot_build bu
-              JOIN runbot_branch br on (br.id = bu.branch_id)
-              JOIN runbot_repo r on (r.id = br.repo_id)
-             WHERE br.sticky
-               AND br.repo_id in %s
-               AND (bu.hidden = 'f' OR bu.hidden IS NULL)
-               AND (
-                    bu.global_state in ('running', 'done')
-               )
-               AND bu.global_result not in ('skipped', 'manually_killed')
-               AND (bu.config_id = r.repo_config_id
-                    OR bu.config_id =  br.branch_config_id
-                    OR bu.config_id =  %s)
-          GROUP BY 1,2,r.sequence,br.id
-          ORDER BY r.sequence, (br.branch_name='master'), br.id
-        """
-        cr = request.env.cr
-        cr.execute(query, (tuple(repos.ids), default_config_id))
-        ctx = OrderedDict()
-        for row in cr.fetchall():
-            ctx.setdefault(row[0], []).append(row[1:])
-        return ctx
-
-    @route('/runbot/glances', type='http', auth='public', website=True)
-    def glances(self, refresh=None):
-        glances_ctx = self._glances_ctx()
-        pending = self._pending()
-        qctx = {
-            'refresh': refresh,
-            'pending_total': pending[0],
-            'pending_level': pending[1],
-            'glances_data': glances_ctx,
+            'bundles': bundles,
+            'title': 'Glances'
         }
         return request.render("runbot.glances", qctx)
 
     @route(['/runbot/monitoring',
-            '/runbot/monitoring/<int:config_id>',
-            '/runbot/monitoring/<int:config_id>/<int:view_id>'], type='http', auth='user', website=True)
-    def monitoring(self, config_id=None, view_id=None, refresh=None, **kwargs):
-        glances_ctx = self._glances_ctx()
+            '/runbot/monitoring/<int:category_id>',
+            '/runbot/monitoring/<int:category_id>/<int:view_id>'], type='http', auth='user', website=True)
+    def monitoring(self, category_id=None, view_id=None, **kwargs):
         pending = self._pending()
         hosts_data = request.env['runbot.host'].search([])
-
-        last_monitored = None
-
-        monitored_config_id = config_id or int(request.env['ir.config_parameter'].sudo().get_param('runbot.monitored_config_id', 1))
-        request.env.cr.execute("""SELECT DISTINCT ON (branch_id) branch_id, id FROM runbot_build
-                                WHERE config_id = %s
-                                AND global_state in ('running', 'done')
-                                AND branch_id in (SELECT id FROM runbot_branch where sticky='t')
-                                AND local_state != 'duplicate'
-                                AND hidden = false
-                                ORDER BY branch_id ASC, id DESC""", [int(monitored_config_id)])
-        last_monitored = request.env['runbot.build'].browse([r[1] for r in request.env.cr.fetchall()])
-
-        config = request.env['runbot.build.config'].browse(monitored_config_id)
+        if category_id:
+            category = request.env['runbot.category'].browse(category_id)
+            assert category.exists()
+        else:
+            category = request.env.ref('runbot.nightly_category')
+            category_id = category.id
+        bundles = request.env['runbot.bundle'].search([('sticky', '=', True)])  # NOTE we dont filter on project
         qctx = {
-            'config': config,
-            'refresh': refresh,
+            'category': category,
             'pending_total': pending[0],
             'pending_level': pending[1],
             'scheduled_count': pending[2],
-            'glances_data': glances_ctx,
+            'bundles': bundles,
             'hosts_data': hosts_data,
-            'last_monitored': last_monitored,  # nightly
             'auto_tags': request.env['runbot.build.error'].disabling_tags(),
             'build_errors': request.env['runbot.build.error'].search([('random', '=', True)]),
-            'kwargs': kwargs
+            'kwargs': kwargs,
+            'title': 'monitoring'
         }
-        return request.render(view_id if view_id else config.monitoring_view_id.id or "runbot.monitoring", qctx)
+        return request.render(view_id if view_id else "runbot.monitoring", qctx)
 
-    @route(['/runbot/config/<int:config_id>',
-            '/runbot/config/<config_name>'], type='http', auth="public", website=True)
-    def config(self, config_id=None, config_name=None, refresh=None, **kwargs):
+    @route(['/runbot/errors',
+            '/runbot/errors/<int:error_id>'], type='http', auth='user', website=True)
+    def build_errors(self, error_id=None, **kwargs):
+        build_errors = request.env['runbot.build.error'].search([('random', '=', True), ('parent_id', '=', False), ('responsible', '!=', request.env.user.id)]).filtered(lambda rec: len(rec.children_build_ids) > 1)
+        assigned_errors = request.env['runbot.build.error'].search([('responsible', '=', request.env.user.id)])
+        build_errors = build_errors.sorted(lambda rec: (rec.last_seen_date.date(), rec.build_count), reverse=True)
+        assigned_errors = assigned_errors.sorted(lambda rec: (rec.last_seen_date.date(), rec.build_count), reverse=True)
+        build_errors = assigned_errors + build_errors
 
-        if config_id:
-            monitored_config_id = config_id
-        else:
-            config = request.env['runbot.build.config'].search([('name', '=', config_name)], limit=1)
-            if config:
-                monitored_config_id = config.id
-            else:
-                raise UserError('Config name not found')
-
-        readable_repos = request.env['runbot.repo'].search([])
-        request.env.cr.execute("""SELECT DISTINCT ON (branch_id) branch_id, id FROM runbot_build
-                                WHERE config_id = %s
-                                AND global_state in ('running', 'done')
-                                AND branch_id in (SELECT id FROM runbot_branch where sticky='t' and repo_id in %s)
-                                AND local_state != 'duplicate'
-                                AND hidden = false
-                                ORDER BY branch_id ASC, id DESC""", [int(monitored_config_id), tuple(readable_repos.ids)])
-        last_monitored = request.env['runbot.build'].browse([r[1] for r in request.env.cr.fetchall()])
-
-        config = request.env['runbot.build.config'].browse(monitored_config_id)
         qctx = {
-            'config': config,
-            'refresh': refresh,
-            'last_monitored': last_monitored,  # nightly
-            'kwargs': kwargs
+            'build_errors': build_errors,
+            'title': 'Build Errors'
         }
-        return request.render(config.monitoring_view_id.id or "runbot.config_monitoring", qctx)
-
-    @route(['/runbot/branch/<int:branch_id>', '/runbot/branch/<int:branch_id>/page/<int:page>'], website=True, auth='public', type='http')
-    def branch_builds(self, branch_id=None, search='', page=1, limit=50, refresh='', **kwargs):
-        """ list builds of a runbot branch """
-        domain =[('branch_id','=',branch_id), ('hidden', '=', False)]
-        builds_count = request.env['runbot.build'].search_count(domain)
-        pager = request.website.pager(
-            url='/runbot/branch/%s' % branch_id,
-            total=builds_count,
-            page=page,
-            step=50,
-        )
-        builds = request.env['runbot.build'].search(domain, limit=limit, offset=pager.get('offset',0))
-
-        context = {'pager': pager, 'builds': builds, 'repo': request.env['runbot.branch'].browse(branch_id).repo_id}
-        return request.render("runbot.branch", context)
+        return request.render('runbot.build_error', qctx)

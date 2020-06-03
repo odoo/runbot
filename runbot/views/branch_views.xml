@@ -9,64 +9,44 @@
               <button name="recompute_infos" string="Recompute Infos" type="object" class="oe_highlight"/>
             </header>
             <sheet>
-              <div class="oe_button_box" name="button_box">
-                <button name="toggle_request_branch_rebuild" type="object" class="oe_stat_button" icon="fa-play">
-                  <field name="rebuild_requested" widget="boolean_button" options='{"terminology": {
-                      "string_true": "Rebuild Asked",
-                      "hover_true": "Cancel the branch rebuild",
-                      "string_false": "No Rebuild Asked",
-                      "hover_false": "Request a branch rebuild"
-                  }}'/>
-                </button>
-              </div>
               <group name="branch_group">
-                <field name="repo_id"/>
-                <field name="duplicate_repo_id" invisible='1'/>
+                <field name="bundle_id" readonly='0'/>
+                <field name="remote_id"/>
                 <field name="name"/>
-                <field name="branch_name"/>
                 <field name="branch_url"/>
+                <field name="is_pr"/>
                 <field name="pull_head_name"/>
                 <field name="target_branch_name"/>
-                <field name="sticky"/>
-                <field name="priority"/>
-                <field name="state"/>
-                <field name="modules"/>
-                <field name="config_id"/>
-                <field name="no_build"/>
-                <field name="closest_sticky"/>
-                <field name="defined_sticky" domain="[('sticky', '=', True), ('repo_id', 'in', [repo_id, duplicate_repo_id])]"/>
-                <field name="previous_version"/>
-                <field name="intermediate_stickies" widget="many2many_tags"/>
+                <field name="head"/>
+                <field name="alive"/>
               </group>
             </sheet>
           </form>
         </field>
     </record>
-          
-    
+
+
     <record id="branch_view_tree" model="ir.ui.view">
         <field name="name">runbot.branch.tree</field>
         <field name="model">runbot.branch</field>
         <field name="arch" type="xml">
             <tree string="Branches">
-                <field name="repo_id"/>
+                <field name="remote_id"/>
                 <field name="name"/>
-                <field name="sticky"/>
-                <field name="priority"/>
-                <field name="config_id"/>
-                <field name="state"/>
             </tree>
         </field>
     </record>
-    
+
     <record id="open_view_branch_tree" model="ir.actions.act_window">
         <field name="name">Branches</field>
         <field name="res_model">runbot.branch</field>
         <field name="view_mode">tree,form</field>
     </record>
-    
+
+    <menuitem name="Runbot" id="runbot_menu_root"/>
+
     <menuitem
-        name="Branches" 
+        name="Branches"
         id="runbot_menu_branch_tree"
         parent="runbot_menu_root"
         sequence="20"
