@@ -1,8 +1,68 @@
 <odoo>
   <data>
-    <menuitem name="Runbot" id="runbot_menu_root"/>
-    
-    <record id="repo_form" model="ir.ui.view">
+      <record id="repo_trigger_form" model="ir.ui.view">
+        <field name="name">runbot.trigger.form</field>
+        <field name="model">runbot.trigger</field>
+        <field name="arch" type="xml">
+          <form>
+            <header>
+            </header>
+            <sheet>
+              <group name="repo_group">
+                <field name="name"/>
+                <field name="sequence"/>
+                <field name="description"/>
+                <field name="category_id" required='1'/>
+                <field name="project_id"/>
+                <field name="repo_ids"/>
+                <field name="dependency_ids"/>
+                <field name="config_id"/>
+                <field name="version_domain" widget="domain" options="{'model': 'runbot.version', 'in_dialog': True}"/>
+                <field name="hide"/>
+                <field name="manual"/>
+                <field name="upgrade_dumps_trigger_id"/>
+                <field name="upgrade_step_id"/>
+                <field name="ci_context"/>
+                <field name="ci_url"/>
+                <field name="ci_description"/>
+              </group>
+            </sheet>
+          </form>
+        </field>
+      </record>
+
+      <record id="trigger_view_tree" model="ir.ui.view">
+        <field name="name">runbot.trigger.tree</field>
+        <field name="model">runbot.trigger</field>
+        <field name="arch" type="xml">
+            <tree string="Repositories">
+                <field name="name"/>
+                <field name="category_id"/>
+                <field name="project_id"/>
+                <field name="config_id"/>
+                <field name="ci_context"/>
+                <field name="repo_ids" widget="many2many_tags"/>
+            </tree>
+        </field>
+      </record>
+
+      <record id="repo_trigger_catgory_form" model="ir.ui.view">
+        <field name="name">runbot.category.form</field>
+        <field name="model">runbot.category</field>
+        <field name="arch" type="xml">
+          <form>
+            <sheet>
+              <group name="category_group">
+                <field name="name"/>
+                <field name="icon"/>
+                <field name="view_id"/>
+              </group>
+            </sheet>
+          </form>
+        </field>
+      </record>
+
+      <record id="repo_form" model="ir.ui.view">
         <field name="name">runbot.repo.form</field>
         <field name="model">runbot.repo</field>
         <field name="arch" type="xml">
@@ -10,30 +70,68 @@
             <header>
             </header>
             <sheet>
-              <group name="repo_group">
-                <field name="sequence"/>
+              <group name="repo">
                 <field name="name"/>
-                <field name="mode"/>
-                <field name="no_build"/>
-                <field name="nginx"/>
-                <field name="duplicate_id"/>
-                <field name="dependency_ids" widget="many2many_tags"/>
+                <field name="identity_file"/>
+                <field name="sequence"/>
+                <field name="project_id"/>
                 <field name="modules"/>
-                <field name="modules_auto"/>
-                <field name="token"/>
-                <field name="group_ids"  widget="many2many_tags"/>
-                <field name="hook_time"/>
-                <field name="config_id"/>
                 <field name="server_files"/>
                 <field name="manifest_files"/>
                 <field name="addons_paths"/>
+                <field name="hook_time" groups="base.group_no_one"/>
+                <field name="mode"/>
+                <field name="forbidden_regex"/>
+                <field name="invalid_branch_message"/>
+                <field name="remote_ids">
+                  <tree string="Remotes" editable="bottom">
+                    <field name="name"/>
+                    <field name="sequence"/>
+                    <field name="fetch_heads" string="Branch"/>
+                    <field name="fetch_pull" string="PR"/>
+                    <field name="token"/>
+                  </tree>
+                </field>
               </group>
             </sheet>
           </form>
         </field>
     </record>
-          
-    
+
+    <record id="remote_form" model="ir.ui.view">
+        <field name="name">runbot.remote.form</field>
+        <field name="model">runbot.remote</field>
+        <field name="arch" type="xml">
+          <form>
+            <header>
+            </header>
+            <sheet>
+              <group name="repo_group">
+                <field name="name"/>
+                <field name="sequence"/>
+                <field name="repo_id"/>
+                <field name="token"/>
+                <field name="fetch_pull"/>
+                <field name="fetch_heads"/>
+              </group>
+            </sheet>
+          </form>
+        </field>
+    </record>
+
+    <record id="remote_view_tree" model="ir.ui.view">
+        <field name="name">runbot.remote.tree</field>
+        <field name="model">runbot.remote</field>
+        <field name="arch" type="xml">
+            <tree string="Repositories">
+                <field name="name"/>
+                <field name="repo_id"/>
+                <field name="fetch_pull"/>
+                <field name="fetch_heads"/>
+            </tree>
+        </field>
+    </record>
+
     <record id="repo_view_tree" model="ir.ui.view">
         <field name="name">runbot.repo.tree</field>
         <field name="model">runbot.repo</field>
@@ -41,24 +139,76 @@
             <tree string="Repositories">
                 <field name="sequence" widget="handle"/>
                 <field name="name"/>
-                <field name="mode"/>
             </tree>
         </field>
     </record>
-    
-    <record id="open_view_repo_tree" model="ir.actions.act_window">
+
+    <record id="runbot_repos_action" model="ir.actions.act_window">
         <field name="name">Repositories</field>
         <field name="res_model">runbot.repo</field>
         <field name="view_mode">tree,form</field>
     </record>
-    
+
+    <record id="runbot_triggers_action" model="ir.actions.act_window">
+        <field name="name">Triggers</field>
+        <field name="res_model">runbot.trigger</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+    <record id="runbot_remotes_action" model="ir.actions.act_window">
+        <field name="name">Remotes</field>
+        <field name="res_model">runbot.remote</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="runbot_triggers_category_action" model="ir.actions.act_window">
+        <field name="name">Trigger Categories</field>
+        <field name="res_model">runbot.category</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem id="runbot_menu_repos_main" name="Repos" parent="runbot_menu_root"/>
     <menuitem
-        name="Repositories" 
-        id="runbot_menu_repo_tree"
-        parent="runbot_menu_root"
+       id="runbot_menu_repos"
+        parent="runbot_menu_repos_main"
         sequence="10"
-        action="open_view_repo_tree"
+        action="runbot_repos_action"
         />
-    
+      <menuitem
+        id="runbot_menu_remotes"
+        parent="runbot_menu_repos_main"
+        sequence="20"
+        action="runbot_remotes_action"
+      />
+      <menuitem
+        id="runbot_menu_trigger"
+        parent="runbot_menu_repos_main"
+        sequence="30"
+        action="runbot_triggers_action"
+      />
+      <menuitem
+        id="runbot_menu_trigger_category"
+        parent="runbot_menu_repos_main"
+        sequence="40"
+        action="runbot_triggers_category_action"
+      />
+
+      <menuitem
+        name="Technical"
+        id="runbot_menu_technical"
+        parent="runbot_menu_root"
+        sequence="1000"
+        />
+
+        <menuitem id="runbot_menu_ir_cron_act" action="base.ir_cron_act" parent="runbot_menu_technical"/>
+        <menuitem id="runbot_menu_base_automation_act" action="base_automation.base_automation_act" parent="runbot_menu_technical"/>
+        <menuitem id="runbot_menu_action_ui_view" action="base.action_ui_view" parent="runbot_menu_technical"/>
+
+      <menuitem
+        name="▶"
+        id="runbot_menu_website"
+        parent="runbot_menu_root"
+        sequence="1001"
+        action="website.action_website"
+        />
   </data>
 </odoo>

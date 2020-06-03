@@ -2,8 +2,7 @@
     "use strict";
 
     var OPMAP = {
-        'rebuild': {operation: 'force', then: 'redirect'},
-        'rebuild-exact': {operation: 'force/1', then: 'redirect'},
+        'rebuild': {operation: 'rebuild', then: 'redirect'},
         'kill': {operation: 'kill', then: 'reload'},
         'wakeup': {operation: 'wakeup', then: 'reload'}
     };

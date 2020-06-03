@@ -1,154 +1,229 @@
 # -*- coding: utf-8 -*-
-from unittest.mock import patch
-from odoo.tests import common
-from .common import RunbotCase
+from odoo.tools import mute_logger
+from .common import RunbotCase, RunbotCaseMinimalSetup
 
-class Test_Branch(RunbotCase):
 
-    def setUp(self):
-        super(Test_Branch, self).setUp()
-        Repo = self.env['runbot.repo']
-        self.repo = Repo.create({'name': 'bla@example.com:foo/bar', 'token': '123'})
-        self.Branch = self.env['runbot.branch']
-
-        #mock_patch = patch('odoo.addons.runbot.models.repo.runbot_repo._github', self._github)
-        #mock_patch.start()
-        #self.addCleanup(mock_patch.stop)
+class TestBranch(RunbotCase):
 
     def test_base_fields(self):
         branch = self.Branch.create({
-            'repo_id': self.repo.id,
-            'name': 'refs/head/master'
+            'remote_id': self.remote_server.id,
+            'name': 'master',
+            'is_pr': False,
         })
 
-        self.assertEqual(branch.branch_name, 'master')
-        self.assertEqual(branch.branch_url, 'https://example.com/foo/bar/tree/master')
-        self.assertEqual(branch.config_id, self.env.ref('runbot.runbot_build_config_default'))
+        self.assertEqual(branch.branch_url, 'https://example.com/base/server/tree/master')
 
     def test_pull_request(self):
         mock_github = self.patchers['github_patcher']
         mock_github.return_value = {
-            'head' : {'label': 'foo-dev:bar_branch'},
-            'base' : {'ref': 'master'},
+            'base': {'ref': 'master'},
+            'head': {'label': 'foo-dev:bar_branch', 'repo': {'full_name': 'foo-dev/bar'}},
         }
         pr = self.Branch.create({
-            'repo_id': self.repo.id,
-            'name': 'refs/pull/12345'
+            'remote_id': self.remote_server.id,
+            'name': '12345',
+            'is_pr': True,
         })
-        self.assertEqual(pr.branch_name, '12345')
-        self.assertEqual(pr.branch_url, 'https://example.com/foo/bar/pull/12345')
+        self.assertEqual(pr.name, '12345')
+        self.assertEqual(pr.branch_url, 'https://example.com/base/server/pull/12345')
         self.assertEqual(pr.target_branch_name, 'master')
         self.assertEqual(pr.pull_head_name, 'foo-dev:bar_branch')
-
-    def test_coverage_in_name(self):
-        """Test that coverage in branch name enables coverage"""
-        branch = self.Branch.create({
-            'repo_id': self.repo.id,
-            'name': 'refs/head/foo-branch-bar'
-        })
-        self.assertEqual(branch.config_id, self.env.ref('runbot.runbot_build_config_default'))
-        cov_branch = self.Branch.create({
-            'repo_id': self.repo.id,
-            'name': 'refs/head/foo-use-coverage-branch-bar'
-        })
-        self.assertEqual(cov_branch.config_id, self.env.ref('runbot.runbot_build_config_test_coverage'))
-
 
 class TestBranchRelations(RunbotCase):
 
     def setUp(self):
         super(TestBranchRelations, self).setUp()
 
-        self.repo = self.env['runbot.repo'].create({'name': 'bla@example.com:foo/bar'})
-        self.repodev = self.env['runbot.repo'].create({'name': 'bla@example.com:foo-dev/bar', 'duplicate_id':self.repo.id })
-        self.Branch = self.env['runbot.branch']
-
-        def create_sticky(name):
-            return self.Branch.create({
-                'repo_id': self.repo.id,
-                'name': 'refs/heads/%s' % name,
-                'sticky': True
+        def create_base(name):
+            branch = self.Branch.create({
+                'remote_id': self.remote_server.id,
+                'name': name,
+                'is_pr': False,
             })
-        self.master = create_sticky('master')
-        create_sticky('11.0')
-        create_sticky('saas-11.1')
-        create_sticky('12.0')
-        create_sticky('saas-12.3')
-        create_sticky('13.0')
-        create_sticky('saas-13.1')
-        self.last = create_sticky('saas-13.2')
+            branch.bundle_id.is_base = True
+            return branch
+        self.master = create_base('master')
+        create_base('11.0')
+        create_base('saas-11.1')
+        create_base('12.0')
+        create_base('saas-12.3')
+        create_base('13.0')
+        create_base('saas-13.1')
+        self.last = create_base('saas-13.2')
+        self.env['runbot.bundle'].flush()
+        self.env['runbot.version'].flush()
 
     def test_relations_master_dev(self):
         b = self.Branch.create({
-                'repo_id': self.repodev.id,
-                'name': 'refs/heads/master-test-tri',
+                'remote_id': self.remote_server_dev.id,
+                'name': 'master-test-tri',
+                'is_pr': False,
             })
-        self.assertEqual(b.closest_sticky.branch_name, 'master')
-        self.assertEqual(b.previous_version.branch_name, '13.0')
-        self.assertEqual(sorted(b.intermediate_stickies.mapped('branch_name')), ['saas-13.1', 'saas-13.2'])
+        self.assertEqual(b.bundle_id.base_id.name, 'master')
+        self.assertEqual(b.bundle_id.previous_major_version_base_id.name, '13.0')
+        self.assertEqual(b.bundle_id.intermediate_version_base_ids.mapped('name'), ['saas-13.1', 'saas-13.2'])
 
     def test_relations_master(self):
         b = self.master
-        self.assertEqual(b.closest_sticky.branch_name, 'master')
-        self.assertEqual(b.previous_version.branch_name, '13.0')
-        self.assertEqual(sorted(b.intermediate_stickies.mapped('branch_name')), ['saas-13.1', 'saas-13.2'])
+        self.assertEqual(b.bundle_id.base_id.name, 'master')
+        self.assertEqual(b.bundle_id.previous_major_version_base_id.name, '13.0')
+        self.assertEqual(b.bundle_id.intermediate_version_base_ids.mapped('name'), ['saas-13.1', 'saas-13.2'])
 
     def test_relations_no_intermediate(self):
         b = self.Branch.create({
-                'repo_id': self.repodev.id,
-                'name': 'refs/heads/saas-13.1-test-tri',
+                'remote_id': self.remote_server_dev.id,
+                'name': 'saas-13.1-test-tri',
+                'is_pr': False,
             })
-        self.assertEqual(b.closest_sticky.branch_name, 'saas-13.1')
-        self.assertEqual(b.previous_version.branch_name, '13.0')
-        self.assertEqual(sorted(b.intermediate_stickies.mapped('branch_name')), [])
+        self.assertEqual(b.bundle_id.base_id.name, 'saas-13.1')
+        self.assertEqual(b.bundle_id.previous_major_version_base_id.name, '13.0')
+        self.assertEqual(b.bundle_id.intermediate_version_base_ids.mapped('name'), [])
 
     def test_relations_old_branch(self):
         b = self.Branch.create({
-                'repo_id': self.repodev.id,
-                'name': 'refs/heads/11.0-test-tri',
+                'remote_id': self.remote_server_dev.id,
+                'name': '11.0-test-tri',
+                'is_pr': False,
             })
-        self.assertEqual(b.closest_sticky.branch_name, '11.0')
-        self.assertEqual(b.previous_version.branch_name, False)
-        self.assertEqual(sorted(b.intermediate_stickies.mapped('branch_name')), [])
+        self.assertEqual(b.bundle_id.base_id.name, '11.0')
+        self.assertEqual(b.bundle_id.previous_major_version_base_id.name, False)
+        self.assertEqual(sorted(b.bundle_id.intermediate_version_base_ids.mapped('name')), [])
 
     def test_relations_closest_forced(self):
         b = self.Branch.create({
-                'repo_id': self.repodev.id,
-                'name': 'refs/heads/master-test-tri',
+                'remote_id': self.remote_server_dev.id,
+                'name': 'master-test-tri',
+                'is_pr': False,
             })
-        self.assertEqual(b.closest_sticky.branch_name, 'master')
-        self.assertEqual(b.previous_version.branch_name, '13.0')
-        self.assertEqual(sorted(b.intermediate_stickies.mapped('branch_name')), ['saas-13.1', 'saas-13.2'])
+        self.assertEqual(b.bundle_id.base_id.name, 'master')
+        self.assertEqual(b.bundle_id.previous_major_version_base_id.name, '13.0')
+        self.assertEqual(sorted(b.bundle_id.intermediate_version_base_ids.mapped('name')), ['saas-13.1', 'saas-13.2'])
 
-        b.defined_sticky = self.last
+        b.bundle_id.defined_base_id = self.last.bundle_id
 
-        self.assertEqual(b.closest_sticky.branch_name, 'saas-13.2')
-        self.assertEqual(b.previous_version.branch_name, '13.0')
-        self.assertEqual(sorted(b.intermediate_stickies.mapped('branch_name')), ['saas-13.1'])
+        self.assertEqual(b.bundle_id.base_id.name, 'saas-13.2')
+        self.assertEqual(b.bundle_id.previous_major_version_base_id.name, '13.0')
+        self.assertEqual(sorted(b.bundle_id.intermediate_version_base_ids.mapped('name')), ['saas-13.1'])
 
     def test_relations_no_match(self):
         b = self.Branch.create({
-                'repo_id': self.repodev.id,
-                'name': 'refs/heads/icantnamemybranches',
+                'remote_id': self.remote_server_dev.id,
+                'name': 'icantnamemybranches',
+                'is_pr': False,
             })
 
-        self.assertEqual(b.closest_sticky.branch_name, False)
-        self.assertEqual(b.previous_version.branch_name, False)
-        self.assertEqual(sorted(b.intermediate_stickies.mapped('branch_name')), [])
+        self.assertEqual(b.bundle_id.base_id.name, 'master')
 
     def test_relations_pr(self):
         self.Branch.create({
-                'repo_id': self.repodev.id,
-                'name': 'refs/heads/master-test-tri',
+                'remote_id': self.remote_server_dev.id,
+                'name': 'master-test-tri',
+                'is_pr': False,
             })
+
+        self.patchers['github_patcher'].return_value = {
+            'base': {'ref': 'master-test-tri'},
+            'head': {'label': 'dev:master-test-tri-imp', 'repo': {'full_name': 'dev/server'}},
+            }
         b = self.Branch.create({
-                'repo_id': self.repodev.id,
-                'target_branch_name': 'master-test-tri',
-                'name': 'refs/pull/100',
+                'remote_id': self.remote_server_dev.id,
+                'name': '100',
+                'is_pr': True,
             })
-        b.target_branch_name = 'master-test-tri'
-        self.assertEqual(b.closest_sticky.branch_name, 'master')
-        self.assertEqual(b.previous_version.branch_name, '13.0')
-        self.assertEqual(sorted(b.intermediate_stickies.mapped('branch_name')), ['saas-13.1', 'saas-13.2'])
+
+        self.assertEqual(b.bundle_id.name, 'master-test-tri-imp')
+        self.assertEqual(b.bundle_id.base_id.name, 'master')
+        self.assertEqual(b.bundle_id.previous_major_version_base_id.name, '13.0')
+        self.assertEqual(sorted(b.bundle_id.intermediate_version_base_ids.mapped('name')), ['saas-13.1', 'saas-13.2'])
 
 
+class TestBranchForbidden(RunbotCase):
+    """Test that a branch matching the repo forbidden regex, goes to dummy bundle"""
+
+    def test_forbidden(self):
+        dummy_bundle = self.env.ref('runbot.bundle_dummy')
+        self.remote_server_dev.repo_id.forbidden_regex = '^bad_name.+'
+        with mute_logger("odoo.addons.runbot.models.branch"):
+            branch = self.Branch.create({
+                    'remote_id': self.remote_server_dev.id,
+                    'name': 'bad_name-evil',
+                    'is_pr': False,
+                })
+            self.assertEqual(branch.bundle_id.id, dummy_bundle.id, "A forbidden branch should goes in dummy bundle")
+
+
+class TestBranchIsBase(RunbotCaseMinimalSetup):
+    """Test that a branch matching the is_base_regex goes in the right bundle"""
+
+    def setUp(self):
+        super(TestBranchIsBase, self).setUp()
+        self.additionnal_setup()
+
+    def test_is_base_regex_on_main_remote(self):
+        branch = self.Branch.create({
+                'remote_id': self.remote_server.id,
+                'name': 'saas-13.4',
+                'is_pr': False,
+            })
+        self.assertTrue(branch.bundle_id.is_base, "A branch matching the is_base_regex parameter should create is_base bundle")
+        self.assertTrue(branch.bundle_id.sticky, "A branch matching the is_base_regex parameter should create sticky bundle")
+
+    @mute_logger("odoo.addons.runbot.models.branch")
+    def test_is_base_regex_on_dev_remote(self):
+        """Test that a branch matching the is_base regex on a secondary remote goes to the dummy bundles."""
+        dummy_bundle = self.env.ref('runbot.bundle_dummy')
+
+        # master branch on dev remote
+        initial_addons_dev_commit = self.Commit.create({
+            'name': 'dddddd',
+            'repo_id': self.repo_addons.id,
+            'date': '2015-09-30',
+            'subject': 'Please use the right repo',
+            'author': 'oxo',
+            'author_email': 'oxo@somewhere.com'
+        })
+
+        branch_addons_dev = self.Branch.create({
+            'name': 'master',
+            'remote_id': self.remote_addons_dev.id,
+            'is_pr': False,
+            'head': initial_addons_dev_commit.id
+        })
+        self.assertEqual(branch_addons_dev.bundle_id, dummy_bundle, "A branch matching the is_base_regex should on a secondary repo should goes in dummy bundle")
+
+        # saas-12.3 branch on dev remote
+        initial_server_dev_commit = self.Commit.create({
+            'name': 'bbbbbb',
+            'repo_id': self.repo_server.id,
+            'date': '2014-05-26',
+            'subject': 'Please use the right repo',
+            'author': 'oxo',
+            'author_email': 'oxo@somewhere.com'
+        })
+
+        branch_server_dev = self.Branch.create({
+            'name': 'saas-12.3',
+            'remote_id': self.remote_server_dev.id,
+            'is_pr': False,
+            'head': initial_server_dev_commit.id
+        })
+        self.assertEqual(branch_server_dev.bundle_id, dummy_bundle, "A branch matching the is_base_regex should on a secondary repo should goes in dummy bundle")
+
+        # 12.0 branch on dev remote
+        mistaken_commit = self.Commit.create({
+            'name': 'eeeeee',
+            'repo_id': self.repo_server.id,
+            'date': '2015-06-27',
+            'subject': 'dummy commit',
+            'author': 'brol',
+            'author_email': 'brol@somewhere.com'
+        })
+
+        branch_mistake_dev = self.Branch.create({
+            'name': '12.0',
+            'remote_id': self.remote_server_dev.id,
+            'is_pr': False,
+            'head': mistaken_commit.id
+        })
+        self.assertEqual(branch_mistake_dev.bundle_id, dummy_bundle, "A branch matching the is_base_regex should on a secondary repo should goes in dummy bundle")

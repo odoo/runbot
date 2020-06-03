@@ -1,255 +1,312 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
   <data>
-    <template id="runbot.build_name">
-        <t t-if="bu.real_build.requested_action=='deathrow'"><i class="text-info fa fa-crosshairs"/> killing</t>
-        <t t-if="bu.real_build.requested_action=='wake_up'"><i class="text-info fa fa-coffee"/> waking up</t>
-        <t t-if="not bu.requested_action">
-          <t t-if="bu.global_state=='pending'"><i class="text-default fa fa-pause"/> pending</t>
-          <t t-if="bu.global_state in ('testing', 'waiting')">
-            <t t-set="textklass" t-value="dict(ko='danger', warn='warning').get(bu.global_result, 'info')"/>
-            <t t-if="bu.global_state == 'waiting'">
-              <span t-attf-class="text-{{textklass}}"><i class="fa fa-spinner fa-spin"/> <t t-esc="bu.global_state"/></span> <small t-if="not hide_time">time: <t t-esc="bu.get_formated_build_time()"/></small>
-            </t>
-            <t t-else="">
-              <span t-attf-class="text-{{textklass}}"><i class="fa fa-spinner fa-spin"/> <t t-esc="bu.global_state"/></span> <small> step <t t-esc="bu['job']"/>: </small><small t-if="not hide_time"><t t-esc="bu.get_formated_job_time()"/> -- time: <t t-esc="bu.get_formated_build_time()"/></small>
-            </t>
-          </t>
-          <t t-if="bu.global_state in ('running', 'done')">
-            <t t-if="bu.global_result=='ok'"><i class="text-success fa fa-thumbs-up" title="Success" aria-label="Success"/><small t-if="not hide_time"> age: <t t-esc="bu.get_formated_build_age()"/> -- time: <t t-esc="bu.get_formated_build_time()"/></small></t>
-            <t t-if="bu.global_result=='ko'"><i class="text-danger fa fa-thumbs-down" title="Failed" aria-label="Failed"/><small t-if="not hide_time"> age: <t t-esc="bu.get_formated_build_age()"/> -- time: <t t-esc="bu.get_formated_build_time()"/></small></t>
-            <t t-if="bu.global_result=='warn'"><i class="text-warning fa fa-warning" title="Some warnings" aria-label="Some warnings"/><small t-if="not hide_time"> age: <t t-esc="bu.get_formated_build_age()"/> -- time: <t t-esc="bu.get_formated_build_time()"/></small></t>
-            <t t-if="bu.global_result=='skipped'"><i class="text-danger fa fa-ban"/> skipped</t>
-            <t t-if="bu.global_result=='killed'"><i class="text-danger fa fa-times"/> killed</t>
-            <t t-if="bu.global_result=='manually_killed'"><i class="text-danger fa fa-times"/> manually killed</t>
-          </t>
-        </t>
-    </template>
-    <template id="runbot.build_button">
-        <div t-attf-class="pull-right">
-            <div t-attf-class="btn-group {{klass}}">
-                <a t-if="bu.real_build.local_state=='running'" t-attf-href="http://{{bu['domain']}}/?db={{bu.real_build.dest}}-all" class="btn btn-primary" title="Sign in on this build" aria-label="Sign in on this build"><i class="fa fa-sign-in"/></a>
-                <a t-if="bu.real_build.local_state=='done' and bu.real_build.requested_action != 'wake_up'" href="#" data-runbot="wakeup" t-att-data-runbot-build="bu.real_build.id" class="btn btn-default" title="Wake up this build" aria-label="Wake up this build"><i class="fa fa-coffee"/></a>
-                <a t-attf-href="/runbot/build/{{bu['id']}}" class="btn btn-default" title="Build details" aria-label="Build details"><i class="fa fa-file-text-o"/></a>
-                <a t-if="show_commit_button" t-attf-href="https://#{repo.base}/commit/#{bu['name']}" class="btn btn-default" title="Open commit on GitHub" aria-label="Open commit on GitHub"><i class="fa fa-github"/></a>
-                <button class="btn btn-default dropdown-toggle" data-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false"><i class="fa fa-cog"/><span class="caret"></span></button>
-                <ul class="dropdown-menu dropdown-menu-right" role="menu">
-                    <li t-if="bu.global_result=='skipped'" groups="runbot.group_runbot_admin">
-                        <a href="#" data-runbot="rebuild" t-att-data-runbot-build="bu['id']">Force Build <i class="fa fa-level-up"></i></a>
-                    </li>
-                    <t t-if="bu.real_build.local_state=='running'">
-                        <li><a t-attf-href="http://{{bu['domain']}}/?db={{bu['real_build'].dest}}-all">Connect all <i class="fa fa-sign-in"></i></a></li>
-                        <li><a t-attf-href="http://{{bu['domain']}}/?db={{bu['real_build'].dest}}-base">Connect base <i class="fa fa-sign-in"></i></a></li>
-                        <li><a t-attf-href="http://{{bu['domain']}}/">Connect <i class="fa fa-sign-in"></i></a></li>
-                    </t>
-                    <li t-if="bu.global_state in ['done','running'] or requested_action == 'deathrow'" groups="base.group_user">
-                        <t t-if="show_rebuild_button">
-                          <a href="#" data-runbot="rebuild" t-att-data-runbot-build="bu['id']"
-                            title="Create a new build keeping build commit head, but will recompute all other info (config, dependencies, extra_params)">
-                          Rebuild <i class="fa fa-refresh"/>
-                          </a>
-                        </t>
-                        <a href="#" data-runbot="rebuild-exact" t-att-data-runbot-build="bu['id']"
-                          title="Create a new build keeping all build info (config, dependencies, extra_params)">
-                        Exact Rebuild <i class="fa fa-refresh"/>
-                        </a>
-                    </li>
-                    <li t-if="bu.global_state != 'done'" groups="base.group_user">
-                        <a t-if="bu.real_build.requested_action != 'deathrow'" href="#" data-runbot="kill" t-att-data-runbot-build="bu['id']">Kill <i class="fa fa-crosshairs"/></a>
-                        <span t-else="" data-runbot="kill" > Killing <i class="fa fa-spinner fa-spin"/> <i class="fa fa-crosshairs"/></span>
-                    </li>
-                    <li t-if="bu.global_state == 'done'" groups="base.group_user">
-                        <a t-if="bu.real_build.requested_action != 'wake_up'" href="#" data-runbot="wakeup" t-att-data-runbot-build="bu['id']">Wake up <i class="fa fa-coffee"/></a>
-                        <span t-else="" data-runbot="wakeup" > Waking up <i class="fa fa-spinner fa-spin"/> <i class="fa fa-crosshairs"/></span>
-                    </li>
-
-                    <li t-if="bu.global_state not in ('testing', 'waiting', 'pending')" class="divider"></li>
-                    <li><a t-attf-href="/runbot/build/{{bu['id']}}">Logs <i class="fa fa-file-text-o"/></a></li>
-                    <t t-set="log_url" t-value="'http://%s' % bu.real_build.host if bu.real_build.host != fqdn else ''"/>
-                    <t t-if="bu.real_build.host" t-foreach="(bu.log_list or '').split(',')" t-as="log_name" >
-                      <li><a t-attf-href="{{log_url}}/runbot/static/build/#{bu['real_build'].dest}/logs/#{log_name}.txt">Full <t t-esc="log_name"/> logs <i class="fa fa-file-text-o"/></a></li>
-                    </t>
-                    <li t-if="bu.coverage and bu.real_build.host"><a t-attf-href="http://{{bu.real_build.host}}/runbot/static/build/#{bu['real_build'].dest}/coverage/index.html">Coverage <i class="fa fa-file-text-o"/></a></li>
-                    <li t-if="bu.global_state!='pending'" class="divider"></li>
-                    <li><a t-attf-href="{{br['branch'].branch_url}}"><t t-esc="'Branch ' if not br['branch'].pull_head_name else 'Pull '"/><i class="fa fa-github"/></a></li>
-                    <li><a t-attf-href="https://{{repo.base}}/commit/{{bu['name']}}">Commit <i class="fa fa-github"/></a></li>
-                    <li><a t-attf-href="https://{{repo.base}}/compare/{{br['branch'].branch_name}}">Compare <i class="fa fa-github"/></a></li>
-                    <!-- TODO branch.pull from -->
-                    <li class="divider"></li>
-                    <li groups="runbot.group_runbot_admin"><a t-attf-href="/web/#id={{bu['id']}}&amp;view_type=form&amp;model=runbot.build" target="new">View in backend</a></li>
-                </ul>
-            </div>
-        </div>
-    </template>
-    <!-- Event / Logs page -->
-    <template id="runbot.build_class">
-        <t t-set="rowclass">info</t>
-        <t t-if="build.global_state in ['running','done']">
-          <t t-if="build.global_result == 'ok'"><t t-set="rowclass">success</t></t>
-          <t t-if="build.global_result == 'skipped'"><t t-set="rowclass">default</t></t>
-          <t t-if="build.global_result in ['killed', 'manually_killed']"><t t-set="rowclass">killed</t></t>
-        </t>
-        <t t-if="build.global_result == 'ko'"><t t-set="rowclass">danger</t></t>
-        <t t-if="build.global_result == 'warn'"><t t-set="rowclass">warning</t></t>
-        <t t-esc="rowclass"/>
-    </template>
     <template id="runbot.build">
-        <t t-call='website.layout'>
-
-          <t t-set="nav_form">
-            <form class="form-inline">
-              <div class="btn-group">
-                  <t t-call="runbot.build_button">
-                      <t t-set="bu" t-value="build"/>
-                      <t t-set="klass" t-value="''"/>
-                      <t t-set="show_commit_button" t-value="True"/>
-                  </t>
-              </div>
-            </form>
-            <form class="form-inline" t-attf-action="/runbot/build/#{build['id']}/force" method='POST' t-if="request.params.get('ask_rebuild')" groups="runbot.group_user">
-              <a href='#' class="btn btn-danger" data-runbot="rebuild" t-attf-data-runbot-build="#{build['id']}" > <i class='fa fa-refresh'/> Force Rebuild</a>
-            </form>
-          </t>
-                <div class="row" >
-                    <div class='col-md-12'>
-                        <table class="table table-condensed tabel-bordered">
-                          <tr>
-                            <t t-set="rowclass"><t t-call="runbot.build_class"><t t-set="build" t-value="build"/></t></t>
-                            <td t-attf-class="bg-{{rowclass.strip()}}-light">
-                                <t t-if="build.description">
-                                <b>Description:</b> <t t-raw="build.md_description"/><br/>
-                                </t>
-                                <b>Subject:</b>  <t t-esc="build.subject"/><br/>
-                                <b>Author:</b>  <t t-esc="build.author"/><br/>
-                                <b>Committer:</b>  <t t-esc="build.committer"/><br/>
-                                <b>Commit:</b>  <a title="Go to github commit page" t-attf-href="https://{{build.repo_id.base}}/commit/{{build.name}}"><t t-esc="build.name"/></a><br/>
-                                <t t-foreach="build.sudo().dependency_ids" t-as="dep">
-                                  <b>Dep:</b> <t t-esc="dep.dependecy_repo_id.short_name"/>:<a t-attf-href="https://{{dep.dependecy_repo_id.base}}/commit/{{dep.dependency_hash}}"><t t-esc="dep.dependency_hash"/></a>
-                                  <t t-if='dep.closest_branch_id'> from branch <t t-esc="dep.closest_branch_id.name"/></t>
-                                  <br/>
-                                </t>
-                                <b>Branch:</b>  <span id="branchclp"><a title="Go to branch build list" t-attf-href="/runbot/branch/{{build.branch_id.id}}" t-esc="build.branch_id.branch_name"/></span>
-                                <t t-if="build.branch_id.pull_head_name" t-esc="'(%s)' % build.branch_id.pull_branch_name"/>
-                                <!--<a href="#" class="clipbtn octicon octicon-clippy" data-clipboard-target="#branchclp" title="Copy branch name to clipboard"/>--><br/>
-                                <b>Host:</b>  <t t-esc="build.real_build.host"/><br/>
-                                <b>Dest:</b>  <t t-esc="build.dest"/><br/>
-                                <b>Total time:</b>  <t t-esc="build.get_formated_build_time()"/><br/>
-
-                            <br/>
-                            <t t-set="branch_name_builds" t-value="build.branch_id._get_last_branch_name_builds()"/>
-                            <t t-if="branch_name_builds">
-                              <b>Latest branch builds:</b>
-                              <t t-foreach="branch_name_builds" t-as="cbu">
-                                <t t-set="klass">info</t>
-                          
-                                <t t-if="cbu.global_result == 'ko'"><t t-set="klass">danger</t></t>
-                                <t t-if="cbu.global_result == 'warn'"><t t-set="klass">warning</t></t>
-                                <t t-if="cbu.global_result in ('killed', 'manually_killed')"><t t-set="klass">killed</t></t>
-                                <t t-if="cbu.global_result == 'ok' and cbu.global_state in ('running','done')"><t t-set="klass">success</t></t>
-                                <a t-attf-href='/runbot/build/{{cbu.id}}'><span t-attf-class="label label-{{klass}}"><t t-esc="cbu.repo_id._get_repo_name_part()"/></span></a>
-                              </t><br/>
-                            </t>
-                            </td>
-                            <td t-if="build.real_build.children_ids">
-                              Children:
-                              <table class="table table-condensed">
-                                <t t-foreach="build.real_build.children_ids.sorted('id')" t-as="child">
-                                  <t t-set="rowclass"><t t-call="runbot.build_class"><t t-set="build" t-value="child"/></t></t>
-                                  <tr t-attf-class="bg-{{rowclass.strip()}}-light"><td>
-                                    <a t-attf-href="/runbot/build/{{child.id}}" >Build <t t-esc="child.id"/></a>
-                                    <t t-if="child.description">
-                                      <t t-raw="child.md_description" />
-                                    </t>
-                                    <t t-else="">
-                                        with config <t t-esc="child.config_id.name"/>
-                                    </t>
-                                    <a groups="runbot.group_build_config_user" t-attf-href="/web#id={{child.config_id.id}}&amp;view_type=form&amp;model=runbot.build.config">...</a>
-                                    <t t-if="child.orphan_result"><i class="fa fa-chain-broken" title="Build result ignored for parent" /></t>
-                                    <t t-if="child.job"> Running step: <t t-esc="child.job"/></t>
-                                    <t t-if="child.global_state in ['testing', 'waiting']">
-                                      <i class="fa fa-spinner fa-spin"/>
-                                      <t t-esc="child.global_state"/>
-                                    </t>
-                                  </td>
-                                  <td> <span t-attf-class="label label-info" t-esc="child.get_formated_build_time()"/>
-                                  </td>
-                                  <td>
-                                    <t t-call="runbot.build_button">
-                                        <t t-set="bu" t-value="child"/>
-                                        <t t-set="klass" t-value="'btn-group-ssm'"/>
-                                    </t>
-
-                                  </td></tr>
-                                </t>
-                              </table>
-                            </td>
-                          </tr>
-                        </table>
-                        <p t-if="build.parent_id">Child of <a t-attf-href="/runbot/build/#{build.parent_id.id}"><t t-esc="build.parent_id.dest"/></a>
-                        <t t-if="build.orphan_result">&amp;nbsp;<i class="fa fa-chain-broken" title="Build result ignored for parent" />&amp;nbsp;Orphaned build, the result does not affect parent build result</t></p>
-                        <p t-if="build.duplicate_id">Duplicate of <a t-attf-href="/runbot/build/#{build.duplicate_id.id}"><t t-esc="build.duplicate_id.dest"/></a></p>
-                        <table class="table table-condensed">
-                        <tr>
-                            <th>Date</th>
-                            <th>Level</th>
-                            <th>Type</th>
-                            <th>Message</th>
-                        </tr>
-                        <t t-foreach="build.real_build.sudo().log_ids" t-as="l">
-                            <t t-set="subbuild" t-value="(([child for child in build.real_build.children_ids if child.id == int(l.path)] if l.type == 'subbuild' else False) or [build.browse()])[0]"/>
-                            <t t-set="logclass" t-value="dict(CRITICAL='danger', ERROR='danger', WARNING='warning', OK='success', SEPARATOR='separator').get(l.level)"/>
-                            <tr t-attf-class="'bg-%s-light' % {{logclass}} if {{logclass}} != 'separator' else {{logclass}}">
-                                <td style="white-space: nowrap; width:1%;"><t t-esc="l.create_date.strftime('%Y-%m-%d %H:%M:%S')"/></td>
-                                <td style="white-space: nowrap; width:1%;"><b t-if="l.level != 'SEPARATOR' and l.type not in ['link', 'markdown']" t-esc="l.level"/></td>
-                                <td style="white-space: nowrap; width:1%;"><t t-if="l.level != 'SEPARATOR' and l.type not in ['link', 'markdown']" t-esc="l.type"/></td>
-                                <t t-set="message_class" t-value="''"/>
-                                <t t-if="subbuild" t-set="message_class"><t t-call="runbot.build_class"><t t-set="build" t-value="subbuild"/></t></t>
-                                <td t-attf-class="bg-{{message_class.strip() or logclass}}-light">
-                                    <t t-if="l.type not in ('runbot', 'link', 'markdown')">
-                                      <t t-if="l.type == 'subbuild'">
-                                         <a t-attf-href="/runbot/build/{{l.path}}">Build #<t t-esc="l.path"/></a>
-                                      </t>
-                                      <a t-else="" t-attf-href="https://{{repo.base}}/blob/{{build['name']}}/{{l.path}}#L{{l.line}}"><t t-esc="l.name"/>:<t t-esc="l.line"/></a> <t t-esc="l.func"/>
-                                    </t>
-                                    <t t-if="l.type == 'link' and len(l.message.split('$$')) == 3">
-                                      <t t-set="message" t-value="l.message.split('$$')"/>
-                                      <t t-if="message[1].startswith('fa-')">
-                                        <t t-esc="message[0]"/><a t-attf-href="{{l.path}}"><i t-attf-class="fa {{message[1]}}"/></a><t t-esc="message[2]"/>
-                                      </t>
-                                      <t t-else="">
-                                          <t t-esc="message[0]"/><a t-attf-href="{{l.path}}"><t t-esc="message[1]"/></a><t t-esc="message[2]"/>
-                                      </t>
-                                    </t>
-                                    <t t-elif="l.type == 'markdown'" t-raw="l._markdown()"/>
-                                    <t t-else="">
-                                      <t t-if="'\n' not in l.message" t-esc="l.message"/>
-                                      <pre t-if="'\n' in l.message" style="margin:0;padding:0; border: none;"><t t-esc="l.message"/></pre>
-                                      <t t-if="l.type == 'subbuild' and subbuild.sudo().error_log_ids">
-                                         <a class="show" data-toggle="collapse" t-attf-data-target="#subbuild-{{subbuild.id}}"><i class="fa"></i></a>
-                                         <div t-attf-id="subbuild-{{subbuild.id}}" class="collapse in">
-                                          <table class="table table-condensed" style="margin-bottom:0;">
-                                            <t t-foreach="subbuild.sudo().error_log_ids" t-as="sl">
-                                              <tr>
-                                                <td t-att-class="dict(CRITICAL='danger', ERROR='danger', WARNING='warning', OK='success', SEPARATOR='separator').get(sl.level)">
-                                                    <t t-if="sl.type == 'server'">
-                                                      <a t-attf-href="https://{{repo.base}}/blob/{{build['name']}}/{{sl.path}}#L{{sl.line}}"><t t-esc="sl.name"/>:<t t-esc="sl.line"/></a> <t t-esc="sl.func"/>
-                                                    </t>
-                                                    <t t-if="'\n' not in sl.message" t-esc="sl.message"/>
-                                                    <pre t-if="'\n' in sl.message" style="margin:0;padding:0; border: none;"><t t-esc="sl.message"/></pre>
-                                                </td>
-                                              </tr>
-                                            </t>
-                                          </table>
-                                         </div>
-                                      </t>
-                                    </t>
-                                </td>
-                            </tr>
-                        </t>
-                        </table>
-                    </div>
+      <t t-call='website.layout'>
+        <t t-set="nav_form">
+          <form class="form-inline">
+            <div class="btn-group">
+              <t t-call="runbot.build_button">
+                <t t-set="bu" t-value="build"/>
+                <t t-set="klass" t-value="''"/>
+                <t t-set="show_commit_button" t-value="True"/>
+              </t>
             </div>
+          </form>
+          <form class="form-inline" t-attf-action="/runbot/build/#{build['id']}/force" method='POST' t-if="request.params.get('ask_rebuild')" groups="runbot.group_user">
+            <a href='#' class="btn btn-danger" data-runbot="rebuild" t-attf-data-runbot-build="#{build['id']}">
+              <i class='fa fa-refresh'/>
+              Force Rebuild
+            </a>
+          </form>
         </t>
+        <div class="row">
+          <div class="col-md-12">
+            <t t-set="batches" t-value="build.slot_ids.mapped('batch_id')"/>
+            <t t-set="bundles" t-value="batches.mapped('bundle_id')"/>
+            <t t-if="batches">
+              <t t-if="len(bundles) == 1">
+                <t t-if="len(batches) == 1">
+                  <b>Batch:</b>
+                  <a t-esc="bundles.name" t-attf-href="/runbot/batch/{{batches[0].id}}"/>
+                </t>
+                <t t-else="">
+                  <b>Bundle:</b>
+                  <t t-esc="bundles.name" t-attf-href="/runbot/bundle/{{bundle.id}}"/>
+                  <br/>
+                </t>
+              </t>
+              <t t-else="">
+                This build is referenced in
+                <t t-esc="len(bundles)"/>
+                bundles
+                <t t-if="more">
+                  :
+                  <a t-foreach="bundles" class="badge badge-light" t-as="bundle" t-esc="bundle.name" t-attf-href="/runbot/bundle/{{bundle.id}}"/>
+                </t>
+                <br/>
+              </t>
+              <t t-if="len(batches) > 1">
+                First apparition:
+                <a t-esc="batches[0].bundle_id.name" t-attf-href="/runbot/batch/{{batches[0].id}}"/>
+                <br/>
+                Last apparition:
+                <a t-esc="batches[-1].bundle_id.name" t-attf-href="/runbot/batch/{{batches[-1].id}}"/>
+                <br/>
+              </t>
+            </t>
+          </div>
+          <div class="col-md-12">
+            <table class="table table-condensed tabel-bordered">
+              <tr>
+                <t t-set="rowclass">
+                  <t t-call="runbot.build_class">
+                    <t t-set="build" t-value="build"/>
+                  </t>
+                </t>
+                <td t-attf-class="bg-{{rowclass.strip()}}-light">
+                  <t t-if="build.description">
+                    <b>Description:</b>
+                    <t t-raw="build.md_description"/>
+                    <br/>
+                  </t>
+                  <t t-foreach="build.params_id.sudo().commit_link_ids" t-as="build_commit">
+                    <b>Commit:</b>
+                    <a t-attf-href="/runbot/commit/{{build_commit.commit_id.id}}">
+                      <t t-esc="build_commit.commit_id.dname"/>
+                    </a>
+                    <a t-att-href="'https://%s/commit/%s' % (build_commit.branch_id.remote_id.base_url, build_commit.commit_id.name)" class="btn btn-sm text-left" title="View Commit on Github"><i class="fa fa-github"/></a>
+                    <t t-if="build_commit.match_type in ('default', 'pr_target', 'prefix') ">
+                      from base branch
+                      <br/>
+                    </t>
+                    <div t-else="" class="ml-3">
+                      <b>Subject:</b>
+                      <t t-esc="build_commit.commit_id.subject"/>
+                      <br/>
+                      <b>Author:</b>
+                      <t t-esc="build_commit.commit_id.author"/>
+                      <br/>
+                      <b>Committer:</b>
+                      <t t-esc="build_commit.commit_id.committer"/>
+                      <br/>
+                    </div>
+                  </t>
+                  <b>Version:</b>
+                  <t t-esc="build.params_id.version_id.name"/>
+                  <br/>
+                  <b>Config:</b>
+                  <t t-esc="build.params_id.config_id.name"/>
+                  <br/>
+                  <t t-if='more'>
+                    <b>Trigger:</b>
+                    <t t-esc="build.params_id.trigger_id.name"/>
+                    <br/>
+                    <b>Config data:</b>
+                    <t t-esc="build.params_id.config_data.dict"/>
+                    <br/>
+                    <b>Modules:</b>
+                    <t t-esc="build.params_id.modules"/>
+                    <br/>
+                    <b>Extra params:</b>
+                    <t t-esc="build.params_id.extra_params"/>
+                    <br/>
+
+                    <t t-if="len(build.params_id.builds_reference_ids) > 1">
+                      <b>Reference batch:</b>
+                      <t t-foreach="build.params_id.builds_reference_ids" t-as="reference">
+                        <span t-esc="reference.id"/>
+                      </t>
+                      <br/>
+                    </t>
+
+                    <t t-if="len(build.params_id.build_ids) > 1">
+                      <b>Similar builds:</b>
+                      <t t-foreach="build.params_id.build_ids" t-as="simbuild">
+                        <a t-if="simbuild.id != build.id" t-attf-href="/runbot/build/#{simbuild.id}">
+                          <span
+                            t-attf-class="label label-{{simbuild.get_color_class()}}"
+                            t-esc="simbuild.id"/>
+                        </a>
+                      </t>
+                      <br/>
+                    </t>
+                    <b>Host:</b>
+                    <t t-esc="build.host"/>
+                    <br/>
+                  </t>
+                  <b>Total time:</b>
+                  <t t-esc="build.get_formated_build_time()"/>
+                  <br/>
+                  <b>Trigger:</b>
+                  <t t-esc="build.params_id.trigger_id.name"/>
+                  <br/>
+                  <br/>
+                </td>
+                <td t-if="build.children_ids">
+                  Children:
+                  <table class="table table-condensed">
+                    <t t-foreach="build.children_ids.sorted('id')" t-as="child">
+                      <t t-set="rowclass">
+                        <t t-call="runbot.build_class">
+                          <t t-set="build" t-value="child"/>
+                        </t>
+                      </t>
+                      <tr t-attf-class="bg-{{rowclass.strip()}}-light{{' line-through' if child.orphan_result else ''}}">
+                        <td>
+                          <a t-attf-href="/runbot/build/{{child.id}}">
+                            Build
+                            <t t-esc="child.id"/>
+                          </a>
+                          <t t-if="child.description">
+                            <t t-raw="child.md_description" />
+                          </t>
+                          <t t-else="">
+                            with config
+                            <t t-esc="child.params_id.config_id.name"/>
+                          </t>
+                          <a groups="runbot.group_build_config_user" t-attf-href="/web#id={{child.params_id.config_id.id}}&amp;view_type=form&amp;model=runbot.build.config">...</a>
+                          <t t-if="child.orphan_result">
+                            <i class="fa fa-chain-broken" title="Build result ignored for parent" />
+                          </t>
+                          <t t-if="child.job">
+                            Running step:
+                            <t t-esc="child.job"/>
+                          </t>
+                          <t t-if="child.global_state in ['testing', 'waiting']">
+                            <i class="fa fa-spinner fa-spin"/>
+                            <t t-esc="child.global_state"/>
+                          </t>
+                        </td>
+                        <td>
+                          <span t-attf-class="label label-info" t-esc="child.get_formated_build_time()"/>
+                        </td>
+                        <td>
+                          <t t-call="runbot.build_button">
+                            <t t-set="bu" t-value="child"/>
+                            <t t-set="klass" t-value="'btn-group-ssm'"/>
+                          </t>
+
+                        </td>
+                      </tr>
+                    </t>
+                  </table>
+                </td>
+              </tr>
+            </table>
+            <p t-if="build.parent_id">
+              Child of
+              <a t-attf-href="/runbot/build/#{build.parent_id.id}">
+                <t t-esc="build.parent_id.dest"/>
+              </a>
+              <t t-if="build.orphan_result">
+                &amp;nbsp;
+                <i class="fa fa-chain-broken" title="Build result ignored for parent" />
+                &amp;nbsp;Orphaned build, the result does not affect parent build result
+              </t>
+            </p>
+            <table class="table table-condensed">
+              <tr>
+                <th>Date</th>
+                <th>Level</th>
+                <th>Type</th>
+                <th>Message</th>
+              </tr>
+
+              <t t-set="commit_link_per_name" t-value="{commit_link.commit_id.repo_id.name:commit_link for commit_link in build.params_id.commit_link_ids}"/>
+              <t t-foreach="build.sudo().log_ids" t-as="l">
+                <t t-set="subbuild" t-value="(([child for child in build.children_ids if child.id == int(l.path)] if l.type == 'subbuild' else False) or [build.browse()])[0]"/>
+                <t t-set="logclass" t-value="dict(CRITICAL='danger', ERROR='danger', WARNING='warning', OK='success', SEPARATOR='separator').get(l.level)"/>
+                <tr t-attf-class="'bg-%s-light' % {{logclass}} if {{logclass}} != 'separator' else {{logclass}}">
+                  <td style="white-space: nowrap; width:1%;">
+                    <t t-esc="l.create_date.strftime('%Y-%m-%d %H:%M:%S')"/>
+                  </td>
+                  <td style="white-space: nowrap; width:1%;">
+                    <b t-if="l.level != 'SEPARATOR' and l.type not in ['link', 'markdown']" t-esc="l.level"/>
+                  </td>
+                  <td style="white-space: nowrap; width:1%;">
+                    <t t-if="l.level != 'SEPARATOR' and l.type not in ['link', 'markdown']" t-esc="l.type"/>
+                  </td>
+                  <t t-set="message_class" t-value="''"/>
+                  <t t-if="subbuild" t-set="message_class">
+                    <t t-call="runbot.build_class">
+                      <t t-set="build" t-value="subbuild"/>
+                    </t>
+                  </t>
+                  <td t-attf-class="bg-{{message_class.strip() or logclass}}-light">
+                    <t t-if="l.type not in ('runbot', 'link', 'markdown')">
+                      <t t-if="l.type == 'subbuild'">
+                        <a t-attf-href="/runbot/build/{{l.path}}">
+                          Build #
+                          <t t-esc="l.path"/>
+                        </a>
+                      </t>
+                      <t t-else="">
+                        <t t-set="repo_name" t-value="l.path.replace('/data/build/', '').split('/')[0] "/>
+                        <t t-set="href" t-value=""/>
+                        <t t-if="repo_name in commit_link_per_name">
+                          <t t-set="repo_base_url" t-value="commit_link_per_name[repo_name].branch_id.remote_id.base_url if repo_name in commit_link_per_name else ''"/>
+                          <t t-set="commit_hash" t-value="commit_link_per_name[repo_name].commit_id.name if repo_name in commit_link_per_name else ''"/>
+                          <t t-set="path" t-value="l.path.replace('/data/build/%s/' % repo_name, '')"/>
+                          <t t-set="href" t-value="'https://%s/blob/%s/%s#L%s' % (repo_base_url, commit_hash, path, l.line)"/>
+                        </t>
+                        <a t-att-href="href" t-att-title="l.func"><t t-esc="l.name"/>:<t t-esc="l.line"/></a>
+                      </t>
+                    </t>
+                    <t t-if="l.type == 'link' and len(l.message.split('$$')) == 3">
+                      <t t-set="message" t-value="l.message.split('$$')"/>
+                      <t t-if="message[1].startswith('fa-')">
+                        <t t-esc="message[0]"/>
+                        <a t-attf-href="{{l.path}}">
+                          <i t-attf-class="fa {{message[1]}}"/>
+                        </a>
+                        <t t-esc="message[2]"/>
+                      </t>
+                      <t t-else="">
+                        <t t-esc="message[0]"/>
+                        <a t-attf-href="{{l.path}}">
+                          <t t-esc="message[1]"/>
+                        </a>
+                        <t t-esc="message[2]"/>
+                      </t>
+                    </t>
+                    <t t-elif="l.type == 'markdown'" t-raw="l._markdown()"/>
+                    <t t-else="">
+                      <t t-if="'\n' not in l.message" t-esc="l.message"/>
+                      <pre t-if="'\n' in l.message" style="margin:0;padding:0; border: none;">
+                        <t t-esc="l.message"/>
+                      </pre>
+                      <t t-if="l.type == 'subbuild' and subbuild.sudo().error_log_ids">
+                        <a class="show" data-toggle="collapse" t-attf-data-target="#subbuild-{{subbuild.id}}">
+                          <i class="fa"/>
+                        </a>
+                        <div t-attf-id="subbuild-{{subbuild.id}}" class="collapse in">
+                          <table class="table table-condensed" style="margin-bottom:0;">
+                            <t t-foreach="subbuild.sudo().error_log_ids" t-as="sl">
+                              <tr>
+                                <td t-att-class="dict(CRITICAL='danger', ERROR='danger', WARNING='warning', OK='success', SEPARATOR='separator').get(sl.level)">
+                                  <t t-if="sl.type == 'server'">
+                                    <!--t-attf-href="https://{{repo.base_url}}/blob/{{build['name']}}/{{sl.path}}#L{{sl.line}}"-->
+                                    <a t-att-title="sl.func"><t t-esc="sl.name"/>:<t t-esc="sl.line"/></a>
+                                  </t>
+                                  <t t-if="'\n' not in sl.message" t-esc="sl.message"/>
+                                  <pre t-if="'\n' in sl.message" style="margin:0;padding:0; border: none;">
+                                    <t t-esc="sl.message"/>
+                                  </pre>
+                                </td>
+                              </tr>
+                            </t>
+                          </table>
+                        </div>
+                      </t>
+                    </t>
+                  </td>
+                </tr>
+              </t>
+            </table>
+          </div>
+        </div>
+      </t>
     </template>
   </data>
 </odoo>

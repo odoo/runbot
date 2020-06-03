@@ -6,13 +6,14 @@
         <field name="model">runbot.build.stat.sql</field>
         <field name="arch" type="xml">
             <tree string="Statistics">
-                <field name="config_step_id"/>
-                <field name="build_id"/>
-                <field name="build_name"/>
-                <field name="repo_name"/>
-                <field name="branch_name"/>
                 <field name="key"/>
                 <field name="value"/>
+                <field name="config_step_id"/>
+                <field name="build_id"/>
+                <field name="bundle_id"/>
+                <field name="batch_id"/>
+                <field name="trigger_id"/>
+                <field name="stat_id"/>
             </tree>
         </field>
     </record>

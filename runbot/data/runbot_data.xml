@@ -1,0 +1,94 @@
+<odoo>
+    <record model="runbot.category" id="runbot.default_category">
+        <field name="name">Default</field>
+        <field name="icon">gear</field>
+    </record>
+    <record model="runbot.category" id="runbot.nightly_category">
+        <field name="name">Nightly</field>
+        <field name="icon">moon-o</field>
+    </record>
+    <record model="runbot.category" id="runbot.weekly_category">
+        <field name="name">Weekly</field>
+        <field name="icon">tasks</field>
+    </record>
+
+    <record model="runbot.project" id="runbot.main_project">
+        <field name="name">R&amp;D</field>
+    </record>
+
+    <record model="runbot.bundle" id="runbot.bundle_master">
+        <field name="name">master</field>
+        <field name="is_base">True</field>
+        <field name="project_id" ref="runbot.main_project"/>
+    </record>
+    <record model="runbot.bundle" id="runbot.bundle_dummy">
+        <field name="name">Dummy</field>
+        <field name="no_build">True</field>
+        <field name="project_id" ref="runbot.main_project"/>
+    </record>
+
+    <record model="ir.config_parameter" id="runbot.runbot_is_base_regex">
+        <field name="key">runbot.runbot_is_base_regex</field>
+        <field name="value">^((master)|(saas-)?\d+\.\d+)$</field>
+    </record>
+
+    <record model="ir.actions.server" id="action_toggle_is_base">
+        <field name="name">Mark is base</field>
+        <field name="model_id" ref="runbot.model_runbot_bundle" />
+        <field name="binding_model_id" ref="runbot.model_runbot_bundle" />
+        <field name="type">ir.actions.server</field>
+        <field name="state">code</field>
+        <field name="code">
+            records.write({'is_base': True})
+        </field>
+    </record>
+    <record model="ir.actions.server" id="action_mark_no_build">
+        <field name="name">Mark no build</field>
+        <field name="model_id" ref="runbot.model_runbot_bundle" />
+        <field name="binding_model_id" ref="runbot.model_runbot_bundle" />
+        <field name="type">ir.actions.server</field>
+        <field name="state">code</field>
+        <field name="code">
+            records.write({'no_build': True})
+        </field>
+    </record>
+    <record model="ir.actions.server" id="action_mark_build">
+        <field name="name">Mark build</field>
+        <field name="model_id" ref="runbot.model_runbot_bundle" />
+        <field name="binding_model_id" ref="runbot.model_runbot_bundle" />
+        <field name="type">ir.actions.server</field>
+        <field name="state">code</field>
+        <field name="code">
+            records.write({'no_build': False})
+        </field>
+    </record>
+
+    <record id="ir_cron_runbot" model="ir.cron">
+        <field name="name">Runbot</field>
+        <field name="interval_number">10</field>
+        <field name="interval_type">seconds</field>
+        <field name="numbercall">-1</field>
+        <field name="doall" eval="False"/>
+        <field name="model_id" ref="model_runbot_runbot"/>
+        <field name="code">model._cron()</field>
+        <field name="state">code</field>
+    </record>
+
+
+    <record id="bundle_create" model="base.automation">
+        <field name="name">Base, staging and tmp management</field>
+        <field name="model_id" ref="runbot.model_runbot_bundle"/>
+        <field name="trigger">on_create</field>
+        <field name="active" eval="True"/>
+        <field name="state">code</field>
+        <field name="code">
+if record.name.startswith('tmp.'):
+    record['no_build'] = True
+elif record.name.startswith('staging.'):
+    name = record.name.replace('staging.', '')
+    base = record.env['runbot.bundle'].search([('name', '=', name), ('project_id', '=', record.project_id.id), ('is_base', '=', True)], limit=1)
+    if base:
+        record['defined_base_id'] = base
+       </field>
+   </record>
+</odoo>

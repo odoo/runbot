@@ -19,8 +19,8 @@
                 <field name="fixing_commit"/>
                 <field name="active"/>
                 <field name="parent_id" />
-                <field name="branch_ids" widget="many2many_tags"/>
-                <field name="repo_ids" widget="many2many_tags"/>
+                <field name="bundle_ids" widget="many2many_tags"/>
+                <field name="trigger_ids" widget="many2many_tags"/>
                 <field name="tag_ids" widget="many2many_tags"/>
                 <field name="first_seen_date"/>
                 <field name="first_seen_build_id"/>
@@ -35,8 +35,6 @@
                       <field name="create_date"/>
                       <field name="id"/>
                       <field name="host" groups="base.group_no_one"/>
-                      <field name="repo_id"/>
-                      <field name="branch_id"/>
                       <field name="dest"/>
                       <field name="build_url" widget="url" readonly="1" text="View build"/>
                     </tree>
@@ -48,8 +46,6 @@
                       <field name="create_date"/>
                       <field name="id"/>
                       <field name="host" groups="base.group_no_one"/>
-                      <field name="repo_id"/>
-                      <field name="branch_id"/>
                       <field name="dest"/>
                       <field name="build_url" widget="url" readonly="1" text="View build"/>
                     </tree>

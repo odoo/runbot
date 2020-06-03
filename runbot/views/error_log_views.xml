@@ -6,8 +6,6 @@
       <field name="model">runbot.error.log</field>
       <field name="arch" type="xml">
         <form string="Build Error">
-
-      
           <header>
           </header>
           <sheet>
@@ -19,8 +17,6 @@
               </div>
               <group>
                   <group>
-                    <field name="repo_short_name"/>
-                    <field name="branch_name"/>
                     <field name="log_type"/>
                   </group>
                   <group>
@@ -40,7 +36,7 @@
         </form>
       </field>
     </record>
-    
+
     <record id="runbot_error_log_tree_view" model="ir.ui.view">
       <field name="name">Runbot Error Log tree view</field>
       <field name="model">runbot.error.log</field>
@@ -49,8 +45,6 @@
           <button name="action_goto_build" type="object" icon="fa-external-link "/>
           <field name="build_id"/>
           <field name="log_create_date"/>
-          <field name="repo_short_name"/>
-          <field name="branch_name"/>
           <field name="name"/>
           <field name="func"/>
           <field name="path"/>
@@ -59,7 +53,7 @@
         </tree>
       </field>
     </record>
-    
+
     <record id="runbot_logs_search_view" model="ir.ui.view">
       <field name="name">runbot.error.log.filter</field>
       <field name="model">runbot.error.log</field>
@@ -68,13 +62,9 @@
           <field name="message"/>
           <field name="name" string="Module"/>
           <field name="func"/>
-          <field name="branch_name"/>
-          <field name="repo_name"/>
           <field name="build_id"/>
           <filter string="Failed builds" name="failed_builds" domain="[('global_state', '=', 'done'), ('global_result', '=', 'ko')]"/>
           <separator/>
-          <filter string="Master branches" name="master_branches" domain="[('branch_name', '=', 'master')]"/>
-          <filter string="Sticky branches" name="sticky_branches" domain="[('branch_sticky', '=', True)]"/>
         </search>
       </field>
     </record>
@@ -94,7 +84,7 @@
     />
 
     <menuitem
-        name="Error Logs" 
+        name="Error Logs"
         id="runbot_menu_error_logs"
         parent="runbot_log_menu"
         sequence="20"

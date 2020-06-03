@@ -15,37 +15,38 @@ class Step(models.Model):
 
     job_type = fields.Selection(selection_add=[('cla_check', 'Check cla')])
 
-    def _run_step(self, build, log_path):
-        if self.job_type == 'cla_check':
-            return self._runbot_cla_check(build, log_path)
-        return super(Step, self)._run_step(build, log_path)
-
-    def _runbot_cla_check(self, build, log_path):
+    def _run_cla_check(self, build, log_path):
         build._checkout()
         cla_glob = glob.glob(build._get_server_commit()._source_path("doc/cla/*/*.md"))
+        error = False
+        checked = set()
         if cla_glob:
-            description = "%s Odoo CLA signature check" % build.author
-            mo = re.search('[^ <@]+@[^ @>]+', build.author_email or '')
-            state = "failure"
-            if mo:
-                email = mo.group(0).lower()
-                if re.match('.*@(odoo|openerp|tinyerp)\.com$', email):
-                    state = "success"
+            for commit in build.params_id.commit_ids:
+                email = commit.author_email
+                if email in checked:
+                    continue
+                checked.add(email)
+                build._log('check_cla', "[Odoo CLA signature](https://www.odoo.com/sign-cla) check for %s (%s) " % (commit.author, email), log_type='markdown')
+                mo = re.search('[^ <@]+@[^ @>]+', email or '')
+                if mo:
+                    email = mo.group(0).lower()
+                    if not re.match('.*@(odoo|openerp|tinyerp)\.com$', email):
+                        try:
+                            cla = ''.join(io.open(f, encoding='utf-8').read() for f in cla_glob)
+                            if cla.lower().find(email) == -1:
+                                error = True
+                                build._log('check_cla', 'Invalid email format %s' % email, level="ERROR")
+                        except UnicodeDecodeError:
+                            error = True
+                            build._log('check_cla', 'Invalid CLA encoding (must be utf-8)', level="ERROR")
                 else:
-                    try:
-                        cla = ''.join(io.open(f, encoding='utf-8').read() for f in cla_glob)
-                        if cla.lower().find(email) != -1:
-                            state = "success"
-                    except UnicodeDecodeError:
-                        description = 'Invalid CLA encoding (must be utf-8)'
-                    _logger.info('CLA build:%s email:%s result:%s', build.dest, email, state)
-            status = {
-                "state": state,
-                "target_url": "https://www.odoo.com/sign-cla",
-                "description": description,
-                "context": "legal/cla"
-            }
-            build._log('check_cla', 'CLA %s' % state)
-            build._github_status_notify_all(status)
-        # 0 is myself, -1 is everybody else, -2 nothing
-        return -2
+                    error = True
+                    build._log('check_cla', 'Invalid email format %s' % email, level="ERROR")
+        else:
+            error = True
+            build._log('check_cla', "Missing cla file", level="ERROR")
+
+        if error:
+            build.local_result = 'ko'
+        elif not build.local_result:
+            build.local_result = 'ok'

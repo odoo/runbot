@@ -3,7 +3,7 @@
   <data noupdate="1">
     <record id="runbot_build_config_step_test_base" model="runbot.build.config.step">
         <field name="name">base</field>
-        <field name="install_modules">base</field>
+        <field name="install_modules">-*,base</field>
         <field name="cpu_limit">600</field>
         <field name="test_enable" eval="False"/>
         <field name="protected" eval="True"/>
@@ -12,7 +12,7 @@
 
     <record id="runbot_build_config_step_test_all" model="runbot.build.config.step">
         <field name="name">all</field>
-        <field name="install_modules">*</field>
+        <field name="install_modules"></field>
         <field name="test_enable" eval="True"/>
         <field name="protected" eval="True"/>
         <field name="default_sequence">20</field>
@@ -27,19 +27,17 @@
 
     <record id="runbot_build_config_default" model="runbot.build.config">
         <field name="name">Default</field>
-        <field name="update_github_state" eval="True"/>
         <field name="step_order_ids" eval="[(5,0,0),
-        (0, 0, {'step_id': ref('runbot_build_config_step_test_base')}), 
-        (0, 0, {'step_id': ref('runbot_build_config_step_test_all')}), 
+        (0, 0, {'step_id': ref('runbot_build_config_step_test_base')}),
+        (0, 0, {'step_id': ref('runbot_build_config_step_test_all')}),
         (0, 0, {'step_id': ref('runbot_build_config_step_run')})]"/>
         <field name="protected" eval="True"/>
     </record>
 
     <record id="runbot_build_config_default_no_run" model="runbot.build.config">
         <field name="name">Default no run</field>
-        <field name="update_github_state" eval="True"/>
         <field name="step_order_ids" eval="[(5,0,0),
-        (0, 0, {'step_id': ref('runbot_build_config_step_test_base')}), 
+        (0, 0, {'step_id': ref('runbot_build_config_step_test_base')}),
         (0, 0, {'step_id': ref('runbot_build_config_step_test_all')})]"/>
         <field name="protected" eval="True"/>
     </record>
@@ -54,7 +52,7 @@
     <!-- Coverage-->
     <record id="runbot_build_config_step_test_coverage" model="runbot.build.config.step">
         <field name="name">coverage</field>
-        <field name="install_modules">*</field>
+        <field name="install_modules"></field>
         <field name="cpu_limit">7000</field>
         <field name="test_enable" eval="True"/>
         <field name="coverage" eval="True"/>
@@ -75,7 +73,6 @@
         <field name="create_config_ids" eval="[(4, ref('runbot_build_config_light_test'))]"/>
         <field name="number_builds">20</field>
         <field name="protected" eval="True"/>
-        <field name="force_build" eval="True"/>
     </record>
 
     <record id="runbot_build_config_multibuild" model="runbot.build.config">
@@ -84,10 +81,10 @@
         <field name="step_order_ids" eval="[(5,0,0), (0, 0, {'step_id': ref('runbot_build_config_step_create_light_multi')})]"/>
         <field name="protected" eval="True"/>
     </record>
-    <!-- l10n todo check-->
+    <!-- l10n -->
     <record id="runbot_build_config_step_test_l10n" model="runbot.build.config.step">
         <field name="name">l10n</field>
-        <field name="install_modules">*</field>
+        <field name="install_modules"></field>
         <field name="test_enable" eval="True"/>
         <field name="protected" eval="True"/>
         <field name="default_sequence">30</field>
@@ -104,7 +101,7 @@
     <!-- Click all-->
     <record id="runbot_build_config_step_test_click_all" model="runbot.build.config.step">
         <field name="name">clickall</field>
-        <field name="install_modules">*</field>
+        <field name="install_modules"></field>
         <field name="cpu_limit">5400</field>
         <field name="test_enable" eval="True"/>
         <field name="protected" eval="True"/>

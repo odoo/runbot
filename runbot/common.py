@@ -3,11 +3,11 @@
 import contextlib
 import itertools
 import logging
-import os
 import psycopg2
 import re
 import socket
 import time
+import os
 
 from collections import OrderedDict
 from datetime import timedelta
@@ -19,29 +19,11 @@ from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT
 
 _logger = logging.getLogger(__name__)
 
-dest_reg = re.compile(r'^\d{5,}-.{1,32}-[\da-f]{6}(.*)*$')
+dest_reg = re.compile(r'^\d{5,}-.+$')
 
-class Commit():
-    def __init__(self, repo, sha):
-        self.repo = repo
-        self.sha = sha
 
-    def _source_path(self, *path):
-        return self.repo._source_path(self.sha, *path)
-
-    def export(self):
-        return self.repo._git_export(self.sha)
-
-    def read_source(self, file, mode='r'):
-        file_path = self._source_path(file)
-        try:
-            with open(file_path, mode) as f:
-                return f.read()
-        except:
-            return False
-
-    def __str__(self):
-        return '%s:%s' % (self.repo.short_name, self.sha)
+class RunbotException(Exception):
+    pass
 
 
 def fqdn():
@@ -89,12 +71,26 @@ def rfind(filename, pattern):
     return False
 
 
+def time_delta(time):
+    if isinstance(time, timedelta):
+        return time
+    return timedelta(seconds=-time)
+
+
 def s2human(time):
     """Convert a time in second into an human readable string"""
     return format_timedelta(
-        timedelta(seconds=time),
+        time_delta(time),
         format="narrow",
         threshold=2.1,
+    )
+
+
+def s2human_long(time):
+    return format_timedelta(
+        time_delta(time),
+        threshold=2.1,
+        add_direction=True, locale='en'
     )
 
 

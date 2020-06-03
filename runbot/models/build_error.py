@@ -10,7 +10,7 @@ from odoo.exceptions import ValidationError
 _logger = logging.getLogger(__name__)
 
 
-class RunbotBuildError(models.Model):
+class BuildError(models.Model):
 
     _name = "runbot.build.error"
     _description = "Build error"
@@ -24,16 +24,16 @@ class RunbotBuildError(models.Model):
     module_name = fields.Char('Module name')  # name in ir_logging
     function = fields.Char('Function name')  # func name in ir logging
     fingerprint = fields.Char('Error fingerprint', index=True)
-    random = fields.Boolean('underterministic error', track_visibility='onchange')
-    responsible = fields.Many2one('res.users', 'Assigned fixer', track_visibility='onchange')
-    fixing_commit = fields.Char('Fixing commit', track_visibility='onchange')
+    random = fields.Boolean('underterministic error', tracking=True)
+    responsible = fields.Many2one('res.users', 'Assigned fixer', tracking=True)
+    fixing_commit = fields.Char('Fixing commit', tracking=True)
     build_ids = fields.Many2many('runbot.build', 'runbot_build_error_ids_runbot_build_rel', string='Affected builds')
-    branch_ids = fields.Many2many('runbot.branch', compute='_compute_branch_ids')
-    repo_ids = fields.Many2many('runbot.repo', compute='_compute_repo_ids')
-    active = fields.Boolean('Error is not fixed', default=True, track_visibility='onchange')
+    bundle_ids = fields.One2many('runbot.bundle', compute='_compute_bundle_ids')
+    trigger_ids = fields.Many2many('runbot.trigger', compute='_compute_trigger_ids')
+    active = fields.Boolean('Error is not fixed', default=True, tracking=True)
     tag_ids = fields.Many2many('runbot.build.error.tag', string='Tags')
-    build_count = fields.Integer(compute='_compute_build_counts', string='Nb seen', stored=True)
-    parent_id = fields.Many2one('runbot.build.error', 'Linked to')
+    build_count = fields.Integer(compute='_compute_build_counts', string='Nb seen')
+    parent_id = fields.Many2one('runbot.build.error', 'Linked to', index=True)
     child_ids = fields.One2many('runbot.build.error', 'parent_id', string='Child Errors', context={'active_test': False})
     children_build_ids = fields.Many2many('runbot.build', compute='_compute_children_build_ids', string='Children builds')
     error_history_ids = fields.Many2many('runbot.build.error', compute='_compute_error_history_ids', string='Old errors', context={'active_test': False})
@@ -63,7 +63,7 @@ class RunbotBuildError(models.Model):
         if 'active' in vals:
             for build_error in self:
                 (build_error.child_ids - self).write({'active': vals['active']})
-        return super(RunbotBuildError, self).write(vals)
+        return super(BuildError, self).write(vals)
 
     @api.depends('build_ids')
     def _compute_build_counts(self):
@@ -71,14 +71,15 @@ class RunbotBuildError(models.Model):
             build_error.build_count = len(build_error.children_build_ids)
 
     @api.depends('build_ids')
-    def _compute_branch_ids(self):
+    def _compute_bundle_ids(self):
         for build_error in self:
-            build_error.branch_ids = build_error.mapped('build_ids.branch_id')
+            top_parent_builds = build_error.build_ids.mapped(lambda rec: rec and rec._get_top_parent())
+            build_error.bundle_ids = top_parent_builds.mapped('slot_ids').mapped('batch_id.bundle_id')
 
     @api.depends('build_ids')
-    def _compute_repo_ids(self):
+    def _compute_trigger_ids(self):
         for build_error in self:
-            build_error.repo_ids = build_error.mapped('build_ids.repo_id')
+            build_error.trigger_ids = build_error.mapped('build_ids.params_id.trigger_id')
 
     @api.depends('content')
     def _compute_summary(self):
@@ -134,7 +135,6 @@ class RunbotBuildError(models.Model):
                 build.build_error_ids += build_error
             del hash_dict[build_error.fingerprint]
 
-        fixed_errors_dict = {rec.fingerprint: rec for rec in self.env['runbot.build.error'].search([('fingerprint', 'in', list(hash_dict.keys())), ('active', '=', False)])}
         # create an error for the remaining entries
         for fingerprint, logs in hash_dict.items():
             build_error = self.env['runbot.build.error'].create({
@@ -161,7 +161,7 @@ class RunbotBuildError(models.Model):
 
     @api.model
     def test_tags_list(self):
-        active_errors = self.search([('test_tags', '!=', False), ('random', '=', True)])
+        active_errors = self.search([('test_tags', '!=', False)])
         test_tag_list = active_errors.mapped('test_tags')
         return [test_tag for error_tags in test_tag_list for test_tag in (error_tags).split(',')]
 
@@ -170,7 +170,7 @@ class RunbotBuildError(models.Model):
         return ['-%s' % tag for tag in self.test_tags_list()]
 
 
-class RunbotBuildErrorTag(models.Model):
+class BuildErrorTag(models.Model):
 
     _name = "runbot.build.error.tag"
     _description = "Build error tag"
@@ -179,7 +179,7 @@ class RunbotBuildErrorTag(models.Model):
     error_ids = fields.Many2many('runbot.build.error', string='Errors')
 
 
-class RunbotErrorRegex(models.Model):
+class ErrorRegex(models.Model):
 
     _name = "runbot.error.regex"
     _description = "Build error regex"

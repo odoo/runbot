@@ -15,15 +15,11 @@
                         <field name="step_order_ids">
                             <tree string="Step list" editable="bottom">
                                 <field name="step_id"/>
-                                <field name="sequence" groups="base.group_no_one"/>
                                 <field name="sequence" widget="handle"/>
                             </tree>
                         </field>
-                        <field name="update_github_state" readonly='1'/>
-                        <field name="update_github_state" groups="base.group_no_one"/>
                         <field name="protected" groups="base.group_no_one"/>
                         <field name="group" groups="base.group_no_one"/>
-                        <field name="monitoring_view_id" groups="base.group_no_one"/>
                     </group>
                 </sheet>
                 <div class="oe_chatter">
@@ -44,6 +40,7 @@
                     </div>
                     <group string="General settings">
                         <field name="name"/>
+                        <field name="domain_filter"/>
                         <field name="job_type"/>
                         <field name="make_stats"/>
                         <field name="protected" groups="base.group_no_one"/>
@@ -76,14 +73,44 @@
                         <field name="enable_auto_tags"/>
                         <field name="sub_command"/>
                         <field name="extra_params" groups="base.group_no_one"/>
+                    </group>
+                    <group string="Test settings" attrs="{'invisible': [('job_type', 'not in', ('python', 'install_odoo', 'test_upgrade'))]}">
                         <field name="additionnal_env"/>
                     </group>
                     <group string="Create settings" attrs="{'invisible': [('job_type', 'not in', ('python', 'create_build'))]}">
                         <field name="create_config_ids" widget="many2many_tags" options="{'no_create': True}" />
                         <field name="number_builds"/>
-                        <field name="hide_build" groups="base.group_no_one"/>
-                        <field name="force_build"/>
                         <field name="make_orphan"/>
+                    </group>
+                    <group attrs="{'invisible': [('job_type', 'not in', ('python', 'configure_upgrade'))]}">
+                      <group class="col" string="Target version settings">
+                        <field string="Current" name="upgrade_to_current"/>
+                        <field string="Master" name="upgrade_to_master"/>
+                        <field string="Major" name="upgrade_to_major_versions"/>
+                        <field string="All saas" name="upgrade_to_all_versions"/>
+                        <field string="Explicit list" name="upgrade_to_version_ids" widget="many2many_tags"/>
+                      </group>
+                      <group class="col" string="Source version settings">
+                        <field string="Major" name="upgrade_from_previous_major_version"/>
+                        <field string="Last saas" name="upgrade_from_last_intermediate_version"/>
+                        <field string="All saas" name="upgrade_from_all_intermediate_version"/>
+                        <field string="Explicit list" name="upgrade_from_version_ids" widget="many2many_tags"/>
+                      </group>
+                      <group string="Upgrade settings" class="o_group_col_12">
+                        <field name="upgrade_flat"/>
+                        <field name="upgrade_config_id"/>
+                        <field string="Db to upgrade" name="upgrade_dbs">
+                          <tree editable="bottom">
+                              <field name="config_id"/>
+                              <field name="db_pattern"/>
+                              <field name="min_target_version_id"/>
+                          </tree>
+                        </field>
+                      </group>
+                    </group>
+                    <group string="Restore settings" attrs="{'invisible': [('job_type', '!=', 'restore')]}">
+                        <field name="restore_download_db_suffix"/>
+                        <field name="restore_rename_db_suffix"/>
                     </group>
                 </sheet>
                 <div class="oe_chatter">
@@ -101,7 +128,6 @@
         <tree string="Build Configs">
           <field name="name"/>
           <field name="description"/>
-          <field name="group"/>
         </tree>
       </field>
     </record>

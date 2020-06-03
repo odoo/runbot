@@ -35,13 +35,15 @@ ENV COVERAGE_FILE /data/build/.coverage
 
 
 class Command():
-    def __init__(self, pres, cmd, posts, finals=None, config_tuples=None):
+
+    def __init__(self, pres, cmd, posts, finals=None, config_tuples=None, cmd_checker=None):
         """ Command object that represent commands to run in Docker container
         :param pres: list of pre-commands
         :param cmd: list of main command only run if the pres commands succeed (&&)
         :param posts: list of post commands posts only run if the cmd command succedd (&&)
         :param finals: list of finals commands always executed
         :param config_tuples: list of key,value tuples to write in config file
+        :param cmd_checker: a checker object that must have a `_cmd_check` method that will be called at build
         returns a string of the full command line to run
         """
         self.pres = pres or []
@@ -49,6 +51,7 @@ class Command():
         self.posts = posts or []
         self.finals = finals or []
         self.config_tuples = config_tuples or []
+        self.cmd_checker = cmd_checker
 
     def __getattr__(self, name):
         return getattr(self.cmd, name)
@@ -57,7 +60,7 @@ class Command():
         return self.cmd[key]
 
     def __add__(self, l):
-        return Command(self.pres, self.cmd + l, self.posts, self.finals, self.config_tuples)
+        return Command(self.pres, self.cmd + l, self.posts, self.finals, self.config_tuples, self.cmd_checker)
 
     def __str__(self):
         return ' '.join(self)
@@ -66,6 +69,8 @@ class Command():
         return self.build().replace('&& ', '&&\n').replace('|| ', '||\n\t').replace(';', ';\n')
 
     def build(self):
+        if self.cmd_checker:
+            self.cmd_checker._cmd_check(self)
         cmd_chain = []
         cmd_chain += [' '.join(pre) for pre in self.pres if pre]
         cmd_chain.append(' '.join(self))
@@ -95,6 +100,10 @@ class Command():
 
 
 def docker_build(log_path, build_dir):
+    return _docker_build(log_path, build_dir)
+
+
+def _docker_build(log_path, build_dir):
     """Build the docker image
     :param log_path: path to the logfile that will contain odoo stdout and stderr
     :param build_dir: the build directory that contains the Odoo sources to build.
@@ -111,7 +120,11 @@ def docker_build(log_path, build_dir):
     dbuild.wait()
 
 
-def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None, cpu_limit=None, preexec_fn=None, ro_volumes=None, env_variables=None):
+def docker_run(*args, **kwargs):
+    return _docker_run(*args, **kwargs)
+
+
+def _docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None, cpu_limit=None, preexec_fn=None, ro_volumes=None, env_variables=None):
     """Run tests in a docker container
     :param run_cmd: command string to run in container
     :param log_path: path to the logfile that will contain odoo stdout and stderr
@@ -166,11 +179,16 @@ def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None,
     if cpu_limit:
         docker_command.extend(['--ulimit', 'cpu=%s' % int(cpu_limit)])
     docker_command.extend(['odoo:runbot_tests', '/bin/bash', '-c', "%s" % run_cmd])
-    docker_run = subprocess.Popen(docker_command, stdout=logs, stderr=logs, preexec_fn=preexec_fn, close_fds=False, cwd=build_dir)
+    subprocess.Popen(docker_command, stdout=logs, stderr=logs, preexec_fn=preexec_fn, close_fds=False, cwd=build_dir)
     _logger.info('Started Docker container %s', container_name)
     return
 
+
 def docker_stop(container_name, build_dir=None):
+    return _docker_stop(container_name, build_dir)
+
+
+def _docker_stop(container_name, build_dir):
     """Stops the container named container_name"""
     container_name = sanitize_container_name(container_name)
     _logger.info('Stopping container %s', container_name)
@@ -181,10 +199,12 @@ def docker_stop(container_name, build_dir=None):
         _logger.info('Stopping docker without defined build_dir')
     subprocess.run(['docker', 'stop', container_name])
 
+
 def docker_is_running(container_name):
     container_name = sanitize_container_name(container_name)
     dinspect = subprocess.run(['docker', 'container', 'inspect', container_name], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
     return True if dinspect.returncode == 0 else False
+
 
 def docker_state(container_name, build_dir):
     container_name = sanitize_container_name(container_name)
@@ -201,6 +221,7 @@ def docker_state(container_name, build_dir):
 
     return 'UNKNOWN'
 
+
 def docker_clear_state(container_name, build_dir):
     """Return True if container is still running"""
     container_name = sanitize_container_name(container_name)
@@ -208,6 +229,7 @@ def docker_clear_state(container_name, build_dir):
         os.remove(os.path.join(build_dir, 'start-%s' % container_name))
     if os.path.exists(os.path.join(build_dir, 'end-%s' % container_name)):
         os.remove(os.path.join(build_dir, 'end-%s' % container_name))
+
 
 def docker_get_gateway_ip():
     """Return the host ip of the docker default bridge gateway"""
@@ -220,7 +242,12 @@ def docker_get_gateway_ip():
         except KeyError:
             return None
 
+
 def docker_ps():
+    return _docker_ps()
+
+
+def _docker_ps():
     """Return a list of running containers names"""
     try:
         docker_ps = subprocess.run(['docker', 'ps', '--format', '{{.Names}}'], stderr=subprocess.DEVNULL, stdout=subprocess.PIPE)
@@ -229,7 +256,11 @@ def docker_ps():
         return []
     if docker_ps.returncode != 0:
         return []
-    return docker_ps.stdout.decode().strip().split('\n')
+    output = docker_ps.stdout.decode()
+    if not output:
+        return []
+    return output.strip().split('\n')
+
 
 def build(args):
     """Build container from CLI"""
@@ -272,7 +303,7 @@ def tests(args):
         container_name = 'odoo-container-test-%s' % datetime.datetime.now().microsecond
         docker_run(cmd.build(), env_log, args.build_dir, container_name, env_variables=env_variables)
         expected = 'testa is test a and testb is "test b"'
-        time.sleep(3) # ugly sleep to wait for docker process to flush the log file
+        time.sleep(3)  # ugly sleep to wait for docker process to flush the log file
         assert expected in open(env_log,'r').read()
 
     # Test testing
@@ -281,13 +312,13 @@ def tests(args):
     python_params = []
     if args.coverage:
         omit = ['--omit', '*__manifest__.py']
-        python_params = [ '-m', 'coverage', 'run', '--branch', '--source', '/data/build'] + omit
+        python_params = ['-m', 'coverage', 'run', '--branch', '--source', '/data/build'] + omit
         posts = [['python%s' % py_version, "-m", "coverage", "html", "-d", "/data/build/coverage", "--ignore-errors"], ['python%s' % py_version, "-m", "coverage", "xml", "--ignore-errors"]]
         os.makedirs(os.path.join(args.build_dir, 'coverage'), exist_ok=True)
     elif args.flamegraph:
         flame_log = '/data/build/logs/flame.log'
         python_params = ['-m', 'flamegraph', '-o', flame_log]
-    odoo_cmd = ['python%s' % py_version ] + python_params + ['/data/build/odoo-bin', '-d %s' % args.db_name, '--addons-path=/data/build/addons', '-i', args.odoo_modules,  '--test-enable', '--stop-after-init', '--max-cron-threads=0']
+    odoo_cmd = ['python%s' % py_version] + python_params + ['/data/build/odoo-bin', '-d %s' % args.db_name, '--addons-path=/data/build/addons', '-i', args.odoo_modules,  '--test-enable', '--stop-after-init', '--max-cron-threads=0']
     cmd = Command(pres, odoo_cmd, posts)
     cmd.add_config_tuple('data_dir', '/data/build/datadir')
     cmd.add_config_tuple('db_user', '%s' % os.getlogin())
@@ -345,6 +376,29 @@ def tests(args):
         docker_run(cmd.build(), logfile, args.build_dir, container_name, exposed_ports=[args.odoo_port, args.odoo_port + 1], cpu_limit=300)
 
 
+##############################################################################
+# Ugly monkey patch to set runbot in set runbot in testing mode
+# No Docker will be started, instead a fake docker_run function will be used
+##############################################################################
+
+if os.environ.get('RUNBOT_MODE') == 'test':
+    _logger.warning('Using Fake Docker')
+
+    def fake_docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None, cpu_limit=None, preexec_fn=None, ro_volumes=None, env_variables=None, *args, **kwargs):
+        _logger.info('Docker Fake Run: %s', run_cmd)
+        open(os.path.join(build_dir, 'start-%s' % container_name), 'w').write('fake start\n')
+        open(os.path.join(build_dir, 'end-%s' % container_name), 'w').write('fake end')
+        with open(log_path, 'w') as log_file:
+            log_file.write('Fake docker_run started\n')
+            log_file.write('run_cmd: %s\n' % run_cmd)
+            log_file.write('build_dir: %s\n' % container_name)
+            log_file.write('container_name: %s\n' % container_name)
+            log_file.write('.modules.loading: Modules loaded.\n')
+            log_file.write('Initiating shutdown\n')
+
+    docker_run = fake_docker_run
+
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
     parser = argparse.ArgumentParser()
@@ -358,8 +412,8 @@ if __name__ == '__main__':
     p_test.add_argument('odoo_port', type=int)
     p_test.add_argument('db_name')
     group = p_test.add_mutually_exclusive_group()
-    group.add_argument('--coverage', action='store_true', help= 'test a build with coverage')
-    group.add_argument('--flamegraph', action='store_true', help= 'test a build and draw a flamegraph')
+    group.add_argument('--coverage', action='store_true', help='test a build with coverage')
+    group.add_argument('--flamegraph', action='store_true', help='test a build and draw a flamegraph')
     p_test.add_argument('-i', dest='odoo_modules', default='web', help='Comma separated list of modules')
     p_test.add_argument('--kill', action='store_true', default=False, help='Also test container kill')
     p_test.add_argument('--dump', action='store_true', default=False, help='Test database export with pg_dump')

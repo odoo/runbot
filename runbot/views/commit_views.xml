@@ -1,0 +1,31 @@
+<odoo>
+  <data>
+    <record id="commit_view_tree" model="ir.ui.view">
+        <field name="name">runbot.commit.tree</field>
+        <field name="model">runbot.commit</field>
+        <field name="arch" type="xml">
+            <tree string="Commits">
+                <field name="name"/>
+                <field name="date"/>
+                <field name="repo_id"/>
+                <field name="author_email"/>
+                <field name="committer_email"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="open_view_commit_tree" model="ir.actions.act_window">
+        <field name="name">Commits</field>
+        <field name="res_model">runbot.commit</field>
+        <field name="view_mode">tree</field>
+    </record>
+
+    <menuitem
+        name="Commits"
+        id="runbot_menu_commit_tree"
+        parent="runbot_menu_root"
+        sequence="20"
+        action="open_view_commit_tree"
+        />
+  </data>
+</odoo>

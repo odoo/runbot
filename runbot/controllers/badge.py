@@ -11,51 +11,47 @@ from odoo.http import request, route, Controller
 class RunbotBadge(Controller):
 
     @route([
-        '/runbot/badge/<int:repo_id>/<branch>.svg',
-        '/runbot/badge/<any(default,flat):theme>/<int:repo_id>/<branch>.svg',
+        '/runbot/badge/<int:repo_id>/<name>.svg',
+        '/runbot/badge/trigger/<int:trigger_id>/<name>.svg',
+        '/runbot/badge/<any(default,flat):theme>/<int:repo_id>/<name>.svg',
+        '/runbot/badge/trigger/<any(default,flat):theme>/<int:trigger_id>/<name>.svg',
     ], type="http", auth="public", methods=['GET', 'HEAD'])
-    def badge(self, repo_id, branch, theme='default'):
-
-        domain = [('repo_id', '=', repo_id),
-                  ('branch_id.branch_name', '=', branch),
-                  ('branch_id.sticky', '=', True),
-                  ('hidden', '=', False),
-                  ('parent_id', '=', False),
-                  ('global_state', 'in', ['testing', 'running', 'done']),
-                  ('global_result', 'not in', ['skipped', 'manually_killed']),
-                  ]
-
-        last_update = '__last_update'
-        builds = request.env['runbot.build'].sudo().search_read(
-            domain, ['global_state', 'global_result', 'build_age', last_update],
-            order='id desc', limit=1)
-
-        if not builds:
-            return request.not_found()
-
-        build = builds[0]
-        etag = request.httprequest.headers.get('If-None-Match')
-        retag = hashlib.md5(str(build[last_update]).encode()).hexdigest()
-
-        if etag == retag:
-            return werkzeug.wrappers.Response(status=304)
-
-        if build['global_state'] in ('testing', 'waiting'):
-            state = build['global_state']
-            cache_factor = 1
+    def badge(self, name, repo_id=False, trigger_id=False, theme='default'):
+        if trigger_id:
+            triggers = request.env['runbot.trigger'].browse(trigger_id)
         else:
-            cache_factor = 2
-            if build['global_result'] == 'ok':
+            triggers = request.env['runbot.trigger'].search([('repo_ids', 'in', repo_id)])
+            # -> hack to use repo. Would be better to change logic and use a trigger_id in params
+        bundle = request.env['runbot.bundle'].search([('name', '=', name),
+            ('project_id', '=', request.env.ref('runbot.main_project').id)])  # WARNING no filter on project
+        if not bundle or not triggers:
+            return request.not_found()
+        batch = request.env['runbot.batch'].search([
+            ('bundle_id', '=', bundle.id),
+            ('state', '=', 'done'),
+            ('category_id', '=', request.env.ref('runbot.default_category').id)
+        ], order='id desc', limit=1)
+
+        builds = batch.slot_ids.filtered(lambda s: s.trigger_id in triggers).mapped('build_id')
+        if not builds:
+            state = 'testing'
+        else:
+            result = builds.result_multi()
+            if result == 'ok':
                 state = 'success'
-            elif build['global_result'] == 'warn':
+            elif result == 'warn':
                 state = 'warning'
             else:
                 state = 'failed'
 
+        etag = request.httprequest.headers.get('If-None-Match')
+        retag = hashlib.md5(state.encode()).hexdigest()
+        if etag == retag:
+            return werkzeug.wrappers.Response(status=304)
+
         # from https://github.com/badges/shields/blob/master/colorscheme.json
         color = {
             'testing': "#dfb317",
-            'waiting': "#dfb317",
             'success': "#4c1",
             'failed': "#e05d44",
             'warning': "#fe7d37",
@@ -75,13 +71,12 @@ class RunbotBadge(Controller):
                 self.width = text_width(text) + 10
 
         data = {
-            'left': Text(branch, '#555'),
+            'left': Text(name, '#555'),
             'right': Text(state, color),
         }
-        five_minutes = 5 * 60
         headers = [
             ('Content-Type', 'image/svg+xml'),
-            ('Cache-Control', 'max-age=%d' % (five_minutes * cache_factor,)),
+            ('Cache-Control', 'max-age=%d' % (10*60,)),
             ('ETag', retag),
         ]
         return request.render("runbot.badge_" + theme, data, headers=headers)
