@@ -15,6 +15,7 @@ import io
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -121,6 +122,7 @@ def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None,
     :params ro_volumes: dict of dest:source volumes to mount readonly in builddir
     :params env_variables: list of environment variables
     """
+    container_name = sanitize_container_name(container_name)
     if isinstance(run_cmd, Command):
         cmd_object = run_cmd
         run_cmd = cmd_object.build()
@@ -170,6 +172,7 @@ def docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None,
 
 def docker_stop(container_name, build_dir=None):
     """Stops the container named container_name"""
+    container_name = sanitize_container_name(container_name)
     _logger.info('Stopping container %s', container_name)
     if build_dir:
         end_file = os.path.join(build_dir, 'end-%s' % container_name)
@@ -179,10 +182,12 @@ def docker_stop(container_name, build_dir=None):
     subprocess.run(['docker', 'stop', container_name])
 
 def docker_is_running(container_name):
+    container_name = sanitize_container_name(container_name)
     dinspect = subprocess.run(['docker', 'container', 'inspect', container_name], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
     return True if dinspect.returncode == 0 else False
 
 def docker_state(container_name, build_dir):
+    container_name = sanitize_container_name(container_name)
     started = os.path.exists(os.path.join(build_dir, 'start-%s' % container_name))
     ended = os.path.exists(os.path.join(build_dir, 'end-%s' % container_name))
     if ended:
@@ -198,6 +203,7 @@ def docker_state(container_name, build_dir):
 
 def docker_clear_state(container_name, build_dir):
     """Return True if container is still running"""
+    container_name = sanitize_container_name(container_name)
     if os.path.exists(os.path.join(build_dir, 'start-%s' % container_name)):
         os.remove(os.path.join(build_dir, 'start-%s' % container_name))
     if os.path.exists(os.path.join(build_dir, 'end-%s' % container_name)):
@@ -234,6 +240,12 @@ def build(args):
     _logger.info('Logfile is in %s', logfile)
     docker_build(logfile, args.build_dir)
     _logger.info('Finished building the base image container')
+
+
+def sanitize_container_name(name):
+    """Returns a container name with unallowed characters removed"""
+    name = re.sub('^[^a-zA-Z0-9]+', '', name)
+    return re.sub('[^a-zA-Z0-9_.-]', '', name)
 
 def tests(args):
     _logger.info('Start container tests')
