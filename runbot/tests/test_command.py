@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo.tests import common
 from ..container import Command
+from ..container import sanitize_container_name
 
 
 CONFIG = """[options]
@@ -35,3 +36,28 @@ class Test_Command(common.TransactionCase):
 
         with self.assertRaises(AssertionError):
             cmd.add_config_tuple('http-interface', '127.0.0.1')
+
+
+class TestSanitizeContainerName(common.TransactionCase):
+
+    def test_sanitize_container_name(self):
+
+        # 1. test that a valid name remains unchanged
+        valid_name = '3155889-saas-13.4-container-all_at_install'
+        self.assertEqual(sanitize_container_name(valid_name), valid_name)
+
+        # 2. test a name starting with an invalid character
+        invalid_name = '#3155889-saas-13.4-container-all_at_install'
+        self.assertEqual(sanitize_container_name(invalid_name), valid_name)
+
+        # 3. test a name with an invalid character somewhere
+        invalid_name = '3155889-saas-13.4-container#-all_at_install'
+        self.assertEqual(sanitize_container_name(invalid_name), valid_name)
+
+        # 4. test  a name starting with multiple invalid characters
+        invalid_name = '#/.3155889-saas-13.4-container-all_at_install'
+        self.assertEqual(sanitize_container_name(invalid_name), valid_name)
+
+        # 5. test both
+        invalid_name = '_.3155889-saas-13.4-##container/-all_at_install'
+        self.assertEqual(sanitize_container_name(invalid_name), valid_name)
