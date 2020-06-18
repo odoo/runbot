@@ -9,7 +9,7 @@ import subprocess
 import time
 import datetime
 from ..common import dt2time, fqdn, now, grep, local_pgadmin_cursor, s2human, Commit, dest_reg, os, list_local_dbs, pseudo_markdown
-from ..container import docker_build, docker_stop, docker_state, Command
+from ..container import docker_build, docker_stop, docker_state, Command, sanitize_container_name
 from ..fields import JsonDictField
 from odoo.addons.runbot.models.repo import RunbotException
 from odoo import models, fields, api, registry
@@ -392,6 +392,7 @@ class runbot_build(models.Model):
                 nickname = build.branch_id.name.split('/')[2]
                 nickname = re.sub(r'"|\'|~|\:', '', nickname)
                 nickname = re.sub(r'_|/|\.', '-', nickname)
+                nickname = sanitize_container_name(nickname)
                 build.dest = ("%05d-%s-%s" % (build.id or 0, nickname[:32], build.name[:6])).lower()
 
     @api.depends('repo_id', 'port', 'dest', 'host', 'duplicate_id.domain')
