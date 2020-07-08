@@ -153,7 +153,7 @@ class Test_Repo(RunbotCase):
 
     @skip('This test is for performances. It needs a lot of real branches in DB to mean something')
     def test_repo_perf_find_new_commits(self):
-        mock_root.return_value = '/tmp/static'
+        self.mock_root.return_value = '/tmp/static'
         repo = self.env['runbot.repo'].search([('name', '=', 'blabla')])
 
         self.commit_list = []
