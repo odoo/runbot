@@ -5,13 +5,6 @@
         <field name="arch" type="xml">
             <form>
                 <sheet>
-                    <!--
-                    <div class="oe_button_box" name="button_box">
-                        <button class="oe_stat_button" name="action_see_attachments" type="object" icon="fa-book" attrs="{'invisible': ['|', ('state', '=', 'confirmed'), ('type', '=', 'routing')]}">
-                            <field string="Attachments" name="mrp_document_count" widget="statinfo"/>
-                        </button>
-                    </div>
-                    -->
                     <div class="oe_title">
                         <h1><field name="name" placeholder="Name"/></h1>
                     </div>
@@ -33,11 +26,11 @@
 
                     <separator string="Repositories"/>
                     <field name="repo_ids">
-                        <tree editable="bottom">
+                        <tree>
                             <field name="sequence" widget="handle"/>
                             <field name="name"/>
-                            <field name="required_statuses"/>
                             <field name="branch_filter"/>
+                            <field name="status_ids" widget="many2many_tags"/>
                         </tree>
                     </field>
                     <separator string="Branches"/>
@@ -46,6 +39,32 @@
                             <field name="sequence" widget="handle" />
                             <field name="name"/>
                             <field name="active"/>
+                        </tree>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="form_repository" model="ir.ui.view">
+        <field name="name">Repository form</field>
+        <field name="model">runbot_merge.repository</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="branch_filter"/>
+                        </group>
+                    </group>
+                    <separator string="Required Statuses"/>
+                    <field name="status_ids">
+                        <tree editable="bottom">
+                            <field name="context"/>
+                            <field name="branch_ids" widget="many2many_tags"/>
                         </tree>
                     </field>
                 </sheet>
