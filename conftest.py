@@ -55,6 +55,7 @@ import time
 import uuid
 import xmlrpc.client
 from contextlib import closing
+from datetime import datetime
 
 import psutil
 import pytest
@@ -105,7 +106,9 @@ def config(pytestconfig):
     return cnf
 
 @pytest.fixture(scope='session')
-def rolemap(config):
+def rolemap(request, config):
+    # hack because capsys is not session-scoped
+    capmanager = request.config.pluginmanager.getplugin("capturemanager")
     # only fetch github logins once per session
     rolemap = {}
     for k, data in config.items():
@@ -116,7 +119,8 @@ def rolemap(config):
         else:
             continue
 
-        r = requests.get('https://api.github.com/user', headers={'Authorization': 'token %s' % data['token']})
+        with capmanager.global_and_fixture_disabled():
+            r = _rate_limited(lambda: requests.get('https://api.github.com/user', headers={'Authorization': 'token %s' % data['token']}))
         r.raise_for_status()
 
         rolemap[role] = data['user'] = r.json()['login']
@@ -336,14 +340,15 @@ def env(port, server, db, default_crons):
 # users is just so I can avoid autouse on toplevel users fixture b/c it (seems
 # to) break the existing local tests
 @pytest.fixture
-def make_repo(request, config, tunnel, users):
+def make_repo(capsys, request, config, tunnel, users):
     owner = config['github']['owner']
     github = requests.Session()
     github.headers['Authorization'] = 'token %s' % config['github']['token']
 
     # check whether "owner" is a user or an org, as repo-creation endpoint is
     # different
-    q = github.get('https://api.github.com/users/{}'.format(owner))
+    with capsys.disabled():
+        q = _rate_limited(lambda: github.get('https://api.github.com/users/{}'.format(owner)))
     q.raise_for_status()
     if q.json().get('type') == 'Organization':
         endpoint = 'https://api.github.com/orgs/{}/repos'.format(owner)
@@ -398,6 +403,20 @@ def make_repo(request, config, tunnel, users):
     if not request.config.getoption('--no-delete'):
         for repo in reversed(repos):
             repo.delete()
+
+
+def _rate_limited(req):
+    while True:
+        q = req()
+        if not q.ok and q.headers.get('X-RateLimit-Remaining') == '0':
+            reset = int(q.headers['X-RateLimit-Reset'])
+            delay = round(reset - time.time() + 1.0)
+            print("Hit rate limit, sleeping for", delay, "seconds")
+            time.sleep(delay)
+            continue
+        break
+    return q
+
 
 Commit = collections.namedtuple('Commit', 'id tree message author committer parents')
 class Repo:
