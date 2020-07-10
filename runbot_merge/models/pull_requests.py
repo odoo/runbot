@@ -223,11 +223,22 @@ class StatusConfiguration(models.Model):
     context = fields.Char(required=True)
     repo_id = fields.Many2one('runbot_merge.repository', required=True, ondelete='cascade')
     branch_ids = fields.Many2many('runbot_merge.branch', 'runbot_merge_repository_status_branch', 'status_id', 'branch_id')
+    prs = fields.Boolean(string="Applies to pull requests", default=True)
+    stagings = fields.Boolean(string="Applies to stagings", default=True)
 
     def _for_branch(self, branch):
         assert branch._name == 'runbot_merge.branch', \
             f'Expected branch, got {branch}'
         return self.filtered(lambda st: not st.branch_ids or branch in st.branch_ids)
+    def _for_pr(self, pr):
+        assert pr._name == 'runbot_merge.pull_requests', \
+            f'Expected pull request, got {pr}'
+        return self._for_branch(pr.target).filtered('prs')
+    def _for_staging(self, staging):
+        assert staging._name == 'runbot_merge.stagings', \
+            f'Expected staging, got {staging}'
+        return self._for_branch(staging.target).filtered('stagings')
+
 class Repository(models.Model):
     _name = _description = 'runbot_merge.repository'
     _order = 'sequence, id'
@@ -699,7 +710,7 @@ class PullRequests(models.Model):
             pr.statuses = pprint.pformat(statuses)
 
             st = 'success'
-            for ci in pr.repository.status_ids._for_branch(pr.target):
+            for ci in pr.repository.status_ids._for_pr(pr):
                 v = state_(statuses, ci.context) or 'pending'
                 if v in ('error', 'failure'):
                     st = 'failure'
@@ -968,7 +979,7 @@ class PullRequests(models.Model):
         # targets
         failed = self.browse(())
         for pr in self:
-            required = pr.repository.status_ids._for_branch(pr.target).mapped('context')
+            required = pr.repository.status_ids._for_pr(pr).mapped('context')
 
             success = True
             for ci in required:
@@ -1547,7 +1558,7 @@ class Stagings(models.Model):
             }
             # maps commits to the statuses they need
             required_statuses = [
-                (head, repos[repo].status_ids._for_branch(s.target).mapped('context'))
+                (head, repos[repo].status_ids._for_staging(s).mapped('context'))
                 for repo, head in json.loads(s.heads).items()
                 if not repo.endswith('^')
             ]
