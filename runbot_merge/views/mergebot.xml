@@ -65,6 +65,8 @@
                         <tree editable="bottom">
                             <field name="context"/>
                             <field name="branch_ids" widget="many2many_tags"/>
+                            <field name="prs"/>
+                            <field name="stagings"/>
                         </tree>
                     </field>
                 </sheet>

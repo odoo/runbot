@@ -16,6 +16,8 @@ def repo(env, project, make_repo, users, setreviewers):
                     'context': 'lint',
                     'branch_ids': [(4, project.branch_ids.id, False)]
                 }),
+                (0, 0, {'context': 'pr', 'stagings': False}),
+                (0, 0, {'context': 'staging', 'prs': False}),
             ]
         })],
     })
@@ -41,7 +43,10 @@ def test_status_applies(env, repo, config):
         repo.post_status(c, 'success', 'ci')
     env.run_crons('runbot_merge.process_updated_commits')
     assert pr_id.state == 'opened'
-
+    with repo:
+        repo.post_status(c, 'success', 'pr')
+    env.run_crons('runbot_merge.process_updated_commits')
+    assert pr_id.state == 'opened'
     with repo:
         repo.post_status(c, 'success', 'lint')
     env.run_crons('runbot_merge.process_updated_commits')
@@ -59,6 +64,10 @@ def test_status_applies(env, repo, config):
     assert st.state == 'pending'
     with repo:
         repo.post_status('staging.master', 'success', 'lint')
+    env.run_crons('runbot_merge.process_updated_commits')
+    assert st.state == 'pending'
+    with repo:
+        repo.post_status('staging.master', 'success', 'staging')
     env.run_crons('runbot_merge.process_updated_commits')
     assert st.state == 'success'
 
@@ -82,6 +91,10 @@ def test_status_skipped(env, project, repo, config):
     with repo:
         repo.post_status(c, 'success', 'ci')
     env.run_crons('runbot_merge.process_updated_commits')
+    assert pr_id.state == 'opened'
+    with repo:
+        repo.post_status(c, 'success', 'pr')
+    env.run_crons('runbot_merge.process_updated_commits')
     assert pr_id.state == 'validated'
 
     with repo:
@@ -89,6 +102,10 @@ def test_status_skipped(env, project, repo, config):
     env.run_crons()
 
     st = env['runbot_merge.stagings'].search([])
+    assert st.state == 'pending'
+    with repo:
+        repo.post_status('staging.maintenance', 'success', 'staging')
+    env.run_crons('runbot_merge.process_updated_commits')
     assert st.state == 'pending'
     with repo:
         repo.post_status('staging.maintenance', 'success', 'ci')
