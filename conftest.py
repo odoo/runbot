@@ -1087,7 +1087,6 @@ class Model:
         return self._env(self._model, name, self._ids, *args, **kwargs)
 
     def __setattr__(self, fieldname, value):
-        assert self._fields[fieldname]['type'] not in ('many2one', 'one2many', 'many2many')
         self._env(self._model, 'write', self._ids, {fieldname: value})
 
     def __iter__(self):

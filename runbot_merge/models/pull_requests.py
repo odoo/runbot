@@ -1,8 +1,9 @@
+# coding: utf-8
+
 import ast
 import base64
 import collections
 import datetime
-import functools
 import io
 import itertools
 import json
@@ -10,7 +11,6 @@ import logging
 import os
 import pprint
 import re
-import sys
 import time
 
 from itertools import takewhile
@@ -64,9 +64,6 @@ class Project(models.Model):
              "of (valid) incoming webhook signatures, failing signatures "
              "will lead to webhook rejection. Should only use ASCII."
     )
-
-    def _create_stagings(self, commit=False):
-        pass
 
     def _check_stagings(self, commit=False):
         for staging in self.search([]).mapped('branch_ids.active_staging_id'):
@@ -217,6 +214,20 @@ class Project(models.Model):
         """, (self.id, name))
         return bool(self.env.cr.rowcount)
 
+class StatusConfiguration(models.Model):
+    _name = 'runbot_merge.repository.status'
+    _description = "required statuses on repositories"
+    _rec_name = 'context'
+    _log_access = False
+
+    context = fields.Char(required=True)
+    repo_id = fields.Many2one('runbot_merge.repository', required=True, ondelete='cascade')
+    branch_ids = fields.Many2many('runbot_merge.branch', 'runbot_merge_repository_status_branch', 'status_id', 'branch_id')
+
+    def _for_branch(self, branch):
+        assert branch._name == 'runbot_merge.branch', \
+            f'Expected branch, got {branch}'
+        return self.filtered(lambda st: not st.branch_ids or branch in st.branch_ids)
 class Repository(models.Model):
     _name = _description = 'runbot_merge.repository'
     _order = 'sequence, id'
@@ -224,11 +235,8 @@ class Repository(models.Model):
     sequence = fields.Integer(default=50)
     name = fields.Char(required=True)
     project_id = fields.Many2one('runbot_merge.project', required=True)
-    required_statuses = fields.Char(
-        help="Comma-separated list of status contexts which must be "\
-        "`success` for a PR or staging to be valid",
-        default='legal/cla,ci/runbot'
-    )
+    status_ids = fields.One2many('runbot_merge.repository.status', 'repo_id', string="Required Statuses")
+
     branch_filter = fields.Char(default='[(1, "=", 1)]', help="Filter branches valid for this repository")
     substitutions = fields.Text(
         "label substitutions",
@@ -236,6 +244,22 @@ class Repository(models.Model):
 
 All substitutions are tentatively applied sequentially to the input.
 """)
+
+    @api.model
+    def create(self, vals):
+        if 'status_ids' in vals:
+            return super().create(vals)
+
+        st = vals.pop('required_statuses', 'legal/cla,ci/runbot')
+        if st:
+            vals['status_ids'] = [(0, 0, {'context': c}) for c in st.split(',')]
+        return super().create(vals)
+
+    def write(self, vals):
+        st = vals.pop('required_statuses', None)
+        if st:
+            vals['status_ids'] = [(5, 0, {})] + [(0, 0, {'context': c}) for c in st.split(',')]
+        return super().write(vals)
 
     def github(self, token_field='github_token'):
         return github.GH(self.project_id[token_field], self.name)
@@ -662,27 +686,27 @@ class PullRequests(models.Model):
                 pr.blocked = 'linked pr %s is not ready' % unready.display_name
                 continue
 
-    @api.depends('head', 'repository.required_statuses')
+    @api.depends('head', 'repository.status_ids')
     def _compute_statuses(self):
         Commits = self.env['runbot_merge.commit']
-        for s in self:
-            c = Commits.search([('sha', '=', s.head)])
+        for pr in self:
+            c = Commits.search([('sha', '=', pr.head)])
             if not (c and c.statuses):
-                s.status = s.statuses = False
+                pr.status = pr.statuses = False
                 continue
 
             statuses = json.loads(c.statuses)
-            s.statuses = pprint.pformat(statuses)
+            pr.statuses = pprint.pformat(statuses)
 
             st = 'success'
-            for ci in filter(None, (s.repository.required_statuses or '').split(',')):
-                v = state_(statuses, ci) or 'pending'
+            for ci in pr.repository.status_ids._for_branch(pr.target):
+                v = state_(statuses, ci.context) or 'pending'
                 if v in ('error', 'failure'):
                     st = 'failure'
                     break
                 if v == 'pending':
                     st = 'pending'
-            s.status = st
+            pr.status = st
 
     @api.depends('batch_ids.active')
     def _compute_active_batch(self):
@@ -944,7 +968,7 @@ class PullRequests(models.Model):
         # targets
         failed = self.browse(())
         for pr in self:
-            required = filter(None, (pr.repository.required_statuses or '').split(','))
+            required = pr.repository.status_ids._for_branch(pr.target).mapped('context')
 
             success = True
             for ci in required:
@@ -1438,7 +1462,7 @@ class Commit(models.Model):
     def _auto_init(self):
         res = super(Commit, self)._auto_init()
         self._cr.execute("""
-            CREATE INDEX IF NOT EXISTS runbot_merge_unique_statuses 
+            CREATE INDEX IF NOT EXISTS runbot_merge_unique_statuses
             ON runbot_merge_commit
             USING hash (sha)
         """)
@@ -1523,10 +1547,9 @@ class Stagings(models.Model):
             }
             # maps commits to the statuses they need
             required_statuses = [
-                (head, repos[repo].required_statuses.split(','))
+                (head, repos[repo].status_ids._for_branch(s.target).mapped('context'))
                 for repo, head in json.loads(s.heads).items()
                 if not repo.endswith('^')
-                if repos[repo].required_statuses
             ]
             # maps commits to their statuses
             cmap = {
