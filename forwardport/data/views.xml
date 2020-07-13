@@ -47,7 +47,12 @@
         <field name="model">runbot_merge.pull_requests</field>
         <field name="arch" type="xml">
             <xpath expr="//sheet/group[2]" position="after">
-                <separator string="Forwardported" attrs="{'invisible': [('source_id', '=', False)]}"/>
+                <separator string="Forward Port" attrs="{'invisible': [('source_id', '=', False)]}"/>
+                <group attrs="{'invisible': [('source_id', '!=', False)]}">
+                    <group>
+                        <field string="Policy" name="fw_policy"/>
+                    </group>
+                </group>
                 <group attrs="{'invisible': [('source_id', '=', False)]}">
                     <group>
                         <field string="Original PR" name="source_id"/>
