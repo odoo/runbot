@@ -280,12 +280,12 @@ class PullRequests(models.Model):
 
         tokens = [
             token
-            for line in re.findall('^\s*[@|#]?{}:? (.*)$'.format(self.repository.project_id.fp_github_name), comment, re.MULTILINE | re.IGNORECASE)
+            for line in re.findall('^\s*[@|#]?{}:? (.*)$'.format(self.repository.project_id.fp_github_name), comment['body'] or '', re.MULTILINE | re.IGNORECASE)
             for token in line.split()
         ]
         if not tokens:
             _logger.info("found no commands in comment of %s (%s) (%s)", author.github_login, author.display_name,
-                 utils.shorten(comment, 50)
+                 utils.shorten(comment['body'] or '', 50)
             )
             return
 
@@ -323,7 +323,7 @@ class PullRequests(models.Model):
                 # don't update the root ever
                 for pr in filter(lambda p: p.parent_id, self._iter_ancestors()):
                     # only the author is delegated explicitely on the
-                    pr._parse_commands(author, merge_bot + ' r+', login)
+                    pr._parse_commands(author, {**comment, 'body': merge_bot + ' r+'}, login)
             elif token == 'close':
                 msg = "I'm sorry, @{}. I can't close this PR for you."
                 if self.source_id._pr_acl(author).is_reviewer:

@@ -777,6 +777,15 @@ class Repo:
             self.reset = reset
 MakeCommit = Repo.Commit
 ct = itertools.count()
+
+class Comment(tuple):
+    def __new__(cls, c):
+        self = super(Comment, cls).__new__(cls, (c['user']['login'], c['body']))
+        self._c = c
+        return self
+    def __getitem__(self, item):
+        return self._c[item]
+
 class PR:
     def __init__(self, repo, number):
         self.repo = repo
@@ -815,10 +824,7 @@ class PR:
     def comments(self):
         r = self.repo._session.get('https://api.github.com/repos/{}/issues/{}/comments'.format(self.repo.name, self.number))
         assert 200 <= r.status_code < 300, r.json()
-        return [
-            (c['user']['login'], c['body'])
-            for c in r.json()
-        ]
+        return [Comment(c) for c in r.json()]
 
     @property
     def ref(self):

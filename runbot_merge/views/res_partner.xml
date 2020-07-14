@@ -35,6 +35,9 @@
                                 </tree>
                             </field>
                         </group>
+                        <group colspan="4">
+                            <field name="override_rights" widget="many2many_tags"/>
+                        </group>
                     </group>
                     <group>
                         <group colspan="4" string="Delegate On">

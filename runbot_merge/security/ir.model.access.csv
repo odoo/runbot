@@ -12,8 +12,11 @@ access_runbot_merge_batch_admin,Admin access to batches,model_runbot_merge_batch
 access_runbot_merge_fetch_job_admin,Admin access to fetch jobs,model_runbot_merge_fetch_job,runbot_merge.group_admin,1,1,1,1
 access_runbot_merge_pull_requests_feedback_admin,Admin access to feedback,model_runbot_merge_pull_requests_feedback,runbot_merge.group_admin,1,1,1,1
 access_runbot_merge_review_rights,Admin access to review permissions,model_res_partner_review,runbot_merge.group_admin,1,1,1,1
+access_runbot_merge_review_override,Admin access to override permissions,model_res_partner_override,runbot_merge.group_admin,1,1,1,1
 access_runbot_merge_project,User access to project,model_runbot_merge_project,base.group_user,1,0,0,0
 access_runbot_merge_repository,User access to repo,model_runbot_merge_repository,base.group_user,1,0,0,0
 access_runbot_merge_branch,User access to branches,model_runbot_merge_branch,base.group_user,1,0,0,0
 access_runbot_merge_pull_requests,User access to PR,model_runbot_merge_pull_requests,base.group_user,1,0,0,0
 access_runbot_merge_pull_requests_feedback,Users have no reason to access feedback,model_runbot_merge_pull_requests_feedback,,0,0,0,0
+access_runbot_merge_review_rights_2,Users can see partners,model_res_partner_review,base.group_user,1,0,0,0
+access_runbot_merge_review_override_2,Users can see partners,model_res_partner_override,base.group_user,1,0,0,0
