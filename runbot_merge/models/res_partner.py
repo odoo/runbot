@@ -13,6 +13,7 @@ class Partner(models.Model):
     delegate_reviewer = fields.Many2many('runbot_merge.pull_requests')
     formatted_email = fields.Char(string="commit email", compute='_rfc5322_formatted')
     review_rights = fields.One2many('res.partner.review', 'partner_id')
+    override_rights = fields.One2many('res.partner.override', 'partner_id')
 
     def _auto_init(self):
         res = super(Partner, self)._auto_init()
@@ -72,3 +73,17 @@ class ReviewRights(models.Model):
 
     def name_search(self, name='', args=None, operator='ilike', limit=100):
         return self.search(args + [('repository_id.name', operator, name)], limit=limit).name_get()
+
+class OverrideRights(models.Model):
+    _name = 'res.partner.override'
+    _description = 'lints which the partner can override'
+
+    partner_id = fields.Many2one('res.partner', required=True, ondelete='cascade')
+    repository_id = fields.Many2one('runbot_merge.repository', required=True)
+    context = fields.Char(required=True)
+
+    def name_get(self):
+        return [
+            (r.id, f'{r.repository.name}: {r.context}')
+            for r in self
+        ]

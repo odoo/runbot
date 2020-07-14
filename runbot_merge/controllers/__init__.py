@@ -259,7 +259,7 @@ def handle_comment(env, event):
     if event['action'] != 'created':
         return "Ignored: action (%r) is not 'created'" % event['action']
 
-    return _handle_comment(env, repo, issue, author, comment)
+    return _handle_comment(env, repo, issue, event['comment'])
 
 def handle_review(env, event):
     repo = event['repository']['full_name']
@@ -272,7 +272,7 @@ def handle_review(env, event):
         return "Ignored: action (%r) is not 'submitted'" % event['action']
 
     return _handle_comment(
-        env, repo, pr, author, comment,
+        env, repo, pr, event['review'],
         target=event['pull_request']['base']['ref'])
 
 def handle_ping(env, event):
@@ -287,14 +287,14 @@ EVENTS = {
     'ping': handle_ping,
 }
 
-def _handle_comment(env, repo, issue, author, comment, target=None):
+def _handle_comment(env, repo, issue, comment, target=None):
     repository = env['runbot_merge.repository'].search([('name', '=', repo)])
-    if not repository.project_id._find_commands(comment):
+    if not repository.project_id._find_commands(comment['body'] or ''):
         return "No commands, ignoring"
 
     pr = env['runbot_merge.pull_requests']._get_or_schedule(repo, issue, target=target)
     if not pr:
         return "Unknown PR, scheduling fetch"
 
-    partner = env['res.partner'].search([('github_login', '=', author), ])
-    return pr._parse_commands(partner, comment, author)
+    partner = env['res.partner'].search([('github_login', '=', comment['user']['login'])])
+    return pr._parse_commands(partner, comment, comment['user']['login'])

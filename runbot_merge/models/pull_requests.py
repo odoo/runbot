@@ -623,6 +623,7 @@ class PullRequests(models.Model):
     delegates = fields.Many2many('res.partner', help="Delegate reviewers, not intrinsically reviewers but can review this PR")
     priority = fields.Integer(default=2, index=True)
 
+    overrides = fields.Char(required=True, default='{}')
     statuses = fields.Text(compute='_compute_statuses')
     status = fields.Char(compute='_compute_statuses')
     previous_failure = fields.Char(default='{}')
@@ -702,12 +703,13 @@ class PullRequests(models.Model):
         Commits = self.env['runbot_merge.commit']
         for pr in self:
             c = Commits.search([('sha', '=', pr.head)])
-            if not (c and c.statuses):
+            st = json.loads(c.statuses or '{}')
+            statuses = {**st, **json.loads(pr.overrides)}
+            if not statuses:
                 pr.status = pr.statuses = False
                 continue
 
-            statuses = json.loads(c.statuses)
-            pr.statuses = pprint.pformat(statuses)
+            pr.statuses = pprint.pformat(st)
 
             st = 'success'
             for ci in pr.repository.status_ids._for_pr(pr):
@@ -754,21 +756,16 @@ class PullRequests(models.Model):
 
     def _parse_command(self, commandstring):
         for m in re.finditer(
-            r'(\S+?)(?:([+-])|=(\S*))?(?:\s|$)',
+            r'(\S+?)(?:([+-])|=(\S*))?(?=\s|$)',
             commandstring,
         ):
             name, flag, param = m.groups()
-            if name in ('retry', 'check'):
-                yield (name, None)
-            elif name in ('r', 'review'):
-                if flag == '+':
-                    yield ('review', True)
-                elif flag == '-':
-                    yield ('review', False)
+            if name == 'r':
+                name = 'review'
+            if flag in ('+', '-'):
+                yield name, flag == '+'
             elif name == 'delegate':
-                if flag == '+':
-                    yield ('delegate', True)
-                elif param:
+                if param:
                     yield ('delegate', [
                         p.lstrip('#@')
                         for p in param.split(',')
@@ -778,6 +775,8 @@ class PullRequests(models.Model):
                     yield ('priority', int(param))
             elif any(name == k for k, _ in type(self).merge_method.selection):
                 yield ('method', name)
+            else:
+                yield name, param
 
     def _parse_commands(self, author, comment, login):
         """Parses a command string prefixed by Project::github_prefix.
@@ -807,18 +806,18 @@ class PullRequests(models.Model):
 
         commands = dict(
             ps
-            for m in self.repository.project_id._find_commands(comment)
+            for m in self.repository.project_id._find_commands(comment['body'] or '')
             for ps in self._parse_command(m)
         )
 
         if not commands:
             _logger.info("found no commands in comment of %s (%s) (%s)", author.github_login, author.display_name,
-                 utils.shorten(comment, 50)
+                 utils.shorten(comment['body'] or '', 50)
             )
             return 'ok'
 
         Feedback = self.env['runbot_merge.pull_requests.feedback']
-        if not is_author:
+        if not (is_author or 'override' in commands):
             # no point even parsing commands
             _logger.info("ignoring comment of %s (%s): no ACL to %s",
                           login, name, self.display_name)
@@ -931,6 +930,27 @@ class PullRequests(models.Model):
                         'pull_request': self.number,
                         'message':"Merge method set to %s" % explanation
                     })
+            elif command == 'override':
+                overridable = author.override_rights\
+                    .filtered(lambda r: r.repository_id == self.repository)\
+                    .mapped('context')
+                if param in overridable:
+                    self.overrides = json.dumps({
+                        **json.loads(self.overrides),
+                        param: {
+                            'state': 'success',
+                            'target_url': comment['html_url'],
+                            'description': f"Overridden by @{author.github_login}",
+                        },
+                    })
+                    c = self.env['runbot_merge.commit'].search([('sha', '=', self.head)])
+                    if c:
+                        c.to_check = True
+                    else:
+                        c.create({'sha': self.head, 'statuses': '{}'})
+                    ok = True
+                else:
+                    msg = "You are not allowed to do that."
 
             _logger.info(
                 "%s %s(%s) on %s by %s (%s)",
@@ -980,17 +1000,18 @@ class PullRequests(models.Model):
         failed = self.browse(())
         for pr in self:
             required = pr.repository.status_ids._for_pr(pr).mapped('context')
+            sts = {**statuses, **json.loads(pr.overrides)}
 
             success = True
             for ci in required:
-                st = state_(statuses, ci) or 'pending'
+                st = state_(sts, ci) or 'pending'
                 if st == 'success':
                     continue
 
                 success = False
                 if st in ('error', 'failure'):
                     failed |= pr
-                    pr._notify_ci_new_failure(ci, to_status(statuses.get(ci.strip(), 'pending')))
+                    pr._notify_ci_new_failure(ci, to_status(sts.get(ci.strip(), 'pending')))
             if success:
                 oldstate = pr.state
                 if oldstate == 'opened':
