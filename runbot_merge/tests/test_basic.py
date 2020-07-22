@@ -924,12 +924,14 @@ def test_ci_failure_after_review(env, repo, users, config):
     env.run_crons()
 
     with repo:
-        repo.post_status(prx.head, 'failure', 'ci/runbot')
-        repo.post_status(prx.head, 'success', 'legal/cla')
+        repo.post_status(prx.head, 'failure', 'ci/runbot', target_url="https://a")
+        repo.post_status(prx.head, 'failure', 'legal/cla', target_url="https://b")
+        repo.post_status(prx.head, 'failure', 'foo/bar', target_url="https://c")
     env.run_crons()
 
     assert prx.comments == [
         (users['reviewer'], 'hansen r+'),
+        (users['user'], "'legal/cla' failed on this reviewed PR.".format_map(users)),
         (users['user'], "'ci/runbot' failed on this reviewed PR.".format_map(users)),
     ]
 
