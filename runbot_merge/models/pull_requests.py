@@ -950,7 +950,10 @@ class PullRequests(models.Model):
                         c.create({'sha': self.head, 'statuses': '{}'})
                     ok = True
                 else:
-                    msg = "You are not allowed to do that."
+                    msg = f"You are not allowed to override this status."
+            else:
+                # ignore unknown commands
+                continue
 
             _logger.info(
                 "%s %s(%s) on %s by %s (%s)",
