@@ -115,6 +115,7 @@
         </t>
     </template>
     <template id="stagings" name="mergebot branch stagings">
+        <t t-set="repo_statuses" t-value="branch.project_id.repo_ids.having_branch(branch).status_ids"/>
         <ul class="list-unstyled stagings">
             <t t-foreach="branch.staging_ids.sorted(lambda s: s.staged_at, reverse=True)[:6]" t-as="staging">
                 <t t-set="success" t-value="staging.state == 'success'"/>
@@ -157,16 +158,20 @@
                                         Open Staging
                                     </a>
                                 </li>
-                                <li t-foreach="staging.statuses" t-as="st" t-if="st[3]"
-                                    t-att-class="
-                                        'bg-success' if st[2] == 'success'
-                                   else 'bg-danger' if st[2] in ('error', 'failure')
-                                   else 'bg-info'"
-                                >
-                                    <a t-att-href="st[3]" target="new">
-                                        <t t-esc="st[0]"/>: <t t-esc="st[1]"/>
-                                    </a>
-                                </li>
+
+                                <t t-set="statuses" t-value="{c: (s, t) for h, c, s, t in staging.statuses}"/>
+                                <t t-foreach="repo_statuses._for_staging(staging)" t-as="req">
+                                    <t t-set="st" t-value="statuses.get(req.context) or ('pending', None)"/>
+                                    <li t-att-class="
+                                            'bg-success' if st[0] == 'success'
+                                       else 'bg-danger' if st[0] in ('error', 'failure')
+                                       else 'bg-info'"
+                                    >
+                                        <a t-att-href="st[1]" target="new">
+                                            <t t-esc="req.repo_id.name"/>: <t t-esc="req.context"/>
+                                        </a>
+                                    </li>
+                                </t>
                             </ul>
                         </div>
                     </t>
@@ -175,6 +180,7 @@
         </ul>
     </template>
     <template id="branch_stagings" name="mergebot stagings page">
+        <t t-set="repo_statuses" t-value="branch.project_id.repo_ids.having_branch(branch).status_ids"/>
         <t t-call="website.layout">
             <div id="wrap"><div class="container-fluid">
                 <section class="row">
@@ -231,19 +237,22 @@
                                                 Open Staging
                                             </a>
                                         </li>
-                                        <li t-foreach="staging.statuses"
-                                            t-as="st" t-if="st[3]"
-                                            t-att-class="
-                                        'bg-success' if st[2] == 'success'
-                                   else 'bg-danger' if st[2] in ('error', 'failure')
-                                   else 'bg-info'"
-                                        >
-                                            <a t-att-href="st[3]"
-                                               target="new">
-                                                <t t-esc="st[0]"/>:
-                                                <t t-esc="st[1]"/>
-                                            </a>
-                                        </li>
+
+                                        <t t-set="statuses" t-value="{c: (s, t) for h, c, s, t in staging.statuses}"/>
+                                        <t t-foreach="repo_statuses._for_staging(staging)" t-as="req">
+                                            <t t-set="st" t-value="statuses.get(req.context) or ('pending', None)"/>
+                                            <li t-att-class="
+                                                    'bg-success' if st[0] == 'success'
+                                               else 'bg-danger' if st[0] in ('error', 'failure')
+                                               else 'bg-info'"
+                                            >
+                                                <a t-att-href="st[1]"
+                                                   target="new">
+                                                    <t t-esc="req.repo_id.name"/>:
+                                                    <t t-esc="req.context"/>
+                                                </a>
+                                            </li>
+                                        </t>
                                     </ul>
                                 </div>
                             </th>

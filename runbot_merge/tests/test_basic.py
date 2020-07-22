@@ -87,10 +87,8 @@ def test_trivial_flow(env, repo, page, users, config):
     p = html.fromstring(page('/runbot_merge'))
     s = p.cssselect('.staging div.dropdown li')
     assert len(s) == 2
-    assert s[0].get('class') == 'bg-success'
-    assert s[0][0].text.strip() == '{}: ci/runbot'.format(repo.name)
-    assert s[1].get('class') == 'bg-danger'
-    assert s[1][0].text.strip() == '{}: ci/lint'.format(repo.name)
+    assert s[1].get('class') == 'bg-success'
+    assert s[1][0].text.strip() == '{}: ci/runbot'.format(repo.name)
 
     assert re.match('^force rebuild', staging_head.message)
 
