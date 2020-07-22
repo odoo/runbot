@@ -2857,6 +2857,22 @@ class TestRecognizeCommands:
             prx.post_comment('%shansen r+' % indent, config['role_reviewer']['token'])
         assert pr.state == 'approved'
 
+    def test_unknown_commands(self, repo, env, config, users):
+        with repo:
+            m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+            repo.make_ref('heads/master', m)
+
+            c = repo.make_commit(m, 'first', None, tree={'m': 'c'})
+            pr = repo.make_pr(title='title', body=None, target='master', head=c)
+            pr.post_comment("hansen do the thing", config['role_reviewer']['token'])
+            pr.post_comment('hansen @bobby-b r+ :+1:', config['role_reviewer']['token'])
+        env.run_crons()
+
+        assert pr.comments == [
+            (users['reviewer'], "hansen do the thing"),
+            (users['reviewer'], "hansen @bobby-b r+ :+1:"),
+        ]
+
 class TestRMinus:
     def test_rminus_approved(self, repo, env, config):
         """ approved -> r- -> opened
