@@ -1002,12 +1002,17 @@ class PullRequests(models.Model):
             required = pr.repository.status_ids._for_pr(pr).mapped('context')
             sts = {**statuses, **json.loads(pr.overrides)}
 
+            a, r = [], []
             success = True
             for ci in required:
                 st = state_(sts, ci) or 'pending'
                 if st == 'success':
+                    r.append(f'\N{Ballot Box} {ci}')
+                    a.append(f'\N{Ballot Box with Check} {ci}')
                     continue
 
+                a.append(f'\N{Ballot Box} {ci}')
+                r.append(f'\N{Ballot Box with Check} {ci}')
                 success = False
                 if st in ('error', 'failure'):
                     failed |= pr
@@ -1018,6 +1023,12 @@ class PullRequests(models.Model):
                     pr.state = 'validated'
                 elif oldstate == 'approved':
                     pr.state = 'ready'
+            self.env['runbot_merge.pull_requests.tagging'].create({
+                'repository': pr.repository.id,
+                'pull_request': pr.number,
+                'tags_remove': json.dumps(r),
+                'tags_add': json.dumps(a),
+            })
         return failed
 
     def _notify_ci_new_failure(self, ci, st):

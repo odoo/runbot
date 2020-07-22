@@ -39,7 +39,7 @@ def test_trivial_flow(env, repo, page, users, config):
     ])
     assert pr.state == 'opened'
     env.run_crons()
-    assert pr1.labels == {'seen 🙂'}
+    assert pr1.labels == {'seen 🙂', '☐ legal/cla', '☐ ci/runbot'}
     # nothing happened
 
     with repo:
@@ -54,7 +54,7 @@ def test_trivial_flow(env, repo, page, users, config):
     env.run_crons()
     assert pr.state == 'validated'
 
-    assert pr1.labels == {'seen 🙂', 'CI 🤖'}
+    assert pr1.labels == {'seen 🙂', 'CI 🤖', '☑ ci/runbot', '☑ legal/cla'}
 
     with repo:
         pr1.post_comment('hansen r+ rebase-merge', config['role_reviewer']['token'])
@@ -64,7 +64,7 @@ def test_trivial_flow(env, repo, page, users, config):
 
     env.run_crons()
     assert pr.staging_id
-    assert pr1.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merging 👷'}
+    assert pr1.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merging 👷', '☑ ci/runbot', '☑ legal/cla'}
 
     with repo:
         # get head of staging branch
@@ -94,7 +94,7 @@ def test_trivial_flow(env, repo, page, users, config):
 
     assert st.state == 'success'
     assert pr.state == 'merged'
-    assert pr1.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merged 🎉'}
+    assert pr1.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merged 🎉', '☑ ci/runbot', '☑ legal/cla'}
 
     master = repo.commit('heads/master')
     # with default-rebase, only one parent is "known"
@@ -356,7 +356,7 @@ def test_staging_conflict(env, repo, config):
         ('number', '=', pr2.number)
     ])
     assert p_2.state == 'ready', "PR2 should not have been staged since there is a pending staging for master"
-    assert pr2.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌'}
+    assert pr2.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', '☑ ci/runbot', '☑ legal/cla'}
 
     staging_head = repo.commit('heads/staging.master')
     with repo:
@@ -432,7 +432,7 @@ def test_staging_merge_fail(env, repo, users, config):
         ('number', '=', prx.number)
     ])
     assert pr1.state == 'error'
-    assert prx.labels == {'seen 🙂', 'error 🙅'}
+    assert prx.labels == {'seen 🙂', 'error 🙅', '☑ legal/cla', '☑ ci/runbot'}
     assert prx.comments == [
         (users['reviewer'], 'hansen r+ rebase-merge'),
         (users['user'], 'Merge method set to rebase and merge, using the PR as merge commit message'),
@@ -661,7 +661,7 @@ class TestPREdition:
         with repo: prx.base = '2.0'
         assert not pr.exists()
         env.run_crons()
-        assert prx.labels == set()
+        assert prx.labels == {'☐ legal/cla', '☐ ci/runbot'}
 
         with repo: prx.base = '1.0'
         assert env['runbot_merge.pull_requests'].search([
@@ -814,7 +814,7 @@ def test_close_staged(env, repo, config):
     assert not pr.staging_id
     assert not env['runbot_merge.stagings'].search([])
     assert pr.state == 'closed'
-    assert prx.labels == {'seen 🙂', 'closed 💔'}
+    assert prx.labels == {'seen 🙂', 'closed 💔', '☑ ci/runbot', '☑ legal/cla'}
 
 def test_forward_port(env, repo, config):
     with repo:
@@ -3259,18 +3259,17 @@ class TestLabelling:
 
             c = repo.make_commit(m, 'replace file contents', None, tree={'a': 'some other content'})
             pr = repo.make_pr(title='gibberish', body='blahblah', target='master', head=c)
+        env.run_crons('runbot_merge.feedback_cron')
+        assert pr.labels == {'seen 🙂', '☐ legal/cla', '☐ ci/runbot'},\
+            "required statuses should be labelled as pending"
 
-        [pr_id] = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', pr.number),
-        ])
         with repo:
             repo.post_status(c, 'success', 'legal/cla')
             repo.post_status(c, 'success', 'ci/runbot')
 
         env.run_crons()
 
-        assert pr.labels == {'seen 🙂', 'CI 🤖'}
+        assert pr.labels == {'seen 🙂', 'CI 🤖', '☑ legal/cla', '☑ ci/runbot'}
         with repo:
             # desync state and labels
             pr.labels.remove('CI 🤖')
@@ -3278,7 +3277,7 @@ class TestLabelling:
             pr.post_comment('hansen r+', config['role_reviewer']['token'])
         env.run_crons()
 
-        assert pr.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merging 👷'},\
+        assert pr.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merging 👷', '☑ legal/cla', '☑ ci/runbot'},\
             "labels should be resynchronised"
 
     def test_other_tags(self, env, repo, config):
@@ -3293,20 +3292,16 @@ class TestLabelling:
             # "foreign" labels
             pr.labels.update(('L1', 'L2'))
 
-        [pr_id] = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', pr.number),
-        ])
         with repo:
             repo.post_status(c, 'success', 'legal/cla')
             repo.post_status(c, 'success', 'ci/runbot')
         env.run_crons()
 
-        assert pr.labels == {'seen 🙂', 'CI 🤖', 'L1', 'L2'}, "should not lose foreign labels"
+        assert pr.labels == {'seen 🙂', 'CI 🤖', '☑ legal/cla', '☑ ci/runbot', 'L1', 'L2'}, "should not lose foreign labels"
 
         with repo:
             pr.post_comment('hansen r+', config['role_reviewer']['token'])
         env.run_crons()
 
-        assert pr.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merging 👷', 'L1', 'L2'},\
+        assert pr.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merging 👷', '☑ legal/cla', '☑ ci/runbot', 'L1', 'L2'},\
             "should not lose foreign labels"
