@@ -159,9 +159,9 @@
                                     </a>
                                 </li>
 
-                                <t t-set="statuses" t-value="{c: (s, t) for h, c, s, t in staging.statuses}"/>
+                                <t t-set="statuses" t-value="{(r, c): (s, t) for r, c, s, t in staging.statuses}"/>
                                 <t t-foreach="repo_statuses._for_staging(staging)" t-as="req">
-                                    <t t-set="st" t-value="statuses.get(req.context) or ('pending', None)"/>
+                                    <t t-set="st" t-value="statuses.get((req.repo_id.name, req.context)) or ('pending', None)"/>
                                     <li t-att-class="
                                             'bg-success' if st[0] == 'success'
                                        else 'bg-danger' if st[0] in ('error', 'failure')
@@ -237,10 +237,9 @@
                                                 Open Staging
                                             </a>
                                         </li>
-
-                                        <t t-set="statuses" t-value="{c: (s, t) for h, c, s, t in staging.statuses}"/>
+                                        <t t-set="statuses" t-value="{(r, c): (s, t) for r, c, s, t in staging.statuses}"/>
                                         <t t-foreach="repo_statuses._for_staging(staging)" t-as="req">
-                                            <t t-set="st" t-value="statuses.get(req.context) or ('pending', None)"/>
+                                            <t t-set="st" t-value="statuses.get((req.repo_id.name, req.context)) or ('pending', None)"/>
                                             <li t-att-class="
                                                     'bg-success' if st[0] == 'success'
                                                else 'bg-danger' if st[0] in ('error', 'failure')
