@@ -8,6 +8,9 @@ from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from odoo import http
 from . import models, controllers
 
+def delegate(self, attr):
+    return getattr(self.app, attr)
+SentryWsgiMiddleware.__getattr__ = delegate
 
 def enable_sentry():
     logger = logging.getLogger('runbot_merge')
