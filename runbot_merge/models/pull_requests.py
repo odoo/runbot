@@ -309,7 +309,7 @@ All substitutions are tentatively applied sequentially to the input.
             })
             self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': pr_id.repository.id,
-                'pull_request': self.number,
+                'pull_request': number,
                 'message': r,
             })
             return
