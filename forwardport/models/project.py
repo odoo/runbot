@@ -431,7 +431,7 @@ class PullRequests(models.Model):
             mates = batch.prs
             # wait until all of them are validated or ready
             if any(pr.source_id.fw_policy != 'skipci' and pr.state not in ('validated', 'ready') for pr in mates):
-                _logger.warning("-> not ready (%s)", [(pr.display_name, pr.state) for pr in mates])
+                _logger.info("-> not ready (%s)", [(pr.display_name, pr.state) for pr in mates])
                 continue
 
             # check that there's no weird-ass state
