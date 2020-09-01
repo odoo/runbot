@@ -753,10 +753,10 @@ class runbot_build(models.Model):
 
             build.write(build_values)
             if ending_build:
-                build._github_status()
                 if not build.local_result:  # Set 'ok' result if no result set (no tests job on build)
                     build.local_result = 'ok'
                     build._logger("No result set, setting ok by default")
+                build._github_status()
             build._run_job()
 
     def _run_job(self):
