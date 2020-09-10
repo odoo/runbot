@@ -4,6 +4,7 @@ import logging
 
 from ..common import pseudo_markdown
 from odoo import models, fields, tools
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -95,7 +96,6 @@ class RunbotErrorLog(models.Model):
     path = fields.Char(string='Path', readonly=True)
     line = fields.Char(string='Line', readonly=True)
     build_id = fields.Many2one('runbot.build', string='Build', readonly=True)
-    #bu_name = fields.Char(String='Build name', readonly=True) as aggregate
     dest = fields.Char(String='Build dest', readonly=True)
     local_state = fields.Char(string='Local state', readonly=True)
     local_result = fields.Char(string='Local result', readonly=True)
@@ -104,9 +104,9 @@ class RunbotErrorLog(models.Model):
     bu_create_date = fields.Datetime(string='Build create date', readonly=True)
     host = fields.Char(string='Host', readonly=True)
     parent_id = fields.Many2one('runbot.build', string='Parent build', readonly=True)
-    #bundle_id = fields.Many2one('runbot.bundle', string='Bundle', readonly=True)
-    #bundle_name = fields.Char(string='Bundle name', readonly=True)
-    #bundle_sticky = fields.Boolean(string='Sticky', readonly=True)
+    top_parent_id = fields.Many2one('runbot.build', string="Top parent", readonly=True)
+    bundle_ids = fields.Many2many('runbot.bundle', compute='_compute_bundle_id',  search='_search_bundle', string='Bundle', readonly=True)
+    sticky = fields.Boolean(string='Bundle Sticky', compute='_compute_bundle_id', search='_search_sticky', readonly=True)
     build_url = fields.Char(compute='_compute_build_url', readonly=True)
 
     def _compute_repo_short_name(self):
@@ -125,10 +125,61 @@ class RunbotErrorLog(models.Model):
             "target": "new",
         }
 
+    def _compute_bundle_id(self):
+        slots = self.env['runbot.batch.slot'].search([('build_id', 'in', self.mapped('top_parent_id').ids)])
+        for l in self:
+            l.bundle_ids = slots.filtered(lambda rec: rec.build_id.id == l.top_parent_id.id).batch_id.bundle_id
+            l.sticky = any(l.bundle_ids.filtered('sticky'))
+
+    def _search_bundle(self, operator, value):
+        query = """
+          SELECT id
+          FROM runbot_build as build
+          WHERE EXISTS(
+            SELECT * FROM runbot_batch_slot as slot
+            JOIN
+              runbot_batch batch ON batch.id = slot.batch_id
+            JOIN
+              runbot_bundle bundle ON bundle.id = batch.bundle_id
+            %s
+        """
+        if operator in ('ilike', '=', 'in'):
+            value = '%%%s%%' % value if operator == 'ilike' else value
+            col_name = 'id' if operator == 'in' else 'name'
+            where_condition = "WHERE slot.build_id = build.id AND bundle.%s %s any(%%s));" if operator == 'in' else "WHERE slot.build_id = build.id AND bundle.%s %s %%s);"
+            operator = '=' if operator == 'in' else operator
+            where_condition = where_condition % (col_name, operator)
+            query = query % where_condition
+            self.env.cr.execute(query, (value,))
+            build_ids = [t[0] for t in self.env.cr.fetchall()]
+            return [('top_parent_id', 'in', build_ids)]
+
+        raise UserError('Operator `%s` not implemented for bundle search' % operator)
+
+    def search_count(self, args):
+       return 4242  # hack to speed up the view
+
+    def _search_sticky(self, operator, value):
+        if operator == '=':
+            self.env.cr.execute("""
+              SELECT id
+              FROM runbot_build as build
+              WHERE EXISTS(
+                SELECT * FROM runbot_batch_slot as slot
+                JOIN
+                  runbot_batch batch ON batch.id = slot.batch_id
+                JOIN
+                  runbot_bundle bundle ON bundle.id = batch.bundle_id
+                WHERE
+                  bundle.sticky = %s AND slot.build_id = build.id);
+            """, (value,))
+            build_ids = [t[0] for t in self.env.cr.fetchall()]
+            return [('top_parent_id', 'in', build_ids)]
+        return []
+
     def _parse_logs(self):
         BuildError = self.env['runbot.build.error']
         BuildError._parse_logs(self)
-
 
     def init(self):
         """ Create an SQL view for ir.logging """
@@ -152,7 +203,8 @@ class RunbotErrorLog(models.Model):
                 bu.global_result  AS global_result,
                 bu.create_date  AS bu_create_date,
                 bu.host  AS host,
-                bu.parent_id  AS parent_id
+                bu.parent_id  AS parent_id,
+                split_part(bu.parent_path, '/',1)::int AS top_parent_id
             FROM
                 ir_logging AS l
             JOIN

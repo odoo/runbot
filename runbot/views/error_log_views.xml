@@ -14,6 +14,7 @@
               <div class="oe_title">
                   <h1><field name="build_id"/></h1>
                   <field name="build_url" widget="url"/>
+                  &amp;nbsp;<field name="log_create_date"/>
               </div>
               <group>
                   <group>
@@ -44,6 +45,7 @@
         <tree string="Build Errors">
           <button name="action_goto_build" type="object" icon="fa-external-link "/>
           <field name="build_id"/>
+          <field name="bundle_ids" widget="many2many_tags"/>
           <field name="log_create_date"/>
           <field name="name"/>
           <field name="func"/>
@@ -65,6 +67,13 @@
           <field name="build_id"/>
           <filter string="Failed builds" name="failed_builds" domain="[('global_state', '=', 'done'), ('global_result', '=', 'ko')]"/>
           <separator/>
+          <filter string="Master bundle" name="master_bundle" domain="[('bundle_ids.name', '=', 'master')]"/>
+          <filter string="Sticky bundles" name="sticky_bundles" domain="[('sticky', '=', True)]"/>
+          <separator/>
+          <!-- <filter name="filter_log_create_date" date="log_create_date" string="Log Date" default_period="last_7_days"/> -->
+          <filter string="Last 7 Days" name="log_date" domain="[
+                        ('log_create_date', '>=', (datetime.datetime.combine(context_today() + relativedelta(days=-7), datetime.time(0,0,0)).to_utc()).strftime('%Y-%m-%d %H:%M:%S')),
+                        ('log_create_date', '&lt;', (datetime.datetime.combine(context_today(), datetime.time(0,0,0)).to_utc()).strftime('%Y-%m-%d %H:%M:%S'))]"/>
         </search>
       </field>
     </record>
@@ -73,7 +82,8 @@
         <field name="name">Error Logs</field>
         <field name="res_model">runbot.error.log</field>
         <field name="view_mode">tree,form</field>
-        <field name="context">{'search_default_sticky_branches': True, 'search_default_failed_builds': True}</field>
+        <!-- <field name="context">{'search_default_sticky_bundles': True, 'search_default_failed_builds': True, 'time_ranges': {'field': 'log_create_date', 'range': 'last_7_days'},}</field> -->
+        <field name="context">{'search_default_sticky_bundles': True, 'search_default_failed_builds': True, 'search_default_log_date': True}</field>
     </record>
 
     <menuitem
