@@ -1,7 +1,5 @@
 # Odoo Runbot Repository
 
-[![Build Status](http://runbot.odoo.com/runbot/badge/flat/13/13.0.svg)](http://runbot.odoo.com/runbot)
-
 This repository contains the source code of Odoo testing bot [runbot.odoo.com](http://runbot.odoo.com/runbot) and related addons.
 
 ------------------
