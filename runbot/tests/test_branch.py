@@ -169,6 +169,29 @@ class TestBranchIsBase(RunbotCaseMinimalSetup):
         self.assertTrue(branch.bundle_id.is_base, "A branch matching the is_base_regex parameter should create is_base bundle")
         self.assertTrue(branch.bundle_id.sticky, "A branch matching the is_base_regex parameter should create sticky bundle")
 
+    def test_host(self):
+        r10 = self.env['runbot.host'].create({'name': 'runbot10.odoo.com'})
+        r12 = self.env['runbot.host'].create({'name': 'runbot12.odoo.com', 'assigned_only': True})
+
+        branch = self.Branch.create({
+                'remote_id': self.remote_server.id,
+                'name': 'saas-13.4-runbotinexist-test',
+                'is_pr': False,
+            })
+        self.assertFalse(branch.bundle_id.host_id)
+        branch = self.Branch.create({
+                'remote_id': self.remote_server.id,
+                'name': 'saas-13.4-runbot10-test',
+                'is_pr': False,
+        })
+        self.assertEqual(branch.bundle_id.host_id, r10)
+        branch = self.Branch.create({
+                'remote_id': self.remote_server.id,
+                'name': 'saas-13.4-runbot_x-test',
+                'is_pr': False,
+        })
+        self.assertEqual(branch.bundle_id.host_id, r12)
+
     @mute_logger("odoo.addons.runbot.models.branch")
     def test_is_base_regex_on_dev_remote(self):
         """Test that a branch matching the is_base regex on a secondary remote goes to the dummy bundles."""
