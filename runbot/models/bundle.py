@@ -45,6 +45,25 @@ class Bundle(models.Model):
     trigger_custom_ids = fields.One2many('runbot.bundle.trigger.custom', 'bundle_id')
     auto_rebase = fields.Boolean('Auto rebase', default=False)
 
+    host_id = fields.Many2one('runbot.host', compute="_compute_host_id", store=True)
+
+    @api.depends('name')
+    def _compute_host_id(self):
+        assigned_only = None
+        runbots = {}
+        for bundle in self:
+            elems = bundle.name.split('-')
+            for elem in elems:
+                if elem.startswith('runbot'):
+                    if elem.replace('runbot', '') == '_x':
+                        if assigned_only is None:
+                            assigned_only = self.env['runbot.host'].search([('assigned_only', '=', True)], limit=1)
+                        bundle.host_id = assigned_only or False
+                    elif elem.replace('runbot', '').isdigit():
+                        if elem not in runbots:
+                            runbots[elem] = self.env['runbot.host'].search([('name', 'like', '%s%%' % elem)], limit=1)
+                        bundle.host_id = runbots[elem] or False
+
     @api.depends('sticky')
     def _compute_make_stats(self):
         for bundle in self:

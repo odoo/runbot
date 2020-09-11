@@ -115,6 +115,9 @@ class Batch(models.Model):
                 'build_type': 'normal' if self.category_id == self.env.ref('runbot.default_category') else 'scheduled',
                 'no_auto_run': self.bundle_id.no_auto_run,
             })
+            if self.bundle_id.host_id:
+                build.host = self.bundle_id.host_id.name
+
             build._github_status(post_commit=False)
         return link_type, build
 
