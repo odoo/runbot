@@ -129,7 +129,7 @@ Create a repo for you custom addons repo
 - No server files should be given since it is an addons repo.
 - No addons_path given to use repo root as default.
 - we only want to test runbot and runbot_cla on runbot, `-*,runbot,runbot_cla` will blacklist all except this ones
-- The remote has PR option checked to fetch pull request too. This is optional.
+- The remote PR option can be checked to fetch pull request too if a github token is given for this repo.
 
 #### Tweak runbot parameters and enable features
 
@@ -173,6 +173,8 @@ In this example, we want to create a new build when a new commit is pushed on ru
 Note that the used config is default. It is adviced to customize this config. In our example, adding */runbot,/runbot_cla* test-tags on config step *all* may be a good idea to speed up testing by skipping tests from dependencies.
 
 When a branch is pushed, a new batch will be created, and after one minute the new build will be created if no other change is detected. The build remains in pending state for now. Check the result on 127.0.0.1:8069/runbot
+
+CI options (not on screeshot) will only be used to send status on remotes of trigger repositories having a valid token.
 
 #### Hosts
 Runbot is able to share pending builds accross multiple hosts. In the present case, there is only one. A new host will never assign pending build to himself by default.
