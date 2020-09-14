@@ -107,5 +107,5 @@ class Host(models.Model):
         self.ensure_one()
         nb_hosts = self.env['runbot.host'].search_count([])
         nb_reserved = self.env['runbot.host'].search_count([('assigned_only', '=', True)])
-        if nb_reserved < (nb_hosts / 2):
+        if nb_reserved < (nb_hosts / 2) and nb_hosts > 1:
             self.assigned_only = True
