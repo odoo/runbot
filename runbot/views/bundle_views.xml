@@ -33,7 +33,7 @@
                     <field name="no_auto_run"/>
                     <field name="priority"/>
                     <field name="build_all"/>
-                    <field name="host_id"/>
+                    <field name="host_id" readonly="0"/>
                     <field name="branch_ids">
                         <tree>
                             <field name="dname"/>
