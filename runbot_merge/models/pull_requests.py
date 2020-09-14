@@ -133,7 +133,7 @@ class Project(models.Model):
                 if f.close:
                     gh.close(f.pull_request)
                     try:
-                        data = json.loads(message)
+                        data = json.loads(message or '')
                     except json.JSONDecodeError:
                         pass
                     else:
