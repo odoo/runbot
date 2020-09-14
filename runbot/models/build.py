@@ -151,6 +151,8 @@ class BuildResult(models.Model):
     requested_action = fields.Selection([('wake_up', 'To wake up'), ('deathrow', 'To kill')], string='Action requested', index=True)
     # web infos
     host = fields.Char('Host')
+    keep_host = fields.Boolean('Keep host on rebuild and for children')
+
     port = fields.Integer('Port')
     dest = fields.Char(compute='_compute_dest', type='char', string='Dest', readonly=1, store=True)
     domain = fields.Char(compute='_compute_domain', type='char', string='URL')
@@ -317,12 +319,15 @@ class BuildResult(models.Model):
             commit_link_ids = self.params_id.commit_link_ids
             commit_link_ids |= additionnal_commit_links
             param_values['commit_link_ids'] = commit_link_ids
+
         return self.create({
             'params_id': self.params_id.copy(param_values).id,
             'parent_id': self.id,
             'build_type': self.build_type,
             'description': description,
             'orphan_result': orphan,
+            'keep_host': self.keep_host,
+            'host': self.host if self.keep_host else '',
         })
 
     def result_multi(self):
@@ -418,6 +423,9 @@ class BuildResult(models.Model):
             'params_id': self.params_id.id,
             'build_type': 'rebuild',
         }
+        if self.keep_host:
+            values['host'] = self.host
+            values['keep_host'] = True
         if self.parent_id:
             values.update({
                 'parent_id': self.parent_id.id,
@@ -1072,7 +1080,7 @@ class BuildResult(models.Model):
                     _logger.debug('Skipping result for orphan build %s', self.id)
                 else:
                     build.parent_id._github_status(post_commit)
-            elif build.params_id.config_id == build.params_id.trigger_id.config_id: 
+            elif build.params_id.config_id == build.params_id.trigger_id.config_id:
                 if build.global_result in ('ko', 'warn'):
                     state = 'failure'
                 elif build.global_state in ('pending', 'testing'):

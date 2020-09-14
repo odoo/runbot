@@ -33,6 +33,7 @@
                     <field name="no_auto_run"/>
                     <field name="priority"/>
                     <field name="build_all"/>
+                    <field name="host_id"/>
                     <field name="branch_ids">
                         <tree>
                             <field name="dname"/>

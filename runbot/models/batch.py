@@ -117,6 +117,7 @@ class Batch(models.Model):
             })
             if self.bundle_id.host_id:
                 build.host = self.bundle_id.host_id.name
+                build.keep_host = True
 
             build._github_status(post_commit=False)
         return link_type, build
