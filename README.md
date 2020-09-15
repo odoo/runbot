@@ -20,7 +20,7 @@ Runbot v5 use a set of concept in order to cover all the use cases we need
 - **Build**: A test instance, using a set of commits and parameters to run some code and produce a result.
 - **Trigger**: Indicates that a build should be created when a new commit is pushed on a repo. A trigger has both trigger repos, and dependency repo. Ex: new commit on runbot-> build with runbot and a dependency with odoo.
 - **Bundle**: A set or branches that work together: all the branches with the same name and all linked pr in the same project.
-- **Batch**: A container for builds and commits of a bundle. When a new commit is pushed on a branch, if a trigger exists for the repo of that branch, a new batch is created with this commit. After 60 seconds, if no other commit is added to the batch, a build is created by triggering a new commit in this batch.
+- **Batch**: A container for builds and commits of a bundle. When a new commit is pushed on a branch, if a trigger exists for the repo of that branch, a new batch is created with this commit. After 60 seconds, if no other commit is added to the batch, a build is created by trigger having a new commit in this batch.
 
 ## HOW TO
 
@@ -148,7 +148,7 @@ Acces the runbot settings and tweak the default parameters.
 
 Save the parameter. The next cron execution should do a lot of setup.
 NOTE: The default limit_time_real-cron should be ideally set to at least 1800 for this operation.
-- If schedule builds are checked, the first time consuming operation will be to build the docker image. You can check the current running dockers with `docker ps -a`. One of them should be up for a few minutes. If the build is not finished at the end of the cron timeout, docker build will either resolve its progress and continue the next step, but could also fail on the same step each time and stay stuck. Ensure to have limit-time-real-cron high enough, depending on your bandwidth and power this value could be 600-1800 (or more). Let's wait and make a coffee. You can also check progress by tailing runbot/static/docker/docker_build.txt
+- If "schedule builds" is checked, the first time consuming operation will be to build the docker image. You can check the current running dockers with `docker ps -a`. One of them should be up for a few minutes. If the build is not finished at the end of the cron timeout, docker build will either resolve its progress and continue the next step, but could also fail on the same step each time and stay stuck. Ensure to have limit-time-real-cron high enough, depending on your bandwidth and power this value could be 600-1800 (or more). Let's wait and make a coffee. You can also check progress by tailing runbot/static/docker/docker_build.txt
 
 - The next git update will init the repositories, a config file with your remotes should be created for each repo. You can check the content in /runbot/static/repo/(runbot|odoo)/config. The repo will be fetched, this operation may take some time too.
 
@@ -183,7 +183,7 @@ Go in the Build Hosts menu and choose yours. Uncheck *Only accept assigned build
 ### Modules filters
 Modules to install can be filtered by repo, and by config step. The first filter to be applied is the repo one, creating the default list for a config step.
 Addon -module on a repo will remove the module from the default, it is advised to reflect the default case on repo. To test only a custom module, adding *-\** on odoo repo will disable all odoo addons. Only dependencies of custom modules will be installed. Some specific modules can also be filtered using *-module1,-module1* or somme specific modules can be kept using *-\*,module1,module2*
-Module can also be filtered on a config step with the same logic as repo filter, except that all modules can be un allowlisted from repo by starting the list with *\** (all available modules)
+Module can also be filtered on a config step with the same logic as repo filter, except that repo's blacklist can be disabled to allow all modules by starting the list with *\** (all available modules)
 It is also possible to add test-tags to config step to allow more module to be installed but only testing some specific one. Test tags: */module1,/module2*
 
 ### db template
