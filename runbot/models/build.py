@@ -327,7 +327,7 @@ class BuildResult(models.Model):
             'description': description,
             'orphan_result': orphan,
             'keep_host': self.keep_host,
-            'host': self.host if self.keep_host else '',
+            'host': self.host if self.keep_host else False,
         })
 
     def result_multi(self):
