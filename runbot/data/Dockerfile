@@ -9,6 +9,7 @@ RUN set -x ; \
     build-essential \
     ca-certificates \
     curl \
+    ffmpeg \
     file \
     fonts-freefont-ttf \
     fonts-noto-cjk \
