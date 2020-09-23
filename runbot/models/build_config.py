@@ -397,6 +397,9 @@ class ConfigStep(models.Model):
         if grep(config_path, "--screenshots"):
             cmd.add_config_tuple('screenshots', '/data/build/tests')
 
+        if grep(config_path, "--screencasts"):
+            cmd.add_config_tuple('screencasts', '/data/build/tests')
+
         cmd.append('--stop-after-init')  # install job should always finish
         if '--log-level' not in extra_params:
             cmd.append('--log-level=test')

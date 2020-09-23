@@ -34,7 +34,6 @@ class Runbot(models.AbstractModel):
         return os.path.abspath(default)
 
     def _scheduler(self, host):
-
         self._gc_testing(host)
         self._commit()
         for build in self._get_builds_with_requested_actions(host):
@@ -152,6 +151,7 @@ class Runbot(models.AbstractModel):
         env = self.env
         settings = {}
         settings['port'] = config.get('http_port')
+        settings['runbot_domain'] = self._domain()
         settings['runbot_static'] = os.path.join(get_module_resource('runbot', 'static'), '')
         nginx_dir = os.path.join(self._root(), 'nginx')
         settings['nginx_dir'] = nginx_dir

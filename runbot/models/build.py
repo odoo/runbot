@@ -942,7 +942,7 @@ class BuildResult(models.Model):
             if logdb_uri and grep(build._server('sql_db.py'), 'allow_uri'):
                 logdb = '%s' % logdb_uri
             command.add_config_tuple("log_db", "%s" % logdb)
-            if grep(build._server('tools/config.py'), 'log-db-level'):
+            if grep(config_path, 'log-db-level'):
                 command.add_config_tuple("log_db_level", '25')
 
         if grep(config_path, "data-dir"):

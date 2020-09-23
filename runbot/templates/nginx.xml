@@ -47,6 +47,7 @@ server {
        autoindex off;
        location ~ /runbot/static/build/[^/]+/(logs|tests)/ {
           autoindex on;
+          add_header 'Access-Control-Allow-Origin' 'https://<t t-esc="runbot_domain"/>';
        }
     }
 }
