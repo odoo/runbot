@@ -7,4 +7,4 @@ class User(models.Model):
 
     # Add default action_id
     action_id = fields.Many2one('ir.actions.actions',
-                                default=lambda self: self.env.ref('runbot.runbot_menu_warning_root', raise_if_not_found=False))
+                                default=lambda self: self.env.ref('runbot.open_view_warning_tree', raise_if_not_found=False))
