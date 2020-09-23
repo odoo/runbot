@@ -397,7 +397,7 @@ class ConfigStep(models.Model):
         if grep(config_path, "--screenshots"):
             cmd.add_config_tuple('screenshots', '/data/build/tests')
 
-        if grep(config_path, "--screencasts") and self.env['ir.config_parameter'].sudo().get_param('runbot.enable_screencast', False)):
+        if grep(config_path, "--screencasts") and self.env['ir.config_parameter'].sudo().get_param('runbot.enable_screencast', False):
             cmd.add_config_tuple('screencasts', '/data/build/tests')
 
         cmd.append('--stop-after-init')  # install job should always finish
