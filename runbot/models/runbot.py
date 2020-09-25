@@ -136,7 +136,7 @@ class Runbot(models.AbstractModel):
                             WHERE
                                 %s
                             ORDER BY
-                                array_position(array['normal','rebuild','indirect','scheduled']::varchar[], runbot_build.build_type) ASC
+                                parent_path
                             FOR UPDATE OF runbot_build SKIP LOCKED
                             LIMIT %%s
                         )
