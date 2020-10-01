@@ -66,17 +66,31 @@ class Project(models.Model):
     )
 
     def _check_stagings(self, commit=False):
-        for staging in self.search([]).mapped('branch_ids.active_staging_id'):
-            staging.check_status()
-            if commit:
-                self.env.cr.commit()
-
-    def _create_stagings(self, commit=False):
-        for branch in self.search([]).mapped('branch_ids'):
-            if not branch.active_staging_id:
-                branch.try_staging()
+        for branch in self.search([]).mapped('branch_ids').filtered('active'):
+            staging = branch.active_staging_id
+            if not staging:
+                continue
+            try:
+                with self.env.cr.savepoint():
+                    staging.check_status()
+            except Exception:
+                _logger.exception("Failed to check staging for branch %r (staging %s)",
+                                  branch.name, staging)
+            else:
                 if commit:
                     self.env.cr.commit()
+
+    def _create_stagings(self, commit=False):
+        for branch in self.search([]).mapped('branch_ids').filtered('active'):
+            if not branch.active_staging_id:
+                try:
+                    with self.env.cr.savepoint():
+                        branch.try_staging()
+                except Exception:
+                    _logger.exception("Failed to create staging for branch %r", branch.name)
+                else:
+                    if commit:
+                        self.env.cr.commit()
 
     def _send_feedback(self):
         Repos = self.env['runbot_merge.repository']
