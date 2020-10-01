@@ -129,7 +129,7 @@ def handle_pr(env, event):
         return "Nothing to update ({})".format(event['changes'].keys())
 
     if not branch:
-        _logger.info("Ignoring PR for un-managed branch %s#%s", r, b)
+        _logger.info("Ignoring PR for un-managed branch %s:%s", r, b)
         return "Not set up to care about {}:{}".format(r, b)
 
     author_name = pr['user']['login']

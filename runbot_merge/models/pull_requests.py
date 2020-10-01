@@ -288,7 +288,8 @@ All substitutions are tentatively applied sequentially to the input.
         issue, pr = gh.pr(number)
 
         if not self.project_id._has_branch(pr['base']['ref']):
-            _logger.info("Tasked with loading PR %d for un-managed branch %s, ignoring", pr['number'], pr['base']['ref'])
+            _logger.info("Tasked with loading PR %d for un-managed branch %s:%s, ignoring",
+                         pr['number'], self.name, pr['base']['ref'])
             self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': self.id,
                 'pull_request': number,
@@ -664,13 +665,14 @@ class PullRequests(models.Model):
             batch = pr
             if not re.search(r':patch-\d+', pr.label):
                 batch = self.search([
+                    ('target', '=', pr.target.id),
                     ('label', '=', pr.label),
                     ('state', 'not in', ('merged', 'closed')),
                 ])
 
             # check if PRs are configured (single commit or merge method set)
             if not (pr.squash or pr.merge_method):
-                pr.blocked = 'has no merge'
+                pr.blocked = 'has no merge method'
                 continue
             other_unset = next((p for p in batch if not (p.squash or p.merge_method)), None)
             if other_unset:

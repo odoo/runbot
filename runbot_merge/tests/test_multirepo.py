@@ -6,6 +6,7 @@ When preparing a staging, we simply want to ensure branch-matched PRs
 are staged concurrently in all repos
 """
 import json
+import time
 
 import pytest
 import requests
@@ -152,6 +153,52 @@ def test_stage_match(env, project, repo_a, repo_b, config):
 
     assert 'Related: {}'.format(pr_b.display_name) in repo_a.commit('master').message
     assert 'Related: {}'.format(pr_a.display_name) in repo_b.commit('master').message
+
+def test_different_targets(env, project, repo_a, repo_b, config):
+    """ PRs with different targets should not be matched together
+    """
+    project.write({
+        'batch_limit': 1,
+        'branch_ids': [(0, 0, {'name': 'other'})]
+    })
+    with repo_a:
+        make_branch(repo_a, 'master', 'initial', {'master': 'a_0'})
+        make_branch(repo_a, 'other', 'initial', {'other': 'a_0'})
+        pr_a = make_pr(
+            repo_a, 'do-a-thing', [{'mater': 'a_1'}],
+            target='master',
+            user=config['role_user']['token'],
+            reviewer=config['role_reviewer']['token'],
+        )
+    with repo_b:
+        make_branch(repo_b, 'master', 'initial', {'master': 'b_0'})
+        make_branch(repo_b, 'other', 'initial', {'other': 'b_0'})
+        pr_b = make_pr(
+            repo_b, 'do-a-thing', [{'other': 'b_1'}],
+            target='other',
+            user=config['role_user']['token'],
+            reviewer=config['role_reviewer']['token'],
+            statuses=[],
+        )
+    time.sleep(5)
+    env.run_crons()
+
+    pr_a = to_pr(env, pr_a)
+    pr_b = to_pr(env, pr_b)
+    assert pr_a.state == 'ready'
+    assert not pr_a.blocked
+    assert pr_a.staging_id
+
+    assert pr_b.blocked
+    assert pr_b.state == 'approved'
+    assert not pr_b.staging_id
+
+    for r in [repo_a, repo_b]:
+        with r:
+            r.post_status('staging.master', 'success', 'legal/cla')
+            r.post_status('staging.master', 'success', 'ci/runbot')
+    env.run_crons()
+    assert pr_a.state == 'merged'
 
 def test_stage_different_statuses(env, project, repo_a, repo_b, config):
     project.batch_limit = 1
