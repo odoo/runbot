@@ -236,14 +236,18 @@ class StatusConfiguration(models.Model):
 
     context = fields.Char(required=True)
     repo_id = fields.Many2one('runbot_merge.repository', required=True, ondelete='cascade')
-    branch_ids = fields.Many2many('runbot_merge.branch', 'runbot_merge_repository_status_branch', 'status_id', 'branch_id')
+    branch_filter = fields.Char(help="branches this status applies to")
+    # FIXME: migrate branch_ids -> branch_filter = [('id', 'in', branch_ids.ids)]
     prs = fields.Boolean(string="Applies to pull requests", default=True)
     stagings = fields.Boolean(string="Applies to stagings", default=True)
 
     def _for_branch(self, branch):
         assert branch._name == 'runbot_merge.branch', \
             f'Expected branch, got {branch}'
-        return self.filtered(lambda st: not st.branch_ids or branch in st.branch_ids)
+        return self.filtered(lambda st: (
+            not st.branch_filter
+            or branch.filtered_domain(ast.literal_eval(st.branch_filter))
+        ))
     def _for_pr(self, pr):
         assert pr._name == 'runbot_merge.pull_requests', \
             f'Expected pull request, got {pr}'

@@ -14,7 +14,7 @@ def repo(env, project, make_repo, users, setreviewers):
                 # require the lint status on master
                 (0, 0, {
                     'context': 'lint',
-                    'branch_ids': [(4, project.branch_ids.id, False)]
+                    'branch_filter': [('id', '=', project.branch_ids.id)]
                 }),
                 (0, 0, {'context': 'pr', 'stagings': False}),
                 (0, 0, {'context': 'staging', 'prs': False}),
