@@ -11,6 +11,8 @@ from lxml import html
 import odoo
 
 from test_utils import re_matches, get_partner, _simple_init
+from utils import Commit
+
 
 @pytest.fixture
 def repo(env, project, make_repo, users, setreviewers):
@@ -322,7 +324,7 @@ class TestWebhookSecurity:
             ('number', '=', pr0.number),
         ])
 
-def test_staging_conflict(env, repo, config):
+def test_staging_ongoing(env, repo, config):
     with repo:
         # create base branch
         m = repo.make_commit(None, 'initial', None, tree={'a': 'some content'})
@@ -411,8 +413,9 @@ def test_staging_concurrent(env, repo, config):
     ])
     assert pr2.staging_id
 
-def test_staging_merge_fail(env, repo, users, config):
-    """ # of staging failure (no CI) before mark & notify?
+def test_staging_confict_first(env, repo, users, config):
+    """ If the first batch of a staging triggers a conflict, the PR should be
+    marked as in error
     """
     with repo:
         m1 = repo.make_commit(None, 'initial', None, tree={'f': 'm1'})
@@ -438,6 +441,52 @@ def test_staging_merge_fail(env, repo, users, config):
         (users['user'], 'Merge method set to rebase and merge, using the PR as merge commit message'),
         (users['user'], re_matches('^Unable to stage PR')),
     ]
+
+def test_staging_conflict_second(env, repo, users, config):
+    """ If the non-first batch of a staging triggers a conflict, the PR should
+    just be skipped: it might be a conflict with an other PR which could fail
+    the staging
+    """
+    with repo:
+        [m] = repo.make_commits(None, Commit('initial', tree={'a': '1'}), ref='heads/master')
+
+    with repo:
+        repo.make_commits(m, Commit('first pr', tree={'a': '2'}), ref='heads/pr0')
+        pr0 = repo.make_pr(target='master', head='pr0')
+        repo.post_status(pr0.head, 'success', 'ci/runbot')
+        repo.post_status(pr0.head, 'success', 'legal/cla')
+        pr0.post_comment('hansen r+', config['role_reviewer']['token'])
+
+    with repo:
+        repo.make_commits(m, Commit('second pr', tree={'a': '3'}), ref='heads/pr1')
+        pr1 = repo.make_pr(target='master', head='pr1')
+        repo.post_status(pr1.head, 'success', 'ci/runbot')
+        repo.post_status(pr1.head, 'success', 'legal/cla')
+        pr1.post_comment('hansen r+', config['role_reviewer']['token'])
+
+    env.run_crons()
+    PRs = env['runbot_merge.pull_requests']
+    pr0_id = PRs.search([
+        ('repository.name', '=', repo.name),
+        ('number', '=', pr0.number),
+    ])
+    pr1_id = PRs.search([
+        ('repository.name', '=', repo.name),
+        ('number', '=', pr1.number),
+    ])
+    assert pr0_id.staging_id, "pr0 should have been staged"
+    assert not pr1_id.staging_id, "pr1 should not have been staged (due to conflict)"
+    assert pr1_id.state == 'ready', "pr1 should not be in error yet"
+
+    # merge the staging, this should try to stage pr1, fail, and put it in error
+    # as it now conflicts with the master proper
+    with repo:
+        repo.post_status('staging.master', 'success', 'ci/runbot')
+        repo.post_status('staging.master', 'success', 'legal/cla')
+    env.run_crons()
+
+    assert pr1_id.state == 'error', "now pr1 should be in error"
+
 
 def test_staging_ci_timeout(env, repo, config):
     """If a staging timeouts (~ delay since staged greater than

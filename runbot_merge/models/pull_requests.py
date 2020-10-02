@@ -237,7 +237,6 @@ class StatusConfiguration(models.Model):
     context = fields.Char(required=True)
     repo_id = fields.Many2one('runbot_merge.repository', required=True, ondelete='cascade')
     branch_filter = fields.Char(help="branches this status applies to")
-    # FIXME: migrate branch_ids -> branch_filter = [('id', 'in', branch_ids.ids)]
     prs = fields.Boolean(string="Applies to pull requests", default=True)
     stagings = fields.Boolean(string="Applies to stagings", default=True)
 
@@ -484,10 +483,25 @@ class Branch(models.Model):
             gh.set_ref('tmp.{}'.format(self.name), it['head'])
 
         batch_limit = self.project_id.batch_limit
+        first = True
         for batch in batched_prs:
             if len(staged) >= batch_limit:
                 break
-            staged |= Batch.stage(meta, batch)
+            try:
+                staged |= Batch.stage(meta, batch)
+            except exceptions.MergeError as e:
+                if first:
+                    pr = e.args[0]
+                    _logger.exception("Failed to merge %s into staging branch",
+                                      pr.display_name)
+                    pr.state = 'error'
+                    self.env['runbot_merge.pull_requests.feedback'].create({
+                        'repository': pr.repository.id,
+                        'pull_request': pr.number,
+                        'message': "Unable to stage PR (%s)" % e.__context__,
+                    })
+            else:
+                first = False
 
         if not staged:
             return
@@ -1925,6 +1939,14 @@ class Batch(models.Model):
                     original_head, new_heads[pr]
                 )
             except (exceptions.MergeError, AssertionError) as e:
+                # reset the head which failed, as rebase() may have partially
+                # updated it (despite later steps failing)
+                gh.set_ref(target, original_head)
+                # then reset every previous update
+                for to_revert in new_heads.keys():
+                    it = meta[to_revert.repository]
+                    it['gh'].set_ref('tmp.{}'.format(to_revert.target.name), it['head'])
+
                 if isinstance(e, exceptions.Skip):
                     old_head, new_head, to_squash = e.args
                     pr.write({
@@ -1936,31 +1958,18 @@ class Batch(models.Model):
                         "head mismatch on %s: had %s but found %s",
                         pr.display_name, old_head, new_head
                     )
-                    msg = "We apparently missed an update to this PR and" \
-                          " tried to stage it in a state which might not have" \
-                          " been approved. PR has been updated to %s, please" \
-                          " check and approve or re-approve." % new_head
+                    self.env['runbot_merge.pull_requests.feedback'].create({
+                        'repository': pr.repository.id,
+                        'pull_request': pr.number,
+                        'message': "We apparently missed an update to this PR "
+                                   "and tried to stage it in a state which "
+                                   "might not have been approved. PR has been "
+                                   "updated to %s, please check and approve or "
+                                   "re-approve." % new_head
+                    })
+                    return self.env['runbot_merge.batch']
                 else:
-                    _logger.exception("Failed to merge %s into staging branch (error: %s)",
-                                      pr.display_name, e)
-                    pr.state = 'error'
-                    msg = "Unable to stage PR (%s)" % e
-
-                self.env['runbot_merge.pull_requests.feedback'].create({
-                    'repository': pr.repository.id,
-                    'pull_request': pr.number,
-                    'message': msg,
-                })
-
-                # reset the head which failed, as rebase() may have partially
-                # updated it (despite later steps failing)
-                gh.set_ref(target, original_head)
-                # then reset every previous update
-                for to_revert in new_heads.keys():
-                    it = meta[to_revert.repository]
-                    it['gh'].set_ref('tmp.{}'.format(to_revert.target.name), it['head'])
-
-                return self.env['runbot_merge.batch']
+                    raise exceptions.MergeError(pr)
 
         # update meta to new heads
         for pr, head in new_heads.items():
