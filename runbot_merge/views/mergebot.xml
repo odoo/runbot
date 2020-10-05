@@ -64,7 +64,7 @@
                     <field name="status_ids">
                         <tree editable="bottom">
                             <field name="context"/>
-                            <field name="branch_filter" widget="domain"/>
+                            <field name="branch_filter"/>
                             <field name="prs"/>
                             <field name="stagings"/>
                         </tree>
