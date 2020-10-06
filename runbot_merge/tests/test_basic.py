@@ -789,47 +789,6 @@ class TestPREdition:
         with repo:
             prx.base = 'master'
 
-    def test_retarget_from_disabled(self, env, repo):
-        """ Retargeting a PR from a disabled branch should not duplicate the PR
-        """
-        branch_1 = env['runbot_merge.branch'].create({
-            'name': '1.0',
-            'project_id': env['runbot_merge.project'].search([]).id,
-        })
-        branch_2 = env['runbot_merge.branch'].create({
-            'name': '2.0',
-            'project_id': env['runbot_merge.project'].search([]).id,
-        })
-
-        with repo:
-            c0 = repo.make_commit(None, '0', None, tree={'a': '0'})
-            repo.make_ref('heads/1.0', c0)
-            c1 = repo.make_commit(c0, '1', None, tree={'a': '1'})
-            repo.make_ref('heads/2.0', c1)
-            c2 = repo.make_commit(c1, '2', None, tree={'a': '2'})
-            repo.make_ref('heads/master', c2)
-
-            # create PR on 1.0
-            c = repo.make_commit(c0, 'c', None, tree={'a': '0', 'b': '0'})
-            prx = repo.make_pr(title='t', body='b', target='1.0', head=c)
-        # there should only be a single PR in the system at this point
-        [pr] = env['runbot_merge.pull_requests'].search([])
-        assert pr.target == branch_1
-
-        # branch 1 is EOL, disable it
-        branch_1.active = False
-
-        with repo:
-            # we forgot we had active PRs for it, and we may want to merge them
-            # still, retarget them!
-            prx.base = '2.0'
-
-        # check that we still only have one PR in the system
-        [pr_] = env['runbot_merge.pull_requests'].search([])
-        # and that it's the same as the old one, just edited with a new target
-        assert pr_ == pr
-        assert pr.target == branch_2
-
 @pytest.mark.skip(reason="What do?")
 def test_edit_staged(env, repo):
     """
@@ -2835,6 +2794,7 @@ class TestUnknownPR:
 
         assert prx.comments == [
             (users['reviewer'], 'hansen r+'),
+            (users['user'], "This PR targets the un-managed branch %s:branch, it can not be merged." % repo.name),
             (users['user'], "I'm sorry. Branch `branch` is not within my remit."),
         ]
 

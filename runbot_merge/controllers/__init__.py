@@ -84,12 +84,17 @@ def handle_pr(env, event):
 
     # PRs to unmanaged branches are not necessarily abnormal and
     # we don't care
-    # note: deactivated ~= unmanaged for new PRs
-    branch = env['runbot_merge.branch'].search([
+    branch = env['runbot_merge.branch'].with_context(active_test=False).search([
         ('name', '=', b),
         ('project_id', '=', repo.project_id.id),
     ])
 
+    def feedback(**info):
+        return env['runbot_merge.pull_requests.feedback'].create({
+            'repository': repo.id,
+            'pull_request': pr['number'],
+            **info,
+        })
     def find(target):
         return env['runbot_merge.pull_requests'].search([
             ('repository', '=', repo.id),
@@ -101,10 +106,9 @@ def handle_pr(env, event):
     # handling must occur before the rest of the steps
     if event['action'] == 'edited':
         source = event['changes'].get('base', {'ref': {'from': b}})['ref']['from']
-        source_branch = env['runbot_merge.branch'].search([
+        source_branch = env['runbot_merge.branch'].with_context(active_test=False).search([
             ('name', '=', source),
             ('project_id', '=', repo.project_id.id),
-            '|', ('active', '=', True), ('active', '=', False)
         ])
         # retargeting to un-managed => delete
         if not branch:
@@ -128,8 +132,17 @@ def handle_pr(env, event):
             return 'Updated {}'.format(pr_obj.id)
         return "Nothing to update ({})".format(event['changes'].keys())
 
+    message = None
     if not branch:
-        _logger.info("Ignoring PR for un-managed branch %s:%s", r, b)
+        message = f"This PR targets the un-managed branch {r}:{b}, it can not be merged."
+        _logger.info("Ignoring event %s on PR %s#%d for un-managed branch %s",
+                     event['action'], r, pr['number'], b)
+    elif not branch.active:
+        message = f"This PR targets the disabled branch {r}:{b}, it can not be merged."
+    if message and event['action'] not in ('synchronize', 'closed'):
+        feedback(message=message)
+
+    if not branch:
         return "Not set up to care about {}:{}".format(r, b)
 
     author_name = pr['user']['login']
@@ -194,12 +207,10 @@ def handle_pr(env, event):
 
     if event['action'] == 'reopened' :
         if pr_obj.state == 'merged':
-            env['runbot_merge.pull_requests.feedback'].create({
-                'repository': pr_obj.repository.id,
-                'pull_request': pr_obj.number,
-                'close': True,
-                'message': "@%s ya silly goose you can't reopen a PR that's been merged PR." % event['sender']['login']
-            })
+            feedback(
+                close=True,
+                message="@%s ya silly goose you can't reopen a PR that's been merged PR." % event['sender']['login']
+            )
 
         if pr_obj.state == 'closed':
             _logger.info('%s reopening %s', event['sender']['login'], pr_obj.display_name)

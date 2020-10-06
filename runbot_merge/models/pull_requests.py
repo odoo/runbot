@@ -1132,7 +1132,7 @@ class PullRequests(models.Model):
                 ('name', '=', description['base']['repo']['full_name']),
             ])
         if branch is None:
-            branch = self.env['runbot_merge.branch'].search([
+            branch = self.env['runbot_merge.branch'].with_context(active_test=False).search([
                 ('name', '=', description['base']['ref']),
                 ('project_id', '=', repo.project_id.id),
             ])
