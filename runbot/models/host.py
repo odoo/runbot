@@ -71,10 +71,23 @@ class Host(models.Model):
         self._bootstrap_db_template()
 
     def _docker_build(self):
-        """ build docker image """
+        """ build docker images needed by locally pending builds"""
+        self.ensure_one()
         static_path = self._get_work_path()
-        log_path = os.path.join(static_path, 'docker', 'docker_build.txt')
-        docker_build(log_path, static_path)
+        self.clear_caches()  # needed to ensure that content is updated on all hosts
+        for dockerfile in self.env['runbot.dockerfile'].search([('to_build', '=', True)]):
+            _logger.info('Building %s, %s', dockerfile.name, hash(dockerfile.dockerfile))
+            docker_build_path = os.path.join(static_path, 'docker', dockerfile.image_tag)
+            os.makedirs(docker_build_path, exist_ok=True)
+            with open(os.path.join(docker_build_path, 'Dockerfile'), 'w') as Dockerfile:
+                Dockerfile.write(dockerfile.dockerfile)
+            build_process = docker_build(docker_build_path, dockerfile.image_tag)
+            if build_process.returncode != 0:
+                dockerfile.to_build = False
+                message = 'Dockerfile build "%s" failed on host %s' % (dockerfile.image_tag, self.name)
+                dockerfile.message_post(body=message)
+                self.env['runbot.runbot'].warning(message)
+                _logger.warning(message)
 
     def _get_work_path(self):
         return os.path.abspath(os.path.join(os.path.dirname(__file__), '../static'))

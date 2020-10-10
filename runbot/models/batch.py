@@ -134,6 +134,11 @@ class Batch(models.Model):
         project = bundle.project_id
         if not bundle.version_id:
             _logger.error('No version found on bundle %s in project %s', bundle.name, project.name)
+
+        dockerfile_id = bundle.dockerfile_id or bundle.base_id.dockerfile_id or bundle.version_id.dockerfile_id
+        if not dockerfile_id:
+            _logger.error('No dockerfile found !')
+
         triggers = self.env['runbot.trigger'].search([  # could be optimised for multiple batches. Ormcached method?
             ('project_id', '=', project.id),
             ('category_id', '=', self.category_id.id)
@@ -279,7 +284,8 @@ class Batch(models.Model):
                 'trigger_id': trigger.id,  # for future reference and access rights
                 'config_data': {},
                 'commit_link_ids': [(6, 0, [commit_link_by_repos[repo.id].id for repo in trigger_repos])],
-                'modules': bundle.modules
+                'modules': bundle.modules,
+                'dockerfile_id': dockerfile_id,
             }
             params_value['builds_reference_ids'] = trigger._reference_builds(bundle)
 

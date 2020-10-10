@@ -296,7 +296,7 @@
 
         <template id="runbot.branch_github_menu">
           <button t-attf-class="btn btn-default btn-ssm" data-toggle="dropdown" title="Github links" aria-label="Github links" aria-expanded="false">
-            <i t-attf-class="fa fa-github"/>
+            <i t-attf-class="fa fa-github {{'text-primary' if any(branch_id.is_pr and branch_id.alive for branch_id in bundle.branch_ids) else ''}}"/>
             <span class="caret"/>
           </button>
           <div  class="dropdown-menu" role="menu">

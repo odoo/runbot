@@ -9,6 +9,8 @@
     'version': '5.0',
     'depends': ['base', 'base_automation', 'website'],
     'data': [
+        'templates/dockerfile.xml',
+        'data/dockerfile_data.xml',
         'data/build_parse.xml',
         'data/error_link.xml',
         'data/runbot_build_config_data.xml',
@@ -40,6 +42,7 @@
         'views/bundle_views.xml',
         'views/commit_views.xml',
         'views/config_views.xml',
+        'views/dockerfile_views.xml',
         'views/error_log_views.xml',
         'views/host_views.xml',
         'views/repo_views.xml',

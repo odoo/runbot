@@ -188,3 +188,17 @@ It is also possible to add test-tags to config step to allow more module to be i
 
 ### db template
 Db creation will use template0 by default. It is possible to specify a specific template to use in runbot config *Postgresql template*. It is mainly used to add extensions by default.
+
+
+## Dockerfiles
+
+Runbot is using a Dockerfile Odoo model to define the Dockerfile used for builds and is shipped with a default one. This default Dockerfile is based on Ubuntu Bionic and is intended to build recent supported versions of Odoo (currently 12.0 up to 14.0).
+
+The model is using Odoo QWeb views as templates.
+
+A new Dockerfile can be created as needed either by duplicating the default one and adapt parameters in the view. e.g.: changing the key `'from': 'ubuntu:bionic'` to `'from': 'debian:buster'` will create a new Dockerfile based on Debian instead of ubuntu.
+Or by providing a plain Dockerfile in the template.
+
+Once the Dockerfile is created and the `to_build` field is checked, the Dockerfile will be built (pay attention that no other operations will occur during the build).
+
+A version or a bundle can be assigned a specific Dockerfile.

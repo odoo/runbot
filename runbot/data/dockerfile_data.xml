@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record model="runbot.dockerfile" id="runbot.docker_default">
+        <field name="name">Docker Default</field>
+        <field name="template_id" ref="runbot.docker_base"/>
+        <field name="to_build">True</field>
+        <field name="description">Default Dockerfile for latest Odoo versions.</field>
+    </record>
+</odoo>
+

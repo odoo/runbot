@@ -23,6 +23,8 @@ class Version(models.Model):
     next_major_version_id = fields.Many2one('runbot.version', compute='_compute_version_relations')
     next_intermediate_version_ids = fields.Many2many('runbot.version', compute='_compute_version_relations')
 
+    dockerfile_id = fields.Many2one('runbot.dockerfile', default=lambda self: self.env.ref('runbot.docker_default', raise_if_not_found=False))
+
     @api.depends('name')
     def _compute_version_number(self):
         for version in self:
