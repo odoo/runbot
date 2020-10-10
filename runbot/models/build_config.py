@@ -338,12 +338,17 @@ class ConfigStep(models.Model):
         if smtp_host:
             cmd += ['--smtp', smtp_host]
 
+        extra_params = self.extra_params or ''
+        if extra_params:
+            cmd.extend(shlex.split(extra_params))
+        env_variables = self.additionnal_env.split(';') if self.additionnal_env else []
+
         docker_name = build._get_docker_name()
         build_path = build._path()
         build_port = build.port
         self.env.cr.commit()  # commit before docker run to be 100% sure that db state is consistent with dockers
         self.invalidate_cache()
-        res = docker_run(cmd, log_path, build_path, docker_name, exposed_ports=[build_port, build_port + 1], ro_volumes=exports)
+        res = docker_run(cmd, log_path, build_path, docker_name, exposed_ports=[build_port, build_port + 1], ro_volumes=exports, env_variables=env_variables)
         self.env['runbot.runbot']._reload_nginx()
         return res
 

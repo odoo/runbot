@@ -72,9 +72,9 @@
                         <field name="test_tags"/>
                         <field name="enable_auto_tags"/>
                         <field name="sub_command"/>
-                        <field name="extra_params" groups="base.group_no_one"/>
                     </group>
-                    <group string="Test settings" attrs="{'invisible': [('job_type', 'not in', ('python', 'install_odoo', 'test_upgrade'))]}">
+                    <group string="Extra Parameters" attrs="{'invisible': [('job_type', 'not in', ('python', 'install_odoo', 'test_upgrade', 'run_odoo'))]}">
+                        <field name="extra_params"/>
                         <field name="additionnal_env"/>
                     </group>
                     <group string="Create settings" attrs="{'invisible': [('job_type', 'not in', ('python', 'create_build'))]}">
