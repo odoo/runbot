@@ -9,7 +9,7 @@ import time
 import datetime
 import hashlib
 from ..common import dt2time, fqdn, now, grep, local_pgadmin_cursor, s2human, dest_reg, os, list_local_dbs, pseudo_markdown, RunbotException
-from ..container import docker_stop, docker_state, Command
+from ..container import docker_stop, docker_state, Command, docker_run
 from ..fields import JsonDictField
 from odoo import models, fields, api
 from odoo.exceptions import UserError, ValidationError
@@ -50,6 +50,8 @@ class BuildParameters(models.Model):
     project_id = fields.Many2one('runbot.project', required=True, index=True)  # for access rights
     trigger_id = fields.Many2one('runbot.trigger', index=True)  # for access rights
     category = fields.Char('Category', index=True)  # normal vs nightly vs weekly, ...
+    dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, default=lambda self: self.env.ref('runbot.docker_default', raise_if_not_found=False))
+    skip_requirements = fields.Boolean('Skip requirements.txt auto install')
     # other informations
     extra_params = fields.Char('Extra cmd args')
     config_id = fields.Many2one('runbot.build.config', 'Run Config', required=True,
@@ -86,6 +88,8 @@ class BuildParameters(models.Model):
                 'upgrade_from_build_id': param.upgrade_from_build_id.id,
                 'upgrade_to_build_id': param.upgrade_to_build_id.id,
                 'dump_db': param.dump_db.id,
+                'dockerfile_id': param.dockerfile_id.id,
+                'skip_requirements': param.skip_requirements,
             }
             param.fingerprint = hashlib.sha256(str(cleaned_vals).encode('utf8')).hexdigest()
 
@@ -716,6 +720,14 @@ class BuildResult(models.Model):
                     build._log("run", message, level='ERROR')
                     build._kill(result='ko')
 
+    def _docker_run(self, *args, **kwargs):
+        self.ensure_one()
+        if 'image_tag' not in kwargs:
+            kwargs.update({'image_tag': self.params_id.dockerfile_id.image_tag})
+        if kwargs['image_tag'] != 'odoo:DockerDefault':
+            self._log('Preparing', 'Using Dockerfile Tag %s' % kwargs['image_tag'])
+        docker_run(*args, **kwargs)
+
     def _path(self, *l, **kw):
         """Return the repo build path"""
         self.ensure_one()
@@ -908,7 +920,7 @@ class BuildResult(models.Model):
         py_version = py_version if py_version is not None else build._get_py_version()
         pres = []
         for commit_id in self.env.context.get('defined_commit_ids') or self.params_id.commit_ids:
-            if os.path.isfile(commit_id._source_path('requirements.txt')):  # this is a change I think
+            if not self.params_id.skip_requirements and os.path.isfile(commit_id._source_path('requirements.txt')):
                 repo_dir = self._docker_source_folder(commit_id)
                 requirement_path = os.path.join(repo_dir, 'requirements.txt')
                 pres.append(['sudo', 'pip%s' % py_version, 'install', '-r', '%s' % requirement_path])

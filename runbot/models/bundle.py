@@ -47,6 +47,8 @@ class Bundle(models.Model):
 
     host_id = fields.Many2one('runbot.host', compute="_compute_host_id", store=True)
 
+    dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, help="Use a custom Dockerfile")
+
     @api.depends('name')
     def _compute_host_id(self):
         assigned_only = None

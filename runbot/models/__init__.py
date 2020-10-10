@@ -8,6 +8,7 @@ from . import build_error
 from . import bundle
 from . import commit
 from . import database
+from . import dockerfile
 from . import event
 from . import host
 from . import ir_cron

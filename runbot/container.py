@@ -99,38 +99,36 @@ class Command():
         return res.read()
 
 
-def docker_build(log_path, build_dir):
-    return _docker_build(log_path, build_dir)
+def docker_build(build_dir, image_tag):
+    return _docker_build(build_dir, image_tag)
 
 
-def _docker_build(log_path, build_dir):
+def _docker_build(build_dir, image_tag):
     """Build the docker image
-    :param log_path: path to the logfile that will contain odoo stdout and stderr
-    :param build_dir: the build directory that contains the Odoo sources to build.
+    :param build_dir: the build directory that contains Dockerfile.
+    :param image_tag: name used to tag the resulting docker image
     """
-    # Prepare docker image
-    docker_dir = os.path.join(build_dir, 'docker')
-    os.makedirs(docker_dir, exist_ok=True)
-    shutil.copy(os.path.join(os.path.dirname(__file__), 'data', 'Dockerfile'), docker_dir)
     # synchronise the current user with the odoo user inside the Dockerfile
-    with open(os.path.join(docker_dir, 'Dockerfile'), 'a') as df:
+    with open(os.path.join(build_dir, 'Dockerfile'), 'a') as df:
         df.write(DOCKERUSER)
+    log_path = os.path.join(build_dir, 'docker_build.txt')
     logs = open(log_path, 'w')
-    dbuild = subprocess.Popen(['docker', 'build', '--tag', 'odoo:runbot_tests', '.'], stdout=logs, stderr=logs, cwd=docker_dir)
-    dbuild.wait()
+    dbuild = subprocess.Popen(['docker', 'build', '--tag', image_tag, '.'], stdout=logs, stderr=logs, cwd=build_dir)
+    return dbuild.wait()
 
 
 def docker_run(*args, **kwargs):
     return _docker_run(*args, **kwargs)
 
 
-def _docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None, cpu_limit=None, preexec_fn=None, ro_volumes=None, env_variables=None):
+def _docker_run(run_cmd, log_path, build_dir, container_name, image_tag='odoo:DockerDefault', exposed_ports=None, cpu_limit=None, preexec_fn=None, ro_volumes=None, env_variables=None):
     """Run tests in a docker container
     :param run_cmd: command string to run in container
     :param log_path: path to the logfile that will contain odoo stdout and stderr
     :param build_dir: the build directory that contains the Odoo sources to build.
                       This directory is shared as a volume with the container
     :param container_name: used to give a name to the container for later reference
+    :param image_tag: Docker image tag name to select which docker image to use
     :param exposed_ports: if not None, starting at 8069, ports will be exposed as exposed_ports numbers
     :params ro_volumes: dict of dest:source volumes to mount readonly in builddir
     :params env_variables: list of environment variables
@@ -179,7 +177,7 @@ def _docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None
             docker_command.extend(['-p', '127.0.0.1:%s:%s' % (hp, dp)])
     if cpu_limit:
         docker_command.extend(['--ulimit', 'cpu=%s' % int(cpu_limit)])
-    docker_command.extend(['odoo:runbot_tests', '/bin/bash', '-c', "%s" % run_cmd])
+    docker_command.extend([image_tag, '/bin/bash', '-c', "%s" % run_cmd])
     subprocess.Popen(docker_command, stdout=logs, stderr=logs, preexec_fn=preexec_fn, close_fds=False, cwd=build_dir)
     _logger.info('Started Docker container %s', container_name)
     return
@@ -286,102 +284,6 @@ def sanitize_container_name(name):
     name = re.sub('^[^a-zA-Z0-9]+', '', name)
     return re.sub('[^a-zA-Z0-9_.-]', '', name)
 
-def tests(args):
-    _logger.info('Start container tests')
-    os.makedirs(os.path.join(args.build_dir, 'logs'), exist_ok=True)
-    os.makedirs(os.path.join(args.build_dir, 'datadir'), exist_ok=True)
-
-    if args.kill:
-        # Test stopping a non running container
-        _logger.info('Test killing an non existing container')
-        docker_stop('xy' * 5)
-    # Test building
-    _logger.info('Test building the base image container')
-    logfile = os.path.join(args.build_dir, 'logs', 'logs-build.txt')
-    docker_build(logfile, args.build_dir)
-
-    with open(os.path.join(args.build_dir, 'odoo-bin'), 'r') as exfile:
-        py_version = '3' if 'python3' in exfile.readline() else ''
-
-    # Test environment variables
-    if args.env:
-        cmd = Command(None, ['echo testa is $TESTA and testb is $TESTB '], None)
-        env_variables = ['TESTA=test a', 'TESTB="test b"']
-        env_log = os.path.join(args.build_dir, 'logs', 'logs-env.txt')
-        container_name = 'odoo-container-test-%s' % datetime.datetime.now().microsecond
-        docker_run(cmd.build(), env_log, args.build_dir, container_name, env_variables=env_variables)
-        expected = 'testa is test a and testb is "test b"'
-        time.sleep(3)  # ugly sleep to wait for docker process to flush the log file
-        assert expected in open(env_log,'r').read()
-
-    # Test testing
-    pres = [['sudo', 'pip%s' % py_version, 'install', '-r', '/data/build/requirements.txt']]
-    posts = None
-    python_params = []
-    if args.coverage:
-        omit = ['--omit', '*__manifest__.py']
-        python_params = ['-m', 'coverage', 'run', '--branch', '--source', '/data/build'] + omit
-        posts = [['python%s' % py_version, "-m", "coverage", "html", "-d", "/data/build/coverage", "--ignore-errors"], ['python%s' % py_version, "-m", "coverage", "xml", "--ignore-errors"]]
-        os.makedirs(os.path.join(args.build_dir, 'coverage'), exist_ok=True)
-    elif args.flamegraph:
-        flame_log = '/data/build/logs/flame.log'
-        python_params = ['-m', 'flamegraph', '-o', flame_log]
-    odoo_cmd = ['python%s' % py_version] + python_params + ['/data/build/odoo-bin', '-d %s' % args.db_name, '--addons-path=/data/build/addons', '-i', args.odoo_modules,  '--test-enable', '--stop-after-init', '--max-cron-threads=0']
-    cmd = Command(pres, odoo_cmd, posts)
-    cmd.add_config_tuple('data_dir', '/data/build/datadir')
-    cmd.add_config_tuple('db_user', '%s' % os.getlogin())
-
-    if args.dump:
-        os.makedirs(os.path.join(args.build_dir, 'logs', args.db_name), exist_ok=True)
-        dump_dir = '/data/build/logs/%s/' % args.db_name
-        sql_dest = '%s/dump.sql' % dump_dir
-        filestore_path = '/data/build/datadir/filestore/%s' % args.db_name
-        filestore_dest = '%s/filestore/' % dump_dir
-        zip_path = '/data/build/logs/%s.zip' % args.db_name
-        cmd.finals.append(['pg_dump', args.db_name, '>', sql_dest])
-        cmd.finals.append(['cp', '-r', filestore_path, filestore_dest])
-        cmd.finals.append(['cd', dump_dir, '&&', 'zip', '-rm9', zip_path, '*'])
-
-    if args.flamegraph:
-        cmd.finals.append(['flamegraph.pl', '--title', 'Flamegraph', flame_log, '>', '/data/build/logs/flame.svg'])
-        cmd.finals.append(['gzip', '-f', flame_log])
-
-    if args.kill:
-        logfile = os.path.join(args.build_dir, 'logs', 'logs-partial.txt')
-        container_name = 'odoo-container-test-%s' % datetime.datetime.now().microsecond
-        docker_run(cmd.build(), logfile, args.build_dir, container_name)
-        # Test stopping the container
-        _logger.info('Waiting 30 sec before killing the build')
-        time.sleep(30)
-        docker_stop(container_name)
-        time.sleep(3)
-
-    # Test full testing
-    logfile = os.path.join(args.build_dir, 'logs', 'logs-full-test.txt')
-    container_name = 'odoo-container-test-%s' % datetime.datetime.now().microsecond
-    docker_run(cmd, logfile, args.build_dir, container_name)
-    time.sleep(1)  # give time for the container to start
-
-    while docker_is_running(container_name):
-        time.sleep(10)
-        _logger.info("Waiting for %s to stop", container_name)
-
-    if args.run:
-        # Test running
-        logfile = os.path.join(args.build_dir, 'logs', 'logs-running.txt')
-        odoo_cmd = [
-            'python%s' % py_version,
-            '/data/build/odoo-bin', '-d %s' % args.db_name,
-            '--db-filter', '%s.*$' % args.db_name, '--addons-path=/data/build/addons',
-            '-r %s' % os.getlogin(), '-i', 'web',  '--max-cron-threads=1',
-            '--data-dir', '/data/build/datadir', '--workers', '2',
-            '--longpolling-port', '8070', '--unaccent']
-        smtp_host = docker_get_gateway_ip()
-        if smtp_host:
-            odoo_cmd.extend(['--smtp', smtp_host])
-        container_name = 'odoo-container-test-%s' % datetime.datetime.now().microsecond
-        cmd = Command(pres, odoo_cmd, [])
-        docker_run(cmd.build(), logfile, args.build_dir, container_name, exposed_ports=[args.odoo_port, args.odoo_port + 1], cpu_limit=300)
 
 
 ##############################################################################
@@ -406,27 +308,3 @@ if os.environ.get('RUNBOT_MODE') == 'test':
             log_file.write('Initiating shutdown\n')
 
     docker_run = fake_docker_run
-
-
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
-    parser = argparse.ArgumentParser()
-    subparser = parser.add_subparsers(dest='command', required='True', help='commands')
-    p_build = subparser.add_parser('build', help='Build docker image')
-    p_build.add_argument('build_dir')
-    p_build.set_defaults(func=build)
-    p_test = subparser.add_parser('tests', help='Test docker functions')
-    p_test.set_defaults(func=tests)
-    p_test.add_argument('build_dir')
-    p_test.add_argument('odoo_port', type=int)
-    p_test.add_argument('db_name')
-    group = p_test.add_mutually_exclusive_group()
-    group.add_argument('--coverage', action='store_true', help='test a build with coverage')
-    group.add_argument('--flamegraph', action='store_true', help='test a build and draw a flamegraph')
-    p_test.add_argument('-i', dest='odoo_modules', default='web', help='Comma separated list of modules')
-    p_test.add_argument('--kill', action='store_true', default=False, help='Also test container kill')
-    p_test.add_argument('--dump', action='store_true', default=False, help='Test database export with pg_dump')
-    p_test.add_argument('--run', action='store_true', default=False, help='Also test running (Warning: the container survives exit)')
-    p_test.add_argument('--env', action='store_true', default=False, help='Test passing environment variables')
-    args = parser.parse_args()
-    args.func(args)
