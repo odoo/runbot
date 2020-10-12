@@ -19,11 +19,13 @@ class RunbotBadge(Controller):
     def badge(self, name, repo_id=False, trigger_id=False, theme='default'):
         if trigger_id:
             triggers = request.env['runbot.trigger'].browse(trigger_id)
+            project = triggers.project_id
         else:
             triggers = request.env['runbot.trigger'].search([('repo_ids', 'in', repo_id)])
+            project = request.env['runbot.repo'].browse(repo_id).project_id
             # -> hack to use repo. Would be better to change logic and use a trigger_id in params
         bundle = request.env['runbot.bundle'].search([('name', '=', name),
-            ('project_id', '=', request.env.ref('runbot.main_project').id)])  # WARNING no filter on project
+            ('project_id', '=', project.id)])
         if not bundle or not triggers:
             return request.not_found()
         batch = request.env['runbot.batch'].search([
