@@ -1,10 +1,12 @@
 import base64
 import glob
+import json
 import logging
 import fnmatch
 import re
 import shlex
 import time
+from unidiff import PatchSet
 from ..common import now, grep, time2str, rfind, s2human, os, RunbotException
 from ..container import docker_run, docker_get_gateway_ip, Command
 from odoo import models, fields, api
@@ -265,11 +267,12 @@ class ConfigStep(models.Model):
             'log_path': build._path('logs', '%s.txt' % self.name),
             'glob': glob.glob,
             'Command': Command,
-            'base64': base64,
             're': re,
             'time': time,
             'grep': grep,
             'rfind': rfind,
+            'json_loads': json.loads,
+            'PatchSet': PatchSet,
         }
 
     def _run_python(self, build, log_path):
@@ -290,7 +293,7 @@ class ConfigStep(models.Model):
         if not self:
             return False
         self.ensure_one()
-        return self.job_type in ('install_odoo', 'run_odoo', 'restore', 'test_upgrade') or (self.job_type == 'python' and ('docker_run(' in self.python_code or '_run_install_odoo(' in self.python_code))
+        return self.job_type in ('install_odoo', 'run_odoo', 'restore', 'test_upgrade') or (self.job_type == 'python' and ('docker_run(' in self.python_code or '_run_' in self.python_code))
 
     def _run_run_odoo(self, build, log_path, force=False):
         if not force:
@@ -963,9 +966,11 @@ class ConfigStep(models.Model):
                 self._check_log,
                 self._check_module_loaded,
                 self._check_error,
-                self._check_warning,
                 self._check_build_ended
             ]
+            if build.local_result != 'warn':
+                checkers.append(self._check_warning)
+
             local_result = self._get_checkers_result(build, checkers)
             build_values['local_result'] = build._get_worst_result([build.local_result, local_result])
         return build_values

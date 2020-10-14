@@ -2,8 +2,9 @@
 <odoo>
     <data>
         <template id="runbot.batch">
-            <t t-call='website.layout'>
-                <div class="table-responsive">
+            <t t-call="website.layout">
+                <div class="row">
+                    <div class="col-lg-6">
                     <table class="table table-stripped">
                         <tr>
                             <td>Bundle</td>
@@ -110,10 +111,22 @@
                                 </div>
                             </td>
                         </tr>
+                    </table>
+                    </div>
+                    <div class="col-lg-6">
+                    <table class="table table-stripped">
                         <tr>
                             <td>Builds</td>
                             <td>
-                                <t t-foreach="batch.slot_ids" t-as="slot">
+                                <t t-foreach="batch.slot_ids.filtered(lambda s: not s.manual)" t-as="slot">
+                                    <t t-call="runbot.slot_button"/>
+                                </t>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Manual</td>
+                            <td>
+                                <t t-foreach="batch.slot_ids.filtered(lambda s: s.manual)" t-as="slot">
                                     <t t-call="runbot.slot_button"/>
                                 </t>
                             </td>
@@ -129,16 +142,14 @@
                             </td>
                         </tr>
                     </table>
+                    </div>
                 </div>
                 <t t-foreach="batch.log_ids" t-as="log">
                     <t t-set="logclass" t-value="dict(ERROR='danger', WARNING='warning', INFO='info').get(log.level, 'warning')"/>
                     <div t-attf-class="alert alert-{{logclass}}">
                         <b t-esc="log.level"/>
                         --
-                        <t t-foreach="log._markdown().split('\n')" t-as="line">
-                            <span t-esc="line"/>
-                            <br t-if="not line_last"/>
-                        </t>
+                        <t t-raw="log._markdown()"/>
                     </div>
                 </t>
             </t>

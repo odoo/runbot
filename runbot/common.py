@@ -127,6 +127,7 @@ def pseudo_markdown(text):
             r'~~(.+?)~~': '<del>\g<1></del>',  # it's not official markdown but who cares
             r'__(.+?)__': '<ins>\g<1></ins>',  # same here, maybe we should change the method name
             r'`(.+?)`': '<code>\g<1></code>',
+            r'\r?\n': '<br/>',
     }
 
     for p, b in patterns.items():

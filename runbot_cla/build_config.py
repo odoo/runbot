@@ -35,7 +35,7 @@ class Step(models.Model):
                             cla = ''.join(io.open(f, encoding='utf-8').read() for f in cla_glob)
                             if cla.lower().find(email) == -1:
                                 error = True
-                                build._log('check_cla', 'Invalid email format %s' % email, level="ERROR")
+                                build._log('check_cla', 'Email not found in cla file %s' % email, level="ERROR")
                         except UnicodeDecodeError:
                             error = True
                             build._log('check_cla', 'Invalid CLA encoding (must be utf-8)', level="ERROR")

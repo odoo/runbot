@@ -213,7 +213,7 @@ class BuildResult(models.Model):
     def _compute_log_list(self):  # storing this field because it will be access trhoug repo viewn and keep track of the list at create
         for build in self:
             build.log_list = ','.join({step.name for step in build.params_id.config_id.step_ids() if step._has_log()})
-        # should be moved
+        # TODO replace logic, add log file to list when executed (avoid 404, link log on docker start, avoid fake is_docker_step)
 
     @api.depends('children_ids.global_state', 'local_state')
     def _compute_global_state(self):

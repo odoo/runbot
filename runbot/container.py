@@ -145,6 +145,7 @@ def _docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None
     logs = open(log_path, 'w')
     run_cmd = 'cd /data/build;touch start-%s;%s;cd /data/build;touch end-%s' % (container_name, run_cmd, container_name)
     docker_clear_state(container_name, build_dir)  # ensure that no state are remaining
+    open(os.path.join(build_dir, 'exist-%s' % container_name), 'w+').close()
     logs.write("Docker command:\n%s\n=================================================\n" % cmd_object)
     # create start script
     docker_command = [
@@ -208,8 +209,13 @@ def docker_is_running(container_name):
 
 def docker_state(container_name, build_dir):
     container_name = sanitize_container_name(container_name)
+    exist = os.path.exists(os.path.join(build_dir, 'exist-%s' % container_name))
     started = os.path.exists(os.path.join(build_dir, 'start-%s' % container_name))
     ended = os.path.exists(os.path.join(build_dir, 'end-%s' % container_name))
+
+    if not exist:
+        return 'VOID'
+
     if ended:
         return 'END'
 
@@ -229,6 +235,8 @@ def docker_clear_state(container_name, build_dir):
         os.remove(os.path.join(build_dir, 'start-%s' % container_name))
     if os.path.exists(os.path.join(build_dir, 'end-%s' % container_name)):
         os.remove(os.path.join(build_dir, 'end-%s' % container_name))
+    if os.path.exists(os.path.join(build_dir, 'exist-%s' % container_name)):
+        os.remove(os.path.join(build_dir, 'exist-%s' % container_name))
 
 
 def docker_get_gateway_ip():
@@ -386,6 +394,7 @@ if os.environ.get('RUNBOT_MODE') == 'test':
 
     def fake_docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None, cpu_limit=None, preexec_fn=None, ro_volumes=None, env_variables=None, *args, **kwargs):
         _logger.info('Docker Fake Run: %s', run_cmd)
+        open(os.path.join(build_dir, 'exist-%s' % container_name), 'w').write('fake end')
         open(os.path.join(build_dir, 'start-%s' % container_name), 'w').write('fake start\n')
         open(os.path.join(build_dir, 'end-%s' % container_name), 'w').write('fake end')
         with open(log_path, 'w') as log_file:

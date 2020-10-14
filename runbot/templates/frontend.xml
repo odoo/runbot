@@ -88,7 +88,7 @@
           <div class="batch_slots">
             <t t-foreach="batch.slot_ids" t-as="slot">
               <t t-if="slot.build_id">
-                <div t-if="(not slot.trigger_id.hide and trigger_display is None) or (trigger_display and slot.trigger_id.id in trigger_display)"
+                <div t-if="not slot.trigger_id.manual and ((not slot.trigger_id.hide and trigger_display is None) or (trigger_display and slot.trigger_id.id in trigger_display))"
                   t-call="runbot.slot_button" class="slot_container"/>
               </t>
             </t>

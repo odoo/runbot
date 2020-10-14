@@ -71,11 +71,18 @@ class TestIrLogging(RunbotCase):
             'some <strong>bold text</strong> and also some <ins>underlined text</ins> and maybe a bit of <del>strikethrough text</del>'
         )
 
-        log.message = 'a bit of code `import foo\nfoo.bar`'
+        #log.message = 'a bit of code `import foo\nfoo.bar`'
+        #self.assertEqual(
+        #    log._markdown(),
+        #    'a bit of code <code>import foo\nfoo.bar</code>'
+        #)
+
+        log.message = 'a bit of code :\n`import foo`'
         self.assertEqual(
             log._markdown(),
-            'a bit of code <code>import foo\nfoo.bar</code>'
+            'a bit of code :<br/><code>import foo</code>'
         )
+
 
         # test icon
         log.message = 'Hello @icon-file-text-o'

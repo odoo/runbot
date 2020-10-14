@@ -161,8 +161,6 @@ class TestUpgradeFlow(RunbotCase):
             'upgrade_dumps_trigger_id': self.trigger_addons_nightly.id,
         })
 
-        self.branch_upgrade.bundle_id  # force recompute TODO remove this once fixed
-
         with mute_logger('odoo.addons.runbot.models.commit'):
             self.build_niglty_master, self.build_weekly_master = self.create_version('master')
             self.build_niglty_11, self.build_weekly_11 = self.create_version('11.0')

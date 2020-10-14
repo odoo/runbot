@@ -67,7 +67,7 @@
                                         <t t-if="triggers">
                                             <input type="hidden" name="update_triggers" t-att-value="project.id"/>
                                             <t t-foreach="triggers" t-as="trigger">
-                                                <div class="text-nowrap">
+                                                <div t-if="not trigger.manual" class="text-nowrap">
                                                     <input type="checkbox" t-attf-name="trigger_{{trigger.id}}" t-attf-id="trigger_{{trigger.id}}" t-att-checked="trigger_display is None or trigger.id in trigger_display"/>
                                                     <label t-attf-for="trigger_{{trigger.id}}" t-esc="trigger.name"/>
                                                 </div>
