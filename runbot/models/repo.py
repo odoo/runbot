@@ -292,7 +292,7 @@ class Repo(models.Model):
         for repo in self:
             repo.path = os.path.join(root, 'repo', _sanitize(repo.name))
 
-    def _git(self, cmd):
+    def _git(self, cmd, errors='strict'):
         """Execute a git command 'cmd'"""
         self.ensure_one()
         config_args = []
@@ -300,7 +300,7 @@ class Repo(models.Model):
             config_args = ['-c', 'core.sshCommand=ssh -i %s/.ssh/%s' % (str(Path.home()), self.identity_file)]
         cmd = ['git', '-C', self.path] + config_args + cmd
         _logger.info("git command: %s", ' '.join(cmd))
-        return subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode()
+        return subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode(errors=errors)
 
     def _fetch(self, sha):
         if not self._hash_exists(sha):
