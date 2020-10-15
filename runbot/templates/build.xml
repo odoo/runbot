@@ -217,7 +217,7 @@
               <t t-foreach="build.sudo().log_ids" t-as="l">
                 <t t-set="subbuild" t-value="(([child for child in build.children_ids if child.id == int(l.path)] if l.type == 'subbuild' else False) or [build.browse()])[0]"/>
                 <t t-set="logclass" t-value="dict(CRITICAL='danger', ERROR='danger', WARNING='warning', OK='success', SEPARATOR='separator').get(l.level)"/>
-                <tr t-att-class="'separator' if logclass != 'separator' else ''">
+                <tr t-att-class="'separator' if logclass == 'separator' else ''">
                   <td style="white-space: nowrap; width:1%;">
                     <t t-esc="l.create_date.strftime('%Y-%m-%d %H:%M:%S')"/>
                   </td>
