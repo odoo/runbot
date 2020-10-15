@@ -670,9 +670,9 @@ class BuildResult(models.Model):
                 results = build.active_step._make_results(build)
             except Exception as e:
                 if isinstance(e, RunbotException):
-                    message = e.args[0]
+                    message = e.args[0][:300000]
                 else:
-                    message = 'An error occured while computing results of %s:\n %s' % (build.job, str(e).replace('\\n', '\n').replace("\\'", "'"))
+                    message = 'An error occured while computing results of %s:\n %s' % (build.job, str(e).replace('\\n', '\n').replace("\\'", "'")[:10000])
                     _logger.exception(message)
                 build._log('_make_results', message, level='ERROR')
                 results = {'local_result': 'ko'}
