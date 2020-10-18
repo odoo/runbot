@@ -358,11 +358,9 @@ class Batch(models.Model):
 
     def _log(self, message, *args, level='INFO'):
         message = message % args if args else message
-        if len(message) > 300000:
-            message = message[:300000] + '[Truncate, message too long]'
         self.env['runbot.batch.log'].create({
             'batch_id': self.id,
-            'message': message % args if args else message,
+            'message': message,
             'level': level,
         })
 

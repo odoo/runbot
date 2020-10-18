@@ -814,6 +814,10 @@ class BuildResult(models.Model):
         self.env['runbot.database'].create({'name': dbname, 'build_id': self.id})
 
     def _log(self, func, message, level='INFO', log_type='runbot', path='runbot'):
+
+        if len(message) > 300000:
+            message = message[:300000] + '[Truncate, message too long]'
+
         self.ensure_one()
         _logger.debug("Build %s %s %s", self.id, func, message)
         self.env['ir.logging'].create({
