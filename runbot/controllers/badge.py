@@ -17,18 +17,24 @@ class RunbotBadge(Controller):
         '/runbot/badge/trigger/<any(default,flat):theme>/<int:trigger_id>/<name>.svg',
     ], type="http", auth="public", methods=['GET', 'HEAD'])
     def badge(self, name, repo_id=False, trigger_id=False, theme='default'):
+        # Sudo is used here to allow the badge to be returned for projects
+        # which have restricted permissions.
+        Trigger = request.env['runbot.trigger'].sudo()
+        Repo = request.env['runbot.repo'].sudo()
+        Batch = request.env['runbot.batch'].sudo()
+        Bundle = request.env['runbot.bundle'].sudo()
         if trigger_id:
-            triggers = request.env['runbot.trigger'].browse(trigger_id)
+            triggers = Trigger.browse(trigger_id)
             project = triggers.project_id
         else:
-            triggers = request.env['runbot.trigger'].search([('repo_ids', 'in', repo_id)])
-            project = request.env['runbot.repo'].browse(repo_id).project_id
+            triggers = Trigger.search([('repo_ids', 'in', repo_id)])
+            project = Repo.browse(repo_id).project_id
             # -> hack to use repo. Would be better to change logic and use a trigger_id in params
-        bundle = request.env['runbot.bundle'].search([('name', '=', name),
+        bundle = Bundle.search([('name', '=', name),
             ('project_id', '=', project.id)])
         if not bundle or not triggers:
             return request.not_found()
-        batch = request.env['runbot.batch'].search([
+        batch = Batch.search([
             ('bundle_id', '=', bundle.id),
             ('state', '=', 'done'),
             ('category_id', '=', request.env.ref('runbot.default_category').id)
