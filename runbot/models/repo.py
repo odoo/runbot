@@ -47,7 +47,7 @@ class Trigger(models.Model):
     ci_context = fields.Char("Ci context", default='ci/runbot', tracking=True)
     category_id = fields.Many2one('runbot.category', default=lambda self: self.env.ref('runbot.default_category', raise_if_not_found=False))
     version_domain = fields.Char(string="Version domain")
-    hide = fields.Boolean('Hide batch on main page')  # TODO adapt and fix (cla, ...)
+    hide = fields.Boolean('Hide trigger on main page')
     manual = fields.Boolean('Only start trigger manually', default=False)
 
     upgrade_dumps_trigger_id = fields.Many2one('runbot.trigger', string= 'Template/complement trigger', tracking=True)
