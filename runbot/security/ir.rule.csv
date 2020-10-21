@@ -12,3 +12,5 @@ rule_commit,"limited to groups",model_runbot_commit,group_user,"['|', ('repo_id.
 rule_commit_mgmt,"manager can see all",model_runbot_commit,group_runbot_admin,"[(1, '=', 1)]",1,1,1,1
 rule_build,"limited to groups",model_runbot_build,group_user,"['|', ('params_id.project_id.group_ids', '=', False), ('params_id.project_id.group_ids', 'in', [g.id for g in user.groups_id])]",1,1,1,1
 rule_build_mgmt,"manager can see all",model_runbot_build,group_runbot_admin,"[(1, '=', 1)]",1,1,1,1
+access_runbot_build_config_multi_wizard,access_runbot_build_config_multi_wizard,model_runbot_build_config_multi_wizard,base.group_user,1,0,0,0
+access_runbot_build_stat_regex_wizard,access_runbot_build_stat_regex_wizard,model_runbot_build_stat_regex_wizard,base.group_user,1,0,0,0 

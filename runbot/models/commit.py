@@ -174,7 +174,7 @@ class CommitStatus(models.Model):
 
     commit_id = fields.Many2one('runbot.commit', string='Commit', required=True, index=True)
     context = fields.Char('Context', required=True)
-    state = fields.Char('State', required=True)
+    state = fields.Char('State', required=True, copy=True)
     build_id = fields.Many2one('runbot.build', string='Build', index=True)
     target_url = fields.Char('Url')
     description = fields.Char('Description')
@@ -221,6 +221,6 @@ class CommitStatus(models.Model):
                     _logger.exception('Something went wrong sending notification for %s', commit_name)
 
             if post_commit:
-                self._cr.after('commit', send_github_status_async)
+                self._cr.postcommit.add(send_github_status_async)
             else:
                 send_github_status(self.env)

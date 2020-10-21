@@ -141,7 +141,7 @@ class BuildResult(models.Model):
     # could be a default value, but possible to change it to allow duplicate accros branches
 
     description = fields.Char('Description', help='Informative description')
-    md_description = fields.Char(compute='_compute_md_description', String='MD Parsed Description', help='Informative description markdown parsed')
+    md_description = fields.Char(compute='_compute_md_description', string='MD Parsed Description', help='Informative description markdown parsed')
 
     # Related fields for convenience
     version_id = fields.Many2one('runbot.version', related='params_id.version_id', store=True, index=True)
@@ -166,7 +166,7 @@ class BuildResult(models.Model):
     # logs and stats
     log_ids = fields.One2many('ir.logging', 'build_id', string='Logs')
     error_log_ids = fields.One2many('ir.logging', 'build_id', domain=[('level', 'in', ['WARNING', 'ERROR', 'CRITICAL'])], string='Error Logs')
-    stat_ids = fields.One2many('runbot.build.stat', 'build_id', strings='Statistics values')
+    stat_ids = fields.One2many('runbot.build.stat', 'build_id', string='Statistics values')
     log_list = fields.Char('Comma separted list of step_ids names with logs', compute="_compute_log_list", store=True)
 
     active_step = fields.Many2one('runbot.build.config.step', 'Active step')

@@ -59,7 +59,7 @@ class RunbotBuildStatSql(models.Model):
     config_step_id = fields.Many2one(
         "runbot.build.config.step", string="Config Step", readonly=True
     )
-    config_step_name = fields.Char(String="Config Step name", readonly=True)
+    config_step_name = fields.Char(string="Config Step name", readonly=True)
 
     build_id = fields.Many2one("runbot.build", string="Build", readonly=True)
     build_config_id = fields.Many2one("runbot.build.config", string="Config", readonly=True)

@@ -94,14 +94,23 @@ class ConfigStepUpgradeDb(models.Model):
     db_pattern = fields.Char('Db suffix pattern')
     min_target_version_id = fields.Many2one('runbot.version', "Minimal target version_id")
 
-
+TYPES = [
+        ('install_odoo', 'Test odoo'),
+        ('run_odoo', 'Run odoo'),
+        ('python', 'Python code'),
+        ('create_build', 'Create build'),
+        ('configure_upgrade', 'Configure Upgrade'),
+        ('configure_upgrade_complement', 'Configure Upgrade Complement'),
+        ('test_upgrade', 'Test Upgrade'),
+        ('restore', 'Restore')
+    ]
 class ConfigStep(models.Model):
     _name = 'runbot.build.config.step'
     _description = "Config step"
     _inherit = 'mail.thread'
 
     # general info
-    name = fields.Char('Step name', required=True, unique=True, tracking=True, help="Unique name for step please use trigram as postfix for custom step_ids")
+    name = fields.Char('Step name', required=True, tracking=True, help="Unique name for step please use trigram as postfix for custom step_ids")
     domain_filter = fields.Char('Domain filter', tracking=True)
     job_type = fields.Selection([
         ('install_odoo', 'Test odoo'),
@@ -112,7 +121,7 @@ class ConfigStep(models.Model):
         ('configure_upgrade_complement', 'Configure Upgrade Complement'),
         ('test_upgrade', 'Test Upgrade'),
         ('restore', 'Restore')
-    ], default='install_odoo', required=True, tracking=True)
+    ], default='install_odoo', required=True, tracking=True, ondelete={t[0]: 'cascade' for t in [TYPES]})
     protected = fields.Boolean('Protected', default=False, tracking=True)
     default_sequence = fields.Integer('Sequence', default=100, tracking=True)  # or run after? # or in many2many rel?
     step_order_ids = fields.One2many('runbot.build.config.step.order', 'step_id')
@@ -261,15 +270,14 @@ class ConfigStep(models.Model):
     def make_python_ctx(self, build):
         return {
             'self': self,
-            'fields': fields,
-            'models': models,
+            # 'fields': fields,
+            # 'models': models,
             'build': build,
             '_logger': _logger,
             'log_path': build._path('logs', '%s.txt' % self.name),
             'glob': glob.glob,
             'Command': Command,
-            're': re,
-            'time': time,
+            're_match': re.match,
             'grep': grep,
             'rfind': rfind,
             'json_loads': json.loads,

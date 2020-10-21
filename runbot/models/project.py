@@ -5,7 +5,7 @@ class Project(models.Model):
     _name = 'runbot.project'
     _description = 'Project'
 
-    name = fields.Char('Project name', required=True, unique=True)
+    name = fields.Char('Project name', required=True)
     group_ids = fields.Many2many('res.groups', string='Required groups')
 
     trigger_ids = fields.One2many('runbot.trigger', 'project_id', string='Triggers')

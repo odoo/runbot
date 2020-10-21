@@ -121,9 +121,9 @@ class Runbot(models.AbstractModel):
         if domain:
             non_allocated_domain = expression.AND([non_allocated_domain, domain])
         e = expression.expression(non_allocated_domain, self.env['runbot.build'])
-        assert e.get_tables() == ['"runbot_build"']
-        where_clause, where_params = e.to_sql()
-
+        query = e.query
+        query.order = '"runbot_build".parent_path'
+        select_query, select_params = query.select()
         # self-assign to be sure that another runbot batch cannot self assign the same builds
         query = """UPDATE
                         runbot_build
@@ -131,17 +131,12 @@ class Runbot(models.AbstractModel):
                         host = %%s
                     WHERE
                         runbot_build.id IN (
-                            SELECT runbot_build.id
-                            FROM runbot_build
-                            WHERE
-                                %s
-                            ORDER BY
-                                parent_path
+                            %s
                             FOR UPDATE OF runbot_build SKIP LOCKED
                             LIMIT %%s
                         )
-                    RETURNING id""" % where_clause
-        self.env.cr.execute(query, [host.name] + where_params + [nb_slots])
+                    RETURNING id""" % select_query
+        self.env.cr.execute(query, [host.name] + select_params + [nb_slots])
         return self.env.cr.fetchall()
 
     def _domain(self):
