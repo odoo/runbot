@@ -7,7 +7,7 @@ class BundleTriggerCustomization(models.Model):
     _name = 'runbot.bundle.trigger.custom'
     _description = 'Custom trigger'
 
-    trigger_id = fields.Many2one('runbot.trigger', domain="[('project_id', '=', bundle_id.project_id)]")
+    trigger_id = fields.Many2one('runbot.trigger')
     bundle_id = fields.Many2one('runbot.bundle')
     config_id = fields.Many2one('runbot.build.config')
     extra_params = fields.Char("Custom parameters")

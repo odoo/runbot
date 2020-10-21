@@ -245,7 +245,7 @@ class RunbotTeam(models.Model):
 
     name = fields.Char('Team', required=True)
     user_ids = fields.Many2many('res.users', string='Team Members', domain=[('share', '=', False)])
-    dashboard_id = fields.Many2one('runbot.dashboard', String='Dashboard')
+    dashboard_id = fields.Many2one('runbot.dashboard',string='Dashboard')
     build_error_ids = fields.One2many('runbot.build.error', 'team_id', string='Team Errors')
     path_glob = fields.Char('Module Wildcards',
         help='Comma separated list of `fnmatch` wildcards used to assign errors automaticaly\n'
@@ -300,7 +300,7 @@ class RunbotDashboardTile(models.Model):
     trigger_id = fields.Many2one('runbot.trigger', 'Trigger', help='Trigger to monitor in chosen category')
     config_id = fields.Many2one('runbot.build.config', 'Config', help='Select a sub_build with this config')
     domain_filter = fields.Char('Domain Filter', help='If present, will be applied on builds', default="[('global_result', '=', 'ko')]")
-    custom_template_id = fields.Many2one('ir.ui.view', help='Change for a custom Dasbord card template',
+    custom_template_id = fields.Many2one('ir.ui.view', help='Change for a custom Dashboard card template',
         domain=[('type', '=', 'qweb')], default=lambda self: self.env.ref('runbot.default_dashboard_tile_view'))
     sticky_bundle_ids = fields.Many2many('runbot.bundle', compute='_compute_sticky_bundle_ids', string='Sticky Bundles')
     build_ids = fields.Many2many('runbot.build', compute='_compute_build_ids', string='Builds')

@@ -147,12 +147,12 @@ class Remote(models.Model):
         remote = super().create(values_list)
         if not remote.repo_id.main_remote_id:
             remote.repo_id.main_remote_id = remote
-        remote._cr.after('commit', remote.repo_id._update_git_config)
+        remote._cr.postcommit.add(remote.repo_id._update_git_config)
         return remote
 
     def write(self, values):
         res = super().write(values)
-        self._cr.after('commit', self.repo_id._update_git_config)
+        self._cr.postcommit.add(self.repo_id._update_git_config)
         return res
 
     def _github(self, url, payload=None, ignore_errors=False, nb_tries=2, recursive=False):
@@ -217,7 +217,7 @@ class Repo(models.Model):
     _order = 'sequence, id'
     _inherit = 'mail.thread'
 
-    name = fields.Char("Name", unique=True, tracking=True)  # odoo/enterprise/upgrade/security/runbot/design_theme
+    name = fields.Char("Name", tracking=True)  # odoo/enterprise/upgrade/security/runbot/design_theme
     identity_file = fields.Char("Identity File", help="Identity file to use with git/ssh", groups="runbot.group_runbot_admin")
     main_remote_id = fields.Many2one('runbot.remote', "Main remote", tracking=True)
     remote_ids = fields.One2many('runbot.remote', 'repo_id', "Remotes")
@@ -478,7 +478,7 @@ class Repo(models.Model):
             if os.path.isdir(os.path.join(repo.path, 'refs')):
                 git_config_path = os.path.join(repo.path, 'config')
                 template_params = {'repo': repo}
-                git_config = self.env['ir.ui.view'].render_template("runbot.git_config", template_params)
+                git_config = self.env['ir.ui.view']._render_template("runbot.git_config", template_params)
                 with open(git_config_path, 'wb') as config_file:
                     config_file.write(git_config)
                 _logger.info('Config updated for repo %s' % repo.name)

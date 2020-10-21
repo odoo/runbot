@@ -20,8 +20,10 @@ class runbot_event(models.Model):
 
     build_id = fields.Many2one('runbot.build', 'Build', index=True, ondelete='cascade')
     active_step_id = fields.Many2one('runbot.build.config.step', 'Active step', index=True)
-    type = fields.Selection(selection_add=TYPES, string='Type', required=True, index=True)
+    type = fields.Selection(selection_add=TYPES, string='Type', required=True, index=True, ondelete={t[0]: 'cascade' for t in TYPES})
     error_id = fields.Many2one('runbot.build.error', compute='_compute_known_error')  # remember to never store this field
+    dbname = fields.Char(string='Database Name', index=False)
+
 
     def init(self):
         parent_class = super(runbot_event, self)
@@ -110,7 +112,7 @@ class RunbotErrorLog(models.Model):
     path = fields.Char(string='Path', readonly=True)
     line = fields.Char(string='Line', readonly=True)
     build_id = fields.Many2one('runbot.build', string='Build', readonly=True)
-    dest = fields.Char(String='Build dest', readonly=True)
+    dest = fields.Char(string='Build dest', readonly=True)
     local_state = fields.Char(string='Local state', readonly=True)
     local_result = fields.Char(string='Local result', readonly=True)
     global_state = fields.Char(string='Global state', readonly=True)

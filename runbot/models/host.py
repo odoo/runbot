@@ -13,7 +13,7 @@ class Host(models.Model):
     _order = 'id'
     _inherit = 'mail.thread'
 
-    name = fields.Char('Host name', required=True, unique=True)
+    name = fields.Char('Host name', required=True)
     disp_name = fields.Char('Display name')
     active = fields.Boolean('Active', default=True, tracking=True)
     last_start_loop = fields.Datetime('Last start')

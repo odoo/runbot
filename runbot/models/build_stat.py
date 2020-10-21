@@ -20,7 +20,7 @@ class BuildStat(models.Model):
 
     build_id = fields.Many2one("runbot.build", "Build", index=True, ondelete="cascade")
     config_step_id = fields.Many2one(
-        "runbot.build.config.step", "Step", index=True, ondelete="cascade"
+        "runbot.build.config.step", "Step", ondelete="cascade"
     )
     key = fields.Char("key", index=True)
     value = fields.Float("Value")
@@ -61,7 +61,7 @@ class RunbotBuildStatSql(models.Model):
     config_step_id = fields.Many2one(
         "runbot.build.config.step", string="Config Step", readonly=True
     )
-    config_step_name = fields.Char(String="Config Step name", readonly=True)
+    config_step_name = fields.Char(string="Config Step name", readonly=True)
 
     build_id = fields.Many2one("runbot.build", string="Build", readonly=True)
     build_config_id = fields.Many2one("runbot.build.config", string="Config", readonly=True)

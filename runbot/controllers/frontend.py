@@ -143,17 +143,14 @@ class Runbot(Controller):
                 domain = expression.AND([domain, search_domain])
 
             e = expression.expression(domain, request.env['runbot.bundle'])
-            where_clause, where_params = e.to_sql()
-
-            env.cr.execute("""
-                SELECT id FROM runbot_bundle
-                WHERE {where_clause}
-                ORDER BY
-                    (case when sticky then 1 when sticky is null then 2 else 2 end),
-                    case when sticky then version_number end collate "C" desc,
-                    last_batch desc
-                LIMIT 40""".format(where_clause=where_clause), where_params)
-            bundles = env['runbot.bundle'].browse([r[0] for r in env.cr.fetchall()])
+            query = e.query
+            query.order = """
+             (case when "runbot_bundle".sticky then 1 when "runbot_bundle".sticky is null then 2 else 2 end),
+                    case when "runbot_bundle".sticky then "runbot_bundle".version_number end collate "C" desc,
+                    "runbot_bundle".last_batch desc
+            """
+            query.limit=40
+            bundles = env['runbot.bundle'].browse(query)
 
             category_id = int(request.httprequest.cookies.get('category') or 0) or request.env['ir.model.data'].xmlid_to_res_id('runbot.default_category')
 

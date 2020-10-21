@@ -42,7 +42,7 @@
                           <t t-if="active_category_id != category.id">
                             <t t-set="last_category_batch" t-value="bundle.with_context(category_id=category.id).last_done_batch"/>
                             <t t-if="last_category_batch">
-                              <t t-if="category.view_id" t-call="{{category.view_id.key}}"/>
+                              <t t-if="category.view_id" t-call="{{category.view_id.sudo().key}}"/>
                               <a t-else=""
                                 t-attf-title="View last {{category.name}} batch"
                                 t-attf-href="/runbot/batch/{{last_category_batch.id}}"

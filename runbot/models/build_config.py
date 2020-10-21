@@ -20,6 +20,18 @@ _re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING '
 
 PYTHON_DEFAULT = "# type python code here\n\n\n\n\n\n"
 
+class ReProxy():
+    @classmethod
+    def match(cls, *args, **kwrags):
+        return re.match(*args, **kwrags)
+
+    @classmethod
+    def search(cls, *args, **kwrags):
+        return re.search(*args, **kwrags)
+
+    @classmethod
+    def compile(cls, *args, **kwrags):
+        return re.compile(*args, **kwrags)
 
 class Config(models.Model):
     _name = 'runbot.build.config'
@@ -95,16 +107,7 @@ class ConfigStepUpgradeDb(models.Model):
     db_pattern = fields.Char('Db suffix pattern')
     min_target_version_id = fields.Many2one('runbot.version', "Minimal target version_id")
 
-
-class ConfigStep(models.Model):
-    _name = 'runbot.build.config.step'
-    _description = "Config step"
-    _inherit = 'mail.thread'
-
-    # general info
-    name = fields.Char('Step name', required=True, unique=True, tracking=True, help="Unique name for step please use trigram as postfix for custom step_ids")
-    domain_filter = fields.Char('Domain filter', tracking=True)
-    job_type = fields.Selection([
+TYPES = [
         ('install_odoo', 'Test odoo'),
         ('run_odoo', 'Run odoo'),
         ('python', 'Python code'),
@@ -113,7 +116,16 @@ class ConfigStep(models.Model):
         ('configure_upgrade_complement', 'Configure Upgrade Complement'),
         ('test_upgrade', 'Test Upgrade'),
         ('restore', 'Restore')
-    ], default='install_odoo', required=True, tracking=True)
+    ]
+class ConfigStep(models.Model):
+    _name = 'runbot.build.config.step'
+    _description = "Config step"
+    _inherit = 'mail.thread'
+
+    # general info
+    name = fields.Char('Step name', required=True, tracking=True, help="Unique name for step please use trigram as postfix for custom step_ids")
+    domain_filter = fields.Char('Domain filter', tracking=True)
+    job_type = fields.Selection(TYPES, default='install_odoo', required=True, tracking=True, ondelete={t[0]: 'cascade' for t in [TYPES]})
     protected = fields.Boolean('Protected', default=False, tracking=True)
     default_sequence = fields.Integer('Sequence', default=100, tracking=True)  # or run after? # or in many2many rel?
     step_order_ids = fields.One2many('runbot.build.config.step.order', 'step_id')
@@ -265,18 +277,18 @@ class ConfigStep(models.Model):
                 child = build._add_child(child_data, orphan=self.make_orphan)
                 build._log('create_build', 'created with config %s' % create_config.name, log_type='subbuild', path=str(child.id))
 
+
     def make_python_ctx(self, build):
         return {
             'self': self,
-            'fields': fields,
-            'models': models,
+            # 'fields': fields,
+            # 'models': models,
             'build': build,
             '_logger': _logger,
             'log_path': build._path('logs', '%s.txt' % self.name),
             'glob': glob.glob,
             'Command': Command,
-            're': re,
-            'time': time,
+            're': ReProxy,
             'grep': grep,
             'rfind': rfind,
             'json_loads': json.loads,

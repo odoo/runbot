@@ -54,8 +54,9 @@ class Bundle(models.Model):
     def _compute_host_id(self):
         assigned_only = None
         runbots = {}
-        for bundle in self.filtered('name'):
-            elems = bundle.name.split('-')
+        for bundle in self:
+            bundle.host_id = False
+            elems = (bundle.name or '').split('-')
             for elem in elems:
                 if elem.startswith('runbot'):
                     if elem.replace('runbot', '') == '_x':
@@ -126,8 +127,8 @@ class Bundle(models.Model):
 
     @api.depends_context('category_id')
     def _compute_last_batchs(self):
-        if self:
-            batch_ids = defaultdict(list)
+        batch_ids = defaultdict(list)
+        if self.ids:
             category_id = self.env.context.get('category_id', self.env['ir.model.data'].xmlid_to_res_id('runbot.default_category'))
             self.env.cr.execute("""
                 SELECT
@@ -151,8 +152,8 @@ class Bundle(models.Model):
             for batch in batchs:
                 batch_ids[batch.bundle_id.id].append(batch.id)
 
-            for bundle in self:
-                bundle.last_batchs = [(6, 0, batch_ids[bundle.id])]
+        for bundle in self:
+            bundle.last_batchs = [(6, 0, batch_ids[bundle.id])] if bundle.id in batch_ids else False
 
     @api.depends_context('category_id')
     def _compute_last_done_batch(self):
