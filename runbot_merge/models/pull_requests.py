@@ -304,10 +304,11 @@ All substitutions are tentatively applied sequentially to the input.
         # fetch PR object and handle as *opened*
         issue, pr = gh.pr(number)
 
+        feedback = self.env['runbot_merge.pull_requests.feedback'].create
         if not self.project_id._has_branch(pr['base']['ref']):
             _logger.info("Tasked with loading PR %d for un-managed branch %s:%s, ignoring",
-                         pr['number'], self.name, pr['base']['ref'])
-            self.env['runbot_merge.pull_requests.feedback'].create({
+                         number, self.name, pr['base']['ref'])
+            feedback({
                 'repository': self.id,
                 'pull_request': number,
                 'message': "I'm sorry. Branch `{}` is not within my remit.".format(pr['base']['ref']),
@@ -317,7 +318,7 @@ All substitutions are tentatively applied sequentially to the input.
         # if the PR is already loaded, check... if the heads match?
         pr_id = self.env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', pr['base']['repo']['full_name']),
-            ('number', '=', pr['number']),
+            ('number', '=', number),
         ])
         if pr_id:
             # TODO: edited, maybe (requires crafting a 'changes' object)
@@ -325,36 +326,60 @@ All substitutions are tentatively applied sequentially to the input.
                 'action': 'synchronize',
                 'pull_request': pr,
             })
-            self.env['runbot_merge.pull_requests.feedback'].create({
+            feedback({
                 'repository': pr_id.repository.id,
                 'pull_request': number,
                 'message': r,
             })
             return
 
+        # init the PR to the null commit so we can later synchronise it back
+        # back to the "proper" head while resetting reviews
         controllers.handle_pr(self.env, {
             'action': 'opened',
-            'pull_request': pr,
+            'pull_request': {**pr, 'head': {**pr['head'], 'sha': '0'*40}},
         })
+        # fetch & set up actual head
         for st in gh.statuses(pr['head']['sha']):
             controllers.handle_status(self.env, st)
-        # get and handle all comments
-        for comment in gh.comments(number):
-            controllers.handle_comment(self.env, {
-                'action': 'created',
-                'issue': issue,
-                'sender': comment['user'],
-                'comment': comment,
-                'repository': {'full_name': self.name},
-            })
-        # get and handle all reviews
-        for review in gh.reviews(number):
-            controllers.handle_review(self.env, {
-                'action': 'submitted',
-                'review': review,
-                'pull_request': pr,
-                'repository': {'full_name': self.name},
-            })
+        # fetch and apply comments
+        counter = itertools.count()
+        items = [ # use counter so `comment` and `review` don't get hit during sort
+            (comment['created_at'], next(counter), False, comment)
+            for comment in gh.comments(number)
+        ] + [
+            (review['submitted_at'], next(counter), True, review)
+            for review in gh.reviews(number)
+        ]
+        items.sort()
+        for _, _, is_review, item in items:
+            if is_review:
+                controllers.handle_review(self.env, {
+                    'action': 'submitted',
+                    'review': item,
+                    'pull_request': pr,
+                    'repository': {'full_name': self.name},
+                })
+            else:
+                controllers.handle_comment(self.env, {
+                    'action': 'created',
+                    'issue': issue,
+                    'sender': item['user'],
+                    'comment': item,
+                    'repository': {'full_name': self.name},
+                })
+        # sync to real head
+        controllers.handle_pr(self.env, {
+            'action': 'synchronize',
+            'pull_request': pr,
+            'sender': {'login': self.project_id.github_prefix}
+        })
+        feedback({
+            'repository': self.id,
+            'pull_request': number,
+            'message': "Sorry, I didn't know about this PR and had to retrieve "
+                       "its information, you may have to re-approve it."
+        })
 
     def having_branch(self, branch):
         branches = self.env['runbot_merge.branch'].search

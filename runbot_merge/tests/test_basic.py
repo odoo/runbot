@@ -2725,11 +2725,8 @@ class TestUnknownPR:
 
     => instead, create PRs on the fly when getting notifications related to
        valid but unknown PRs
-
-    * get statuses if head commit unknown (additional cron?)
-    * handle any comment & review (existing PRs may enter the system on a review/r+)
     """
-    def test_rplus_unknown(self, repo, env, config):
+    def test_rplus_unknown(self, repo, env, config, users):
         with repo:
             m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
             m2 = repo.make_commit(m, 'second', None, tree={'m': 'm', 'm2': 'm2'})
@@ -2751,27 +2748,42 @@ class TestUnknownPR:
         # reviewer reviewers
         with repo:
             prx.post_comment('hansen r+', config['role_reviewer']['token'])
+        with repo:
+            prx.post_review('REQUEST_CHANGES', 'hansen r-', config['role_reviewer']['token'])
+        with repo:
+            prx.post_comment('hansen r+', config['role_reviewer']['token'])
 
         Fetch = env['runbot_merge.fetch_job']
-        assert Fetch.search([('repository', '=', repo.name), ('number', '=', prx.number)])
+        fetches = Fetch.search([('repository', '=', repo.name), ('number', '=', prx.number)])
+        assert len(fetches) == 1, f"expected one fetch for {prx.number}, found {len(fetches)}"
+
         env.run_crons('runbot_merge.fetch_prs_cron')
         env.run_crons()
         assert not Fetch.search([('repository', '=', repo.name), ('number', '=', prx.number)])
 
         c = env['runbot_merge.commit'].search([('sha', '=', prx.head)])
+        print(prx.head, c, c.statuses, flush=True)
         assert json.loads(c.statuses) == {
             'legal/cla': {'state': 'success', 'target_url': None, 'description': None},
             'ci/runbot': {'state': 'success', 'target_url': 'http://example.org/wheee', 'description': None}
         }
+        assert prx.comments == [
+            (users['reviewer'], 'hansen r+'),
+            (users['reviewer'], 'hansen r+'),
+            (users['user'], "Sorry, I didn't know about this PR and had to "
+                            "retrieve its information, you may have to "
+                            "re-approve it."),
+        ]
 
         pr = env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ])
-        assert pr.state == 'ready'
+        assert pr.state == 'validated'
 
-        env.run_crons('runbot_merge.merge_cron', 'runbot_merge.staging_cron')
-        assert pr.staging_id
+        with repo:
+            prx.post_comment('hansen r+', config['role_reviewer']['token'])
+        assert pr.state == 'ready'
 
     def test_rplus_unmanaged(self, env, repo, users, config):
         """ r+ on an unmanaged target should notify about
