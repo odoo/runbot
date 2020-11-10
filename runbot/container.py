@@ -121,7 +121,7 @@ def docker_run(*args, **kwargs):
     return _docker_run(*args, **kwargs)
 
 
-def _docker_run(run_cmd, log_path, build_dir, container_name, image_tag='odoo:DockerDefault', exposed_ports=None, cpu_limit=None, preexec_fn=None, ro_volumes=None, env_variables=None):
+def _docker_run(run_cmd, log_path, build_dir, container_name, image_tag=False, exposed_ports=None, cpu_limit=None, preexec_fn=None, ro_volumes=None, env_variables=None):
     """Run tests in a docker container
     :param run_cmd: command string to run in container
     :param log_path: path to the logfile that will contain odoo stdout and stderr
@@ -133,6 +133,7 @@ def _docker_run(run_cmd, log_path, build_dir, container_name, image_tag='odoo:Do
     :params ro_volumes: dict of dest:source volumes to mount readonly in builddir
     :params env_variables: list of environment variables
     """
+    image_tag = image_tag or 'odoo:DockerDefault'
     container_name = sanitize_container_name(container_name)
     if isinstance(run_cmd, Command):
         cmd_object = run_cmd

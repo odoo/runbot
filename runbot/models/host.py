@@ -82,7 +82,7 @@ class Host(models.Model):
             with open(os.path.join(docker_build_path, 'Dockerfile'), 'w') as Dockerfile:
                 Dockerfile.write(dockerfile.dockerfile)
             build_process = docker_build(docker_build_path, dockerfile.image_tag)
-            if build_process.returncode != 0:
+            if build_process != 0:
                 dockerfile.to_build = False
                 message = 'Dockerfile build "%s" failed on host %s' % (dockerfile.image_tag, self.name)
                 dockerfile.message_post(body=message)
