@@ -84,6 +84,6 @@ class OverrideRights(models.Model):
 
     def name_get(self):
         return [
-            (r.id, f'{r.repository.name}: {r.context}')
+            (r.id, f'{r.repository_id.name}: {r.context}')
             for r in self
         ]
