@@ -220,14 +220,19 @@ class TestBuildConfigStep(RunbotCase):
 
         self.patchers['docker_run'].side_effect = docker_run
 
-        config_step._run_install_odoo(self.parent_build, 'dev/null/logpath')
+        config_step._run_step(self.parent_build, 'dev/null/logpath')
 
         assert_db_name = 'custom_build'
         parent_build_params = self.parent_build.params_id.copy({'config_data': {'db_name': 'custom_build'}})
         parent_build = self.parent_build.copy({'params_id': parent_build_params.id})
-        config_step._run_install_odoo(parent_build, 'dev/null/logpath')
+        config_step._run_step(parent_build, 'dev/null/logpath')
 
-        config_step._run_run_odoo(parent_build, 'dev/null/logpath')
+        config_step = self.ConfigStep.create({
+            'name': 'run_test',
+            'job_type': 'run_odoo',
+            'custom_db_name': 'custom',
+        })
+        config_step._run_step(parent_build, 'dev/null/logpath')
 
         self.assertEqual(call_count, 3)
 
@@ -236,7 +241,7 @@ class TestBuildConfigStep(RunbotCase):
         """minimal test for python steps. Also test that `-d` in cmd creates a database"""
         test_code = """cmd = build._cmd()
 cmd += ['-d', 'test_database']
-docker_run(cmd)
+docker_params = dict(cmd=cmd)
         """
         config_step = self.ConfigStep.create({
             'name': 'default',
@@ -249,7 +254,7 @@ docker_run(cmd)
             self.assertIn('-d test_database', run_cmd)
 
         self.patchers['docker_run'].side_effect = docker_run
-        config_step._run_python(self.parent_build, 'dev/null/logpath')
+        config_step._run_step(self.parent_build, 'dev/null/logpath')
         self.patchers['docker_run'].assert_called_once()
         db = self.env['runbot.database'].search([('name', '=', 'test_database')])
         self.assertEqual(db.build_id, self.parent_build)
@@ -270,7 +275,7 @@ docker_run(cmd)
             call_count += 1
 
         self.patchers['docker_run'].side_effect = docker_run
-        config_step._run_install_odoo(self.parent_build, 'dev/null/logpath')
+        config_step._run_step(self.parent_build, 'dev/null/logpath')
 
         self.assertEqual(call_count, 1)
 

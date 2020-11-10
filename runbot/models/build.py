@@ -720,13 +720,13 @@ class BuildResult(models.Model):
                     build._log("run", message, level='ERROR')
                     build._kill(result='ko')
 
-    def _docker_run(self, *args, **kwargs):
+    def _docker_run(self, **kwargs):
         self.ensure_one()
         if 'image_tag' not in kwargs:
             kwargs.update({'image_tag': self.params_id.dockerfile_id.image_tag})
         if kwargs['image_tag'] != 'odoo:DockerDefault':
             self._log('Preparing', 'Using Dockerfile Tag %s' % kwargs['image_tag'])
-        docker_run(*args, **kwargs)
+        docker_run(**kwargs)
 
     def _path(self, *l, **kw):
         """Return the repo build path"""
