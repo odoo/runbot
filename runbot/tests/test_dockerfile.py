@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 
-from unittest.mock import patch, mock_open, MagicMock
+from unittest.mock import patch, mock_open
 
 from odoo.tests.common import Form, tagged, HttpCase
 from .common import RunbotCase
@@ -57,7 +57,7 @@ class TestDockerfile(RunbotCase, HttpCase):
             self.assertIn('apt-get install -y -qq google-chrome-stable=87.0-1', content)
 
         docker_build_mock = self.patchers['docker_build']
-        docker_build_mock.return_value = MagicMock(returncode=0)
+        docker_build_mock.return_value = 0
         mopen = mock_open()
         rb_host = self.env['runbot.host'].create({'name': 'runbotxxx.odoo.com'})
         with patch('builtins.open', mopen) as file_mock:
