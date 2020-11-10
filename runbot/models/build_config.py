@@ -8,7 +8,7 @@ import shlex
 import time
 from unidiff import PatchSet
 from ..common import now, grep, time2str, rfind, s2human, os, RunbotException
-from ..container import docker_run, docker_get_gateway_ip, Command
+from ..container import docker_get_gateway_ip, Command
 from odoo import models, fields, api
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools.safe_eval import safe_eval, test_python_expr
@@ -238,12 +238,14 @@ class ConfigStep(models.Model):
         log_path = build._path('logs', '%s.txt' % self.name)
         build.write({'job_start': now(), 'job_end': False})  # state, ...
         build._log('run', 'Starting step **%s** from config **%s**' % (self.name, build.params_id.config_id.name), log_type='markdown', level='SEPARATOR')
-        return self._run_step(build, log_path)
+        self._run_step(build, log_path)
 
     def _run_step(self, build, log_path):
         build.log_counter = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_maxlogs', 100)
         run_method = getattr(self, '_run_%s' % self.job_type)
-        return run_method(build, log_path)
+        docker_params = run_method(build, log_path)
+        if docker_params:
+            build._docker_run(**docker_params)
 
     def _run_create_build(self, build, log_path):
         count = 0
@@ -262,7 +264,6 @@ class ConfigStep(models.Model):
             'fields': fields,
             'models': models,
             'build': build,
-            'docker_run': docker_run,
             '_logger': _logger,
             'log_path': build._path('logs', '%s.txt' % self.name),
             'glob': glob.glob,
@@ -279,6 +280,7 @@ class ConfigStep(models.Model):
         eval_ctx = self.make_python_ctx(build)
         try:
             safe_eval(self.python_code.strip(), eval_ctx, mode="exec", nocopy=True)
+            return eval_ctx.get('docker_params')
         except ValueError as e:
             save_eval_value_error_re = r'<class \'odoo.addons.runbot.models.repo.RunbotException\'>: "(.*)" while evaluating\n.*'
             message = e.args[0]
@@ -348,9 +350,9 @@ class ConfigStep(models.Model):
         build_port = build.port
         self.env.cr.commit()  # commit before docker run to be 100% sure that db state is consistent with dockers
         self.invalidate_cache()
-        res = build._docker_run(cmd, log_path, build_path, docker_name, exposed_ports=[build_port, build_port + 1], ro_volumes=exports, env_variables=env_variables)
         self.env['runbot.runbot']._reload_nginx()
-        return res
+        return dict(cmd=cmd, log_path=log_path, build_dir=build_path, container_name=docker_name, exposed_ports=[build_port, build_port + 1], ro_volumes=exports, env_variables=env_variables)
+
 
     def _run_install_odoo(self, build, log_path):
         exports = build._checkout()
@@ -434,7 +436,7 @@ class ConfigStep(models.Model):
         max_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=10000))
         timeout = min(self.cpu_limit, max_timeout)
         env_variables = self.additionnal_env.split(';') if self.additionnal_env else []
-        return build._docker_run(cmd, log_path, build._path(), build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports, env_variables=env_variables)
+        return dict(cmd=cmd, log_path=log_path, build_dir=build._path(), container_name=build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports, env_variables=env_variables)
 
     def _upgrade_create_childs(self):
         pass
@@ -667,7 +669,7 @@ class ConfigStep(models.Model):
         exception_env = self.env['runbot.upgrade.exception']._generate()
         if exception_env:
             env_variables.append(exception_env)
-        build._docker_run(migrate_cmd, log_path, build._path(), build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports, env_variables=env_variables, image_tag=target.params_id.dockerfile_id.image_tag)
+        return dict(cmd=migrate_cmd, log_path=log_path, build_dir=build._path(), container_name=build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports, env_variables=env_variables, image_tag=target.params_id.dockerfile_id.image_tag)
 
     def _run_restore(self, build, log_path):
         # exports = build._checkout()
@@ -708,7 +710,7 @@ class ConfigStep(models.Model):
 
             ])
 
-        build._docker_run(cmd, log_path, build._path(), build._get_docker_name(), cpu_limit=self.cpu_limit)
+        return dict(cmd=cmd, log_path=log_path, build_dir=build._path(), container_name=build._get_docker_name(), cpu_limit=self.cpu_limit)
 
     def _reference_builds(self, bundle, trigger):
         upgrade_dumps_trigger_id = trigger.upgrade_dumps_trigger_id
