@@ -277,6 +277,22 @@
         </field>
     </record>
 
+    <record id="runbot_merge_action_overrides" model="ir.actions.act_window">
+        <field name="name">CI / statuses overrides</field>
+        <field name="res_model">res.partner.override</field>
+    </record>
+    <record id="runot_merge_tree_overrides" model="ir.ui.view">
+        <field name="name">Overrides List</field>
+        <field name="model">res.partner.override</field>
+        <field name="arch" type="xml">
+            <tree editable="bottom">
+                <field name="context"/>
+                <field name="repository_id"/>
+                <field name="partner_ids" widget="many2many_tags"/>
+            </tree>
+        </field>
+    </record>
+
     <menuitem name="Mergebot" id="runbot_merge_menu"/>
     <menuitem name="Projects" id="runbot_merge_menu_project"
               parent="runbot_merge_menu"
@@ -290,4 +306,8 @@
     <menuitem name="Fetches" id="runbot_merge_menu_fetches"
               parent="runbot_merge_menu"
               action="runbot_merge_action_fetches"/>
+    <menuitem name="Configuration" id="runbot_merge_menu_configuration" parent="runbot_merge_menu"/>
+    <menuitem name="CI Overrides" id="runbot_merge_menu_configuration_overrides"
+              parent="runbot_merge_menu"
+              action="runbot_merge_action_overrides"/>
 </odoo>

@@ -991,7 +991,7 @@ class PullRequests(models.Model):
                     })
             elif command == 'override':
                 overridable = author.override_rights\
-                    .filtered(lambda r: r.repository_id == self.repository)\
+                    .filtered(lambda r: not r.repository_id or (r.repository_id == self.repository))\
                     .mapped('context')
                 if param in overridable:
                     self.overrides = json.dumps({

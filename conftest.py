@@ -1040,6 +1040,9 @@ class Model:
         ids = self._env(self._model, 'search', *args, **kwargs)
         return Model(self._env, self._model, ids)
 
+    def name_search(self, *args, **kwargs):
+        return self._env(self._model, 'name_search', *args, **kwargs)
+
     def create(self, values):
         return Model(self._env, self._model, [self._env(self._model, 'create', values)])
 
@@ -1048,6 +1051,9 @@ class Model:
 
     def read(self, fields):
         return self._env(self._model, 'read', self._ids, fields)
+
+    def name_get(self):
+        return self._env(self._model, 'name_get', self._ids)
 
     def unlink(self):
         return self._env(self._model, 'unlink', self._ids)

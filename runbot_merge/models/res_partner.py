@@ -13,7 +13,7 @@ class Partner(models.Model):
     delegate_reviewer = fields.Many2many('runbot_merge.pull_requests')
     formatted_email = fields.Char(string="commit email", compute='_rfc5322_formatted')
     review_rights = fields.One2many('res.partner.review', 'partner_id')
-    override_rights = fields.One2many('res.partner.override', 'partner_id')
+    override_rights = fields.Many2many('res.partner.override')
 
     def _auto_init(self):
         res = super(Partner, self)._auto_init()
@@ -71,19 +71,34 @@ class ReviewRights(models.Model):
             for r in self
         ]
 
+    @api.model
     def name_search(self, name='', args=None, operator='ilike', limit=100):
-        return self.search(args + [('repository_id.name', operator, name)], limit=limit).name_get()
+        return self.search((args or []) + [('repository_id.name', operator, name)], limit=limit).name_get()
 
 class OverrideRights(models.Model):
     _name = 'res.partner.override'
     _description = 'lints which the partner can override'
 
-    partner_id = fields.Many2one('res.partner', required=True, ondelete='cascade')
-    repository_id = fields.Many2one('runbot_merge.repository', required=True)
+    partner_ids = fields.Many2many('res.partner')
+    repository_id = fields.Many2one('runbot_merge.repository')
     context = fields.Char(required=True)
+
+    def init(self):
+        super().init()
+        tools.create_unique_index(
+            self.env.cr, 'res_partner_override_unique', self._table,
+            ['context', 'coalesce(repository_id, 0)']
+        )
+
+    @api.model
+    def name_search(self, name='', args=None, operator='ilike', limit=100):
+        return self.search((args or []) + [
+            '|', ('context', operator, name),
+                 ('repository_id.name', operator, name)
+        ], limit=limit).name_get()
 
     def name_get(self):
         return [
-            (r.id, f'{r.repository_id.name}: {r.context}')
+            (r.id, f'{r.repository_id.name}: {r.context}' if r.repository_id else r.context)
             for r in self
         ]
