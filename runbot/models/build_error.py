@@ -106,7 +106,7 @@ class BuildError(models.Model):
     def _compute_error_history_ids(self):
         for error in self:
             fingerprints = [error.fingerprint] + [rec.fingerprint for rec in error.child_ids]
-            error.error_history_ids = self.search([('fingerprint', 'in', fingerprints), ('active', '=', False), ('id', '!=', error.id)])
+            error.error_history_ids = self.search([('fingerprint', 'in', fingerprints), ('active', '=', False), ('id', '!=', error.id or False)])
 
     @api.model
     def _digest(self, s):

@@ -9,7 +9,7 @@
             </header>
             <sheet>
               <group name="build_error_group">
-                <field name="fingerprint"/>
+                <field name="fingerprint" readonly="1"/>
                 <field name="content"/>
                 <field name="cleaned_content" groups="base.group_no_one"/>
                 <field name="module_name"/>
