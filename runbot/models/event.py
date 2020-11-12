@@ -179,7 +179,7 @@ class RunbotErrorLog(models.Model):
 
     def _parse_logs(self):
         BuildError = self.env['runbot.build.error']
-        BuildError._parse_logs(self)
+        return BuildError._parse_logs(self)
 
     def init(self):
         """ Create an SQL view for ir.logging """
