@@ -418,7 +418,7 @@ class ConfigStep(models.Model):
         if extra_params:
             cmd.extend(shlex.split(extra_params))
 
-        cmd.posts.extend(self._post_install_commands(build, modules_to_install, py_version))  # coverage post, extra-checks, ...
+        cmd.finals.extend(self._post_install_commands(build, modules_to_install, py_version))  # coverage post, extra-checks, ...
         dump_dir = '/data/build/logs/%s/' % db_name
         sql_dest = '%s/dump.sql' % dump_dir
         filestore_path = '/data/build/datadir/filestore/%s' % db_name
@@ -800,17 +800,16 @@ class ConfigStep(models.Model):
         build._log('', **kwargs)
 
         if self.coverage:
-            message = 'Coverage xml: $$fa-download'
-            build._log('end_job', message, log_type='link', path='/data/build/logs/coverage.xml')
+            xml_url = '%scoverage.xml' % build.http_log_url()
+            html_url = 'http://%s/runbot/static/build/%s/coverage/index.html' % (build.host, build.dest)
+            message = 'Coverage report: [xml @icon-download](%s), [html @icon-eye](%s)' % (xml_url, html_url)
+            build._log('end_job', message, log_type='markdown')
 
         if self.flamegraph:
-            link = self._perf_data_url(build, 'log.gz')
-            message = 'Flamegraph data: $$fa-download$$'
-            build._log('end_job', message, log_type='link', path=link)
-
-            link = self._perf_data_url(build, 'svg')
-            message = 'Flamegraph svg: $$fa-download$$'
-            build._log('end_job', message, log_type='link', path=link)
+            dat_url = '%sflame_%s.%s' % (build.http_log_url(), self.name, 'log.gz')
+            svg_url = '%sflame_%s.%s' % (build.http_log_url(), self.name, 'svg')
+            message = 'Flamegraph report: [data @icon-download](%s), [svg @icon-eye](%s)' % (dat_url, svg_url)
+            build._log('end_job', message, log_type='markdown')
 
     def _modules_to_install(self, build):
         return set(build._get_modules_to_test(modules_patterns=self.install_modules))
@@ -828,9 +827,6 @@ class ConfigStep(models.Model):
 
     def _perfs_data_path(self, ext='log'):
         return '/data/build/logs/flame_%s.%s' % (self.name, ext)
-
-    def _perf_data_url(self, build, ext='log'):
-        return '%sflame_%s.%s' % (build.http_log_url(), self.name, ext)
 
     def _coverage_params(self, build, modules_to_install):
         pattern_to_omit = set()

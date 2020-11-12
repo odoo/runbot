@@ -76,7 +76,7 @@ class Host(models.Model):
         static_path = self._get_work_path()
         self.clear_caches()  # needed to ensure that content is updated on all hosts
         for dockerfile in self.env['runbot.dockerfile'].search([('to_build', '=', True)]):
-            _logger.info('Building %s, %s', dockerfile.name, hash(dockerfile.dockerfile))
+            _logger.info('Building %s, %s', dockerfile.name, hash(str(dockerfile.dockerfile)))
             docker_build_path = os.path.join(static_path, 'docker', dockerfile.image_tag)
             os.makedirs(docker_build_path, exist_ok=True)
             with open(os.path.join(docker_build_path, 'Dockerfile'), 'w') as Dockerfile:
