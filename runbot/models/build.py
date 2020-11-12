@@ -628,7 +628,7 @@ class BuildResult(models.Model):
                             'port': port,
                         })
                         build._log('wake_up', '**Waking up build**', log_type='markdown', level='SEPARATOR')
-                        self.env['runbot.build.config.step']._run_run_odoo(build, log_path, force=True)
+                        self.env.ref('runbot.runbot_build_config_step_run')._run_step(build, log_path, force=True)
                         # reload_nginx will be triggered by _run_run_odoo
                     except Exception:
                         _logger.exception('Failed to wake up build %s', build.dest)
