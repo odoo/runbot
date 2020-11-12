@@ -351,16 +351,36 @@ class Runbot(Controller):
         return request.render(view_id if view_id else "runbot.monitoring", qctx)
 
     @route(['/runbot/errors',
-            '/runbot/errors/<int:error_id>'], type='http', auth='user', website=True)
-    def build_errors(self, error_id=None, **kwargs):
-        build_errors = request.env['runbot.build.error'].search([('random', '=', True), ('parent_id', '=', False), ('responsible', '!=', request.env.user.id)]).filtered(lambda rec: len(rec.children_build_ids) > 1)
-        assigned_errors = request.env['runbot.build.error'].search([('responsible', '=', request.env.user.id)])
-        build_errors = build_errors.sorted(lambda rec: (rec.last_seen_date.date(), rec.build_count), reverse=True)
-        assigned_errors = assigned_errors.sorted(lambda rec: (rec.last_seen_date.date(), rec.build_count), reverse=True)
-        build_errors = assigned_errors + build_errors
+            '/runbot/errors/page/<int:page>'], type='http', auth='user', website=True)
+    def build_errors(self, error_id=None, sort=None, page=1, limit=20, **kwargs):
+        sort_order_choices = {
+            'last_seen_date desc': 'Last seen date: Newer First',
+            'last_seen_date asc': 'Last seen date: Older First',
+            'build_count desc': 'Number seen: High to Low',
+            'build_count asc': 'Number seen: Low to High',
+            'responsible asc': 'Assignee: A - Z',
+            'responsible desc': 'Assignee: Z - A',
+            'module_name asc': 'Module name: A - Z',
+            'module_name desc': 'Module name: Z -A'
+        }
+
+        sort_order = sort if sort in sort_order_choices else 'last_seen_date desc'
+
+        current_user_errors = request.env['runbot.build.error'].search([('responsible', '=', request.env.user.id)], order='last_seen_date desc, build_count desc')
+
+        domain = [('responsible', '!=', request.env.user.id), ('build_count', '>', 1)]
+        build_errors_count = request.env['runbot.build.error'].search_count(domain)
+        url_args = {}
+        url_args['sort'] = sort
+        pager = request.website.pager(url='/runbot/errors/', url_args=url_args, total=build_errors_count, page=page, step=limit)
+
+        build_errors = request.env['runbot.build.error'].search(domain, order=sort_order, limit=limit, offset=pager.get('offset', 0))
 
         qctx = {
+            'current_user_errors': current_user_errors,
             'build_errors': build_errors,
-            'title': 'Build Errors'
+            'title': 'Build Errors',
+            'sort_order_choices': sort_order_choices,
+            'pager': pager
         }
         return request.render('runbot.build_error', qctx)
