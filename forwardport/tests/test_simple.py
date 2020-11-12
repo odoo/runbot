@@ -359,7 +359,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 a
 =======
 0
->>>\x3e>>> [0-9a-f]{7,}(...)? temp
+>>>\x3e>>> [0-9a-f]{7,}.*
 '''),
     }
     [project] = env['runbot_merge.project'].search([])
@@ -538,7 +538,7 @@ def test_conflict(env, config, make_repo, users):
 a
 =======
 xxx
->>>\x3e>>> [0-9a-f]{7,}(...)? temp
+>>>\x3e>>> [0-9a-f]{7,}.*
 '''),
     }
     assert prod.get_pr(prb_id.number).comments == [
