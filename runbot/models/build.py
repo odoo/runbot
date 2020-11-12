@@ -1022,7 +1022,7 @@ class BuildResult(models.Model):
         # only parse logs from builds in error and not already scanned
         builds_to_scan = self.search([('id', 'in', self.ids), ('local_result', '=', 'ko'), ('build_error_ids', '=', False)])
         ir_logs = self.env['ir.logging'].search([('level', '=', 'ERROR'), ('type', '=', 'server'), ('build_id', 'in', builds_to_scan.ids)])
-        BuildError._parse_logs(ir_logs)
+        return BuildError._parse_logs(ir_logs)
 
     def is_file(self, file, mode='r'):
         file_path = self._path(file)
