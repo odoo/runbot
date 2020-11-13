@@ -304,7 +304,7 @@
         </template>
 
         <template id="runbot.branch_copy_button">
-            <button t-attf-class="btn btn-link btn-ssm" title="Copy Bundle name" aria-label="Copy Bundle name" t-attf-onclick="copyToClipboard('{{ bundle.name.split(':')[-1] }}')">
+            <button t-attf-class="btn btn-default btn-ssm" title="Copy Bundle name" aria-label="Copy Bundle name" t-attf-onclick="copyToClipboard('{{ bundle.name.split(':')[-1] }}')">
               <i t-attf-class="fa fa-clipboard"/>
             </button>
         </template>
