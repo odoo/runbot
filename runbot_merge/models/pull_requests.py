@@ -265,6 +265,8 @@ class Repository(models.Model):
     project_id = fields.Many2one('runbot_merge.project', required=True)
     status_ids = fields.One2many('runbot_merge.repository.status', 'repo_id', string="Required Statuses")
 
+    group_id = fields.Many2one('res.groups', default=lambda self: self.env.ref('base.group_user'))
+
     branch_filter = fields.Char(default='[(1, "=", 1)]', help="Filter branches valid for this repository")
     substitutions = fields.Text(
         "label substitutions",
@@ -711,6 +713,27 @@ class PullRequests(models.Model):
             for p in self
         ]
 
+    @property
+    def _approved(self):
+        return self.state in ('approved', 'ready') or any(
+            p.priority == 0
+            for p in (self | self._linked_prs)
+        )
+
+    @property
+    def _ready(self):
+        return (self.squash or self.merge_method) and self._approved and self.status == 'success'
+
+    @property
+    def _linked_prs(self):
+        if re.search(r':patch-\d+', self.label):
+            return self.browse(())
+        return self.search([
+            ('target', '=', self.target.id),
+            ('label', '=', self.label),
+            ('state', 'not in', ('merged', 'closed')),
+        ]) - self
+
     # missing link to other PRs
     @api.depends('priority', 'state', 'squash', 'merge_method', 'batch_id.active', 'label')
     def _compute_is_blocked(self):
@@ -719,31 +742,23 @@ class PullRequests(models.Model):
             if pr.state in ('merged', 'closed'):
                 continue
 
-            batch = pr
-            if not re.search(r':patch-\d+', pr.label):
-                batch = self.search([
-                    ('target', '=', pr.target.id),
-                    ('label', '=', pr.label),
-                    ('state', 'not in', ('merged', 'closed')),
-                ])
-
+            linked = pr._linked_prs
             # check if PRs are configured (single commit or merge method set)
             if not (pr.squash or pr.merge_method):
                 pr.blocked = 'has no merge method'
                 continue
-            other_unset = next((p for p in batch if not (p.squash or p.merge_method)), None)
+            other_unset = next((p for p in linked if not (p.squash or p.merge_method)), None)
             if other_unset:
                 pr.blocked = "linked PR %s has no merge method" % other_unset.display_name
                 continue
 
             # check if any PR in the batch is p=0 and none is in error
-            if any(p.priority == 0 for p in batch):
-                in_error = next((p for p in batch if p.state == 'error'), None)
-                if in_error:
-                    if pr == in_error:
-                        pr.blocked = "in error"
-                    else:
-                        pr.blocked = "linked pr %s in error" % in_error.display_name
+            if any(p.priority == 0 for p in (pr | linked)):
+                if pr.state == 'error':
+                    pr.blocked = "in error"
+                other_error = next((p for p in linked if p.state == 'error'), None)
+                if other_error:
+                    pr.blocked = "linked pr %s in error" % other_error.display_name
                 # if none is in error then none is blocked because p=0
                 # "unblocks" the entire batch
                 continue
@@ -752,7 +767,7 @@ class PullRequests(models.Model):
                 pr.blocked = 'not ready'
                 continue
 
-            unready = next((p for p in batch if p.state != 'ready'), None)
+            unready = next((p for p in linked if p.state != 'ready'), None)
             if unready:
                 pr.blocked = 'linked pr %s is not ready' % unready.display_name
                 continue

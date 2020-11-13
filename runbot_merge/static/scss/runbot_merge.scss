@@ -62,3 +62,25 @@ h5 { font-size: 1em; }
 .pr-awaiting { opacity: 0.8; }
 .pr-blocked { opacity: 0.6; }
 .pr-failed { opacity: 0.9; }
+
+ul.todo {
+  list-style-type: '☐ ';
+  > li.ok {
+    //@extend .alert-success;
+    list-style-type: '☑ ';
+  }
+  > li.fail {
+    @extend .alert-danger;
+    list-style-type: '☒ ';
+  }
+}
+
+dl.runbot-merge-fields {
+  @extend .row;
+  > dt {
+    @extend .col-sm-2;
+  }
+  > dd {
+    @extend .col-sm-10;
+  }
+}

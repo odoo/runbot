@@ -57,6 +57,9 @@
                     </div>
                     <group>
                         <group>
+                            <field name="group_id" string="Accessible to"/>
+                        </group>
+                        <group>
                             <field name="branch_filter"/>
                         </group>
                     </group>

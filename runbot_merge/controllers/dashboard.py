@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+import ast
+import json
+
+import werkzeug.exceptions
+
 from odoo.http import Controller, route, request
 
 LIMIT = 20
@@ -20,4 +25,21 @@ class MergebotDashboard(Controller):
             'branch': request.env['runbot_merge.branch'].browse(branch_id).sudo(),
             'stagings': stagings[:LIMIT],
             'next': stagings[-1].staged_at if len(stagings) > LIMIT else None,
+        })
+
+    @route('/<org>/<repo>/pull/<int(min=1):pr>', auth='public', type='http', website=True)
+    def pr(self, org, repo, pr):
+        pr_id = request.env['runbot_merge.pull_requests'].sudo().search([
+            ('repository.name', '=', f'{org}/{repo}'),
+            ('number', '=', int(pr)),
+        ])
+        if not pr_id:
+            raise werkzeug.exceptions.NotFound()
+        if not pr_id.repository.group_id <= request.env.user.groups_id:
+            raise werkzeug.exceptions.NotFound()
+
+        return request.render('runbot_merge.view_pull_request', {
+            'pr': pr_id,
+            'merged_head': json.loads(pr_id.commits_map).get(''),
+            'statuses': ast.literal_eval(pr_id.statuses) if pr_id.statuses else {}
         })
