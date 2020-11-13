@@ -10,12 +10,15 @@
                                 <span class="text-center" style="font-size: 18px;">
                                     <t t-esc="bundle.name"/>
                                     <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e" />
-                                    <a groups="runbot.group_runbot_admin" t-attf-href="/web/#id={{bundle.id}}&amp;view_type=form&amp;model=runbot.bundle" class="btn btn-default btn-sm" target="new" title="View in Backend">
-                                      <i class="fa fa-list"/>
-                                    </a>
-                                    <a groups="runbot.group_user" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Force A New Batch">
-                                        <i class="fa fa-refresh"/>
-                                    </a>
+                                    <div class="btn-group" role="group">
+                                        <a groups="runbot.group_runbot_admin" t-attf-href="/web/#id={{bundle.id}}&amp;view_type=form&amp;model=runbot.bundle" class="btn btn-default btn-sm" target="new" title="View in Backend">
+                                          <i class="fa fa-list"/>
+                                        </a>
+                                        <a class="btn btn-default" groups="runbot.group_user" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Force A New Batch">
+                                            <i class="fa fa-refresh"/>
+                                        </a>
+                                        <t t-call="runbot.branch_copy_button"/>
+                                    </div>
                                 </span>
                                 <span class="pull-right">
                                     <t t-call="website.pager" />

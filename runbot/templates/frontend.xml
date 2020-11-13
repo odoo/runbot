@@ -32,26 +32,31 @@
                   <div class="col-md-3 col-lg-2 cell">
                     <div class="one_line">
                       <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e" />
-                      <t t-if="not bundle.sticky" t-call="runbot.branch_copy_button"/>
                       <a t-attf-href="/runbot/bundle/#{bundle.id}" title="View Bundle">
                         <b t-esc="bundle.name"/>
                       </a>
-                      <br/>
-                      <t t-foreach="categories" t-as="category">
-                        <t t-if="active_category_id != category.id">
-                          <t t-set="last_category_batch" t-value="bundle.with_context(category_id=category.id).last_done_batch"/>
-                          <t t-if="last_category_batch">
-                            <t t-if="category.view_id" t-call="{{category.view_id.key}}"/>
-                            <a t-else=""
-                              t-attf-title="View last {{category.name}} batch"
-                              t-attf-href="/runbot/batch/{{last_category_batch.id}}"
-                              t-attf-class="fa fa-{{category.icon}}"
-                              />
+                    </div>
+                    <div class="btn-toolbar" role="toolbar" aria-label="Toolbar with button groups">
+                      <div class="btn-group" role="group">
+                        <t t-foreach="categories" t-as="category">
+                          <t t-if="active_category_id != category.id">
+                            <t t-set="last_category_batch" t-value="bundle.with_context(category_id=category.id).last_done_batch"/>
+                            <t t-if="last_category_batch">
+                              <t t-if="category.view_id" t-call="{{category.view_id.key}}"/>
+                              <a t-else=""
+                                t-attf-title="View last {{category.name}} batch"
+                                t-attf-href="/runbot/batch/{{last_category_batch.id}}"
+                                t-attf-class="fa fa-{{category.icon}}"
+                                />
+                            </t>
                           </t>
                         </t>
-                      </t>
+                      </div>
+                      <div class="btn-group" role="group">
+                        <t t-if="not bundle.sticky" t-call="runbot.branch_copy_button"/>
+                        <t t-call="runbot.branch_github_menu"/>
+                      </div>
                     </div>
-                    <t t-call="runbot.branch_github_menu"/>
                   </div>
                   <div class="col-md-9 col-lg-10">
                     <div class="row no-gutters">
