@@ -42,3 +42,11 @@
     //  new Clipboard('.clipbtn');
     //});
 })(jQuery);
+
+function copyToClipboard(text) {
+        if (!navigator.clipboard) {
+            console.error('Clipboard not supported');
+            return;
+        }
+        navigator.clipboard.writeText(text);
+    }
