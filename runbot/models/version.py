@@ -75,7 +75,7 @@ class Version(models.Model):
                 (
                     v
                     for v in all_versions
-                    if (v.is_major or v.name == 'master') and v.number > version.number and v.sequence >= version.sequence
+                    if (v.is_major or v.name == 'master' or v.name == 'main') and v.number > version.number and v.sequence >= version.sequence
                 ), self.browse())
             if version.next_major_version_id:
                 version.next_intermediate_version_ids = all_versions.filtered(

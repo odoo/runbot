@@ -67,7 +67,7 @@
           <field name="build_id"/>
           <filter string="Failed builds" name="failed_builds" domain="[('global_state', '=', 'done'), ('global_result', '=', 'ko')]"/>
           <separator/>
-          <filter string="Master bundle" name="master_bundle" domain="[('bundle_ids.name', '=', 'master')]"/>
+          <filter string="Master bundle" name="master_bundle" domain="[('bundle_ids.name', 'in', ('master', 'main'))]"/>
           <filter string="Sticky bundles" name="sticky_bundles" domain="[('sticky', '=', True)]"/>
           <separator/>
           <!-- <filter name="filter_log_create_date" date="log_create_date" string="Log Date" default_period="last_7_days"/> -->

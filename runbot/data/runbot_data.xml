@@ -29,7 +29,7 @@
 
     <record model="ir.config_parameter" id="runbot.runbot_is_base_regex">
         <field name="key">runbot.runbot_is_base_regex</field>
-        <field name="value">^((master)|(saas-)?\d+\.\d+)$</field>
+        <field name="value">^((master)|(main)|(saas-)?\d+\.\d+)$</field>
     </record>
 
     <record model="ir.actions.server" id="action_toggle_is_base">

@@ -91,7 +91,7 @@ class Bundle(models.Model):
                 if bundle.name.startswith('%s-' % bname):
                     bundle.base_id = self.browse(bid)
                     break
-                elif bname == 'master':
+                elif bname == 'master' or bname == 'main':
                     master_base = self.browse(bid)
             else:
                 bundle.base_id = master_base

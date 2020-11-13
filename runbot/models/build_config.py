@@ -755,11 +755,11 @@ class ConfigStep(models.Model):
             target_refs_bundles |= self.env['runbot.bundle'].search(sticky_domain + [('version_id', 'in', self.upgrade_to_version_ids.ids)])
         else:
             if self.upgrade_to_master:
-                target_refs_bundles |= self.env['runbot.bundle'].search(sticky_domain + [('name', '=', 'master')])
+                target_refs_bundles |= self.env['runbot.bundle'].search(sticky_domain + [('name', 'in', ('main','master'))])
             if self.upgrade_to_all_versions:
-                target_refs_bundles |= self.env['runbot.bundle'].search(sticky_domain + [('name', '!=', 'master')])
+                target_refs_bundles |= self.env['runbot.bundle'].search(sticky_domain + [('name', 'not in', ('main', 'master'))])
             elif self.upgrade_to_major_versions:
-                target_refs_bundles |= self.env['runbot.bundle'].search(sticky_domain + [('name', '!=', 'master'), ('version_id.is_major', '=', True)])
+                target_refs_bundles |= self.env['runbot.bundle'].search(sticky_domain + [('name', 'not in', ('main', 'master')), ('version_id.is_major', '=', True)])
 
         source_refs_bundles = self.env['runbot.bundle']
 
