@@ -208,6 +208,9 @@ class Bundle(models.Model):
         if self.defined_base_id:
             return [('info', 'This bundle has a forced base: %s' % self.defined_base_id.name)]
         warnings = []
+        if not self.base_id:  # not sure what can cause this
+            _logger.warning('force recompute base_id for bundle %s')
+            self._compute_base_id()
         for branch in self.branch_ids:
             if branch.is_pr and branch.target_branch_name != self.base_id.name:
                 if branch.target_branch_name.startswith(self.base_id.name):

@@ -134,6 +134,8 @@ class Batch(models.Model):
         project = bundle.project_id
         if not bundle.version_id:
             _logger.error('No version found on bundle %s in project %s', bundle.name, project.name)
+            bundle._compute_base_id()
+            _logger.warning('FIXED! Found version %s', bundle.version_id.name)
 
         dockerfile_id = bundle.dockerfile_id or bundle.base_id.dockerfile_id or bundle.version_id.dockerfile_id
         if not dockerfile_id:
