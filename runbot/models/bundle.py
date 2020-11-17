@@ -33,6 +33,7 @@ class Bundle(models.Model):
     is_base = fields.Boolean('Is base', index=True)
     defined_base_id = fields.Many2one('runbot.bundle', 'Forced base bundle', domain="[('project_id', '=', project_id), ('is_base', '=', True)]")
     base_id = fields.Many2one('runbot.bundle', 'Base bundle', compute='_compute_base_id', store=True)
+    to_upgrade = fields.Boolean('To upgrade', compute='_compute_to_upgrade', store=False, index=False)
 
     version_id = fields.Many2one('runbot.version', 'Version', compute='_compute_version_id', store=True)
     version_number = fields.Char(related='version_id.number', store=True, index=True)
@@ -75,6 +76,11 @@ class Bundle(models.Model):
     def _compute_sticky(self):
         for bundle in self:
             bundle.sticky = bundle.is_base
+
+    @api.depends('is_base')
+    def _compute_to_upgrade(self):
+        for bundle in self:
+            bundle.to_upgrade = bundle.is_base
 
     @api.depends('name', 'is_base', 'defined_base_id', 'base_id.is_base', 'project_id')
     def _compute_base_id(self):
