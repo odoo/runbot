@@ -740,26 +740,26 @@ class ConfigStep(models.Model):
 
         upgrade_complement_step = trigger.upgrade_dumps_trigger_id.upgrade_step_id
 
-        if next_versions:
+        if next_versions and bundle.to_upgrade:
             for next_version in next_versions:
                 if bundle.version_id in upgrade_complement_step._get_upgrade_source_versions(next_version):
                     target_versions |= next_version
         return target_versions.with_context(
             category_id=category_id, project_id=bundle.project_id.id
-            ).mapped('base_bundle_id.last_done_batch')
+            ).mapped('base_bundle_id').filtered('to_upgrade').mapped('last_done_batch')
 
     def _reference_batches_upgrade(self, bundle, category_id):
         target_refs_bundles = self.env['runbot.bundle']
-        sticky_domain = [('sticky', '=', True), ('project_id', '=', bundle.project_id.id)]
+        upgrade_domain = [('to_upgrade', '=', True), ('project_id', '=', bundle.project_id.id)]
         if self.upgrade_to_version_ids:
-            target_refs_bundles |= self.env['runbot.bundle'].search(sticky_domain + [('version_id', 'in', self.upgrade_to_version_ids.ids)])
+            target_refs_bundles |= self.env['runbot.bundle'].search(upgrade_domain + [('version_id', 'in', self.upgrade_to_version_ids.ids)])
         else:
             if self.upgrade_to_master:
-                target_refs_bundles |= self.env['runbot.bundle'].search(sticky_domain + [('name', '=', 'master')])
+                target_refs_bundles |= self.env['runbot.bundle'].search(upgrade_domain + [('name', '=', 'master')])
             if self.upgrade_to_all_versions:
-                target_refs_bundles |= self.env['runbot.bundle'].search(sticky_domain + [('name', '!=', 'master')])
+                target_refs_bundles |= self.env['runbot.bundle'].search(upgrade_domain + [('name', '!=', 'master')])
             elif self.upgrade_to_major_versions:
-                target_refs_bundles |= self.env['runbot.bundle'].search(sticky_domain + [('name', '!=', 'master'), ('version_id.is_major', '=', True)])
+                target_refs_bundles |= self.env['runbot.bundle'].search(upgrade_domain + [('name', '!=', 'master'), ('version_id.is_major', '=', True)])
 
         source_refs_bundles = self.env['runbot.bundle']
 
@@ -774,13 +774,14 @@ class ConfigStep(models.Model):
                     source_refs_bundles |= f_bundle.intermediate_version_base_ids[-1]
 
         if self.upgrade_from_version_ids:
-            source_refs_bundles |= self.env['runbot.bundle'].search(sticky_domain + [('version_id', 'in', self.upgrade_from_version_ids.ids)])
+            source_refs_bundles |= self.env['runbot.bundle'].search(upgrade_domain + [('version_id', 'in', self.upgrade_from_version_ids.ids)])
             # this is subject to discussion. should this be smart and filter 'from_versions' or should it be flexible and do all possibilities
         else:
             if self.upgrade_to_current:
                 from_versions(bundle)
             for f_bundle in target_refs_bundles:
                 from_versions(f_bundle)
+            source_refs_bundles = source_refs_bundles.filtered('to_upgrade')
 
         return (target_refs_bundles | source_refs_bundles).with_context(
             category_id=category_id

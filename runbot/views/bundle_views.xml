@@ -25,6 +25,7 @@
                     <field name="name"/>
                     <field name="project_id"/>
                     <field name="sticky" readonly="0"/>
+                    <field name="to_upgrade" readonly="0"/>
                     <field name="is_base"/>
                     <field name="base_id"/>
                     <field name="defined_base_id"/>
@@ -70,6 +71,7 @@
                 <field name="version_number"/>
                 <field name="is_base"/>
                 <field name="sticky"/>
+                <field name="to_upgrade"/>
                 <field name="no_build"/>
                 <field name="branch_ids"/>
                 <field name="version_id"/>
