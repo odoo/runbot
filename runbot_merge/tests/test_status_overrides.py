@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from utils import Commit
+from utils import seen, Commit
 
 
 def test_no_duplicates(env):
@@ -87,6 +87,7 @@ def test_basic(env, project, make_repo, users, setreviewers, config):
     comments = pr.comments
     assert comments == [
         (users['reviewer'], 'hansen r+'),
+        seen(env, pr, users),
         (users['reviewer'], 'hansen override=l/int'),
         (users['user'], "I'm sorry, @{}. You are not allowed to override this status.".format(users['reviewer'])),
         (users['other'], "hansen override=l/int"),
@@ -137,6 +138,7 @@ def test_no_repository(env, project, make_repo, users, setreviewers, config):
     comments = pr.comments
     assert comments == [
         (users['reviewer'], 'hansen r+'),
+        seen(env, pr, users),
         (users['other'], "hansen override=l/int"),
     ]
     assert pr_id.statuses == '{}'

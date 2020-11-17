@@ -2,23 +2,24 @@ import datetime
 import itertools
 import json
 import re
-import time
 from unittest import mock
 
 import pytest
 from lxml import html
 
 import odoo
+from utils import _simple_init, seen, re_matches, get_partner, Commit
 
-from test_utils import re_matches, get_partner, _simple_init
-from utils import Commit
 
+def pr_page(page, pr):
+    return html.fromstring(page(f'/{pr.repo.name}/pull/{pr.number}'))
 
 @pytest.fixture
 def repo(env, project, make_repo, users, setreviewers):
     r = make_repo('repo')
     project.write({'repo_ids': [(0, 0, {
         'name': r.name,
+        'group_id': False,
         'required_statuses': 'legal/cla,ci/runbot'
     })]})
     setreviewers(*project.repo_ids)
@@ -33,16 +34,18 @@ def test_trivial_flow(env, repo, page, users, config):
         # create PR with 2 commits
         c0 = repo.make_commit(m, 'replace file contents', None, tree={'a': 'some other content'})
         c1 = repo.make_commit(c0, 'add file', None, tree={'a': 'some other content', 'b': 'a second file'})
-        pr1 = repo.make_pr(title="gibberish", body="blahblah", target='master', head=c1,)
+        pr = repo.make_pr(title="gibberish", body="blahblah", target='master', head=c1,)
 
-    [pr] = env['runbot_merge.pull_requests'].search([
+    [pr_id] = env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', repo.name),
-        ('number', '=', pr1.number),
+        ('number', '=', pr.number),
     ])
-    assert pr.state == 'opened'
+    assert pr_id.state == 'opened'
     env.run_crons()
-    assert pr1.labels == {'seen 🙂', '☐ legal/cla', '☐ ci/runbot'}
-    # nothing happened
+    assert pr.comments == [seen(env, pr, users)]
+    s = pr_page(page, pr).cssselect('.alert-info > ul > li')
+    assert [it.get('class') for it in s] == ['fail', 'fail', ''],\
+        "merge method unset, review missing, no CI"
 
     with repo:
         repo.post_status(c1, 'success', 'legal/cla')
@@ -54,19 +57,27 @@ def test_trivial_flow(env, repo, page, users, config):
         repo.post_status(c1, 'success', 'ci/runbot')
 
     env.run_crons()
-    assert pr.state == 'validated'
+    assert pr_id.state == 'validated'
 
-    assert pr1.labels == {'seen 🙂', 'CI 🤖', '☑ ci/runbot', '☑ legal/cla'}
+    s = pr_page(page, pr).cssselect('.alert-info > ul > li')
+    assert [it.get('class') for it in s] == ['fail', 'fail', 'ok'],\
+        "merge method unset, review missing, CI"
+    statuses = [
+        (l.find('a').text.split(':')[0], l.get('class').strip())
+        for l in s[2].cssselect('ul li')
+    ]
+    assert statuses == [('legal/cla', 'ok'), ('ci/runbot', 'ok')]
+
 
     with repo:
-        pr1.post_comment('hansen r+ rebase-merge', config['role_reviewer']['token'])
-    assert pr.state == 'ready'
+        pr.post_comment('hansen r+ rebase-merge', config['role_reviewer']['token'])
+    assert pr_id.state == 'ready'
 
     # can't check labels here as running the cron will stage it
 
     env.run_crons()
-    assert pr.staging_id
-    assert pr1.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merging 👷', '☑ ci/runbot', '☑ legal/cla'}
+    assert pr_id.staging_id
+    assert pr_page(page, pr).cssselect('.alert-primary')
 
     with repo:
         # get head of staging branch
@@ -77,7 +88,7 @@ def test_trivial_flow(env, repo, page, users, config):
         repo.post_status(staging_head.id, 'failure', 'ci/lint', target_url='http://ignored.com/whocares')
     # need to store this because after the crons have run the staging will
     # have succeeded and been disabled
-    st = pr.staging_id
+    st = pr_id.staging_id
     env.run_crons()
 
     assert set(tuple(t) for t in st.statuses) == {
@@ -95,8 +106,8 @@ def test_trivial_flow(env, repo, page, users, config):
     assert re.match('^force rebuild', staging_head.message)
 
     assert st.state == 'success'
-    assert pr.state == 'merged'
-    assert pr1.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merged 🎉', '☑ ci/runbot', '☑ legal/cla'}
+    assert pr_id.state == 'merged'
+    assert pr_page(page, pr).cssselect('.alert-success')
 
     master = repo.commit('heads/master')
     # with default-rebase, only one parent is "known"
@@ -358,7 +369,6 @@ def test_staging_ongoing(env, repo, config):
         ('number', '=', pr2.number)
     ])
     assert p_2.state == 'ready', "PR2 should not have been staged since there is a pending staging for master"
-    assert pr2.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', '☑ ci/runbot', '☑ legal/cla'}
 
     staging_head = repo.commit('heads/staging.master')
     with repo:
@@ -413,7 +423,7 @@ def test_staging_concurrent(env, repo, config):
     ])
     assert pr2.staging_id
 
-def test_staging_confict_first(env, repo, users, config):
+def test_staging_confict_first(env, repo, users, config, page):
     """ If the first batch of a staging triggers a conflict, the PR should be
     marked as in error
     """
@@ -435,9 +445,10 @@ def test_staging_confict_first(env, repo, users, config):
         ('number', '=', prx.number)
     ])
     assert pr1.state == 'error'
-    assert prx.labels == {'seen 🙂', 'error 🙅', '☑ legal/cla', '☑ ci/runbot'}
+    assert pr_page(page, prx).cssselect('.alert-danger')
     assert prx.comments == [
         (users['reviewer'], 'hansen r+ rebase-merge'),
+        seen(env, prx, users),
         (users['user'], 'Merge method set to rebase and merge, using the PR as merge commit message'),
         (users['user'], re_matches('^Unable to stage PR')),
     ]
@@ -566,6 +577,7 @@ def test_staging_ci_failure_single(env, repo, users, config):
 
     assert prx.comments == [
         (users['reviewer'], 'hansen r+ rebase-merge'),
+        seen(env, prx, users),
         (users['user'], "Merge method set to rebase and merge, using the PR as merge commit message"),
         (users['user'], 'Staging failed: ci/runbot')
     ]
@@ -710,7 +722,6 @@ class TestPREdition:
         with repo: prx.base = '2.0'
         assert not pr.exists()
         env.run_crons()
-        assert prx.labels == {'☐ legal/cla', '☐ ci/runbot'}
 
         with repo: prx.base = '1.0'
         assert env['runbot_merge.pull_requests'].search([
@@ -794,7 +805,7 @@ def test_edit_staged(env, repo):
     """
     What should happen when editing the PR/metadata (not pushing) of a staged PR
     """
-def test_close_staged(env, repo, config):
+def test_close_staged(env, repo, config, page):
     """
     When closing a staged PR, cancel the staging
     """
@@ -822,7 +833,7 @@ def test_close_staged(env, repo, config):
     assert not pr.staging_id
     assert not env['runbot_merge.stagings'].search([])
     assert pr.state == 'closed'
-    assert prx.labels == {'seen 🙂', 'closed 💔', '☑ ci/runbot', '☑ legal/cla'}
+    assert pr_page(page, prx).cssselect('.alert-light')
 
 def test_forward_port(env, repo, config):
     with repo:
@@ -910,10 +921,12 @@ def test_rebase_failure(env, repo, users, config):
 
     assert pr_a.comments == [
         (users['reviewer'], 'hansen r+'),
+        seen(env, pr_a, users),
         (users['user'], re_matches(r'^Unable to stage PR')),
     ]
     assert pr_b.comments == [
         (users['reviewer'], 'hansen r+'),
+        seen(env, pr_b, users),
     ]
     assert repo.read_tree(repo.commit('heads/staging.master')) == {
         'm': 'm',
@@ -939,6 +952,7 @@ def test_ci_failure_after_review(env, repo, users, config):
 
     assert prx.comments == [
         (users['reviewer'], 'hansen r+'),
+        seen(env, prx, users),
         (users['user'], "'legal/cla' failed on this reviewed PR.".format_map(users)),
         (users['user'], "'ci/runbot' failed on this reviewed PR.".format_map(users)),
     ]
@@ -983,6 +997,7 @@ def test_reopen_merged_pr(env, repo, config, users):
     assert pr.state == 'merged'
     assert prx.comments == [
         (users['reviewer'], 'hansen r+'),
+        seen(env, prx, users),
         (users['user'], "@%s ya silly goose you can't reopen a PR that's been merged PR." % users['other'])
     ]
 
@@ -1142,6 +1157,7 @@ class TestRetry:
         assert prx.comments == [
             (users['reviewer'], 'hansen r+'),
             (users['reviewer'], 'hansen retry'),
+            seen(env, prx, users),
             (users['user'], "I'm sorry, @{}. Retry makes no sense when the PR is not in error.".format(users['reviewer'])),
         ]
 
@@ -1315,6 +1331,7 @@ class TestMergeMethod:
 
         assert prx.comments == [
             (users['reviewer'], 'hansen r+'),
+            seen(env, prx, users),
             (users['user'], """Because this PR has multiple commits, I need to know how to merge it:
 
 * `merge` to merge directly, using the PR as merge commit message
@@ -1359,6 +1376,7 @@ class TestMergeMethod:
 
         assert prx.comments == [
             (users['reviewer'], 'hansen rebase-merge'),
+            seen(env, prx, users),
             (users['user'], "Merge method set to rebase and merge, using the PR as merge commit message"),
             (users['reviewer'], 'hansen merge'),
             (users['user'], "Merge method set to merge directly, using the PR as merge commit message"),
@@ -2551,6 +2569,7 @@ class TestReviewing(object):
         env.run_crons()
         assert prx.comments == [
             (users['other'], 'hansen r+'),
+            seen(env, prx, users),
             (users['user'], "I'm sorry, @{}. I'm afraid I can't do that.".format(users['other'])),
             (users['reviewer'], 'hansen r+'),
             (users['reviewer'], 'hansen r+'),
@@ -2582,6 +2601,7 @@ class TestReviewing(object):
         env.run_crons()
         assert prx.comments == [
             (users['reviewer'], 'hansen r+'),
+            seen(env, prx, users),
             (users['user'], "I'm sorry, @{}. You can't review+.".format(users['reviewer'])),
         ]
 
@@ -2768,8 +2788,10 @@ class TestUnknownPR:
             'ci/runbot': {'state': 'success', 'target_url': 'http://example.org/wheee', 'description': None}
         }
         assert prx.comments == [
+            seen(env, prx, users),
             (users['reviewer'], 'hansen r+'),
             (users['reviewer'], 'hansen r+'),
+            seen(env, prx, users),
             (users['user'], "Sorry, I didn't know about this PR and had to "
                             "retrieve its information, you may have to "
                             "re-approve it."),
@@ -2892,6 +2914,7 @@ class TestRecognizeCommands:
         assert pr.comments == [
             (users['reviewer'], "hansen do the thing"),
             (users['reviewer'], "hansen @bobby-b r+ :+1:"),
+            seen(env, pr, users),
         ]
 
 class TestRMinus:
@@ -3102,6 +3125,7 @@ class TestRMinus:
         assert pr.priority == 1, "priority should have been downgraded"
         assert prx.comments == [
             (users['reviewer'], 'hansen p=0'),
+            seen(env, prx, users),
             (users['reviewer'], 'hansen r-'),
             (users['user'], "PR priority reset to 1, as pull requests with priority 0 ignore review state."),
         ]
@@ -3201,6 +3225,7 @@ class TestFeedback:
 
         assert prx.comments == [
             (users['reviewer'], 'hansen r+'),
+            seen(env, prx, users),
             (users['user'], "'ci/runbot' failed on this reviewed PR.")
         ]
 
@@ -3229,6 +3254,7 @@ class TestFeedback:
         env.run_crons()
 
         assert prx.comments == [
+            seen(env, prx, users),
             (users['reviewer'], 'hansen r+'),
             (users['user'], "@%s, you may want to rebuild or fix this PR as it has failed CI." % users['reviewer'])
         ]
@@ -3287,58 +3313,3 @@ class TestEmailFormatting:
             'github_login': 'Osmose99',
         })
         assert p1.formatted_email == 'Shultz <Osmose99@users.noreply.github.com>'
-
-class TestLabelling:
-    def test_desync(self, env, repo, config):
-        with repo:
-            m = repo.make_commit(None, 'initial', None, tree={'a': 'some content'})
-            repo.make_ref('heads/master', m)
-
-            c = repo.make_commit(m, 'replace file contents', None, tree={'a': 'some other content'})
-            pr = repo.make_pr(title='gibberish', body='blahblah', target='master', head=c)
-        env.run_crons('runbot_merge.feedback_cron')
-        assert pr.labels == {'seen 🙂', '☐ legal/cla', '☐ ci/runbot'},\
-            "required statuses should be labelled as pending"
-
-        with repo:
-            repo.post_status(c, 'success', 'legal/cla')
-            repo.post_status(c, 'success', 'ci/runbot')
-
-        env.run_crons()
-
-        assert pr.labels == {'seen 🙂', 'CI 🤖', '☑ legal/cla', '☑ ci/runbot'}
-        with repo:
-            # desync state and labels
-            pr.labels.remove('CI 🤖')
-
-            pr.post_comment('hansen r+', config['role_reviewer']['token'])
-        env.run_crons()
-
-        assert pr.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merging 👷', '☑ legal/cla', '☑ ci/runbot'},\
-            "labels should be resynchronised"
-
-    def test_other_tags(self, env, repo, config):
-        with repo:
-            m = repo.make_commit(None, 'initial', None, tree={'a': 'some content'})
-            repo.make_ref('heads/master', m)
-
-            c = repo.make_commit(m, 'replace file contents', None, tree={'a': 'some other content'})
-            pr = repo.make_pr(title='gibberish', body='blahblah', target='master', head=c)
-
-        with repo:
-            # "foreign" labels
-            pr.labels.update(('L1', 'L2'))
-
-        with repo:
-            repo.post_status(c, 'success', 'legal/cla')
-            repo.post_status(c, 'success', 'ci/runbot')
-        env.run_crons()
-
-        assert pr.labels == {'seen 🙂', 'CI 🤖', '☑ legal/cla', '☑ ci/runbot', 'L1', 'L2'}, "should not lose foreign labels"
-
-        with repo:
-            pr.post_comment('hansen r+', config['role_reviewer']['token'])
-        env.run_crons()
-
-        assert pr.labels == {'seen 🙂', 'CI 🤖', 'r+ 👌', 'merging 👷', '☑ legal/cla', '☑ ci/runbot', 'L1', 'L2'},\
-            "should not lose foreign labels"

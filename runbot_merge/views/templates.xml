@@ -338,7 +338,6 @@
             </li>
             <li t-att-class="'ok' if pr.state not in ('opened', 'approved') else ''">
                 CI
-                <t t-set="statuses" t-value="statuses"/>
                 <ul class="todo">
                     <t t-foreach="pr.repository.status_ids._for_pr(pr)" t-as="ci">
                         <t t-set="st" t-value="statuses.get(ci.context.strip())"/>
@@ -359,7 +358,7 @@
                 <ul class="todo">
                     <t t-foreach="linked_prs" t-as="linked">
                         <li t-att-class="'ok' if linked._ready else 'fail'">
-                            <a t-attf-href="/{{linked.repository.name}}/pull/{{linked.number}}" t-field="linked.display_name"/>
+                            <a t-attf-href="linked.url" t-field="linked.display_name"/>
                         </li>
                     </t>
                 </ul>
@@ -371,8 +370,7 @@
     <template id="view_pull_request">
         <t t-call="website.layout">
             <div id="wrap"><div class="container-fluid">
-                <t t-set="pr_url" t-valuef="https://github.com/{{pr.repository.name}}/pull/{{pr.number}}"/>
-                <a t-att-href="pr_url">
+                <a t-att-href="pr.url">
                     <h1 t-field="pr.display_name"/>
                 </a>
                 <h6>Created by <span t-field="pr.author.display_name"/></h6>
@@ -386,7 +384,7 @@
                     <dt>label</dt>
                     <dd><span t-field="pr.label"/></dd>
                     <dt>head</dt>
-                    <dd><a t-attf-href="{{pr_url}}/commits/{{pr.head}}"><span t-field="pr.head"/></a></dd>
+                    <dd><a t-attf-href="{{pr.github_url}}/commits/{{pr.head}}"><span t-field="pr.head"/></a></dd>
                 </dl>
                 <p t-field="pr.message"/>
             </div></div>

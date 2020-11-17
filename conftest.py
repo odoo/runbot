@@ -55,7 +55,6 @@ import time
 import uuid
 import xmlrpc.client
 from contextlib import closing
-from datetime import datetime
 
 import psutil
 import pytest
@@ -79,6 +78,12 @@ def pytest_addoption(parser):
              "queries per minute, free is 40, multi-repo batching tests will "
              "blow through the former); localtunnel has no rate-limiting but "
              "the servers are way less reliable")
+
+
+# noinspection PyUnusedLocal
+def pytest_configure(config):
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'mergebot_test_utils'))
+    print(sys.path)
 
 @pytest.fixture(scope='session', autouse=True)
 def _set_socket_timeout():

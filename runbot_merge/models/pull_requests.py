@@ -16,6 +16,7 @@ import time
 from itertools import takewhile
 
 import requests
+import werkzeug
 from werkzeug.datastructures import Headers
 
 from odoo import api, fields, models, tools
@@ -607,18 +608,6 @@ For-Commit-Id: %s
                 )
                 raise TimeoutError("Staged head not updated after %d seconds" % sum(WAIT_FOR_VISIBILITY))
 
-
-        # creating the staging doesn't trigger a write on the prs
-        # and thus the ->staging taggings, so do that by hand
-        Tagging = self.env['runbot_merge.pull_requests.tagging']
-        for pr in st.mapped('batch_ids.prs'):
-            Tagging.create({
-                'pull_request': pr.number,
-                'repository': pr.repository.id,
-                'state_from': 'ready',
-                'state_to': 'staged',
-            })
-
         logger.info("Created staging %s (%s) to %s", st, ', '.join(
             '%s[%s]' % (batch, batch.prs)
             for batch in staged
@@ -702,6 +691,18 @@ class PullRequests(models.Model):
         compute='_compute_is_blocked',
         help="PR is not currently stageable for some reason (mostly an issue if status is ready)"
     )
+
+    url = fields.Char(compute='_compute_url')
+    github_url = fields.Char(compute='_compute_url')
+
+    @api.depends('repository.name', 'number')
+    def _compute_url(self):
+        base = werkzeug.urls.url_parse(self.env['ir.config_parameter'].sudo().get_param('web.base.url', 'http://localhost:8069'))
+        gh_base = werkzeug.urls.url_parse('https://github.com')
+        for pr in self:
+            path = f'/{werkzeug.urls.url_quote(pr.repository.name)}/pull/{pr.number}'
+            pr.url = str(base.join(path))
+            pr.github_url = str(gh_base.join(path))
 
     @api.depends('repository.name', 'number')
     def _compute_display_name(self):
@@ -1100,12 +1101,6 @@ class PullRequests(models.Model):
                     pr.state = 'validated'
                 elif oldstate == 'approved':
                     pr.state = 'ready'
-            self.env['runbot_merge.pull_requests.tagging'].create({
-                'repository': pr.repository.id,
-                'pull_request': pr.number,
-                'tags_remove': json.dumps(r),
-                'tags_add': json.dumps(a),
-            })
         return failed
 
     def _notify_ci_new_failure(self, ci, st):
@@ -1158,11 +1153,10 @@ class PullRequests(models.Model):
         pr._validate(json.loads(c.statuses or '{}'))
 
         if pr.state not in ('closed', 'merged'):
-            self.env['runbot_merge.pull_requests.tagging'].create({
-                'pull_request': pr.number,
+            self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': pr.repository.id,
-                'state_from': False,
-                'state_to': pr._tagstate,
+                'pull_request': pr.number,
+                'message': f"[Pull request status dashboard]({pr.url}).",
             })
         return pr
 
@@ -1208,27 +1202,7 @@ class PullRequests(models.Model):
         if newhead:
             c = self.env['runbot_merge.commit'].search([('sha', '=', newhead)])
             self._validate(json.loads(c.statuses or '{}'))
-
-        for pr in self:
-            before, after = oldstate[pr], pr._tagstate
-            if after != before:
-                self.env['runbot_merge.pull_requests.tagging'].create({
-                    'pull_request': pr.number,
-                    'repository': pr.repository.id,
-                    'state_from': oldstate[pr],
-                    'state_to': pr._tagstate,
-                })
         return w
-
-    def unlink(self):
-        for pr in self:
-            self.env['runbot_merge.pull_requests.tagging'].create({
-                'pull_request': pr.number,
-                'repository': pr.repository.id,
-                'state_from': pr._tagstate,
-                'state_to': False,
-            })
-        return super().unlink()
 
     def _check_linked_prs_statuses(self, commit=False):
         """ Looks for linked PRs where at least one of the PRs is in a ready
@@ -1446,12 +1420,6 @@ class PullRequests(models.Model):
         self.env.cr.commit()
         self.modified(['state'])
         if self.env.cr.rowcount:
-            self.env['runbot_merge.pull_requests.tagging'].create({
-                'pull_request': self.number,
-                'repository': self.repository.id,
-                'state_from': res[1] if not self.staging_id else 'staged',
-                'state_to': 'closed',
-            })
             self.unstage(
                 "PR %s closed by %s",
                 self.display_name,

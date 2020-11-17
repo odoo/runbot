@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
-import sys
-
 import pytest
-import re
 
-from utils import *
+from utils import seen, Commit
+
 
 def make_basic(env, config, make_repo, *, fp_token, fp_remote):
     """ Creates a basic repo with 3 forking branches
@@ -401,6 +399,7 @@ class TestNotAllBranches:
         # different next target
         assert pr_a.comments == [
             (users['reviewer'], 'hansen r+'),
+            seen(env, pr_a, users),
             (users['user'], "This pull request can not be forward ported: next "
                             "branch is 'b' but linked pull request %s#%d has a"
                             " next branch 'c'." % (b.name, pr_b.number)
@@ -408,6 +407,7 @@ class TestNotAllBranches:
         ]
         assert pr_b.comments == [
             (users['reviewer'], 'hansen r+'),
+            seen(env, pr_b, users),
             (users['user'], "This pull request can not be forward ported: next "
                             "branch is 'c' but linked pull request %s#%d has a"
                             " next branch 'b'." % (a.name, pr_a.number)

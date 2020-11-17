@@ -25,6 +25,20 @@ def validate_all(repos, refs, contexts=('ci/runbot', 'legal/cla')):
     for repo, branch, context in itertools.product(repos, refs, contexts):
         repo.post_status(branch, 'success', context)
 
+def get_partner(env, gh_login):
+    return env['res.partner'].search([('github_login', '=', gh_login)])
+
+def _simple_init(repo):
+    """ Creates a very simple initialisation: a master branch with a commit,
+    and a PR by 'user' with two commits, targeted to the master branch
+    """
+    m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
+    repo.make_ref('heads/master', m)
+    c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
+    c2 = repo.make_commit(c1, 'second', None, tree={'m': 'c2'})
+    prx = repo.make_pr(title='title', body='body', target='master', head=c2)
+    return prx
+
 class re_matches:
     def __init__(self, pattern, flags=0):
         self._r = re.compile(pattern, flags)
@@ -35,6 +49,12 @@ class re_matches:
     def __repr__(self):
         return '~' + self._r.pattern + '~'
 
+def seen(env, pr, users):
+    pr_id = env['runbot_merge.pull_requests'].search([
+        ('repository.name', '=', pr.repo.name),
+        ('number', '=', pr.number)
+    ])
+    return users['user'], f'[Pull request status dashboard]({pr_id.url}).'
 
 def make_basic(env, config, make_repo, *, reponame='proj', project_name='myproject'):
     """ Creates a basic repo with 3 forking branches

@@ -1,4 +1,4 @@
-from utils import *
+from utils import Commit, make_basic
 
 
 def test_single_updated(env, config, make_repo):

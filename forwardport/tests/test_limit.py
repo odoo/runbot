@@ -3,7 +3,7 @@ import collections
 
 import pytest
 
-from utils import *
+from utils import seen, Commit, make_basic
 
 Description = collections.namedtuple('Restriction', 'source limit')
 def test_configure(env, config, make_repo):
@@ -164,6 +164,7 @@ def test_disable(env, config, make_repo, users, enabled):
         (users['other'], "Branch 'b' is disabled, it can't be used as a forward port target."),
         (users['other'], "There is no branch 'foo', it can't be used as a forward port target."),
         (users['other'], "Forward-porting to 'c'."),
+        seen(env, pr, users),
     }
 
 
@@ -196,8 +197,9 @@ def test_default_disabled(env, config, make_repo, users):
     pr2 = prod.get_pr(p2.number)
 
     cs = pr2.comments
-    assert len(cs) == 1
+    assert len(cs) == 2
     assert pr2.comments == [
+        seen(env, pr2, users),
         (users['user'], """\
 Ping @%s, @%s
 This PR targets b and is the last of the forward-port chain.
@@ -243,10 +245,12 @@ def test_limit_after_merge(env, config, make_repo, users):
         "check that limit was not updated"
     assert pr1.comments == [
         (users['reviewer'], "hansen r+"),
+        seen(env, pr1, users),
         (users['reviewer'], bot_name + ' up to b'),
         (bot_name, "Sorry, forward-port limit can only be set before the PR is merged."),
     ]
     assert pr2.comments == [
+        seen(env, pr2, users),
         (users['user'], """\
 This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
 

@@ -38,8 +38,15 @@ class MergebotDashboard(Controller):
         if not pr_id.repository.group_id <= request.env.user.groups_id:
             raise werkzeug.exceptions.NotFound()
 
+        st = {}
+        if pr_id.statuses:
+            # normalise `statuses` to map to a dict
+            st = {
+                k: {'state': v} if isinstance(v, str) else v
+                for k, v in ast.literal_eval(pr_id.statuses).items()
+            }
         return request.render('runbot_merge.view_pull_request', {
             'pr': pr_id,
             'merged_head': json.loads(pr_id.commits_map).get(''),
-            'statuses': ast.literal_eval(pr_id.statuses) if pr_id.statuses else {}
+            'statuses': st
         })

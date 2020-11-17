@@ -11,7 +11,8 @@ import time
 import pytest
 import requests
 
-from test_utils import re_matches, get_partner
+from utils import seen, re_matches, get_partner
+
 
 @pytest.fixture
 def repo_a(project, make_repo, setreviewers):
@@ -395,6 +396,7 @@ def test_merge_fail(env, project, repo_a, repo_b, users, config):
     assert failed.state == 'error'
     assert pr1b.comments == [
         (users['reviewer'], 'hansen r+'),
+        seen(env, pr1b, users),
         (users['user'], re_matches('^Unable to stage PR')),
     ]
     other = to_pr(env, pr1a)
@@ -493,15 +495,17 @@ class TestCompanionsNotReady:
 
         assert p_a.comments == [
             (users['reviewer'], 'hansen r+'),
+            seen(env, p_a, users),
             (users['user'], "Linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (repo_b.name, p_b.number)),
         ]
         # ensure the message is only sent once per PR
         env.run_crons('runbot_merge.check_linked_prs_status')
         assert p_a.comments == [
             (users['reviewer'], 'hansen r+'),
+            seen(env, p_a, users),
             (users['user'], "Linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (repo_b.name, p_b.number)),
         ]
-        assert p_b.comments == []
+        assert p_b.comments == [seen(env, p_b, users)]
 
     def test_two_of_three_unready(self, env, project, repo_a, repo_b, repo_c, users, config):
         """ In a 3-batch, if two of the PRs are not ready both should be
@@ -531,15 +535,16 @@ class TestCompanionsNotReady:
             )
         env.run_crons()
 
-        assert pr_a.comments == []
+        assert pr_a.comments == [seen(env, pr_a, users)]
         assert pr_b.comments == [
             (users['reviewer'], 'hansen r+'),
+            seen(env, pr_b, users),
             (users['user'], "Linked pull request(s) %s#%d, %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
                 repo_a.name, pr_a.number,
                 repo_c.name, pr_c.number
             ))
         ]
-        assert pr_c.comments == []
+        assert pr_c.comments == [seen(env, pr_c, users)]
 
     def test_one_of_three_unready(self, env, project, repo_a, repo_b, repo_c, users, config):
         """ In a 3-batch, if one PR is not ready it should be linked on the
@@ -569,15 +574,17 @@ class TestCompanionsNotReady:
             )
         env.run_crons()
 
-        assert pr_a.comments == []
+        assert pr_a.comments == [seen(env, pr_a, users)]
         assert pr_b.comments == [
             (users['reviewer'], 'hansen r+'),
+            seen(env, pr_b, users),
             (users['user'], "Linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
                 repo_a.name, pr_a.number
             ))
         ]
         assert pr_c.comments == [
             (users['reviewer'], 'hansen r+'),
+            seen(env, pr_c, users),
             (users['user'],
              "Linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
                  repo_a.name, pr_a.number
@@ -616,6 +623,7 @@ def test_other_failed(env, project, repo_a, repo_b, users, config):
     assert pr.state == 'error'
     assert pr_a.comments == [
         (users['reviewer'], 'hansen r+'),
+        seen(env, pr_a, users),
         (users['user'], 'Staging failed: ci/runbot on %s (view more at http://example.org/b)' % sth)
     ]
 

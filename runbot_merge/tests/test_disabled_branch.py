@@ -1,6 +1,4 @@
-import pytest
-
-from utils import Commit
+from utils import seen, Commit
 
 def test_existing_pr_disabled_branch(env, project, make_repo, setreviewers, config, users):
     """ PRs to disabled branches are ignored, but what if the PR exists *before*
@@ -59,6 +57,7 @@ def test_existing_pr_disabled_branch(env, project, make_repo, setreviewers, conf
     env.run_crons()
     assert pr.comments == [
         (users['reviewer'], "hansen r+"),
+        seen(env, pr, users),
         (users['user'], "This PR targets the disabled branch %s:other, it can not be merged." % repo.name),
     ], "reopening a PR to an inactive branch should send feedback, but not closing it"
 
@@ -133,6 +132,7 @@ def test_new_pr_disabled_branch(env, project, make_repo, setreviewers, users):
     assert pr_id.state == 'opened'
     assert pr.comments == [
         (users['user'], "This PR targets the disabled branch %s:other, it can not be merged." % repo.name),
+        seen(env, pr, users),
     ]
 
 def test_retarget_from_disabled(env, make_repo, project, setreviewers):

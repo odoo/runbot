@@ -1,8 +1,3 @@
-import json
-
-from utils import Commit
-
-
 def test_partner_merge(env):
     p_src = env['res.partner'].create({
         'name': 'kfhsf',
