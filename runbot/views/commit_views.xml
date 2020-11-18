@@ -1,5 +1,28 @@
 <odoo>
   <data>
+
+    <record id="commit_view_form" model="ir.ui.view">
+        <field name="model">runbot.commit</field>
+        <field name="arch" type="xml">
+            <form string="Commit">
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="dname"/>
+                        <field name="repo_id"/>
+                        <field name="date"/>
+                        <field name="author"/>
+                        <field name="author_email"/>
+                        <field name="committer"/>
+                        <field name="committer_email"/>
+                        <field name="subject"/>
+                        <field name="rebase_on_id"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
     <record id="commit_view_tree" model="ir.ui.view">
         <field name="name">runbot.commit.tree</field>
         <field name="model">runbot.commit</field>
@@ -14,10 +37,26 @@
         </field>
     </record>
 
+    <record id="runbot_commit_search_view" model="ir.ui.view">
+      <field name="name">runbot.commit.filter</field>
+      <field name="model">runbot.commit</field>
+      <field name="arch" type="xml">
+        <search string="Search commit">
+          <field name="name"/>
+          <field name="date"/>
+          <field name="author"/>
+          <field name="author_email"/>
+          <field name="committer"/>
+          <field name="committer_email"/>
+          <field name="subject"/>
+        </search>
+      </field>
+    </record>
+
     <record id="open_view_commit_tree" model="ir.actions.act_window">
         <field name="name">Commits</field>
         <field name="res_model">runbot.commit</field>
-        <field name="view_mode">tree</field>
+        <field name="view_mode">tree,form</field>
     </record>
 
     <menuitem
