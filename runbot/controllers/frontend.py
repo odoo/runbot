@@ -368,7 +368,7 @@ class Runbot(Controller):
 
         current_user_errors = request.env['runbot.build.error'].search([('responsible', '=', request.env.user.id)], order='last_seen_date desc, build_count desc')
 
-        domain = [('responsible', '!=', request.env.user.id), ('build_count', '>', 1)]
+        domain = [('parent_id', '=', False), ('responsible', '!=', request.env.user.id), ('build_count', '>', 1)]
         build_errors_count = request.env['runbot.build.error'].search_count(domain)
         url_args = {}
         url_args['sort'] = sort
