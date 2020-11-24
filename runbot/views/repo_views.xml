@@ -17,6 +17,7 @@
                 <field name="repo_ids"/>
                 <field name="dependency_ids"/>
                 <field name="config_id"/>
+                <field name="batch_dependent"/>
                 <field name="version_domain" widget="domain" options="{'model': 'runbot.version', 'in_dialog': True}"/>
                 <field name="hide"/>
                 <field name="manual"/>

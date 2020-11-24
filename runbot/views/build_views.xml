@@ -16,6 +16,9 @@
                                 <field name="match_type"/>
                             </tree>
                         </field>
+                        <field name="trigger_id"/>
+                        <field name="create_batch_id"/>
+                        <field name="dockerfile_id"/>
                     </group>
                 </sheet>
             </form>
