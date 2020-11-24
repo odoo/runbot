@@ -286,6 +286,7 @@ class Batch(models.Model):
                 'commit_link_ids': [(6, 0, [commit_link_by_repos[repo.id].id for repo in trigger_repos])],
                 'modules': bundle.modules,
                 'dockerfile_id': dockerfile_id,
+                'create_batch_id': self.id,
             }
             params_value['builds_reference_ids'] = trigger._reference_builds(bundle)
 

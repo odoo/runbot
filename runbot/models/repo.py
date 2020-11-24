@@ -43,6 +43,7 @@ class Trigger(models.Model):
     repo_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_triggers', string="Triggers", domain="[('project_id', '=', project_id)]")
     dependency_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_dependencies', string="Dependencies")
     config_id = fields.Many2one('runbot.build.config', string="Config", required=True)
+    batch_dependent = fields.Boolean('Batch Dependent', help="Force adding batch in build parameters to make it unique and give access to bundle")
 
     ci_context = fields.Char("Ci context", default='ci/runbot', tracking=True)
     category_id = fields.Many2one('runbot.category', default=lambda self: self.env.ref('runbot.default_category', raise_if_not_found=False))
