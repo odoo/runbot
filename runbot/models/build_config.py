@@ -740,7 +740,7 @@ class ConfigStep(models.Model):
 
         upgrade_complement_step = trigger.upgrade_dumps_trigger_id.upgrade_step_id
 
-        if next_versions and bundle.to_upgrade:
+        if next_versions and bundle.base_id.to_upgrade:
             for next_version in next_versions:
                 if bundle.version_id in upgrade_complement_step._get_upgrade_source_versions(next_version):
                     target_versions |= next_version
