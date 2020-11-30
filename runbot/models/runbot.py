@@ -159,7 +159,7 @@ class Runbot(models.AbstractModel):
         if nginx:
             settings['builds'] = env['runbot.build'].search([('local_state', '=', 'running'), ('host', '=', fqdn())])
 
-            nginx_config = env['ir.ui.view'].render_template("runbot.nginx_config", settings)
+            nginx_config = env['ir.ui.view']._render_template("runbot.nginx_config", settings)
             os.makedirs(nginx_dir, exist_ok=True)
             content = None
             nginx_conf_path = os.path.join(nginx_dir, 'nginx.conf')

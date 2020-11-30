@@ -469,7 +469,7 @@ class Repo(models.Model):
             if os.path.isdir(os.path.join(repo.path, 'refs')):
                 git_config_path = os.path.join(repo.path, 'config')
                 template_params = {'repo': repo}
-                git_config = self.env['ir.ui.view'].render_template("runbot.git_config", template_params)
+                git_config = self.env['ir.ui.view']._render_template("runbot.git_config", template_params)
                 with open(git_config_path, 'wb') as config_file:
                     config_file.write(git_config)
                 _logger.info('Config updated for repo %s' % repo.name)
