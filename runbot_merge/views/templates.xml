@@ -358,7 +358,7 @@
                 <ul class="todo">
                     <t t-foreach="linked_prs" t-as="linked">
                         <li t-att-class="'ok' if linked._ready else 'fail'">
-                            <a t-attf-href="linked.url" t-field="linked.display_name"/>
+                            <a t-att-href="linked.url" t-field="linked.display_name"/>
                         </li>
                     </t>
                 </ul>
