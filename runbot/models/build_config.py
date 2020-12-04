@@ -322,7 +322,8 @@ class ConfigStep(models.Model):
             # not sure, to avoid old server to check other dbs
             cmd += ["--max-cron-threads", "0"]
 
-        db_name = build.params_id.config_data.get('db_name') or [step.db_name for step in build.params_id.config_id.step_ids() if step.job_type == 'install_odoo'][-1]
+        install_steps = [step.db_name for step in build.params_id.config_id.step_ids() if step.job_type == 'install_odoo']
+        db_name = build.params_id.config_data.get('db_name') or 'all' in install_steps and 'all' or install_steps[0]
         # we need to have at least one job of type install_odoo to run odoo, take the last one for db_name.
         cmd += ['-d', '%s-%s' % (build.dest, db_name)]
 
