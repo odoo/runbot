@@ -17,6 +17,9 @@
                                         <a class="btn btn-default" groups="runbot.group_user" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Force A New Batch">
                                             <i class="fa fa-refresh"/>
                                         </a>
+                                        <a class="btn btn-default" groups="runbot.group_user" t-attf-href="/runbot/bundle/{{bundle.id}}/force/1" title="Force A New Batch with automatic rebase">
+                                            <i class="fa fa-fast-forward"/>
+                                        </a>
                                         <t t-call="runbot.branch_copy_button"/>
                                     </div>
                                 </span>
