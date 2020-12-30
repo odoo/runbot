@@ -427,12 +427,20 @@ class Repo(models.Model):
                 # Not perfect, il some case a pr can be closed but still visible in repo.
                 # The head wont change but on creation the branch will be set alive even if git into said pr is closed
                 # It is still better to have false open than false closed
-
-                if branch.reference_name and branch.remote_id and branch.remote_id.repo_id._is_branch_forbidden(branch.reference_name ):
-                    message = "This branch name is incorrect. Branch name should be prefixed with a valid version"
-                    message = branch.remote_id.repo_id.invalid_branch_message or message
-                    branch.head._github_status(False, "Branch naming", 'failure', False, message)
-
+                try:
+                    if branch.reference_name and branch.remote_id and branch.remote_id.repo_id._is_branch_forbidden(branch.reference_name ):
+                        message = "This branch name is incorrect. Branch name should be prefixed with a valid version"
+                        message = branch.remote_id.repo_id.invalid_branch_message or message
+                        branch.head._github_status(False, "Branch naming", 'failure', False, message)
+                except requests.HTTPError as exc:
+                    _logger.warning('Error fetching information from Github: %s', exc)
+                    # if we start getting 403, this likely means we are hitting
+                    # a limit on Github -> stop hammering the service
+                    if exc.response.status_code == 403:
+                        break
+                    # otherwise, we don't have the information we need, it
+                    # makes no sense to go on on this ref
+                    continue
                 if not self.trigger_ids:
                     continue
 
