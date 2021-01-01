@@ -768,18 +768,23 @@ class BuildResult(models.Model):
         return exports
 
     def _get_available_modules(self):
+        all_modules = dict()
         available_modules = defaultdict(list)
         # repo_modules = []
         for commit in self.env.context.get('defined_commit_ids') or self.params_id.commit_ids:
             for (addons_path, module, manifest_file_name) in commit._get_available_modules():
-                if module in available_modules:
+                if module in all_modules:
                     self._log(
                         'Building environment',
-                        '%s is a duplicated modules (found in "%s")' % (module, commit._source_path(addons_path, module, manifest_file_name)),
+                        '%s is a duplicated modules (found in "%s", already defined in %s)' % (
+                            module,
+                            commit._source_path(addons_path, module, manifest_file_name),
+                            all_modules[module]._source_path(addons_path, module, manifest_file_name)),
                         level='WARNING'
                     )
                 else:
                     available_modules[commit.repo_id].append(module)
+                    all_modules[module] = commit
         # return repo_modules, available_modules
         return available_modules
 
