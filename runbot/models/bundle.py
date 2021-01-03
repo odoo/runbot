@@ -1,6 +1,7 @@
 import time
 import logging
 import datetime
+import re
 import subprocess
 
 from collections import defaultdict
@@ -93,6 +94,13 @@ class Bundle(models.Model):
                 continue
             project_id = bundle.project_id.id
             master_base = False
+            bundle_name = bundle.name
+            if ':' in bundle_name:
+                bundle_name = bundle_name.split(':', 1)[1]
+            if re.match(r'^\d\d[-_]', bundle_name):
+                bundle_name = bundle_name[:2] + '.0-' + bundle_name[4:]
+            elif re.match(r'^\d\d\.\d_', bundle_name):
+                bundle_name = bundle_name[:4] + '-' + bundle_name[6:]
             for bid, bname in self._get_base_ids(project_id):
                 if bundle.name.startswith('%s-' % bname):
                     bundle.base_id = self.browse(bid)
@@ -101,6 +109,14 @@ class Bundle(models.Model):
                     master_base = self.browse(bid)
             else:
                 bundle.base_id = master_base
+            # if we cannot guess from the branch name, then look for the target branch
+            _logger.warning('Could not guess the branch_id of bundle %s. Checking the target branch', bundle.name)
+            if not bundle.base_id:
+                for branch in bundle.branch_ids:
+                    for bid, bname in self._get_base_ids(project_id):
+                        if branch.target_branch_name == bname:
+                            bundle.base_id = bid
+                            break
 
     @tools.ormcache('project_id')
     def _get_base_ids(self, project_id):
