@@ -869,7 +869,7 @@ stderr:
         logger = _logger.getChild('cherrypick').getChild(str(self.number))
 
         # original head so we can reset
-        original_head = working_copy.stdout().rev_parse('HEAD').stdout.decode().strip()
+        prev = original_head = working_copy.stdout().rev_parse('HEAD').stdout.decode().strip()
 
         commits = self.commits()
         logger.info("%s: %s commits in %s", self, len(commits), original_head)
@@ -892,12 +892,12 @@ stderr:
             conf = configured.with_config(stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
             # first try with default / low renamelimit
             r = conf.cherry_pick(commit_sha)
-            _logger.debug("Cherry-picked %s: %s\n%s\n%s", commit_sha, r.returncode, r.stdout.decode(), r.stderr.decode())
+            _logger.debug("Cherry-picked %s: %s\n%s\n%s", commit_sha, r.returncode, r.stdout.decode(), _clean_rename(r.stderr.decode()))
             if r.returncode:
                 # if it failed, retry with high renamelimit
-                configured.reset('--hard', original_head)
+                configured.reset('--hard', prev)
                 r = conf.with_params('merge.renamelimit=0').cherry_pick(commit_sha)
-                _logger.debug("Cherry-picked %s (renamelimit=0): %s\n%s\n%s", commit_sha, r.returncode, r.stdout.decode(), r.stderr.decode())
+                _logger.debug("Cherry-picked %s (renamelimit=0): %s\n%s\n%s", commit_sha, r.returncode, r.stdout.decode(), _clean_rename(r.stderr.decode()))
 
             if r.returncode: # pick failed, reset and bail
                 logger.info("%s: failed", commit_sha)
@@ -905,13 +905,7 @@ stderr:
                 raise CherrypickError(
                     commit_sha,
                     r.stdout.decode(),
-                    # Don't include the inexact rename detection spam in the
-                    # feedback, it's useless. There seems to be no way to
-                    # silence these messages.
-                    '\n'.join(
-                        line for line in r.stderr.decode().splitlines()
-                        if not line.startswith('Performing inexact rename detection')
-                    )
+                    _clean_rename(r.stderr.decode())
                 )
 
             msg = self._make_fp_message(commit)
@@ -920,8 +914,8 @@ stderr:
             configured \
                 .with_config(input=str(msg).encode())\
                 .commit(amend=True, file='-')
-            new = configured.stdout().rev_parse('HEAD').stdout.decode()
-            logger.info('%s: success -> %s', commit_sha, new)
+            prev = configured.stdout().rev_parse('HEAD').stdout.decode()
+            logger.info('%s: success -> %s', commit_sha, prev)
 
     def _build_merge_message(self, message, related_prs=()):
         msg = super()._build_merge_message(message, related_prs=related_prs)
@@ -1107,3 +1101,12 @@ class GitCommand:
 
 class CherrypickError(Exception):
     ...
+
+def _clean_rename(s):
+    """ Filters out the "inexact rename detection" spam of cherry-pick: it's
+    useless but there seems to be no good way to silence these messages.
+    """
+    return '\n'.join(
+        l for l in s.splitlines()
+        if not l.startswith('Performing inexact rename detection')
+    )
