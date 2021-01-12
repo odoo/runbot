@@ -841,10 +841,12 @@ class PullRequests(models.Model):
                 yield name, flag == '+'
             elif name == 'delegate':
                 if param:
-                    yield ('delegate', [
-                        p.lstrip('#@')
-                        for p in param.split(',')
-                    ])
+                    for p in param.split(','):
+                        yield 'delegate', p.lstrip('#@')
+            elif name == 'override':
+                if param:
+                    for p in param.split(','):
+                        yield 'override', p
             elif name in ('p', 'priority'):
                 if param in ('0', '1', '2'):
                     yield ('priority', int(param))
@@ -879,11 +881,11 @@ class PullRequests(models.Model):
 
         is_admin, is_reviewer, is_author = self._pr_acl(author)
 
-        commands = dict(
+        commands = [
             ps
             for m in self.repository.project_id._find_commands(comment['body'] or '')
             for ps in self._parse_command(m)
-        )
+        ]
 
         if not commands:
             _logger.info("found no commands in comment of %s (%s) (%s)", author.github_login, author.display_name,
@@ -892,7 +894,7 @@ class PullRequests(models.Model):
             return 'ok'
 
         Feedback = self.env['runbot_merge.pull_requests.feedback']
-        if not (is_author or 'override' in commands):
+        if not (is_author or any(cmd == 'override' for cmd, _ in commands)):
             # no point even parsing commands
             _logger.info("ignoring comment of %s (%s): no ACL to %s",
                           login, name, self.display_name)
@@ -916,7 +918,7 @@ class PullRequests(models.Model):
 
             return '%s%s' % (command, pstr)
         msgs = []
-        for command, param in commands.items():
+        for command, param in commands:
             ok = False
             msg = []
             if command == 'retry':
@@ -975,16 +977,15 @@ class PullRequests(models.Model):
             elif command == 'delegate':
                 if is_reviewer:
                     ok = True
-                    Partners = delegates = self.env['res.partner']
+                    Partners = self.env['res.partner']
                     if param is True:
-                        delegates |= self.author
+                        delegate = self.author
                     else:
-                        for login in param:
-                            delegates |= Partners.search([('github_login', '=', login)]) or Partners.create({
-                                'name': login,
-                                'github_login': login,
-                            })
-                    delegates.write({'delegate_reviewer': [(4, self.id, 0)]})
+                        delegate = Partners.search([('github_login', '=', param)]) or Partners.create({
+                            'name': param,
+                            'github_login': param,
+                        })
+                    delegate.write({'delegate_reviewer': [(4, self.id, 0)]})
             elif command == 'priority':
                 if is_admin:
                     ok = True

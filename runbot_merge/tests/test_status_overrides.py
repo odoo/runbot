@@ -99,6 +99,71 @@ def test_basic(env, project, make_repo, users, setreviewers, config):
         'description': 'Overridden by @{}'.format(users['other']),
     }}
 
+def test_multiple(env, project, make_repo, users, setreviewers, config):
+    """ Test that overriding multiple statuses in the same comment works
+    """
+
+    repo = make_repo('repo')
+    repo_id = env['runbot_merge.repository'].create({
+        'project_id': project.id,
+        'name': repo.name,
+        'status_ids': [(0, 0, {'context': 'l/int'}), (0, 0, {'context': 'c/i'})]
+    })
+    setreviewers(*project.repo_ids)
+    # "other" can override the lints
+    env['res.partner'].create({
+        'name': config['role_other'].get('name', 'Other'),
+        'github_login': users['other'],
+        'override_rights': [(0, 0, {
+            'repository_id': repo_id.id,
+            'context': 'l/int',
+        }), (0, 0, {
+            'repository_id': repo_id.id,
+            'context': 'c/i',
+        })]
+    })
+
+    with repo:
+        root = repo.make_commits(None, Commit('root', tree={'a': '0'}), ref='heads/master')
+    for i, comment in enumerate([
+        # style 1: multiple commands inline
+        'hansen override=l/int override=c/i',
+        # style 2: multiple parameters to command
+        'hansen override=l/int,c/i',
+        # style 3: multiple commands each on its own line
+        'hansen override=l/int\nhansen override=c/i',
+    ], start=1):
+        with repo:
+            repo.make_commits(root, Commit(f'pr{i}', tree={'a': f'{i}'}), ref=f'heads/change{i}')
+            pr = repo.make_pr(target='master', title=f'super change {i}', head=f'change{i}')
+        env.run_crons()
+
+        pr_id = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', repo.name),
+            ('number', '=', pr.number)
+        ])
+        assert pr_id.state == 'opened'
+
+        with repo:
+            pr.post_comment(comment, config['role_other']['token'])
+        env.run_crons()
+        assert pr_id.state == 'validated'
+
+        comments = pr.comments
+        assert pr_id.statuses == '{}'
+        assert json.loads(pr_id.overrides) == {
+            'l/int': {
+                'state': 'success',
+                'target_url': comments[-1]['html_url'],
+                'description': 'Overridden by @{}'.format(users['other']),
+            },
+            'c/i': {
+                'state': 'success',
+                'target_url': comments[-1]['html_url'],
+                'description': 'Overridden by @{}'.format(users['other']),
+            },
+        }
+
 def test_no_repository(env, project, make_repo, users, setreviewers, config):
     """ A repo missing from an override allows overriding the status in every repo
     """
