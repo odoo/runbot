@@ -99,6 +99,9 @@ class Project(models.Model):
             bafter = p._forward_port_ordered()
             if bafter.ids == bbefore.ids:
                 continue
+
+            logger = _logger.getChild('project').getChild(p.name)
+            logger.debug("branches updated %s -> %s", bbefore, bafter)
             # if it's just that a branch was inserted at the end forwardport
             # should keep on keeping normally
             if bafter.ids[:-1] == bbefore.ids:
@@ -120,6 +123,7 @@ class Project(models.Model):
                     if new:
                         raise UserError("Inserting multiple branches at the same time is not supported")
                     new = b
+            logger.debug('before: %s new: %s after: %s', before.ids, new.ids, after.ids)
             # find all FPs whose ancestry spans the insertion
             leaves = self.env['runbot_merge.pull_requests'].search([
                 ('state', 'not in', ['closed', 'merged']),
@@ -133,6 +137,7 @@ class Project(models.Model):
                 '|', ('id', 'in', leaves.mapped('source_id').ids),
                      ('source_id', 'in', leaves.mapped('source_id').ids),
             ])
+            logger.debug("\nPRs spanning new: %s\nto port: %s", leaves, candidates)
             # enqueue the creation of a new forward-port based on our candidates
             # but it should only create a single step and needs to stitch batch
             # the parents linked list, so it has a special type
