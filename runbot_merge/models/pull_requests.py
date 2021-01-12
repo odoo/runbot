@@ -2041,17 +2041,60 @@ def parse_refs_smart(read):
         m = refline.match(line)
         yield m[1].decode(), m[2].decode()
 
+BREAK = re.compile(r'''
+    ^
+    [ ]{0,3} # 0-3 spaces of indentation
+    # followed by a sequence of three or more matching -, _, or * characters,
+    # each followed optionally by any number of spaces or tabs
+    # so needs to start with a _, - or *, then have at least 2 more such
+    # interspersed with any number of spaces or tabs
+    ([*_-])
+    ([ \t]*\1){2,}
+    [ \t]*
+    $
+''', flags=re.VERBOSE)
+SETEX_UNDERLINE = re.compile(r'''
+    ^
+    [ ]{0,3} # no more than 3 spaces indentation
+    [-=]+ # a sequence of = characters or a sequence of - characters
+    [ ]* # any number of trailing spaces
+    $
+    # we don't care about "a line containing a single -" because we want to
+    # disambiguate SETEX headings from thematic breaks, and thematic breaks have
+    # 3+ -. Doesn't look like GH interprets `- - -` as a line so yay...
+''', flags=re.VERBOSE)
 HEADER = re.compile('^([A-Za-z-]+): (.*)$')
 class Message:
     @classmethod
     def from_message(cls, msg):
         in_headers = True
+        maybe_setex = None
         headers = []
         body = []
         for line in reversed(msg.splitlines()):
+            if maybe_setex:
+                # NOTE: actually slightly more complicated: it's a SETEX heading
+                #       only if preceding line(s) can be interpreted as a
+                #       paragraph so e.g. a title followed by a line of dashes
+                #       would indeed be a break, but this should be good enough
+                #       for now, if we need more we'll need a full-blown
+                #       markdown parser probably
+                if line: # actually a SETEX title -> add underline to body then process current
+                    body.append(maybe_setex)
+                else: # actually break, remove body then process current
+                    body = []
+                maybe_setex = None
+
             if not line:
                 if not in_headers and body and body[-1]:
                     body.append(line)
+                continue
+
+            if BREAK.match(line):
+                if SETEX_UNDERLINE.match(line):
+                    maybe_setex = line
+                else:
+                    body = []
                 continue
 
             h = HEADER.match(line)

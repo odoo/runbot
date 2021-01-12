@@ -2,6 +2,7 @@ import datetime
 import itertools
 import json
 import re
+import textwrap
 from unittest import mock
 
 import pytest
@@ -1631,6 +1632,89 @@ class TestMergeMethod:
         expected = node('gibberish\n\ncloses {}#{}'
                         '\n\nSigned-off-by: {}'.format(repo.name, prx.number, reviewer), m, c0)
         assert log_to_node(repo.log('heads/master')), expected
+
+    @pytest.mark.parametrize('separator', [
+        '***', '___', '\n---',
+        '*'*12, '\n----------------',
+        '- - -', '  **     **     **'
+    ])
+    def test_pr_message_break(self, repo, env, users, config, separator):
+        """ If the PR message contains a "thematic break", only the part before
+        should be included in the merge commit's message.
+        """
+        reviewer = get_partner(env, users["reviewer"]).formatted_email
+        with repo:
+            root = repo.make_commits(None, Commit("root", tree={'a': 'a'}), ref='heads/master')
+
+            repo.make_commits(root, Commit('C', tree={'a': 'b'}), ref=f'heads/change')
+            pr = repo.make_pr(title="title", body=f'first\n{separator}\nsecond',
+                              target='master', head=f'change')
+            repo.post_status(pr.head, 'success', 'legal/cla')
+            repo.post_status(pr.head, 'success', 'ci/runbot')
+            pr.post_comment('hansen r+ merge', config['role_reviewer']['token'])
+        env.run_crons()
+
+        with repo:
+            repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+            repo.post_status('heads/staging.master', 'success', 'legal/cla')
+        env.run_crons()
+
+        head = repo.commit('heads/master')
+        assert head.message == textwrap.dedent(f"""\
+        title
+
+        first
+
+        closes {repo.name}#{pr.number}
+
+        Signed-off-by: {reviewer}
+        """).strip(), "should not contain the content which follows the thematic break"
+
+    def test_pr_message_setex_title(self, repo, env, users, config):
+        """ should not break on a proper SETEX-style title """
+        reviewer = get_partner(env, users["reviewer"]).formatted_email
+        with repo:
+            root = repo.make_commits(None, Commit("root", tree={'a': 'a'}), ref='heads/master')
+
+            repo.make_commits(root, Commit('C', tree={'a': 'b'}), ref=f'heads/change')
+            pr = repo.make_pr(title="title", body="""\
+Title
+---
+This is some text
+
+Title 2
+-------
+This is more text
+***
+removed
+""",
+                              target='master', head=f'change')
+            repo.post_status(pr.head, 'success', 'legal/cla')
+            repo.post_status(pr.head, 'success', 'ci/runbot')
+            pr.post_comment('hansen r+ merge', config['role_reviewer']['token'])
+        env.run_crons()
+
+        with repo:
+            repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+            repo.post_status('heads/staging.master', 'success', 'legal/cla')
+        env.run_crons()
+
+        head = repo.commit('heads/master')
+        assert head.message == textwrap.dedent(f"""\
+        title
+
+        Title
+        ---
+        This is some text
+
+        Title 2
+        -------
+        This is more text
+
+        closes {repo.name}#{pr.number}
+
+        Signed-off-by: {reviewer}
+        """).strip(), "should not break the SETEX titles"
 
     def test_pr_mergehead(self, repo, env, config):
         """ if the head of the PR is a merge commit and one of the parents is
