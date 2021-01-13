@@ -513,6 +513,16 @@ class PullRequests(models.Model):
             else:
                 break
 
+    @api.depends('parent_id.statuses')
+    def _compute_statuses(self):
+        super()._compute_statuses()
+
+    def _get_overrides(self):
+        # NB: assumes _get_overrides always returns an "owned" dict which we can modify
+        p = self.parent_id._get_overrides() if self.parent_id else {}
+        p.update(super()._get_overrides())
+        return p
+
     def _iter_ancestors(self):
         while self:
             yield self

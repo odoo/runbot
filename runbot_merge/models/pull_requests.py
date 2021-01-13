@@ -673,7 +673,14 @@ class PullRequests(models.Model):
     priority = fields.Integer(default=2, index=True)
 
     overrides = fields.Char(required=True, default='{}')
-    statuses = fields.Text(compute='_compute_statuses')
+    statuses = fields.Text(
+        compute='_compute_statuses',
+        help="Copy of the statuses from the HEAD commit, as a Python literal"
+    )
+    statuses_full = fields.Text(
+        compute='_compute_statuses',
+        help="Compilation of the full status of the PR (commit statuses + overrides), as JSON"
+    )
     status = fields.Char(compute='_compute_statuses')
     previous_failure = fields.Char(default='{}')
 
@@ -773,13 +780,19 @@ class PullRequests(models.Model):
                 pr.blocked = 'linked pr %s is not ready' % unready.display_name
                 continue
 
-    @api.depends('head', 'repository.status_ids')
+    def _get_overrides(self):
+        if self:
+            return json.loads(self.overrides)
+        return {}
+
+    @api.depends('head', 'repository.status_ids', 'overrides')
     def _compute_statuses(self):
         Commits = self.env['runbot_merge.commit']
         for pr in self:
             c = Commits.search([('sha', '=', pr.head)])
             st = json.loads(c.statuses or '{}')
-            statuses = {**st, **json.loads(pr.overrides)}
+            statuses = {**st, **pr._get_overrides()}
+            pr.statuses_full = json.dumps(statuses)
             if not statuses:
                 pr.status = pr.statuses = False
                 continue
@@ -1079,19 +1092,14 @@ class PullRequests(models.Model):
         failed = self.browse(())
         for pr in self:
             required = pr.repository.status_ids._for_pr(pr).mapped('context')
-            sts = {**statuses, **json.loads(pr.overrides)}
+            sts = {**statuses, **pr._get_overrides()}
 
-            a, r = [], []
             success = True
             for ci in required:
                 st = state_(sts, ci) or 'pending'
                 if st == 'success':
-                    r.append(f'\N{Ballot Box} {ci}')
-                    a.append(f'\N{Ballot Box with Check} {ci}')
                     continue
 
-                a.append(f'\N{Ballot Box} {ci}')
-                r.append(f'\N{Ballot Box with Check} {ci}')
                 success = False
                 if st in ('error', 'failure'):
                     failed |= pr
@@ -1192,8 +1200,6 @@ class PullRequests(models.Model):
         })
 
     def write(self, vals):
-        oldstate = { pr: pr._tagstate for pr in self }
-
         if vals.get('squash'):
             vals['merge_method'] = False
 
@@ -1472,7 +1478,6 @@ class Tagging(models.Model):
     tags_add = fields.Char(required=True, default='[]')
 
     def create(self, values):
-        before = str(values)
         if values.pop('state_from', None):
             values['tags_remove'] = ALL_TAGS
         if 'state_to' in values:

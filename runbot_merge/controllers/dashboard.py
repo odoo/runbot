@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import ast
 import json
 
 import werkzeug.exceptions
@@ -43,7 +42,7 @@ class MergebotDashboard(Controller):
             # normalise `statuses` to map to a dict
             st = {
                 k: {'state': v} if isinstance(v, str) else v
-                for k, v in ast.literal_eval(pr_id.statuses).items()
+                for k, v in json.loads(pr_id.statuses_full).items()
             }
         return request.render('runbot_merge.view_pull_request', {
             'pr': pr_id,

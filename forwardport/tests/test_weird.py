@@ -173,7 +173,6 @@ def test_failed_staging(env, config, make_repo):
     env.run_crons()
 
     pr1_id, pr2_id, pr3_id = env['runbot_merge.pull_requests'].search([], order='number')
-    pr2 = prod.get_pr(pr2_id.number)
     pr3 = prod.get_pr(pr3_id.number)
     with prod:
         prod.post_status(pr3_id.head, 'success', 'legal/cla')

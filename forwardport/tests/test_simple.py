@@ -1220,7 +1220,7 @@ class TestBranchDeletion:
             prod.post_status(c, 'success', 'ci/runbot')
             pr1.post_comment('hansen r+', config['role_reviewer']['token'])
 
-            [c] = other.make_commits('a', Commit('c2', tree={'2': '0'}), ref='heads/bbranch')
+            other.make_commits('a', Commit('c2', tree={'2': '0'}), ref='heads/bbranch')
             pr2 = prod.make_pr(target='a', head='%s:bbranch' % other.owner, title='b')
             pr2.close()
 

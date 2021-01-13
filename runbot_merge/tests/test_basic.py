@@ -659,7 +659,7 @@ def test_ff_failure_batch(env, repo, users, config):
 
     # block FF
     with repo:
-        m2 = repo.make_commit('heads/master', 'NO!', None, tree={'m': 'm2'})
+        repo.make_commit('heads/master', 'NO!', None, tree={'m': 'm2'})
 
     old_staging = repo.commit('heads/staging.master')
     # confirm staging
@@ -801,11 +801,6 @@ class TestPREdition:
         with repo:
             prx.base = 'master'
 
-@pytest.mark.skip(reason="What do?")
-def test_edit_staged(env, repo):
-    """
-    What should happen when editing the PR/metadata (not pushing) of a staged PR
-    """
 def test_close_staged(env, repo, config, page):
     """
     When closing a staged PR, cancel the staging
@@ -915,7 +910,7 @@ def test_rebase_failure(env, repo, users, config):
         return original(*args)
 
     env['runbot_merge.commit']._notify()
-    with mock.patch.object(GH, 'set_ref', autospec=True, side_effect=wrapper) as m:
+    with mock.patch.object(GH, 'set_ref', autospec=True, side_effect=wrapper):
         env['runbot_merge.project']._check_progress()
 
     env['runbot_merge.project']._send_feedback()
