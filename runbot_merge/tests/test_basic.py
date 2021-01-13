@@ -940,17 +940,24 @@ def test_ci_failure_after_review(env, repo, users, config):
         prx.post_comment('hansen r+', config['role_reviewer']['token'])
     env.run_crons()
 
-    with repo:
-        repo.post_status(prx.head, 'failure', 'ci/runbot', target_url="https://a")
-        repo.post_status(prx.head, 'failure', 'legal/cla', target_url="https://b")
-        repo.post_status(prx.head, 'failure', 'foo/bar', target_url="https://c")
-    env.run_crons()
+    for ctx, url in [
+        ('ci/runbot', 'https://a'),
+        ('ci/runbot', 'https://a'),
+        ('legal/cla', 'https://b'),
+        ('foo/bar', 'https://c'),
+        ('ci/runbot', 'https://a'),
+        ('legal/cla', 'https://d'), # url changes so different from the previous
+    ]:
+        with repo:
+            repo.post_status(prx.head, 'failure', ctx, target_url=url)
+        env.run_crons()
 
     assert prx.comments == [
         (users['reviewer'], 'hansen r+'),
         seen(env, prx, users),
-        (users['user'], "'legal/cla' failed on this reviewed PR.".format_map(users)),
         (users['user'], "'ci/runbot' failed on this reviewed PR.".format_map(users)),
+        (users['user'], "'legal/cla' failed on this reviewed PR.".format_map(users)),
+        (users['user'], "'legal/cla' failed on this reviewed PR.".format_map(users)),
     ]
 
 def test_reopen_merged_pr(env, repo, config, users):

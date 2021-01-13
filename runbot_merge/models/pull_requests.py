@@ -1113,11 +1113,12 @@ class PullRequests(models.Model):
         return failed
 
     def _notify_ci_new_failure(self, ci, st):
-        # only sending notification if the newly failed status is different than
-        # the old one
         prev = json.loads(self.previous_failure)
-        if not self._statuses_equivalent(st, prev):
-            self.previous_failure = json.dumps(st)
+        if prev.get('state'): # old-style previous-failure
+            prev = {ci: prev}
+        if not any(self._statuses_equivalent(st, v) for v in prev.values()):
+            prev[ci] = st
+            self.previous_failure = json.dumps(prev)
             self._notify_ci_failed(ci)
 
     def _statuses_equivalent(self, a, b):
