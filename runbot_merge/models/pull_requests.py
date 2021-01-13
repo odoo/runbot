@@ -1670,6 +1670,7 @@ class Stagings(models.Model):
             vals = {'state': st}
             if update_timeout_limit:
                 vals['timeout_limit'] = fields.Datetime.to_string(datetime.datetime.now() + datetime.timedelta(minutes=s.target.project_id.ci_timeout))
+                _logger.debug("staging %s: got pending status, bumping timeout to %s (%s)", vals['timeout_limit'], cmap)
             s.write(vals)
 
     def action_cancel(self):
