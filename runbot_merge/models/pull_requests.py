@@ -1691,7 +1691,7 @@ class Stagings(models.Model):
         })
 
     def fail(self, message, prs=None):
-        _logger.error("Staging %s failed: %s", self, message)
+        _logger.info("Staging %s failed: %s", self, message)
         prs = prs or self.batch_ids.prs
         prs.write({'state': 'error'})
         for pr in prs:

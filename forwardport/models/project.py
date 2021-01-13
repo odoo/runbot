@@ -74,7 +74,7 @@ class Project(models.Model):
                 'Authorization': 'token %s' % project.fp_github_token
             })
             if not (r0.ok and r1.ok):
-                _logger.warning("Failed to fetch bot information for project %s: %s", project.name, (r0.text or r0.content) if not r0.ok else (r1.text or r1.content))
+                _logger.error("Failed to fetch bot information for project %s: %s", project.name, (r0.text or r0.content) if not r0.ok else (r1.text or r1.content))
                 continue
             project.fp_github_name = r0.json()['login']
             project.fp_github_email = next((
@@ -587,7 +587,7 @@ class PullRequests(models.Model):
 
         notarget = [p.repository.name for p in self if not p.repository.fp_remote_target]
         if notarget:
-            _logger.warning(
+            _logger.error(
                 "Can not forward-port %s: repos %s don't have a remote configured",
                 self, ', '.join(notarget)
             )

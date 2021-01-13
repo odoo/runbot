@@ -160,7 +160,7 @@ def handle_pr(env, event):
 
     pr_obj = env['runbot_merge.pull_requests']._get_or_schedule(r, pr['number'])
     if not pr_obj:
-        _logger.warning("webhook %s on unknown PR %s#%s, scheduled fetch", event['action'], repo.name, pr['number'])
+        _logger.info("webhook %s on unknown PR %s#%s, scheduled fetch", event['action'], repo.name, pr['number'])
         return "Unknown PR {}:{}, scheduling fetch".format(repo.name, pr['number'])
     if event['action'] == 'synchronize':
         if pr_obj.head == pr['head']['sha']:
