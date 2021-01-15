@@ -854,7 +854,9 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
             # switch back to the PR branch
             conf.checkout(fp_branch_name)
             # cherry-pick the squashed commit to generate the conflict
-            conf.with_params('merge.renamelimit=0').with_config(check=False).cherry_pick(squashed)
+            conf.with_params('merge.renamelimit=0')\
+                .with_config(check=False)\
+                .cherry_pick(squashed, no_commit=True)
 
             # if there was a single commit, reuse its message when committing
             # the conflict
@@ -887,9 +889,10 @@ stderr:
         prev = original_head = working_copy.stdout().rev_parse('HEAD').stdout.decode().strip()
 
         commits = self.commits()
-        logger.info("%s: %s commits in %s", self, len(commits), original_head)
-        for c in commits:
-            logger.debug('- %s (%s)', c['sha'], c['commit']['message'])
+        logger.info("%s: copy %s commits to %s\n%s", self, len(commits), original_head, '\n'.join(
+            '- %s (%s)' % (c['sha'], c['commit']['message'].splitlines()[0])
+            for c in commits
+        ))
 
         for commit in commits:
             commit_sha = commit['sha']
@@ -907,15 +910,20 @@ stderr:
             conf = configured.with_config(stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
             # first try with default / low renamelimit
             r = conf.cherry_pick(commit_sha)
-            _logger.debug("Cherry-picked %s: %s\n%s\n%s", commit_sha, r.returncode, r.stdout.decode(), _clean_rename(r.stderr.decode()))
+            logger.debug("Cherry-picked %s: %s\n%s\n%s", commit_sha, r.returncode, r.stdout.decode(), _clean_rename(r.stderr.decode()))
             if r.returncode:
                 # if it failed, retry with high renamelimit
                 configured.reset('--hard', prev)
                 r = conf.with_params('merge.renamelimit=0').cherry_pick(commit_sha)
-                _logger.debug("Cherry-picked %s (renamelimit=0): %s\n%s\n%s", commit_sha, r.returncode, r.stdout.decode(), _clean_rename(r.stderr.decode()))
+                logger.debug("Cherry-picked %s (renamelimit=0): %s\n%s\n%s", commit_sha, r.returncode, r.stdout.decode(), _clean_rename(r.stderr.decode()))
 
             if r.returncode: # pick failed, reset and bail
-                logger.info("%s: failed", commit_sha)
+                # try to log inflateInit: out of memory errors as warning, they
+                # seem to return the status code 128
+                logger.log(
+                    logging.WARNING if r.returncode == 128 else logging.INFO,
+                    "forward-port of %s (%s) failed at %s",
+                    self, self.display_name, commit_sha)
                 configured.reset('--hard', original_head)
                 raise CherrypickError(
                     commit_sha,
