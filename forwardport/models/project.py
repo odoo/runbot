@@ -899,15 +899,20 @@ stderr:
             # config (global -c) or commit options don't really give access to
             # setting dates
             cm = commit['commit'] # get the "git" commit object rather than the "github" commit resource
-            configured = working_copy.with_config(env={
+            env = {
                 'GIT_AUTHOR_NAME': cm['author']['name'],
                 'GIT_AUTHOR_EMAIL': cm['author']['email'],
                 'GIT_AUTHOR_DATE': cm['author']['date'],
                 'GIT_COMMITTER_NAME': cm['committer']['name'],
                 'GIT_COMMITTER_EMAIL': cm['committer']['email'],
-            })
+            }
+            configured = working_copy.with_config(env=env)
 
-            conf = configured.with_config(stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+            conf = working_copy.with_config(
+                env={**env, 'GIT_TRACE': 'true'},
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                check=False
+            )
             # first try with default / low renamelimit
             r = conf.cherry_pick(commit_sha)
             logger.debug("Cherry-picked %s: %s\n%s\n%s", commit_sha, r.returncode, r.stdout.decode(), _clean_rename(r.stderr.decode()))
