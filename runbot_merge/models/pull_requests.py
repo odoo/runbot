@@ -1539,9 +1539,14 @@ class Commit(models.Model):
                 pr = PRs.search([('head', '=', c.sha)])
                 if pr:
                     pr._validate(st)
-                # heads is a json-encoded mapping of reponame:head, so chances
-                # are if a sha matches a heads it's matching one of the shas
-                stagings = Stagings.search([('heads', 'ilike', c.sha)])
+
+                stagings = Stagings.search([('heads', 'ilike', c.sha)]).filtered(
+                    lambda s, h=c.sha: any(
+                        head == h
+                        for repo, head in json.loads(s.heads).items()
+                        if not repo.endswith('^')
+                    )
+                )
                 if stagings:
                     stagings._validate()
             except Exception:
@@ -1670,7 +1675,7 @@ class Stagings(models.Model):
             vals = {'state': st}
             if update_timeout_limit:
                 vals['timeout_limit'] = fields.Datetime.to_string(datetime.datetime.now() + datetime.timedelta(minutes=s.target.project_id.ci_timeout))
-                _logger.debug("staging %s: got pending status, bumping timeout to %s (%s)", vals['timeout_limit'], cmap)
+                _logger.debug("%s got pending status, bumping timeout to %s (%s)", self, vals['timeout_limit'], cmap)
             s.write(vals)
 
     def action_cancel(self):
