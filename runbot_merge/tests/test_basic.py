@@ -1718,6 +1718,39 @@ removed
         Signed-off-by: {reviewer}
         """).strip(), "should not break the SETEX titles"
 
+    def test_rebase_no_edit(self, repo, env, users, config):
+        """ Only the merge messages should be de-breaked
+        """
+        reviewer = get_partner(env, users["reviewer"]).formatted_email
+        with repo:
+            root = repo.make_commits(None, Commit("root", tree={'a': 'a'}), ref='heads/master')
+
+            repo.make_commits(root, Commit('Commit\n\nfirst\n***\nsecond', tree={'a': 'b'}), ref=f'heads/change')
+            pr = repo.make_pr(title="PR", body=f'first\n***\nsecond',
+                              target='master', head=f'change')
+            repo.post_status(pr.head, 'success', 'legal/cla')
+            repo.post_status(pr.head, 'success', 'ci/runbot')
+            pr.post_comment('hansen r+', config['role_reviewer']['token'])
+        env.run_crons()
+
+        with repo:
+            repo.post_status('heads/staging.master', 'success', 'ci/runbot')
+            repo.post_status('heads/staging.master', 'success', 'legal/cla')
+        env.run_crons()
+
+        head = repo.commit('heads/master')
+        assert head.message == textwrap.dedent(f"""\
+        Commit
+
+        first
+        ***
+        second
+
+        closes {repo.name}#{pr.number}
+
+        Signed-off-by: {reviewer}
+        """).strip(), "squashed / rebased messages should not be stripped"
+
     def test_pr_mergehead(self, repo, env, config):
         """ if the head of the PR is a merge commit and one of the parents is
         in the target, replicate the merge commit instead of merging

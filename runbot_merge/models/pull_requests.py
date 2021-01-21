@@ -1343,7 +1343,7 @@ class PullRequests(models.Model):
         return head
 
     def _stage_rebase_merge(self, gh, target, commits, related_prs=()):
-        msg = self._build_merge_message(self.message, related_prs=related_prs)
+        msg = self._build_merge_message(self, related_prs=related_prs)
         h, mapping = gh.rebase(self.number, target, reset=True, commits=commits)
         merge_head = gh.merge(h, target, str(msg))['sha']
         self.commits_map = json.dumps({**mapping, '': merge_head})
@@ -1384,7 +1384,7 @@ class PullRequests(models.Model):
             return copy['sha']
         else:
             # otherwise do a regular merge
-            msg = self._build_merge_message(self.message)
+            msg = self._build_merge_message(self)
             merge_head = gh.merge(self.head, target, str(msg))['sha']
             # and the merge commit is the normal merge head
             commits_map[''] = merge_head
@@ -2081,6 +2081,8 @@ class Message:
     def from_message(cls, msg):
         in_headers = True
         maybe_setex = None
+        # creating from PR message -> remove content following break
+        msg, handle_break = (msg, False) if isinstance(msg, str) else (msg.message, True)
         headers = []
         body = []
         for line in reversed(msg.splitlines()):
@@ -2102,7 +2104,7 @@ class Message:
                     body.append(line)
                 continue
 
-            if BREAK.match(line):
+            if handle_break and BREAK.match(line):
                 if SETEX_UNDERLINE.match(line):
                     maybe_setex = line
                 else:
