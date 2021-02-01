@@ -252,7 +252,7 @@ class Runbot(Controller):
         last_status = CommitStatus.search([('commit_id', '=', status.commit_id.id), ('context', '=', status.context)], order='id desc', limit=1)
         if status != last_status:
             raise Forbidden("Only the last status can be resent")
-        if last_status.sent_date and (datetime.datetime.now() - last_status.sent_date).seconds > 60:  # ensure at least 60sec between two resend
+        if not last_status.sent_date or (datetime.datetime.now() - last_status.sent_date).seconds > 60:  # ensure at least 60sec between two resend
             new_status = status.sudo().copy()
             new_status.description = 'Status resent by %s' % request.env.user.name
             new_status._send()
