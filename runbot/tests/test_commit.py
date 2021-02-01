@@ -48,10 +48,7 @@ class TestCommitStatus(HttpCase):
         self.assertEqual(parsed_response.path, '/web/login')
 
         # 2. test that a simple Odoo user cannot resend a status
-        self.authenticate('simple', 'simple')
-        with mute_logger('odoo.addons.http_routing.models.ir_http'):
-            response = self.url_open('/runbot/commit/resend/%s' % commit_status.id)
-        # TODO remove or fix since the 'runbot.group_user' has been given to the 'base.group_user'.
+        # removed since the 'runbot.group_user' has been given to the 'base.group_user'.
         # self.assertEqual(response.status_code, 403)
 
         # 3. test that a non-existsing commit_status returns a 404
@@ -64,7 +61,16 @@ class TestCommitStatus(HttpCase):
         response = self.url_open('/runbot/commit/resend/%s' % non_existing_id)
         self.assertEqual(response.status_code, 404)
 
-        # 4. Finally test that a new status is created on resend and that the _send method is called
+        #4.1 Test that a status not sent (with not sent_date) can be manually resend
+        with patch('odoo.addons.runbot.models.commit.CommitStatus._send') as send_patcher:
+            response = self.url_open('/runbot/commit/resend/%s' % commit_status.id)
+            self.assertEqual(response.status_code, 200)
+            send_patcher.assert_called()
+
+        commit_status = self.env['runbot.commit.status'].search([], order='id desc', limit=1)
+        self.assertEqual(commit_status.description, 'Status resent by runbot_admin')
+
+        # 4.2 Finally test that a new status is created on resend and that the _send method is called
         with patch('odoo.addons.runbot.models.commit.CommitStatus._send') as send_patcher:
             a_minute_ago = datetime.datetime.now() - datetime.timedelta(seconds=65)
             commit_status.sent_date = a_minute_ago
