@@ -9,6 +9,6 @@ _logger = logging.getLogger(__name__)
 class TestRunbot(RunbotCase):
 
     def test_warning_from_runbot_abstract(self):
-        warning_id = self.env['runbot.runbot'].warning('Test warning message')
+        warning = self.env['runbot.runbot'].warning('Test warning message')
 
-        self.assertTrue(self.env['runbot.warning'].browse(warning_id).exists())
+        self.assertTrue(self.env['runbot.warning'].browse(warning.id).exists())
