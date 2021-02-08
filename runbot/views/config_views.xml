@@ -68,6 +68,7 @@
                         <field name="db_name" groups="base.group_no_one"/>
                         <field name="cpu_limit" groups="base.group_no_one"/>
                         <field name="coverage"/>
+                        <field name="paths_to_omit" attrs="{'invisible': [('coverage', '!=', True)]}"/>
                         <field name="test_enable"/>
                         <field name="test_tags"/>
                         <field name="enable_auto_tags"/>

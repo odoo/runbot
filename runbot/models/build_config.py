@@ -127,6 +127,7 @@ class ConfigStep(models.Model):
     db_name = fields.Char('Db Name', compute='_compute_db_name', inverse='_inverse_db_name', tracking=True)
     cpu_limit = fields.Integer('Cpu limit', default=3600, tracking=True)
     coverage = fields.Boolean('Coverage', default=False, tracking=True)
+    paths_to_omit = fields.Char('Paths to omit from coverage', tracking=True)
     flamegraph = fields.Boolean('Allow Flamegraph', default=False, tracking=True)
     test_enable = fields.Boolean('Test enable', default=True, tracking=True)
     test_tags = fields.Char('Test tags', help="comma separated list of test tags", tracking=True)
@@ -832,6 +833,8 @@ class ConfigStep(models.Model):
 
     def _coverage_params(self, build, modules_to_install):
         pattern_to_omit = set()
+        if self.paths_to_omit:
+            pattern_to_omit = set(self.paths_to_omit.split(','))
         for commit in build.params_id.commit_ids:
             docker_source_folder = build._docker_source_folder(commit)
             for manifest_file in commit.repo_id.manifest_files.split(','):
