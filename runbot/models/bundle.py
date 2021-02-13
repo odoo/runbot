@@ -54,7 +54,7 @@ class Bundle(models.Model):
     def _compute_host_id(self):
         assigned_only = None
         runbots = {}
-        for bundle in self:
+        for bundle in self.filtered('name'):
             elems = bundle.name.split('-')
             for elem in elems:
                 if elem.startswith('runbot'):
