@@ -223,11 +223,11 @@
                     Force Build
                 </a>
                 <t t-if="bu.local_state=='running'">
-                    <a class="dropdown-item" t-attf-href="http://{{bu.domain}}/?db={{bu.dest}}-all">
+                    <a class="dropdown-item" t-attf-href="http://{{bu.dest}}-all.{{bu.host}}/">
                         <i class="fa fa-sign-in"/>
                         Connect all
                     </a>
-                    <a class="dropdown-item" t-attf-href="http://{{bu.domain}}/?db={{bu.dest}}-base">
+                    <a class="dropdown-item" t-attf-href="http://{{bu.dest}}-base.{{bu.host}}/">
                         <i class="fa fa-sign-in"/>
                         Connect base
                     </a>
