@@ -43,6 +43,7 @@ import base64
 import collections
 import configparser
 import copy
+import http.client
 import itertools
 import logging
 import os
@@ -493,7 +494,7 @@ class Repo:
         if re.match(r'[0-9a-f]{40}', ref):
             # just check that the commit exists
             r = self._session.get('https://api.github.com/repos/{}/git/commits/{}'.format(self.name, ref))
-            assert 200 <= r.status_code < 300, r.reason
+            assert 200 <= r.status_code < 300, r.reason or http.client.responses[r.status_code]
             return r.json()['sha']
 
         if ref.startswith('refs/'):
@@ -502,7 +503,7 @@ class Repo:
             ref = 'heads/' + ref
 
         r = self._session.get('https://api.github.com/repos/{}/git/ref/{}'.format(self.name, ref))
-        assert 200 <= r.status_code < 300, r.reason
+        assert 200 <= r.status_code < 300, r.reason or http.client.responses[r.status_code]
         res = r.json()
         assert res['object']['type'] == 'commit'
         return res['object']['sha']
