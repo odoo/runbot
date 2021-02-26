@@ -1123,7 +1123,11 @@ class Model:
         if not isinstance(other, Model) or self._model != other._model:
             return NotImplemented
 
-        return Model(self._env, self._model, {*self._ids, *other._ids}, fields=self._fields)
+        return Model(
+            self._env, self._model,
+            self._ids + tuple(id_ for id_ in other.ids if id_ not in self._ids),
+            fields=self._fields
+        )
     __add__ = __or__
 
     def __and__(self, other):
