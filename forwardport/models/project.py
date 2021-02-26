@@ -637,10 +637,19 @@ class PullRequests(models.Model):
                 body = None
 
             self.env.cr.execute('LOCK runbot_merge_pull_requests IN SHARE MODE')
-            r = gh.post('https://api.github.com/repos/{}/pulls'.format(pr.repository.name), json={
+            url = 'https://api.github.com/repos/{}/pulls'.format(pr.repository.name)
+            pr_data = {
                 'base': target.name, 'head': '%s:%s' % (owner, new_branch),
-                'title': title, 'body': body,
-            })
+                'title': title, 'body': body, 'draft': True
+            }
+            r = gh.post(url, json=pr_data)
+            if r.status_code == 422:
+                # assume this is a private repo which doesn't support draft PRs
+                # (github error response doesn't provide any machine
+                # information, only a human-readable message) so retry without
+                del pr_data['draft']
+                r = gh.post(url, json=pr_data)
+
             results = r.json()
             if not (200 <= r.status_code < 300):
                 _logger.warning("Failed to create forward-port PR for %s, deleting branches", pr.display_name)
