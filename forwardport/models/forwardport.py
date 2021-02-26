@@ -117,8 +117,16 @@ class UpdateQueue(models.Model, Queue):
                     child.target, child.refname, s)
 
                 new_head = working_copy.stdout().rev_parse(child.refname).stdout.decode().strip()
+                commits_count = int(working_copy.stdout().rev_list(
+                    f'{child.target.name}..{child.refname}',
+                    count=True
+                ).stdout.decode().strip())
                 # update child's head to the head we're going to push
-                child.with_context(ignore_head_update=True).head = new_head
+                child.with_context(ignore_head_update=True).write({
+                    'head': new_head,
+                    # 'state': 'opened',
+                    'squash': commits_count == 1,
+                })
                 working_copy.push('-f', 'target', child.refname)
                 # committing here means github could technically trigger its
                 # webhook before sending a response, but committing before
