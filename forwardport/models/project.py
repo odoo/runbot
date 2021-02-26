@@ -782,8 +782,13 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
         """
         source = self._get_local_directory()
         # update all the branches & PRs
-        _logger.info("Update %s", source._directory)
-        source.with_params('gc.pruneExpire=1.day.ago').fetch('-p', 'origin')
+        r = source.with_params('gc.pruneExpire=1.day.ago')\
+            .with_config(
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT
+            )\
+            .fetch('-p', 'origin')
+        _logger.info("Updated %s:\n%s", source._directory, r.stdout.decode())
         # FIXME: check that pr.head is pull/{number}'s head instead?
         source.cat_file(e=self.head)
         # create working copy
@@ -1057,6 +1062,7 @@ def git(directory): return Repo(directory, check=True)
 class Repo:
     def __init__(self, directory, **config):
         self._directory = str(directory)
+        config.setdefault('stderr', subprocess.PIPE)
         self._config = config
         self._params = ()
         self._opener = subprocess.run
@@ -1066,12 +1072,14 @@ class Repo:
 
     def _run(self, *args, **kwargs):
         opts = {**self._config, **kwargs}
-        return self._opener(
-            ('git', '-C', self._directory)
-            + tuple(itertools.chain.from_iterable(('-c', p) for p in self._params))
-            + args,
-            **opts
-        )
+        args = ('git', '-C', self._directory)\
+            + tuple(itertools.chain.from_iterable(('-c', p) for p in self._params))\
+            + args
+        try:
+            return self._opener(args, **opts)
+        except subprocess.CalledProcessError as e:
+            _logger.error("git call error:\n%s", e.stderr.decode())
+            raise
 
     def stdout(self, flag=True):
         if flag is True:
