@@ -538,10 +538,11 @@ class PullRequests(models.Model):
         if not self:
             return
 
-        ref = self[0]
+        all_sources = [(p.source_id or p._get_root()) for p in self]
+        all_targets = [s._find_next_target(p) for s, p in zip(all_sources, self)]
 
-        base = ref.source_id or ref._get_root()
-        all_targets = [(p.source_id or p._get_root())._find_next_target(p) for p in self]
+        ref = self[0]
+        base = all_sources[0]
         target = all_targets[0]
         if target is None:
             _logger.info(
@@ -549,6 +550,13 @@ class PullRequests(models.Model):
                 ref.display_name,
             )
             return  # QUESTION: do the prs need to be updated?
+
+        # check if the PRs have already been forward-ported: is there a PR
+        # with the same source targeting the next branch in the series
+        for source in all_sources:
+            if self.search_count([('source_id', '=', source.id), ('target', '=', target.id)]):
+                _logger.info("Will not forward-port %s: already ported", ref.display_name)
+                return
 
         # check if all PRs in the batch have the same "next target" , bail if
         # that's not the case as it doesn't make sense for forward one PR from

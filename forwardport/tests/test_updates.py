@@ -2,6 +2,9 @@
 Test cases for updating PRs during after the forward-porting process after the
 initial merge has succeeded (and forward-porting has started)
 """
+import sys
+
+import pytest
 
 from utils import seen, re_matches, Commit, make_basic
 
@@ -260,3 +263,105 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 
 You may want or need to manually update any followup PR.""" % pr1_id.display_name)
     ]
+
+def test_duplicate_fw(env, make_repo, setreviewers, config, users):
+    """ Test for #451
+    """
+    # 0 - 1 - 2 - 3 - 4  master
+    #             \ - 31 v3
+    #         \ - 21     v2
+    #     \ - 11         v1
+    repo = make_repo('proj')
+    with repo:
+        _, c1, c2, c3, _ = repo.make_commits(
+            None,
+            Commit('0', tree={'f': 'a'}),
+            Commit('1', tree={'f': 'b'}),
+            Commit('2', tree={'f': 'c'}),
+            Commit('3', tree={'f': 'd'}),
+            Commit('4', tree={'f': 'e'}),
+            ref='heads/master'
+        )
+        repo.make_commits(c1, Commit('11', tree={'g': 'a'}), ref='heads/v1')
+        repo.make_commits(c2, Commit('21', tree={'h': 'a'}), ref='heads/v2')
+        repo.make_commits(c3, Commit('31', tree={'i': 'a'}), ref='heads/v3')
+
+    proj = env['runbot_merge.project'].create({
+        'name': 'a project',
+        'github_token': config['github']['token'],
+        'github_prefix': 'hansen',
+        'fp_github_token': config['github']['token'],
+        'branch_ids': [
+            (0, 0, {'name': 'master', 'fp_sequence': 0, 'fp_target': True}),
+            (0, 0, {'name': 'v3', 'fp_sequence': 1, 'fp_target': True}),
+            (0, 0, {'name': 'v2', 'fp_sequence': 2, 'fp_target': True}),
+            (0, 0, {'name': 'v1', 'fp_sequence': 3, 'fp_target': True}),
+        ],
+        'repo_ids': [
+            (0, 0, {
+                'name': repo.name,
+                'required_statuses': 'ci',
+                'fp_remote_target': repo.name,
+            })
+        ]
+    })
+    setreviewers(*proj.repo_ids)
+
+    # create a PR in v1, merge it, then create all 3 ports
+    with repo:
+        repo.make_commits('v1', Commit('c0', tree={'z': 'a'}), ref='heads/hugechange')
+        prv1 = repo.make_pr(target='v1', head='hugechange')
+        repo.post_status('hugechange', 'success', 'ci')
+        prv1.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+    PRs = env['runbot_merge.pull_requests']
+    prv1_id = PRs.search([
+        ('repository.name', '=', repo.name),
+        ('number', '=', prv1.number),
+    ])
+    assert prv1_id.state == 'ready'
+    with repo:
+        repo.post_status('staging.v1', 'success', 'ci')
+    env.run_crons()
+    assert prv1_id.state == 'merged'
+
+    parent = prv1_id
+    while True:
+        child = PRs.search([('parent_id', '=', parent.id)])
+        if not child:
+            break
+
+        assert child.state == 'opened'
+        with repo:
+            repo.post_status(child.head, 'success', 'ci')
+        env.run_crons()
+        parent = child
+    pr_ids = _, prv2_id, prv3_id, prmaster_id = PRs.search([], order='number')
+    _, prv2, prv3, prmaster = [repo.get_pr(p.number) for p in pr_ids]
+    assert pr_ids.mapped('target.name') == ['v1', 'v2', 'v3', 'master']
+    assert pr_ids.mapped('state') == ['merged', 'validated', 'validated', 'validated']
+    assert repo.read_tree(repo.commit(prmaster_id.head)) == {'f': 'e', 'z': 'a'}
+
+    with repo:
+        repo.make_commits('v2', Commit('c0', tree={'z': 'b'}), ref=prv2.ref, make=False)
+    env.run_crons()
+    assert pr_ids.mapped('state') == ['merged', 'opened', 'validated', 'validated']
+    assert repo.read_tree(repo.commit(prv2_id.head)) == {'f': 'c', 'h': 'a', 'z': 'b'}
+    assert repo.read_tree(repo.commit(prv3_id.head)) == {'f': 'd', 'i': 'a', 'z': 'b'}
+    assert repo.read_tree(repo.commit(prmaster_id.head)) == {'f': 'e', 'z': 'b'}
+
+    assert prv2_id.source_id == prv1_id
+    assert not prv2_id.parent_id
+
+    env.run_crons()
+    assert PRs.search([], order='number') == pr_ids
+
+    with repo:
+        repo.post_status(prv2.head, 'success', 'ci')
+        prv2.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+    with repo:
+        repo.post_status('staging.v2', 'success', 'ci')
+    env.run_crons()
+    # env.run_crons()
+    assert PRs.search([], order='number') == pr_ids
