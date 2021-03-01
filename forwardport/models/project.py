@@ -871,7 +871,12 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
             conf.with_params('merge.renamelimit=0')\
                 .with_config(check=False)\
                 .cherry_pick(squashed, no_commit=True)
-
+            status = conf.stdout().status(short=True, untracked_files='no').stdout.decode()
+            h, out, err = e.args
+            if err.strip():
+                err = err.rstrip() + '\n----------\nstatus:\n' + status
+            else:
+                err = 'status:\n' + status
             # if there was a single commit, reuse its message when committing
             # the conflict
             # TODO: still add conflict information to this?
@@ -888,8 +893,8 @@ stdout:
 %s
 stderr:
 %s
-""" % e.args)
-            return e.args, working_copy
+""" % (h, out, err))
+            return (h, out, err), working_copy
 
     def _cherry_pick(self, working_copy):
         """ Cherrypicks ``self`` into the working copy
