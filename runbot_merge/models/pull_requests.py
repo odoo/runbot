@@ -1843,6 +1843,15 @@ class Stagings(models.Model):
                     self, prs
                 )
                 prs.write({'state': 'merged'})
+                pseudobranch = None
+                if self.target == project.branch_ids[:1] and project.branch_ids[1:2]:
+                    prev = project.branch_ids[1:2].name
+                    m = re.search(r'(\d+)(?:\.(\d+))?$', prev)
+                    if m:
+                        pseudobranch = "%s.%d" % (m[1], (int(m[2] or 0) + 1))
+                    else:
+                        pseudobranch = 'post-' + prev
+
                 for pr in prs:
                     self.env['runbot_merge.pull_requests.feedback'].create({
                         'repository': pr.repository.id,
@@ -1852,6 +1861,12 @@ class Stagings(models.Model):
                         }),
                         'close': True,
                     })
+                    if pseudobranch:
+                        self.env['runbot_merge.pull_requests.tagging'].create({
+                            'repository': pr.repository.id,
+                            'pull_request': pr.number,
+                            'tags_add': json.dumps([pseudobranch]),
+                        })
             finally:
                 self.batch_ids.write({'active': False})
                 self.write({'active': False})
