@@ -164,7 +164,7 @@
                 <span t-else="" t-attf-class="btn btn-default disabled slot_name">
                     <span t-esc="slot.trigger_id.name"/>
                 </span>
-                <a t-if="bu.local_state == 'running'" t-attf-href="http://{{bu.dest}}-all.{{bu.host}}" class="fa fa-sign-in btn btn-info"/>
+                <a t-if="bu.local_state == 'running' and bu.database_ids" t-attf-href="http://{{sorted(bu.mapped('database_ids.name'))[0]}}.{{bu.host}}" class="fa fa-sign-in btn btn-info"/>
                 <t t-if="bu" t-call="runbot.build_menu"/>
                 <a t-if="not bu" class="btn btn-default" title="Create build" t-attf-href="/runbot/batch/slot/{{slot.id}}/build">
                     <i class="fa fa-play fa-fw"/>
@@ -175,7 +175,7 @@
         <template id="runbot.build_button">
             <div t-attf-class="pull-right">
                 <div t-attf-class="btn-group {{klass}}">
-                    <a t-if="bu.local_state=='running'" t-attf-href="http://{{bu.dest}}-all.{{bu.host}}" class="btn btn-primary" title="Sign in on this build" aria-label="Sign in on this build">
+                    <a t-if="bu.local_state == 'running' and bu.database_ids" t-attf-href="http://{{sorted(bu.mapped('database_ids.name'))[0]}}.{{bu.host}}" class="btn btn-primary" title="Sign in on this build" aria-label="Sign in on this build">
                         <i class="fa fa-sign-in"/>
                     </a>
                     <a t-if="bu.local_state=='done' and bu.requested_action != 'wake_up'" href="#" data-runbot="wakeup" t-att-data-runbot-build="bu.id" class="btn btn-default" title="Wake up this build" aria-label="Wake up this build">
@@ -223,13 +223,15 @@
                     Force Build
                 </a>
                 <t t-if="bu.local_state=='running'">
-                    <a class="dropdown-item" t-attf-href="http://{{bu.dest}}-base.{{bu.host}}/">
+                    <t t-foreach="bu.database_ids.sorted('name')[1:]" t-as="db">
+                        <a class="dropdown-item" t-attf-href="http://{{db.name}}.{{bu.host}}/">
+                            <i class="fa fa-sign-in"/>
+                            Connect <t t-esc="db.db_suffix"></t>
+                        </a>
+                    </t>
+                    <a class="dropdown-item" t-attf-href="http://{{bu.domain}}/web/database/selector">
                         <i class="fa fa-sign-in"/>
-                        Connect base
-                    </a>
-                    <a class="dropdown-item" t-attf-href="http://{{bu.domain}}/">
-                        <i class="fa fa-sign-in"/>
-                        Connect
+                        Database selector
                     </a>
                 </t>
                 <a class="dropdown-item" t-if="bu.global_state in ['done','running'] or requested_action == 'deathrow'" groups="base.group_user" href="#" data-runbot="rebuild" t-att-data-runbot-build="bu['id']" title="Retry this build, usefull for false positive">
