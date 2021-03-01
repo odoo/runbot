@@ -370,7 +370,7 @@
     <template id="view_pull_request">
         <t t-call="website.layout">
             <div id="wrap"><div class="container-fluid">
-                <a t-att-href="pr.url">
+                <a t-att-href="pr.github_url">
                     <h1 t-field="pr.display_name"/>
                 </a>
                 <h6>Created by <span t-field="pr.author.display_name"/></h6>
