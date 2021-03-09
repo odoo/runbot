@@ -19,12 +19,21 @@ RUN set -x ; \
     <template id="runbot.docker_install_chrome">
       <t t-set="chrome_distrib" t-value="values['chrome_distrib']"/>
       <t t-set="chrome_version" t-value="values['chrome_version']"/>
+      <t t-set="chrome_source" t-value="values.get('chrome_source')"/>
 # Install Google Chrome
+      <t t-if="chrome_source == 'google'">
+RUN curl -sSL https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_<t t-esc="chrome_version"/>_amd64.deb -o /tmp/chrome.deb \
+    &amp;&amp; apt-get update \
+    &amp;&amp; apt-get -y install --no-install-recommends /tmp/chrome.deb \
+    &amp;&amp; rm /tmp/chrome.deb
+      </t>
+      <t t-else="">
 RUN curl -sSL http://nightly.odoo.com/odoo.key | apt-key add - \
     &amp;&amp; echo "deb http://nightly.odoo.com/deb/<t t-esc="chrome_distrib"/> ./" > /etc/apt/sources.list.d/google-chrome.list \
     &amp;&amp; apt-get update \
     &amp;&amp; apt-get install -y -qq google-chrome-stable=<t t-esc="chrome_version"/> \
     &amp;&amp; rm -rf /var/lib/apt/lists/*
+      </t>
     </template>
 
     <template id="runbot.docker_install_phantomjs">
