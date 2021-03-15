@@ -530,7 +530,7 @@ class Repo(models.Model):
                 if try_count > 4:
                     message = 'Failed to fetch repo %s: %s' % (self.name, e.output.decode())
                     host = self.env['runbot.host']._get_current()
-                    host.message_post(body='message')
+                    host.message_post(body=message)
                     self.env['runbot.runbot'].warning('Host %s got reserved because of fetch failure' % host.name)
                     _logger.exception(message)
                     host.disable()
