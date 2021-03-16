@@ -7,6 +7,7 @@ import functools
 import werkzeug.utils
 import werkzeug.urls
 
+from collections import defaultdict
 from werkzeug.exceptions import NotFound, Forbidden
 
 from odoo.addons.http_routing.models.ir_http import slug
@@ -140,7 +141,6 @@ class Runbot(Controller):
                     if res:
                         search_domains.append([('id', 'in', res.mapped('bundle_id').ids)])
                 search_domain = expression.OR(search_domains)
-                print(search_domain)
                 domain = expression.AND([domain, search_domain])
 
             e = expression.expression(domain, request.env['runbot.bundle'])
@@ -384,3 +384,71 @@ class Runbot(Controller):
             'pager': pager
         }
         return request.render('runbot.build_error', qctx)
+
+    @route(['/runbot/build/stats/<int:build_id>'], type='http', auth="public", website=True)
+    def build_stats(self, build_id, search=None, **post):
+        """Build statistics"""
+
+        Build = request.env['runbot.build']
+
+        build = Build.browse([build_id])[0]
+        if not build.exists():
+            return request.not_found()
+
+        build_stats = defaultdict(dict)
+        for stat in build.stat_ids.filtered(lambda rec: '.' in rec.key).sorted(key=lambda  rec: rec.value, reverse=True):
+            category, module = stat.key.split('.', maxsplit=1)
+            value = int(stat.value) if stat.value == int(stat.value) else stat.value
+            build_stats[category].update({module: value})
+
+        context = {
+            'build': build,
+            'build_stats': build_stats,
+            'default_category': request.env['ir.model.data'].xmlid_to_res_id('runbot.default_category'),
+            'project': build.params_id.trigger_id.project_id,
+            'title': 'Build %s statistics' % build.id
+        }
+        return request.render("runbot.build_stats", context)
+
+
+    @route(['/runbot/stats/'], type='json', auth="public", website=False)
+    def stats_json(self, bundle_id=False, trigger_id=False, key_category='', max_build_id=False, limit=100, search=None, **post):
+        """ Json stats """
+        trigger_id = trigger_id and int(trigger_id)
+        bundle_id = bundle_id and int(bundle_id)
+        max_build_id = max_build_id and int(max_build_id)
+        limit = int(limit)
+        limit = min(limit, 1000)
+
+        trigger = request.env['runbot.trigger'].browse(trigger_id)
+        bundle = request.env['runbot.bundle'].browse(bundle_id)
+        if not trigger_id or not bundle_id or not trigger.exists() or not bundle.exists():
+            return request.not_found()
+
+        builds_domain = [
+            ('global_result', '=', 'ok'), ('slot_ids.batch_id.bundle_id', '=', bundle_id), ('params_id.trigger_id', '=', trigger.id),
+        ]
+
+        if max_build_id:
+            builds_domain = expression.AND([builds_domain, [('id', '<=', max_build_id)]])
+        builds = request.env['runbot.build'].search(builds_domain, order='id desc', limit=limit)
+
+        request.env.cr.execute("SELECT build_id, key, value FROM runbot_build_stat WHERE build_id IN %s AND key like %s", [tuple(builds.ids), '%s.%%' % key_category]) # read manually is way faster than using orm
+        res = {}
+        for (builds_id, key, value) in request.env.cr.fetchall():
+            res.setdefault(builds_id, {})[key.split('.')[1]] = value
+        return res
+
+    @route(['/runbot/stats/<model("runbot.bundle"):bundle>/<model("runbot.trigger"):trigger>'], type='http', auth="public", website=True)
+    def modules_stats(self, bundle, trigger, search=None, **post):
+        """Modules statistics"""
+
+        categories = request.env['runbot.build.stat.regex'].search([]).mapped('name')
+
+        context = {
+            'stats_categories': categories,
+            'bundle': bundle,
+            'trigger': trigger,
+        }
+
+        return request.render("runbot.modules_stats", context)

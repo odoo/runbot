@@ -26,6 +26,7 @@
                 <field name="ci_context"/>
                 <field name="ci_url"/>
                 <field name="ci_description"/>
+                <field name="has_stats"/>
               </group>
             </sheet>
           </form>

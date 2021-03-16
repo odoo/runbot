@@ -21,6 +21,7 @@
                                             <i class="fa fa-fast-forward"/>
                                         </a>
                                         <t t-call="runbot.branch_copy_button"/>
+                                        <t t-call="runbot.bundle_stats_dropdown"/>
                                     </div>
                                 </span>
                                 <span class="pull-right">

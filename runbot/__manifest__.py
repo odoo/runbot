@@ -27,6 +27,7 @@
         'templates/batch.xml',
         'templates/branch.xml',
         'templates/build.xml',
+        'templates/build_stats.xml',
         'templates/bundle.xml',
         'templates/commit.xml',
         'templates/dashboard.xml',
