@@ -306,5 +306,20 @@
               <i t-attf-class="fa fa-clipboard"/>
             </button>
         </template>
+
+
+        <template id="runbot.bundle_stats_dropdown">
+            <button t-attf-class="btn btn-default dropdown-toggle" data-toggle="dropdown" title="Bundle Stats" aria-label="Bundle Stats" aria-expanded="false">
+                    <i t-attf-class="fa fa-bar-chart"/>
+                    <span class="caret"/>
+            </button>
+            <div class="dropdown-menu dropdown-menu-right" role="menu">
+                <t t-foreach="project.trigger_ids" t-as="trigger">
+                    <a class="dropdown-item" t-if="trigger.has_stats" t-attf-href="/runbot/stats/{{bundle.id}}/{{trigger.id}}">
+                        <t t-esc="trigger.name" />
+                    </a>
+                </t>
+            </div>
+        </template>
     </data>
 </odoo>

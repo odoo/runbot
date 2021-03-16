@@ -4,6 +4,7 @@
       <xpath expr="." position="inside">
         <link rel="stylesheet" href="/runbot/static/src/css/runbot.scss"/>
         <script type="text/javascript" src="/runbot/static/src/js/runbot.js"/>
+        <script type="text/javascript" src="/web/static/lib/Chart/Chart.js"></script>
       </xpath>
     </template>
   </data>

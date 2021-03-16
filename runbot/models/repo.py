@@ -51,10 +51,16 @@ class Trigger(models.Model):
     hide = fields.Boolean('Hide trigger on main page')
     manual = fields.Boolean('Only start trigger manually', default=False)
 
-    upgrade_dumps_trigger_id = fields.Many2one('runbot.trigger', string= 'Template/complement trigger', tracking=True)
+    upgrade_dumps_trigger_id = fields.Many2one('runbot.trigger', string='Template/complement trigger', tracking=True)
     upgrade_step_id = fields.Many2one('runbot.build.config.step', compute="_compute_upgrade_step_id", store=True)
     ci_url = fields.Char("ci url")
     ci_description = fields.Char("ci description")
+    has_stats = fields.Boolean('Has a make_stats config step', compute="_compute_has_stats", store=True)
+
+    @api.depends('config_id.step_order_ids.step_id.make_stats')
+    def _compute_has_stats(self):
+        for trigger in self:
+            trigger.has_stats = any(trigger.config_id.step_order_ids.step_id.mapped('make_stats'))
 
     @api.depends('upgrade_dumps_trigger_id', 'config_id', 'config_id.step_order_ids.step_id.job_type')
     def _compute_upgrade_step_id(self):

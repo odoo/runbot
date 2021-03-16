@@ -138,9 +138,11 @@
                   <b>Total time:</b>
                   <t t-esc="build.get_formated_build_time()"/>
                   <br/>
-                  <b>Trigger:</b>
-                  <t t-esc="build.params_id.trigger_id.name"/>
-                  <br/>
+                  <t t-if="build.stat_ids">
+                    <b>Stats:</b>
+                      <a t-attf-href="/runbot/build/stats/{{build.id}}">Build <t t-esc="build.id"/></a>
+                    <br/>
+                  </t>
                   <br/>
                 </td>
                 <td t-if="build.children_ids">

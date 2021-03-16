@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <template id="runbot.build_stats">
+      <t t-call='website.layout'>
+          <t t-set="bundles" t-value="build.slot_ids.mapped('batch_id.bundle_id')"/>
+          <div>
+            <div class="row">
+              <div class="col-md-4">
+                <div class="bg-success-light">
+                  <b>Build: </b><a t-attf-href="/runbot/build/{{build.id}}"><t t-esc="build.id"/></a><br/>
+                  <t t-if="build.description">
+                    <b>Description:</b>
+                    <t t-raw="build.md_description"/>
+                    <br/>
+                  </t>
+                  <b>Date: </b><t t-esc="build.create_date" /><br/>
+                  <b>Config: </b><t t-esc="build.params_id.config_id.name" /><br/>
+                  <b>Bundle(s): </b>
+                  <t t-foreach="bundles" t-as="bundle">
+                    <a t-attf-href="/runbot/bundle/{{bundle.id}}"><t t-esc="bundle.name" /></a>
+                  </t><br/>
+                  <t t-foreach="build.params_id.sudo().commit_link_ids" t-as="build_commit">
+                    <b>Commit:</b>
+                    <a t-attf-href="/runbot/commit/{{build_commit.commit_id.id}}">
+                      <t t-esc="build_commit.commit_id.dname"/>
+                    </a>
+                    <a t-att-href="'https://%s/commit/%s' % (build_commit.branch_id.remote_id.base_url, build_commit.commit_id.name)" class="btn btn-sm text-left" title="View Commit on Github"><i class="fa fa-github"/></a>
+                    <t t-if="build_commit.match_type in ('default', 'pr_target', 'prefix') ">
+                      from base branch
+                      <br/>
+                    </t>
+                    <div t-else="" class="ml-3">
+                      <b>Subject:</b>
+                      <t t-esc="build_commit.commit_id.subject"/>
+                      <br/>
+                      <b>Author:</b>
+                      <t t-esc="build_commit.commit_id.author"/>
+                      <br/>
+                      <b>Committer:</b>
+                      <t t-esc="build_commit.commit_id.committer"/>
+                      <br/>
+                    </div>
+                  </t>
+                  <b>Version:</b>
+                  <t t-esc="build.params_id.version_id.name"/>
+                  <br/>
+                </div>
+              </div>
+              <div t-foreach="sorted(build_stats.keys())" t-as="category" class="col-md-4">
+                <h3><t t-esc="category.title().replace('_', ' ')"/></h3>
+                <table class="table table-condensed table-responsive table-stripped">
+                  <tr t-foreach="build_stats[category].keys()" t-as="module">
+                    <td><t t-esc="module"/></td>
+                    <td><t t-esc="build_stats[category][module]"/></td>
+                  </tr>
+                </table>
+              </div>
+              <div t-if="not build_stats" class="col-md-12 alert alert-warning">No stats records found for this build</div>
+            </div>
+          </div>
+      </t>
+    </template>
+
+    <template id="runbot.modules_stats">
+      <t t-call='website.layout'>
+        <input type="hidden" id="bundle_id" t-att-value="bundle.id"/>
+        <input type="hidden" id="trigger_id" t-att-value="trigger.id"/>
+        <div class="container-fluid">
+          <nav class="navbar navbar-light">
+            <div class="container">
+              <b>Bundle:</b><t t-esc="bundle.name"/><br/>
+              <b>Trigger:</b><t t-esc="trigger.name"/>
+              <b>Stat Category:</b>
+              <select id="key_category_selector" class="form-select" aria-label="Stat Category">
+                <option t-foreach="stats_categories" t-as="category" t-attf-value="{{category}}"><t t-esc="category.replace('_',' ').title()"/></option>
+              </select>
+              <b>Mode: </b>
+              <select id="mode_selector" class="form-select" aria-label="Display mode">
+                <option title="Real Values" selected="selected" value="normal">Normal</option>
+                <option title="Delta With Reference Build Values" value="difference">Difference</option>
+              </select>
+              <b>Nb of builds:</b>
+              <select id="limit_selector" class="form-select" aria-label="Number Of Builds">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option selected="selected" value="100">100</option>
+                <option value="150">250</option>
+              </select>
+              <b>Nb datasets:</b>
+              <select id="nb_dataset_selector" class="form-select" aria-label="Number Of Builds">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option selected="selected" value="100">100</option>
+              </select>
+
+              <button id="fast_backward_button" class="btn btn-default" title="Previous Builds" aria-label="Previous Builds">
+                <i t-attf-class="fa  fa-fast-backward"/>
+              </button>
+              <i id="chart_spinner" class="fa fa-2x fa-circle-o-notch fa-spin"/>
+            </div>
+          </nav>
+        <canvas id="canvas"></canvas>
+        </div>
+      </t>
+      <script type="text/javascript" src="/runbot/static/src/js/stats.js"></script>
+    </template>
+  </data>
+</odoo>
