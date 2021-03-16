@@ -140,7 +140,6 @@ class Runbot(Controller):
                     if res:
                         search_domains.append([('id', 'in', res.mapped('bundle_id').ids)])
                 search_domain = expression.OR(search_domains)
-                print(search_domain)
                 domain = expression.AND([domain, search_domain])
 
             e = expression.expression(domain, request.env['runbot.bundle'])
