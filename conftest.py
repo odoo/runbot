@@ -54,6 +54,7 @@ import subprocess
 import sys
 import time
 import uuid
+import warnings
 import xmlrpc.client
 from contextlib import closing
 
@@ -383,6 +384,7 @@ def make_repo(capsys, request, config, tunnel, users):
             'allow_rebase_merge': False,
         })
         r.raise_for_status()
+        repo = Repo(github, fullname, repos)
 
         # create webhook
         github.post('{}/hooks'.format(repo_url), json={
@@ -401,8 +403,9 @@ def make_repo(capsys, request, config, tunnel, users):
             'content': base64.b64encode(b'whee').decode('ascii'),
             'branch': 'garbage_%s' % uuid.uuid4()
         }).raise_for_status()
-
-        return Repo(github, fullname, repos)
+        # try to unwatch repo, doesn't actually work
+        repo.unsubscribe()
+        return repo
 
     yield repomaker
 
@@ -432,9 +435,6 @@ class Repo:
         self._repos = repos
         self.hook = False
         repos.append(self)
-
-        # unwatch repo
-        self.unsubscribe()
 
     @property
     def owner(self):
@@ -470,7 +470,7 @@ class Repo:
     def delete(self):
         r = self._session.delete('https://api.github.com/repos/{}'.format(self.name))
         if r.status_code != 204:
-            logging.getLogger(__name__).warning("Unable to delete repository %s", self.name)
+            warnings.warn("Unable to delete repository %s (HTTP %s)" % (self.name, r.status_code))
 
     def set_secret(self, secret):
         assert self.hook
