@@ -42,7 +42,7 @@
                           </div>
                           <div class="col"><t t-esc="build_error.responsible.name"/></div>
                           <div class="col">
-                            <a groups="runbot.group_user" t-attf-href="/web/#id={{build_error.id}}&amp;view_type=form&amp;model=runbot.build.error" target="new" title="View in Backend">
+                            <a groups="base.group_user" t-attf-href="/web/#id={{build_error.id}}&amp;view_type=form&amp;model=runbot.build.error" target="new" title="View in Backend">
                               <i class="fa fa-list"/>
                             </a>
                             <a t-att-href="build_error.last_seen_build_id.build_url" t-attf-title="View last affected build ({{build_error.last_seen_build_id.id}})"><i class="fa fa-external-link"/></a>
@@ -116,7 +116,7 @@
                         </div>
                         <div class="col"><t t-esc="build_error.responsible.name"/></div>
                         <div class="col">
-                          <a groups="runbot.group_user" t-attf-href="/web/#id={{build_error.id}}&amp;view_type=form&amp;model=runbot.build.error" target="new" title="View in Backend">
+                          <a groups="base.group_user" t-attf-href="/web/#id={{build_error.id}}&amp;view_type=form&amp;model=runbot.build.error" target="new" title="View in Backend">
                             <i class="fa fa-list"/>
                           </a>
                           <a t-att-href="build_error.last_seen_build_id.build_url" t-attf-title="View last affected build ({{build_error.last_seen_build_id.id}})"><i class="fa fa-external-link"/></a>

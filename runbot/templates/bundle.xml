@@ -14,10 +14,10 @@
                                         <a groups="runbot.group_runbot_admin" t-attf-href="/web/#id={{bundle.id}}&amp;view_type=form&amp;model=runbot.bundle" class="btn btn-default btn-sm" target="new" title="View in Backend">
                                           <i class="fa fa-list"/>
                                         </a>
-                                        <a class="btn btn-default" groups="runbot.group_user" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Force A New Batch">
+                                        <a class="btn btn-default" groups="base.group_user" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Force A New Batch">
                                             <i class="fa fa-refresh"/>
                                         </a>
-                                        <a class="btn btn-default" groups="runbot.group_user" t-attf-href="/runbot/bundle/{{bundle.id}}/force/1" title="Force A New Batch with automatic rebase">
+                                        <a class="btn btn-default" groups="base.group_user" t-attf-href="/runbot/bundle/{{bundle.id}}/force/1" title="Force A New Batch with automatic rebase">
                                             <i class="fa fa-fast-forward"/>
                                         </a>
                                         <t t-call="runbot.branch_copy_button"/>

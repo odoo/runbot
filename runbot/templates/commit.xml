@@ -81,7 +81,7 @@
                     <t t-if="status.target_url" t-esc="status.target_url.split('/')[-1]" />
                   </a>
                 </td>
-                <td groups="runbot.group_user">
+                <td groups="base.group_user">
                   <a t-attf-href="/runbot/commit/resend/{{status.id}}" title="Resend github status">
                     <i class="fa fa-repeat"/>
                   </a>

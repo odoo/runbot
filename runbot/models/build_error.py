@@ -73,7 +73,7 @@ class BuildError(models.Model):
     @api.depends('build_ids')
     def _compute_bundle_ids(self):
         for build_error in self:
-            top_parent_builds = build_error.build_ids.mapped(lambda rec: rec and rec._get_top_parent())
+            top_parent_builds = build_error.build_ids.mapped(lambda rec: rec and rec.top_parent)
             build_error.bundle_ids = top_parent_builds.mapped('slot_ids').mapped('batch_id.bundle_id')
 
     @api.depends('build_ids')

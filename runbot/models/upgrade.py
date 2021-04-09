@@ -44,7 +44,7 @@ class BuildResult(models.Model):
 
         if exception:
             bundle = False
-            batches = self._get_top_parent().slot_ids.mapped('batch_id')
+            batches = self.top_parent.slot_ids.mapped('batch_id')
             if batches:
                 bundle = batches[0].bundle_id.id
             res = {
