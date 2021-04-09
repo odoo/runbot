@@ -13,16 +13,10 @@
               </t>
             </div>
           </form>
-          <form class="form-inline" t-attf-action="/runbot/build/#{build['id']}/force" method='POST' t-if="request.params.get('ask_rebuild')" groups="runbot.group_user">
-            <a href='#' class="btn btn-danger" data-runbot="rebuild" t-attf-data-runbot-build="#{build['id']}">
-              <i class='fa fa-refresh'/>
-              Force Rebuild
-            </a>
-          </form>
         </t>
         <div class="row">
           <div class="col-md-12">
-            <t t-set="batches" t-value="build.slot_ids.mapped('batch_id')"/>
+            <t t-set="batches" t-value="build.top_parent.with_context(active_test=False).slot_ids.mapped('batch_id')"/>
             <t t-set="bundles" t-value="batches.mapped('bundle_id')"/>
             <t t-if="batches">
               <t t-if="len(bundles) == 1">
@@ -55,6 +49,17 @@
                 <br/>
               </t>
             </t>
+            <div t-if="build.parent_id">
+              <b>Parent build:</b>
+              <a t-attf-href="/runbot/build/#{build.parent_id.id}">
+                <t t-esc="build.parent_id.dest"/>
+              </a>
+              <t t-if="build.orphan_result">
+                &amp;nbsp;
+                <i class="fa fa-chain-broken" title="Build result ignored for parent" />
+                &amp;nbsp;Orphaned build, the result does not affect parent build result
+              </t>
+            </div>
           </div>
           <div class="col-md-12">
             <table class="table table-condensed tabel-bordered">
@@ -196,17 +201,6 @@
                 </td>
               </tr>
             </table>
-            <p t-if="build.parent_id">
-              Child of
-              <a t-attf-href="/runbot/build/#{build.parent_id.id}">
-                <t t-esc="build.parent_id.dest"/>
-              </a>
-              <t t-if="build.orphan_result">
-                &amp;nbsp;
-                <i class="fa fa-chain-broken" title="Build result ignored for parent" />
-                &amp;nbsp;Orphaned build, the result does not affect parent build result
-              </t>
-            </p>
             <table class="table table-condensed">
               <tr>
                 <th>Date</th>

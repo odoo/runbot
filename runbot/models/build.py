@@ -199,6 +199,7 @@ class BuildResult(models.Model):
 
     parent_id = fields.Many2one('runbot.build', 'Parent Build', index=True)
     parent_path = fields.Char('Parent path', index=True)
+    top_parent =  fields.Many2one('runbot.build', compute='_compute_top_parent')
     # should we add a has children stored boolean?
     children_ids = fields.One2many('runbot.build', 'parent_id')
 
@@ -252,12 +253,9 @@ class BuildResult(models.Model):
         for build in self:
             build.md_description = pseudo_markdown(build.description)
 
-    def _get_top_parent(self):
-        self.ensure_one()
-        build = self
-        while build.parent_id:
-            build = build.parent_id
-        return build
+    def _compute_top_parent(self):
+        for build in self:
+            build.top_parent = self.browse(int(build.parent_path.split('/')[0]))
 
     def _get_youngest_state(self, states):
         index = min([self._get_state_score(state) for state in states])
