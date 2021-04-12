@@ -200,3 +200,31 @@ body, .table{
         }
     }
 }
+.chart-legend {
+    max-height: calc(100vh - 160px);
+    overflow-y: scroll;
+    overflow-x: hidden;
+    cursor: pointer;
+    padding: 5px;
+
+    .label {
+        margin-left: 5px;
+        font-weight: bold;
+    }
+    .disabled{
+        .color {
+            visibility: hidden;
+        }
+        .label {
+            font-weight: normal;
+            text-decoration: line-through;
+            margin-left: 5px;
+        }
+    }
+
+    ul {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+    }
+}
