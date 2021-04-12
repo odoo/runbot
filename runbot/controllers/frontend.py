@@ -426,7 +426,7 @@ class Runbot(Controller):
             return request.not_found()
 
         builds_domain = [
-            ('global_result', '=', 'ok'), ('slot_ids.batch_id.bundle_id', '=', bundle_id), ('params_id.trigger_id', '=', trigger.id),
+            ('global_state', 'in', ('running', 'done')), ('global_result', '=', 'ok'), ('slot_ids.batch_id.bundle_id', '=', bundle_id), ('params_id.trigger_id', '=', trigger.id),
         ]
 
         if max_build_id:
