@@ -46,9 +46,13 @@
         <field name="name">runbot.dockerfile.tree</field>
         <field name="model">runbot.dockerfile</field>
         <field name="arch" type="xml">
-            <tree string="Dockerfile">
-                <field name="name"/>
-            </tree>
+          <tree string="Dockerfile" decoration-danger="dockerfile == ''" decoration-warning="to_build == False">
+            <field name="name"/>
+            <field name="image_tag"/>
+            <field name="to_build"/>
+            <field name="version_ids" widget="many2many_tags"/>
+            <field name="dockerfile" invisible="True"/>
+          </tree>
         </field>
     </record>
 
