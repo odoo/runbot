@@ -2,9 +2,12 @@
 var config = {
   type: 'line',
   options: {
+
+    animation: {
+      duration: 0
+    },
     legend: {
-        display: true,
-        position: 'right',
+        display: false,
     },
     responsive: true,
     tooltips: {
@@ -22,7 +25,7 @@ var config = {
         display: true,
         scaleLabel: {
           display: true,
-          labelString: 'Queries'
+          labelString: 'Value'
         },
       }]
     }
@@ -34,7 +37,7 @@ config.options.onClick = function(event, activeElements) {
         var x_label_index = this.scales['x-axis-0'].getValueForPixel(event.x);
         var build_id = config.data.labels[x_label_index]
         if (event.layerY > this.chartArea.bottom && event.layerY < this.chartArea.bottom + this.scales['x-axis-0'].height){
-          config.searchParams['max_build_id'] = build_id;
+          config.searchParams['center_build_id'] = build_id;
           fetchUpdateChart();
         }
         return;
@@ -43,23 +46,23 @@ config.options.onClick = function(event, activeElements) {
 };
 
 function fetch(path, data, then) {
-        const xhttp = new XMLHttpRequest();
-        xhttp.onreadystatechange = function() {
-            if (this.readyState == 4 && this.status == 200) {
-                const res = JSON.parse(this.responseText);
-                then(res.result);
-            }
-        };
-        xhttp.open("POST", path);
-        xhttp.setRequestHeader('Content-Type', 'application/json');
-        xhttp.send(JSON.stringify({params:data}));
-    };
+  const xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+          const res = JSON.parse(this.responseText);
+          then(res.result);
+      }
+  };
+  xhttp.open("POST", path);
+  xhttp.setRequestHeader('Content-Type', 'application/json');
+  xhttp.send(JSON.stringify({params:data}));
+};
 
-function random_color(module_name){
+function random_color(name){
     var colors = ['#004acd', '#3658c3', '#4a66ba', '#5974b2', '#6581aa', '#6f8fa3', '#7a9c9d', '#85a899', '#91b596', '#a0c096', '#fdaf56', '#f89a59', '#f1865a', '#e87359', '#dc6158', '#ce5055', '#bf4150', '#ad344b', '#992a45', '#84243d'];
     var sum = 0;
-    for (var i = 0; i < module_name.length; i++) {
-        sum += module_name.charCodeAt(i);
+    for (var i = 0; i < name.length; i++) {
+        sum += name.charCodeAt(i);
     }
     sum = sum % colors.length;
     color = colors[sum];
@@ -69,7 +72,7 @@ function random_color(module_name){
 
 
 function process_chart_data(){
-    if (Object.keys(config.result).length == 0)
+    if (! config.result || Object.keys(config.result).length == 0)
     {
       config.data = {
         labels:[],
@@ -82,38 +85,66 @@ function process_chart_data(){
     var older_build_stats = config.result[builds.slice(-1)[0]];
 
     var mode = document.getElementById('mode_selector').value;
+    
+    var keys = Object.keys(newer_build_stats);
 
-    function display_value(module, build_stats){
-        // {'base': 50, 'crm': 25 ...}
-        if (build_stats === undefined)
-            build_stats = newer_build_stats;
-        if (build_stats[module] === undefined)
-            return NaN;
-        if (mode == 'normal')
-            return build_stats[module]
-        if (older_build_stats[module] === undefined)
-            return NaN;
-        return build_stats[module] - older_build_stats[module]
+    var sort_values = {}
+    for (key of keys) {
+      sort_value = NaN
+      if (mode == 'normal') {
+        sort_value = newer_build_stats[key]
+      } else if (mode == 'alpha') {
+        sort_value = key
+      } else if (mode == 'change_count') {
+        sort_value = 0
+        previous = undefined
+        for (build of builds) {
+          res = config.result[build]
+          value = res[key]
+          if (previous !== undefined && value !== undefined && previous != value) {
+            sort_value +=1
+          }
+          previous = value
+        }
+      }
+      else if (older_build_stats[key] !== undefined) {
+        if (mode == "difference") {
+          sort_value = Math.abs(newer_build_stats[key] - older_build_stats[key])
+        }
+      }
+      sort_values[key] = sort_value
+    }
+    keys.sort((m1, m2) => sort_values[m2] - sort_values[m1]);
+
+    if (config.searchParams.nb_dataset != -1) {
+      visible_keys = new Set(keys.slice(0, config.searchParams.nb_dataset));
+    } else {
+      visible_keys = new Set(config.searchParams.visible_keys.split('-'))
+    }
+    console.log(visible_keys);
+    function display_value(key, build_stats){
+      if (build_stats[key] === undefined)
+          return NaN;
+      if (mode == 'normal' || mode == 'alpha')
+          return build_stats[key]
+      if (older_build_stats[key] === undefined)
+          return NaN;
+      return  build_stats[key] - older_build_stats[key]
     }
 
-    var modules = Object.keys(newer_build_stats);
-
-    modules.sort((m1, m2) => Math.abs(display_value(m2)) - Math.abs(display_value(m1)));
-    console.log(config.searchParams.nb_dataset)
-    modules = modules.slice(0, config.searchParams.nb_dataset);
-
     config.data = {
-        labels: builds,
-        datasets: modules.map(function (key){
-            return {
-                label: key,
-                data: builds.map(build => display_value(key, config.result[build])),
-                borderColor: random_color(key),
-                backgroundColor: 'rgba(0, 0, 0, 0)',
-                lineTension: 0
-            }
-        })
-      };
+      labels: builds,
+      datasets: keys.map(function (key){
+          return {
+              label: key,
+              data: builds.map(build => display_value(key, config.result[build])),
+              borderColor: random_color(key),
+              backgroundColor: 'rgba(0, 0, 0, 0)',
+              lineTension: 0,
+              hidden: !visible_keys.has(key),
+          }
+      })
+    };
 }
 
 function fetchUpdateChart() {
@@ -126,9 +157,54 @@ function fetchUpdateChart() {
     chart_spinner.style.visibility = 'hidden';
     updateChart()
   });
-};
+}
+
+function generateLegend() {
+  var legend = $("<ul></ul>");
+  for (data of config.data.datasets) {
+    var legendElement = $(`<li><span class="color" style="border: 2px solid ${data.borderColor};"></span><span class="label">${data.label}<span></li>`)
+    if (data.hidden){
+      legendElement.addClass('disabled')
+    }
+    legend.append(legendElement)
+  }
+  $("#js-legend").html(legend);
+  $("#js-legend > ul > li").on("click",function(e){
+    var index = $(this).index();
+    //$(this).toggleClass("disabled")
+    var curr = window.statsChart.data.datasets[index];
+    curr.hidden = !curr.hidden;
+    config.searchParams.nb_dataset=-1; 
+    config.searchParams.visible_keys = window.statsChart.data.datasets.filter(dataset => !dataset.hidden).map(dataset => dataset.label).join('-')
+    updateChart();
+  })
+}
+
+function updateForm() {
+  for([key, value] of Object.entries(config.searchParams)){
+    var selector = document.getElementById(key + '_selector');
+    if (selector != null){
+      selector.value = value;
+      selector.onchange = function(){
+        var id = this.id.replace('_selector', '');
+        config.searchParams[this.id.replace('_selector', '')] = this.value;
+        if (localParams.indexOf(id) == -1){
+          fetchUpdateChart();
+        } else {
+          updateChart()
+        }
+      }
+    }
+  }
+  let display_forward = config.result && config.searchParams.center_build_id != 0 && (config.searchParams.center_build_id !== Object.keys(config.result).slice(-1)[0])
+  document.getElementById("forward_button").style.visibility = display_forward ? "visible":"hidden";
+  document.getElementById("fast_forward_button").style.visibility = display_forward ? "visible":"hidden";
+  let display_backward = config.result && (config.searchParams.center_build_id !== Object.keys(config.result)[0])
+  document.getElementById("backward_button").style.visibility = display_backward ? "visible":"hidden";
+}
 
 function updateChart(){
+  updateForm()
   updateUrl();
   process_chart_data();    
   if (! window.statsChart) {
@@ -137,6 +213,7 @@ function updateChart(){
   } else {
     window.statsChart.update();
   }
+  generateLegend();
 }
 
 function compute_fetch_params(){
@@ -152,44 +229,33 @@ function updateUrl(){
 }
 
 window.onload = function() {
-
-    var mode_selector = document.getElementById('mode_selector');
-    var fast_backward_button = document.getElementById('fast_backward_button');
-
     config.searchParams = {
       limit: 25,
-      max_build_id: 0,
+      center_build_id: 0,
       key_category: 'module_loading_queries',
       mode: 'normal',
       nb_dataset: 20,
+      visible_keys: '',
     };
-    localParams = ['mode', 'nb_dataset']
+    localParams = ['mode', 'nb_dataset', 'visible_keys']
   
     for([key, value] of new URLSearchParams(window.location.hash.replace("#","?"))){
       config.searchParams[key] = value;
     }
 
-
-    for([key, value] of Object.entries(config.searchParams)){
-      var selector = document.getElementById(key + '_selector');
-      if (selector != null){
-        selector.value = value;
-        selector.onchange = function(){
-          var id = this.id.replace('_selector', '');
-          config.searchParams[this.id.replace('_selector', '')] = this.value;
-          if (localParams.indexOf(id) == -1){
-            fetchUpdateChart();
-          } else {
-            updateChart()
-          }
-        }
-      }
+    document.getElementById('backward_button').onclick = function(){
+      config.searchParams['center_build_id'] = Object.keys(config.result)[0];
+      fetchUpdateChart();
     }
-
-    fast_backward_button.onclick = function(){
-      config.searchParams['max_build_id'] = Object.keys(config.result)[0];
+    document.getElementById('forward_button').onclick = function(){
+      config.searchParams['center_build_id'] = Object.keys(config.result).slice(-1)[0];
+      fetchUpdateChart();
+    }
+    document.getElementById('fast_forward_button').onclick = function(){
+      config.searchParams['center_build_id'] = 0;
       fetchUpdateChart();
     }
 
+    
     fetchUpdateChart();
 };

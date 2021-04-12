@@ -412,13 +412,12 @@ class Runbot(Controller):
 
 
     @route(['/runbot/stats/'], type='json', auth="public", website=False)
-    def stats_json(self, bundle_id=False, trigger_id=False, key_category='', max_build_id=False, limit=100, search=None, **post):
+    def stats_json(self, bundle_id=False, trigger_id=False, key_category='', center_build_id=False, limit=100, search=None, **post):
         """ Json stats """
         trigger_id = trigger_id and int(trigger_id)
         bundle_id = bundle_id and int(bundle_id)
-        max_build_id = max_build_id and int(max_build_id)
-        limit = int(limit)
-        limit = min(limit, 1000)
+        center_build_id = center_build_id and int(center_build_id)
+        limit = min(int(limit), 1000)
 
         trigger = request.env['runbot.trigger'].browse(trigger_id)
         bundle = request.env['runbot.bundle'].browse(bundle_id)
@@ -428,10 +427,15 @@ class Runbot(Controller):
         builds_domain = [
             ('global_state', 'in', ('running', 'done')), ('global_result', '=', 'ok'), ('slot_ids.batch_id.bundle_id', '=', bundle_id), ('params_id.trigger_id', '=', trigger.id),
         ]
+        builds = request.env['runbot.build']
+        if center_build_id:
+            builds = builds.search(
+                expression.AND([builds_domain, [('id', '>=', center_build_id)]]), 
+                order='id', limit=limit/2)
+            builds_domain = expression.AND([builds_domain, [('id', '<=', center_build_id)]])
+            limit -= len(builds)
 
-        if max_build_id:
-            builds_domain = expression.AND([builds_domain, [('id', '<=', max_build_id)]])
-        builds = request.env['runbot.build'].search(builds_domain, order='id desc', limit=limit)
+        builds |= builds.search(builds_domain, order='id desc', limit=limit)
 
         request.env.cr.execute("SELECT build_id, key, value FROM runbot_build_stat WHERE build_id IN %s AND key like %s", [tuple(builds.ids), '%s.%%' % key_category]) # read manually is way faster than using orm
         res = {}
