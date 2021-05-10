@@ -122,12 +122,19 @@ def list_local_dbs(additionnal_conditions=None):
 
 def pseudo_markdown(text):
     text = utils.escape(text)
+
+    # first, extract code blocs:
+    codes = []
+    def code_remove(match):
+        codes.append(match.group(1))
+        return f'<code>{len(codes)-1}</code>'
+
     patterns = {
-            r'\*\*(.+?)\*\*': '<strong>\g<1></strong>',
-            r'~~(.+?)~~': '<del>\g<1></del>',  # it's not official markdown but who cares
-            r'__(.+?)__': '<ins>\g<1></ins>',  # same here, maybe we should change the method name
-            r'`(.+?)`': '<code>\g<1></code>',
-            r'\r?\n': '<br/>',
+        r'`(.+?)`': code_remove,
+        r'\*\*(.+?)\*\*': '<strong>\\g<1></strong>',
+        r'~~(.+?)~~': '<del>\\g<1></del>',  # it's not official markdown but who cares
+        r'__(.+?)__': '<ins>\\g<1></ins>',  # same here, maybe we should change the method name
+        r'\r?\n': '<br/>',
     }
 
     for p, b in patterns.items():
@@ -135,9 +142,14 @@ def pseudo_markdown(text):
 
     # icons
     re_icon = re.compile(r'@icon-([a-z0-9-]+)')
-    text = re_icon.sub('<i class="fa fa-\g<1>"></i>', text)
+    text = re_icon.sub('<i class="fa fa-\\g<1>"></i>', text)
 
     # links
     re_links = re.compile(r'\[(.+?)\]\((.+?)\)')
-    text = re_links.sub('<a href="\g<2>">\g<1></a>', text)
+    text = re_links.sub('<a href="\\g<2>">\\g<1></a>', text)
+
+    def code_replace(match):
+        return f'<code>{codes[int(match.group(1))]}</code>'
+
+    text = re.sub(r'<code>(\d+)</code>', code_replace, text, flags=re.DOTALL)
     return text
