@@ -91,6 +91,19 @@ class TestIrLogging(RunbotCase):
             'Hello <i class="fa fa-file-text-o"></i>'
         )
 
+        log.message = 'a bit of code :\n`print(__name__)`'
+        self.assertEqual(
+            log._markdown(),
+            'a bit of code :<br/><code>print(__name__)</code>'
+        )
+
+        log.message = 'a bit of __code__ :\n`print(__name__)` **but also** `print(__name__)`'
+        self.assertEqual(
+            log._markdown(),
+            'a bit of <ins>code</ins> :<br/><code>print(__name__)</code> <strong>but also</strong> <code>print(__name__)</code>'
+        )
+
+
         # test links
         log.message = 'This [link](https://wwww.somewhere.com) goes to somewhere and [this one](http://www.nowhere.com) to nowhere.'
         self.assertEqual(
