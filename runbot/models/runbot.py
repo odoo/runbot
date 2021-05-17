@@ -7,6 +7,8 @@ import signal
 import subprocess
 import shutil
 
+from requests.exceptions import HTTPError
+
 from ..common import fqdn, dest_reg, os
 from ..container import docker_ps, docker_stop
 
@@ -16,7 +18,6 @@ from odoo.tools import config
 from odoo.modules.module import get_module_resource
 
 _logger = logging.getLogger(__name__)
-
 
 # after this point, not realy a repo buisness
 class Runbot(models.AbstractModel):
@@ -202,6 +203,7 @@ class Runbot(models.AbstractModel):
         This method is the default cron for new commit discovery and build sheduling.
         The cron runs for a long time to avoid spamming logs
         """
+        pull_info_failures = set()
         start_time = time.time()
         timeout = self._get_cron_period()
         get_param = self.env['ir.config_parameter'].get_param
@@ -228,8 +230,25 @@ class Runbot(models.AbstractModel):
             self._commit()
             if runbot_do_fetch:
                 for repo in repos:
-                    repo._update_batches(bool(preparing_batch))
-                    self._commit()
+                    try:
+                        repo._update_batches(bool(preparing_batch), ignore=pull_info_failures)
+                        self._commit()
+                    except HTTPError as e:
+                        # Sometimes a pr pull info can fail.
+                        # - Most of the time it is only temporary and it will be successfull on next try. 
+                        # - In some rare case the pr will always fail (github inconsistency) The pr exists in git (for-each-ref) but not on github api.
+                        # For this rare case, we store the pr in memory in order to unstuck other pr/branches update.
+                        # We consider that this error should not remain, in this case github needs to fix this inconsistency.
+                        # Another solution would be to create the pr with fake pull info. This idea is not the best one
+                        # since we want to avoid to have many pr with fake pull_info in case of temporary failure of github services.
+                        # With this solution, the pr will be retried once every cron loop (~10 minutes).
+                        # We dont except to have pr with this kind of persistent failure more than every few mounths/years.
+                        self.env.cr.rollback()
+                        self.env.clear()
+                        pull_number = e.response.url.split('/')[-1]
+                        pull_info_failures.add(pull_number)
+                        self.warning('Pr pull info failed for %s', pull_number)
+                        self._commit()
             if processing_batch:
                 _logger.info('starting processing of %s batches', len(processing_batch))
                 for batch in processing_batch:
@@ -335,6 +354,9 @@ class Runbot(models.AbstractModel):
     def warning(self, message, *args):
         if args:
             message = message % args
+        existing = self.env['runbot.warning'].search([('message', '=', message)])
+        if existing:
+            existing.count += 1
         return self.env['runbot.warning'].create({'message': message})
 
 
@@ -342,8 +364,10 @@ class RunbotWarning(models.Model):
     """
     Generic Warnings for runbot
     """
+    _order = 'write_date desc, id desc'
 
     _name = 'runbot.warning'
     _description = 'Generic Runbot Warning'
 
     message = fields.Char("Warning", index=True)
+    count = fields.Integer("Count", default=1)

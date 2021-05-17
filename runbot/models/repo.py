@@ -345,13 +345,12 @@ class Repo(models.Model):
             return os.path.getmtime(fname_fetch_head)
         return 0
 
-    def _get_refs(self, max_age=30):
+    def _get_refs(self, max_age=30, ignore=None):
         """Find new refs
         :return: list of tuples with following refs informations:
         name, sha, date, author, author_email, subject, committer, committer_email
         """
         self.ensure_one()
-
         get_ref_time = round(self._get_fetch_head_time(), 4)
         if not self.get_ref_time or get_ref_time > self.get_ref_time:
             try:
@@ -367,6 +366,8 @@ class Repo(models.Model):
                     return []
                 refs = [tuple(field for field in line.split('\x00')) for line in git_refs.split('\n')]
                 refs = [r for r in refs if dateutil.parser.parse(r[2][:19]) + datetime.timedelta(days=max_age) > datetime.datetime.now()]
+                if ignore:
+                    refs = [r for r in refs if r[0].split('/')[-1] not in ignore]
                 return refs
             except Exception:
                 _logger.exception('Fail to get refs for repo %s', self.name)
@@ -401,7 +402,6 @@ class Repo(models.Model):
                 _logger.info('new branch %s found in %s', name, self.name)
         if new_branch_values:
             _logger.info('Creating new branches')
-            # TODO ASAP dont fail all if pr status fail, aka github is dans les choux
             new_branches = self.env['runbot.branch'].create(new_branch_values)
             for branch in new_branches:
                 ref_branches[branch.ref()] = branch
@@ -457,13 +457,13 @@ class Repo(models.Model):
                 if bundle.last_batch.state == 'preparing':
                     bundle.last_batch._new_commit(branch)
 
-    def _update_batches(self, force=False):
+    def _update_batches(self, force=False, ignore=None):
         """ Find new commits in physical repos"""
         updated = False
         for repo in self:
             if repo.remote_ids and self._update(poll_delay=30 if force else 60*5):
                 max_age = int(self.env['ir.config_parameter'].get_param('runbot.runbot_max_age', default=30))
-                ref = repo._get_refs(max_age)
+                ref = repo._get_refs(max_age, ignore=ignore)
                 ref_branches = repo._find_or_create_branches(ref)
                 repo._find_new_commits(ref, ref_branches)
                 updated = True
@@ -549,7 +549,6 @@ class Repo(models.Model):
                 return repo._update_git(force, poll_delay)
             except Exception:
                 _logger.exception('Fail to update repo %s', repo.name)
-
 
 class RefTime(models.Model):
     _name = 'runbot.repo.reftime'
