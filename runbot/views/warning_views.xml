@@ -5,8 +5,9 @@
       <field name="model">runbot.warning</field>
       <field name="arch" type="xml">
         <tree string="Runbot Warnings">
-          <field name="create_date"/>
+          <field name="write_date"/>
           <field name="message"/>
+          <field name="count"/>
         </tree>
       </field>
     </record>
