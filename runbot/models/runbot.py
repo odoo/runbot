@@ -354,7 +354,7 @@ class Runbot(models.AbstractModel):
     def warning(self, message, *args):
         if args:
             message = message % args
-        existing = self.env['runbot.warning'].search([('message', '=', message)])
+        existing = self.env['runbot.warning'].search([('message', '=', message)], limit=1)
         if existing:
             existing.count += 1
         return self.env['runbot.warning'].create({'message': message})
