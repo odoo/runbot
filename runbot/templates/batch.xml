@@ -67,6 +67,11 @@
                                                 <span t-esc="commit_link.file_changed"/>
                                                 <i class="fa fa-file"/>
                                                 )
+                                                <span io="behind">(
+                                                    <span t-esc="'%s ahead' % commit_link.base_ahead" class="text-success"/>
+                                                    ,
+                                                    <span t-esc="'%s behind' % commit_link.base_behind" class="text-danger"/>
+                                                )</span>
                                             </span>
                                         </t>
                                         <br/>
@@ -76,11 +81,6 @@
                                             <br/>
                                             Merge base:
                                             <span t-esc="commit_link.merge_base_commit_id.name"/>
-                                            (
-                                            <span t-esc="'%s ahead' % commit_link.base_ahead" class="text-success"/>
-                                            ,
-                                            <span t-esc="'%s behind' % commit_link.base_behind" class="text-danger"/>
-                                            )
                                             <br/>
                                         </t>
                                     </small>
