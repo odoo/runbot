@@ -17,6 +17,12 @@ class Bundle(models.Model):
     name = fields.Char('Bundle name', required=True, help="Name of the base branch")
     project_id = fields.Many2one('runbot.project', required=True, index=True)
     branch_ids = fields.One2many('runbot.branch', 'bundle_id')
+    pr_state = fields.Selection(
+        [('open', 'Has Open PR'), ('done', 'All PR are closed'), ('nopr', 'Has no PR')],
+        compute='_compute_bundle_pr_state',
+        search='_search_pr_state',
+        string='PR States',
+    )
 
     # custom behaviour
     no_build = fields.Boolean('No build')
@@ -181,6 +187,30 @@ class Bundle(models.Model):
             for batch in batchs:
                 batch.bundle_id.last_done_batch = batch
 
+    @api.depends('branch_ids.is_pr', 'branch_ids.alive')
+    def _compute_bundle_pr_state(self):
+        """('open', 'Has Open PR'), ('done', 'All PR are closed'), ('nopr', 'Has no PR')"""
+        for bundle in self:
+            prs = bundle.branch_ids.filtered(lambda b: b.is_pr)
+            if not prs:
+                bundle.pr_state = 'nopr'
+            elif any(prs.mapped('alive')):
+                bundle.pr_state = 'open'
+            else:
+                bundle.pr_state = 'done'
+
+    def _search_pr_state(self, operator, value):
+        op = operator == '=' and 'in' or 'not in'
+        if value == 'open':
+            select = "SELECT bundle_id FROM runbot_branch WHERE is_pr and alive GROUP BY bundle_id"
+        if value == 'done':
+            select = "SELECT bundle_id FROM runbot_branch WHERE is_pr GROUP BY bundle_id HAVING NOT bool_or(alive)"
+        if value == 'nopr':
+            op = operator == '=' and 'not in' or 'in'
+            select = "SELECT bundle_id FROM runbot_branch WHERE is_pr"
+        self.env.cr.execute(select)
+        return [('id', op, list([x[0] for x in self.env.cr.fetchall()]))]
+
     def create(self, values_list):
         res = super().create(values_list)
         if res.is_base:
@@ -231,6 +261,14 @@ class Bundle(models.Model):
             branch_groups[branch.remote_id.repo_id].append(branch)
         return branch_groups
 
+    def action_open_frontend(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_url',
+            'name': "Bundle Frontend View",
+            'target': 'new',
+            'url': '/runbot/bundle/%s' % self.id
+        }
 
 class BundleTriggerCustomisation(models.Model):
     _name = 'runbot.bundle.trigger.custom'

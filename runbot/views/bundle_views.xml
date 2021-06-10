@@ -20,6 +20,7 @@
         <field name="arch" type="xml">
             <form string="Bundles">
                 <div class="oe_button_box" name="button_box">
+                    <button name="action_open_frontend" title="Open Frontend" aria-label="Open" type="object" icon="fa-play" class="oe_link"/>
                 </div>
                 <group>
                     <field name="name"/>
@@ -65,7 +66,7 @@
     <record id="view_runbot_bundle_tree" model="ir.ui.view">
         <field name="model">runbot.bundle</field>
         <field name="arch" type="xml">
-            <tree string="Bundle">
+            <tree string="Bundle" decoration-primary="sticky == True" decoration-muted="pr_state == 'nopr'" decoration-success="pr_state == 'done'" decoration-warning="pr_state == 'open'">
                 <field name="project_id"/>
                 <field name="name"/>
                 <field name="version_number"/>
@@ -75,10 +76,24 @@
                 <field name="no_build"/>
                 <field name="branch_ids"/>
                 <field name="version_id"/>
+                <button name="action_open_frontend" title="Open Frontend" aria-label="Open" type="object" icon="fa-play" class="oe_link"/>
+                <field name="pr_state"/>
             </tree>
         </field>
     </record>
 
+    <record id="runbot_bundle_search_view" model="ir.ui.view">
+      <field name="name">runbot.bundle.filter</field>
+      <field name="model">runbot.bundle</field>
+      <field name="arch" type="xml">
+        <search string="Search regex">
+          <field name="name"/>
+          <filter string="Has Open PR" name="open_pr" domain="[('pr_state', '=', 'open')]"/>
+          <filter string="All PR Closed" name="open_pr" domain="[('pr_state', '=', 'done')]"/>
+          <filter string="Has no PR" name="nopr" domain="[('pr_state', '=', 'nopr')]"/>
+        </search>
+      </field>
+    </record>
     <record id="view_runbot_batch" model="ir.ui.view">
         <field name="model">runbot.batch</field>
         <field name="arch" type="xml">
