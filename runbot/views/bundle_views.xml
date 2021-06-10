@@ -75,10 +75,24 @@
                 <field name="no_build"/>
                 <field name="branch_ids"/>
                 <field name="version_id"/>
+                <field name="labels" widget="many2many_tags" readonly="1"/>
             </tree>
         </field>
     </record>
 
+    <record id="runbot_bundle_search_view" model="ir.ui.view">
+      <field name="name">runbot.bundle.filter</field>
+      <field name="model">runbot.bundle</field>
+      <field name="arch" type="xml">
+        <search string="Search regex">
+          <field name="name"/>
+          <field name="labels"/>
+           <filter string="Has Open PR" name="open_pr" domain="[('pr_state', '=', 'open')]"/>
+           <filter string="All PR Closed" name="open_pr" domain="[('pr_state', '=', 'done')]"/>
+           <filter string="Has no PR" name="nopr" domain="[('pr_state', '=', 'nopr')]"/>
+        </search>
+      </field>
+    </record>
     <record id="view_runbot_batch" model="ir.ui.view">
         <field name="model">runbot.batch</field>
         <field name="arch" type="xml">
@@ -126,6 +140,40 @@
         </field>
     </record>
 
+    <record id="view_runbot_branch_label_form" model="ir.ui.view">
+        <field name="model">runbot.branch.label</field>
+        <field name="arch" type="xml">
+            <form string="Label">
+                <group>
+                    <field name="name"/>
+                </group>
+                <field name="bundle_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}">
+                    <tree string="Bundle">
+                        <field name="project_id"/>
+                        <field name="name"/>
+                        <field name="version_number"/>
+                        <field name="is_base"/>
+                        <field name="sticky"/>
+                        <field name="to_upgrade"/>
+                        <field name="no_build"/>
+                        <field name="branch_ids"/>
+                        <field name="version_id"/>
+                        <field name="labels" widget="many2many_tags" readonly="1"/>
+                        <button name="action_open_frontend" title="Open Frontend" aria-label="Open" type="object" icon="fa-play" class="oe_link"/>
+                    </tree>
+                </field>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_runbot_branch_label_tree" model="ir.ui.view">
+        <field name="model">runbot.branch.label</field>
+        <field name="arch" type="xml">
+            <tree string="Label">
+                <field name="name"/>
+            </tree>
+        </field>
+    </record>
     <record id="action_bundle" model="ir.actions.act_window">
         <field name="name">Bundles</field>
         <field name="type">ir.actions.act_window</field>
@@ -151,10 +199,17 @@
         <field name="view_mode">tree,form</field>
     </record>
 
+    <record id="action_bundle_label" model="ir.actions.act_window">
+        <field name="name">Labels</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">runbot.branch.label</field>
+        <field name="view_mode">tree,form</field>
+    </record>
     <menuitem id="menu_bundle" name="Bundle" parent="runbot_menu_root"/>
     <menuitem id="menu_bundle_bundle" action="action_bundle" parent="menu_bundle"/>
     <menuitem id="menu_bundle_project" action="action_bundle_project" parent="menu_bundle"/>
     <menuitem id="menu_bundle_version" action="action_bundle_version" parent="menu_bundle"/>
     <menuitem id="menu_bundle_batch" action="action_bundle_batch" parent="menu_bundle"/>
+    <menuitem id="menu_bundle_label" action="action_bundle_label" parent="menu_bundle"/>
   </data>
 </odoo>

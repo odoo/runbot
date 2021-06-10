@@ -14,21 +14,6 @@ class TestBranch(RunbotCase):
 
         self.assertEqual(branch.branch_url, 'https://example.com/base/server/tree/master')
 
-    def test_pull_request(self):
-        mock_github = self.patchers['github_patcher']
-        mock_github.return_value = {
-            'base': {'ref': 'master'},
-            'head': {'label': 'foo-dev:bar_branch', 'repo': {'full_name': 'foo-dev/bar'}},
-        }
-        pr = self.Branch.create({
-            'remote_id': self.remote_server.id,
-            'name': '12345',
-            'is_pr': True,
-        })
-        self.assertEqual(pr.name, '12345')
-        self.assertEqual(pr.branch_url, 'https://example.com/base/server/pull/12345')
-        self.assertEqual(pr.target_branch_name, 'master')
-        self.assertEqual(pr.pull_head_name, 'foo-dev:bar_branch')
 
 class TestBranchRelations(RunbotCase):
 

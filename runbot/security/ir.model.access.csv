@@ -103,3 +103,6 @@ access_runbot_upgrade_exception_admin,access_runbot_upgrade_exception_admin,runb
 
 access_runbot_dockerfile_user,access_runbot_dockerfile_user,runbot.model_runbot_dockerfile,runbot.group_user,1,0,0,0
 access_runbot_dockerfile_admin,access_runbot_dockerfile_admin,runbot.model_runbot_dockerfile,runbot.group_runbot_admin,1,1,1,1
+
+access_runbot_branch_label,runbot_branch_label,runbot.model_runbot_branch_label,group_user,1,0,0,0
+access_runbot_branch_label_admin,runbot_branch_label_admin,runbot.model_runbot_branch_label,runbot.group_runbot_admin,1,1,1,1

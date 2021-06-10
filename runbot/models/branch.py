@@ -17,6 +17,8 @@ class Branch(models.Model):
     name = fields.Char('Name', required=True)
     remote_id = fields.Many2one('runbot.remote', 'Remote', required=True, ondelete='cascade')
 
+    label_ids = fields.Many2many('runbot.branch.label', string='PR Labels')
+
     head = fields.Many2one('runbot.commit', 'Head Commit', index=True)
     head_name = fields.Char('Head name', related='head.name', store=True)
 
@@ -93,6 +95,7 @@ class Branch(models.Model):
                         _logger.info('Not all pr found after 100 pages: remaining: %s', pr_names)
                         break
 
+        all_labels = self.env['runbot.branch.label'].search([])
         for branch in self:
             branch.target_branch_name = False
             branch.pull_head_name = False
@@ -110,6 +113,13 @@ class Branch(models.Model):
                                 owner, repo_name = pull_head_repo_name.split('/')
                                 name_to_remote[pull_head_repo_name] = self.env['runbot.remote'].search([('owner', '=', owner), ('repo_name', '=', repo_name)], limit=1)
                             branch.pull_head_remote_id = name_to_remote[pull_head_repo_name]
+                        if 'labels' in pi and pi.get('labels'):
+                            pi_labels = {l['name'] for l in pi['labels']}
+                            existing_labels = all_labels.filtered(lambda l: l.name in pi_labels)
+                            new_labels_vals = [{'name': l} for  l in pi_labels.difference(set(existing_labels.mapped('name')))]
+                            labels_ids = self.env['runbot.branch.label'].create(new_labels_vals)
+                            all_labels |= labels_ids
+                            branch.label_ids = labels_ids | existing_labels
                     except (TypeError, AttributeError):
                         _logger.exception('Error for pr %s using pull_info %s', branch.name, pi)
                         raise
@@ -219,3 +229,18 @@ class RefLog(models.Model):
     commit_id = fields.Many2one('runbot.commit', index=True)
     branch_id = fields.Many2one('runbot.branch', index=True)
     date = fields.Datetime(default=fields.Datetime.now)
+
+
+class BranchLabel(models.Model):
+    _name = "runbot.branch.label"
+    _description = "Pull Request Label"
+    _sql_constraints = [('branch_label_uniq', 'unique (name)', 'A branch label must be unique')]
+
+    name = fields.Char('Label', index=True)
+    branch_ids = fields.Many2many('runbot.branch', string='Branches')
+    bundle_ids = fields.Many2many('runbot.bundle', string='Bundles', compute='_compute_bundles')
+
+    @api.depends('branch_ids')
+    def _compute_bundles(self):
+        for label in self:
+            label.bundle_ids = label.branch_ids.mapped('bundle_id')

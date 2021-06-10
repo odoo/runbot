@@ -17,6 +17,7 @@ class Bundle(models.Model):
     name = fields.Char('Bundle name', required=True, help="Name of the base branch")
     project_id = fields.Many2one('runbot.project', required=True, index=True)
     branch_ids = fields.One2many('runbot.branch', 'bundle_id')
+    labels = fields.One2many('runbot.branch.label', compute='_compute_labels', search='_search_labels')
 
     # custom behaviour
     no_build = fields.Boolean('No build')
@@ -180,6 +181,16 @@ class Bundle(models.Model):
             batchs = self.env['runbot.batch'].browse([r[0] for r in self.env.cr.fetchall()])
             for batch in batchs:
                 batch.bundle_id.last_done_batch = batch
+
+    @api.depends('branch_ids.label_ids')
+    def _compute_labels(self):
+        for bundle in self:
+            bundle.labels = bundle.branch_ids.mapped('label_ids')
+
+    def _search_labels(self, operator, value):
+        if operator in ('=', 'like', 'ilike', 'in', '!='):
+            branch_ids = self.env['runbot.branch'].search([('label_ids.name', operator, value)])
+            return [('branch_ids', 'in', branch_ids.ids)]
 
     def create(self, values_list):
         res = super().create(values_list)
