@@ -17,7 +17,7 @@ RUN set -x ; \
     </template>
 
     <template id="runbot.docker_install_chrome">
-      <t t-set="chrome_distrib" t-value="values['chrome_distrib']"/>
+      <t t-set="chrome_distrib" t-value="values.get('chrome_distrib')"/>
       <t t-set="chrome_version" t-value="values['chrome_version']"/>
       <t t-set="chrome_source" t-value="values.get('chrome_source')"/>
 # Install Google Chrome
@@ -95,18 +95,24 @@ RUN apt-get update \
 
     <template id="runbot.docker_install_odoo_python_requirements">
 ADD https://raw.githubusercontent.com/odoo/odoo/<t t-esc="values['odoo_branch']"/>/requirements.txt /root/requirements.txt
-RUN <t t-esc="values['python_version']"/> -m pip install setuptools wheel &amp;&amp; \
+RUN <t t-esc="values['python_version']"/> -m pip install --no-cache-dir setuptools wheel &amp;&amp; \
     <t t-esc="values['python_version']"/> -m pip install --no-cache-dir -r /root/requirements.txt &amp;&amp; \
-    <t t-esc="values['python_version']"/> -m pip install <t t-esc="values['additional_pip']"/>
+    <t t-esc="values['python_version']"/> -m pip install --no-cache-dir <t t-esc="values['additional_pip']"/>
     </template>
+
+    <template id="runbot.docker_install_runbot_python_requirements">
+RUN <t t-esc="values['python_version']"/> -m pip install --no-cache-dir setuptools wheel &amp;&amp; \
+    <t t-esc="values['python_version']"/> -m pip install <t t-esc="values['runbot_pip']"/>
+    </template>
+
 
     <template id="runbot.docker_base">
       <t t-set="default" t-value="{
-'from': 'ubuntu:bionic',
+'from': 'ubuntu:focal',
 'odoo_branch': 'master',
-'chrome_distrib': 'bionic',
-'chrome_version': '80.0.3987.116-1',
-'node_packages': 'rtlcss es-check',
+'chrome_source': 'google',
+'chrome_version': '90.0.4430.93-1',
+'node_packages': 'rtlcss es-check eslint',
 'node_version': '15',
 'psql_version': '12',
 'wkhtml_url': 'https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.5/wkhtmltox_0.12.5-1.bionic_amd64.deb',
@@ -114,10 +120,11 @@ RUN <t t-esc="values['python_version']"/> -m pip install setuptools wheel &amp;&
 'phantom': False,
 'do_requirements': True,
 'python_version': 'python3',
-'deb_packages_python': 'python3 python3-dev python3-pip python3-setuptools python3-wheel python3-markdown libpq-dev',
-'deb_package_default': 'apt-transport-https build-essential ca-certificates curl ffmpeg file fonts-freefont-ttf fonts-noto-cjk gawk gnupg libldap2-dev libsasl2-dev libxslt1-dev lsb-release node-less ocrmypdf sed sudo unzip xfonts-75dpi zip zlib1g-dev',
-'additional_pip': 'coverage==4.5.4 websocket-client astroid==2.4.2 pylint==2.5.0 phonenumbers pyCrypto dbfread==2.0.7 firebase-admin==2.17.0 flamegraph pdfminer.six==20200720 pdf417gen==0.7.1'
-              }"/>
+'deb_packages_python': 'python3 python3-dbfread python3-dev python3-pip python3-setuptools python3-wheel python3-markdown python3-mock python3-phonenumbers python3-vatnumber python3-websocket libpq-dev',
+'deb_package_default': 'apt-transport-https build-essential ca-certificates curl ffmpeg file fonts-freefont-ttf fonts-noto-cjk gawk gnupg gsfonts libldap2-dev libjpeg9-dev libsasl2-dev libxslt1-dev lsb-release node-less ocrmypdf sed sudo unzip xfonts-75dpi zip zlib1g-dev',
+'additional_pip': 'ebaysdk==2.1.5 pdf417gen==0.7.1',
+'runbot_pip': 'coverage==4.5.4 astroid==2.4.2 pylint==2.5.0 flamegraph'
+}"/>
       <t t-set="values" t-value="default"/>
       <t t-set="dummy" t-value="values.update(custom_values)" t-if="custom_values" />
 
@@ -134,6 +141,7 @@ RUN <t t-esc="values['python_version']"/> -m pip install setuptools wheel &amp;&
       <t t-call="runbot.docker_install_node_packages"/>
       <t t-call="runbot.docker_install_flamegraph"/>
       <t t-call="runbot.docker_install_odoo_debs"/>
+      <t t-call="runbot.docker_install_runbot_python_requirements"/>
       <t t-call="runbot.docker_install_psql"/>
       <t t-if="values['chrome']" t-call="runbot.docker_install_chrome"/>
       <t t-if="values['phantom']" t-call="runbot.docker_install_phantomjs"/>

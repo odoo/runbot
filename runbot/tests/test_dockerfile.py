@@ -18,6 +18,7 @@ class TestDockerfile(RunbotCase, HttpCase):
       'from': 'ubuntu:focal',
       'phantom': True,
       'additional_pip': 'babel==2.8.0',
+      'chrome_source': 'odoo',
       'chrome_version': '86.0.4240.183-1',
     }"/>
 </t>
@@ -40,7 +41,7 @@ class TestDockerfile(RunbotCase, HttpCase):
         self.assertTrue(dockerfile.dockerfile.startswith('FROM ubuntu:focal'))
         self.assertIn(' apt-get install -y -qq google-chrome-stable=86.0.4240.183-1', dockerfile.dockerfile)
         self.assertIn('# Install phantomjs', dockerfile.dockerfile)
-        self.assertIn('pip install babel==2.8.0', dockerfile.dockerfile)
+        self.assertIn('pip install --no-cache-dir babel==2.8.0', dockerfile.dockerfile)
 
         # test view update
         xml_content = xml_content.replace('86.0.4240.183-1', '87.0-1')
