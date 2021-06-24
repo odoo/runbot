@@ -32,6 +32,14 @@
                     </tree>
                   </field>
                 </page>
+                <page string="Bundles">
+                  <field name="bundle_ids" widget="one2many">
+                    <tree>
+                      <field name="project_id"/>
+                      <field name="name"/>
+                    </tree>
+                  </field>
+                </page>
               </notebook>
             </sheet>
             <div class="oe_chatter">
@@ -51,6 +59,7 @@
             <field name="image_tag"/>
             <field name="to_build"/>
             <field name="version_ids" widget="many2many_tags"/>
+            <field name="bundle_ids"/>
             <field name="dockerfile" invisible="True"/>
           </tree>
         </field>
