@@ -12,6 +12,7 @@
                 <field name="image_tag"/>
                 <field name="to_build"/>
                 <field name="version_ids" widget="many2many_tags"/>
+                <field name="project_ids" widget="many2many_tags"/>
                 <field name="template_id"/>
               </group>
               <group>
@@ -59,6 +60,7 @@
             <field name="image_tag"/>
             <field name="to_build"/>
             <field name="version_ids" widget="many2many_tags"/>
+            <field name="project_ids" widget="many2many_tags"/>
             <field name="bundle_ids"/>
             <field name="dockerfile" invisible="True"/>
           </tree>

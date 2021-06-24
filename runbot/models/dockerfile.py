@@ -20,6 +20,7 @@ class Dockerfile(models.Model):
     version_ids = fields.One2many('runbot.version', 'dockerfile_id', string='Versions')
     description = fields.Text('Description')
     view_ids = fields.Many2many('ir.ui.view', compute='_compute_view_ids')
+    project_ids = fields.One2many('runbot.project', 'dockerfile_id', string='Default for Projects')
     bundle_ids = fields.One2many('runbot.bundle', 'dockerfile_id', string='Used in Bundles')
 
     _sql_constraints = [('runbot_dockerfile_name_unique', 'unique(name)', 'A Dockerfile with this name already exists')]

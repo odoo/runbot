@@ -9,6 +9,7 @@ class Project(models.Model):
     group_ids = fields.Many2many('res.groups', string='Required groups')
 
     trigger_ids = fields.One2many('runbot.trigger', 'project_id', string='Triggers')
+    dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, help="Project Default Dockerfile")
 
 
 class Category(models.Model):
