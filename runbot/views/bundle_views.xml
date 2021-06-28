@@ -49,6 +49,7 @@
                         <tree editable="bottom">
                             <field name="trigger_id" domain="[('project_id', '=', parent.project_id)]"/>
                             <field name="config_id"/>
+                            <field name="extra_params"/>
                         </tree>
                     </field>
                     <field string="Last batches" name="last_batchs">

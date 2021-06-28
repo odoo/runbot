@@ -266,8 +266,10 @@ class Batch(models.Model):
         version_id = self.bundle_id.version_id.id
         project_id = self.bundle_id.project_id.id
         config_by_trigger = {}
+        params_by_trigger = {}
         for trigger_custom in self.bundle_id.trigger_custom_ids:
             config_by_trigger[trigger_custom.trigger_id.id] = trigger_custom.config_id
+            params_by_trigger[trigger_custom.trigger_id.id] = trigger_custom.extra_params
         for trigger in triggers:
             trigger_repos = trigger.repo_ids | trigger.dependency_ids
             if trigger_repos & missing_repos:
@@ -275,10 +277,12 @@ class Batch(models.Model):
                 continue
             # in any case, search for an existing build
             config = config_by_trigger.get(trigger.id, trigger.config_id)
-
+            if not config:
+                continue
+            extra_params = params_by_trigger.get(trigger.id, '')
             params_value = {
                 'version_id':  version_id,
-                'extra_params': '',
+                'extra_params': extra_params,
                 'config_id': config.id,
                 'project_id': project_id,
                 'trigger_id': trigger.id,  # for future reference and access rights

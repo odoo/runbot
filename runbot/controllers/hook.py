@@ -45,11 +45,15 @@ class Hook(http.Controller):
                     ('is_base', '=', True),
                     ('project_id', '=', branch.remote_id.repo_id.project_id.id)
                 ])
-                if base:
+                if base and branch.bundle_id.defined_base_id != base:
                     _logger.info('Changing base of bundle %s to %s(%s)', branch.bundle_id, base.name, base.id)
                     branch.bundle_id.defined_base_id = base.id
-                    # TODO remove all ci
-
+                    branch.bundle_id._force()
+            elif payload.get('action') in ('ready_for_review', 'converted_to_draft'):
+                init_draft = branch.draft
+                branch._compute_branch_infos(payload.get('pull_request', {}))
+                if branch.draft != init_draft:
+                    branch.bundle_id._force()
             elif payload.get('action') in ('deleted', 'closed'):
                 _logger.info('Closing pr %s', branch.name)
                 branch.alive = False
