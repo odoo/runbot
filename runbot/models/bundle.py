@@ -43,12 +43,12 @@ class Bundle(models.Model):
 
     priority = fields.Boolean('Build priority', default=False)
 
+    # Custom parameters
     trigger_custom_ids = fields.One2many('runbot.bundle.trigger.custom', 'bundle_id')
-    auto_rebase = fields.Boolean('Auto rebase', default=False)
-
     host_id = fields.Many2one('runbot.host', compute="_compute_host_id", store=True)
-
     dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, help="Use a custom Dockerfile")
+    commit_limit = fields.Integer("Commit limit")
+    file_limit = fields.Integer("File limit")
 
     @api.depends('name')
     def _compute_host_id(self):
@@ -194,7 +194,7 @@ class Bundle(models.Model):
             model = self.browse()
             model._get_base_ids.clear_cache(model)
 
-    def _force(self, category_id=None, auto_rebase=False):
+    def _force(self, category_id=None):
         self.ensure_one()
         if self.last_batch.state == 'preparing':
             return
@@ -207,7 +207,6 @@ class Bundle(models.Model):
             values['category_id'] = category_id
         new = self.env['runbot.batch'].create(values)
         self.last_batch = new
-        new.sudo()._prepare(auto_rebase or self.auto_rebase)
         return new
 
     def consistency_warning(self):
@@ -239,6 +238,7 @@ class BundleTriggerCustomisation(models.Model):
     trigger_id = fields.Many2one('runbot.trigger', domain="[('project_id', '=', bundle_id.project_id)]")
     bundle_id = fields.Many2one('runbot.bundle')
     config_id = fields.Many2one('runbot.build.config')
+    extra_params = fields.Char("Custom parameters")
 
     _sql_constraints = [
         (

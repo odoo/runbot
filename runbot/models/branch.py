@@ -34,6 +34,7 @@ class Branch(models.Model):
     dname = fields.Char('Display name', compute='_compute_dname', search='_search_dname')
 
     alive = fields.Boolean('Alive', default=True)
+    draft = fields.Boolean('Draft', compute='_compute_branch_infos', store=True)
 
     @api.depends('name', 'remote_id.short_name')
     def _compute_dname(self):
@@ -101,6 +102,7 @@ class Branch(models.Model):
                 pi = branch.is_pr and (pull_info or pull_info_dict.get((branch.remote_id, branch.name)) or branch._get_pull_info())
                 if pi:
                     try:
+                        branch.draft = pi.get('draft', False)
                         branch.target_branch_name = pi['base']['ref']
                         branch.pull_head_name = pi['head']['label']
                         pull_head_repo_name = False

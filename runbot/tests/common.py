@@ -211,7 +211,8 @@ class RunbotCase(TransactionCase):
 
         self.assertEqual(triggers.repo_ids + triggers.dependency_ids, self.remote_addons.repo_id + self.remote_server.repo_id)
 
-        self.branch_addons.bundle_id._force()
+        batch = self.branch_addons.bundle_id._force()
+        batch._prepare()
 
 
 class RunbotCaseMinimalSetup(RunbotCase):
