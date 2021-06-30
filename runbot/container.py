@@ -8,17 +8,13 @@ When testing this file:
     the first parameter should be a directory containing Odoo.
     The second parameter is the exposed port
 """
-import argparse
 import configparser
-import datetime
 import io
 import json
 import logging
 import os
 import re
-import shutil
 import subprocess
-import time
 
 
 _logger = logging.getLogger(__name__)
@@ -121,7 +117,7 @@ def docker_run(*args, **kwargs):
     return _docker_run(*args, **kwargs)
 
 
-def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False, image_tag=False, exposed_ports=None, cpu_limit=None, preexec_fn=None, ro_volumes=None, env_variables=None):
+def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False, image_tag=False, exposed_ports=None, cpu_limit=None, memory=None, preexec_fn=None, ro_volumes=None, env_variables=None):
     """Run tests in a docker container
     :param run_cmd: command string to run in container
     :param log_path: path to the logfile that will contain odoo stdout and stderr
@@ -130,6 +126,7 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
     :param container_name: used to give a name to the container for later reference
     :param image_tag: Docker image tag name to select which docker image to use
     :param exposed_ports: if not None, starting at 8069, ports will be exposed as exposed_ports numbers
+    :param memory: memory limit in bytes for the container
     :params ro_volumes: dict of dest:source volumes to mount readonly in builddir
     :params env_variables: list of environment variables
     """
@@ -157,6 +154,10 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
         '--shm-size=128m',
         '--init',
     ]
+
+    if memory:
+        docker_command.append('--memory=%s' % memory)
+
     if ro_volumes:
         for dest, source in ro_volumes.items():
             logs.write("Adding readonly volume '%s' pointing to %s \n" % (dest, source))
