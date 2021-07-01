@@ -148,7 +148,8 @@
                     </ul>
                     <t t-if="staging.heads">
                         <div class="dropdown">
-                            <button class="btn btn-link dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                            <button class="btn btn-link dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"
+                                    t-attf-title="{{staging.staged_at}}Z">
                                 Staged <span t-field="staging.staged_at" t-options="{'widget': 'relative'}"/>
                                 <span class="caret"></span>
                             </button>
@@ -218,7 +219,7 @@
                             <th t-att-title="title.strip() or None">
                                 <t t-if="not staging.heads">
                                     <span t-field="staging.staged_at"
-                                          t-options="{'widget': 'text'}"/>
+                                          t-options="{'format': 'yyyy-MM-dd\'T\'HH:mm:ssZ'}"/>
                                 </t>
                                 <div class="dropdown" t-if="staging.heads">
                                     <button class="btn btn-link dropdown-toggle"
@@ -227,7 +228,7 @@
                                             aria-haspopup="true"
                                             aria-expanded="true">
                                         <span t-field="staging.staged_at"
-                                              t-options="{'widget': 'text'}"/>
+                                              t-options="{'format': 'yyyy-MM-dd\'T\'HH:mm:ssZ'}"/>
                                         <span class="caret"></span>
                                     </button>
                                     <ul class="dropdown-menu">
