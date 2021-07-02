@@ -102,7 +102,7 @@ class Host(models.Model):
         return int(icp.get_param('runbot.runbot_running_max', default=5))
 
     def set_psql_conn_count(self):
-        _logger.debug('Updating psql connection count...')
+        _logger.info('Updating psql connection count...')
         self.ensure_one()
         with local_pgadmin_cursor() as local_cr:
             local_cr.execute("SELECT sum(numbackends) FROM pg_stat_database;")

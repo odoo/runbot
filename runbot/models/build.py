@@ -481,13 +481,13 @@ class BuildResult(models.Model):
             elif dest != hide_in_logs:
                 ignored.add(dest)
         if ignored:
-            _logger.debug('%s (%s) not deleted because not dest format', label, list(ignored))
+            _logger.info('%s (%s) not deleted because not dest format', label, list(ignored))
         builds = self.browse(dest_by_builds_ids)
         existing = builds.exists()
         remaining = (builds - existing)
         if remaining:
             dest_list = [dest for sublist in [dest_by_builds_ids[rem_id] for rem_id in remaining.ids] for dest in sublist]
-            _logger.debug('(%s) (%s) not deleted because no corresponding build found', label, " ".join(dest_list))
+            _logger.info('(%s) (%s) not deleted because no corresponding build found', label, " ".join(dest_list))
         for build in existing:
             if fields.Datetime.from_string(build.gc_date) < datetime.datetime.now():
                 if build.local_state == 'done':
@@ -501,7 +501,7 @@ class BuildResult(models.Model):
         Remove datadir and drop databases of build older than db_gc_days or db_gc_days_child.
         If force is set to True, does the same cleaning based on recordset without checking build age.
         """
-        _logger.debug('Local cleaning')
+        _logger.info('Local cleaning')
         _filter = self._filter_to_clean
         additionnal_conditions = []
 
@@ -512,7 +512,7 @@ class BuildResult(models.Model):
                     if build and build in self:
                         yield dest
                     elif not build:
-                        _logger.debug('%s (%s) skipped because not dest format', label, dest)
+                        _logger.info('%s (%s) skipped because not dest format', label, dest)
             _filter = filter_ids
             for _id in self.exists().ids:
                 additionnal_conditions.append("datname like '%s-%%'" % _id)
@@ -564,7 +564,7 @@ class BuildResult(models.Model):
         l = list(l)
         for build in self:
             l[0] = "%s %s" % (build.dest, l[0])
-            _logger.debug(*l)
+            _logger.info(*l)
 
     def _get_docker_name(self):
         self.ensure_one()
@@ -667,7 +667,7 @@ class BuildResult(models.Model):
                 if build.job_time < 5:
                     continue
                 elif build.job_time < 60:
-                    _logger.debug('container "%s" seems too take a while to start :%s' % (build.job_time, build._get_docker_name()))
+                    _logger.info('container "%s" seems too take a while to start :%s' % (build.job_time, build._get_docker_name()))
                     continue
                 else:
                     build._log('_schedule', 'Docker with state %s not started after 60 seconds, skipping' % _docker_state, level='ERROR')
@@ -824,14 +824,14 @@ class BuildResult(models.Model):
         datadir = appdirs.user_data_dir()
         paths = [os.path.join(datadir, pn, 'filestore', dbname) for pn in 'OpenERP Odoo'.split()]
         cmd = ['rm', '-rf'] + paths
-        _logger.debug(' '.join(cmd))
+        _logger.info(' '.join(cmd))
         subprocess.call(cmd)
 
     def _local_pg_createdb(self, dbname):
         icp = self.env['ir.config_parameter']
         db_template = icp.get_param('runbot.runbot_db_template', default='template0')
         self._local_pg_dropdb(dbname)
-        _logger.debug("createdb %s", dbname)
+        _logger.info("createdb %s", dbname)
         with local_pgadmin_cursor() as local_cr:
             local_cr.execute(sql.SQL("""CREATE DATABASE {} TEMPLATE %s LC_COLLATE 'C' ENCODING 'unicode'""").format(sql.Identifier(dbname)), (db_template,))
         self.env['runbot.database'].create({'name': dbname, 'build_id': self.id})
@@ -842,7 +842,7 @@ class BuildResult(models.Model):
             message = message[:300000] + '[Truncate, message too long]'
 
         self.ensure_one()
-        _logger.debug("Build %s %s %s", self.id, func, message)
+        _logger.info("Build %s %s %s", self.id, func, message)
         self.env['ir.logging'].create({
             'build_id': self.id,
             'level': level,
@@ -1104,7 +1104,7 @@ class BuildResult(models.Model):
             # TODO maybe avoid to send status if build is killable (another new build exist and will send the status)
             if build.parent_id:
                 if build.orphan_result:
-                    _logger.debug('Skipping result for orphan build %s', self.id)
+                    _logger.info('Skipping result for orphan build %s', self.id)
                 else:
                     build.parent_id._github_status(post_commit)
             elif build.params_id.config_id == build.params_id.trigger_id.config_id:
@@ -1117,7 +1117,7 @@ class BuildResult(models.Model):
                     if build.global_result == 'ok':
                         state = 'success'
                 else:
-                    _logger.debug("skipping github status for build %s ", build.id)
+                    _logger.info("skipping github status for build %s ", build.id)
                     continue
 
                 runbot_domain = self.env['runbot.runbot']._domain()

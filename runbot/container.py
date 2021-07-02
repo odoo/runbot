@@ -142,7 +142,7 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
         run_cmd = cmd_object.build()
     else:
         cmd_object = Command([], run_cmd.split(' '), [])
-    _logger.debug('Docker run command: %s', run_cmd)
+    _logger.info('Docker run command: %s', run_cmd)
     logs = open(log_path, 'w')
     run_cmd = 'cd /data/build;touch start-%s;%s;cd /data/build;touch end-%s' % (container_name, run_cmd, container_name)
     docker_clear_state(container_name, build_dir)  # ensure that no state are remaining
