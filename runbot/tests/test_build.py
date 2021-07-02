@@ -342,7 +342,7 @@ class TestBuildResult(RunbotCase):
         self.assertEqual(other_build.local_state, 'done')
         self.assertEqual(other_build.local_result, 'skipped')
         log_first_part = '%s skip %%s' % (other_build.dest)
-        mock_logger.debug.assert_called_with(log_first_part, 'A good reason')
+        mock_logger.info.assert_called_with(log_first_part, 'A good reason')
 
     def test_children(self):
         build1 = self.Build.create({

@@ -205,7 +205,7 @@ class CommitStatus(models.Model):
 
             def send_github_status(env):
                 for remote in env['runbot.remote'].browse(remote_ids):
-                    _logger.debug(
+                    _logger.info(
                         "github updating %s status %s to %s in repo %s",
                         status['context'], commit_name, status['state'], remote.name)
                     remote._github('/repos/:owner/:repo/statuses/%s' % commit_name, status, ignore_errors=True)

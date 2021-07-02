@@ -14,6 +14,7 @@ class Hook(http.Controller):
 
     @http.route(['/runbot/hook/<int:remote_id>', '/runbot/hook/org'], type='http', auth="public", website=True, csrf=False)
     def hook(self, remote_id=None, **post):
+        _logger.info('Hook on %s', remote_id)
         event = request.httprequest.headers.get("X-Github-Event")
         payload = json.loads(request.params.get('payload', '{}'))
         if remote_id is None:
@@ -39,7 +40,7 @@ class Hook(http.Controller):
             if payload and payload.get('action', '') == 'edited' and 'base' in payload.get('changes'):
                 # handle PR that have been re-targeted
                 branch._compute_branch_infos(payload.get('pull_request', {}))
-                _logger.info('retargeting %s to %s', branch.name, branch.target_branch_name)
+                _logger.info('Retargeting %s to %s', branch.name, branch.target_branch_name)
                 base = request.env['runbot.bundle'].search([
                     ('name', '=', branch.target_branch_name),
                     ('is_base', '=', True),
@@ -58,7 +59,7 @@ class Hook(http.Controller):
                 _logger.info('Closing pr %s', branch.name)
                 branch.alive = False
             else:
-                _logger.debug('Ignoring unsupported pull request operation %s %s', event, payload.get('action', ''))
+                _logger.info('Ignoring unsupported pull request operation %s %s', event, payload.get('action', ''))
         elif event == 'delete':
             if payload.get('ref_type') == 'branch':
                 branch_ref = payload.get('ref')
@@ -66,5 +67,5 @@ class Hook(http.Controller):
                 branch = request.env['runbot.branch'].sudo().search([('remote_id', '=', remote.id), ('name', '=', branch_ref)])
                 branch.alive = False
         else:
-            _logger.debug('Ignoring unsupported hook %s %s', event, payload.get('action', ''))
+            _logger.info('Ignoring unsupported hook %s %s', event, payload.get('action', ''))
         return ""

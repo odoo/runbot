@@ -173,21 +173,21 @@ class Runbot(models.AbstractModel):
                 with open(nginx_conf_path, 'rb') as f:
                     content = f.read()
             if content != nginx_config:
-                _logger.debug('reload nginx')
+                _logger.info('reload nginx')
                 with open(nginx_conf_path, 'wb') as f:
                     f.write(nginx_config)
                 try:
                     pid = int(open(os.path.join(nginx_dir, 'nginx.pid')).read().strip(' \n'))
                     os.kill(pid, signal.SIGHUP)
                 except Exception:
-                    _logger.debug('start nginx')
+                    _logger.info('start nginx')
                     if subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf']):
                         # obscure nginx bug leaving orphan worker listening on nginx port
                         if not subprocess.call(['pkill', '-f', '-P1', 'nginx: worker']):
-                            _logger.debug('failed to start nginx - orphan worker killed, retrying')
+                            _logger.warning('failed to start nginx - orphan worker killed, retrying')
                             subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf'])
                         else:
-                            _logger.debug('failed to start nginx - failed to kill orphan worker - oh well')
+                            _logger.warning('failed to start nginx - failed to kill orphan worker - oh well')
 
     def _get_cron_period(self):
         """ Compute a randomized cron period with a 2 min margin below
@@ -349,7 +349,7 @@ class Runbot(models.AbstractModel):
                 docker_stop(containers[c.id], c._path())
         ignored = {dc for dc in docker_ps_result if not dest_reg.match(dc)}
         if ignored:
-            _logger.debug('docker (%s) not deleted because not dest format', list(ignored))
+            _logger.info('docker (%s) not deleted because not dest format', list(ignored))
 
     def warning(self, message, *args):
         if args:
