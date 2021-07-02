@@ -215,15 +215,15 @@ class TestBuildResult(RunbotCase):
         self.repo_addons.modules = '-*'
 
         modules_to_test = build._get_modules_to_test(modules_patterns='')
-        self.assertEqual(modules_to_test, sorted(['good_module', 'hwgood', 'other_good', 'hw_explicit']))
+        self.assertEqual(sorted(modules_to_test), sorted(['good_module', 'hwgood', 'other_good', 'hw_explicit']))
 
         modules_to_test = build._get_modules_to_test(modules_patterns='-*, l10n_be')
-        self.assertEqual(modules_to_test, sorted(['l10n_be']))
+        self.assertEqual(sorted(modules_to_test), sorted(['l10n_be']))
         modules_to_test = build._get_modules_to_test(modules_patterns='l10n_be')
-        self.assertEqual(modules_to_test, sorted(['good_module', 'hwgood', 'other_good', 'hw_explicit', 'l10n_be']))
+        self.assertEqual(sorted(modules_to_test), sorted(['good_module', 'hwgood', 'other_good', 'hw_explicit', 'l10n_be']))
         # star to get all available mods
         modules_to_test = build._get_modules_to_test(modules_patterns='*, -hw_*, hw_explicit')
-        self.assertEqual(modules_to_test, sorted(['good_module', 'bad_module', 'other_good', 'l10n_be', 'hwgood', 'hw_explicit', 'other_mod_1', 'other_mod_2']))
+        self.assertEqual(sorted(modules_to_test), sorted(['good_module', 'bad_module', 'other_good', 'l10n_be', 'hwgood', 'hw_explicit', 'other_mod_1', 'other_mod_2']))
 
     def test_build_cmd_log_db(self, ):
         """ test that the logdb connection URI is taken from the .odoorc file """

@@ -3,6 +3,7 @@ import glob
 import json
 import logging
 import fnmatch
+import random
 import re
 import shlex
 import time
@@ -815,7 +816,9 @@ class ConfigStep(models.Model):
             build._log('end_job', message, log_type='markdown')
 
     def _modules_to_install(self, build):
-        return set(build._get_modules_to_test(modules_patterns=self.install_modules))
+        mods = list(build._get_modules_to_test(modules_patterns=self.install_modules))
+        random.shuffle(mods)
+        return mods
 
     def _post_install_commands(self, build, modules_to_install, py_version=None):
         cmds = []

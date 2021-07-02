@@ -812,7 +812,7 @@ class BuildResult(models.Model):
         modules_to_install = filter_patterns(self.params_id.modules, modules_to_install, available_modules)
         modules_to_install = filter_patterns(modules_patterns, modules_to_install, available_modules)
 
-        return sorted(modules_to_install)
+        return modules_to_install
 
     def _local_pg_dropdb(self, dbname):
         with local_pgadmin_cursor() as local_cr:
