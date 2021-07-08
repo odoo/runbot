@@ -429,12 +429,14 @@ class Repo(models.Model):
                         'date': dateutil.parser.parse(date[:19]),
                     })
                 branch.head = commit
-                branch.alive = True
-                # Not perfect, il some case a pr can be closed but still visible in repo.
-                # The head wont change but on creation the branch will be set alive even if git into said pr is closed
-                # It is still better to have false open than false closed
+                if not branch.alive:
+                    if branch.is_pr:
+                        _logger.info('Recomputing infos of dead pr %s', branch.name)
+                        branch._compute_branch_infos()
+                    else:
+                        branch.alive = True
 
-                if branch.reference_name and branch.remote_id and branch.remote_id.repo_id._is_branch_forbidden(branch.reference_name ):
+                if branch.reference_name and branch.remote_id and branch.remote_id.repo_id._is_branch_forbidden(branch.reference_name):
                     message = "This branch name is incorrect. Branch name should be prefixed with a valid version"
                     message = branch.remote_id.repo_id.invalid_branch_message or message
                     branch.head._github_status(False, "Branch naming", 'failure', False, message)
@@ -446,7 +448,7 @@ class Repo(models.Model):
                 if bundle.no_build:
                     continue
 
-                if bundle.last_batch.state != 'preparing' and commit not in bundle.last_batch.commit_ids:
+                if bundle.last_batch.state != 'preparing':
                     preparing = self.env['runbot.batch'].create({
                         'last_update': fields.Datetime.now(),
                         'bundle_id': bundle.id,

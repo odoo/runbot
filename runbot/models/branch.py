@@ -104,6 +104,7 @@ class Branch(models.Model):
                 if pi:
                     try:
                         branch.draft = pi.get('draft', False)
+                        branch.alive = pi.get('state', False) != 'closed'
                         branch.target_branch_name = pi['base']['ref']
                         branch.pull_head_name = pi['head']['label']
                         pull_head_repo_name = False
@@ -199,9 +200,26 @@ class Branch(models.Model):
             self.name
         )
 
-    def recompute_infos(self):
+    def recompute_infos(self, payload=None):
         """ public method to recompute infos on demand """
-        self._compute_branch_infos()
+        was_draft = self.draft
+        was_alive = self.alive
+        init_target_branch_name = self.target_branch_name
+        self._compute_branch_infos(payload)
+        if self.target_branch_name != init_target_branch_name:
+            _logger.info('retargeting %s to %s', self.name, self.target_branch_name)
+            base = self.env['runbot.bundle'].search([
+                ('name', '=', self.target_branch_name),
+                ('is_base', '=', True),
+                ('project_id', '=', self.remote_id.repo_id.project_id.id)
+            ])
+            if base and self.bundle_id.defined_base_id != base:
+                _logger.info('Changing base of bundle %s to %s(%s)', self.bundle_id, base.name, base.id)
+                self.bundle_id.defined_base_id = base.id
+                self.bundle_id._force()
+
+        if (not self.draft and was_draft) or (self.alive and not was_alive) or (self.target_branch_name != init_target_branch_name and self.alive):
+            self.bundle_id._force()
 
     @api.model
     def match_is_base(self, name):
