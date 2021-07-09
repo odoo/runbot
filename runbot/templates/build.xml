@@ -215,7 +215,7 @@
                 <t t-set="logclass" t-value="dict(CRITICAL='danger', ERROR='danger', WARNING='warning', OK='success', SEPARATOR='separator').get(l.level)"/>
                 <tr t-att-class="'separator' if logclass == 'separator' else ''">
                   <td style="white-space: nowrap; width:1%;">
-                    <t t-esc="l.create_date.strftime('%Y-%m-%d %H:%M:%S')"/>
+                    <span t-field="l.create_date" t-options="{'format': 'yyyy-MM-dd HH:mm:ssZ'}"/>
                   </td>
                   <td style="white-space: nowrap; width:1%;">
                     <b t-if="l.level != 'SEPARATOR' and l.type not in ['link', 'markdown']" t-esc="l.level"/>

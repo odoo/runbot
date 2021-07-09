@@ -87,6 +87,7 @@
               <i class="fa fa-exclamation-triangle" t-if="batch.has_warning"/>
               <i class="arrow fa fa-window-maximize"/>
             </a>
+            <span class="small float-right" t-field="batch.create_date" t-options="{'format': 'yyyy-MM-dd HH:mmZ'}" t-if="more"/>
           </div>
           <t t-if="batch.state=='preparing'">
             <span><i class="fa fa-cog fa-spin fa-fw"/> preparing</span>

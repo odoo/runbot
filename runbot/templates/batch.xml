@@ -28,12 +28,12 @@
                         </tr>
                         <tr>
                             <td>Create date</td>
-                            <td t-esc="batch.create_date"/>
+                            <td><span t-field="batch.create_date" t-options="{'format': 'yyyy-MM-dd HH:mm:ssZ'}"/></td>
                         </tr>
                         <tr t-if="more">
                             <td>Last update</td>
                             <td>
-                                <t t-esc="batch.last_update"/>
+                                <span t-field="batch.last_update" t-options="{'format': 'yyyy-MM-dd HH:mm:ssZ'}"/>
                                 <span class="badge badge-info" t-esc="s2human(batch.last_update - batch.create_date)"/>
                             </td>
                         </tr>
@@ -104,7 +104,7 @@
                                             <br/>
                                         </t>
                                         Commit date:
-                                        <span t-esc="commit.date"/>
+                                        <span t-field="commit.date" t-options="{'format': 'yyyy-MM-dd HH:mm:ssZ'}"/>
                                         <br/>
                                     </t>
                                     <hr/>

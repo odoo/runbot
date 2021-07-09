@@ -46,7 +46,7 @@
               </tr>
               <tr>
                 <td>Date</td>
-                <td t-esc="commit.date"/>
+                <td><span t-field="commit.date" t-options="{'format': 'yyyy-MM-dd HH:mm:ssZ'}"/></td>
               </tr>
               <tr>
                 <td>Author</td>
@@ -70,7 +70,7 @@
             <table class="table table-sm table-borderless">
               <tr t-foreach='last_status_by_context' t-as='context'>
                 <t t-set="status" t-value="last_status_by_context[context]"/>
-                <td t-esc="status.sent_date and status.sent_date.strftime('%Y-%m-%d %H:%M:%S') or '—'"/>
+                <td><span t-if="status.sent_date" t-field="status.sent_date" t-options="{'format': 'yyyy-MM-dd HH:mm:ssZ'}"/><t t-else="">&amp;mdash;</t></td>
                 <td t-esc="context"/>
                 <t t-call="runbot.commit_status_state_td">
                   <t t-set="state" t-value="status.state"/>
@@ -105,7 +105,7 @@
             <h3>Status history</h3>
             <table class="table table-stripped">
               <tr t-foreach='status_list' t-as='status'>
-                <td t-esc="status.sent_date and status.sent_date.strftime('%Y-%m-%d %H:%M:%S') or '—'"/>
+                <td><span t-if="status.sent_date" t-field="status.sent_date" t-options="{'format': 'yyyy-MM-dd HH:mm:ssZ'}"/><t t-else="">&amp;mdash;</t></td>
                 <td t-esc="status.context"/>
                 <t t-call="runbot.commit_status_state_td">
                   <t t-set="state" t-value="status.state"/>
