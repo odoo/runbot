@@ -178,7 +178,10 @@
                     <a t-if="bu.local_state == 'running' and bu.database_ids" t-attf-href="http://{{sorted(bu.mapped('database_ids.name'))[0]}}.{{bu.host}}" class="btn btn-primary" title="Sign in on this build" aria-label="Sign in on this build">
                         <i class="fa fa-sign-in"/>
                     </a>
-                    <a t-if="bu.local_state=='done' and bu.requested_action != 'wake_up'" href="#" data-runbot="wakeup" t-att-data-runbot-build="bu.id" class="btn btn-default" title="Wake up this build" aria-label="Wake up this build">
+                    <a t-if="bu.static_run" t-att-href="bu.static_run" class="btn btn-primary" title="View result" aria-label="View result">
+                        <i class="fa fa-sign-in"/>
+                    </a>
+                    <a t-if="bu.local_state=='done' and bu.requested_action != 'wake_up' and bu.database_ids" href="#" data-runbot="wakeup" t-att-data-runbot-build="bu.id" class="btn btn-default" title="Wake up this build" aria-label="Wake up this build">
                         <i class="fa fa-coffee"/>
                     </a>
                     <a t-attf-href="/runbot/build/{{bu['id']}}" class="btn btn-default" title="Build details" aria-label="Build details">

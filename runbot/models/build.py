@@ -217,6 +217,8 @@ class BuildResult(models.Model):
 
     database_ids = fields.One2many('runbot.database', 'build_id')
 
+    static_run = fields.Char('Static run URL')
+
     @api.depends('params_id.config_id')
     def _compute_log_list(self):  # storing this field because it will be access trhoug repo viewn and keep track of the list at create
         for build in self:
