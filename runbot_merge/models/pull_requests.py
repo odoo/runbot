@@ -756,6 +756,10 @@ class PullRequests(models.Model):
     def _linked_prs(self):
         if re.search(r':patch-\d+', self.label):
             return self.browse(())
+        if self.state == 'merged':
+            return self.with_context(active_test=False).batch_ids\
+                   .filtered(lambda b: b.staging_id.state == 'success')\
+                   .prs - self
         return self.search([
             ('target', '=', self.target.id),
             ('label', '=', self.label),

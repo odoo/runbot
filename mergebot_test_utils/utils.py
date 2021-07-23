@@ -2,6 +2,8 @@
 import itertools
 import re
 
+from lxml import html
+
 MESSAGE_TEMPLATE = """{message}
 
 closes {repo}#{number}
@@ -123,3 +125,12 @@ def make_basic(env, config, make_repo, *, reponame='proj', project_name='myproje
     })
 
     return prod, other
+
+def pr_page(page, pr):
+    return html.fromstring(page(f'/{pr.repo.name}/pull/{pr.number}'))
+
+def to_pr(env, pr):
+    return env['runbot_merge.pull_requests'].search([
+        ('repository.name', '=', pr.repo.name),
+        ('number', '=', pr.number),
+    ])

@@ -9,11 +9,7 @@ import pytest
 from lxml import html
 
 import odoo
-from utils import _simple_init, seen, re_matches, get_partner, Commit
-
-
-def pr_page(page, pr):
-    return html.fromstring(page(f'/{pr.repo.name}/pull/{pr.number}'))
+from utils import _simple_init, seen, re_matches, get_partner, Commit, pr_page, to_pr
 
 @pytest.fixture
 def repo(env, project, make_repo, users, setreviewers):
@@ -37,10 +33,7 @@ def test_trivial_flow(env, repo, page, users, config):
         c1 = repo.make_commit(c0, 'add file', None, tree={'a': 'some other content', 'b': 'a second file'})
         pr = repo.make_pr(title="gibberish", body="blahblah", target='master', head=c1,)
 
-    [pr_id] = env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', repo.name),
-        ('number', '=', pr.number),
-    ])
+    pr_id = to_pr(env, pr)
     assert pr_id.state == 'opened'
     env.run_crons()
     assert pr.comments == [seen(env, pr, users)]
@@ -92,7 +85,7 @@ def test_trivial_flow(env, repo, page, users, config):
     st = pr_id.staging_id
     env.run_crons()
 
-    assert set(tuple(t) for t in st.statuses) == {
+    assert {tuple(t) for t in st.statuses} == {
         (repo.name, 'legal/cla', 'success', ''),
         (repo.name, 'ci/runbot', 'success', 'http://foo.com/pog'),
         (repo.name, 'ci/lint', 'failure', 'http://ignored.com/whocares'),

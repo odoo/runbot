@@ -307,6 +307,16 @@
             <t t-if="merged_head">
                 at <a t-attf-href="https://github.com/{{pr.repository.name}}/commit/{{merged_head}}"><t t-esc="merged_head"/></a>
             </t>
+
+            <t t-set="linked_prs" t-value="pr._linked_prs"/>
+            <div t-if="linked_prs">
+                Linked pull requests
+                <ul>
+                    <li t-foreach="linked_prs" t-as="linked">
+                        <a t-att-href="linked.url" t-field="linked.display_name"/>
+                    </li>
+                </ul>
+            </div>
         </div>
     </template>
     <template id="view_pull_request_info_closed">
@@ -323,6 +333,16 @@
     <template id="view_pull_request_info_staging">
         <div class="alert alert-primary">
             Staged <span t-field="pr.staging_id.staged_at" t-options="{'widget': 'relative'}"/>.
+
+            <t t-set="linked_prs" t-value="pr._linked_prs"/>
+            <div t-if="linked_prs">
+                Linked pull requests
+                <ul>
+                    <li t-foreach="linked_prs" t-as="linked">
+                        <a t-att-href="linked.url" t-field="linked.display_name"/>
+                    </li>
+                </ul>
+            </div>
         </div>
     </template>
     <template id="view_pull_request_info_open">
