@@ -216,7 +216,7 @@ def test_limit_after_merge(env, config, make_repo, users):
     (already forward-ported or not), or is a forward-port PR, fwbot should
     just feedback that it won't do it
     """
-    prod, _ = make_basic(env, config, make_repo)
+    prod, other = make_basic(env, config, make_repo)
     reviewer = config['role_reviewer']['token']
     branch_c = env['runbot_merge.branch'].search([('name', '=', 'c')])
     bot_name = env['runbot_merge.project'].search([]).fp_github_name
@@ -259,5 +259,30 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         (users['reviewer'], bot_name + ' up to b'),
         (bot_name, "Sorry, forward-port limit can only be set on an origin PR"
                    " (%s here) before it's merged and forward-ported." % p1.display_name
+         ),
+    ]
+
+    # update pr2 to detach it from pr1
+    with other:
+        other.make_commits(
+            p2.target.name,
+            Commit('updated', tree={'1': '1'}),
+            ref=pr2.ref,
+            make=False
+        )
+    env.run_crons()
+    assert not p2.parent_id
+    assert p2.source_id == p1
+
+    with prod:
+        pr2.post_comment(bot_name + ' up to b', reviewer)
+    env.run_crons()
+
+    assert pr2.comments[4:] == [
+        (bot_name, "This PR was modified / updated and has become a normal PR. "
+                   "It should be merged the normal way (via @hansen)"),
+        (users['reviewer'], bot_name + ' up to b'),
+        (bot_name, "Sorry, forward-port limit can only be set on an origin PR "
+                   f"({p1.display_name} here) before it's merged and forward-ported."
          ),
     ]
