@@ -317,11 +317,24 @@ class PullRequests(models.Model):
                 tokens = itertools.chain(['to', self.target.name], tokens)
 
             if token in ('r+', 'review+'):
+                if not self.source_id:
+                    Feedback.create({
+                        'repository': self.repository.id,
+                        'pull_request': self.number,
+                        'message': "I'm sorry, @{}. I can only do this on forward-port PRs and this ain't one.".format(login),
+                        'token_field': 'fp_github_token',
+                    })
+                    continue
                 if not self.source_id._pr_acl(author).is_reviewer:
                     Feedback.create({
                         'repository': self.repository.id,
                         'pull_request': self.number,
-                        'message': "I'm sorry, @{}. You can't review+.".format(login),
+                        'message': "I'm sorry, @{}. You can't review this PR: "
+                                   "you need to be a reviewer on {}.".format(
+                            login,
+                            self.source_id.display_name
+                        ),
+                        'token_field': 'fp_github_token',
                     })
                     continue
                 merge_bot = self.repository.project_id.github_prefix
@@ -341,6 +354,7 @@ class PullRequests(models.Model):
                         'repository': self.repository.id,
                         'pull_request': self.number,
                         'message': "I'm sorry, @{}. You can't set a forward-port limit.".format(login),
+                        'token_field': 'fp_github_token',
                     })
                     continue
                 if not limit:
