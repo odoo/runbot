@@ -79,6 +79,15 @@ class BatchQueue(models.Model, Queue):
             )
         batch.active = False
 
+
+CONFLICT_TEMPLATE = "WARNING: the latest change ({previous.head}) triggered " \
+                    "a conflict when updating the next forward-port " \
+                    "({next.display_name}), and has been ignored.\n\n" \
+                    "You will need to update this pull request differently, " \
+                    "or fix the issue by hand on {next.display_name}."
+CHILD_CONFLICT = "WARNING: the update of {previous.display_name} to " \
+                 "{previous.head} has caused a conflict in this pull request, " \
+                 "data may have been lost."
 class UpdateQueue(models.Model, Queue):
     _name = 'forwardport.updates'
     _description = 'if a forward-port PR gets updated & has followups (cherrypick succeeded) the followups need to be updated as well'
@@ -89,6 +98,7 @@ class UpdateQueue(models.Model, Queue):
     new_root = fields.Many2one('runbot_merge.pull_requests')
 
     def _process_item(self):
+        Feedback = self.env['runbot_merge.pull_requests.feedback']
         previous = self.new_root
         with ExitStack() as s:
             for child in self.new_root._iter_descendants():
@@ -100,7 +110,7 @@ class UpdateQueue(models.Model, Queue):
                     self.new_root.display_name
                 )
                 if child.state in ('closed', 'merged'):
-                    self.env['runbot_merge.pull_requests.feedback'].create({
+                    Feedback.create({
                         'repository': child.repository.id,
                         'pull_request': child.number,
                         'message': "Ancestor PR %s has been updated but this PR"
@@ -108,14 +118,31 @@ class UpdateQueue(models.Model, Queue):
                                    "\n\n"
                                    "You may want or need to manually update any"
                                    " followup PR." % (
-                            self.new_root.display_name,
-                            child.state,
-                        )
+                                       self.new_root.display_name,
+                                       child.state,
+                                   )
                     })
                     return
                 # QUESTION: update PR to draft if there are conflicts?
-                _, working_copy = previous._create_fp_branch(
+                conflicts, working_copy = previous._create_fp_branch(
                     child.target, child.refname, s)
+                if conflicts:
+                    _, out, err = conflicts
+                    Feedback.create({
+                        'repository': previous.repository.id,
+                        'pull_request': previous.number,
+                        'message': CONFLICT_TEMPLATE.format(
+                            previous=previous,
+                            next=child
+                        )
+                    })
+                    Feedback.create({
+                        'repository': child.repository.id,
+                        'pull_request': child.number,
+                        'message': CHILD_CONFLICT.format(previous=previous, next=child)\
+                            + (f'\n\nstdout:\n```\n{out.strip()}\n```' if out.strip() else '')
+                            + (f'\n\nstderr:\n```\n{err.strip()}\n```' if err.strip() else '')
+                    })
 
                 new_head = working_copy.stdout().rev_parse(child.refname).stdout.decode().strip()
                 commits_count = int(working_copy.stdout().rev_list(
