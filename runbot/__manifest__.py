@@ -55,4 +55,5 @@
         'wizards/mutli_build_wizard_views.xml',
         'wizards/stat_regex_wizard_views.xml',
     ],
+    'license': 'LGPL-3',
 }
