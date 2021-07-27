@@ -671,23 +671,20 @@ class PullRequests(models.Model):
                 del pr_data['draft']
                 r = gh.post(url, json=pr_data)
 
-            results = r.json()
-            if not (200 <= r.status_code < 300):
+            if not r.ok:
                 _logger.warning("Failed to create forward-port PR for %s, deleting branches", pr.display_name)
                 # delete all the branches this should automatically close the
                 # PRs if we've created any. Using the API here is probably
                 # simpler than going through the working copies
                 for repo in self.mapped('repository'):
-                    r = gh.delete('https://api.github.com/repos/{}/git/refs/heads/{}'.format(repo.fp_remote_target, new_branch))
-                    if r.ok:
+                    d = gh.delete('https://api.github.com/repos/{}/git/refs/heads/{}'.format(repo.fp_remote_target, new_branch))
+                    if d.ok:
                         _logger.info("Deleting %s:%s=success", repo.fp_remote_target, new_branch)
                     else:
-                        _logger.warning("Deleting %s:%s=%s", repo.fp_remote_target, new_branch, r.json())
-                raise RuntimeError("Forwardport failure: %s (%s)" % (pr.display_name, results))
+                        _logger.warning("Deleting %s:%s=%s", repo.fp_remote_target, new_branch, d.text)
+                raise RuntimeError("Forwardport failure: %s (%s)" % (pr.display_name, r.text))
 
-            r = results
-
-            new_pr = self._from_gh(r)
+            new_pr = self._from_gh(r.json())
             _logger.info("Created forward-port PR %s", new_pr)
             new_batch |= new_pr
 
