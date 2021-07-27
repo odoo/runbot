@@ -179,7 +179,7 @@ class Runbot(Controller):
     @route([
         '/runbot/bundle/<model("runbot.bundle"):bundle>',
         '/runbot/bundle/<model("runbot.bundle"):bundle>/page/<int:page>'
-        ], website=True, auth='public', type='http')
+        ], website=True, auth='public', type='http', sitemap=False)
     def bundle(self, bundle=None, page=1, limit=50, **kwargs):
         domain = [('bundle_id', '=', bundle.id), ('hidden', '=', False)]
         batch_count = request.env['runbot.batch'].search_count(domain)
@@ -212,7 +212,7 @@ class Runbot(Controller):
         batch._prepare(auto_rebase)
         return werkzeug.utils.redirect('/runbot/batch/%s' % batch.id)
 
-    @route(['/runbot/batch/<int:batch_id>'], website=True, auth='public', type='http')
+    @route(['/runbot/batch/<int:batch_id>'], website=True, auth='public', type='http', sitemap=False)
     def batch(self, batch_id=None, **kwargs):
         batch = request.env['runbot.batch'].browse(batch_id)
         context = {
@@ -227,7 +227,7 @@ class Runbot(Controller):
         build = slot.sudo()._create_missing_build()
         return werkzeug.utils.redirect('/runbot/build/%s' % build.id)
 
-    @route(['/runbot/commit/<model("runbot.commit"):commit>'], website=True, auth='public', type='http')
+    @route(['/runbot/commit/<model("runbot.commit"):commit>'], website=True, auth='public', type='http', sitemap=False)
     def commit(self, commit=None, **kwargs):
         status_list = request.env['runbot.commit.status'].search([('commit_id', '=', commit.id)], order='id desc')
         last_status_by_context = dict()
@@ -275,7 +275,7 @@ class Runbot(Controller):
 
         return werkzeug.utils.redirect(build.build_url)
 
-    @route(['/runbot/build/<int:build_id>'], type='http', auth="public", website=True)
+    @route(['/runbot/build/<int:build_id>'], type='http', auth="public", website=True, sitemap=False)
     def build(self, build_id, search=None, **post):
         """Events/Logs"""
 
@@ -295,7 +295,7 @@ class Runbot(Controller):
 
     @route([
         '/runbot/branch/<model("runbot.branch"):branch>',
-        ], website=True, auth='public', type='http')
+        ], website=True, auth='public', type='http', sitemap=False)
     def branch(self, branch=None, **kwargs):
         pr_branch = branch.bundle_id.branch_ids.filtered(lambda rec: not rec.is_pr and rec.id != branch.id and rec.remote_id.repo_id == branch.remote_id.repo_id)[:1]
         branch_pr = branch.bundle_id.branch_ids.filtered(lambda rec: rec.is_pr and rec.id != branch.id and rec.remote_id.repo_id == branch.remote_id.repo_id)[:1]
@@ -312,7 +312,7 @@ class Runbot(Controller):
     @route([
         '/runbot/glances',
         '/runbot/glances/<int:project_id>'
-        ], type='http', auth='public', website=True)
+        ], type='http', auth='public', website=True, sitemap=False)
     def glances(self, project_id=None, **kwargs):
         project_ids = [project_id] if project_id else request.env['runbot.project'].search([]).ids # search for access rights
         bundles = request.env['runbot.bundle'].search([('sticky', '=', True), ('project_id', 'in', project_ids)])
@@ -327,7 +327,7 @@ class Runbot(Controller):
 
     @route(['/runbot/monitoring',
             '/runbot/monitoring/<int:category_id>',
-            '/runbot/monitoring/<int:category_id>/<int:view_id>'], type='http', auth='user', website=True)
+            '/runbot/monitoring/<int:category_id>/<int:view_id>'], type='http', auth='user', website=True, sitemap=False)
     def monitoring(self, category_id=None, view_id=None, **kwargs):
         pending = self._pending()
         hosts_data = request.env['runbot.host'].search([])
@@ -353,7 +353,7 @@ class Runbot(Controller):
         return request.render(view_id if view_id else "runbot.monitoring", qctx)
 
     @route(['/runbot/errors',
-            '/runbot/errors/page/<int:page>'], type='http', auth='user', website=True)
+            '/runbot/errors/page/<int:page>'], type='http', auth='user', website=True, sitemap=False)
     def build_errors(self, error_id=None, sort=None, page=1, limit=20, **kwargs):
         sort_order_choices = {
             'last_seen_date desc': 'Last seen date: Newer First',
@@ -387,7 +387,7 @@ class Runbot(Controller):
         }
         return request.render('runbot.build_error', qctx)
 
-    @route(['/runbot/build/stats/<int:build_id>'], type='http', auth="public", website=True)
+    @route(['/runbot/build/stats/<int:build_id>'], type='http', auth="public", website=True, sitemap=False)
     def build_stats(self, build_id, search=None, **post):
         """Build statistics"""
 
@@ -413,7 +413,7 @@ class Runbot(Controller):
         return request.render("runbot.build_stats", context)
 
 
-    @route(['/runbot/stats/'], type='json', auth="public", website=False)
+    @route(['/runbot/stats/'], type='json', auth="public", website=False, sitemap=False)
     def stats_json(self, bundle_id=False, trigger_id=False, key_category='', center_build_id=False, limit=100, search=None, **post):
         """ Json stats """
         trigger_id = trigger_id and int(trigger_id)
@@ -445,7 +445,7 @@ class Runbot(Controller):
             res.setdefault(builds_id, {})[key.split('.')[1]] = value
         return res
 
-    @route(['/runbot/stats/<model("runbot.bundle"):bundle>/<model("runbot.trigger"):trigger>'], type='http', auth="public", website=True)
+    @route(['/runbot/stats/<model("runbot.bundle"):bundle>/<model("runbot.trigger"):trigger>'], type='http', auth="public", website=True, sitemap=False)
     def modules_stats(self, bundle, trigger, search=None, **post):
         """Modules statistics"""
 

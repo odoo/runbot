@@ -9,4 +9,5 @@
         'data/crons.xml',
         'data/views.xml',
     ],
+    'license': 'LGPL-3',
 }

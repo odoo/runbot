@@ -15,7 +15,7 @@ class RunbotBadge(Controller):
         '/runbot/badge/trigger/<int:trigger_id>/<name>.svg',
         '/runbot/badge/<any(default,flat):theme>/<int:repo_id>/<name>.svg',
         '/runbot/badge/trigger/<any(default,flat):theme>/<int:trigger_id>/<name>.svg',
-    ], type="http", auth="public", methods=['GET', 'HEAD'])
+    ], type="http", auth="public", methods=['GET', 'HEAD'], sitemap=False)
     def badge(self, name, repo_id=False, trigger_id=False, theme='default'):
         # Sudo is used here to allow the badge to be returned for projects
         # which have restricted permissions.
