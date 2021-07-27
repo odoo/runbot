@@ -2,11 +2,13 @@
 Test cases for updating PRs during after the forward-porting process after the
 initial merge has succeeded (and forward-porting has started)
 """
+import re
 import sys
 
 import pytest
 
-from utils import seen, re_matches, Commit, make_basic
+from utils import seen, re_matches, Commit, make_basic, to_pr
+
 
 def test_update_pr(env, config, make_repo, users):
     """ Even for successful cherrypicks, it's possible that e.g. CI doesn't
@@ -118,57 +120,6 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         'h': 'a',
         'x': '5'
     }, "the followup FP should also have the update"
-
-    with pr_repo:
-        pr_repo.make_commits(
-            pr1_id.target.name,
-            Commit('fire!', tree={'h': '0'}),
-            ref='heads/%s' % pr_ref,
-        )
-    env.run_crons()
-    # since there are PRs, this is going to update pr2 as broken
-    assert prod.read_tree(prod.commit(pr1_id.head)) == {
-        'f': 'c',
-        'g': 'b',
-        'h': '0'
-    }
-    assert prod.read_tree(prod.commit(pr2_id.head)) == {
-        'f': 'c',
-        'g': 'a',
-        'h': re_matches(r'''<<<\x3c<<< HEAD
-a
-=======
-0
->>>\x3e>>> [0-9a-f]{7,}.*
-'''),
-    }
-    [project] = env['runbot_merge.project'].search([])
-    pr2 = prod.get_pr(pr2_id.number)
-    # fail pr2 then fwbot r+ to check that we get a warning
-    with prod:
-        prod.post_status(pr2_id.head, 'failure', 'ci/runbot')
-    env.run_crons() # parse commit statuses
-    with prod:
-        pr2.post_comment(project.fp_github_name + ' r+', config['role_reviewer']['token'])
-    env.run_crons() # send feedback
-
-    assert pr2.comments == [
-        seen(env, pr2, users),
-        (users['user'], """Ping @{}, @{}
-This PR targets c and is the last of the forward-port chain containing:
-* {}
-
-To merge the full chain, say
-> @{} r+
-
-More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
-""".format(users['user'], users['reviewer'], pr1_id.display_name, project.fp_github_name)),
-        (users['user'], 'Ping @{}, @{}\n\nci/runbot failed on this forward-port PR'.format(
-            users['user'], users['reviewer']
-        )),
-        (users['reviewer'], project.fp_github_name + ' r+'),
-        (users['user'], '@{}, you may want to rebuild or fix this PR as it has failed CI.'.format(users['reviewer'])),
-    ]
 
 def test_update_merged(env, make_repo, config, users):
     """ Strange things happen when an FP gets closed / merged but then its
@@ -365,3 +316,92 @@ def test_duplicate_fw(env, make_repo, setreviewers, config, users):
     env.run_crons()
     # env.run_crons()
     assert PRs.search([], order='number') == pr_ids
+
+def test_subsequent_conflict(env, make_repo, config, users):
+    """ Test for updating an fw PR in the case where it produces a conflict in
+    the followup. Cf #467.
+    """
+    repo, fork = make_basic(env, config, make_repo)
+
+    # create a PR in branch A which adds a new file
+    with repo:
+        repo.make_commits('a', Commit('newfile', tree={'x': '0'}), ref='heads/pr1')
+        pr_1 = repo.make_pr(target='a', head='pr1')
+        repo.post_status('pr1', 'success', 'legal/cla')
+        repo.post_status('pr1', 'success', 'ci/runbot')
+        pr_1.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+    with repo:
+        repo.post_status('staging.a', 'success', 'legal/cla')
+        repo.post_status('staging.a', 'success', 'ci/runbot')
+    env.run_crons()
+    pr1_id = to_pr(env, pr_1)
+    assert pr1_id.state == 'merged'
+
+    pr2_id = env['runbot_merge.pull_requests'].search([('source_id', '=', pr1_id.id)])
+    assert pr2_id
+    with repo:
+        repo.post_status(pr2_id.head, 'success', 'legal/cla')
+        repo.post_status(pr2_id.head, 'success', 'ci/runbot')
+    env.run_crons()
+
+    pr3_id = env['runbot_merge.pull_requests'].search([('parent_id', '=', pr2_id.id)])
+    assert pr3_id
+    assert repo.read_tree(repo.commit(pr3_id.head)) == {
+        'f': 'c',
+        'g': 'a',
+        'h': 'a',
+        'x': '0',
+    }
+
+    # update pr2: add a file "h"
+    pr2 = repo.get_pr(pr2_id.number)
+    t = {**repo.read_tree(repo.commit(pr2_id.head)), 'h': 'conflict!'}
+    with fork:
+        fork.make_commits(pr2_id.target.name, Commit('newfiles', tree=t), ref=pr2.ref, make=False)
+    env.run_crons()
+
+    assert repo.read_tree(repo.commit(pr3_id.head)) == {
+        'f': 'c',
+        'g': 'a',
+        'h': re_matches(r'''<<<\x3c<<< HEAD
+a
+=======
+conflict!
+>>>\x3e>>> [0-9a-f]{7,}.*
+'''),
+        'x': '0',
+    }
+    # skip comments:
+    # 1. link to mergebot status page
+    # 2. "forward port chain" bit
+    # 3. updated / modified & got detached
+    assert pr2.comments[3:] == [
+        (users['user'], f"WARNING: the latest change ({pr2_id.head}) triggered "
+                        f"a conflict when updating the next forward-port "
+                        f"({pr3_id.display_name}), and has been ignored.\n\n"
+                        f"You will need to update this pull request "
+                        f"differently, or fix the issue by hand on "
+                        f"{pr3_id.display_name}.")
+    ]
+    # skip comments:
+    # 1. link to status page
+    # 2. forward-port chain thing
+    assert repo.get_pr(pr3_id.number).comments[2:] == [
+        (users['user'], re_matches(f'''\
+WARNING: the update of {pr2_id.display_name} to {pr2_id.head} has caused a \
+conflict in this pull request, data may have been lost.
+
+stdout:
+```
+CONFLICT \(add/add\): Merge conflict in h
+Auto-merging h
+```
+
+stderr:
+```
+\\d{{2}}:\\d{{2}}:\\d{{2}}.\\d+ .* {pr2_id.head}
+error: could not apply [0-9a-f]+\\.\\.\\. newfiles
+hint: after resolving the conflicts, mark the corrected paths
+.*''', re.DOTALL))
+    ]
