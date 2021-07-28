@@ -34,7 +34,6 @@ from odoo.exceptions import UserError
 from odoo.tools import topological_sort, groupby
 from odoo.tools.appdirs import user_cache_dir
 from odoo.addons.runbot_merge import utils
-from odoo.addons.runbot_merge.models.pull_requests import RPLUS
 
 footer = '\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'
 
@@ -192,6 +191,7 @@ class PullRequests(models.Model):
         help="a PR with a parent is an automatic forward port"
     )
     source_id = fields.Many2one('runbot_merge.pull_requests', index=True, help="the original source of this FP even if parents were detached along the way")
+    forwardport_ids = fields.One2many('runbot_merge.pull_requests', 'source_id')
     reminder_backoff_factor = fields.Integer(default=-4)
     merge_date = fields.Datetime()
 
@@ -1039,19 +1039,31 @@ stderr:
             repo.config('--add', 'remote.origin.fetch', '+refs/pull/*/head:refs/heads/pull/*')
             return repo
 
-    def _reminder(self):
-        now = datetime.datetime.now()
-        cutoff = self.env.context.get('forwardport_updated_before') or fields.Datetime.to_string(now - DEFAULT_DELTA)
-        cutoff_dt = fields.Datetime.from_string(cutoff)
+    def _outstanding(self, cutoff=None):
+        """ Returns "outstanding" (unmerged and unclosed) forward-ports whose
+        source was merged before ``cutoff`` (all of them if not provided).
 
-        for source, prs in groupby(self.env['runbot_merge.pull_requests'].search([
+        :param str cutoff: a datetime (ISO-8601 formatted)
+        :returns: an iterator of (source, forward_ports)
+        """
+        cutoff_terms = []
+        if cutoff:
+            # original merged more than <cutoff> ago
+            cutoff_terms = [('source_id.merge_date', '<', cutoff)]
+        return groupby(self.env['runbot_merge.pull_requests'].search([
             # only FP PRs
             ('source_id', '!=', False),
             # active
             ('state', 'not in', ['merged', 'closed']),
-            # original merged more than <cutoff> ago
-            ('source_id.merge_date', '<', cutoff),
-        ], order='source_id, id'), lambda p: p.source_id):
+            *cutoff_terms,
+        ], order='source_id, id'), lambda p: p.source_id)
+
+    def _reminder(self):
+        cutoff = self.env.context.get('forwardport_updated_before') \
+              or fields.Datetime.to_string(datetime.datetime.now() - DEFAULT_DELTA)
+        cutoff_dt = fields.Datetime.from_string(cutoff)
+
+        for source, prs in self._outstanding(cutoff):
             backoff = dateutil.relativedelta.relativedelta(days=2**source.reminder_backoff_factor)
             prs = list(prs)
             if source.merge_date > (cutoff_dt - backoff):
