@@ -6,6 +6,101 @@
                 Forward-port is disabled, merged pull requests will not be forward-ported.
             </div>
         </xpath>
+        <!-- key block (hopefully) -->
+        <xpath expr="//div[@id='alerts']" position="inside">
+            <t t-if="env['runbot_merge.pull_requests'].check_access_rights('read', False)">
+                <t t-set="outstanding" t-value="env['runbot_merge.pull_requests'].search_count([
+                    ('source_id', '!=', False),
+                    ('state', 'not in', ['merged', 'closed']),
+                ])"/>
+                <div t-if="outstanding != 0" class="alert col-md-12 bg-warning">
+                    <a href="/forwardport/outstanding">
+                        <t t-esc="outstanding"/> outstanding forward-ports
+                    </a>
+                </div>
+            </t>
+        </xpath>
+    </template>
+
+    <template id="pr_background">
+        <t t-if="p.state == 'merged'">bg-success</t>
+        <t t-elif="p.state == 'closed'">bg-light</t>
+        <t t-elif="p.state == 'error'">bg-danger</t>
+        <t t-else="">bg-warning</t>
+    </template>
+
+    <record id="forwardport.outstanding_fp" model="website.page">
+        <field name="name">Outstanding forward ports</field>
+        <field name="type">qweb</field>
+        <field name="url">/forwardport/outstanding</field>
+        <field name="website_indexed" eval="False"/>
+        <field name="is_published">True</field>
+        <field name="key">forwardport.outstanding_fp</field>
+        <field name="arch" type="xml">
+            <t name="Outstanding forward ports" t-name="forwardport.outstanding_fp">
+                <t t-call="website.layout">
+                    <div id="wrap" class="oe_structure oe_empty"><div class="container-fluid">
+                        <h1>List of pull requests with outstanding forward ports</h1>
+                        <dl><t t-foreach="env['runbot_merge.pull_requests']._outstanding()" t-as="x">
+                            <t t-set="source" t-value="x[0]"/>
+                            <t t-set="prs" t-value="x[1]"/>
+                            <dt>
+                                <a t-att-href="source.url"><span t-field="source.display_name"/></a>
+                                by <span t-field="source.author.display_name"
+                                         t-attf-title="@{{source.author.github_login}}"/>
+                                merged <span t-field="source.merge_date"
+                                             t-options="{'widget': 'relative'}"
+                                             t-att-title="source.merge_date"/>
+                                by <span t-field="source.reviewed_by.display_name"
+                                         t-attf-title="@{{source.reviewed_by.github_login}}"/>
+                            </dt>
+                            <dd>
+                                Outstanding forward-ports:
+                                <ul>
+                                    <li t-foreach="prs" t-as="p">
+                                        <a t-att-href="p.url"><span t-field="p.display_name"/></a>
+                                        (<span t-field="p.state"/>)
+                                        targeting <span t-field="p.target.name"/>
+                                    </li>
+                                </ul>
+                            </dd>
+                        </t></dl>
+                    </div></div>
+                </t>
+            </t>
+        </field>
+    </record>
+
+    <template id="view_pull_request" inherit_id="runbot_merge.view_pull_request">
+        <xpath expr="//dl[hasclass('runbot-merge-fields')]" position="inside">
+            <t t-if="pr.state == 'merged'">
+                <dt>merged</dt>
+                <dd>
+                    <span t-field="pr.merge_date" t-options="{'widget': 'relative'}"
+                          t-att-title="pr.merge_date"/>
+                </dd>
+            </t>
+            <t t-if="pr.source_id">
+                <dt>forward-port of</dt>
+                <dd>
+                    <a t-att-href="pr.source_id.url">
+                        <span t-field="pr.source_id.display_name"/>
+                    </a>
+                </dd>
+            </t>
+            <t t-if="pr.forwardport_ids">
+                <dt>forward-ports</dt>
+                <dd><ul>
+                    <t t-foreach="pr.forwardport_ids" t-as="p">
+                        <t t-set="bgsignal"><t t-call="forwardport.pr_background"/></t>
+                        <li t-att-class="bgsignal">
+                            <a t-att-href="p.url"><span t-field="p.display_name"/></a>
+                            targeting <span t-field="p.target.name"/>
+                        </li>
+                    </t>
+                </ul></dd>
+            </t>
+        </xpath>
     </template>
 
     <record model="ir.ui.view" id="project">
