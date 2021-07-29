@@ -12,7 +12,7 @@ import pytest
 import requests
 from lxml.etree import XPath, tostring
 
-from utils import seen, re_matches, get_partner, pr_page, to_pr
+from utils import seen, re_matches, get_partner, pr_page, to_pr, Commit
 
 
 @pytest.fixture
@@ -972,3 +972,98 @@ class TestSubstitutions:
         assert prb_id.staging_id, "PR B should be staged"
         assert pra_id.staging_id == prb_id.staging_id, "both prs should be staged together"
         assert pra_id.batch_id == prb_id.batch_id, "both prs should be part of the same batch"
+
+def test_multi_project(env, make_repo, setreviewers, users, config,
+                       tunnel):
+    """ There should be no linking of PRs across projects, even if there is some
+    structural overlap between the two.
+
+    Here we have two projects on different forks, then a user creates a PR from
+    a third fork (or one of the forks should not matter) to *both*.
+
+    The two PRs should be independent.
+    """
+    Projects = env['runbot_merge.project']
+    gh_token = config['github']['token']
+
+    r1 = make_repo("repo_a")
+    with r1:
+        r1.make_commits(
+            None, Commit('root', tree={'a': 'a'}),
+            ref='heads/default')
+    r1_dev = r1.fork()
+    p1 = Projects.create({
+        'name': 'Project 1',
+        'github_token': gh_token,
+        'github_prefix': 'hansen',
+        'repo_ids': [(0, 0, {
+            'name': r1.name,
+            'group_id': False,
+            'required_statuses': 'a',
+        })],
+        'branch_ids': [(0, 0, {'name': 'default'})],
+    })
+    setreviewers(*p1.repo_ids)
+
+    r2 = make_repo('repo_b')
+    with r2:
+        r2.make_commits(
+            None, Commit('root', tree={'b': 'a'}),
+            ref='heads/default'
+        )
+    r2_dev = r2.fork()
+    p2 = Projects.create({
+        'name': "Project 2",
+        'github_token': gh_token,
+        'github_prefix': 'hansen',
+        'repo_ids': [(0, 0, {
+            'name': r2.name,
+            'group_id': False,
+            'required_statuses': 'a',
+        })],
+        'branch_ids': [(0, 0, {'name': 'default'})],
+    })
+    setreviewers(*p2.repo_ids)
+
+    assert r1_dev.owner == r2_dev.owner
+
+    with r1, r1_dev:
+        r1_dev.make_commits('default', Commit('new', tree={'a': 'b'}), ref='heads/other')
+
+        # create, validate, and approve pr1
+        pr1 = r1.make_pr(title='pr 1', target='default', head=r1_dev.owner + ':other')
+        r1.post_status(pr1.head, 'success', 'a')
+        pr1.post_comment('hansen r+', config['role_reviewer']['token'])
+
+    with r2, r2_dev:
+        r2_dev.make_commits('default', Commit('new', tree={'b': 'b'}), ref='heads/other')
+
+        # create second PR with the same label *in a different project*, don't
+        # approve it
+        pr2 = r2.make_pr(title='pr 2', target='default', head=r2_dev.owner + ':other')
+        r2.post_status(pr2.head, 'success', 'a')
+    env.run_crons()
+
+    pr1_id = to_pr(env, pr1)
+    pr2_id = to_pr(env, pr2)
+
+    print(
+        pr1.repo.name, pr1.number, pr1_id.display_name, pr1_id.label,
+        '\n',
+        pr2.repo.name, pr2.number, pr2_id.display_name, pr2_id.label,
+        flush=True,
+    )
+
+    assert pr1_id.state == 'ready' and not pr1_id.blocked
+    assert pr2_id.state == 'validated'
+
+    assert pr1_id.staging_id
+    assert not pr2_id.staging_id
+
+    assert pr1.comments == [
+        (users['reviewer'], 'hansen r+'),
+        (users['user'], f'[Pull request status dashboard]({pr1_id.url}).'),
+    ]
+    assert pr2.comments == [
+        (users['user'], f'[Pull request status dashboard]({pr2_id.url}).'),
+    ]
