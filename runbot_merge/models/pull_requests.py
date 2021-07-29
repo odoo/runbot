@@ -1254,6 +1254,7 @@ class PullRequests(models.Model):
               pr.state != 'merged'
           AND pr.state != 'closed'
         GROUP BY
+            pr.target,
             CASE
                 WHEN pr.label SIMILAR TO '%%:patch-[[:digit:]]+'
                     THEN pr.id::text
@@ -1264,7 +1265,7 @@ class PullRequests(models.Model):
               bool_or(pr.state = 'ready' AND NOT pr.link_warned)
           -- one of the others should be unready
           AND bool_or(pr.state != 'ready')
-          -- but ignore batches with one of the prs at p-
+          -- but ignore batches with one of the prs at p0
           AND bool_and(pr.priority != 0)
         """)
         for [ids] in self.env.cr.fetchall():
