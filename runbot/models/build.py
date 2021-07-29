@@ -736,7 +736,7 @@ class BuildResult(models.Model):
             self._log('Preparing', 'Using Dockerfile Tag %s' % kwargs['image_tag'])
         containers_memory_limit = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_containers_memory', 0)
         if containers_memory_limit and 'memory' not in kwargs:
-            kwargs['memory'] = containers_memory_limit * 1024 ** 3
+            kwargs['memory'] = float(containers_memory_limit) * 1024 ** 3
         docker_run(**kwargs)
 
     def _path(self, *l, **kw):
