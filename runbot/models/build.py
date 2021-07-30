@@ -408,20 +408,6 @@ class BuildResult(models.Model):
             else:
                 build.build_age = 0
 
-    # TODO move this logic to batch: use param to check consistency of found commits
-    def _get_params(self):
-        try:
-            message = self.repo_id._git(['show', '-s', self.name])
-        except CalledProcessError:
-            _logger.error('Error getting params for %s', self.name)
-            message = ''
-        params = defaultdict(lambda: defaultdict(str))
-        if message:
-            regex = re.compile(r'^[\t ]*Runbot-dependency: ([A-Za-z0-9\-_]+/[A-Za-z0-9\-_]+):([0-9A-Fa-f\-]*) *(#.*)?$', re.M)  # dep:repo:hash #comment
-            for result in re.findall(regex, message):
-                params['dep'][result[0]] = result[1]
-        return params
-
     def _rebuild(self, message=None):
         """Force a rebuild and return a recordset of builds"""
         self.ensure_one()
