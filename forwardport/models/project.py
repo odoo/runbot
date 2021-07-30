@@ -343,7 +343,8 @@ class PullRequests(models.Model):
                     # only the author is delegated explicitely on the
                     pr._parse_commands(author, {**comment, 'body': merge_bot + ' r+'}, login)
             elif token == 'close':
-                msg = "I'm sorry, @{}. I can't close this PR for you."
+                msg = "I'm sorry, @{}. I can't close this PR for you.".format(
+                    login)
                 if self.source_id._pr_acl(author).is_reviewer:
                     close = True
                     msg = None
