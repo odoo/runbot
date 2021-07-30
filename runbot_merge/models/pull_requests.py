@@ -210,7 +210,8 @@ class Project(models.Model):
             except Exception:
                 self.env.cr.execute("ROLLBACK TO SAVEPOINT runbot_merge_before_fetch")
                 _logger.exception("Failed to load pr %s, skipping it", f.number)
-            self.env.cr.execute("RELEASE SAVEPOINT runbot_merge_before_fetch")
+            finally:
+                self.env.cr.execute("RELEASE SAVEPOINT runbot_merge_before_fetch")
 
             # commit after each fetched PR
             f.active = False
@@ -329,6 +330,7 @@ All substitutions are tentatively applied sequentially to the input.
             r = controllers.handle_pr(self.env, {
                 'action': 'synchronize',
                 'pull_request': pr,
+                'sender': {'login': self.project_id.github_prefix}
             })
             feedback({
                 'repository': pr_id.repository.id,
@@ -337,11 +339,21 @@ All substitutions are tentatively applied sequentially to the input.
             })
             return
 
+        feedback({
+            'repository': self.id,
+            'pull_request': number,
+            'message': "Sorry, I didn't know about this PR and had to retrieve "
+                       "its information, you may have to re-approve it."
+        })
         # init the PR to the null commit so we can later synchronise it back
         # back to the "proper" head while resetting reviews
         controllers.handle_pr(self.env, {
             'action': 'opened',
-            'pull_request': {**pr, 'head': {**pr['head'], 'sha': '0'*40}},
+            'pull_request': {
+                **pr,
+                'head': {**pr['head'], 'sha': '0'*40},
+                'state': 'open',
+            },
         })
         # fetch & set up actual head
         for st in gh.statuses(pr['head']['sha']):
@@ -378,12 +390,14 @@ All substitutions are tentatively applied sequentially to the input.
             'pull_request': pr,
             'sender': {'login': self.project_id.github_prefix}
         })
-        feedback({
-            'repository': self.id,
-            'pull_request': number,
-            'message': "Sorry, I didn't know about this PR and had to retrieve "
-                       "its information, you may have to re-approve it."
-        })
+        if pr['state'] == 'closed':
+            # don't go through controller because try_closing does weird things
+            # for safety / race condition reasons which ends up committing
+            # and breaks everything
+            self.env['runbot_merge.pull_requests'].search([
+                ('repository.name', '=', pr['base']['repo']['full_name']),
+                ('number', '=', number),
+            ]).state = 'closed'
 
     def having_branch(self, branch):
         branches = self.env['runbot_merge.branch'].search
@@ -1214,6 +1228,7 @@ class PullRequests(models.Model):
         if body:
             message += '\n\n' + body
         return self.env['runbot_merge.pull_requests'].create({
+            'state': 'opened' if description['state'] == 'open' else 'closed',
             'number': description['number'],
             'label': repo._remap_label(description['head']['label']),
             'author': author.id,

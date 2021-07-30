@@ -896,6 +896,7 @@ class TestSubstitutions:
                         'full_name': r.name,
                     },
                     'pull_request': {
+                        'state': 'open',
                         'user': {'login': 'bob'},
                         'base': {
                             'repo': {'full_name': r.name},

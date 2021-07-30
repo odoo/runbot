@@ -193,16 +193,22 @@ def handle_pr(env, event):
 
     # don't marked merged PRs as closed (!!!)
     if event['action'] == 'closed' and pr_obj.state != 'merged':
-        # FIXME: store some sort of "try to close it later" if the merge fails?
-        _logger.info(
-            '%s closing %s (state=%s)',
-            event['sender']['login'],
-            pr_obj.display_name,
-            pr_obj.state,
-        )
+        oldstate = pr_obj.state
         if pr_obj._try_closing(event['sender']['login']):
+            _logger.info(
+                '%s closed %s (state=%s)',
+                event['sender']['login'],
+                pr_obj.display_name,
+                oldstate,
+            )
             return 'Closed {}'.format(pr_obj.id)
         else:
+            _logger.warning(
+                '%s tried to close %s (state=%s)',
+                event['sender']['login'],
+                pr_obj.display_name,
+                oldstate,
+            )
             return 'Ignored: could not lock rows (probably being merged)'
 
     if event['action'] == 'reopened' :

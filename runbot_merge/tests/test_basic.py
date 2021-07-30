@@ -2894,7 +2894,6 @@ class TestUnknownPR:
         assert not Fetch.search([('repository', '=', repo.name), ('number', '=', prx.number)])
 
         c = env['runbot_merge.commit'].search([('sha', '=', prx.head)])
-        print(prx.head, c, c.statuses, flush=True)
         assert json.loads(c.statuses) == {
             'legal/cla': {'state': 'success', 'target_url': None, 'description': None},
             'ci/runbot': {'state': 'success', 'target_url': 'http://example.org/wheee', 'description': None}
@@ -2903,10 +2902,10 @@ class TestUnknownPR:
             seen(env, prx, users),
             (users['reviewer'], 'hansen r+'),
             (users['reviewer'], 'hansen r+'),
-            seen(env, prx, users),
             (users['user'], "Sorry, I didn't know about this PR and had to "
                             "retrieve its information, you may have to "
                             "re-approve it."),
+            seen(env, prx, users),
         ]
 
         pr = env['runbot_merge.pull_requests'].search([
@@ -2918,6 +2917,49 @@ class TestUnknownPR:
         with repo:
             prx.post_comment('hansen r+', config['role_reviewer']['token'])
         assert pr.state == 'ready'
+
+    def test_fetch_closed(self, env, repo, users, config):
+        """ If an "unknown PR" is fetched while closed, it should be saved as
+        closed
+        """
+        with repo:
+            m, _ = repo.make_commits(
+                None,
+                Commit('initial', tree={'m': 'm'}),
+                Commit('second', tree={'m2': 'm2'}),
+                ref='heads/master')
+
+            [c1] = repo.make_commits(m, Commit('first', tree={'m': 'c1'}))
+            pr = repo.make_pr(title='title', body='body', target='master', head=c1)
+        env.run_crons()
+        with repo:
+            pr.close()
+
+        # assume an unknown but ready PR: we don't know the PR or its head commit
+        to_pr(env, pr).unlink()
+        env['runbot_merge.commit'].search([('sha', '=', pr.head)]).unlink()
+
+        # reviewer reviewers
+        with repo:
+            pr.post_comment('hansen r+', config['role_reviewer']['token'])
+
+        Fetch = env['runbot_merge.fetch_job']
+        fetches = Fetch.search([('repository', '=', repo.name), ('number', '=', pr.number)])
+        assert len(fetches) == 1, f"expected one fetch for {pr.number}, found {len(fetches)}"
+
+        env.run_crons('runbot_merge.fetch_prs_cron')
+        env.run_crons()
+        assert not Fetch.search([('repository', '=', repo.name), ('number', '=', pr.number)])
+
+        assert to_pr(env, pr).state == 'closed'
+        assert pr.comments == [
+            seen(env, pr, users),
+            (users['reviewer'], 'hansen r+'),
+            (users['user'], "Sorry, I didn't know about this PR and had to "
+                            "retrieve its information, you may have to "
+                            "re-approve it."),
+            seen(env, pr, users),
+        ]
 
     def test_rplus_unmanaged(self, env, repo, users, config):
         """ r+ on an unmanaged target should notify about
