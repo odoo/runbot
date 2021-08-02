@@ -860,8 +860,10 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
             root_branch = 'origin/pull/%d' % root.number
             working_copy.checkout('-bsquashed', root_branch)
             root_commits = root.commits()
+            # commits returns oldest first, so youngest (head) last
+            head_commit = root_commits[-1]['commit']
 
-            to_tuple = operator.itemgetter('name', 'email', 'date')
+            to_tuple = operator.itemgetter('name', 'email')
             to_dict = lambda term, vals: {
                 'GIT_%s_NAME' % term: vals[0],
                 'GIT_%s_EMAIL' % term: vals[1],
@@ -872,8 +874,10 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
                 authors.add(to_tuple(c['author']))
                 committers.add(to_tuple(c['committer']))
             fp_authorship = (project_id.fp_github_name, project_id.fp_github_email, '')
-            author = authors.pop() if len(authors) == 1 else fp_authorship
-            committer = committers.pop() if len(committers) == 1 else fp_authorship
+            author = fp_authorship if len(authors) != 1\
+                else authors.pop() + (head_commit['author']['date'],)
+            committer = fp_authorship if len(committers) != 1 \
+                else committers.pop() + (head_commit['committer']['date'],)
             conf = working_copy.with_config(env={
                 **to_dict('AUTHOR', author),
                 **to_dict('COMMITTER', committer),
