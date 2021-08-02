@@ -130,16 +130,18 @@ def rolemap(request, config):
             r = _rate_limited(lambda: requests.get('https://api.github.com/user', headers={'Authorization': 'token %s' % data['token']}))
         r.raise_for_status()
 
-        rolemap[role] = data['user'] = r.json()['login']
+        user = rolemap[role] = r.json()
+        data['user'] = user['login']
     return rolemap
 
 @pytest.fixture
 def partners(env, config, rolemap):
     m = dict.fromkeys(rolemap.keys(), env['res.partner'])
-    for role, login in rolemap.items():
+    for role, u in rolemap.items():
         if role in ('user', 'other'):
             continue
 
+        login = u['login']
         m[role] = env['res.partner'].create({
             'name': config['role_' + role].get('name', login),
             'github_login': login,
@@ -165,7 +167,7 @@ def setreviewers(partners):
 
 @pytest.fixture
 def users(partners, rolemap):
-    return rolemap
+    return {k: v['login'] for k, v in rolemap.items()}
 
 @pytest.fixture(scope='session')
 def tunnel(pytestconfig, port):
@@ -419,7 +421,7 @@ def _rate_limited(req):
         q = req()
         if not q.ok and q.headers.get('X-RateLimit-Remaining') == '0':
             reset = int(q.headers['X-RateLimit-Reset'])
-            delay = round(reset - time.time() + 1.0)
+            delay = max(0, round(reset - time.time() + 1.0))
             print("Hit rate limit, sleeping for", delay, "seconds")
             time.sleep(delay)
             continue

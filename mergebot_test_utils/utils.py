@@ -52,11 +52,7 @@ class re_matches:
         return '~' + self._r.pattern + '~'
 
 def seen(env, pr, users):
-    pr_id = env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', pr.repo.name),
-        ('number', '=', pr.number)
-    ])
-    return users['user'], f'[Pull request status dashboard]({pr_id.url}).'
+    return users['user'], f'[Pull request status dashboard]({to_pr(env, pr).url}).'
 
 def make_basic(env, config, make_repo, *, reponame='proj', project_name='myproject'):
     """ Creates a basic repo with 3 forking branches
