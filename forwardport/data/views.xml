@@ -136,6 +136,18 @@
         </field>
     </record>
 
+    <record model="ir.ui.view" id="repository">
+        <field name="name">Show forwardport repository fields</field>
+        <field name="inherit_id" ref="runbot_merge.form_repository"/>
+        <field name="model">runbot_merge.repository</field>
+        <field name="arch" type="xml">
+            <field name="branch_filter" position="after">
+                <field string="FP remote" name="fp_remote_target"
+                       help="Repository where forward port branches will be created"/>
+            </field>
+        </field>
+    </record>
+
     <record model="ir.ui.view" id="pr">
         <field name="name">Show forwardport PR fields</field>
         <field name="inherit_id" ref="runbot_merge.runbot_merge_form_prs"/>
