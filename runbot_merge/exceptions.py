@@ -2,5 +2,7 @@ class MergeError(Exception):
     pass
 class FastForwardError(Exception):
     pass
-class Skip(MergeError):
+class Mismatch(MergeError):
     pass
+class Unmergeable(MergeError):
+    ...

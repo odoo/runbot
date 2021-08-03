@@ -533,15 +533,20 @@ class Branch(models.Model):
             try:
                 staged |= Batch.stage(meta, batch)
             except exceptions.MergeError as e:
-                if first:
+                if first or isinstance(e, exceptions.Unmergeable):
                     pr = e.args[0]
-                    _logger.exception("Failed to merge %s into staging branch",
-                                      pr.display_name)
+                    if len(e.args) > 1 and e.args[1]:
+                        message = e.args[1]
+                    else:
+                        message = "Unable to stage PR (%s)" % e.__context__
+                        _logger.exception(
+                            "Failed to merge %s into staging branch",
+                            pr.display_name)
                     pr.state = 'error'
                     self.env['runbot_merge.pull_requests.feedback'].create({
                         'repository': pr.repository.id,
                         'pull_request': pr.number,
-                        'message': "Unable to stage PR (%s)" % e.__context__,
+                        'message': message,
                     })
             else:
                 first = False
@@ -1354,13 +1359,25 @@ class PullRequests(models.Model):
         _, prdict = gh.pr(self.number)
         commits = prdict['commits']
         method = self.merge_method or ('rebase-ff' if commits == 1 else None)
-        assert commits < 50 or not method.startswith('rebase'), \
-            "rebasing a PR of more than 50 commits is a tad excessive"
-        assert commits < 250, "merging PRs of 250+ commits is not supported (https://developer.github.com/v3/pulls/#list-commits-on-a-pull-request)"
+        if commits > 50 and method.startswith('rebase'):
+            raise exceptions.Unmergeable(self, "Rebasing 50 commits is too much.")
+        if commits > 250:
+            raise exceptions.Unmergeable(
+                self, "Merging PRs of 250 or more commits is not supported "
+                "(https://developer.github.com/v3/pulls/#list-commits-on-a-pull-request)"
+            )
         pr_commits = gh.commits(self.number)
+        for c in pr_commits:
+            if not (c['commit']['author']['email'] and c['commit']['committer']['email']):
+                raise exceptions.Unmergeable(
+                    self,
+                    f"All commits must have author and committer email, "
+                    f"missing email on {c['sha']} indicates the authorship is "
+                    f"most likely incorrect."
+                )
         pr_head = pr_commits[-1]['sha']
         if pr_head != self.head:
-            raise exceptions.Skip(self.head, pr_head, commits == 1)
+            raise exceptions.Mismatch(self.head, pr_head, commits == 1)
 
         if self.reviewed_by and self.reviewed_by.name == self.reviewed_by.github_login:
             # XXX: find other trigger(s) to sync github name?
@@ -1397,9 +1414,15 @@ class PullRequests(models.Model):
             # look for parent(s?) of pr_head not in PR, means it's
             # from target (so we merged target in pr)
             merge = head_parents - {c['sha'] for c in commits}
-            assert len(merge) <= 1, \
-                ">1 parent from base in PR's head is not supported"
-            if len(merge) == 1:
+            external_parents = len(merge)
+            if external_parents > 1:
+                raise exceptions.Unmergeable(
+                    "The PR head can only have one parent from the base branch "
+                    "(not part of the PR itself), found %d: %s" % (
+                        external_parents,
+                        ', '.join(merge)
+                    ))
+            if external_parents == 1:
                 [base_commit] = merge
 
         commits_map = {c['sha']: c['sha'] for c in commits}
@@ -2008,44 +2031,45 @@ class Batch(models.Model):
             target = 'tmp.{}'.format(pr.target.name)
             original_head = gh.head(target)
             try:
-                method, new_heads[pr] = pr._stage(gh, target, related_prs=(prs - pr))
-                _logger.info(
-                    "Staged pr %s to %s by %s: %s -> %s",
-                    pr.display_name, pr.target.name, method,
-                    original_head, new_heads[pr]
-                )
-            except (exceptions.MergeError, AssertionError) as e:
-                # reset the head which failed, as rebase() may have partially
-                # updated it (despite later steps failing)
-                gh.set_ref(target, original_head)
-                # then reset every previous update
-                for to_revert in new_heads.keys():
-                    it = meta[to_revert.repository]
-                    it['gh'].set_ref('tmp.{}'.format(to_revert.target.name), it['head'])
-
-                if isinstance(e, exceptions.Skip):
-                    old_head, new_head, to_squash = e.args
-                    pr.write({
-                        'state': 'opened',
-                        'squash': to_squash,
-                        'head': new_head,
-                    })
-                    _logger.warning(
-                        "head mismatch on %s: had %s but found %s",
-                        pr.display_name, old_head, new_head
+                try:
+                    method, new_heads[pr] = pr._stage(gh, target, related_prs=(prs - pr))
+                    _logger.info(
+                        "Staged pr %s to %s by %s: %s -> %s",
+                        pr.display_name, pr.target.name, method,
+                        original_head, new_heads[pr]
                     )
-                    self.env['runbot_merge.pull_requests.feedback'].create({
-                        'repository': pr.repository.id,
-                        'pull_request': pr.number,
-                        'message': "We apparently missed an update to this PR "
-                                   "and tried to stage it in a state which "
-                                   "might not have been approved. PR has been "
-                                   "updated to %s, please check and approve or "
-                                   "re-approve." % new_head
-                    })
-                    return self.env['runbot_merge.batch']
-                else:
-                    raise exceptions.MergeError(pr)
+                except Exception:
+                    # reset the head which failed, as rebase() may have partially
+                    # updated it (despite later steps failing)
+                    gh.set_ref(target, original_head)
+                    # then reset every previous update
+                    for to_revert in new_heads.keys():
+                        it = meta[to_revert.repository]
+                        it['gh'].set_ref('tmp.{}'.format(to_revert.target.name), it['head'])
+                    raise
+            except github.MergeError:
+                raise exceptions.MergeError(pr)
+            except exceptions.Mismatch as e:
+                old_head, new_head, to_squash = e.args
+                pr.write({
+                    'state': 'opened',
+                    'squash': to_squash,
+                    'head': new_head,
+                })
+                _logger.warning(
+                    "head mismatch on %s: had %s but found %s",
+                    pr.display_name, old_head, new_head
+                )
+                self.env['runbot_merge.pull_requests.feedback'].create({
+                    'repository': pr.repository.id,
+                    'pull_request': pr.number,
+                    'message': "We apparently missed an update to this PR "
+                               "and tried to stage it in a state which "
+                               "might not have been approved. PR has been "
+                               "updated to %s, please check and approve or "
+                               "re-approve." % new_head
+                })
+                return self.env['runbot_merge.batch']
 
         # update meta to new heads
         for pr, head in new_heads.items():
