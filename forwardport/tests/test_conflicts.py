@@ -268,11 +268,9 @@ def test_multiple_commits_same_authorship(env, config, make_repo):
     assert get(c.author) == get(author)
     assert get(c.committer) == get(committer)
 
-
 def test_multiple_commits_different_authorship(env, config, make_repo, users, rolemap):
-    """ When a PR has multiple commits by the same author and its
-    forward-porting triggers a conflict, the resulting (squashed) conflict
-    commit should have the original author (same with the committer).
+    """ When a PR has multiple commits by different authors, the resulting
+    (squashed) conflict commit should have
     """
     author = {'name': 'George Pearce', 'email': 'gp@example.org'}
     committer = {'name': 'G. P. W. Meredith', 'email': 'gpwm@example.org'}
@@ -315,7 +313,41 @@ def test_multiple_commits_different_authorship(env, config, make_repo, users, ro
         assert 0, "timed out"
 
     c = prod.commit(pr2_id.head)
+    assert len(c.parents) == 1
     get = itemgetter('name', 'email')
     rm = rolemap['user']
-    assert get(c.author) == (rm['login'], rm['email'])
-    assert get(c.committer) == (rm['login'], rm['email'])
+    assert get(c.author) == (rm['login'], ''), \
+        "In a multi-author PR, the squashed conflict commit should have the " \
+        "author set to the bot but an empty email"
+    assert get(c.committer) == (rm['login'], '')
+
+    assert re.match(r'''<<<\x3c<<< HEAD
+b
+=======
+2
+>>>\x3e>>> [0-9a-f]{7,}.*
+''', prod.read_tree(c)['g'])
+
+    # I'd like to fix the conflict so everything is clean and proper *but*
+    # github's API apparently rejects creating commits with an empty email.
+    #
+    # So fuck that, I'll just "merge the conflict". Still works at simulating
+    # a resolution error as technically that's the sort of things people do.
+
+    pr2 = prod.get_pr(pr2_id.number)
+    with prod:
+        prod.post_status(pr2_id.head, 'success', 'legal/cla')
+        prod.post_status(pr2_id.head, 'success', 'ci/runbot')
+        pr2.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+
+    assert pr2.comments == [
+        seen(env, pr2, users),
+        (users['user'], re_matches(r'Ping.*CONFLICT', re.DOTALL)),
+        (users['reviewer'], 'hansen r+'),
+        (users['user'], f"All commits must have author and committer email, "
+                        f"missing email on {pr2_id.head} indicates the "
+                        f"authorship is most likely incorrect."),
+    ]
+    assert pr2_id.state == 'error'
+    assert not pr2_id.staging_id, "staging should have been rejected"

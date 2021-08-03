@@ -873,7 +873,7 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
             for c in (c['commit'] for c in root_commits):
                 authors.add(to_tuple(c['author']))
                 committers.add(to_tuple(c['committer']))
-            fp_authorship = (project_id.fp_github_name, project_id.fp_github_email, '')
+            fp_authorship = (project_id.fp_github_name, '', '')
             author = fp_authorship if len(authors) != 1\
                 else authors.pop() + (head_commit['author']['date'],)
             committer = fp_authorship if len(committers) != 1 \
