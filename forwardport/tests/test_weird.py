@@ -194,7 +194,7 @@ def test_failed_staging(env, config, make_repo):
     assert len(pr3_head) == 1
 
     assert not pr3_id.batch_id, "check that the PR indeed has no batch anymore"
-    assert not pr3_id.batch_ids
+    assert not pr3_id.batch_ids.filtered(lambda b: b.active)
 
     assert len(env['runbot_merge.batch'].search([
         ('prs', 'in', pr3_id.id),
