@@ -209,7 +209,7 @@ class BuildResult(models.Model):
 
     build_url = fields.Char('Build url', compute='_compute_build_url', store=False)
     build_error_ids = fields.Many2many('runbot.build.error', 'runbot_build_error_ids_runbot_build_rel', string='Errors')
-    keep_running = fields.Boolean('Keep running', help='Keep running')
+    keep_running = fields.Boolean('Keep running', help='Keep running', index=True)
     log_counter = fields.Integer('Log Lines counter', default=100)
 
     slot_ids = fields.One2many('runbot.batch.slot', 'build_id')
