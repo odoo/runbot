@@ -8,6 +8,7 @@ _logger = logging.getLogger(__name__)
 class BuildStat(models.Model):
     _name = "runbot.build.stat"
     _description = "Statistics"
+    _log_access = False
 
     _sql_constraints = [
         (
