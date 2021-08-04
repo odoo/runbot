@@ -88,9 +88,9 @@ class Runbot(models.AbstractModel):
         running_max = host.get_running_max()
         domain_host = self.build_domain_host(host)
         Build = self.env['runbot.build']
-        cannot_be_killed_ids = Build.search(domain_host + [('keep_running', '!=', True)]).ids
+        cannot_be_killed_ids = Build.search(domain_host + [('keep_running', '=', True)]).ids
         sticky_bundles = self.env['runbot.bundle'].search([('sticky', '=', True)])
-        cannot_be_killed_ids = [
+        cannot_be_killed_ids += [
             build.id
             for build in sticky_bundles.mapped('last_batchs.slot_ids.build_id')
             if build.host == host.name
