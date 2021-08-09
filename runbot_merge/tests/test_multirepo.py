@@ -108,10 +108,15 @@ def test_stage_one(env, project, repo_a, repo_b, config):
         )
     env.run_crons()
 
-    assert to_pr(env, pr_a).state == 'ready'
-    assert to_pr(env, pr_a).staging_id
-    assert to_pr(env, pr_b).state == 'ready'
-    assert not to_pr(env, pr_b).staging_id
+    pra_id = to_pr(env, pr_a)
+    assert pra_id.state == 'ready'
+    assert pra_id.staging_id
+    assert repo_a.commit('staging.master').message.startswith('commit_A_00')
+    assert repo_b.commit('staging.master').message.startswith('force rebuild')
+
+    prb_id = to_pr(env, pr_b)
+    assert prb_id.state == 'ready'
+    assert not prb_id.staging_id
 
 get_related_pr_labels = XPath('.//*[normalize-space(text()) = "Linked pull requests"]//a/text()')
 def test_stage_match(env, project, repo_a, repo_b, config, page):
@@ -364,15 +369,16 @@ def test_sub_match(env, project, repo_a, repo_b, repo_c, config):
         "branch-matched PRs should be part of the same staging"
 
     st = pr_b.staging_id
-    b_staging = repo_b.commit('heads/staging.master')
-    c_staging = repo_c.commit('heads/staging.master')
+    a_staging = repo_a.commit('staging.master')
+    b_staging = repo_b.commit('staging.master')
+    c_staging = repo_c.commit('staging.master')
     assert json.loads(st.heads) == {
-        repo_a.name: repo_a.commit('heads/staging.master').id,
-        repo_a.name + '^': repo_a.commit('heads/master').id,
+        repo_a.name: a_staging.id,
+        repo_a.name + '^': a_staging.parents[0],
         repo_b.name: b_staging.id,
-        repo_b.name + '^': b_staging.parents[0],
+        repo_b.name + '^': b_staging.id,
         repo_c.name: c_staging.id,
-        repo_c.name + '^': c_staging.parents[0],
+        repo_c.name + '^': c_staging.id,
     }
 
 def test_merge_fail(env, project, repo_a, repo_b, users, config):
@@ -432,7 +438,6 @@ def test_merge_fail(env, project, repo_a, repo_b, users, config):
         c['commit']['message']
         for c in repo_a.log('heads/staging.master')
     ] == [
-        re_matches('^force rebuild'),
         """commit_do-b-thing_00
 
 closes %s

@@ -474,11 +474,10 @@ def test_access_rights(env, config, make_repo, users, author, reviewer, delegate
         assert pr1.staging_id and pr2.staging_id,\
             "%s should have approved FP of PRs by %s" % (reviewer, author)
         st = prod.commit('staging.b')
-        c = prod.commit(st.parents[0])
         # Should be signed-off by both original reviewer and forward port reviewer
-        original_signoff = signoff(config['role_user'], c.message)
-        forward_signoff = signoff(config['role_' + reviewer], c.message)
-        assert c.message.index(original_signoff) <= c.message.index(forward_signoff),\
+        original_signoff = signoff(config['role_user'], st.message)
+        forward_signoff = signoff(config['role_' + reviewer], st.message)
+        assert st.message.index(original_signoff) <= st.message.index(forward_signoff),\
             "Check that FP approver is after original PR approver as that's " \
             "the review path for the PR"
     else:
