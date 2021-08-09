@@ -9,7 +9,8 @@ import pytest
 from lxml import html
 
 import odoo
-from utils import _simple_init, seen, re_matches, get_partner, Commit, pr_page, to_pr
+from utils import _simple_init, seen, re_matches, get_partner, Commit, pr_page, to_pr, part_of
+
 
 @pytest.fixture
 def repo(env, project, make_repo, users, setreviewers):
@@ -642,13 +643,17 @@ def test_ff_failure_batch(env, repo, users, config):
         C.post_comment('hansen r+ rebase-merge', config['role_reviewer']['token'])
     env.run_crons()
 
+    pr_a = to_pr(env, A)
+    pr_b = to_pr(env, B)
+    pr_c = to_pr(env, C)
+
     messages = [
         c['commit']['message']
         for c in repo.log('heads/staging.master')
     ]
-    assert 'a2' in messages
-    assert 'b2' in messages
-    assert 'c2' in messages
+    assert part_of('a2', pr_a) in messages
+    assert part_of('b2', pr_b) in messages
+    assert part_of('c2', pr_c) in messages
 
     # block FF
     with repo:
@@ -676,9 +681,9 @@ def test_ff_failure_batch(env, repo, users, config):
     reviewer = get_partner(env, users["reviewer"]).formatted_email
     assert messages == {
         'initial', 'NO!',
-        'a1', 'a2', 'A\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, A.number, reviewer),
-        'b1', 'b2', 'B\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, B.number, reviewer),
-        'c1', 'c2', 'C\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, C.number, reviewer),
+        part_of('a1', pr_a), part_of('a2', pr_a), f'A\n\ncloses {pr_a.display_name}\n\nSigned-off-by: {reviewer}',
+        part_of('b1', pr_b), part_of('b2', pr_b), f'B\n\ncloses {pr_b.display_name}\n\nSigned-off-by: {reviewer}',
+        part_of('c1', pr_c), part_of('c2', pr_c), f'C\n\ncloses {pr_c.display_name}\n\nSigned-off-by: {reviewer}',
     }
 
 class TestPREdition:
@@ -1427,14 +1432,15 @@ class TestMergeMethod:
             prx.post_comment('hansen r+ rebase-merge', config['role_reviewer']['token'])
         env.run_crons()
 
+        pr_id = to_pr(env, prx)
         # create a dag (msg:str, parents:set) from the log
         staging = log_to_node(repo.log('heads/staging.master'))
         # then compare to the dag version of the right graph
         nm2 = node('M2', node('M1', node('M0')))
-        nb1 = node('B1', node('B0', nm2))
+        nb1 = node(part_of('B1', pr_id), node(part_of('B0', pr_id), nm2))
         reviewer = get_partner(env, users["reviewer"]).formatted_email
         merge_head = (
-            'title\n\nbody\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, prx.number, reviewer),
+            f'title\n\nbody\n\ncloses {pr_id.display_name}\n\nSigned-off-by: {reviewer}',
             frozenset([nm2, nb1])
         )
         expected = (re_matches('^force rebuild'), frozenset([merge_head]))
@@ -1504,13 +1510,14 @@ class TestMergeMethod:
             prx.post_comment('hansen r+ rebase-ff', config['role_reviewer']['token'])
         env.run_crons()
 
+        pr_id = to_pr(env, prx)
         # create a dag (msg:str, parents:set) from the log
         staging = log_to_node(repo.log('heads/staging.master'))
         # then compare to the dag version of the right graph
         nm2 = node('M2', node('M1', node('M0')))
         reviewer = get_partner(env, users["reviewer"]).formatted_email
-        nb1 = node('B1\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, prx.number, reviewer),
-                   node('B0', nm2))
+        nb1 = node(f'B1\n\ncloses {pr_id.display_name}\n\nSigned-off-by: {reviewer}',
+                   node(part_of('B0', pr_id), nm2))
         expected = node(re_matches('^force rebuild'), nb1)
         assert staging == expected
 
@@ -2358,12 +2365,6 @@ class TestBatching(object):
             )
         return pr
 
-    def _get(self, env, repo, number):
-        return env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', number),
-        ])
-
     def test_staging_batch(self, env, repo, users, config):
         """ If multiple PRs are ready for the same target at the same point,
         they should be staged together
@@ -2376,9 +2377,9 @@ class TestBatching(object):
             pr2 = self._pr(repo, 'PR2', [{'c': 'CCC'}, {'d': 'DDD'}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token'])
         env.run_crons()
 
-        pr1 = self._get(env, repo, pr1.number)
+        pr1 = to_pr(env, pr1)
         assert pr1.staging_id
-        pr2 = self._get(env, repo, pr2.number)
+        pr2 = to_pr(env, pr2)
         assert pr1.staging_id
         assert pr2.staging_id
         assert pr1.staging_id == pr2.staging_id
@@ -2387,16 +2388,19 @@ class TestBatching(object):
         staging = log_to_node(log)
         reviewer = get_partner(env, users["reviewer"]).formatted_email
         p1 = node(
-            'title PR1\n\nbody PR1\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, pr1.number, reviewer),
+            'title PR1\n\nbody PR1\n\ncloses {}\n\nSigned-off-by: {}'.format(pr1.display_name, reviewer),
             node('initial'),
-            node('commit_PR1_01', node('commit_PR1_00', node('initial')))
+            node(part_of('commit_PR1_01', pr1), node(part_of('commit_PR1_00', pr1), node('initial')))
         )
         p2 = node(
-            'title PR2\n\nbody PR2\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, pr2.number, reviewer),
+            'title PR2\n\nbody PR2\n\ncloses {}\n\nSigned-off-by: {}'.format(pr2.display_name, reviewer),
             p1,
-            node('commit_PR2_01', node('commit_PR2_00', p1))
+            node(part_of('commit_PR2_01', pr2), node(part_of('commit_PR2_00', pr2), p1))
         )
         expected = (re_matches('^force rebuild'), frozenset([p2]))
+        import pprint
+        pprint.pprint(staging)
+        pprint.pprint(expected)
         assert staging == expected
 
     def test_staging_batch_norebase(self, env, repo, users, config):
@@ -2413,10 +2417,10 @@ class TestBatching(object):
             pr2.post_comment('hansen merge', config['role_reviewer']['token'])
         env.run_crons()
 
-        pr1 = self._get(env, repo, pr1.number)
+        pr1 = to_pr(env, pr1)
         assert pr1.staging_id
         assert pr1.merge_method == 'merge'
-        pr2 = self._get(env, repo, pr2.number)
+        pr2 = to_pr(env, pr2)
         assert pr2.merge_method == 'merge'
         assert pr1.staging_id
         assert pr2.staging_id
@@ -2452,9 +2456,9 @@ class TestBatching(object):
             pr2 = self._pr(repo, 'PR2', [{'c': 'CCC'}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token'])
         env.run_crons()
 
-        pr1 = self._get(env, repo, pr1.number)
+        pr1 = to_pr(env, pr1)
         assert pr1.staging_id
-        pr2 = self._get(env, repo, pr2.number)
+        pr2 = to_pr(env, pr2)
         assert pr1.staging_id
         assert pr2.staging_id
         assert pr1.staging_id == pr2.staging_id
@@ -2485,7 +2489,7 @@ class TestBatching(object):
             pr11.post_comment('hansen priority=1', config['role_reviewer']['token'])
             pr12.post_comment('hansen priority=1', config['role_reviewer']['token'])
 
-        pr21, pr22, pr11, pr12 = prs = [self._get(env, repo, pr.number) for pr in [pr21, pr22, pr11, pr12]]
+        pr21, pr22, pr11, pr12 = prs = [to_pr(env, pr) for pr in [pr21, pr22, pr11, pr12]]
         assert pr21.priority == pr22.priority == 2
         assert pr11.priority == pr12.priority == 1
 
@@ -2514,7 +2518,7 @@ class TestBatching(object):
         # stage PR1
         env.run_crons()
         p_11, p_12, p_21, p_22 = \
-            [self._get(env, repo, pr.number) for pr in [pr11, pr12, pr21, pr22]]
+            [to_pr(env, pr) for pr in [pr11, pr12, pr21, pr22]]
         assert not p_21.staging_id or p_22.staging_id
         assert p_11.staging_id and p_12.staging_id
         assert p_11.staging_id == p_12.staging_id
@@ -2524,7 +2528,7 @@ class TestBatching(object):
         with repo:
             pr01 = self._pr(repo, 'Urgent1', [{'n': 'n'}, {'o': 'o'}], user=config['role_user']['token'], reviewer=None, statuses=[])
             pr01.post_comment('hansen priority=0 rebase-merge', config['role_reviewer']['token'])
-        p_01 = self._get(env, repo, pr01.number)
+        p_01 = to_pr(env, pr01)
         assert p_01.state == 'opened'
         assert p_01.priority == 0
 
@@ -2544,9 +2548,9 @@ class TestBatching(object):
             repo.make_ref('heads/master', m)
 
             pr1 = self._pr(repo, 'PR1', [{'a': 'AAA'}, {'b': 'BBB'}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token'])
-            p_1 = self._get(env, repo, pr1.number)
+            p_1 = to_pr(env, pr1)
             pr2 = self._pr(repo, 'PR2', [{'a': 'some content', 'c': 'CCC'}, {'d': 'DDD'}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token'])
-            p_2 = self._get(env, repo, pr2.number)
+            p_2 = to_pr(env, pr2)
         env.run_crons()
 
         st = env['runbot_merge.stagings'].search([])
@@ -2570,7 +2574,7 @@ class TestBatching(object):
 
         # TODO: maybe just deactivate stagings instead of deleting them when canceling?
         assert not p_1.staging_id
-        assert self._get(env, repo, pr0.number).staging_id
+        assert to_pr(env, pr0).staging_id
 
     def test_urgent_failed(self, env, repo, config):
         """ Ensure pr[p=0,state=failed] don't get picked up
@@ -2581,13 +2585,13 @@ class TestBatching(object):
 
             pr21 = self._pr(repo, 'PR1', [{'a': 'AAA'}, {'b': 'BBB'}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token'])
 
-        p_21 = self._get(env, repo, pr21.number)
+        p_21 = to_pr(env, pr21)
 
         # no statuses run on PR0s
         with repo:
             pr01 = self._pr(repo, 'Urgent1', [{'n': 'n'}, {'o': 'o'}], user=config['role_user']['token'], reviewer=None, statuses=[])
             pr01.post_comment('hansen priority=0', config['role_reviewer']['token'])
-        p_01 = self._get(env, repo, pr01.number)
+        p_01 = to_pr(env, pr01)
         p_01.state = 'error'
 
         env.run_crons()
