@@ -130,3 +130,8 @@ def to_pr(env, pr):
         ('repository.name', '=', pr.repo.name),
         ('number', '=', pr.number),
     ])
+
+def part_of(label, pr_id, *, separator='\n\n'):
+    """ Adds the "part-of" pseudo-header in the footer.
+    """
+    return f'{label}{separator}Part-of: {pr_id.display_name}'

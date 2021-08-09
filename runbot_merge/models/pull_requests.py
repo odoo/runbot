@@ -1335,24 +1335,45 @@ class PullRequests(models.Model):
         """
         return Message.from_message(message)
 
+    def _is_mentioned(self, message, *, full_reference=False):
+        """Returns whether ``self`` is mentioned in ``message```
+
+        :param str | PullRequest message:
+        :param bool full_reference: whether the repository name must be present
+        :rtype: bool
+        """
+        if full_reference:
+            pattern = fr'\b{re.escape(self.display_name)}\b'
+        else:
+            repository = self.repository.name # .replace('/', '\\/')
+            pattern = fr'( |\b{repository})#{self.number}\b'
+        return bool(re.search(pattern, message if isinstance(message, str) else message.message))
+
     def _build_merge_message(self, message, related_prs=()):
         # handle co-authored commits (https://help.github.com/articles/creating-a-commit-with-multiple-authors/)
         m = self._parse_commit_message(message)
-        pattern = r'( |{repository})#{pr.number}\b'.format(
-            pr=self,
-            repository=self.repository.name.replace('/', '\\/')
-        )
-        if not re.search(pattern, m.body):
+        if not self._is_mentioned(message):
             m.body += '\n\ncloses {pr.display_name}'.format(pr=self)
 
         for r in related_prs:
-            if r.display_name not in m.body:
+            if not r._is_mentioned(message, full_reference=True):
                 m.headers.add('Related', r.display_name)
 
         if self.reviewed_by:
             m.headers.add('signed-off-by', self.reviewed_by.formatted_email)
 
         return m
+
+    def _add_self_references(self, commits):
+        """Adds a footer reference to ``self`` to all ``commits`` if they don't
+        already refer to the PR.
+        """
+        for c in (c['commit'] for c in commits):
+            if not self._is_mentioned(c['message']):
+                m = self._parse_commit_message(c['message'])
+                m.headers.pop('Part-Of', None)
+                m.headers.add('Part-Of', self.display_name)
+                c['message'] = str(m)
 
     def _stage(self, gh, target, related_prs=()):
         # nb: pr_commits is oldest to newest so pr.head is pr_commits[-1]
@@ -1395,13 +1416,15 @@ class PullRequests(models.Model):
         # on top of target
         msg = self._build_merge_message(commits[-1]['commit']['message'], related_prs=related_prs)
         commits[-1]['commit']['message'] = str(msg)
+        self._add_self_references(commits[:-1])
         head, mapping = gh.rebase(self.number, target, commits=commits)
         self.commits_map = json.dumps({**mapping, '': head})
         return head
 
     def _stage_rebase_merge(self, gh, target, commits, related_prs=()):
-        msg = self._build_merge_message(self, related_prs=related_prs)
+        self._add_self_references(commits)
         h, mapping = gh.rebase(self.number, target, reset=True, commits=commits)
+        msg = self._build_merge_message(self, related_prs=related_prs)
         merge_head = gh.merge(h, target, str(msg))['sha']
         self.commits_map = json.dumps({**mapping, '': merge_head})
         return merge_head
