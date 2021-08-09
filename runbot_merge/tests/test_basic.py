@@ -98,8 +98,6 @@ def test_trivial_flow(env, repo, page, users, config):
     assert s[1].get('class') == 'bg-success'
     assert s[1][0].text.strip() == '{}: ci/runbot'.format(repo.name)
 
-    assert re.match('^force rebuild', staging_head.message)
-
     assert st.state == 'success'
     assert pr_id.state == 'merged'
     assert pr_page(page, pr).cssselect('.alert-success')
@@ -846,18 +844,17 @@ def test_forward_port(env, repo, config):
         pr.post_comment('hansen r+ merge', config['role_reviewer']['token'])
     env.run_crons()
 
-    st = repo.commit('heads/staging.master')
-    assert st.message.startswith('force rebuild')
+    st = repo.commit('staging.master')
 
     with repo:
         repo.post_status(st.id, 'success', 'legal/cla')
         repo.post_status(st.id, 'success', 'ci/runbot')
     env.run_crons()
 
-    h = repo.commit('heads/master')
-    assert set(st.parents) == {h.id}
+    h = repo.commit('master')
+    assert st.id == h.id
     assert set(h.parents) == {m, pr.head}
-    commits = {c['sha'] for c in repo.log('heads/master')}
+    commits = {c['sha'] for c in repo.log('master')}
     assert len(commits) == 112
 
 @pytest.mark.skip("Needs to find a way to make set_ref fail on *second* call.")
@@ -1231,13 +1228,10 @@ class TestMergeMethod:
         staging = repo.commit('heads/staging.master')
         assert not repo.is_ancestor(prx.head, of=staging.id),\
             "the pr head should not be an ancestor of the staging branch in a squash merge"
-        assert re.match('^force rebuild', staging.message)
         assert repo.read_tree(staging) == {
             'm': 'c1', 'm2': 'm2',
         }, "the tree should still be correctly merged"
-        [actual_sha] = staging.parents
-        actual = repo.commit(actual_sha)
-        assert actual.parents == [m2],\
+        assert staging.parents == [m2],\
             "dummy commit aside, the previous master's tip should be the sole parent of the staging commit"
 
         with repo:
@@ -1251,8 +1245,8 @@ class TestMergeMethod:
         assert pr.state == 'merged'
         assert prx.state == 'closed'
         assert json.loads(pr.commits_map) == {
-            c1: actual_sha,
-            '': actual_sha,
+            c1: staging.id,
+            '': staging.id,
         }, "for a squash, the one PR commit should be mapped to the one rebased commit"
 
     def test_pr_update_to_many_commits(self, repo, env):
@@ -1443,8 +1437,7 @@ class TestMergeMethod:
             f'title\n\nbody\n\ncloses {pr_id.display_name}\n\nSigned-off-by: {reviewer}',
             frozenset([nm2, nb1])
         )
-        expected = (re_matches('^force rebuild'), frozenset([merge_head]))
-        assert staging == expected
+        assert staging == merge_head
 
         with repo:
             repo.post_status('heads/staging.master', 'success', 'legal/cla')
@@ -1497,13 +1490,20 @@ class TestMergeMethod:
              +------+                   +--^---+
         """
         with repo:
-            m0 = repo.make_commit(None, 'M0', None, tree={'m': '0'})
-            m1 = repo.make_commit(m0, 'M1', None, tree={'m': '1'})
-            m2 = repo.make_commit(m1, 'M2', None, tree={'m': '2'})
-            repo.make_ref('heads/master', m2)
+            _, m1, m2 = repo.make_commits(
+                None,
+                Commit('M0', tree={'m': '0'}),
+                Commit('M1', tree={'m': '1'}),
+                Commit('M2', tree={'m': '2'}),
+                ref='heads/master'
+            )
 
-            b0 = repo.make_commit(m1, 'B0', None, tree={'m': '1', 'b': '0'})
-            b1 = repo.make_commit(b0, 'B1', None, tree={'m': '1', 'b': '1'})
+            b0, b1 = repo.make_commits(
+                m1,
+                Commit('B0', tree={'b': '0'}, author={'name': 'Maarten Tromp', 'email': 'm.tromp@example.nl', 'date': '1651-03-30T12:00:00Z'}),
+                Commit('B1', tree={'b': '1'}, author={'name': 'Rein Huydecoper', 'email': 'r.huydecoper@example.nl', 'date': '1986-04-17T12:00:00Z'}),
+            )
+
             prx = repo.make_pr(title='title', body='body', target='master', head=b1)
             repo.post_status(prx.head, 'success', 'legal/cla')
             repo.post_status(prx.head, 'success', 'ci/runbot')
@@ -1518,8 +1518,7 @@ class TestMergeMethod:
         reviewer = get_partner(env, users["reviewer"]).formatted_email
         nb1 = node(f'B1\n\ncloses {pr_id.display_name}\n\nSigned-off-by: {reviewer}',
                    node(part_of('B0', pr_id), nm2))
-        expected = node(re_matches('^force rebuild'), nb1)
-        assert staging == expected
+        assert staging == nb1
 
         with repo:
             repo.post_status('heads/staging.master', 'success', 'legal/cla')
@@ -1547,6 +1546,23 @@ class TestMergeMethod:
             b0: m0.id, # first PR's commit
         }
         assert m0.parents == [m2], "can't hurt to check the parent of our root commit"
+        assert m0.author['date'] != m0.committer['date'], "commit date should have been rewritten"
+        assert m1.author['date'] != m1.committer['date'], "commit date should have been rewritten"
+
+        utcday = datetime.datetime.utcnow().date()
+        def parse(dt):
+            return datetime.datetime.strptime(dt, "%Y-%m-%dT%H:%M:%SZ")
+
+        # FIXME: actual commit creation could run before the date rollover and
+        #        local datetime.utcnow() after
+        assert parse(m0.committer['date']).date() == utcday
+        # FIXME: git date storage is unreliable and non-portable outside of an
+        #        unsigned 31b epoch range so the m0 event may get flung in the
+        #        future (compared to the literal datum), this test unexpectedly
+        #        becoming true if run on the exact wrong day
+        assert parse(m0.author['date']).date() != utcday
+        assert parse(m1.committer['date']).date() == utcday
+        assert parse(m0.author['date']).date() != utcday
 
     @pytest.mark.skip(reason="what do if the PR contains merge commits???")
     def test_pr_contains_merges(self, repo, env):
@@ -2397,11 +2413,7 @@ class TestBatching(object):
             p1,
             node(part_of('commit_PR2_01', pr2), node(part_of('commit_PR2_00', pr2), p1))
         )
-        expected = (re_matches('^force rebuild'), frozenset([p2]))
-        import pprint
-        pprint.pprint(staging)
-        pprint.pprint(expected)
-        assert staging == expected
+        assert staging == p2
 
     def test_staging_batch_norebase(self, env, repo, users, config):
         """ If multiple PRs are ready for the same target at the same point,
@@ -2426,7 +2438,7 @@ class TestBatching(object):
         assert pr2.staging_id
         assert pr1.staging_id == pr2.staging_id
 
-        log = list(repo.log('heads/staging.master'))
+        log = list(repo.log('staging.master'))
 
         staging = log_to_node(log)
         reviewer = get_partner(env, users["reviewer"]).formatted_email
@@ -2441,8 +2453,7 @@ class TestBatching(object):
             p1,
             node('commit_PR2_01', node('commit_PR2_00', node('initial')))
         )
-        expected = (re_matches('^force rebuild'), frozenset([p2]))
-        assert staging == expected
+        assert staging == p2
 
     def test_staging_batch_squash(self, env, repo, users, config):
         """ If multiple PRs are ready for the same target at the same point,
@@ -2467,11 +2478,9 @@ class TestBatching(object):
 
         staging = log_to_node(log)
         reviewer = get_partner(env, users["reviewer"]).formatted_email
-        expected = node(
-            re_matches('^force rebuild'),
-            node('commit_PR2_00\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, pr2.number, reviewer),
-                 node('commit_PR1_00\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, pr1.number, reviewer),
-                      node('initial'))))
+        expected = node('commit_PR2_00\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, pr2.number, reviewer),
+             node('commit_PR1_00\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, pr1.number, reviewer),
+                  node('initial')))
         assert staging == expected
 
     def test_batching_pressing(self, env, repo, config):

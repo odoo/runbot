@@ -237,30 +237,23 @@ def handle_status(env, event):
         'status on %(sha)s %(context)s:%(state)s (%(target_url)s) [%(description)r]',
         event
     )
-    Commits = env['runbot_merge.commit']
-    env.cr.execute('SELECT id FROM runbot_merge_commit WHERE sha=%s FOR UPDATE', [event['sha']])
-    c = Commits.browse(env.cr.fetchone())
-    if c:
-        old = json.loads(c.statuses)
-        new = {
-            **old,
-            event['context']: {
-                'state': event['state'],
-                'target_url': event['target_url'],
-                'description': event['description']
-            }
+    status_value = json.dumps({
+        event['context']: {
+            'state': event['state'],
+            'target_url': event['target_url'],
+            'description': event['description']
         }
-        if new != old: # don't update the commit if nothing's changed (e.g dupe status)
-            c.statuses = json.dumps(new)
-    else:
-        Commits.create({
-            'sha': event['sha'],
-            'statuses': json.dumps({event['context']: {
-                'state': event['state'],
-                'target_url': event['target_url'],
-                'description': event['description']
-            }})
-        })
+    })
+    # create status, or merge update into commit *unless* the update is already
+    # part of the status (dupe status)
+    env.cr.execute("""
+        INSERT INTO runbot_merge_commit AS c (sha, to_check, statuses)
+        VALUES (%s, true, %s)
+        ON CONFLICT (sha) DO UPDATE
+            SET to_check = true,
+                statuses = c.statuses::jsonb || EXCLUDED.statuses::jsonb
+            WHERE NOT c.statuses::jsonb @> EXCLUDED.statuses::jsonb
+    """, [event['sha'], status_value])
 
     return 'ok'
 

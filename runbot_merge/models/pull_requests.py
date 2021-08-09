@@ -518,10 +518,11 @@ class Branch(models.Model):
 
         Batch = self.env['runbot_merge.batch']
         staged = Batch
+        original_heads = {}
         meta = {repo: {} for repo in self.project_id.repo_ids.having_branch(self)}
         for repo, it in meta.items():
             gh = it['gh'] = repo.github()
-            it['head'] = gh.head(self.name)
+            it['head'] = original_heads[repo] = gh.head(self.name)
             # create tmp staging branch
             gh.set_ref('tmp.{}'.format(self.name), it['head'])
 
@@ -567,23 +568,30 @@ class Branch(models.Model):
                     for repo, h in heads.items()
                     if not repo.endswith('^')
                 )
-            dummy_head = it['gh']('post', 'git/commits', json={
-                'message': '''force rebuild
+            dummy_head = {'sha': it['head']}
+            if it['head'] == original_heads[repo]:
+                # if the repo has not been updated by the staging, create a
+                # dummy commit to force rebuild
+                dummy_head = it['gh']('post', 'git/commits', json={
+                    'message': '''force rebuild
 
 uniquifier: %s
 For-Commit-Id: %s
 %s''' % (r, it['head'], trailer),
-                'tree': tree['sha'],
-                'parents': [it['head']],
-            }).json()
+                    'tree': tree['sha'],
+                    'parents': [it['head']],
+                }).json()
 
-            # $repo is the head to check, $repo^ is the head to merge
+            # $repo is the head to check, $repo^ is the head to merge (they
+            # might be the same)
             heads[repo.name + '^'] = it['head']
             heads[repo.name] = dummy_head['sha']
-            self.env['runbot_merge.commit'].create({
-                'sha': dummy_head['sha'],
-                'statuses': '{}',
-            })
+            self.env.cr.execute(
+                "INSERT INTO runbot_merge_commit (sha, to_check, statuses) "
+                "VALUES (%s, true, '{}') "
+                "ON CONFLICT (sha) DO UPDATE SET to_check=true",
+                [dummy_head['sha']]
+            )
 
         # create actual staging object
         st = self.env['runbot_merge.stagings'].create({

@@ -577,12 +577,12 @@ class Repo:
         if force and r.status_code == 422:
             self.update_ref(name, commit, force=force)
             return
-        assert 200 <= r.status_code < 300, r.json()
+        assert r.ok, r.text
 
     def update_ref(self, name, commit, force=False):
         assert self.hook
         r = self._session.patch('https://api.github.com/repos/{}/git/refs/{}'.format(self.name, name), json={'sha': commit, 'force': force})
-        assert 200 <= r.status_code < 300, r.json()
+        assert r.ok, r.text
 
     def protect(self, branch):
         assert self.hook
@@ -638,7 +638,7 @@ class Repo:
                 ],
                 'base_tree': tree
             })
-            assert 200 <= r.status_code < 300, r.json()
+            assert r.ok, r.text
             tree = r.json()['sha']
 
             data = {
@@ -652,7 +652,7 @@ class Repo:
                 data['committer'] = commit.committer
 
             r = self._session.post('https://api.github.com/repos/{}/git/commits'.format(self.name), json=data)
-            assert 200 <= r.status_code < 300, r.json()
+            assert r.ok, r.text
 
             hashes.append(r.json()['sha'])
             parents = [hashes[-1]]
