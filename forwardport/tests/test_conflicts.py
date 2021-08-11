@@ -92,7 +92,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     time.sleep(5)
     env.run_crons()
     assert pra_id | prb_id | prc_id == env['runbot_merge.pull_requests'].search([], order='number'),\
-        "CI passing should not have resumed the FP process on a conflicting / draft PR"
+        "CI passing should not have resumed the FP process on a conflicting PR"
 
     # fix the PR, should behave as if this were a normal PR
     prc = prod.get_pr(prc_id.number)
@@ -199,7 +199,7 @@ def test_conflict_deleted(env, config, make_repo):
     time.sleep(5)
     env.run_crons()
     assert pr0 | pr1 == env['runbot_merge.pull_requests'].search([], order='number'),\
-        "CI passing should not have resumed the FP process on a conflicting / draft PR"
+        "CI passing should not have resumed the FP process on a conflicting PR"
 
     # fix the PR, should behave as if this were a normal PR
     get_pr = prod.get_pr(pr1.number)

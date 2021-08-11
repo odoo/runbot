@@ -902,6 +902,7 @@ class TestSubstitutions:
                     },
                     'pull_request': {
                         'state': 'open',
+                        'draft': False,
                         'user': {'login': 'bob'},
                         'base': {
                             'repo': {'full_name': r.name},

@@ -123,7 +123,7 @@ class UpdateQueue(models.Model, Queue):
                                    )
                     })
                     return
-                # QUESTION: update PR to draft if there are conflicts?
+
                 conflicts, working_copy = previous._create_fp_branch(
                     child.target, child.refname, s)
                 if conflicts:

@@ -234,7 +234,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 
 def test_empty(env, config, make_repo, users):
     """ Cherrypick of an already cherrypicked (or separately implemented)
-    commit -> create draft PR.
+    commit -> conflicting pr.
     """
     prod, other = make_basic(env, config, make_repo)
     # merge change to b

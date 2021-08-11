@@ -688,7 +688,7 @@ class Repo:
         )).raise_for_status()
         return PR(self, number)
 
-    def make_pr(self, *, title=None, body=None, target, head, token=None):
+    def make_pr(self, *, title=None, body=None, target, head, draft=False, token=None):
         assert self.hook
         self.hook = 2
 
@@ -717,6 +717,7 @@ class Repo:
                 'body': body,
                 'head': head,
                 'base': target,
+                'draft': draft,
             },
             headers=headers,
         )
@@ -774,6 +775,22 @@ class Comment(tuple):
     def __getitem__(self, item):
         return self._c[item]
 
+
+PR_SET_READY = '''
+mutation setReady($pid: ID!) {
+    markPullRequestReadyForReview(input: { pullRequestId: $pid}) {
+        clientMutationId
+    }
+}
+'''
+
+PR_SET_DRAFT = '''
+mutation setDraft($pid: ID!) {
+    convertPullRequestToDraft(input: { pullRequestId: $pid }) {
+        clientMutationId
+    }
+}
+'''
 class PR:
     def __init__(self, repo, number):
         self.repo = repo
@@ -795,6 +812,22 @@ class PR:
     def base(self):
         raise NotImplementedError()
     base = base.setter(lambda self, v: self._set_prop('base', v))
+
+    @property
+    def draft(self):
+        return self._pr['draft']
+    @draft.setter
+    def draft(self, v):
+        assert self.repo.hook
+        # apparently it's not possible to update the draft flag via the v3 API,
+        # only the V4...
+        r = self.repo._session.post('https://api.github.com/graphql', json={
+            'query': PR_SET_DRAFT if v else PR_SET_READY,
+            'variables': {'pid': self._pr['node_id']}
+        })
+        assert r.ok, r.text
+        out = r.json()
+        assert 'errors' not in out, out['errors']
 
     @property
     def head(self):
@@ -863,7 +896,7 @@ class PR:
         r = self.repo._session.patch('https://api.github.com/repos/{}/pulls/{}'.format(self.repo.name, self.number), json={
             prop: value
         }, headers=headers)
-        assert 200 <= r.status_code < 300, r.json()
+        assert r.ok, r.text
 
     def open(self, token=None):
         self._set_prop('state', 'open', token=token)
