@@ -1847,12 +1847,18 @@ class Stagings(models.Model):
             if repo.endswith('^'):
                 continue
 
-            commit = self.env['runbot_merge.commit'].search([
-                ('sha', '=', head)
-            ])
+            required_statuses = set(
+                self.env['runbot_merge.repository']
+                    .search([('name', '=', repo)])
+                    .status_ids
+                    ._for_staging(self)
+                    .mapped('context'))
+
+            commit = self.env['runbot_merge.commit'].search([('sha', '=', head)])
             statuses = json.loads(commit.statuses or '{}')
             reason = next((
                 ctx for ctx, result in statuses.items()
+                if ctx in required_statuses
                 if to_status(result).get('state') in ('error', 'failure')
             ), None)
             if not reason:

@@ -560,6 +560,7 @@ def test_staging_ci_failure_single(env, repo, users, config):
 
     staging_head = repo.commit('heads/staging.master')
     with repo:
+        repo.post_status(staging_head.id, 'failure', 'a/b')
         repo.post_status(staging_head.id, 'success', 'legal/cla')
         repo.post_status(staging_head.id, 'failure', 'ci/runbot') # stable genius
     env.run_crons()
