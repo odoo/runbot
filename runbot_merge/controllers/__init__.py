@@ -189,7 +189,14 @@ def handle_pr(env, event):
             'head': pr['head']['sha'],
             'squash': pr['commits'] == 1,
         })
-        return 'Updated {} to {}'.format(pr_obj.id, pr_obj.head)
+        return 'Updated {} to {}'.format(pr_obj.display_name, pr_obj.head)
+
+    if event['action'] == 'ready_for_review':
+        pr_obj.draft = False
+        return f'Updated {pr_obj.display_name} to ready'
+    if event['action'] == 'converted_to_draft':
+        pr_obj.draft = True
+        return f'Updated {pr_obj.display_name} to draft'
 
     # don't marked merged PRs as closed (!!!)
     if event['action'] == 'closed' and pr_obj.state != 'merged':
@@ -201,7 +208,7 @@ def handle_pr(env, event):
                 pr_obj.display_name,
                 oldstate,
             )
-            return 'Closed {}'.format(pr_obj.id)
+            return 'Closed {}'.format(pr_obj.display_name)
         else:
             _logger.warning(
                 '%s tried to close %s (state=%s)',
@@ -227,7 +234,7 @@ def handle_pr(env, event):
                 'squash': pr['commits'] == 1,
             })
 
-            return 'Reopened {}'.format(pr_obj.id)
+            return 'Reopened {}'.format(pr_obj.display_name)
 
     _logger.info("Ignoring event %s on PR %s", event['action'], pr['number'])
     return "Not handling {} yet".format(event['action'])

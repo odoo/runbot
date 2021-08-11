@@ -688,6 +688,7 @@ class PullRequests(models.Model):
              "cross-repository branch-matching"
     )
     message = fields.Text(required=True)
+    draft = fields.Boolean(default=False, required=True)
     squash = fields.Boolean(default=False)
     merge_method = fields.Selection([
         ('merge', "merge directly, using the PR as merge commit message"),
@@ -999,7 +1000,9 @@ class PullRequests(models.Model):
                         'number': self.number,
                     })
             elif command == 'review':
-                if param and is_reviewer:
+                if self.draft:
+                    msg = "Draft PRs can not be approved."
+                elif param and is_reviewer:
                     oldstate = self.state
                     newstate = RPLUS.get(self.state)
                     if newstate:
@@ -1250,6 +1253,7 @@ class PullRequests(models.Model):
             'head': description['head']['sha'],
             'squash': description['commits'] == 1,
             'message': message,
+            'draft': description['draft'],
         })
 
     def write(self, vals):
