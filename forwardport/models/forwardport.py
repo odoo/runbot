@@ -127,7 +127,7 @@ class UpdateQueue(models.Model, Queue):
                 conflicts, working_copy = previous._create_fp_branch(
                     child.target, child.refname, s)
                 if conflicts:
-                    _, out, err = conflicts
+                    _, out, err, _ = conflicts
                     Feedback.create({
                         'repository': previous.repository.id,
                         'pull_request': previous.number,
