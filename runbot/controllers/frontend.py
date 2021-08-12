@@ -439,10 +439,13 @@ class Runbot(Controller):
 
         builds |= builds.search(builds_domain, order='id desc', limit=limit)
 
+        builds = builds.search([('id', 'child_of', builds.ids)])
+
+        parents = {b.id: b.top_parent.id for b in builds.with_context(prefetch_fields=False)}
         request.env.cr.execute("SELECT build_id, key, value FROM runbot_build_stat WHERE build_id IN %s AND key like %s", [tuple(builds.ids), '%s.%%' % key_category]) # read manually is way faster than using orm
         res = {}
         for (builds_id, key, value) in request.env.cr.fetchall():
-            res.setdefault(builds_id, {})[key.split('.')[1]] = value
+            res.setdefault(parents[builds_id], {})[key.split('.', 1)[1]] = value
         return res
 
     @route(['/runbot/stats/<model("runbot.bundle"):bundle>/<model("runbot.trigger"):trigger>'], type='http', auth="public", website=True, sitemap=False)
