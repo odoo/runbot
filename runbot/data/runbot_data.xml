@@ -87,6 +87,7 @@ if record.name.startswith('tmp.'):
 elif record.name.startswith('staging.'):
     name = record.name.replace('staging.', '')
     base = record.env['runbot.bundle'].search([('name', '=', name), ('project_id', '=', record.project_id.id), ('is_base', '=', True)], limit=1)
+    record['build_all'] = True
     if base:
         record['defined_base_id'] = base
        </field>
