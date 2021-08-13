@@ -47,7 +47,7 @@
                                                                 <a t-att-href="branch.branch_url" class="btn btn-default text-left" title="View Branch on Github"><i class="fa fa-github"/></a>
                                                                 <a groups="runbot.group_runbot_admin" class="btn btn-default fa fa-list text-left" t-attf-href="/web/#id={{branch.id}}&amp;view_type=form&amp;model=runbot.branch" target="new" title="View Branch in Backend"/>
                                                                 <a href="#" t-esc="branch.remote_id.short_name" class="btn btn-default disabled text-left"/>
-                                                                <a t-attf-href="/runbot/branch/{{branch.id}}" class="btn btn-default text-left" title="View Branch Details"><t t-esc="branch.name"/> <i t-if="not branch.alive" title="deleted/closed" class="fa fa-ban text-danger"/></a>
+                                                                <a t-attf-href="/runbot/branch/{{branch.id}}" class="btn btn-default text-left" title="View Branch Details"><span t-att-class="'' if branch.alive else 'line-through'" t-esc="branch.name"/> <i t-if="not branch.alive" title="deleted/closed" class="fa fa-ban text-danger"/></a>
                                                                 <t t-if="len(group[1]) == 1 and not branch.is_pr">
                                                                     <a t-attf-href="https://{{group[0].main_remote_id.base_url}}/compare/{{bundle.version_id.name}}...{{branch.remote_id.owner}}:{{branch.name}}?expand=1" class="btn btn-default text-left" title="Create pr"><i class="fa fa-code-fork"/> Create pr</a>
                                                                 </t>

@@ -316,7 +316,11 @@ class BuildResult(models.Model):
                 build_by_old_values[record.local_state] += record
         local_result = values.get('local_result')
         for build in self:
-            assert not local_result or local_result == self._get_worst_result([build.local_result, local_result])  # dont write ok on a warn/error build
+            if local_result and local_result != self._get_worst_result([build.local_result, local_result]):  # dont write ok on a warn/error build
+                if len(self) == 1:
+                    values.pop('local_result')
+                else:
+                    raise ValidationError('Local result cannot be set to a less critical level')
         res = super(BuildResult, self).write(values)
         if 'log_counter' in values:  # not 100% usefull but more correct ( see test_ir_logging)
             self.flush()
@@ -1009,7 +1013,13 @@ class BuildResult(models.Model):
             # means that a step has been run manually without using config
             return {'active_step': False, 'local_state': 'done'}
 
-        next_index = step_ids.index(self.active_step) + 1 if self.active_step else 0
+        if not self.active_step:
+            next_index = 0
+        else:
+            if self.active_step not in step_ids:
+                self._log('run', 'Config was modified and current step does not exists anymore, skipping.', level='ERROR')
+                return {'active_step': False, 'local_state': 'done', 'local_result': self._get_worst_result([self.local_result, 'ko'])}
+            next_index = step_ids.index(self.active_step) + 1
 
         while True:
             if next_index >= len(step_ids):  # final job, build is done
@@ -1132,5 +1142,5 @@ class BuildResult(models.Model):
                 if trigger.ci_context:
                     for build_commit in self.params_id.commit_link_ids:
                         commit = build_commit.commit_id
-                        if build_commit.match_type != 'default' and commit.repo_id in trigger.repo_ids:
+                        if 'base_' not in build_commit.match_type and commit.repo_id in trigger.repo_ids:
                             commit._github_status(build, trigger.ci_context, state, target_url, desc, post_commit)

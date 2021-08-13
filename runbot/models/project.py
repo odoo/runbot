@@ -7,7 +7,7 @@ class Project(models.Model):
 
     name = fields.Char('Project name', required=True, unique=True)
     group_ids = fields.Many2many('res.groups', string='Required groups')
-
+    keep_sticky_running = fields.Boolean('Keep last sticky builds running')
     trigger_ids = fields.One2many('runbot.trigger', 'project_id', string='Triggers')
     dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, help="Project Default Dockerfile")
 

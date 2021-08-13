@@ -7,6 +7,7 @@
             <form string="Projects">
                 <group>
                     <field name="name"/>
+                    <field name="keep_sticky_running"/>
                     <field name="dockerfile_id"/>
                     <field name="group_ids"/>
                     <field name="trigger_ids"/>
@@ -15,6 +16,18 @@
         </field>
     </record>
 
+    <record id="view_runbot_project_tree" model="ir.ui.view">
+        <field name="model">runbot.project</field>
+        <field name="arch" type="xml">
+            <tree string="Projects">
+                <field name="name"/>
+                <field name="keep_sticky_running"/>
+                <field name="dockerfile_id"/>
+                <field name="group_ids"/>
+                <field name="trigger_ids"/>
+            </tree>
+        </field>
+    </record>
 
     <record id="view_runbot_bundle" model="ir.ui.view">
         <field name="model">runbot.bundle</field>
