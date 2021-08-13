@@ -365,7 +365,7 @@ class Repo(models.Model):
                 if not git_refs:
                     return []
                 refs = [tuple(field for field in line.split('\x00')) for line in git_refs.split('\n')]
-                refs = [r for r in refs if dateutil.parser.parse(r[2][:19]) + datetime.timedelta(days=max_age) > datetime.datetime.now()]
+                refs = [r for r in refs if dateutil.parser.parse(r[2][:19]) + datetime.timedelta(days=max_age) > datetime.datetime.now() or self.env['runbot.branch'].match_is_base(r[0])]
                 if ignore:
                     refs = [r for r in refs if r[0].split('/')[-1] not in ignore]
                 return refs
@@ -440,9 +440,6 @@ class Repo(models.Model):
                     message = "This branch name is incorrect. Branch name should be prefixed with a valid version"
                     message = branch.remote_id.repo_id.invalid_branch_message or message
                     branch.head._github_status(False, "Branch naming", 'failure', False, message)
-
-                if not self.trigger_ids:
-                    continue
 
                 bundle = branch.bundle_id
                 if bundle.no_build:

@@ -4,7 +4,7 @@ import datetime
 from unittest.mock import patch
 
 from odoo import fields
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from .common import RunbotCase, RunbotCaseMinimalSetup
 
 
@@ -183,9 +183,12 @@ class TestBuildResult(RunbotCase):
             'local_result': 'ko'
         })
 
+        other.write({'local_result': 'ok'})
+        self.assertEqual(other.local_result, 'ko')
+
         # test a bulk write, that one cannot change from 'ko' to 'ok'
         builds = self.Build.browse([build.id, other.id])
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(ValidationError):
             builds.write({'local_result': 'ok'})
 
     def test_markdown_description(self):

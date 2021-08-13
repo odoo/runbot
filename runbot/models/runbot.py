@@ -90,7 +90,7 @@ class Runbot(models.AbstractModel):
         domain_host = self.build_domain_host(host)
         Build = self.env['runbot.build']
         cannot_be_killed_ids = Build.search(domain_host + [('keep_running', '=', True)]).ids
-        sticky_bundles = self.env['runbot.bundle'].search([('sticky', '=', True)])
+        sticky_bundles = self.env['runbot.bundle'].search([('sticky', '=', True), ('project_id.keep_sticky_running', '=', True)])
         cannot_be_killed_ids += [
             build.id
             for build in sticky_bundles.mapped('last_batchs.slot_ids.build_id')
