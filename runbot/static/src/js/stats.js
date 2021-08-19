@@ -162,7 +162,7 @@ function fetchUpdateChart() {
 function generateLegend() {
   var legend = $("<ul></ul>");
   for (data of config.data.datasets) {
-    var legendElement = $(`<li><span class="color" style="border: 2px solid ${data.borderColor};"></span><span class="label">${data.label}<span></li>`)
+    var legendElement = $(`<li><span class="color" style="border: 2px solid ${data.borderColor};"></span><span class="label" title="${data.label}">${data.label}<span></li>`)
     if (data.hidden){
       legendElement.addClass('disabled')
     }
@@ -228,6 +228,20 @@ function updateUrl(){
   window.location.hash = new URLSearchParams(config.searchParams).toString();
 }
 
+async function waitForChart() {
+
+  function loop(resolve) {
+    if (window.Chart) {
+      resolve();
+    } else {
+      setTimeout(loop.bind(null, resolve),10);
+    }
+  }
+  return new Promise((resolve) => {
+    loop(resolve);
+  })
+}
+
 window.onload = function() {
     config.searchParams = {
       limit: 25,
@@ -256,6 +270,5 @@ window.onload = function() {
       fetchUpdateChart();
     }
 
-    
-    fetchUpdateChart();
+    waitForChart().then(fetchUpdateChart);
 };

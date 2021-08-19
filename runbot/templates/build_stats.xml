@@ -96,8 +96,8 @@
             </div>
           </nav>
           <div class="row">
-            <div class="col-xs-9 col-md-10 col-lg-11"><canvas id="canvas"></canvas></div>
-            <div class="col-xs-3 col-md-2 col-lg-1">
+            <div class="col-xs-9 col-md-10"><canvas id="canvas"></canvas></div>
+            <div class="col-xs-3 col-md-2">
                 <b>Mode:</b>
                 <select id="mode_selector" class="form-select" aria-label="Display mode">
                   <option title="Real Values ordered by value" selected="selected" value="normal">Value</option>
