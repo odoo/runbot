@@ -81,12 +81,12 @@ function process_chart_data(){
       return
     }
     var builds = Object.keys(config.result);
-    var newer_build_stats = config.result[builds[0]];
-    var older_build_stats = config.result[builds.slice(-1)[0]];
+    var newer_build_stats = config.result[builds.slice(-1)[0]];
+    var older_build_stats = config.result[builds[0]];
 
     var mode = document.getElementById('mode_selector').value;
     
-    var keys = Object.keys(newer_build_stats);
+    var keys = Object.keys(newer_build_stats) ;
 
     var sort_values = {}
     for (key of keys) {
@@ -107,9 +107,13 @@ function process_chart_data(){
           previous = value
         }
       }
-      else if (older_build_stats[key] !== undefined) {
+      else {
         if (mode == "difference") {
-          sort_value = Math.abs(newer_build_stats[key] - older_build_stats[key])
+          var previous_value = 0;
+          if (older_build_stats[key] !== undefined) {
+            previous_value = older_build_stats[key]
+          }
+          sort_value = Math.abs(newer_build_stats[key] - previous_value)
         }
       }
       sort_values[key] = sort_value
@@ -127,9 +131,11 @@ function process_chart_data(){
           return NaN;
       if (mode == 'normal' || mode == 'alpha')
           return build_stats[key]
-      if (older_build_stats[key] === undefined)
-          return NaN;
-      return  build_stats[key] - older_build_stats[key]
+      var previous_value = 0;
+      if (older_build_stats[key] !== undefined) {
+            previous_value = older_build_stats[key]
+      }
+      return  build_stats[key] - previous_value
     }
 
     config.data = {
