@@ -1,6 +1,6 @@
 {
     'name': 'merge bot',
-    'version': '1.6',
+    'version': '1.7',
     'depends': ['contacts', 'website'],
     'data': [
         'security/security.xml',
