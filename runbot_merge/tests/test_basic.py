@@ -6,7 +6,7 @@ import textwrap
 from unittest import mock
 
 import pytest
-from lxml import html
+from lxml import html, etree
 
 import odoo
 from utils import _simple_init, seen, re_matches, get_partner, Commit, pr_page, to_pr, part_of
@@ -416,7 +416,7 @@ def test_staging_concurrent(env, repo, config):
     ])
     assert pr2.staging_id
 
-def test_staging_confict_first(env, repo, users, config, page):
+def test_staging_conflict_first(env, repo, users, config, page):
     """ If the first batch of a staging triggers a conflict, the PR should be
     marked as in error
     """
@@ -427,24 +427,24 @@ def test_staging_confict_first(env, repo, users, config, page):
 
         c1 = repo.make_commit(m1, 'other second', None, tree={'f': 'c1'})
         c2 = repo.make_commit(c1, 'third', None, tree={'f': 'c2'})
-        prx = repo.make_pr(title='title', body='body', target='master', head=c2)
-        repo.post_status(prx.head, 'success', 'ci/runbot')
-        repo.post_status(prx.head, 'success', 'legal/cla')
-        prx.post_comment('hansen r+ rebase-merge', config['role_reviewer']['token'])
+        pr = repo.make_pr(title='title', body='body', target='master', head=c2)
+        repo.post_status(pr.head, 'success', 'ci/runbot')
+        repo.post_status(pr.head, 'success', 'legal/cla')
+        pr.post_comment('hansen r+ rebase-merge', config['role_reviewer']['token'])
     env.run_crons()
 
-    pr1 = env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', repo.name),
-        ('number', '=', prx.number)
-    ])
-    assert pr1.state == 'error'
-    assert pr_page(page, prx).cssselect('.alert-danger')
-    assert prx.comments == [
+    pr_id = to_pr(env, pr)
+    assert pr_id.state == 'error'
+    assert pr.comments == [
         (users['reviewer'], 'hansen r+ rebase-merge'),
-        seen(env, prx, users),
+        seen(env, pr, users),
         (users['user'], 'Merge method set to rebase and merge, using the PR as merge commit message'),
         (users['user'], re_matches('^Unable to stage PR')),
     ]
+
+    dangerbox = pr_page(page, pr).cssselect('.alert-danger span')
+    assert dangerbox
+    assert dangerbox[0].text.strip() == 'Unable to stage PR'
 
 def test_staging_conflict_second(env, repo, users, config):
     """ If the non-first batch of a staging triggers a conflict, the PR should
@@ -467,17 +467,10 @@ def test_staging_conflict_second(env, repo, users, config):
         repo.post_status(pr1.head, 'success', 'ci/runbot')
         repo.post_status(pr1.head, 'success', 'legal/cla')
         pr1.post_comment('hansen r+', config['role_reviewer']['token'])
-
     env.run_crons()
-    PRs = env['runbot_merge.pull_requests']
-    pr0_id = PRs.search([
-        ('repository.name', '=', repo.name),
-        ('number', '=', pr0.number),
-    ])
-    pr1_id = PRs.search([
-        ('repository.name', '=', repo.name),
-        ('number', '=', pr1.number),
-    ])
+
+    pr0_id = to_pr(env, pr0)
+    pr1_id = to_pr(env, pr1)
     assert pr0_id.staging_id, "pr0 should have been staged"
     assert not pr1_id.staging_id, "pr1 should not have been staged (due to conflict)"
     assert pr1_id.state == 'ready', "pr1 should not be in error yet"
@@ -492,7 +485,7 @@ def test_staging_conflict_second(env, repo, users, config):
     assert pr1_id.state == 'error', "now pr1 should be in error"
 
 
-def test_staging_ci_timeout(env, repo, config):
+def test_staging_ci_timeout(env, repo, config, page):
     """If a staging timeouts (~ delay since staged greater than
     configured)... requeue?
     """
@@ -502,22 +495,23 @@ def test_staging_ci_timeout(env, repo, config):
 
         c1 = repo.make_commit(m, 'first', None, tree={'f': 'c1'})
         c2 = repo.make_commit(c1, 'second', None, tree={'f': 'c2'})
-        prx = repo.make_pr(title='title', body='body', target='master', head=c2)
-        repo.post_status(prx.head, 'success', 'ci/runbot')
-        repo.post_status(prx.head, 'success', 'legal/cla')
-        prx.post_comment('hansen r+ rebase-merge', config['role_reviewer']['token'])
+        pr = repo.make_pr(title='title', body='body', target='master', head=c2)
+        repo.post_status(pr.head, 'success', 'ci/runbot')
+        repo.post_status(pr.head, 'success', 'legal/cla')
+        pr.post_comment('hansen r+ rebase-merge', config['role_reviewer']['token'])
     env.run_crons()
 
-    pr1 = env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', repo.name),
-        ('number', '=', prx.number)
-    ])
-    assert pr1.staging_id
+    pr_id = to_pr(env, pr)
+    assert pr_id.staging_id
     timeout = env['runbot_merge.project'].search([]).ci_timeout
 
-    pr1.staging_id.staged_at = odoo.fields.Datetime.to_string(datetime.datetime.now() - datetime.timedelta(minutes=2*timeout))
+    pr_id.staging_id.staged_at = odoo.fields.Datetime.to_string(datetime.datetime.now() - datetime.timedelta(minutes=2*timeout))
     env.run_crons('runbot_merge.merge_cron', 'runbot_merge.staging_cron')
-    assert pr1.state == 'error', "timeout should fail the PR"
+    assert pr_id.state == 'error', "timeout should fail the PR"
+
+    dangerbox = pr_page(page, pr).cssselect('.alert-danger span')
+    assert dangerbox
+    assert dangerbox[0].text == 'timed out (>60 minutes)'
 
 def test_timeout_bump_on_pending(env, repo, config):
     with repo:
@@ -539,7 +533,7 @@ def test_timeout_bump_on_pending(env, repo, config):
     env.run_crons('runbot_merge.process_updated_commits')
     assert st.timeout_limit > old_timeout
 
-def test_staging_ci_failure_single(env, repo, users, config):
+def test_staging_ci_failure_single(env, repo, users, config, page):
     """ on failure of single-PR staging, mark & notify failure
     """
     with repo:
@@ -548,15 +542,13 @@ def test_staging_ci_failure_single(env, repo, users, config):
 
         c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
         c2 = repo.make_commit(c1, 'second', None, tree={'m': 'c2'})
-        prx = repo.make_pr(title='title', body='body', target='master', head=c2)
-        repo.post_status(prx.head, 'success', 'ci/runbot')
-        repo.post_status(prx.head, 'success', 'legal/cla')
-        prx.post_comment('hansen r+ rebase-merge', config['role_reviewer']['token'])
+        pr = repo.make_pr(title='title', body='body', target='master', head=c2)
+        repo.post_status(pr.head, 'success', 'ci/runbot')
+        repo.post_status(pr.head, 'success', 'legal/cla')
+        pr.post_comment('hansen r+ rebase-merge', config['role_reviewer']['token'])
     env.run_crons()
-    assert env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', repo.name),
-        ('number', '=', prx.number)
-    ]).staging_id
+    pr_id = to_pr(env, pr)
+    assert pr_id.staging_id
 
     staging_head = repo.commit('heads/staging.master')
     with repo:
@@ -564,17 +556,18 @@ def test_staging_ci_failure_single(env, repo, users, config):
         repo.post_status(staging_head.id, 'success', 'legal/cla')
         repo.post_status(staging_head.id, 'failure', 'ci/runbot') # stable genius
     env.run_crons()
-    assert env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', repo.name),
-        ('number', '=', prx.number)
-    ]).state == 'error'
+    assert pr_id.state == 'error'
 
-    assert prx.comments == [
+    assert pr.comments == [
         (users['reviewer'], 'hansen r+ rebase-merge'),
-        seen(env, prx, users),
+        seen(env, pr, users),
         (users['user'], "Merge method set to rebase and merge, using the PR as merge commit message"),
         (users['user'], 'Staging failed: ci/runbot')
     ]
+
+    dangerbox = pr_page(page, pr).cssselect('.alert-danger span')
+    assert dangerbox
+    assert dangerbox[0].text == 'ci/runbot'
 
 def test_ff_failure(env, repo, config):
     """ target updated while the PR is being staged => redo staging """
@@ -1143,6 +1136,42 @@ class TestRetry:
             ('repository.name', '=', repo.name),
             ('number', '=', prx.number)
         ]).state == 'merged'
+
+    def test_retry_again_message(self, env, repo, users, config, page):
+        """ For a retried PR, the error message on the PR's page should be the
+        later staging
+        """
+        with repo:
+            pr = _simple_init(repo)
+            repo.post_status(pr.head, 'success', 'ci/runbot')
+            repo.post_status(pr.head, 'success', 'legal/cla')
+            pr.post_comment('hansen r+ delegate=%s rebase-merge' % users['other'],
+                             config["role_reviewer"]['token'])
+        env.run_crons()
+        pr_id = to_pr(env, pr)
+        assert pr_id.staging_id
+
+        with repo:
+            repo.post_status('staging.master', 'success', 'legal/cla')
+            repo.post_status('staging.master', 'failure', 'ci/runbot',
+                             target_url='https://example.com/whocares')
+        env.run_crons()
+        assert pr_id.state == 'error'
+
+        with repo:
+            pr.post_comment('hansen retry', config['role_reviewer']['token'])
+        env.run_crons('runbot_merge.merge_cron', 'runbot_merge.staging_cron')
+
+        with repo:
+            repo.post_status('staging.master', 'success', 'legal/cla')
+            repo.post_status('staging.master', 'failure', 'ci/runbot',
+                             target_url='https://example.com/ohno')
+        env.run_crons()
+        assert pr_id.state == 'error'
+
+        dangerbox = pr_page(page, pr).cssselect('.alert-danger span')
+        assert dangerbox
+        assert dangerbox[0].text == 'ci/runbot (view more at https://example.com/ohno)'
 
     def test_retry_ignored(self, env, repo, users, config):
         """ Check feedback in case of ignored retry command on a non-error PR.

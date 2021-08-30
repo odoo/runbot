@@ -327,7 +327,9 @@
     <template id="view_pull_request_info_error">
         <div class="alert alert-danger">
             Error:
-            <p t-field="pr.staging_id.reason"/>
+            <span t-esc="pr.with_context(active_test=False).batch_ids[-1:].staging_id.reason">
+                Unable to stage PR
+            </span>
         </div>
     </template>
     <template id="view_pull_request_info_staging">
