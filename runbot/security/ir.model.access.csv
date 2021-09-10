@@ -90,6 +90,7 @@ access_runbot_category_runbot_user,access_runbot_category_runbot_user,runbot.mod
 access_runbot_category_runbot_admin,access_runbot_category_runbot_admin,runbot.model_runbot_category,runbot.group_runbot_admin,1,1,1,1
 
 access_runbot_batch_log_runbot_user,access_runbot_batch_log_runbot_user,runbot.model_runbot_batch_log,runbot.group_user,1,0,0,0
+access_runbot_batch_log_runbot_admin,access_runbot_batch_log_runbot_admin,runbot.model_runbot_batch_log,runbot.group_runbot_admin,1,1,1,1
 
 access_runbot_warning_user,access_runbot_warning_user,runbot.model_runbot_warning,runbot.group_user,1,0,0,0
 access_runbot_warning_admin,access_runbot_warning_admin,runbot.model_runbot_warning,runbot.group_runbot_admin,1,1,1,1
