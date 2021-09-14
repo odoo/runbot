@@ -368,7 +368,10 @@ class Runbot(Controller):
 
         sort_order = sort if sort in sort_order_choices else 'last_seen_date desc'
 
-        current_user_errors = request.env['runbot.build.error'].search([('responsible', '=', request.env.user.id)], order='last_seen_date desc, build_count desc')
+        current_user_errors = request.env['runbot.build.error'].search([
+            ('responsible', '=', request.env.user.id),
+            ('parent_id', '=', False),
+        ], order='last_seen_date desc, build_count desc')
 
         domain = [('parent_id', '=', False), ('responsible', '!=', request.env.user.id), ('build_count', '>', 1)]
         build_errors_count = request.env['runbot.build.error'].search_count(domain)
