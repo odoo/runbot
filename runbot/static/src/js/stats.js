@@ -80,13 +80,22 @@ function process_chart_data(){
       }
       return
     }
+
+    var aggregate = document.getElementById('display_aggregate_selector').value;
+    var aggregates = {};
+
+
     var builds = Object.keys(config.result);
     var newer_build_stats = config.result[builds.slice(-1)[0]];
     var older_build_stats = config.result[builds[0]];
-
-    var mode = document.getElementById('mode_selector').value;
-    
     var keys = Object.keys(newer_build_stats) ;
+    if (aggregate != 'sum') {
+      keys.splice(keys.indexOf('Aggregate Sum'));
+    }
+    if (aggregate != 'average') {
+      keys.splice(keys.indexOf('Aggregate Average'));
+    }
+    var mode = document.getElementById('mode_selector').value;
 
     var sort_values = {}
     for (key of keys) {
@@ -160,6 +169,8 @@ function fetchUpdateChart() {
   console.log('fetch')
   fetch('/runbot/stats/', fetch_params, function(result) {
     config.result = result;
+    Object.values(config.result).forEach(v => v['Aggregate Sum'] = Object.values(v).reduce((a, b) => a + b, 0))
+    Object.values(config.result).forEach(v => v['Aggregate Average'] = Object.values(v).reduce((a, b) => a + b, 0)/Object.values(v).length)
     chart_spinner.style.visibility = 'hidden';
     updateChart()
   });
@@ -255,9 +266,10 @@ window.onload = function() {
       key_category: 'module_loading_queries',
       mode: 'normal',
       nb_dataset: 20,
+      display_aggregate: 'none', 
       visible_keys: '',
     };
-    localParams = ['mode', 'nb_dataset', 'visible_keys']
+    localParams = ['display_aggregate', 'mode', 'nb_dataset', 'visible_keys']
   
     for([key, value] of new URLSearchParams(window.location.hash.replace("#","?"))){
       config.searchParams[key] = value;
