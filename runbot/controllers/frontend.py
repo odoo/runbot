@@ -430,7 +430,11 @@ class Runbot(Controller):
             return request.not_found()
 
         builds_domain = [
-            ('global_state', 'in', ('running', 'done')), ('global_result', '=', 'ok'), ('slot_ids.batch_id.bundle_id', '=', bundle_id), ('params_id.trigger_id', '=', trigger.id),
+            ('build_type', '=', 'normal'),
+            ('global_state', 'in', ('running', 'done')),
+            ('global_result', '=', 'ok'),
+            ('slot_ids.batch_id.bundle_id', '=', bundle_id),
+            ('params_id.trigger_id', '=', trigger.id),
         ]
         builds = request.env['runbot.build']
         if center_build_id:
