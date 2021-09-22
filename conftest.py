@@ -805,21 +805,33 @@ class PR:
         self.repo = repo
         self.number = number
         self.labels = LabelsProxy(self)
+        self._cache = None, {}
 
     @property
     def _pr(self):
-        r = self.repo._session.get('https://api.github.com/repos/{}/pulls/{}'.format(self.repo.name, self.number))
-        assert 200 <= r.status_code < 300, r.json()
-        return r.json()
+        previous, caching = self._cache
+        r = self.repo._session.get(
+            'https://api.github.com/repos/{}/pulls/{}'.format(self.repo.name, self.number),
+            headers=caching
+        )
+        assert r.ok, r.json()
+        if r.status_code == 304:
+            return previous
+        contents, caching = self._cache = r.json(), {}
+        if r.headers.get('etag'):
+            caching['If-None-Match'] = r.headers['etag']
+        if r.headers.get('last-modified'):
+            caching['If-Modified-Since']= r.headers['Last-Modified']
+        return contents
 
     @property
     def title(self):
-        raise NotImplementedError()
+        return self._pr['title']
     title = title.setter(lambda self, v: self._set_prop('title', v))
 
     @property
     def base(self):
-        raise NotImplementedError()
+        return self._pr['base']
     base = base.setter(lambda self, v: self._set_prop('base', v))
 
     @property
