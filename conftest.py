@@ -42,6 +42,7 @@ logic errors.
 import base64
 import collections
 import configparser
+import contextlib
 import copy
 import http.client
 import itertools
@@ -174,32 +175,40 @@ def tunnel(pytestconfig, port):
     """ Creates a tunnel to localhost:<port> using ngrok or localtunnel, should yield the
     publicly routable address & terminate the process at the end of the session
     """
-
     tunnel = pytestconfig.getoption('--tunnel')
     if tunnel == 'ngrok':
+        web_addr = 'http://localhost:4040/api'
         addr = 'localhost:%d' % port
-        # if ngrok is not running, start it
+        # try to find out if ngrok is running, and if it's not attempt
+        # to start it
         try:
-            # FIXME: use lockfile instead
-            time.sleep(random.randint(1, 10))
+            # FIXME: this is for xdist to avoid workers running ngrok at the
+            #        exact same time, use lockfile instead
+            time.sleep(random.SystemRandom().randint(1, 10))
             # FIXME: use config file so we can set web_addr to something else
             #        than localhost:4040 (otherwise we can't disambiguate
             #        between the ngrok we started and an ngrok started by
             #        some other user)
-            requests.get('http://localhost:4040/api')
+            requests.get(web_addr)
         except requests.exceptions.ConnectionError:
             subprocess.Popen(NGROK_CLI, stdout=subprocess.DEVNULL)
-            time.sleep(2)
+            for _ in range(5):
+                time.sleep(1)
+                with contextlib.suppress(requests.exceptions.ConnectionError):
+                    requests.get(web_addr)
+                    break
+            else:
+                raise Exception("Unable to connect to ngrok")
 
-        requests.post('http://localhost:4040/api/tunnels', json={
+        requests.post(f'{web_addr}/tunnels', json={
             'name': str(port),
             'proto': 'http',
             'bind_tls': True, # only https
             'addr': addr,
             'inspect': True,
         }).raise_for_status()
-        tunnel = 'http://localhost:4040/api/tunnels/%s' % port
 
+        tunnel = f'{web_addr}/tunnels/{port}'
         for _ in range(10):
             time.sleep(2)
             r = requests.get(tunnel)
@@ -211,7 +220,7 @@ def tunnel(pytestconfig, port):
             try:
                 yield r.json()['public_url']
             finally:
-                requests.delete('http://localhost:4040/api/tunnels/%s' % port)
+                requests.delete(tunnel)
                 for _ in range(10):
                     time.sleep(1)
                     r = requests.get(tunnel)
@@ -222,7 +231,7 @@ def tunnel(pytestconfig, port):
                 else:
                     raise TimeoutError("ngrok tunnel deletion failed")
 
-                r = requests.get('http://localhost:4040/api/tunnels')
+                r = requests.get(f'{web_addr}/tunnels')
                 # there are still tunnels in the list -> bail
                 if r.ok and r.json()['tunnels']:
                     return
@@ -840,6 +849,10 @@ class PR:
     @property
     def state(self):
         return self._pr['state']
+
+    @property
+    def body(self):
+        return self._pr['body']
 
     @property
     def comments(self):
