@@ -1418,6 +1418,11 @@ class PullRequests(models.Model):
             if gh_name:
                 self.reviewed_by.name = gh_name
 
+        # update pr message in case an update was missed
+        msg = f'{prdict["title"]}\n\n{prdict.get("body") or ""}'.strip()
+        if self.message != msg:
+            self.message = msg
+
         # NOTE: lost merge v merge/copy distinction (head being
         #       a merge commit reused instead of being re-merged)
         return method, getattr(self, '_stage_' + method.replace('-', '_'))(

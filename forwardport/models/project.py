@@ -642,36 +642,28 @@ class PullRequests(models.Model):
         for pr in self:
             owner, _ = pr.repository.fp_remote_target.split('/', 1)
             source = pr.source_id or pr
-            message = source.message
-            if message:
-                message += '\n\n'
-            else:
-                message = ''
             root = pr._get_root()
-            message += '\n'.join(
+
+            message = source.message + '\n\n' + '\n'.join(
                 "Forward-Port-Of: %s" % p.display_name
                 for p in root | source
             )
 
             title, body = re.match(r'(?P<title>[^\n]+)\n*(?P<body>.*)', message, flags=re.DOTALL).groups()
-            title = '[FW]' + title
-            if not body:
-                body = None
-
             self.env.cr.execute('LOCK runbot_merge_pull_requests IN SHARE MODE')
-            url = 'https://api.github.com/repos/{}/pulls'.format(pr.repository.name)
-            pr_data = {
-                'base': target.name, 'head': '%s:%s' % (owner, new_branch),
-                'title': title, 'body': body
-            }
-            r = gh.post(url, json=pr_data)
+            r = gh.post(f'https://api.github.com/repos/{pr.repository.name}/pulls', json={
+                'base': target.name,
+                'head': f'{owner}:{new_branch}',
+                'title': '[FW]' + title,
+                'body': body
+            })
             if not r.ok:
                 _logger.warning("Failed to create forward-port PR for %s, deleting branches", pr.display_name)
                 # delete all the branches this should automatically close the
                 # PRs if we've created any. Using the API here is probably
                 # simpler than going through the working copies
                 for repo in self.mapped('repository'):
-                    d = gh.delete('https://api.github.com/repos/{}/git/refs/heads/{}'.format(repo.fp_remote_target, new_branch))
+                    d = gh.delete(f'https://api.github.com/repos/{repo.fp_remote_target}/git/refs/heads/{new_branch}')
                     if d.ok:
                         _logger.info("Deleting %s:%s=success", repo.fp_remote_target, new_branch)
                     else:
