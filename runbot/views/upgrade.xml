@@ -19,6 +19,9 @@
                 <field name="bundle_id"/>
                 <field name="elements"/>
                 <field name="info"/>
+                <field name="create_date"/>
+                <field name="create_uid"/>
+                <field name="team_id"/>
             </tree>
         </field>
     </record>
@@ -32,6 +35,17 @@
                 <field name="regex"/>
             </tree>
         </field>
+    </record>
+
+    <record id="upgrade_exception_search_view" model="ir.ui.view">
+      <field name="name">runbot.upgrade.exception.filter</field>
+      <field name="model">runbot.upgrade.exception</field>
+      <field name="arch" type="xml">
+        <search string="Search exceptions">
+          <field name="elements"/>
+          <field name="bundle_id"/>
+        </search>
+      </field>
     </record>
 
     <record id="open_view_upgrade_exception_tree" model="ir.actions.act_window">

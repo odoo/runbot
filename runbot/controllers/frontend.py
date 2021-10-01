@@ -58,7 +58,6 @@ def route(routes, **kw):
                     response.qcontext['title'] = 'Runbot %s' % project.name or ''
                 response.qcontext['nb_build_errors'] = nb_build_errors
                 response.qcontext['nb_assigned_errors'] = nb_assigned_errors
-
             return response
         return response_wrap
     return decorator
@@ -353,8 +352,9 @@ class Runbot(Controller):
         return request.render(view_id if view_id else "runbot.monitoring", qctx)
 
     @route(['/runbot/errors',
-            '/runbot/errors/page/<int:page>'], type='http', auth='user', website=True, sitemap=False)
-    def build_errors(self, error_id=None, sort=None, page=1, limit=20, **kwargs):
+            '/runbot/errors/page/<int:page>'
+            ], type='http', auth='user', website=True, sitemap=False)
+    def build_errors(self, sort=None, page=1, limit=20, **kwargs):
         sort_order_choices = {
             'last_seen_date desc': 'Last seen date: Newer First',
             'last_seen_date asc': 'Last seen date: Older First',
@@ -389,6 +389,24 @@ class Runbot(Controller):
             'pager': pager
         }
         return request.render('runbot.build_error', qctx)
+
+    @route(['/runbot/teams', '/runbot/teams/<model("runbot.team"):team>',], type='http', auth='user', website=True, sitemap=False)
+    def team_dashboards(self, team=None, hide_empty=False, **kwargs):
+        teams = request.env['runbot.team'].search([]) if not team else None
+        qctx = {
+            'team': team,
+            'teams': teams,
+            'hide_empty': bool(hide_empty),
+        }
+        return request.render('runbot.team', qctx)
+
+    @route(['/runbot/dashboards/<model("runbot.dashboard"):dashboard>',], type='http', auth='user', website=True, sitemap=False)
+    def dashboards(self, dashboard=None, hide_empty=False, **kwargs):
+        qctx = {
+            'dashboard': dashboard,
+            'hide_empty': bool(hide_empty),
+        }
+        return request.render('runbot.dashboard_page', qctx)
 
     @route(['/runbot/build/stats/<int:build_id>'], type='http', auth="public", website=True, sitemap=False)
     def build_stats(self, build_id, search=None, **post):

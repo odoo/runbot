@@ -16,6 +16,7 @@ from . import ir_ui_view
 from . import project
 from . import repo
 from . import res_config_settings
+from . import res_users
 from . import runbot
 from . import upgrade
 from . import user

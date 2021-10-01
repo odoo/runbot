@@ -29,11 +29,17 @@ class TestBuildError(RunbotCase):
     def setUp(self):
         super(TestBuildError, self).setUp()
         self.BuildError = self.env['runbot.build.error']
+        self.BuildErrorTeam = self.env['runbot.team']
 
     def test_build_scan(self):
         IrLog = self.env['ir.logging']
         ko_build = self.create_test_build({'local_result': 'ko'})
         ok_build = self.create_test_build({'local_result': 'ok'})
+
+        error_team = self.BuildErrorTeam.create({
+            'name': 'test-error-team',
+            'path_glob': '*build-error-n*'
+        })
 
         log = {'message': RTE_ERROR,
                'build_id': ko_build.id,
@@ -54,6 +60,7 @@ class TestBuildError(RunbotCase):
         build_error = self.BuildError.search([('build_ids', 'in', [ko_build.id])])
         self.assertIn(ko_build, build_error.build_ids, 'The parsed build should be added to the runbot.build.error')
         self.assertFalse(self.BuildError.search([('build_ids', 'in', [ok_build.id])]), 'A successful build should not associated to a runbot.build.error')
+        self.assertEqual(error_team, build_error.team_id)
 
         # Test that build with same error is added to the errors
         ko_build_same_error = self.create_test_build({'local_result': 'ko'})
@@ -151,3 +158,36 @@ class TestBuildError(RunbotCase):
         # test that test tags on fixed errors are not taken into account
         self.assertNotIn('blah', self.BuildError.test_tags_list())
         self.assertNotIn('-blah', self.BuildError.disabling_tags())
+
+    def test_build_error_team_wildcards(self):
+        website_team = self.BuildErrorTeam.create({
+            'name': 'website_test',
+            'path_glob': '*website*,-*website_sale*'
+        })
+
+        self.assertTrue(website_team.dashboard_id.exists())
+
+        self.assertFalse(self.BuildErrorTeam._get_team('odoo/addons/web_studio/tests/test_ui.py'))
+        self.assertFalse(self.BuildErrorTeam._get_team('odoo/addons/website_sale/tests/test_sale_process.py'))
+        self.assertEqual(website_team.id, self.BuildErrorTeam._get_team('odoo/addons/website_crm/tests/test_website_crm'))
+        self.assertEqual(website_team.id, self.BuildErrorTeam._get_team('odoo/addons/website/tests/test_ui'))
+
+    def test_dashboard_tile_simple(self):
+        self.additionnal_setup()
+        bundle = self.env['runbot.bundle'].search([('project_id', '=', self.project.id)])
+        bundle.last_batch.state = 'done'
+        bundle.flush()
+        bundle._compute_last_done_batch()  # force the recompute
+        self.assertTrue(bool(bundle.last_done_batch.exists()))
+        # simulate a failed build that we want to monitor
+        failed_build = bundle.last_done_batch.slot_ids[0].build_id
+        failed_build.global_result = 'ko'
+        failed_build.flush()
+
+        team = self.env['runbot.team'].create({'name': 'Test team'})
+        dashboard = self.env['runbot.dashboard.tile'].create({
+            'project_id': self.project.id,
+            'category_id': bundle.last_done_batch.category_id.id,
+        })
+
+        self.assertEqual(dashboard.build_ids, failed_build)

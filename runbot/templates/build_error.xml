@@ -1,140 +1,134 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
   <data>
+    <template id="runbot.build_error_cards">
+      <div t-if="build_errors" class="accordion" t-attf-id="accordion_{{accordion_id}}">
+        <div class="card">
+          <div class="card-header">
+            <div class="row">
+              <div class="col">Last seen date</div>
+              <div class="col col-md-3">Module</div>
+              <div class="col col-md-3">Summary</div>
+              <div class="col">Nb Seen</div>
+              <div class="col">Random</div>
+              <div class="col">Assigned to</div>
+              <div class="col">&amp;nbsp;</div>
+            </div>
+          </div>
+        </div>
+        <t t-foreach="build_errors" t-as="build_error">
+          <div class="card">
+            <div class="card-header">
+              <div class="row">
+                <div class="col"><t t-esc="build_error.last_seen_date" t-options='{"widget": "datetime"}'/></div>
+                <div class="col col-md-3"><t t-esc="build_error.module_name"/></div>
+                <div class="col col-md-3">
+                  <button class="btn btn-link" type="button" data-toggle="collapse" t-attf-data-target="#collapse{{build_error.id}}" aria-expanded="true" aria-controls="collapseOne">
+                    <i class="fa fa-minus"/>
+                  </button>
+                  <code><t t-esc="build_error.summary"/></code>
+                </div>
+                <div class="col">
+                  <t t-esc="build_error.build_count"/>
+                </div>
+                <div class="col">
+                  <i t-if="build_error.random" class="fa fa-random"/>
+                </div>
+                <div class="col"><t t-esc="build_error.responsible.name"/></div>
+                <div class="col">
+                  <a groups="base.group_user" t-attf-href="/web/#id={{build_error.id}}&amp;view_type=form&amp;model=runbot.build.error" target="new" title="View in Backend">
+                    <i class="fa fa-list"/>
+                  </a>
+                  <a t-att-href="build_error.last_seen_build_id.build_url" t-attf-title="View last affected build ({{build_error.last_seen_build_id.id}})"><i class="fa fa-external-link"/></a>
+                </div>
+              </div>
+            </div>
+
+            <div t-attf-id="collapse{{build_error.id}}" class="collapse" aria-labelledby="headingOne" t-attf-data-parent="#accordion_{{accordion_id}}">
+              <div class="card-body">
+                <pre class="pre-scrollable bg-danger-light"><t t-esc="build_error.content.strip()" /></pre>
+              </div>
+            </div>
+          </div>
+        </t>
+      </div>
+    </template>
+
     <template id="runbot.build_error">
       <t t-call='website.layout'>
         <div class="container-fluid">
           <div class="row">
             <div class='col-md-12'>
-              <t t-if="current_user_errors">
-                <h3>Your assigned bugs Bugs on Runbot Builds</h3>
-                <div class="accordion" id="userErrorAccordion">
-                  <div class="card">
-                    <div class="card-header">
-                      <div class="row">
-                        <div class="col">Last seen date</div>
-                        <div class="col col-md-3">Module</div>
-                        <div class="col col-md-3">Summary</div>
-                        <div class="col">Nb Seen</div>
-                        <div class="col">Random</div>
-                        <div class="col">Assigned to</div>
-                        <div class="col">&amp;nbsp;</div>
-                      </div>
-                    </div>
-                  </div>
-                  <t t-foreach="current_user_errors" t-as="build_error">
-                    <div class="card">
-                      <div class="card-header">
-                        <div class="row">
-                          <div class="col"><t t-esc="build_error.last_seen_date" t-options='{"widget": "datetime"}'/></div>
-                          <div class="col col-md-3"><t t-esc="build_error.module_name"/></div>
-                          <div class="col col-md-3">
-                            <button class="btn btn-link" type="button" data-toggle="collapse" t-attf-data-target="#collapse{{build_error.id}}" aria-expanded="true" aria-controls="collapseOne">
-                              <i class="fa fa-minus"/>
-                            </button>
-                            <code><t t-esc="build_error.summary"/></code>
-                          </div>
-                          <div class="col">
-                            <t t-esc="build_error.build_count"/>
-                          </div>
-                          <div class="col">
-                            <i t-if="build_error.random" class="fa fa-random"/>
-                          </div>
-                          <div class="col"><t t-esc="build_error.responsible.name"/></div>
-                          <div class="col">
-                            <a groups="base.group_user" t-attf-href="/web/#id={{build_error.id}}&amp;view_type=form&amp;model=runbot.build.error" target="new" title="View in Backend">
-                              <i class="fa fa-list"/>
-                            </a>
-                            <a t-att-href="build_error.last_seen_build_id.build_url" t-attf-title="View last affected build ({{build_error.last_seen_build_id.id}})"><i class="fa fa-external-link"/></a>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div t-attf-id="collapse{{build_error.id}}" class="collapse" aria-labelledby="headingOne" data-parent="#userErrorAccordion">
-                        <div class="card-body">
-                          <pre class="pre-scrollable">
-                            <code><t t-esc="build_error.content.strip()" /></code>
-                          </pre>
-                        </div>
-                      </div>
-                    </div>
-                  </t>
-                </div>
+              <h3>Your assigned bug on Runbot Builds</h3>
+              <t t-call="runbot.build_error_cards">
+                <t t-set="build_errors" t-value="current_user_errors"/>
+                <t t-set="accordion_id">user_errors</t>
               </t>
-
               <h3>Current Bugs on Runbot Builds</h3>
-              <div class="container">
-                <nav class="navbar navbar-expand-lg navbar-light bg-light">
-                  <div class="dropdown mr-auto">
-                    <a role="button" href="#" class="dropdown-toggle btn btn-secondary" data-toggle="dropdown">
-                      Sort By: <t t-esc="request.params.get('sort', '')"/>
-                    </a>
-                    <div class="dropdown-menu" aria-labelledby="sortMenuButton" role="menu">
-                      <t t-foreach="sort_order_choices" t-as="sort_choice">
-                        <a role="menuitem" class="dropdown-item" t-attf-href="/runbot/errors?sort={{sort_choice}}"><t t-esc="sort_order_choices[sort_choice]"/></a>
-                      </t>
+              <t t-if="build_errors">
+                <div class="container">
+                  <nav class="navbar navbar-expand-lg navbar-light bg-light">
+                    <div class="dropdown mr-auto">
+                      <a role="button" href="#" class="dropdown-toggle btn btn-secondary" data-toggle="dropdown">
+                        Sort By: <t t-esc="request.params.get('sort', '')"/>
+                      </a>
+                      <div class="dropdown-menu" aria-labelledby="sortMenuButton" role="menu">
+                        <t t-foreach="sort_order_choices" t-as="sort_choice">
+                          <a role="menuitem" class="dropdown-item" t-attf-href="/runbot/errors?sort={{sort_choice}}"><t t-esc="sort_order_choices[sort_choice]"/></a>
+                        </t>
+                      </div>
                     </div>
-                  </div>
-                  <span class="ml-auto">
-                      <t t-call="website.pager" />
-                  </span>
-                </nav>
-              </div>
-
-              <div class="accordion" id="errorAccordion">
-                <div class="card">
-                  <div class="card-header">
-                    <div class="row">
-                      <div class="col">Last seen date</div>
-                      <div class="col col-md-3">Module</div>
-                      <div class="col col-md-3">Summary</div>
-                      <div class="col">Nb Seen</div>
-                      <div class="col">Random</div>
-                      <div class="col">Assigned to</div>
-                      <div class="col">&amp;nbsp;</div>
-                    </div>
-                  </div>
+                    <span class="ml-auto">
+                        <t t-call="website.pager" />
+                    </span>
+                  </nav>
                 </div>
 
-                <t t-foreach="build_errors" t-as="build_error">
-                  <div class="card">
-                    <div class="card-header">
-                      <div class="row">
-                        <div class="col"><t t-esc="build_error.last_seen_date" t-options='{"widget": "datetime"}'/></div>
-                        <div class="col col-md-3"><t t-esc="build_error.module_name"/></div>
-                        <div class="col col-md-3">
-                          <button class="btn btn-link" type="button" data-toggle="collapse" t-attf-data-target="#collapse{{build_error.id}}" aria-expanded="true" aria-controls="collapseOne">
-                            <i class="fa fa-minus"/>
-                          </button>
-                          <code><t t-esc="build_error.summary"/></code>
-                        </div>
-                        <div class="col">
-                          <t t-esc="build_error.build_count"/>
-                        </div>
-                        <div class="col">
-                          <i t-if="build_error.random" class="fa fa-random"/>
-                        </div>
-                        <div class="col"><t t-esc="build_error.responsible.name"/></div>
-                        <div class="col">
-                          <a groups="base.group_user" t-attf-href="/web/#id={{build_error.id}}&amp;view_type=form&amp;model=runbot.build.error" target="new" title="View in Backend">
-                            <i class="fa fa-list"/>
-                          </a>
-                          <a t-att-href="build_error.last_seen_build_id.build_url" t-attf-title="View last affected build ({{build_error.last_seen_build_id.id}})"><i class="fa fa-external-link"/></a>
-                        </div>
-                      </div>
-                    </div>
+                <t t-call="runbot.build_error_cards">
+                  <t t-set="build_errors" t-value="build_errors"/>
+                  <t t-set="accordion_id">all_errors</t>
+                </t>
+              </t>
+            </div>
+          </div>
+        </div>
+      </t>
+    </template>
 
-                    <div t-attf-id="collapse{{build_error.id}}" class="collapse" aria-labelledby="headingOne" data-parent="#errorAccordion">
-                      <div class="card-body">
-                        <pre class="pre-scrollable">
-                          <code><t t-esc="build_error.content.strip()" /></code>
-                        </pre>
-                      </div>
-                    </div>
-                  </div>
+    <template id="runbot.team">
+      <t t-call='website.layout'>
+        <div class="container-fluid bg-light">
+          <div class="row">
+            <div t-if="team" class='col-md-12'>
+              <div class="col-lg-12 text-center mb16">
+                <h2>Team <t t-esc="team.name.capitalize()"/>
+                  <a groups="base.group_user" t-attf-href="/web/#id={{team.id}}&amp;view_type=form&amp;model=runbot.team" target="new" title="View in Backend">
+                    <i class="fa fa-list"/>
+                  </a>
+                </h2>
+              </div>
+              <div t-if="team.dashboard_id">
+                <h3 t-if="team.dashboard_id.dashboard_tile_ids">Dashboards</h3>
+                <t t-call="runbot.dashboard">
+                  <t t-set="dashboard" t-value="team.dashboard_id"/>
                 </t>
               </div>
-
+              <h3 t-if="team.build_error_ids">Team assigned Errors</h3>
+              <t t-call="runbot.build_error_cards">
+                <t t-set="build_errors" t-value="team.build_error_ids"/>
+                <t t-set="accordion_id">team_errors</t>
+              </t>
+            </div>
+            <!-- Display list of teams of no team is supplied -->
+            <div t-if="not team" class='col-md-12'>
+              <h3> Teams</h3>
+              <div class="row">
+                <div class="list-group list-group-horizontal">
+                  <t t-foreach="teams" t-as="team">
+                    <a t-attf-href="/runbot/teams/{{ team.id }}" class="list-group-item list-group-item-action"><t t-esc="team.name"/></a>
+                  </t>
+                </div>
+              </div>
             </div>
           </div>
         </div>
