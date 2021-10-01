@@ -296,6 +296,17 @@
                     </t>
                   </td>
                 </tr>
+                <t t-if="l.error_id">
+                  <tr>
+                    <td></td><td></td><td></td>
+                    <td class="bg-info-light">
+                      This error already is known.
+                      <a groups="runbot.group_build_config_user" t-attf-href="/web#id={{l.error_id.id}}&amp;view_type=form&amp;model=runbot.build.error" title="View in Backend" target="new">
+                        <i class="fa fa-list"/>
+                      </a>
+                    </td>
+                  </tr>
+                </t>
               </t>
             </table>
           </div>

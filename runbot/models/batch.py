@@ -18,12 +18,19 @@ class Batch(models.Model):
     commit_link_ids = fields.Many2many('runbot.commit.link')
     commit_ids = fields.Many2many('runbot.commit', compute='_compute_commit_ids')
     slot_ids = fields.One2many('runbot.batch.slot', 'batch_id')
+    all_build_ids = fields.Many2many('runbot.build', compute='_compute_all_build_ids', help="Recursive builds")
     state = fields.Selection([('preparing', 'Preparing'), ('ready', 'Ready'), ('done', 'Done'), ('skipped', 'Skipped')])
     hidden = fields.Boolean('Hidden', default=False)
     age = fields.Integer(compute='_compute_age', string='Build age')
     category_id = fields.Many2one('runbot.category', default=lambda self: self.env.ref('runbot.default_category', raise_if_not_found=False))
     log_ids = fields.One2many('runbot.batch.log', 'batch_id')
     has_warning = fields.Boolean("Has warning")
+
+    @api.depends('slot_ids.build_id')
+    def _compute_all_build_ids(self):
+        all_builds = self.env['runbot.build'].search([('id', 'child_of', self.slot_ids.build_id.ids)])
+        for batch in self:
+            batch.all_build_ids = all_builds.filtered_domain([('id', 'child_of', batch.slot_ids.build_id.ids)])
 
     @api.depends('commit_link_ids')
     def _compute_commit_ids(self):
@@ -403,6 +410,7 @@ class BatchSlot(models.Model):
     batch_id = fields.Many2one('runbot.batch', index=True)
     trigger_id = fields.Many2one('runbot.trigger', index=True)
     build_id = fields.Many2one('runbot.build', index=True)
+    all_build_ids = fields.Many2many('runbot.build', compute='_compute_all_build_ids')
     params_id = fields.Many2one('runbot.build.params', index=True, required=True)
     link_type = fields.Selection([('created', 'Build created'), ('matched', 'Existing build matched'), ('rebuild', 'Rebuild')], required=True)  # rebuild type?
     active = fields.Boolean('Attached', default=True)
@@ -411,6 +419,12 @@ class BatchSlot(models.Model):
     # - replace for all batch?
     # - only available on batch and replace for batch only?
     # - create a new bundle batch will new linked build?
+
+    @api.depends('build_id')
+    def _compute_all_build_ids(self):
+        all_builds = self.env['runbot.build'].search([('id', 'child_of', self.build_id.ids)])
+        for slot in self:
+            slot.all_build_ids = all_builds.filtered_domain([('id', 'child_of', slot.build_id.ids)])
 
     def fa_link_type(self):
         return self._fa_link_type.get(self.link_type, 'exclamation-triangle')

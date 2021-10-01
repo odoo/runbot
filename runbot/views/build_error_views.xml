@@ -11,15 +11,17 @@
               <group name="build_error_group">
                 <field name="fingerprint" readonly="1"/>
                 <field name="content"/>
-                <field name="cleaned_content" groups="base.group_no_one"/>
                 <field name="module_name"/>
                 <field name="function"/>
                 <field name="random"/>
                 <field name="responsible"/>
+                <field name="team_id"/>
                 <field name="fixing_commit"/>
+                <field name="fixing_pr_id"/>
                 <field name="active"/>
                 <field name="parent_id" />
                 <field name="bundle_ids" widget="many2many_tags"/>
+                <field name="version_ids" widget="many2many_tags"/>
                 <field name="trigger_ids" widget="many2many_tags"/>
                 <field name="tag_ids" widget="many2many_tags"/>
                 <field name="first_seen_date"/>
@@ -74,6 +76,11 @@
                     </tree>
                   </field>
                 </page>
+                <page string="Cleaned" groups="base.group_no_one">
+                  <group name="build_error_group">
+                    <field name="cleaned_content"/>
+                  </group>
+                </page>
               </notebook>
             </sheet>
             <div class="oe_chatter">
@@ -108,7 +115,9 @@
           <field name="content"/>
           <field name="module_name"/>
           <field name="function"/>
+          <field name="version_ids"/>
           <field name="responsible"/>
+          <field name="team_id"/>
           <field name="fixing_commit"/>
           <filter string="No Parent" name="no_parent_error" domain="[('parent_id', '=', False)]"/>
           <separator/>
@@ -202,5 +211,6 @@
         sequence="20"
         action="open_view_error_regex"
         />
+
   </data>
 </odoo>

@@ -42,6 +42,7 @@
                     <group>
                         <field name="description"/>
                         <field name="params_id"/>
+                        <field name="config_id"/>
                         <field name="port" groups="base.group_no_one"/>
                         <field name="dest"/>
                         <field name="local_state"/>

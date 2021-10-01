@@ -11,6 +11,7 @@ class UpgradeExceptions(models.Model):
     elements = fields.Text('Elements')
     bundle_id = fields.Many2one('runbot.bundle', index=True)
     info = fields.Text('Info')
+    team_id = fields.Many2one('runbot.team', 'Assigned team', index=True)
 
     def _generate(self):
         exceptions = self.search([])

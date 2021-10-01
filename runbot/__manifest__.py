@@ -43,6 +43,7 @@
         'views/bundle_views.xml',
         'views/commit_views.xml',
         'views/config_views.xml',
+        'views/dashboard_views.xml',
         'views/dockerfile_views.xml',
         'views/error_log_views.xml',
         'views/host_views.xml',

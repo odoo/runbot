@@ -2,6 +2,8 @@
 
 import logging
 
+from collections import defaultdict
+
 from ..common import pseudo_markdown
 from odoo import models, fields, tools
 from odoo.exceptions import UserError
@@ -19,6 +21,7 @@ class runbot_event(models.Model):
     build_id = fields.Many2one('runbot.build', 'Build', index=True, ondelete='cascade')
     active_step_id = fields.Many2one('runbot.build.config.step', 'Active step', index=True)
     type = fields.Selection(selection_add=TYPES, string='Type', required=True, index=True)
+    error_id = fields.Many2one('runbot.build.error', compute='_compute_known_error')  # remember to never store this field
 
     def init(self):
         parent_class = super(runbot_event, self)
@@ -79,6 +82,17 @@ FOR EACH ROW EXECUTE PROCEDURE runbot_set_logging_build();
         self.ensure_one()
         return pseudo_markdown(self.message)
 
+
+    def _compute_known_error(self):
+        cleaning_regexes = self.env['runbot.error.regex'].search([('re_type', '=', 'cleaning')])
+        fingerprints = defaultdict(list)
+        for ir_logging in self:
+            ir_logging.error_id = False
+            if ir_logging.level == 'ERROR' and ir_logging.type == 'server':
+                fingerprints[self.env['runbot.build.error']._digest(cleaning_regexes.r_sub('%', ir_logging.message))].append(ir_logging)
+        for build_error in self.env['runbot.build.error'].search([('fingerprint', 'in', list(fingerprints.keys()))]):
+            for ir_logging in fingerprints[build_error.fingerprint]:
+                ir_logging.error_id = build_error.id
 
 class RunbotErrorLog(models.Model):
     _name = 'runbot.error.log'

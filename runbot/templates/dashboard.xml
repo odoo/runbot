@@ -183,5 +183,47 @@
         </div>
       </t>
     </template>
+
+    <template id="runbot.default_dashboard_tile_view">
+      <div class="col-sm-3">
+        <div class="card">
+          <div class="card-header">
+            <t t-esc="tile.display_name"/>
+          </div>
+          <div class="card-body">
+            <p t-if="not tile.build_ids" class="text-success my-0">No build found 👍</p>
+            <t t-foreach="tile.sticky_bundle_ids.sorted(lambda b: b.version_id.number, reverse=True)" t-as="bundle">
+              <t t-set="failed_builds" t-value="tile.build_ids.filtered(lambda b: b.top_parent.slot_ids.batch_id.bundle_id == bundle)"/>
+              <h4 class="card-title" t-if="failed_builds" t-esc="bundle.name"/>
+              <p t-foreach="failed_builds" t-as="build" class="my-0">
+                  <a class="text-danger" t-attf-href="/runbot/build/{{build.id}}" target="new">
+                    <t t-esc="build.description or build.id"/>
+                  </a>
+              </p>
+            </t>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template id="runbot.dashboard">
+      <div class="row">
+        <t t-foreach="dashboard.dashboard_tile_ids" t-as="tile">
+          <t t-if="tile.build_ids or not hide_empty" t-call="{{ tile.custom_template_id.id }}"/>
+        </t>
+      </div>
+    </template>
+
+    <template id="runbot.dashboard_page">
+      <t t-call="runbot.frontend_no_nav">
+        <t t-set="head">
+          <t t-if="refresh">
+            <meta http-equiv="refresh" t-att-content="refresh"/>
+          </t>
+        </t>
+        <t t-call="runbot.dashboard"/>
+      </t>
+    </template>
+
   </data>
 </odoo>
