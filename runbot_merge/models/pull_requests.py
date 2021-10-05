@@ -1064,7 +1064,7 @@ class PullRequests(models.Model):
                             author.github_login, self.target.name,
                         )
             elif command == 'method':
-                if is_admin:
+                if is_reviewer:
                     self.merge_method = param
                     ok = True
                     explanation = next(label for value, label in type(self).merge_method.selection if value == param)

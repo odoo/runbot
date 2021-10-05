@@ -1279,6 +1279,28 @@ class TestMergeMethod:
             '': staging.id,
         }, "for a squash, the one PR commit should be mapped to the one rebased commit"
 
+    def test_delegate_method(self, repo, env, users, config):
+        """Delegates should be able to configure the merge method.
+        """
+        with repo:
+            m, _ = repo.make_commits(
+                None,
+                Commit('initial', tree={'m': 'm'}),
+                Commit('second', tree={'m2': 'm2'}),
+                ref="heads/master"
+            )
+
+            [c1] = repo.make_commits(m, Commit('first', tree={'m': 'c1'}))
+            pr = repo.make_pr(target='master', head=c1)
+            repo.post_status(pr.head, 'success', 'legal/cla')
+            repo.post_status(pr.head, 'success', 'ci/runbot')
+            pr.post_comment('hansen delegate+', config['role_reviewer']['token'])
+            pr.post_comment('hansen merge', config['role_user']['token'])
+        env.run_crons()
+
+        assert pr.user == users['user']
+        assert to_pr(env, pr).merge_method == 'merge'
+
     def test_pr_update_to_many_commits(self, repo, env):
         """
         If a PR starts with 1 commit and a second commit is added, the PR
@@ -1336,23 +1358,26 @@ class TestMergeMethod:
         feedback indicating a merge method is necessary
         """
         with repo:
-            m0 = repo.make_commit(None, 'M0', None, tree={'m': '0'})
-            m1 = repo.make_commit(m0, 'M1', None, tree={'m': '1'})
-            m2 = repo.make_commit(m1, 'M2', None, tree={'m': '2'})
-            repo.make_ref('heads/master', m2)
+            _, m1, _ = repo.make_commits(
+                None,
+                Commit('M0', tree={'m': '0'}),
+                Commit('M1', tree={'m': '1'}),
+                Commit('M2', tree={'m': '2'}),
+                ref='heads/master'
+            )
 
-            b0 = repo.make_commit(m1, 'B0', None, tree={'m': '1', 'b': '0'})
-            b1 = repo.make_commit(b0, 'B1', None, tree={'m': '1', 'b': '1'})
+            _, b1 = repo.make_commits(
+                m1,
+                Commit('B0', tree={'b': '0'}),
+                Commit('B1', tree={'b': '1'}),
+            )
             prx = repo.make_pr(title='title', body='body', target='master', head=b1)
             repo.post_status(prx.head, 'success', 'legal/cla')
             repo.post_status(prx.head, 'success', 'ci/runbot')
             prx.post_comment('hansen r+', config['role_reviewer']['token'])
         env.run_crons()
 
-        assert not env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number),
-        ]).staging_id
+        assert not to_pr(env, prx).staging_id
 
         assert prx.comments == [
             (users['reviewer'], 'hansen r+'),
@@ -1366,7 +1391,7 @@ class TestMergeMethod:
         ]
 
     def test_pr_method_no_review(self, repo, env, users, config):
-        """ Configuring the method should be idependent from the review
+        """ Configuring the method should be independent from the review
         """
         with repo:
             m0 = repo.make_commit(None, 'M0', None, tree={'m': '0'})
