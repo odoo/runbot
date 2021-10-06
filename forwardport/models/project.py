@@ -34,6 +34,7 @@ from odoo.exceptions import UserError
 from odoo.tools import topological_sort, groupby
 from odoo.tools.appdirs import user_cache_dir
 from odoo.addons.runbot_merge import utils
+from odoo.addons.runbot_merge.models.pull_requests import RPLUS
 
 footer = '\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'
 
@@ -339,7 +340,7 @@ class PullRequests(models.Model):
                     continue
                 merge_bot = self.repository.project_id.github_prefix
                 # don't update the root ever
-                for pr in filter(lambda p: p.parent_id, self._iter_ancestors()):
+                for pr in (p for p in self._iter_ancestors() if p.parent_id if p.state in RPLUS):
                     # only the author is delegated explicitely on the
                     pr._parse_commands(author, {**comment, 'body': merge_bot + ' r+'}, login)
             elif token == 'close':

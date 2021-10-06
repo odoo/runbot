@@ -498,6 +498,54 @@ def signoff(conf, message):
             return signoff
     raise AssertionError("Failed to find signoff by %s in %s" % (conf, message))
 
+
+def test_redundant_approval(env, config, make_repo, users):
+    """If a forward port sequence has been partially approved, fw-bot r+ should
+    not perform redundant approval as that triggers warning messages.
+    """
+    prod, _ = make_basic(env, config, make_repo)
+    [project] = env['runbot_merge.project'].search([])
+    with prod:
+        prod.make_commits(
+            'a', Commit('p', tree={'x': '0'}),
+            ref='heads/early'
+        )
+        pr0 = prod.make_pr(target='a', head='early')
+        prod.post_status('heads/early', 'success', 'legal/cla')
+        prod.post_status('heads/early', 'success', 'ci/runbot')
+        pr0.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+    with prod:
+        prod.post_status('staging.a', 'success', 'legal/cla')
+        prod.post_status('staging.a', 'success', 'ci/runbot')
+    env.run_crons()
+    pr0_id, pr1_id = env['runbot_merge.pull_requests'].search([], order='number asc')
+    with prod:
+        prod.post_status(pr1_id.head, 'success', 'legal/cla')
+        prod.post_status(pr1_id.head, 'success', 'ci/runbot')
+    env.run_crons()
+
+    _, _, pr2_id = env['runbot_merge.pull_requests'].search([], order='number asc')
+    assert pr2_id.parent_id == pr1_id
+    assert pr1_id.parent_id == pr0_id
+
+    pr1 = prod.get_pr(pr1_id.number)
+    pr2 = prod.get_pr(pr2_id.number)
+    with prod:
+        pr1.post_comment('hansen r+', config['role_reviewer']['token'])
+    with prod:
+        pr2.post_comment(f'{project.fp_github_name} r+', config['role_reviewer']['token'])
+    env.run_crons()
+
+    assert pr1.comments == [
+        seen(env, pr1, users),
+        (users['user'], 'This PR targets b and is part of the forward-port chain. '
+                        'Further PRs will be created up to c.\n\n'
+                        'More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'),
+        (users['reviewer'], 'hansen r+'),
+    ]
+
+
 def test_batched(env, config, make_repo, users):
     """ Tests for projects with multiple repos & sync'd branches. Batches
     should be FP'd to batches
