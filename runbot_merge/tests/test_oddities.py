@@ -19,7 +19,7 @@ def test_partner_merge(env):
         'state': 'selection',
         'partner_ids': (p_src + p_dest).ids,
         'dst_partner_id': p_dest.id,
-    })._call('action_merge')
+    }).action_merge()
     assert not p_src.exists()
     assert p_dest.name == 'Partner P. Partnersson'
     assert p_dest.github_login == 'xxx'

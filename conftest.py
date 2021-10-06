@@ -1120,17 +1120,18 @@ class Model:
     def __getattr__(self, fieldname):
         if fieldname in ['__dataclass_fields__', '__attrs_attrs__']:
             raise AttributeError('%r is invalid on %s' % (fieldname, self._model))
+
+        field_description = self._fields.get(fieldname)
+        if field_description is None:
+            return functools.partial(self._call, fieldname)
+
         if not self._ids:
             return False
 
-        assert len(self._ids) == 1
         if fieldname == 'id':
             return self._ids[0]
 
-        try:
-            val = self.read([fieldname])[0][fieldname]
-        except Exception:
-            raise AttributeError('%r is invalid on %s' % (fieldname, self._model))
+        val = self.read([fieldname])[0][fieldname]
         field_description = self._fields[fieldname]
         if field_description['type'] in ('many2one', 'one2many', 'many2many'):
             val = val or []
