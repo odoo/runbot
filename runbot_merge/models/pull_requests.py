@@ -534,15 +534,13 @@ class Branch(models.Model):
             try:
                 staged |= Batch.stage(meta, batch)
             except exceptions.MergeError as e:
+                pr = e.args[0]
+                _logger.exception("Failed to merge %s into staging branch", pr.display_name)
                 if first or isinstance(e, exceptions.Unmergeable):
-                    pr = e.args[0]
                     if len(e.args) > 1 and e.args[1]:
                         message = e.args[1]
                     else:
                         message = "Unable to stage PR (%s)" % e.__context__
-                        _logger.exception(
-                            "Failed to merge %s into staging branch",
-                            pr.display_name)
                     pr.state = 'error'
                     self.env['runbot_merge.pull_requests.feedback'].create({
                         'repository': pr.repository.id,
