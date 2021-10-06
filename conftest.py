@@ -263,15 +263,15 @@ class DbDict(dict):
         super().__init__()
         self._adpath = adpath
     def __missing__(self, module):
-        db = 'template_%s' % uuid.uuid4()
+        self[module] = db = 'template_%s' % uuid.uuid4()
         subprocess.run([
             'odoo', '--no-http',
             '--addons-path', self._adpath,
             '-d', db, '-i', module,
             '--max-cron-threads', '0',
-            '--stop-after-init'
+            '--stop-after-init',
+            '--log-level', 'warn'
         ], check=True)
-        self[module] = db
         return db
 
 @pytest.fixture(scope='session')
@@ -332,15 +332,18 @@ def port():
 
 @pytest.fixture
 def server(request, db, port, module):
-    opts = ['--log-handler', 'github_requests:WARNING']
-    if request.config.getoption('--log-github'):
-        opts = []
+    log_handlers = [
+        'odoo.modules.loading:WARNING',
+    ]
+    if not request.config.getoption('--log-github'):
+        log_handlers.append('github_requests:WARNING')
 
     p = subprocess.Popen([
         'odoo', '--http-port', str(port),
         '--addons-path', request.config.getoption('--addons-path'),
-        '-d', db, *opts,
+        '-d', db,
         '--max-cron-threads', '0', # disable cron threads (we're running crons by hand)
+        *itertools.chain.from_iterable(('--log-handler', h) for h in log_handlers),
     ])
 
     try:
