@@ -22,6 +22,8 @@ Configuration:
   ``role_reviewer``, ``role_self_reviewer`` and ``role_other``
     - name (optional, used as partner name when creating that, otherwise github
       login gets used)
+    - email (optional, used as partner email when creating that, otherwise
+      github email gets used, reviewer and self-reviewer must have an email)
     - token, a personal access token with the ``public_repo`` scope (otherwise
       the API can't leave comments), maybe eventually delete_repo (for personal
       forks)
@@ -44,6 +46,7 @@ import collections
 import configparser
 import contextlib
 import copy
+import functools
 import http.client
 import itertools
 import os
@@ -136,14 +139,16 @@ def rolemap(request, config):
 
 @pytest.fixture
 def partners(env, config, rolemap):
-    m = dict.fromkeys(rolemap.keys(), env['res.partner'])
+    m = {}
     for role, u in rolemap.items():
         if role in ('user', 'other'):
             continue
 
         login = u['login']
+        conf = config['role_' + role]
         m[role] = env['res.partner'].create({
-            'name': config['role_' + role].get('name', login),
+            'name': conf.get('name', login),
+            'email': conf.get('email') or u['email'] or False,
             'github_login': login,
         })
     return m

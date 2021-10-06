@@ -84,7 +84,7 @@ def test_straightforward_flow(env, config, make_repo, users):
         number=pr.number,
         headers='',
         name=reviewer_name,
-        login=users['reviewer'],
+        email=config['role_reviewer']['email'],
     )
     assert prod.read_tree(p_1_merged) == {
         'f': 'e',
@@ -192,7 +192,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         number='%s',
         headers='X-original-commit: {}\n'.format(p_1_merged.id),
         name=reviewer_name,
-        login=users['reviewer'],
+        email=config['role_reviewer']['email'],
     )
 
     old_b = prod.read_tree(b_head)
@@ -397,8 +397,6 @@ def test_partially_empty(env, config, make_repo):
         'y': '0',
     }
 
-# reviewer = of the FP sequence, the original PR is always reviewed by `user`
-# set as reviewer
 Case = collections.namedtuple('Case', 'author reviewer delegate success')
 ACL = [
     Case('reviewer', 'reviewer', None, True),
@@ -418,6 +416,9 @@ ACL = [
 ]
 @pytest.mark.parametrize(Case._fields, ACL)
 def test_access_rights(env, config, make_repo, users, author, reviewer, delegate, success):
+    """Validates the review rights *for the forward-port sequence*, the original
+    PR is always reviewed by `user`.
+    """
     prod, other = make_basic(env, config, make_repo)
     project = env['runbot_merge.project'].search([])
 
@@ -425,12 +426,19 @@ def test_access_rights(env, config, make_repo, users, author, reviewer, delegate
     c = env['res.partner'].create({
         'name': users['user'],
         'github_login': users['user'],
+        'email': 'user@example.org',
     })
     c.write({
         'review_rights': [
             (0, 0, {'repository_id': repo.id, 'review': True})
             for repo in project.repo_ids
         ]
+    })
+    # create a partner for `other` so we can put an email on it
+    env['res.partner'].create({
+        'name': users['other'],
+        'github_login': users['other'],
+        'email': 'other@example.org',
     })
 
     author_token = config['role_' + author]['token']

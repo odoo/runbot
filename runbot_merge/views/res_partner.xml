@@ -18,6 +18,14 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//sheet" position="before">
+                <header>
+                    <button type="object" name="fetch_github_email"
+                            string="Fetch Github Email" class="oe_highlight"
+                            attrs="{'invisible': ['|', ('email', '!=', False), ('github_login', '=', False)]}"
+                    />
+                </header>
+            </xpath>
             <xpath expr="//notebook" position="inside">
                 <page string="Mergebot" groups="runbot_merge.group_admin">
                     <group>

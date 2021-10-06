@@ -1,5 +1,9 @@
+import random
 from email.utils import parseaddr
+
 from odoo import fields, models, tools, api
+
+from .. import github
 
 class CIText(fields.Char):
     type = 'char'
@@ -31,6 +35,14 @@ class Partner(models.Model):
             else:
                 email = ''
             partner.formatted_email = '%s <%s>' % (partner.name, email)
+
+    def fetch_github_email(self):
+        # this requires a token in order to fetch the email field, otherwise
+        # it's just not returned, select a random project to fetch
+        gh = github.GH(random.choice(self.env['runbot_merge.project'].search([])).github_token, None)
+        for p in self.filtered(lambda p: p.github_login and p.email is False):
+            p.email = gh.user(p.github_login)['email'] or False
+        return False
 
 class PartnerMerge(models.TransientModel):
     _inherit = 'base.partner.merge.automatic.wizard'

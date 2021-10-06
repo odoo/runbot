@@ -8,7 +8,7 @@ MESSAGE_TEMPLATE = """{message}
 
 closes {repo}#{number}
 
-{headers}Signed-off-by: {name} <{login}@users.noreply.github.com>"""
+{headers}Signed-off-by: {name} <{email}>"""
 # target branch '-' source branch '-' base64 unique '-fw'
 REF_PATTERN = r'{target}-{source}-[a-zA-Z0-9_-]{{4}}-fw'
 

@@ -1005,12 +1005,14 @@ class PullRequests(models.Model):
                 elif param and is_reviewer:
                     oldstate = self.state
                     newstate = RPLUS.get(self.state)
-                    if newstate:
+                    if not author.email:
+                        msg = "I must know your email before you can review PRs. Please contact an administrator."
+                    elif not newstate:
+                        msg = "This PR is already reviewed, reviewing it again is useless."
+                    else:
                         self.state = newstate
                         self.reviewed_by = author
                         ok = True
-                    else:
-                        msg = "This PR is already reviewed, reviewing it again is useless."
                     _logger.debug(
                         "r+ on %s by %s (%s->%s) status=%s message? %s",
                         self.display_name, author.github_login,

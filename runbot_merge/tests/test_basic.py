@@ -216,6 +216,11 @@ class TestCommitMessage:
     def test_commit_delegate(self, env, repo, users, config):
         """ verify 'signed-off-by ...' is correctly added in the commit message for delegated review
         """
+        env['res.partner'].create({
+            'name': users['other'],
+            'github_login': users['other'],
+            'email': users['other'] + '@example.org'
+        })
         with repo:
             c1 = repo.make_commit(None, 'first!', None, tree={'f': 'm1'})
             repo.make_ref('heads/master', c1)
@@ -2810,6 +2815,11 @@ class TestReviewing(object):
         """Users should be able to delegate review to either the creator of
         the PR or an other user without review rights
         """
+        env['res.partner'].create({
+            'name': users['user'],
+            'github_login': users['user'],
+            'email': users['user'] + '@example.org',
+        })
         with repo:
             m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
             m2 = repo.make_commit(m, 'second', None, tree={'m': 'm', 'm2': 'm2'})
@@ -2824,10 +2834,7 @@ class TestReviewing(object):
         env.run_crons()
 
         assert prx.user == users['user']
-        assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number)
-        ]).state == 'ready'
+        assert to_pr(env, prx).state == 'ready'
 
     def test_delegate_review_thirdparty(self, env, repo, users, config):
         """Users should be able to delegate review to either the creator of
@@ -2846,23 +2853,19 @@ class TestReviewing(object):
             other = ''.join(c.lower() if c.isupper() else c.upper() for c in users['other'])
             prx.post_comment('hansen delegate=%s' % other, config['role_reviewer']['token'])
         env.run_crons()
+        env['res.partner'].search([('github_login', '=', other)]).email = f'{other}@example.org'
 
         with repo:
             # check this is ignored
             prx.post_comment('hansen r+', config['role_user']['token'])
         assert prx.user == users['user']
-        assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number)
-        ]).state == 'validated'
+        prx_id = to_pr(env, prx)
+        assert prx_id.state == 'validated'
 
         with repo:
             # check this works
             prx.post_comment('hansen r+', config['role_other']['token'])
-        assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number)
-        ]).state == 'ready'
+        assert prx_id.state == 'ready'
 
     def test_delegate_prefixes(self, env, repo, config):
         with repo:
@@ -2879,7 +2882,6 @@ class TestReviewing(object):
         ])
 
         assert {d.github_login for d in pr.delegates} == {'foo', 'bar', 'baz'}
-
 
     def test_actual_review(self, env, repo, config):
         """ treat github reviews as regular comments
@@ -2915,6 +2917,41 @@ class TestReviewing(object):
             prx.post_review('COMMENT', 'hansen r+', config['role_reviewer']['token'])
         assert pr.priority == 1
         assert pr.state == 'approved'
+
+    def test_no_email(self, env, repo, users, config, partners):
+        """A review should be rejected if the reviewer doesn't have an email
+        configured, otherwise the email address will show up
+        @users.noreply.github.com which is *weird*.
+        """
+        with repo:
+            [m] = repo.make_commits(
+                None,
+                Commit('initial', tree={'m': '1'}),
+                ref='heads/master'
+            )
+            [c] = repo.make_commits(m, Commit('first', tree={'m': '2'}))
+            pr = repo.make_pr(target='master', head=c)
+        env.run_crons()
+        with repo:
+            pr.post_comment('hansen delegate+', config['role_reviewer']['token'])
+            pr.post_comment('hansen r+', config['role_user']['token'])
+        env.run_crons()
+
+        user_partner = env['res.partner'].search([('github_login', '=', users['user'])])
+        assert user_partner.email is False
+        assert pr.comments == [
+            seen(env, pr, users),
+            (users['reviewer'], 'hansen delegate+'),
+            (users['user'], 'hansen r+'),
+            (users['user'], f"I'm sorry, @{users['user']}. I must know your email before you can review PRs. Please contact an administrator."),
+        ]
+        user_partner.fetch_github_email()
+        assert user_partner.email
+        with repo:
+            pr.post_comment('hansen r+', config['role_user']['token'])
+        env.run_crons()
+        assert to_pr(env, pr).state == 'approved'
+
 
 class TestUnknownPR:
     """ Sync PRs initially looked excellent but aside from the v4 API not
