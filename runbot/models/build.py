@@ -733,7 +733,7 @@ class BuildResult(models.Model):
         return os.path.join(root, 'build', build.dest, *l)
 
     def http_log_url(self):
-        return 'http://%s/runbot/static/build/%s/logs/' % (self.host, self.dest)
+        return '//%s/runbot/static/build/%s/logs/' % (self.host, self.dest)
 
     def _server(self, *path):
         """Return the absolute path to the direcory containing the server file, adding optional *path"""
