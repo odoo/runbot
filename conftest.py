@@ -46,7 +46,6 @@ import contextlib
 import copy
 import http.client
 import itertools
-import logging
 import os
 import random
 import re
@@ -358,6 +357,9 @@ def server(request, db, port, module):
 def env(port, server, db, default_crons):
     yield Environment(port, db, default_crons)
 
+def check(response):
+    assert response.ok, response.text or response.reason
+    return response
 # users is just so I can avoid autouse on toplevel users fixture b/c it (seems
 # to) break the existing local tests
 @pytest.fixture
@@ -375,8 +377,7 @@ def make_repo(capsys, request, config, tunnel, users):
         endpoint = 'https://api.github.com/orgs/{}/repos'.format(owner)
     else:
         endpoint = 'https://api.github.com/user/repos'
-        r = github.get('https://api.github.com/user')
-        r.raise_for_status()
+        r = check(github.get('https://api.github.com/user'))
         assert r.json()['login'] == owner
 
     repos = []
@@ -386,7 +387,7 @@ def make_repo(capsys, request, config, tunnel, users):
         repo_url = 'https://api.github.com/repos/{}'.format(fullname)
 
         # create repo
-        r = github.post(endpoint, json={
+        r = check(github.post(endpoint, json={
             'name': name,
             'has_issues': False,
             'has_projects': False,
@@ -396,12 +397,11 @@ def make_repo(capsys, request, config, tunnel, users):
             'allow_squash_merge': False,
             # 'allow_merge_commit': False,
             'allow_rebase_merge': False,
-        })
-        r.raise_for_status()
+        }))
         repo = Repo(github, fullname, repos)
 
         # create webhook
-        github.post('{}/hooks'.format(repo_url), json={
+        check(github.post('{}/hooks'.format(repo_url), json={
             'name': 'web',
             'config': {
                 'url': '{}/runbot_merge/hooks'.format(tunnel),
@@ -409,14 +409,14 @@ def make_repo(capsys, request, config, tunnel, users):
                 'insecure_ssl': '1',
             },
             'events': ['pull_request', 'issue_comment', 'status', 'pull_request_review']
-        })
+        }))
 
-        github.put('{}/contents/{}'.format(repo_url, 'a'), json={
+        check(github.put('{}/contents/{}'.format(repo_url, 'a'), json={
             'path': 'a',
             'message': 'github returns a 409 (Git Repository is Empty) if trying to create a tree in a repo with no objects',
             'content': base64.b64encode(b'whee').decode('ascii'),
             'branch': 'garbage_%s' % uuid.uuid4()
-        }).raise_for_status()
+        }))
         # try to unwatch repo, doesn't actually work
         repo.unsubscribe()
         return repo
@@ -462,16 +462,13 @@ class Repo:
 
     def add_collaborator(self, login, token):
         # send invitation to user
-        r = self._session.put('https://api.github.com/repos/{}/collaborators/{}'.format(self.name, login))
-        assert r.ok, r.json()
+        r = check(self._session.put('https://api.github.com/repos/{}/collaborators/{}'.format(self.name, login)))
         # accept invitation on behalf of user
-        r = requests.patch('https://api.github.com/user/repository_invitations/{}'.format(r.json()['id']), headers={
+        check(requests.patch('https://api.github.com/user/repository_invitations/{}'.format(r.json()['id']), headers={
             'Authorization': 'token ' + token
-        })
-        assert r.ok, r.json()
+        }))
         # sanity check that user is part of collaborators
-        r = self._session.get('https://api.github.com/repos/{}/collaborators'.format(self.name))
-        assert r.ok, r.json()
+        r = check(self._session.get('https://api.github.com/repos/{}/collaborators'.format(self.name)))
         assert any(login == c['login'] for c in r.json())
 
     def _get_session(self, token):
