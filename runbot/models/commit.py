@@ -79,8 +79,12 @@ class Commit(models.Model):
         (_, err) = p2.communicate()
         p1.poll()  # fill the returncode
         if p1.returncode:
+            _logger.info("git export: removing corrupted export %r", export_path)
+            shutil.rmtree(export_path)
             raise RunbotException("Git archive failed for %s with error code %s. (%s)" % (self.name, p1.returncode, p1.stderr.read().decode()))
         if err:
+            _logger.info("git export: removing corrupted export %r", export_path)
+            shutil.rmtree(export_path)
             raise RunbotException("Export for %s failed. (%s)" % (self.name, err))
 
         if self.rebase_on_id:
