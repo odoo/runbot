@@ -326,18 +326,6 @@ class PullRequests(models.Model):
                         'token_field': 'fp_github_token',
                     })
                     continue
-                if not self.source_id._pr_acl(author).is_reviewer:
-                    Feedback.create({
-                        'repository': self.repository.id,
-                        'pull_request': self.number,
-                        'message': "I'm sorry, @{}. You can't review this PR: "
-                                   "you need to be a reviewer on {}.".format(
-                            login,
-                            self.source_id.display_name
-                        ),
-                        'token_field': 'fp_github_token',
-                    })
-                    continue
                 merge_bot = self.repository.project_id.github_prefix
                 # don't update the root ever
                 for pr in (p for p in self._iter_ancestors() if p.parent_id if p.state in RPLUS):
@@ -675,16 +663,16 @@ class PullRequests(models.Model):
             _logger.info("Created forward-port PR %s", new_pr)
             new_batch |= new_pr
 
-            # delegate original author on merged original PR & on new PR so
-            # they can r+ the forward ports (via mergebot or forwardbot)
+            # allows PR author to close or skipci
             source.delegates |= source.author
             new_pr.write({
                 'merge_method': pr.merge_method,
                 'source_id': source.id,
                 # only link to previous PR of sequence if cherrypick passed
                 'parent_id': pr.id if not has_conflicts else False,
-                # copy all delegates of source to new
-                'delegates': [(6, False, source.delegates.ids)]
+                # Copy author & delegates of source as well as delegates of
+                # previous so they can r+ the new forward ports.
+                'delegates': [(6, False, (source.delegates | pr.delegates).ids)]
             })
             if has_conflicts and pr.parent_id and pr.state not in ('merged', 'closed'):
                 message = source._pingline() + """
