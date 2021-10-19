@@ -102,6 +102,12 @@ class UpdateQueue(models.Model, Queue):
         previous = self.new_root
         with ExitStack() as s:
             for child in self.new_root._iter_descendants():
+                self.env.cr.execute("""
+                    SELECT id
+                    FROM runbot_merge_pull_requests
+                    WHERE id = %s
+                    FOR UPDATE NOWAIT
+                """, [child.id])
                 _logger.info(
                     "Re-port %s from %s (changed root %s -> %s)",
                     child.display_name,
@@ -149,22 +155,23 @@ class UpdateQueue(models.Model, Queue):
                     f'{child.target.name}..{child.refname}',
                     count=True
                 ).stdout.decode().strip())
+                old_head = child.head
                 # update child's head to the head we're going to push
                 child.with_context(ignore_head_update=True).write({
                     'head': new_head,
                     # 'state': 'opened',
                     'squash': commits_count == 1,
                 })
-                working_copy.push('-f', 'target', child.refname)
-
-                # also push to local cache: looks like in some cases github
-                # doesn't propagate revisions (?) or at least does so too slowly
-                # so on the next loop we try to fetch the revision we just
-                # pushed through PR and... we can't find it
+                # push the new head to the local cache: in some cases github
+                # doesn't propagate revisions fast enough so on the next loop we
+                # can't find the revision we just pushed
                 dummy_branch = str(uuid.uuid4())
                 ref = previous._get_local_directory()
                 working_copy.push(ref._directory, f'{new_head}:refs/heads/{dummy_branch}')
                 ref.branch('--delete', '--force', dummy_branch)
+                # then update the child's branch to the new head
+                working_copy.push(f'--force-with-lease={child.refname}:{old_head}',
+                                  'target', child.refname)
 
                 # committing here means github could technically trigger its
                 # webhook before sending a response, but committing before
