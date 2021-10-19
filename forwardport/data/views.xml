@@ -39,31 +39,51 @@
         <field name="arch" type="xml">
             <t name="Outstanding forward ports" t-name="forwardport.outstanding_fp">
                 <t t-call="website.layout">
+                    <t t-set="hof" t-value="env['runbot_merge.pull_requests']._hall_of_shame()"/>
                     <div id="wrap" class="oe_structure oe_empty"><div class="container-fluid">
+                        <ul class="alert bg-light list-inline">
+                            <span t-foreach="hof.reviewers" t-as="count" class="list-inline-item">
+                                <a t-attf-href="?reviewer={{count[0].id}}"
+                                   t-field="count[0].display_name"
+                                   t-att-title="count[1]"
+                                />
+                            </span>
+                        </ul>
                         <h1>List of pull requests with outstanding forward ports</h1>
-                        <dl><t t-foreach="env['runbot_merge.pull_requests']._outstanding()" t-as="x">
+                        <t t-set="reviewer" t-value="env['res.partner'].browse(int(request.params.get('reviewer') or 0))"/>
+                        <form method="get" action="" id="reset-filter"/>
+                        <h2 t-if="reviewer" class="text-muted">
+                            merged by <span t-field="reviewer.display_name" t-attf-title="@{{reviewer.github_login}}"/>
+                            <button form="reset-filter" type="submit"
+                                    name="reviewer" value=""
+                                    title="See All" class="btn fa fa-times"/>
+                        </h2>
+                        <dl><t t-foreach="hof.outstanding" t-as="x">
                             <t t-set="source" t-value="x[0]"/>
-                            <t t-set="prs" t-value="x[1]"/>
-                            <dt>
-                                <a t-att-href="source.url"><span t-field="source.display_name"/></a>
-                                by <span t-field="source.author.display_name"
-                                         t-attf-title="@{{source.author.github_login}}"/>
-                                merged <span t-field="source.merge_date"
-                                             t-options="{'widget': 'relative'}"
-                                             t-att-title="source.merge_date"/>
-                                by <span t-field="source.reviewed_by.display_name"
-                                         t-attf-title="@{{source.reviewed_by.github_login}}"/>
-                            </dt>
-                            <dd>
-                                Outstanding forward-ports:
-                                <ul>
-                                    <li t-foreach="prs" t-as="p">
-                                        <a t-att-href="p.url"><span t-field="p.display_name"/></a>
-                                        (<span t-field="p.state"/>)
-                                        targeting <span t-field="p.target.name"/>
-                                    </li>
-                                </ul>
-                            </dd>
+                            <t t-if="not reviewer or source.reviewed_by == reviewer">
+                                <dt>
+                                    <a t-att-href="source.url"><span t-field="source.display_name"/></a>
+                                    by <span t-field="source.author.display_name"
+                                             t-attf-title="@{{source.author.github_login}}"/>
+                                    merged <span t-field="source.merge_date"
+                                                 t-options="{'widget': 'relative'}"
+                                                 t-att-title="source.merge_date"/>
+                                    <t t-if="not reviewer">
+                                        by <span t-field="source.reviewed_by.display_name"
+                                                 t-attf-title="@{{source.reviewed_by.github_login}}"/>
+                                    </t>
+                                </dt>
+                                <dd>
+                                    Outstanding forward-ports:
+                                    <ul>
+                                        <li t-foreach="x.prs" t-as="p">
+                                            <a t-att-href="p.url"><span t-field="p.display_name"/></a>
+                                            (<span t-field="p.state"/>)
+                                            targeting <span t-field="p.target.name"/>
+                                        </li>
+                                    </ul>
+                                </dd>
+                            </t>
                         </t></dl>
                     </div></div>
                 </t>
@@ -78,6 +98,8 @@
                 <dd>
                     <span t-field="pr.merge_date" t-options="{'widget': 'relative'}"
                           t-att-title="pr.merge_date"/>
+                    by <span t-field="pr.reviewed_by.display_name"
+                             t-attf-title="@{{pr.reviewed_by.github_login}}"/>
                 </dd>
             </t>
             <t t-if="pr.source_id">

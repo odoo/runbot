@@ -13,6 +13,7 @@ it up), ...
 """
 import ast
 import base64
+import collections
 import contextlib
 import datetime
 import itertools
@@ -24,6 +25,7 @@ import pathlib
 import re
 import subprocess
 import tempfile
+import typing
 
 import dateutil.relativedelta
 import requests
@@ -1027,24 +1029,45 @@ stderr:
             repo.config('--add', 'remote.origin.fetch', '+refs/pull/*/head:refs/heads/pull/*')
             return repo
 
-    def _outstanding(self, cutoff=None):
+    def _outstanding(self, cutoff):
         """ Returns "outstanding" (unmerged and unclosed) forward-ports whose
         source was merged before ``cutoff`` (all of them if not provided).
 
         :param str cutoff: a datetime (ISO-8601 formatted)
         :returns: an iterator of (source, forward_ports)
         """
-        cutoff_terms = []
-        if cutoff:
-            # original merged more than <cutoff> ago
-            cutoff_terms = [('source_id.merge_date', '<', cutoff)]
         return groupby(self.env['runbot_merge.pull_requests'].search([
             # only FP PRs
             ('source_id', '!=', False),
             # active
             ('state', 'not in', ['merged', 'closed']),
-            *cutoff_terms,
+            ('source_id.merge_date', '<', cutoff),
         ], order='source_id, id'), lambda p: p.source_id)
+
+    def _hall_of_shame(self):
+        """Provides data for the HOS view
+
+        * outstanding forward ports per reviewer
+        * pull requests with outstanding forward ports, oldest-merged first
+        """
+        cutoff_dt = datetime.datetime.now() - DEFAULT_DELTA
+        outstanding = self.env['runbot_merge.pull_requests'].search([
+            ('source_id', '!=', False),
+            ('state', 'not in', ['merged', 'closed']),
+            ('source_id.merge_date', '<', cutoff_dt),
+        ], order=None)
+        # only keep merged because apparently some PRs are in a weird spot
+        # where they're sources but closed?
+        sources = outstanding.mapped('source_id').filtered('merge_date').sorted('merge_date')
+        outstandings = []
+        reviewers = collections.Counter()
+        for source in sources:
+            outstandings.append(Outstanding(source=source, prs=source.forwardport_ids & outstanding))
+            reviewers[source.reviewed_by] += 1
+        return HallOfShame(
+            reviewers=reviewers.most_common(),
+            outstanding=outstandings,
+        )
 
     def _reminder(self):
         cutoff = self.env.context.get('forwardport_updated_before') \
@@ -1178,3 +1201,11 @@ def _clean_rename(s):
         l for l in s.splitlines()
         if not l.startswith('Performing inexact rename detection')
     )
+
+class HallOfShame(typing.NamedTuple):
+    reviewers: list
+    outstanding: list
+
+class Outstanding(typing.NamedTuple):
+    source: object
+    prs: object
