@@ -1803,7 +1803,7 @@ removed
 
             repo.make_commits(root, Commit('Commit\n\nfirst\n***\nsecond', tree={'a': 'b'}), ref=f'heads/change')
             pr = repo.make_pr(title="PR", body=f'first\n***\nsecond',
-                              target='master', head=f'change')
+                              target='master', head='change')
             repo.post_status(pr.head, 'success', 'legal/cla')
             repo.post_status(pr.head, 'success', 'ci/runbot')
             pr.post_comment('hansen r+', config['role_reviewer']['token'])
@@ -1826,6 +1826,44 @@ removed
 
         Signed-off-by: {reviewer}
         """).strip(), "squashed / rebased messages should not be stripped"
+
+    def test_title_no_edit(self, repo, env, users, config):
+        """The first line of a commit message should not be taken in account for
+        rewriting, especially as it can be untagged and interpreted as a
+        pseudo-header
+        """
+        with repo:
+            repo.make_commits(None, Commit("0", tree={'a': '1'}), ref='heads/master')
+            repo.make_commits(
+                'master',
+                Commit('Some: thing\n\nis odd', tree={'b': '1'}),
+                Commit('thing: thong', tree={'b': '2'}),
+                ref='heads/change')
+
+            pr = repo.make_pr(target='master', head='change')
+            repo.post_status(pr.head, 'success', 'legal/cla')
+            repo.post_status(pr.head, 'success', 'ci/runbot')
+            pr.post_comment('hansen rebase-ff r+', config['role_reviewer']['token'])
+        env.run_crons()
+
+        pr_id = to_pr(env, pr)
+        assert pr_id.staging_id # check PR is staged
+
+
+        reviewer = get_partner(env, users["reviewer"]).formatted_email
+        staging_head = repo.commit('staging.master')
+        assert staging_head.message == f"""\
+thing: thong
+
+closes {pr_id.display_name}
+
+Signed-off-by: {reviewer}"""
+        assert repo.commit(staging_head.parents[0]).message == f"""\
+Some: thing
+
+is odd
+
+Part-of: {pr_id.display_name}"""
 
     def test_pr_mergehead(self, repo, env, config):
         """ if the head of the PR is a merge commit and one of the parents is

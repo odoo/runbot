@@ -2232,7 +2232,9 @@ class Message:
         msg, handle_break = (msg, False) if isinstance(msg, str) else (msg.message, True)
         headers = []
         body = []
-        for line in reversed(msg.splitlines()):
+        # don't process the title (first line) of the commit message
+        msg = msg.splitlines()
+        for line in reversed(msg[1:]):
             if maybe_setex:
                 # NOTE: actually slightly more complicated: it's a SETEX heading
                 #       only if preceding line(s) can be interpreted as a
@@ -2268,6 +2270,10 @@ class Message:
             body.append(line)
             in_headers = False
 
+        # if there are non-title body lines, add a separation after the title
+        if body and body[-1]:
+            body.append('')
+        body.append(msg[0])
         return cls('\n'.join(reversed(body)), Headers(reversed(headers)))
 
     def __init__(self, body, headers=None):
