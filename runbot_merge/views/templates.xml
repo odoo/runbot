@@ -14,12 +14,15 @@
         <t t-call="website.layout">
             <div id="wrap"><div class="container-fluid">
                 <div id="alerts" class="row text-center">
+                    <div class="alert alert-light col-md-12 h6 mb-0">
+                        <a href="/runbot_merge/changelog">Changelog</a>
+                    </div>
                     <t t-set="stagingcron" t-value="env(user=1).ref('runbot_merge.staging_cron')"/>
-                    <div t-if="not stagingcron.active" class="alert alert-warning col-12" role="alert">
+                    <div t-if="not stagingcron.active" class="alert alert-warning col-12 mb-0" role="alert">
                         Staging is disabled, "ready" pull requests will not be staged.
                     </div>
                     <t t-set="mergecron" t-value="env(user=1).ref('runbot_merge.merge_cron')"/>
-                    <div t-if="not mergecron.active" class="alert alert-warning col-12" role="alert">
+                    <div t-if="not mergecron.active" class="alert alert-warning col-12 mb-0" role="alert">
                         Merging is disabled, stagings will not be disabled.
                     </div>
                 </div>
@@ -297,6 +300,21 @@
                         Next >
                     </a>
                 </t>
+            </div></div>
+        </t>
+    </template>
+    <template id="changelog" name="mergebot changelog">
+        <t t-call="website.layout">
+            <div id="wrap"><div class="container-fluid">
+                <h1>Changelog</h1>
+                <section t-foreach="entries" t-as="entry">
+                    <h3 t-if="not entry_first" t-esc="entry"/>
+                    <ul>
+                        <li t-foreach="sorted(entry_value)" t-as="item">
+                            <t t-raw="item"/>
+                        </li>
+                    </ul>
+                </section>
             </div></div>
         </t>
     </template>

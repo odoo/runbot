@@ -13,7 +13,7 @@
                     ('source_id', '!=', False),
                     ('state', 'not in', ['merged', 'closed']),
                 ])"/>
-                <div t-if="outstanding != 0" class="alert col-md-12 bg-warning">
+                <div t-if="outstanding != 0" class="alert col-md-12 alert-warning mb-0">
                     <a href="/forwardport/outstanding">
                         <t t-esc="outstanding"/> outstanding forward-ports
                     </a>
