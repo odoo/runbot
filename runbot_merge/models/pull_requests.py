@@ -692,6 +692,7 @@ class PullRequests(models.Model):
         ('merge', "merge directly, using the PR as merge commit message"),
         ('rebase-merge', "rebase and merge, using the PR as merge commit message"),
         ('rebase-ff', "rebase and fast-forward"),
+        ('squash', "squash"),
     ], default=False)
     method_warned = fields.Boolean(default=False)
 
@@ -1065,14 +1066,17 @@ class PullRequests(models.Model):
                         )
             elif command == 'method':
                 if is_reviewer:
-                    self.merge_method = param
-                    ok = True
-                    explanation = next(label for value, label in type(self).merge_method.selection if value == param)
-                    Feedback.create({
-                        'repository': self.repository.id,
-                        'pull_request': self.number,
-                        'message':"Merge method set to %s" % explanation
-                    })
+                    if param == 'squash' and not self.squash:
+                        msg = "Squash can only be used with a single commit at this time."
+                    else:
+                        self.merge_method = param
+                        ok = True
+                        explanation = next(label for value, label in type(self).merge_method.selection if value == param)
+                        Feedback.create({
+                            'repository': self.repository.id,
+                            'pull_request': self.number,
+                            'message':"Merge method set to %s" % explanation
+                        })
             elif command == 'override':
                 overridable = author.override_rights\
                     .filtered(lambda r: not r.repository_id or (r.repository_id == self.repository))\
@@ -1334,6 +1338,7 @@ class PullRequests(models.Model):
                 'message': "Because this PR has multiple commits, I need to know how to merge it:\n\n" + ''.join(
                     '* `%s` to %s\n' % pair
                     for pair in type(self).merge_method.selection
+                    if pair[0] != 'squash'
                 )
             })
             r.method_warned = True
@@ -1427,6 +1432,22 @@ class PullRequests(models.Model):
         #       a merge commit reused instead of being re-merged)
         return method, getattr(self, '_stage_' + method.replace('-', '_'))(
             gh, target, pr_commits, related_prs=related_prs)
+
+    def _stage_squash(self, gh, target, commits, related_prs=()):
+        original_head = gh.head(target)
+        msg = self._build_merge_message(self, related_prs=related_prs)
+        [commit] = commits
+        merge_tree = gh.merge(commit['sha'], target, 'temp')['tree']['sha']
+        squashed = gh('post', 'git/commits', json={
+            'message': str(msg),
+            'tree': merge_tree,
+            'author': commit['commit']['author'],
+            'committer': commit['commit']['committer'],
+            'parents': [original_head],
+        }).json()['sha']
+        gh.set_ref(target, squashed)
+        self.commits_map = json.dumps({commit['sha']: squashed, '': squashed})
+        return squashed
 
     def _stage_rebase_ff(self, gh, target, commits, related_prs=()):
         # updates head commit with PR number (if necessary) then rebases

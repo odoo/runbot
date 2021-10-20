@@ -1916,46 +1916,61 @@ removed
         )
         assert log_to_node(repo.log('heads/master')), expected
 
-    @pytest.mark.xfail(reason="removed support for squash+ command")
-    def test_force_squash_merge(self, repo, env, config):
-        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
-        m2 = repo.make_commit(m, 'second', None, tree={'m': 'm', 'm2': 'm2'})
-        repo.make_ref('heads/master', m2)
+    def test_squash_merge(self, repo, env, config, users):
+        with repo:
+            repo.make_commits(None, Commit('initial', tree={'a': '0'}), ref='heads/master')
 
-        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
-        c2 = repo.make_commit(c1, 'second', None, tree={'m': 'c2'})
-        prx = repo.make_pr(title='title', body='body', target='master', head=c2)
-        repo.post_status(prx.head, 'success', 'legal/cla')
-        repo.post_status(prx.head, 'success', 'ci/runbot')
-        prx.post_comment('hansen r+ squash+', config['role_reviewer']['token'])
-        assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number)
-        ]).squash
+            repo.make_commits('master', Commit('sub', tree={'b': '0'}), ref='heads/other')
+            pr1 = repo.make_pr(title='first pr', target='master', head='other')
+            repo.post_status('other', 'success', 'legal/cla')
+            repo.post_status('other', 'success', 'ci/runbot')
 
+            repo.make_commits('master', Commit('x', tree={'x': '0'}), Commit('y', tree={'x': '1'}), ref='heads/other2')
+            pr2 = repo.make_pr(title='second pr', target='master', head='other2')
+            repo.post_status('other2', 'success', 'legal/cla')
+            repo.post_status('other2', 'success', 'ci/runbot')
         env.run_crons()
-        assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number)
-        ]).staging_id
 
-        staging = repo.commit('heads/staging.master')
-        assert not repo.is_ancestor(prx.head, of=staging.id),\
-            "the pr head should not be an ancestor of the staging branch in a squash merge"
-        assert staging.parents == [m2],\
-            "the previous master's tip should be the sole parent of the staging commit"
-        assert repo.read_tree(staging) == {
-            'm': 'c2', 'm2': 'm2',
-        }, "the tree should still be correctly merged"
-
-        repo.post_status(staging.id, 'success', 'legal/cla')
-        repo.post_status(staging.id, 'success', 'ci/runbot')
+        with repo: # comments sequencing
+            pr1.post_comment('hansen r+ squash', config['role_reviewer']['token'])
+            pr2.post_comment('hansen r+ squash', config['role_reviewer']['token'])
         env.run_crons()
-        assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number)
-        ]).state == 'merged'
-        assert prx.state == 'closed'
+
+        with repo:
+            repo.post_status('staging.master', 'success', 'legal/cla')
+            repo.post_status('staging.master', 'success', 'ci/runbot')
+        env.run_crons()
+
+        # PR 1 should have merged properly, the PR message should be the
+        # message of the merged commit
+        pr1_id = to_pr(env, pr1)
+        assert pr1_id.state == 'merged'
+        assert pr1.comments == [
+            seen(env, pr1, users),
+            (users['reviewer'], 'hansen r+ squash'),
+            (users['user'], 'Merge method set to squash')
+        ]
+        assert repo.commit('master').message == f"""first pr
+
+closes {pr1_id.display_name}
+
+Signed-off-by: {get_partner(env, users["reviewer"]).formatted_email}\
+"""
+
+        pr2_id = to_pr(env, pr2)
+        assert pr2_id.state == 'ready'
+        assert not pr2_id.merge_method
+        assert pr2.comments == [
+            seen(env, pr2, users),
+            (users['reviewer'], 'hansen r+ squash'),
+            (users['user'], f"I'm sorry, @{users['reviewer']}. Squash can only be used with a single commit at this time."),
+            (users['user'], """Because this PR has multiple commits, I need to know how to merge it:
+
+* `merge` to merge directly, using the PR as merge commit message
+* `rebase-merge` to rebase and merge, using the PR as merge commit message
+* `rebase-ff` to rebase and fast-forward
+""")
+        ]
 
     @pytest.mark.xfail(reason="removed support for squash- command")
     def test_disable_squash_merge(self, repo, env, config):
