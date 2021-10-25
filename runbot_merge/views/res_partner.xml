@@ -25,6 +25,11 @@
                             attrs="{'invisible': ['|', ('email', '!=', False), ('github_login', '=', False)]}"
                     />
                 </header>
+                <div class="alert alert-warning" role="alert"
+                     attrs="{'invisible': ['|', ('email', '!=', False), ('review_rights', '=', [])]}">
+                  Reviewers must have an email address set! Without an email
+                  configured, reviews will be ignored.
+                </div>
             </xpath>
             <xpath expr="//notebook" position="inside">
                 <page string="Mergebot" groups="runbot_merge.group_admin">
