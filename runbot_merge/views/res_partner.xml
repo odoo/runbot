@@ -1,5 +1,21 @@
 <odoo>
     <record id="runbot_merge_tree_partner" model="ir.ui.view">
+        <field name="name">Improve search on partners</field>
+        <field name="res.partner"/>
+        <field name="inherit_id" ref="base.view_res_partner_filter"/>
+        <field name="arch" type="xml">
+            <field name="name" position="attributes">
+                <attribute name="filter_domain">[
+                    '|', '|',
+                    ('name', 'ilike', self),
+                    ('github_login', 'ilike', self),
+                    ('email', 'ilike', self),
+                ]</attribute>
+            </field>
+        </field>
+    </record>
+
+    <record id="runbot_merge_tree_partner" model="ir.ui.view">
         <field name="name">Configure partners list to be useful</field>
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_tree"/>
