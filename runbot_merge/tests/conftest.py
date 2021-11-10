@@ -27,7 +27,7 @@ def default_crons():
         'runbot_merge.staging_cron',
         # env['runbot_merge.pull_requests']._check_linked_prs_statuses()
         'runbot_merge.check_linked_prs_status',
-        # env['runbot_merge.project']._send_feedback()
+        # env['runbot_merge.pull_requests.feedback']._send()
         'runbot_merge.feedback_cron',
     ]
 

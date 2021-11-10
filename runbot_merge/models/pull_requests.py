@@ -29,207 +29,7 @@ from .. import github, exceptions, controllers, utils
 WAIT_FOR_VISIBILITY = [10, 10, 10, 10]
 
 _logger = logging.getLogger(__name__)
-class Project(models.Model):
-    _name = _description = 'runbot_merge.project'
 
-    name = fields.Char(required=True, index=True)
-    repo_ids = fields.One2many(
-        'runbot_merge.repository', 'project_id',
-        help="Repos included in that project, they'll be staged together. "\
-        "*Not* to be used for cross-repo dependencies (that is to be handled by the CI)"
-    )
-    branch_ids = fields.One2many(
-        'runbot_merge.branch', 'project_id',
-        context={'active_test': False},
-        help="Branches of all project's repos which are managed by the merge bot. Also "\
-        "target branches of PR this project handles."
-    )
-
-    ci_timeout = fields.Integer(
-        default=60, required=True,
-        help="Delay (in minutes) before a staging is considered timed out and failed"
-    )
-
-    github_token = fields.Char("Github Token", required=True)
-    github_prefix = fields.Char(
-        required=True,
-        default="hanson", # mergebot du bot du bot du~
-        help="Prefix (~bot name) used when sending commands from PR "
-             "comments e.g. [hanson retry] or [hanson r+ p=1]"
-    )
-
-    batch_limit = fields.Integer(
-        default=8, help="Maximum number of PRs staged together")
-
-    secret = fields.Char(
-        help="Webhook secret. If set, will be checked against the signature "
-             "of (valid) incoming webhook signatures, failing signatures "
-             "will lead to webhook rejection. Should only use ASCII."
-    )
-
-    def _check_stagings(self, commit=False):
-        for branch in self.search([]).mapped('branch_ids').filtered('active'):
-            staging = branch.active_staging_id
-            if not staging:
-                continue
-            try:
-                with self.env.cr.savepoint():
-                    staging.check_status()
-            except Exception:
-                _logger.exception("Failed to check staging for branch %r (staging %s)",
-                                  branch.name, staging)
-            else:
-                if commit:
-                    self.env.cr.commit()
-
-    def _create_stagings(self, commit=False):
-        for branch in self.search([]).mapped('branch_ids').filtered('active'):
-            if not branch.active_staging_id:
-                try:
-                    with self.env.cr.savepoint():
-                        branch.try_staging()
-                except Exception:
-                    _logger.exception("Failed to create staging for branch %r", branch.name)
-                else:
-                    if commit:
-                        self.env.cr.commit()
-
-    def _send_feedback(self):
-        Repos = self.env['runbot_merge.repository']
-        ghs = {}
-        # noinspection SqlResolve
-        self.env.cr.execute("""
-        SELECT
-            t.repository as repo_id,
-            t.pull_request as pr_number,
-            array_agg(t.id) as ids,
-            array_agg(t.tags_remove::json) as to_remove,
-            array_agg(t.tags_add::json) as to_add
-        FROM runbot_merge_pull_requests_tagging t
-        GROUP BY t.repository, t.pull_request
-        """)
-        to_remove = []
-        for repo_id, pr, ids, remove, add in self.env.cr.fetchall():
-            repo = Repos.browse(repo_id)
-
-            gh = ghs.get(repo)
-            if not gh:
-                gh = ghs[repo] = repo.github()
-
-            # fold all grouped PRs'
-            tags_remove, tags_add = set(), set()
-            for minus, plus in zip(remove, add):
-                tags_remove.update(minus)
-                # need to remove minuses from to_add in case we get e.g.
-                # -foo +bar; -bar +baz, if we don't remove the minus, we'll end
-                # up with -foo +bar +baz instead of -foo +baz
-                tags_add.difference_update(minus)
-                tags_add.update(plus)
-
-            try:
-                gh.change_tags(pr, tags_remove, tags_add)
-            except Exception:
-                _logger.exception(
-                    "Error while trying to change the tags of %s#%s from %s to %s",
-                    repo.name, pr, remove, add,
-                )
-            else:
-                to_remove.extend(ids)
-        self.env['runbot_merge.pull_requests.tagging'].browse(to_remove).unlink()
-
-        to_remove = []
-        for f in self.env['runbot_merge.pull_requests.feedback'].search([]):
-            repo = f.repository
-            gh = ghs.get((repo, f.token_field))
-            if not gh:
-                gh = ghs[(repo, f.token_field)] = repo.github(f.token_field)
-
-            try:
-                message = f.message
-                if f.close:
-                    gh.close(f.pull_request)
-                    try:
-                        data = json.loads(message or '')
-                    except json.JSONDecodeError:
-                        pass
-                    else:
-                        pr_to_notify = self.env['runbot_merge.pull_requests'].search([
-                            ('repository', '=', repo.id),
-                            ('number', '=', f.pull_request),
-                        ])
-                        if pr_to_notify:
-                            self._notify_pr_merged(gh, pr_to_notify, data)
-                            message = None
-                if message:
-                    gh.comment(f.pull_request, message)
-            except Exception:
-                _logger.exception(
-                    "Error while trying to %s %s#%s (%s)",
-                    'close' if f.close else 'send a comment to',
-                    repo.name, f.pull_request,
-                    utils.shorten(f.message, 200)
-                )
-            else:
-                to_remove.append(f.id)
-        self.env['runbot_merge.pull_requests.feedback'].browse(to_remove).unlink()
-
-    def _notify_pr_merged(self, gh, pr, payload):
-        deployment = gh('POST', 'deployments', json={
-            'ref': pr.head, 'environment': 'merge',
-            'description': "Merge %s into %s" % (pr, pr.target.name),
-            'task': 'merge',
-            'auto_merge': False,
-            'required_contexts': [],
-        }).json()
-        gh('POST', 'deployments/{}/statuses'.format(deployment['id']), json={
-            'state': 'success',
-            'target_url': 'https://github.com/{}/commit/{}'.format(
-                pr.repository.name,
-                payload['sha'],
-            ),
-            'description': "Merged %s in %s at %s" % (
-                pr, pr.target.name, payload['sha']
-            )
-        })
-
-    def is_timed_out(self, staging):
-        return fields.Datetime.from_string(staging.timeout_limit) < datetime.datetime.now()
-
-    def _check_fetch(self, commit=False):
-        """
-        :param bool commit: commit after each fetch has been executed
-        """
-        while True:
-            f = self.env['runbot_merge.fetch_job'].search([], limit=1)
-            if not f:
-                return
-
-            self.env.cr.execute("SAVEPOINT runbot_merge_before_fetch")
-            try:
-                f.repository._load_pr(f.number)
-            except Exception:
-                self.env.cr.execute("ROLLBACK TO SAVEPOINT runbot_merge_before_fetch")
-                _logger.exception("Failed to load pr %s, skipping it", f.number)
-            finally:
-                self.env.cr.execute("RELEASE SAVEPOINT runbot_merge_before_fetch")
-
-            # commit after each fetched PR
-            f.active = False
-            if commit:
-                self.env.cr.commit()
-
-    def _find_commands(self, comment):
-        return re.findall(
-            '^\s*[@|#]?{}:? (.*)$'.format(self.github_prefix),
-            comment, re.MULTILINE | re.IGNORECASE)
-
-    def _has_branch(self, name):
-        self.env.cr.execute("""
-        SELECT 1 FROM runbot_merge_branch
-        WHERE project_id = %s AND name = %s
-        LIMIT 1
-        """, (self.id, name))
-        return bool(self.env.cr.rowcount)
 
 class StatusConfiguration(models.Model):
     _name = 'runbot_merge.repository.status'
@@ -1179,6 +979,25 @@ class PullRequests(models.Model):
             self.previous_failure = json.dumps(prev)
             self._notify_ci_failed(ci)
 
+    def _notify_merged(self, gh, payload):
+        deployment = gh('POST', 'deployments', json={
+            'ref': self.head, 'environment': 'merge',
+            'description': "Merge %s into %s" % (self.display_name, self.target.name),
+            'task': 'merge',
+            'auto_merge': False,
+            'required_contexts': [],
+        }).json()
+        gh('POST', 'deployments/{}/statuses'.format(deployment['id']), json={
+            'state': 'success',
+            'target_url': 'https://github.com/{}/commit/{}'.format(
+                self.repository.name,
+                payload['sha'],
+            ),
+            'description': "Merged %s in %s at %s" % (
+                self.display_name, self.target.name, payload['sha']
+            )
+        })
+
     def _statuses_equivalent(self, a, b):
         """ Check if two statuses are *equivalent* meaning the description field
         is ignored (check only state and target_url). This is because the
@@ -1613,6 +1432,49 @@ class Tagging(models.Model):
             values['tags_add'] = json.dumps(list(values['tags_add']))
         return super().create(values)
 
+    def _send(self):
+        # noinspection SqlResolve
+        self.env.cr.execute("""
+        SELECT
+            t.repository as repo_id,
+            t.pull_request as pr_number,
+            array_agg(t.id) as ids,
+            array_agg(t.tags_remove::json) as to_remove,
+            array_agg(t.tags_add::json) as to_add
+        FROM runbot_merge_pull_requests_tagging t
+        GROUP BY t.repository, t.pull_request
+        """)
+        Repos = self.env['runbot_merge.repository']
+        ghs = {}
+        to_remove = []
+        for repo_id, pr, ids, remove, add in self.env.cr.fetchall():
+            repo = Repos.browse(repo_id)
+
+            gh = ghs.get(repo)
+            if not gh:
+                gh = ghs[repo] = repo.github()
+
+            # fold all grouped PRs'
+            tags_remove, tags_add = set(), set()
+            for minus, plus in zip(remove, add):
+                tags_remove.update(minus)
+                # need to remove minuses from to_add in case we get e.g.
+                # -foo +bar; -bar +baz, if we don't remove the minus, we'll end
+                # up with -foo +bar +baz instead of -foo +baz
+                tags_add.difference_update(minus)
+                tags_add.update(plus)
+
+            try:
+                gh.change_tags(pr, tags_remove, tags_add)
+            except Exception:
+                _logger.exception(
+                    "Error while trying to change the tags of %s#%s from %s to %s",
+                    repo.name, pr, remove, add,
+                )
+            else:
+                to_remove.extend(ids)
+        self.browse(to_remove).unlink()
+
 class Feedback(models.Model):
     """ Queue of feedback comments to send to PR users
     """
@@ -1630,6 +1492,44 @@ class Feedback(models.Model):
         string="Bot User",
         help="Token field (from repo's project) to use to post messages"
     )
+
+    def _send(self):
+        ghs = {}
+        to_remove = []
+        for f in self.search([]):
+            repo = f.repository
+            gh = ghs.get((repo, f.token_field))
+            if not gh:
+                gh = ghs[(repo, f.token_field)] = repo.github(f.token_field)
+
+            try:
+                message = f.message
+                if f.close:
+                    gh.close(f.pull_request)
+                    try:
+                        data = json.loads(message or '')
+                    except json.JSONDecodeError:
+                        pass
+                    else:
+                        pr_to_notify = self.env['runbot_merge.pull_requests'].search([
+                            ('repository', '=', repo.id),
+                            ('number', '=', f.pull_request),
+                        ])
+                        if pr_to_notify:
+                            pr_to_notify._notify_merged(gh, data)
+                            message = None
+                if message:
+                    gh.comment(f.pull_request, message)
+            except Exception:
+                _logger.exception(
+                    "Error while trying to %s %s#%s (%s)",
+                    'close' if f.close else 'send a comment to',
+                    repo.name, f.pull_request,
+                    utils.shorten(f.message, 200)
+                )
+            else:
+                to_remove.append(f.id)
+        self.browse(to_remove).unlink()
 
 class Commit(models.Model):
     """Represents a commit onto which statuses might be posted,
@@ -1981,8 +1881,11 @@ class Stagings(models.Model):
             finally:
                 self.batch_ids.write({'active': False})
                 self.write({'active': False})
-        elif self.state == 'failure' or project.is_timed_out(self):
+        elif self.state == 'failure' or self.is_timed_out():
             self.try_splitting()
+
+    def is_timed_out(self):
+        return fields.Datetime.from_string(self.timeout_limit) < datetime.datetime.now()
 
     def _safety_dance(self, gh, staging_heads):
         """ Reverting updates doesn't work if the branches are protected
@@ -2153,6 +2056,28 @@ class FetchJob(models.Model):
     active = fields.Boolean(default=True)
     repository = fields.Many2one('runbot_merge.repository', required=True)
     number = fields.Integer(required=True)
+
+    def _check(self, commit=False):
+        """
+        :param bool commit: commit after each fetch has been executed
+        """
+        while True:
+            f = self.search([], limit=1)
+            if not f:
+                return
+
+            self.env.cr.execute("SAVEPOINT runbot_merge_before_fetch")
+            try:
+                f.repository._load_pr(f.number)
+            except Exception:
+                self.env.cr.execute("ROLLBACK TO SAVEPOINT runbot_merge_before_fetch")
+                _logger.exception("Failed to load pr %s, skipping it", f.number)
+            finally:
+                self.env.cr.execute("RELEASE SAVEPOINT runbot_merge_before_fetch")
+
+            f.active = False
+            if commit:
+                self.env.cr.commit()
 
 # The commit (and PR) statuses was originally a map of ``{context:state}``
 # however it turns out to clarify error messages it'd be useful to have

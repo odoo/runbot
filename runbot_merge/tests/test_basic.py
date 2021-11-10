@@ -907,7 +907,7 @@ def test_rebase_failure(env, repo, users, config):
     with mock.patch.object(GH, 'set_ref', autospec=True, side_effect=wrapper):
         env['runbot_merge.project']._check_progress()
 
-    env['runbot_merge.project']._send_feedback()
+    env['runbot_merge.pull_requests.feedback']._send()
 
     assert pr_a.comments == [
         (users['reviewer'], 'hansen r+'),

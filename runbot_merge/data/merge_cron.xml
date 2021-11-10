@@ -21,19 +21,29 @@
   </record>
   <record model="ir.cron" id="feedback_cron">
     <field name="name">Send feedback to PR</field>
-    <field name="model_id" ref="model_runbot_merge_project"/>
+    <field name="model_id" ref="model_runbot_merge_pull_requests_feedback"/>
     <field name="state">code</field>
-    <field name="code">model._send_feedback()</field>
+    <field name="code">model._send()</field>
     <field name="interval_number">1</field>
+    <field name="interval_type">minutes</field>
+    <field name="numbercall">-1</field>
+    <field name="doall" eval="False"/>
+  </record>
+  <record model="ir.cron" id="labels_cron">
+    <field name="name">Update labels on PR</field>
+    <field name="model_id" ref="model_runbot_merge_pull_requests_tagging"/>
+    <field name="state">code</field>
+    <field name="code">model._send()</field>
+    <field name="interval_number">10</field>
     <field name="interval_type">minutes</field>
     <field name="numbercall">-1</field>
     <field name="doall" eval="False"/>
   </record>
   <record model="ir.cron" id="fetch_prs_cron">
     <field name="name">Check for PRs to fetch</field>
-    <field name="model_id" ref="model_runbot_merge_project"/>
+    <field name="model_id" ref="model_runbot_merge_fetch_job"/>
     <field name="state">code</field>
-    <field name="code">model._check_fetch(True)</field>
+    <field name="code">model._check(True)</field>
     <field name="interval_number">1</field>
     <field name="interval_type">minutes</field>
     <field name="numbercall">-1</field>
