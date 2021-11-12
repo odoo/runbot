@@ -461,6 +461,7 @@ ACL = collections.namedtuple('ACL', 'is_admin is_reviewer is_author')
 class PullRequests(models.Model):
     _name = _description = 'runbot_merge.pull_requests'
     _order = 'number desc'
+    _rec_name = 'number'
 
     target = fields.Many2one('runbot_merge.branch', required=True, index=True)
     repository = fields.Many2one('runbot_merge.repository', required=True)
@@ -551,7 +552,6 @@ class PullRequests(models.Model):
 
     @api.model
     def name_search(self, name='', args=None, operator='ilike', limit=100):
-        print(f'name_search({name!r}, {args!r}, {operator!r})', flush=True)
         if not name or operator != 'ilike':
             return super().name_search(name, args=args, operator=operator, limit=limit)
         bits = [[('label', 'ilike', name)]]
@@ -565,7 +565,6 @@ class PullRequests(models.Model):
         domain = expression.OR(bits)
         if args:
             domain = expression.AND([args, domain])
-        print('=>', domain, flush=True)
         return self.search(domain, limit=limit).sudo().name_get()
 
     @property
