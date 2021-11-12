@@ -210,6 +210,7 @@ class PullRequests(models.Model):
         for pr in self:
             pr.refname = pr.label.split(':', 1)[-1]
 
+    @api.model_create_single
     def create(self, vals):
         # PR opened event always creates a new PR, override so we can precreate PRs
         existing = self.search([
