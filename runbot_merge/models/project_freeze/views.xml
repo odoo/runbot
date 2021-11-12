@@ -1,0 +1,52 @@
+<odoo>
+    <template id="runbot_merge_freeze_assets" inherit_id="web.assets_backend" active="True">
+        <xpath expr="." position="inside">
+            <script type="text/javascript" src="/runbot_merge/static/project_freeze/index.js"></script>
+        </xpath>
+    </template>
+
+    <record id="runbot_merge_project_freeze_form" model="ir.ui.view">
+        <field name="name">Freeze Wizard Configuration Screen</field>
+        <field name="model">runbot_merge.project.freeze</field>
+        <field name="arch" type="xml">
+            <form js_class="freeze_wizard">
+                <sheet>
+                    <div class="alert alert-warning" role="alert"
+                         attrs="{'invisible': [('errors', '=', False)]}">
+                        <field name="errors" readonly="True"/>
+                    </div>
+                    <group>
+                        <group colspan="2">
+                            <field name="branch_name"/>
+                            <field name="required_pr_ids" widget="many2many_tags"
+                                options="{'color_field': 'state_color', 'no_create': True}"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group colspan="2">
+                            <field name="release_pr_ids" nolabel="1">
+                                <tree editable="bottom" create="false" unlink="false">
+                                    <field name="repository_id" readonly="1"/>
+                                    <field name="pr_id" options="{'no_create': True}"/>
+                                </tree>
+                            </field>
+                        </group>
+                    </group>
+                    <footer>
+                        <!--
+                        the operator should always be able to try freezing, in
+                        case the smart form blows up or whatever, but change
+                        the style of the button if the form has "no errors"
+                        -->
+                        <button string="Freeze" type="object" name="action_freeze"
+                                class="btn-success" attrs="{'invisible': [('errors', '!=', False)]}"/>
+                        <button string="Freeze" type="object" name="action_freeze"
+                                class="btn-primary" attrs="{'invisible': [('errors', '=', False)]}"/>
+                        <button string="Save &amp; Close" special="save"/>
+                        <button string="Cancel" type="object" name="action_cancel" class="btn-warning"/>
+                    </footer>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>

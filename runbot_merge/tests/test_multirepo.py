@@ -1074,3 +1074,154 @@ def test_multi_project(env, make_repo, setreviewers, users, config,
     assert pr2.comments == [
         (users['user'], f'[Pull request status dashboard]({pr2_id.url}).'),
     ]
+
+def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
+    """ Tests the freeze wizard feature (aside from the UI):
+
+    * have a project with 3 repos, and two branches (1.0 and master) each
+    * have 2 PRs required for the freeze
+    * prep 3 freeze PRs
+    * trigger the freeze wizard
+    * trigger it again (check that the same object is returned, there should
+      only be one freeze per project at a time)
+    * configure the freeze
+    * check that it doesn't go through
+    * merge required PRs
+    * check that freeze goes through
+    * check that reminder is shown
+    * check that new branches are created w/ correct parent & commit info
+    """
+    project.freeze_reminder = "Don't forget to like and subscribe"
+
+    # have a project with 3 repos, and two branches (1.0 and master)
+    project.branch_ids = [
+        (1, project.branch_ids.id, {'sequence': 1}),
+        (0, 0, {'name': '1.0', 'sequence': 2}),
+    ]
+
+    masters = []
+    for r in [repo_a, repo_b, repo_c]:
+        with r:
+            [root, _] = r.make_commits(
+                None,
+                Commit('base', tree={'version': '', 'f': '0'}),
+                Commit('release 1.0', tree={'version': '1.0'} if r is repo_a else None),
+                ref='heads/1.0'
+            )
+            masters.extend(r.make_commits(root, Commit('other', tree={'f': '1'}), ref='heads/master'))
+
+    # have 2 PRs required for the freeze
+    with repo_a:
+        repo_a.make_commits('master', Commit('super important file', tree={'g': 'x'}), ref='heads/apr')
+        pr_required_a = repo_a.make_pr(target='master', head='apr')
+    with repo_c:
+        repo_c.make_commits('master', Commit('update thing', tree={'f': '2'}), ref='heads/cpr')
+        pr_required_c = repo_c.make_pr(target='master', head='cpr')
+
+    # have 3 release PRs, only the first one updates the tree (version file)
+    with repo_a:
+        repo_a.make_commits(
+            masters[0],
+            Commit('Release 1.1 (A)', tree={'version': '1.1'}),
+            ref='heads/release-1.1'
+        )
+        pr_rel_a = repo_a.make_pr(target='master', head='release-1.1')
+    with repo_b:
+        repo_b.make_commits(
+            masters[1],
+            Commit('Release 1.1 (B)', tree=None),
+            ref='heads/release-1.1'
+        )
+        pr_rel_b = repo_b.make_pr(target='master', head='release-1.1')
+    with repo_c:
+        repo_c.make_commits(
+            masters[2],
+            Commit('Release 1.1 (C)', tree=None),
+            ref='heads/release-1.1'
+        )
+        pr_rel_c = repo_c.make_pr(target='master', head='release-1.1')
+    env.run_crons() # process the PRs
+
+    release_prs = {
+        repo_a.name: to_pr(env, pr_rel_a),
+        repo_b.name: to_pr(env, pr_rel_b),
+        repo_c.name: to_pr(env, pr_rel_c),
+    }
+
+    # trigger the ~~tree~~ freeze wizard
+    w = project.action_prepare_freeze()
+    w2 = project.action_prepare_freeze()
+    assert w == w2, "each project should only have one freeze wizard active at a time"
+
+    w_id = env[w['res_model']].browse([w['res_id']])
+    assert w_id.branch_name == '1.1', "check that the forking incremented the minor by 1"
+    assert len(w_id.release_pr_ids) == len(project.repo_ids), \
+        "should ask for a many release PRs as we have repositories"
+
+    # configure required PRs
+    w_id.required_pr_ids = (to_pr(env, pr_required_a) | to_pr(env, pr_required_c)).ids
+    # configure releases
+    for r in w_id.release_pr_ids:
+        r.pr_id = release_prs[r.repository_id.name].id
+    r = w_id.action_freeze()
+    assert r == w, "the freeze is not ready so the wizard should redirect to itself"
+    assert w_id.errors == "* 2 required PRs not ready."
+
+    with repo_a:
+        pr_required_a.post_comment('hansen r+', config['role_reviewer']['token'])
+        repo_a.post_status('apr', 'success', 'ci/runbot')
+        repo_a.post_status('apr', 'success', 'legal/cla')
+    with repo_c:
+        pr_required_c.post_comment('hansen r+', config['role_reviewer']['token'])
+        repo_c.post_status('cpr', 'success', 'ci/runbot')
+        repo_c.post_status('cpr', 'success', 'legal/cla')
+    env.run_crons()
+
+    for repo in [repo_a, repo_b, repo_c]:
+        with repo:
+            repo.post_status('staging.master', 'success', 'ci/runbot')
+            repo.post_status('staging.master', 'success', 'legal/cla')
+    env.run_crons()
+
+    assert to_pr(env, pr_required_a).state == 'merged'
+    assert to_pr(env, pr_required_c).state == 'merged'
+
+    assert not w_id.errors
+
+    r = w_id.action_freeze()
+    # check that the wizard was deleted
+    assert not w_id.exists()
+    # check that the wizard pops out a reminder dialog (kinda)
+    assert r['res_model'] == 'runbot_merge.project'
+    assert r['res_id'] == project.id
+
+    env.run_crons() # stage the release prs
+    for repo in [repo_a, repo_b, repo_c]:
+        with repo:
+            repo.post_status('staging.1.1', 'success', 'ci/runbot')
+            repo.post_status('staging.1.1', 'success', 'legal/cla')
+    env.run_crons() # get the release prs merged
+    for pr_id in release_prs.values():
+        assert pr_id.target.name == '1.1'
+        assert pr_id.state == 'merged'
+
+    c_a = repo_a.commit('1.1')
+    assert c_a.message.startswith('Release 1.1 (A)')
+    assert repo_a.read_tree(c_a) == {
+        'f': '1', # from master
+        'g': 'x', # from required pr
+        'version': '1.1', # from release commit
+    }
+    c_a_parent = repo_a.commit(c_a.parents[0])
+    assert c_a_parent.message.startswith('super important file')
+    assert c_a_parent.parents[0] == masters[0]
+
+    c_b = repo_b.commit('1.1')
+    assert c_b.message.startswith('Release 1.1 (B)')
+    assert repo_b.read_tree(c_b) == {'f': '1', 'version': ''}
+    assert c_b.parents[0] == masters[1]
+
+    c_c = repo_c.commit('1.1')
+    assert c_c.message.startswith('Release 1.1 (C)')
+    assert repo_c.read_tree(c_c) == {'f': '2', 'version': ''}
+    assert repo_c.commit(c_c.parents[0]).parents[0] == masters[2]

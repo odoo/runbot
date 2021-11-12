@@ -42,6 +42,9 @@ class Project(models.Model):
              "will lead to webhook rejection. Should only use ASCII."
     )
 
+    freeze_id = fields.Many2one('runbot_merge.project.freeze', compute='_compute_freeze')
+    freeze_reminder = fields.Text()
+
     def _check_stagings(self, commit=False):
         for branch in self.search([]).mapped('branch_ids').filtered('active'):
             staging = branch.active_staging_id
@@ -81,3 +84,37 @@ class Project(models.Model):
         LIMIT 1
         """, (self.id, name))
         return bool(self.env.cr.rowcount)
+
+    def _next_freeze(self):
+        prev = self.branch_ids[1:2].name
+        if not prev:
+            return None
+
+        m = re.search(r'(\d+)(?:\.(\d+))?$', prev)
+        if m:
+            return "%s.%d" % (m[1], (int(m[2] or 0) + 1))
+        else:
+            return f'post-{prev}'
+
+    def _compute_freeze(self):
+        freezes = {
+            f.project_id.id: f.id
+            for f in self.env['runbot_merge.project.freeze'].search([('project_id', 'in', self.ids)])
+        }
+        print(freezes)
+        for project in self:
+            project.freeze_id = freezes.get(project.id) or False
+
+    def action_prepare_freeze(self):
+        """ Initialises the freeze wizard and returns the corresponding action.
+        """
+        self.check_access_rights('write')
+        self.check_access_rule('write')
+        Freeze = self.env['runbot_merge.project.freeze'].sudo()
+
+        w = Freeze.search([('project_id', '=', self.id)]) or Freeze.create({
+            'project_id': self.id,
+            'branch_name': self._next_freeze(),
+            'release_pr_ids': [(0, 0, {'repository_id': repo.id}) for repo in self.repo_ids]
+        })
+        return w.action_freeze()

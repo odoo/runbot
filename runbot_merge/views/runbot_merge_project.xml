@@ -4,8 +4,14 @@
         <field name="model">runbot_merge.project</field>
         <field name="arch" type="xml">
             <form>
+                <field name="freeze_id" invisible="1"/>
                 <header>
-                    <button type="object" name="action_freeze" string="Freeze" class="oe_highlight"/>
+                    <button type="object" name="action_prepare_freeze"
+                            string="Freeze"
+                            attrs="{'invisible': [('freeze_id', '!=', False)]}"/>
+                    <button type="object" name="action_prepare_freeze"
+                            string="View Freeze" class="oe_highlight"
+                            attrs="{'invisible': [('freeze_id', '=', False)]}"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -27,6 +33,15 @@
                         </group>
                     </group>
 
+                    <group class="oe_edit_only">
+                        <group colspan="4">
+                            <label for="freeze_reminder">
+                                Reminder to show after freeze
+                            </label>
+                            <field colspan="4" name="freeze_reminder" nolabel="1"/>
+                        </group>
+                    </group>
+
                     <separator string="Repositories"/>
                     <field name="repo_ids">
                         <tree>
@@ -44,6 +59,18 @@
                             <field name="active"/>
                         </tree>
                     </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="project_freeze_reminder" model="ir.ui.view">
+        <field name="name">Project Form</field>
+        <field name="model">runbot_merge.project</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <field name="freeze_reminder" nolabel="1" readonly="1"/>
                 </sheet>
             </form>
         </field>

@@ -1,5 +1,7 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_runbot_merge_project_admin,Admin access to project,model_runbot_merge_project,runbot_merge.group_admin,1,1,1,1
+access_runbot_merge_project_freeze,Admin access to freeze wizard,model_runbot_merge_project_freeze,runbot_merge.group_admin,1,1,0,0
+access_runbot_merge_project_freeze_prs,Admin access to freeze wizard prs,model_runbot_merge_project_freeze_prs,runbot_merge.group_admin,1,1,0,0
 access_runbot_merge_repository_admin,Admin access to repo,model_runbot_merge_repository,runbot_merge.group_admin,1,1,1,1
 access_runbot_merge_repository_status_admin,Admin access to repo statuses,model_runbot_merge_repository_status,runbot_merge.group_admin,1,1,1,1
 access_runbot_merge_branch_admin,Admin access to branches,model_runbot_merge_branch,runbot_merge.group_admin,1,1,1,1

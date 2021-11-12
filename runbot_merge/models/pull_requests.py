@@ -1851,14 +1851,10 @@ class Stagings(models.Model):
                     self, prs
                 )
                 prs.write({'state': 'merged'})
+
                 pseudobranch = None
-                if self.target == project.branch_ids[:1] and project.branch_ids[1:2]:
-                    prev = project.branch_ids[1:2].name
-                    m = re.search(r'(\d+)(?:\.(\d+))?$', prev)
-                    if m:
-                        pseudobranch = "%s.%d" % (m[1], (int(m[2] or 0) + 1))
-                    else:
-                        pseudobranch = 'post-' + prev
+                if self.target == project.branch_ids[:1]:
+                    pseudobranch = project._next_freeze()
 
                 for pr in prs:
                     self.env['runbot_merge.pull_requests.feedback'].create({

@@ -9,6 +9,7 @@
         'data/merge_cron.xml',
         'views/res_partner.xml',
         'views/runbot_merge_project.xml',
+        'models/project_freeze/views.xml',
         'views/mergebot.xml',
         'views/templates.xml',
     ],
