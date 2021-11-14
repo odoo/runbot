@@ -1057,3 +1057,20 @@ class Model:
 
     def invalidate_cache(self, fnames=None, ids=None):
         pass # not a concern when every access is an RPC call
+
+
+build_a = self.create_test_build({'local_result': 'ko'})
+build_b = self.create_test_build({'local_result': 'ko'})
+
+registry = odoo.registry(args.database)
+with odoo.api.Environment.manage():
+with registry.cursor() as cr:
+
+
+
+
+def_compute_error_history_ids(self):
+
+error.error_history_ids = self.search([('fingerprint', 'in', fingerprints), ('active', '=', False), ('id' '!=', error.id))
+
+
