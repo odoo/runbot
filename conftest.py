@@ -650,17 +650,18 @@ class Repo:
 
         hashes = []
         for commit in commits:
-            if commit.reset:
-                tree = None
-            r = self._session.post('https://api.github.com/repos/{}/git/trees'.format(self.name), json={
-                'tree': [
-                    {'path': k, 'mode': '100644', 'type': 'blob', 'content': v}
-                    for k, v in commit.tree.items()
-                ],
-                'base_tree': tree
-            })
-            assert r.ok, r.text
-            tree = r.json()['sha']
+            if commit.tree:
+                if commit.reset:
+                    tree = None
+                r = self._session.post('https://api.github.com/repos/{}/git/trees'.format(self.name), json={
+                    'tree': [
+                        {'path': k, 'mode': '100644', 'type': 'blob', 'content': v}
+                        for k, v in commit.tree.items()
+                    ],
+                    'base_tree': tree
+                })
+                assert r.ok, r.text
+                tree = r.json()['sha']
 
             data = {
                 'parents': parents,
