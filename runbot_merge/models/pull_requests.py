@@ -1358,23 +1358,21 @@ class PullRequests(models.Model):
         WHERE id = %s AND state != 'merged'
         FOR UPDATE SKIP LOCKED;
         ''', [self.id])
-        res = self.env.cr.fetchone()
-        if not res:
+        if not self.env.cr.fetchone():
             return False
 
         self.env.cr.execute('''
         UPDATE runbot_merge_pull_requests
         SET state = 'closed'
-        WHERE id = %s AND state != 'merged'
+        WHERE id = %s
         ''', [self.id])
         self.env.cr.commit()
         self.modified(['state'])
-        if self.env.cr.rowcount:
-            self.unstage(
-                "PR %s closed by %s",
-                self.display_name,
-                by
-            )
+        self.unstage(
+            "PR %s closed by %s",
+            self.display_name,
+            by
+        )
         return True
 
 # state changes on reviews
