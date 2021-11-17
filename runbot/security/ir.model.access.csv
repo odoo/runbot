@@ -111,3 +111,6 @@ access_runbot_upgrade_exception_admin,access_runbot_upgrade_exception_admin,runb
 
 access_runbot_dockerfile_user,access_runbot_dockerfile_user,runbot.model_runbot_dockerfile,runbot.group_user,1,0,0,0
 access_runbot_dockerfile_admin,access_runbot_dockerfile_admin,runbot.model_runbot_dockerfile,runbot.group_runbot_admin,1,1,1,1
+
+access_runbot_codeowner_admin,runbot_codeowner_admin,runbot.model_runbot_codeowner,runbot.group_runbot_admin,1,1,1,1
+access_runbot_codeowner_user,runbot_codeowner_user,runbot.model_runbot_codeowner,group_user,1,0,0,0

@@ -191,3 +191,35 @@ class TestBuildError(RunbotCase):
         })
 
         self.assertEqual(dashboard.build_ids, failed_build)
+
+class TestCodeOwner(RunbotCase):
+
+    def setUp(self):
+        super().setUp()
+        self.cow_deb = self.env['runbot.codeowner'].create({
+            'project_id' : self.project.id,
+            'github_teams': 'runbot',
+            'regex': '.*debian.*'
+        })
+
+        self.cow_web = self.env['runbot.codeowner'].create({
+            'project_id' : self.project.id,
+            'github_teams': 'website',
+            'regex': '.*website.*'
+        })
+
+        self.cow_crm = self.env['runbot.codeowner'].create({
+            'project_id' : self.project.id,
+            'github_teams': 'crm',
+            'regex': '.*crm.*'
+        })
+
+        self.cow_all = self.cow_deb | self.cow_web | self.cow_crm
+
+    def test_codeowner_invalid_regex(self):
+        with self.assertRaises(ValidationError):
+            self.env['runbot.codeowner'].create({
+                'project_id': self.project.id,
+                'regex': '*debian.*',
+                'github_teams': 'rd-test'
+            })
