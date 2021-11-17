@@ -1,0 +1,53 @@
+<odoo>
+  <data>
+    <record id="codeowner_form" model="ir.ui.view">
+        <field name="name">runbot.codeowner.form</field>
+        <field name="model">runbot.codeowner</field>
+        <field name="arch" type="xml">
+            <form string="Host">
+                <sheet>
+                    <group>
+                        <field name="project_id"/>
+                        <field name="team_id"/>
+                        <field name="github_teams"/>
+                        <field name="regex"/>
+                        <field name="version_domain" widget="domain" options="{'model': 'runbot.version', 'in_dialog': True, 'operators': ['in','=', '&lt;', '&gt;']}"/>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids" widget="mail_followers"/>
+                    <field name="message_ids" widget="mail_thread"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_codeowner_tree" model="ir.ui.view">
+        <field name="name">runbot.codeowner.tree</field>
+        <field name="model">runbot.codeowner</field>
+        <field name="arch" type="xml">
+            <tree string="Codeowners">
+                <field name="project_id"/>
+                <field name="team_id"/>
+                <field name="version_domain"/>
+                <field name="regex"/>
+                <field name="github_teams"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="open_view_codeowner_tree" model="ir.actions.act_window">
+        <field name="name">Codeowner</field>
+        <field name="res_model">runbot.codeowner</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem
+        name="CodeOwners"
+        id="runbot_menu_codeowner_tree"
+        parent="runbot_menu_manage_errors"
+        sequence="90"
+        action="open_view_codeowner_tree"
+        />
+  </data>
+</odoo>

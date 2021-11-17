@@ -6,6 +6,7 @@ from . import build
 from . import build_config
 from . import build_error
 from . import bundle
+from . import codeowner
 from . import commit
 from . import database
 from . import dockerfile
@@ -22,5 +23,6 @@ from . import upgrade
 from . import user
 from . import version
 
+# those imports have to be at the end otherwise the sql view cannot be initialised
 from . import build_stat
 from . import build_stat_regex

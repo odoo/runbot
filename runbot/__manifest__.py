@@ -41,6 +41,7 @@
         'views/build_error_views.xml',
         'views/build_views.xml',
         'views/bundle_views.xml',
+        'views/codeowner_views.xml',
         'views/commit_views.xml',
         'views/config_views.xml',
         'views/dashboard_views.xml',
