@@ -393,15 +393,13 @@ WARNING: the update of {pr2_id.display_name} to {pr2_id.head} has caused a \
 conflict in this pull request, data may have been lost.
 
 stdout:
-```
-CONFLICT \(add/add\): Merge conflict in h
-Auto-merging h
+```.*?
+CONFLICT \(add/add\): Merge conflict in h.*?
 ```
 
 stderr:
 ```
 \\d{{2}}:\\d{{2}}:\\d{{2}}.\\d+ .* {pr2_id.head}
 error: could not apply [0-9a-f]+\\.\\.\\. newfiles
-hint: after resolving the conflicts, mark the corrected paths
-.*''', re.DOTALL))
+''', re.DOTALL))
     ]
