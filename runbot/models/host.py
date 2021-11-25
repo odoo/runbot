@@ -72,6 +72,7 @@ class Host(models.Model):
 
     def _docker_build(self):
         """ build docker images needed by locally pending builds"""
+        _logger.info('Building docker image...')
         self.ensure_one()
         static_path = self._get_work_path()
         self.clear_caches()  # needed to ensure that content is updated on all hosts

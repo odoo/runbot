@@ -756,6 +756,11 @@ class BuildResult(models.Model):
                 self._log('_checkout', 'Multiple repo have same export path in build, some source may be missing for %s' % build_export_path, level='ERROR')
                 self._kill(result='ko')
             exports[build_export_path] = commit.export()
+
+        checkout_time = time.time() - start
+        if checkout_time > 60:
+            self._log('checkout', 'Checkout took %s seconds' % int(checkout_time))
+
         return exports
 
     def _get_available_modules(self):
