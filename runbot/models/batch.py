@@ -97,12 +97,17 @@ class Batch(models.Model):
                         batch._log('Cannot kill or skip build %s, build is used in another bundle: %s', build.id, bundles.mapped('name'))
 
     def _process(self):
+        processed = self.browse()
         for batch in self:
             if batch.state == 'preparing' and batch.last_update < fields.Datetime.now() - datetime.timedelta(seconds=60):
                 batch._prepare()
+                processed |= batch
             elif batch.state == 'ready' and all(slot.build_id.global_state in (False, 'running', 'done') for slot in batch.slot_ids):
+                _logger.info('Batch %s is done', self.id)
                 batch._log('Batch done')
                 batch.state = 'done'
+                processed |= batch
+        return processed
 
     def _create_build(self, params):
         """
@@ -130,12 +135,12 @@ class Batch(models.Model):
         return link_type, build
 
     def _prepare(self, auto_rebase=False):
+        _logger.info('Preparing batch %s', self.id)
         for level, message in self.bundle_id.consistency_warning():
             if level == "warning":
                 self.warning("Bundle warning: %s" % message)
 
         self.state = 'ready'
-        _logger.info('Preparing batch %s', self.id)
 
         bundle = self.bundle_id
         project = bundle.project_id

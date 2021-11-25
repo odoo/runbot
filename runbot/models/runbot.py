@@ -7,6 +7,7 @@ import signal
 import subprocess
 import shutil
 
+from contextlib import contextmanager
 from requests.exceptions import HTTPError
 
 from ..common import fqdn, dest_reg, os
@@ -203,7 +204,7 @@ class Runbot(models.AbstractModel):
         This method is the default cron for new commit discovery and build sheduling.
         The cron runs for a long time to avoid spamming logs
         """
-        pull_info_failures = set()
+        pull_info_failures = {}
         start_time = time.time()
         timeout = self._get_cron_period()
         get_param = self.env['ir.config_parameter'].get_param
@@ -222,55 +223,74 @@ class Runbot(models.AbstractModel):
             self.env['runbot.build']._local_cleanup()
             self._docker_cleanup()
         _logger.info('Starting loop')
-        while time.time() - start_time < timeout:
-            repos = self.env['runbot.repo'].search([('mode', '!=', 'disabled')])
+        if runbot_do_schedule or runbot_do_fetch:
+            while time.time() - start_time < timeout:
+                if runbot_do_fetch:
+                    self._fetch_loop_turn(host, pull_info_failures)
+                if runbot_do_schedule:
+                    sleep_time = self._scheduler_loop_turn(host, update_frequency)
+                    self.sleep(sleep_time)
+                else:
+                    self.sleep(update_frequency)
+                self._commit()
 
-            processing_batch = self.env['runbot.batch'].search([('state', 'in', ('preparing', 'ready'))], order='id asc')
-            preparing_batch = processing_batch.filtered(lambda b: b.state == 'preparing')
-            self._commit()
-            if runbot_do_fetch:
-                for repo in repos:
-                    try:
-                        repo._update_batches(bool(preparing_batch), ignore=pull_info_failures)
-                        self._commit()
-                    except HTTPError as e:
-                        # Sometimes a pr pull info can fail.
-                        # - Most of the time it is only temporary and it will be successfull on next try. 
-                        # - In some rare case the pr will always fail (github inconsistency) The pr exists in git (for-each-ref) but not on github api.
-                        # For this rare case, we store the pr in memory in order to unstuck other pr/branches update.
-                        # We consider that this error should not remain, in this case github needs to fix this inconsistency.
-                        # Another solution would be to create the pr with fake pull info. This idea is not the best one
-                        # since we want to avoid to have many pr with fake pull_info in case of temporary failure of github services.
-                        # With this solution, the pr will be retried once every cron loop (~10 minutes).
-                        # We dont except to have pr with this kind of persistent failure more than every few mounths/years.
-                        self.env.cr.rollback()
-                        self.env.clear()
-                        pull_number = e.response.url.split('/')[-1]
-                        pull_info_failures.add(pull_number)
-                        self.warning('Pr pull info failed for %s', pull_number)
-                        self._commit()
-            if processing_batch:
-                _logger.info('starting processing of %s batches', len(processing_batch))
-                for batch in processing_batch:
-                    batch._process()
-                    self._commit()
-                _logger.info('end processing')
-            self._commit()
-            if runbot_do_schedule:
-                sleep_time = self._scheduler_loop_turn(host, update_frequency)
-                self.sleep(sleep_time)
-            else:
-                self.sleep(update_frequency)
-            self._commit()
-
-        host.last_end_loop = fields.Datetime.now()
+            host.last_end_loop = fields.Datetime.now()
 
     def sleep(self, t):
         time.sleep(t)
 
+    def _fetch_loop_turn(self, host, pull_info_failures, default_sleep=1):
+        with self.manage_host_exception(host) as manager:
+            repos = self.env['runbot.repo'].search([('mode', '!=', 'disabled')])
+            processing_batch = self.env['runbot.batch'].search([('state', 'in', ('preparing', 'ready'))], order='id asc')
+            preparing_batch = processing_batch.filtered(lambda b: b.state == 'preparing')
+            self._commit()
+            for repo in repos:
+                try:
+                    repo._update_batches(force=bool(preparing_batch), ignore=pull_info_failures)
+                    self._commit() # commit is mainly here to avoid to lose progression in case of fetch failure or concurrent update
+                except HTTPError as e:
+                    # Sometimes a pr pull info can fail.
+                    # - Most of the time it is only temporary and it will be successfull on next try.
+                    # - In some rare case the pr will always fail (github inconsistency) The pr exists in git (for-each-ref) but not on github api.
+                    # For this rare case, we store the pr in memory in order to unstuck other pr/branches update.
+                    # We consider that this error should not remain, in this case github needs to fix this inconsistency.
+                    # Another solution would be to create the pr with fake pull info. This idea is not the best one
+                    # since we want to avoid to have many pr with fake pull_info in case of temporary failure of github services.
+                    # With this solution, the pr will be retried once every cron loop (~10 minutes).
+                    # We dont except to have pr with this kind of persistent failure more than every few mounths/years.
+                    self.env.cr.rollback()
+                    self.env.clear()
+                    pull_number = e.response.url.split('/')[-1]
+                    pull_info_failures[pull_number] = time.time()
+                    self.warning('Pr pull info failed for %s', pull_number)
+                    self._commit()
+
+            if processing_batch:
+                for batch in processing_batch:
+                    if batch._process():
+                        self._commit()
+            self._commit()
+
+            # cleanup old pull_info_failures
+            for pr_number, t in pull_info_failures.items():
+                if t + 15*60 < time.time():
+                    _logger.warning('Removing %s from pull_info_failures', pr_number)
+                    del self.pull_info_failures[pr_number]
+
+        return manager.get('sleep', default_sleep)
+
     def _scheduler_loop_turn(self, host, default_sleep=1):
-        try:
+        _logger.info('Scheduling...')
+        with self.manage_host_exception(host) as manager:
             self._scheduler(host)
+        return manager.get('sleep', default_sleep)
+
+    @contextmanager
+    def manage_host_exception(self, host):
+        res = {}
+        try:
+            yield res
             host.last_success = fields.Datetime.now()
             self._commit()
         except Exception as e:
@@ -284,12 +304,11 @@ class Runbot(models.AbstractModel):
                 host.last_exception = str(e)
                 host.exception_count = 1
             self._commit()
-            return random.uniform(0, 3)
+            res['sleep'] = random.uniform(0, 3)
         else:
             if host.last_exception:
                 host.last_exception = ""
                 host.exception_count = 0
-            return default_sleep
 
     def _source_cleanup(self):
         try:
