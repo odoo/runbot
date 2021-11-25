@@ -646,7 +646,7 @@ class PullRequests(models.Model):
             r = gh.post(f'https://api.github.com/repos/{pr.repository.name}/pulls', json={
                 'base': target.name,
                 'head': f'{owner}:{new_branch}',
-                'title': '[FW]' + title,
+                'title': '[FW]' + (' ' if title[0] != '[' else '') + title,
                 'body': body
             })
             if not r.ok:
