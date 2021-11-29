@@ -83,12 +83,15 @@ class Batch(models.Model):
             for slot in batch.slot_ids:
                 slot.skipped = True
                 build = slot.build_id
+                if build.global_state in ('running', 'done'):
+                    continue
                 testing_slots = build.slot_ids.filtered(lambda s: not s.skipped)
                 if not testing_slots:
                     if build.global_state == 'pending':
                         build._skip('Newer build found')
                     elif build.global_state in ('waiting', 'testing'):
-                        build.killable = True
+                        if not build.killable:
+                            build.killable = True
                 elif slot.link_type == 'created':
                     batches = testing_slots.mapped('batch_id')
                     _logger.info('Cannot skip build %s build is still in use in batches %s', build.id, batches.ids)
@@ -117,7 +120,8 @@ class Batch(models.Model):
         build = self.env['runbot.build'].search([('params_id', '=', params.id), ('parent_id', '=', False)], limit=1, order='id desc')
         link_type = 'matched'
         if build:
-            build.killable = False
+            if build.killable:
+                build.killable = False
         else:
             description = params.trigger_id.description if params.trigger_id.description else False
             link_type = 'created'
