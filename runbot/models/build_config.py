@@ -308,8 +308,6 @@ class ConfigStep(models.Model):
                 return
 
         exports = build._checkout()
-        # update job_start AFTER checkout to avoid build being killed too soon if checkout took some time and docker take some time to start
-        build.job_start = now()
 
         # adjust job_end to record an accurate job_20 job_time
         build._log('run', 'Start running build %s' % build.dest)
@@ -358,8 +356,6 @@ class ConfigStep(models.Model):
 
     def _run_install_odoo(self, build, log_path):
         exports = build._checkout()
-        # update job_start AFTER checkout to avoid build being killed too soon if checkout took some time and docker take some time to start
-        build.job_start = now()
 
         modules_to_install = self._modules_to_install(build)
         mods = ",".join(modules_to_install)
