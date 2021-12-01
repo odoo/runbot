@@ -175,6 +175,7 @@ class BuildResult(models.Model):
     job_end = fields.Datetime('Job end')
     build_start = fields.Datetime('Build start')
     build_end = fields.Datetime('Build end')
+    docker_start = fields.Datetime('Docker start')
     job_time = fields.Integer(compute='_compute_job_time', string='Job time')
     build_time = fields.Integer(compute='_compute_build_time', string='Build time')
 
@@ -651,10 +652,11 @@ class BuildResult(models.Model):
                     build._log('_schedule', '%s time exceeded (%ss)' % (build.active_step.name if build.active_step else "?", build.job_time))
                     build._kill(result='killed')
                 continue
-            elif _docker_state in ('UNKNOWN', 'GHOST') and (build.local_state == 'running' or build.active_step._is_docker_step()):
-                if build.job_time < 5:
+            elif _docker_state in ('UNKNOWN', 'GHOST') and (build.local_state == 'running' or build.active_step._is_docker_step()):  # todo replace with docker_start
+                docker_time = time.time() - dt2time(build.docker_start or build.job_start)
+                if docker_time < 5:
                     continue
-                elif build.job_time < 60:
+                elif docker_time < 60:
                     _logger.info('container "%s" seems too take a while to start :%s' % (build.job_time, build._get_docker_name()))
                     continue
                 else:
@@ -662,6 +664,7 @@ class BuildResult(models.Model):
             # No job running, make result and select nex job
             build_values = {
                 'job_end': now(),
+                'docker_start': False,
             }
             # make result of previous job
             try:
@@ -723,6 +726,11 @@ class BuildResult(models.Model):
         containers_memory_limit = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_containers_memory', 0)
         if containers_memory_limit and 'memory' not in kwargs:
             kwargs['memory'] = int(float(containers_memory_limit) * 1024 ** 3)
+        self.docker_start = now()
+        if self.job_start:
+            start_step_time = int(dt2time(self.docker_start) - dt2time(self.job_start))
+            if start_step_time > 60:
+                _logger.info('Step took %s seconds before starting docker', start_step_time)
         docker_run(**kwargs)
 
     def _path(self, *l, **kw):
@@ -749,6 +757,7 @@ class BuildResult(models.Model):
     def _checkout(self):
         self.ensure_one()  # will raise exception if hash not found, we don't want to fail for all build.
         # checkout branch
+        start = time.time()
         exports = {}
         for commit in self.env.context.get('defined_commit_ids') or self.params_id.commit_ids:
             build_export_path = self._docker_source_folder(commit)
