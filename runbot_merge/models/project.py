@@ -101,7 +101,6 @@ class Project(models.Model):
             f.project_id.id: f.id
             for f in self.env['runbot_merge.project.freeze'].search([('project_id', 'in', self.ids)])
         }
-        print(freezes)
         for project in self:
             project.freeze_id = freezes.get(project.id) or False
 
