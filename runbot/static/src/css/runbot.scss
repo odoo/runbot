@@ -228,3 +228,28 @@ body, .table{
         padding: 0;
     }
 }
+.limited-height {
+    max-height: 180px;
+    overflow: scroll;
+
+    >hr {
+        margin: 2px 0px;
+    }
+    &:before {
+        content:'';
+        width:100%;
+        height:30px;
+        position:absolute;
+        left:0;
+        bottom:0;
+        background:linear-gradient(transparent 0px, white 27px);
+    }
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.limited-height::-webkit-scrollbar {
+    display: none;
+}
+.limited-height-toggle:hover {
+    background-color: #DDD;
+}

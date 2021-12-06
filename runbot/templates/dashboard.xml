@@ -185,12 +185,12 @@
     </template>
 
     <template id="runbot.default_dashboard_tile_view">
-      <div class="col-sm-3">
+      <div class="col-md-3 col-lg-2 p-2">
         <div class="card">
-          <div class="card-header">
-            <t t-esc="tile.display_name"/>
+          <div class="card-header limited-height-toggle" t-attf-onclick="$('#tile_{{tile.id}}').toggleClass('limited-height')">
+            <t t-esc="tile.display_name"/> <t t-if="tile.build_ids"> (<t t-esc="len(tile.build_ids)"/>)</t>
           </div>
-          <div class="card-body">
+          <div class="card-body limited-height" t-attf-id="tile_{{tile.id}}">
             <p t-if="not tile.build_ids" class="text-success my-0">No build found 👍</p>
             <t t-foreach="tile.sticky_bundle_ids.sorted(lambda b: b.version_id.number, reverse=True)" t-as="bundle">
               <t t-set="failed_builds" t-value="tile.build_ids.filtered(lambda b: b.top_parent.slot_ids.batch_id.bundle_id == bundle)"/>
@@ -201,6 +201,7 @@
                   </a>
               </p>
             </t>
+            <hr/>
           </div>
         </div>
       </div>
