@@ -471,6 +471,9 @@ class Repo(models.Model):
     def _update_git_config(self):
         """ Update repo git config file """
         for repo in self:
+            if repo.mode == 'disabled':
+                _logger.info(f'skipping disabled repo {repo.name}')
+                continue
             if os.path.isdir(os.path.join(repo.path, 'refs')):
                 git_config_path = os.path.join(repo.path, 'config')
                 template_params = {'repo': repo}
