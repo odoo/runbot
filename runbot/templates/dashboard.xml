@@ -2,7 +2,7 @@
 <odoo>
   <data>
     <template id="runbot.glances">
-      <t t-call='portal.frontend_layout'>
+      <t t-call="runbot.layout">
         <t t-set="head">
           <t t-if="refresh">
             <meta http-equiv="refresh" t-att-content="refresh"/>
@@ -37,7 +37,7 @@
       </t>
     </template>
 
-    <template id="frontend_no_nav" inherit_id="portal.frontend_layout" primary="True">
+    <template id="frontend_no_nav" inherit_id="runbot.layout" primary="True">
       <xpath expr="//header" position="replace">
       </xpath>
     </template>

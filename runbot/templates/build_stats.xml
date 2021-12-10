@@ -2,7 +2,7 @@
 <odoo>
   <data>
     <template id="runbot.build_stats">
-      <t t-call='website.layout'>
+      <t t-call='runbot.layout'>
           <t t-set="bundles" t-value="build.slot_ids.mapped('batch_id.bundle_id')"/>
           <div>
             <div class="row">
@@ -63,7 +63,7 @@
     </template>
 
     <template id="runbot.modules_stats">
-      <t t-call='website.layout'>
+      <t t-call='runbot.layout'>
         <input type="hidden" id="bundle_id" t-att-value="bundle.id"/>
         <input type="hidden" id="trigger_id" t-att-value="trigger.id"/>
         <div class="container-fluid">

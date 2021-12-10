@@ -142,6 +142,7 @@ class BuildResult(models.Model):
 
     description = fields.Char('Description', help='Informative description')
     md_description = fields.Char(compute='_compute_md_description', String='MD Parsed Description', help='Informative description markdown parsed')
+    display_name = fields.Char(compute='_compute_display_name')
 
     # Related fields for convenience
     version_id = fields.Many2one('runbot.version', related='params_id.version_id', store=True, index=True)
@@ -201,6 +202,7 @@ class BuildResult(models.Model):
     parent_id = fields.Many2one('runbot.build', 'Parent Build', index=True)
     parent_path = fields.Char('Parent path', index=True)
     top_parent =  fields.Many2one('runbot.build', compute='_compute_top_parent')
+    ancestors =  fields.Many2many('runbot.build', compute='_compute_ancestors')
     # should we add a has children stored boolean?
     children_ids = fields.One2many('runbot.build', 'parent_id')
 
@@ -219,6 +221,11 @@ class BuildResult(models.Model):
     database_ids = fields.One2many('runbot.database', 'build_id')
 
     static_run = fields.Char('Static run URL')
+
+    @api.depends('description', 'params_id.config_id')
+    def _compute_display_name(self):
+        for build in self:
+            build.display_name = build.description or build.config_id.name
 
     @api.depends('params_id.config_id')
     def _compute_log_list(self):  # storing this field because it will be access trhoug repo viewn and keep track of the list at create
@@ -259,6 +266,10 @@ class BuildResult(models.Model):
     def _compute_top_parent(self):
         for build in self:
             build.top_parent = self.browse(int(build.parent_path.split('/')[0]))
+
+    def _compute_ancestors(self):
+        for build in self:
+            build.ancestors = self.browse([int(b) for b in build.parent_path.split('/') if b])
 
     def _get_youngest_state(self, states):
         index = min([self._get_state_score(state) for state in states])
@@ -379,9 +390,15 @@ class BuildResult(models.Model):
             else:
                 build.domain = "%s:%s" % (domain, build.port)
 
+    @api.depends_context('batch')
     def _compute_build_url(self):
+        batch = self.env.context.get('batch')
+        print(self.env.context)
         for build in self:
-            build.build_url = "/runbot/build/%s" % build.id
+            if batch:
+                build.build_url = "/runbot/batch/%s/build/%s" % (batch.id, build.id)
+            else:
+                build.build_url = "/runbot/build/%s" % build.id
 
     @api.depends('job_start', 'job_end')
     def _compute_job_time(self):

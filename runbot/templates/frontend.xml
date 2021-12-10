@@ -2,11 +2,11 @@
 <odoo>
   <data>
     <template id="runbot.bundles">
-      <t t-call='web.frontend_layout'>
+      <t t-call='runbot.layout'>
         <t t-set="nav_form">
           <form class="form-inline my-2 my-lg-0" role="search" t-att-action="qu(search='')" method="get">
             <div class="input-group md-form form-sm form-2 pl-0">
-              <input class="form-control my-0 py-1 red-border" type="text" placeholder="Search" aria-label="Search" name="search" t-att-value="search"/>
+              <input class="form-control my-0 py-1" type="text" placeholder="Search" aria-label="Search" name="search" t-att-value="search"/>
               <div class="input-group-append">
                 <button type='submit' class="input-group-text red lighten-3" id="basic-text1">
                   <i class="fa fa-search text-grey"/>
@@ -79,15 +79,17 @@
       <t t-if="batch.state=='done' and all(slot.build_id.global_result == 'ok' for slot in batch.slot_ids if slot.build_id)" t-set="klass">success</t>
       <t t-if="batch.state=='done' and any(slot.build_id.global_result in ('ko', 'warn') for slot in batch.slot_ids)" t-set="klass">danger</t>
 
-      <div t-attf-class="batch_tile {{'more' if more else 'nomore'}}">
+      <div t-attf-class="batch_tile if more">
         <div t-attf-class="card bg-{{klass}}-light">
-          <div class="batch_header">
-            <a t-attf-href="/runbot/batch/#{batch.id}" t-attf-class="badge badge-{{'warning' if batch.has_warning else 'light'}}" title="View Batch">
-              <t t-esc="batch.get_formated_age()"/>
-              <i class="fa fa-exclamation-triangle" t-if="batch.has_warning"/>
-              <i class="arrow fa fa-window-maximize"/>
-            </a>
-          </div>
+          <a t-attf-href="/runbot/batch/#{batch.id}" title="View Batch">
+            <div class="batch_header">
+              <span t-attf-class="badge badge-{{'warning' if batch.has_warning else 'light'}}">
+                <t t-esc="batch.get_formated_age()"/>
+                <i class="fa fa-exclamation-triangle" t-if="batch.has_warning"/>
+              </span>
+              <span class="float-right header_hover">View batch...</span>
+            </div>
+          </a>
           <t t-if="batch.state=='preparing'">
             <span><i class="fa fa-cog fa-spin fa-fw"/> preparing</span>
           </t>
@@ -100,7 +102,7 @@
             </t>
             <div class="slot_filler" t-foreach="range(10)" t-as="x"/>
           </div>
-          <div class="batch_commits">
+          <div t-if='more' class="batch_commits">
             <div t-foreach="batch.commit_link_ids.sorted(lambda cl: (cl.commit_id.repo_id.sequence, cl.commit_id.repo_id.id))" t-as="commit_link" class="one_line">
 
               <a t-attf-href="/runbot/commit/#{commit_link.commit_id.id}" t-attf-class="badge badge-light batch_commit match_type_{{commit_link.match_type}}">

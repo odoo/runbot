@@ -146,7 +146,7 @@ class Runbot(models.AbstractModel):
         return self.env.cr.fetchall()
 
     def _domain(self):
-        return self.env.get('ir.config_parameter').get_param('runbot.runbot_domain', fqdn())
+        return self.env.get('ir.config_parameter').sudo().get_param('runbot.runbot_domain', fqdn())
 
     def _reload_nginx(self):
         env = self.env

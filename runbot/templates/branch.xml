@@ -2,7 +2,7 @@
 <odoo>
   <data>
     <template id="runbot.branch">
-      <t t-call='website.layout'>
+      <t t-call='runbot.layout'>
         <div class="container-fluid">
           <div class="row">
             <div class='col-md-12'>

@@ -51,8 +51,7 @@ class Batch(models.Model):
 
     def _url(self):
         self.ensure_one()
-        runbot_domain = self.env['runbot.runbot']._domain()
-        return "http://%s/runbot/batch/%s" % (runbot_domain, self.id)
+        return "/runbot/batch/%s" % self.id
 
     def _new_commit(self, branch, match_type='new'):
         # if not the same hash for repo:
