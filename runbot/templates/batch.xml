@@ -2,7 +2,7 @@
 <odoo>
     <data>
         <template id="runbot.batch">
-            <t t-call="website.layout">
+            <t t-call="runbot.layout">
                 <div class="row">
                     <div class="col-lg-6">
                     <table class="table table-stripped">
@@ -14,17 +14,11 @@
                         </tr>
                         <tr t-if="batch.category_id.id != default_category">
                             <td>Category</td>
-                            <td t-esc="batch.category_id.name">
-                                <i t-attf-class="fa fa-{{batch.category_id.name}}"/>
-                            </td>
+                            <td t-esc="batch.category_id.name"></td>
                         </tr>
                         <tr>
                             <td>Version</td>
                             <td t-esc="batch.slot_ids[0].params_id.version_id.name if batch.slot_ids else batch.bundle_id.version_id.name"/>
-                        </tr>
-                        <tr>
-                            <td>State</td>
-                            <td t-esc="batch.state"/>
                         </tr>
                         <tr>
                             <td>Create date</td>

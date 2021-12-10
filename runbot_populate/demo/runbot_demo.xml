@@ -108,7 +108,6 @@
     </record>
     <record id="bundle_runbot_13_dev_tri" model="runbot.bundle">
         <field name="name">13.0-dev-tri</field>
-        <field name="is_base">True</field>
         <field name="project_id" ref="project_runbot"/>
     </record>
 

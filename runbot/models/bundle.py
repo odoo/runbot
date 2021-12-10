@@ -184,6 +184,11 @@ class Bundle(models.Model):
             for batch in batchs:
                 batch.bundle_id.last_done_batch = batch
 
+    def _url(self):
+        self.ensure_one()
+        return "/runbot/bundle/%s" % self.id
+
+
     def create(self, values_list):
         res = super().create(values_list)
         if res.is_base:

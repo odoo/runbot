@@ -16,16 +16,18 @@
         <field name="name">R&amp;D</field>
     </record>
 
-    <record model="runbot.bundle" id="runbot.bundle_master">
-        <field name="name">master</field>
-        <field name="is_base">True</field>
-        <field name="project_id" ref="runbot.main_project"/>
-    </record>
-    <record model="runbot.bundle" id="runbot.bundle_dummy">
-        <field name="name">Dummy</field>
-        <field name="no_build">True</field>
-        <field name="project_id" ref="runbot.main_project"/>
-    </record>
+    <data noupdate="1">
+        <record model="runbot.bundle" id="runbot.bundle_master" >
+            <field name="name">master</field>
+            <field name="is_base">True</field>
+            <field name="project_id" ref="runbot.main_project"/>
+        </record>
+        <record model="runbot.bundle" id="runbot.bundle_dummy">
+            <field name="name">Dummy</field>
+            <field name="no_build">True</field>
+            <field name="project_id" ref="runbot.main_project"/>
+        </record>
+    </data>
 
     <record model="ir.config_parameter" id="runbot.runbot_is_base_regex">
         <field name="key">runbot.runbot_is_base_regex</field>

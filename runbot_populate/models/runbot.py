@@ -24,7 +24,7 @@ class Runbot(models.AbstractModel):
 
         assert bundles|self.env.ref('runbot.bundle_dummy') == bundles.search([])
 
-        if False and bundles.branch_ids:
+        if bundles.branch_ids:
             # only populate data if no branch are found
             return
 

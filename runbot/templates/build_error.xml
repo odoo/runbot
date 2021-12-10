@@ -55,7 +55,7 @@
     </template>
 
     <template id="runbot.build_error">
-      <t t-call='website.layout'>
+      <t t-call='runbot.layout'>
         <div class="container-fluid">
           <div class="row">
             <div class='col-md-12'>
@@ -96,7 +96,7 @@
     </template>
 
     <template id="runbot.team">
-      <t t-call='website.layout'>
+      <t t-call='runbot.layout'>
         <div class="container-fluid bg-light">
           <div class="row">
             <div t-if="team" class='col-md-12'>

@@ -22,7 +22,7 @@
         'security/ir.model.access.csv',
         'security/ir.rule.csv',
 
-        'templates/assets.xml',
+        'templates/utils.xml',
         'templates/badge.xml',
         'templates/batch.xml',
         'templates/branch.xml',
@@ -34,7 +34,6 @@
         'templates/frontend.xml',
         'templates/git.xml',
         'templates/nginx.xml',
-        'templates/utils.xml',
         'templates/build_error.xml',
 
         'views/branch_views.xml',

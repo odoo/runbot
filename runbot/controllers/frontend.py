@@ -53,6 +53,7 @@ def route(routes, **kw):
                 response.qcontext['current_path'] = request.httprequest.full_path
                 response.qcontext['refresh'] = refresh
                 response.qcontext['filter_mode'] = filter_mode
+                response.qcontext['default_category'] = request.env['ir.model.data'].xmlid_to_res_id('runbot.default_category')
                 response.qcontext['qu'] = QueryURL('/runbot/%s' % (slug(project)), path_args=['search'], search=search, refresh=refresh)
                 if 'title' not in response.qcontext:
                     response.qcontext['title'] = 'Runbot %s' % project.name or ''
@@ -271,23 +272,35 @@ class Runbot(Controller):
         elif operation == 'wakeup':
             build._wake_up()
 
-        return werkzeug.utils.redirect(build.build_url)
+        return str(build.id)
 
-    @route(['/runbot/build/<int:build_id>'], type='http', auth="public", website=True, sitemap=False)
-    def build(self, build_id, search=None, **post):
+    @route([
+        '/runbot/build/<int:build_id>',
+        '/runbot/batch/<int:from_batch>/build/<int:build_id>'
+    ], type='http', auth="public", website=True, sitemap=False)
+    def build(self, build_id, search=None, from_batch=None, **post):
         """Events/Logs"""
 
-        Build = request.env['runbot.build']
+        if from_batch:
+            from_batch = request.env['runbot.batch'].browse(int(from_batch))
+            from_batch = from_batch.with_context(batch=from_batch)
+        Build = request.env['runbot.build'].with_context(batch=from_batch)
 
         build = Build.browse([build_id])[0]
         if not build.exists():
             return request.not_found()
-
+        siblings = (build.parent_id.children_ids if build.parent_id else from_batch.slot_ids.build_id if from_batch else build).sorted('id')
         context = {
             'build': build,
-            'default_category': request.env['ir.model.data'].xmlid_to_res_id('runbot.default_category'),
+            'from_batch': from_batch,
             'project': build.params_id.trigger_id.project_id,
-            'title': 'Build %s' % build.id
+            'title': 'Build %s' % build.id,
+            'siblings': siblings,
+            # following logic is not the most efficient but good enough
+            'prev_ko': next((b for b in reversed(siblings) if b.id < build.id and b.global_result != 'ok'), Build),
+            'prev_bu': next((b for b in reversed(siblings) if b.id < build.id), Build),
+            'next_bu': next((b for b in siblings if b.id > build.id), Build),
+            'next_ko': next((b for b in siblings if b.id > build.id and b.global_result != 'ok'), Build),
         }
         return request.render("runbot.build", context)
 
@@ -426,7 +439,6 @@ class Runbot(Controller):
         context = {
             'build': build,
             'build_stats': build_stats,
-            'default_category': request.env['ir.model.data'].xmlid_to_res_id('runbot.default_category'),
             'project': build.params_id.trigger_id.project_id,
             'title': 'Build %s statistics' % build.id
         }
