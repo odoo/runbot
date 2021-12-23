@@ -320,7 +320,7 @@
             <span class="caret"/>
           </button>
           <div  class="dropdown-menu" role="menu">
-            <t t-foreach="bundle.branch_ids.sorted(key=lambda b: (b.remote_id.repo_id.sequence, b.remote_id.repo_id.id, b.is_pr))" t-as="branch">
+            <t t-foreach="bundle.branch_ids.sorted(key=lambda b: (not b.alive, b.remote_id.repo_id.sequence, b.remote_id.repo_id.id, b.is_pr, b.id))" t-as="branch">
               <t t-set="link_title" t-value="'View %s %s on Github' % ('PR' if branch.is_pr else 'Branch', branch.name)"/>
               <a t-att-href="branch.branch_url" class="dropdown-item" t-att-title="link_title">
                 <span class="font-italic text-muted" t-esc="branch.remote_id.short_name"/> <span t-att-class="'' if branch.alive else 'line-through'" t-esc="branch.name"/> <i t-if="not branch.alive" title="deleted/closed" class="fa fa-ban text-danger"/>
