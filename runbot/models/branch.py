@@ -157,6 +157,7 @@ class Branch(models.Model):
                 }
                 if need_new_base:
                     values['is_base'] = True
+                    values['version_id'] = self.env['runbot.version']._get(name)
 
                 if branch.is_pr and branch.target_branch_name:  # most likely external_pr, use target as version
                     base = self.env['runbot.bundle'].search([
