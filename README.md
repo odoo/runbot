@@ -24,7 +24,7 @@ Runbot v5 use a set of concept in order to cover all the use cases we need
 
 ## HOW TO
 
-This section give the basic steps to follow to configure the runbot v5.0. The configuration may differ from one use to another, this one will describe how to test addons for odoo, needing to fetch odoo core but without testing vanilla odoo. As an exemple, runbot will be used as a tested addons.
+This section give the basic [steps to follow to configure the runbot v5.0](https://kanakinfosystems.com/blog/odoo-runbot). The configuration may differ from one use to another, this one will describe how to test addons for odoo, needing to fetch odoo core but without testing vanilla odoo. As an exemple, runbot will be used as a tested addons.
 
 ### Setup
 
@@ -194,7 +194,7 @@ Db creation will use template0 by default. It is possible to specify a specific 
 
 Runbot is using a Dockerfile Odoo model to define the Dockerfile used for builds and is shipped with a default one. This default Dockerfile is based on Ubuntu Bionic and is intended to build recent supported versions of Odoo (currently 12.0 up to 14.0).
 
-The model is using Odoo QWeb views as templates.
+The model is using Odoo QWeb views as templates. 
 
 A new Dockerfile can be created as needed either by duplicating the default one and adapt parameters in the view. e.g.: changing the key `'from': 'ubuntu:bionic'` to `'from': 'debian:buster'` will create a new Dockerfile based on Debian instead of ubuntu.
 Or by providing a plain Dockerfile in the template.
