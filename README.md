@@ -105,7 +105,7 @@ Other cron operations are still disabled for now.
 Access odoo "backend" *127.0.0.1:8069/web*
 
 If not connected yet, connect as admin (default password: admin). You may want to check that.Check odoo documentation for other needed configuration as master password. This is mainly needed for production purpose, a local instance will work as it is.
-If you create another Odoo user to manage the runbot, you may add the group *Runbot administrator* to this user
+If you create another Odoo user to manage the runbot, you may add the group *Runbot administrator* to this user(https://kanakinfosystems.com/blog/odoo-runbot0)
 
 #### Add remotes and repositories
 Access runbot app and go to the Repos->Repositories menu
@@ -194,7 +194,7 @@ Db creation will use template0 by default. It is possible to specify a specific 
 
 Runbot is using a Dockerfile Odoo model to define the Dockerfile used for builds and is shipped with a default one. This default Dockerfile is based on Ubuntu Bionic and is intended to build recent supported versions of Odoo (currently 12.0 up to 14.0).
 
-The model is using Odoo QWeb views as templates.
+The model is using Odoo QWeb views as templates. 
 
 A new Dockerfile can be created as needed either by duplicating the default one and adapt parameters in the view. e.g.: changing the key `'from': 'ubuntu:bionic'` to `'from': 'debian:buster'` will create a new Dockerfile based on Debian instead of ubuntu.
 Or by providing a plain Dockerfile in the template.
