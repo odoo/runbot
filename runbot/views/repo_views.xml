@@ -85,6 +85,7 @@
                 <field name="mode"/>
                 <field name="forbidden_regex"/>
                 <field name="invalid_branch_message"/>
+                <field name="single_version"/>
                 <field name="remote_ids">
                   <tree string="Remotes" editable="bottom">
                     <field name="name"/>
