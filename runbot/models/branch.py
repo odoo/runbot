@@ -61,13 +61,17 @@ class Branch(models.Model):
             if branch.is_pr:
                 _, name = branch.pull_head_name.split(':')
                 if branch.pull_head_remote_id:
-                    branch.reference_name = name
+                    reference_name = name
                 else:
-                    branch.reference_name = branch.pull_head_name  # repo is not known, not in repo list must be an external pr, so use complete label
+                    reference_name = branch.pull_head_name  # repo is not known, not in repo list must be an external pr, so use complete label
                     #if ':patch-' in branch.pull_head_name:
                     #    branch.reference_name = '%s~%s' % (branch.pull_head_name, branch.name)
             else:
-                branch.reference_name = branch.name
+                reference_name = branch.name
+            forced_version = branch.remote_id.repo_id.single_version  # we don't add a depend on repo.single_version to avoid mass recompute of existing branches
+            if forced_version and not reference_name.startswith(f'{forced_version.name}-'):
+                reference_name = f'{forced_version.name}---{reference_name}'
+            branch.reference_name = reference_name
 
     @api.depends('name')
     def _compute_branch_infos(self, pull_info=None):
