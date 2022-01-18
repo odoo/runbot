@@ -306,6 +306,10 @@
                 </t>
                 <t groups="runbot.group_runbot_admin">
                     <div class="dropdown-divider"/>
+                    <a class="dropdown-item" t-attf-href="/runbot/build/search?config_id={{bu.params_id.config_id.id}}&amp;trigger_id={{bu.params_id.trigger_id.id}}&amp;version_id={{bu.params_id.version_id.id}}&amp;create_batch_id.bundle_id={{bu.params_id.create_batch_id.bundle_id.id}}&amp;description={{bu.description or ''}}">
+                        <i class="fa fa-search"/>
+                        Find similar builds
+                    </a>
                     <a class="dropdown-item" t-attf-href="/web/#id={{bu['id']}}&amp;view_type=form&amp;model=runbot.build" target="new">
                         <i class="fa fa-list"/>
                         View in backend
