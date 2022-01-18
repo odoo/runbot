@@ -330,5 +330,58 @@
         </div>
       </t>
     </template>
+    <template id="runbot.build_search">
+      <t t-call='runbot.layout'>
+        <div class="row">
+          <div class="col-md-12">
+            <table class="table table-condensed">
+              <t t-foreach="builds" t-as="build">
+                <t t-set="rowclass">
+                  <t t-call="runbot.build_class">
+                    <t t-set="build" t-value="build"/>
+                  </t>
+                </t>
+                <tr t-attf-class="bg-{{rowclass.strip()}}-light{{' line-through' if build.orphan_result else ''}}">
+                  <td>
+                      <t t-esc="build.create_date"/>
+                  </td>
+                  <td>
+                    <a t-attf-href="/runbot/{{'batch/%s/' % from_batch.id if from_batch else ''}}build/{{build.id}}">
+                      <t t-esc="build.id"/>
+                    </a>
+                  </td>
+                  <td>
+                    <t t-if="build.description">
+                      <t t-raw="build.md_description" />
+                    </t>
+                  </td>
+                  <td>
+                    <t t-if="build.global_state in ['testing', 'waiting']">
+                      <i class="fa fa-spinner fa-spin"/>
+                      <t t-esc="build.global_state"/>
+                    </t>
+                  </td>
+                  <td>
+                    <span t-esc="build.params_id.config_id.name"/>
+                  </td>
+                  <td>
+                    <span t-esc="build.params_id.version_id.name"/>
+                  </td>
+                  <td>
+                    <span t-esc="build.get_formated_build_time()"/>
+                  </td>
+                  <td>
+                    <t t-call="runbot.build_button">
+                      <t t-set="bu" t-value="build"/>
+                      <t t-set="klass" t-value="'btn-group-ssm'"/>
+                    </t>
+                  </td>
+                </tr>
+              </t>
+            </table>
+          </div>
+        </div>
+      </t>
+    </template>
   </data>
 </odoo>

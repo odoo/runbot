@@ -305,6 +305,31 @@ class Runbot(Controller):
         return request.render("runbot.build", context)
 
     @route([
+    '/runbot/build/search',
+    ], website=True, auth='public', type='http', sitemap=False)
+    def builds(self, **kwargs):
+        domain = []
+        for key in ('config_id', 'version_id', 'project_id', 'trigger_id', 'create_batch_id.bundle_id', 'create_batch_id'): # allowed params
+            value = kwargs.get(key)
+            if value:
+                domain.append((f'params_id.{key}', '=', int(value)))
+
+        for key in ('global_state', 'local_state', 'global_result', 'local_result'):
+            value = kwargs.get(key)
+            if value:
+                domain.append((f'{key}', '=', value))
+
+        for key in ('description',):
+            if key in kwargs:
+                domain.append((f'{key}', 'ilike', kwargs.get(key)))
+
+        context = {
+            'builds': request.env['runbot.build'].search(domain, limit=100),
+        }
+
+        return request.render('runbot.build_search', context)
+
+    @route([
         '/runbot/branch/<model("runbot.branch"):branch>',
         ], website=True, auth='public', type='http', sitemap=False)
     def branch(self, branch=None, **kwargs):
