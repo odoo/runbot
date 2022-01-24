@@ -85,7 +85,7 @@ RUN curl -sSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
 ADD https://raw.githubusercontent.com/odoo/odoo/<t t-esc="values['odoo_branch']"/>/debian/control /tmp/control.txt
 RUN apt-get update \
     &amp;&amp; sed -n '/^Depends:/,/^[A-Z]/p' /tmp/control.txt \
-       | awk '/^ [a-z]/ { gsub(/,/,"") ; print }' | sort -u \
+       | awk '/^ [a-z]/ { gsub(/,/,"") ; print $1 }' | sort -u \
        | egrep -v 'postgresql-client' \
        | sed 's/python-imaging/python-pil/'| sed 's/python-pypdf/python-pypdf2/' \
        | DEBIAN_FRONTEND=noninteractive xargs apt-get install -y -qq \
