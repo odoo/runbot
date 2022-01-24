@@ -366,7 +366,7 @@ class Repo(models.Model):
                 if not git_refs:
                     return []
                 refs = [tuple(field for field in line.split('\x00')) for line in git_refs.split('\n')]
-                refs = [r for r in refs if dateutil.parser.parse(r[2][:19]) + datetime.timedelta(days=max_age) > datetime.datetime.now() or self.env['runbot.branch'].match_is_base(r[0])]
+                refs = [r for r in refs if dateutil.parser.parse(r[2][:19]) + datetime.timedelta(days=max_age) > datetime.datetime.now() or self.env['runbot.branch'].match_is_base(r[0].split('\n')[-1])]
                 if ignore:
                     refs = [r for r in refs if r[0].split('/')[-1] not in ignore]
                 return refs

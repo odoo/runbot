@@ -1,9 +1,11 @@
 import logging
 from odoo import models, fields, api
+from odoo.tools import config
 from ..common import fqdn, local_pgadmin_cursor, os
 from ..container import docker_build
 _logger = logging.getLogger(__name__)
 
+forced_host_name = None
 
 class Host(models.Model):
     _name = 'runbot.host'
@@ -94,8 +96,8 @@ class Host(models.Model):
         return os.path.abspath(os.path.join(os.path.dirname(__file__), '../static'))
 
     @api.model
-    def _get_current(self, suffix=''):
-        name = '%s%s' % (fqdn(), suffix)
+    def _get_current(self):
+        name = config.get('forced_host_name') or fqdn()
         return self.search([('name', '=', name)]) or self.create({'name': name})
 
     def get_running_max(self):

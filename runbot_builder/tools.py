@@ -46,6 +46,7 @@ class RunbotClient():
         while True:
             try:
                 self.host.last_start_loop = fields.Datetime.now()
+                self.env.cr.commit()
                 self.count = self.count % self.max_count
                 sleep_time = self.loop_turn()
                 self.count += 1
@@ -90,6 +91,8 @@ def run(client_class):
     parser.add_argument('--db_password')
     parser.add_argument('-d', '--database', default='runbot', help='name of runbot db')
     parser.add_argument('--logfile', default=False)
+    parser.add_argument('--forced-host-name', default=False)
+
     args = parser.parse_args()
     if args.logfile:
         dirname = os.path.dirname(args.logfile)
@@ -112,6 +115,8 @@ def run(client_class):
     addon_path = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
     config_addons_path = odoo.tools.config['addons_path']
     odoo.tools.config['addons_path'] = ','.join([config_addons_path, addon_path])
+
+    odoo.tools.config['forced_host_name'] = args.forced_host_name
 
     # create environment
     registry = odoo.registry(args.database)
