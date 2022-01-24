@@ -222,6 +222,9 @@ class Branch(models.Model):
                 self.bundle_id.defined_base_id = base.id
                 self.bundle_id._force()
 
+        if self.draft:
+            self.reviewers = ''  # reset reviewers on draft
+
         if (not self.draft and was_draft) or (self.alive and not was_alive) or (self.target_branch_name != init_target_branch_name and self.alive):
             self.bundle_id._force()
 

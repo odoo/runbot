@@ -44,6 +44,8 @@
                 <field name="config_id"/>
                 <field name="ci_context"/>
                 <field name="repo_ids" widget="many2many_tags"/>
+                <field name="dependency_ids" widget="many2many_tags"/>
+                <field name="manual"/>
             </tree>
         </field>
       </record>
