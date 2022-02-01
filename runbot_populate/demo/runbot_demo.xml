@@ -95,6 +95,11 @@
         <field name="name">15.0-dev-tri</field>
         <field name="project_id" ref="runbot.main_project"/>
     </record>
+    <record id="bundle_master_dev_partial_tri" model="runbot.bundle">
+        <field name="name">master-dev-partial-tri</field>
+        <field name="project_id" ref="runbot.main_project"/>
+    </record>
+
 
     <record id="bundle_runbot_15_0" model="runbot.bundle">
         <field name="name">15.0</field>

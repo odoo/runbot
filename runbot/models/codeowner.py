@@ -27,4 +27,4 @@ class Codeowner(models.Model):
     def _get_version_domain(self):
         """ Helper to get the evaluated version domain """
         self.ensure_one()
-        return ast.eval(self.version_domain) if self.version_domain else []
+        return ast.literal_eval(self.version_domain) if self.version_domain else []
