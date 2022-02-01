@@ -39,7 +39,7 @@ class Runbot(models.AbstractModel):
                     if bundle.is_base:
                         dev_remote = main_remote
                     self.env['runbot.branch'].create({'remote_id': dev_remote.id, 'name': bundle.name, 'is_pr': False})
-                    if not bundle.sticky:
+                    if not bundle.is_base:
                         mock_github.return_value = {
                             'base': {
                                 'ref': bundle.base_id.name
@@ -56,6 +56,9 @@ class Runbot(models.AbstractModel):
                         })
                         count += 1
                         branch.flush()
+
+                    if 'partial' in bundle.name:
+                        break
 
                 if not bundle.is_base:
                     pr = not pr
@@ -90,7 +93,7 @@ class Runbot(models.AbstractModel):
                 def git(command):
                     if command[0] == 'merge-base':
                         _, sha1, sha2 = command
-                        return sha1 if sha1 == sha2 else sha2 if bundle.is_base else '%s_%s' % (sha1, sha2)
+                        return sha1 if sha1 == sha2 else sha2 #if bundle.is_base else '%s_%s' % (sha1, sha2)
                     elif command[0] == 'rev-list':
                         _, _, _, shas = command
                         sha1, sha2 = shas.split('...')

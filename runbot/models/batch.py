@@ -235,7 +235,7 @@ class Batch(models.Model):
                 ]).sorted(lambda b: (len(b.commit_ids & merge_base_commits), b.id), reverse=True)
                 if batches:
                     batch = batches[0]
-                    self._log('Using batch %s to define missing commits', batch.id)
+                    self._log('Using batch [%s](%s) to define missing commits', batch.id, batch._url())
                     batch_exiting_commit = batch.commit_ids.filtered(lambda c: c.repo_id in merge_base_commits.repo_id)
                     not_matching = (batch_exiting_commit - merge_base_commits)
                     if not_matching:
