@@ -74,7 +74,7 @@ class Host(models.Model):
 
     def _docker_build(self):
         """ build docker images needed by locally pending builds"""
-        _logger.info('Building docker image...')
+        _logger.info('Building docker images...')
         self.ensure_one()
         static_path = self._get_work_path()
         self.clear_caches()  # needed to ensure that content is updated on all hosts
@@ -84,13 +84,11 @@ class Host(models.Model):
             os.makedirs(docker_build_path, exist_ok=True)
             with open(os.path.join(docker_build_path, 'Dockerfile'), 'w') as Dockerfile:
                 Dockerfile.write(dockerfile.dockerfile)
-            build_process = docker_build(docker_build_path, dockerfile.image_tag)
-            if build_process != 0:
+            docker_build_success, msg = docker_build(docker_build_path, dockerfile.image_tag)
+            if not docker_build_success:
                 dockerfile.to_build = False
-                message = 'Dockerfile build "%s" failed on host %s' % (dockerfile.image_tag, self.name)
-                dockerfile.message_post(body=message)
-                self.env['runbot.runbot'].warning(message)
-                _logger.warning(message)
+                dockerfile.message_post(body=f'Build failure:\n{msg}')
+                self.env['runbot.runbot'].warning(f'Dockerfile build "{dockerfile.image_tag}" failed on host {self.name}')
 
     def _get_work_path(self):
         return os.path.abspath(os.path.join(os.path.dirname(__file__), '../static'))
