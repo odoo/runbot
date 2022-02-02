@@ -58,7 +58,7 @@ class TestDockerfile(RunbotCase, HttpCase):
             self.assertIn('apt-get install -y -qq google-chrome-stable=87.0-1', content)
 
         docker_build_mock = self.patchers['docker_build']
-        docker_build_mock.return_value = 0
+        docker_build_mock.return_value = (True, None)
         mopen = mock_open()
         rb_host = self.env['runbot.host'].create({'name': 'runbotxxx.odoo.com'})
         with patch('builtins.open', mopen) as file_mock:

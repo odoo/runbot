@@ -10,14 +10,24 @@ When testing this file:
 """
 import configparser
 import io
-import json
 import logging
 import os
 import re
 import subprocess
+import warnings
+
+# unsolved issue https://github.com/docker/docker-py/issues/2928
+with warnings.catch_warnings():
+    warnings.filterwarnings(
+        "ignore",
+        message="The distutils package is deprecated.*",
+        category=DeprecationWarning
+    )
+    import docker
 
 
 _logger = logging.getLogger(__name__)
+
 DOCKERUSER = """
 RUN groupadd -g %(group_id)s odoo \\
 && useradd -u %(user_id)s -g odoo -G audio,video odoo \\
@@ -103,14 +113,23 @@ def _docker_build(build_dir, image_tag):
     """Build the docker image
     :param build_dir: the build directory that contains Dockerfile.
     :param image_tag: name used to tag the resulting docker image
+    :return: tuple(success, msg) where success is a boolean and msg is the error message or None
     """
     # synchronise the current user with the odoo user inside the Dockerfile
     with open(os.path.join(build_dir, 'Dockerfile'), 'a') as df:
         df.write(DOCKERUSER)
-    log_path = os.path.join(build_dir, 'docker_build.txt')
-    logs = open(log_path, 'w')
-    dbuild = subprocess.Popen(['docker', 'build', '--tag', image_tag, '.'], stdout=logs, stderr=logs, cwd=build_dir)
-    return dbuild.wait()
+    docker_client = docker.from_env()
+    try:
+        docker_client.images.build(path=build_dir, tag=image_tag, rm=True)
+    except docker.errors.APIError as e:
+        _logger.error('Build of image %s failed with this API error:', image_tag)
+        return (False, e.explanation)
+    except docker.errors.BuildError as e:
+        _logger.error('Build of image %s failed with this BUILD error:', image_tag)
+        msg = f"{e.msg}\n{''.join(l.get('stream') or '' for l in e.build_log)}"
+        return (False, msg)
+    _logger.info('Dockerfile %s finished build', image_tag)
+    return (True, None)
 
 
 def docker_run(*args, **kwargs):
@@ -140,32 +159,23 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
     else:
         cmd_object = Command([], run_cmd.split(' '), [])
     _logger.info('Docker run command: %s', run_cmd)
-    logs = open(log_path, 'w')
     run_cmd = 'cd /data/build;touch start-%s;%s;cd /data/build;touch end-%s' % (container_name, run_cmd, container_name)
     docker_clear_state(container_name, build_dir)  # ensure that no state are remaining
     open(os.path.join(build_dir, 'exist-%s' % container_name), 'w+').close()
+    logs = open(log_path, 'w')
     logs.write("Docker command:\n%s\n=================================================\n" % cmd_object)
     # create start script
-    docker_command = [
-        'docker', 'run', '--rm',
-        '--name', container_name,
-        '--volume=/var/run/postgresql:/var/run/postgresql',
-        '--volume=%s:/data/build' % build_dir,
-        '--shm-size=128m',
-        '--init',
-    ]
-
-    if memory:
-        docker_command.append('--memory=%s' % memory)
+    volumes = {
+        '/var/run/postgresql': {'bind': '/var/run/postgresql', 'mode': 'rw'},
+        f'{build_dir}': {'bind': '/data/build', 'mode': 'rw'},
+        f'{log_path}': {'bind': '/data/buildlogs.txt', 'mode': 'rw'}
+    }
 
     if ro_volumes:
         for dest, source in ro_volumes.items():
             logs.write("Adding readonly volume '%s' pointing to %s \n" % (dest, source))
-            docker_command.append('--volume=%s:/data/build/%s:ro' % (source, dest))
-
-    if env_variables:
-        for var in env_variables:
-            docker_command.append('-e=%s' % var)
+            volumes[source] = {'bind': f'/data/build/{dest}', 'mode': 'ro'}
+    logs.close()
 
     serverrc_path = os.path.expanduser('~/.openerp_serverrc')
     odoorc_path = os.path.expanduser('~/.odoorc')
@@ -174,16 +184,37 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
     rc_path = os.path.join(build_dir, '.odoorc')
     with open(rc_path, 'w') as rc_file:
         rc_file.write(rc_content)
-    docker_command.extend(['--volume=%s:/home/odoo/.odoorc:ro' % rc_path])
+    volumes[rc_path] = {'bind': '/home/odoo/.odoorc', 'mode': 'ro'}
 
+    ports = {}
     if exposed_ports:
         for dp, hp in enumerate(exposed_ports, start=8069):
-            docker_command.extend(['-p', '127.0.0.1:%s:%s' % (hp, dp)])
+            ports[f'{dp}/tcp'] = ('127.0.0.1', hp)
+
+    ulimits = []
     if cpu_limit:
-        docker_command.extend(['--ulimit', 'cpu=%s' % int(cpu_limit)])
-    docker_command.extend([image_tag, '/bin/bash', '-c', "%s" % run_cmd])
-    subprocess.Popen(docker_command, stdout=logs, stderr=logs, preexec_fn=preexec_fn, close_fds=False, cwd=build_dir)
-    _logger.info('Started Docker container %s', container_name)
+        ulimits.append(docker.types.Ulimit(name='cpu', soft=cpu_limit, hard=cpu_limit))
+
+    docker_client = docker.from_env()
+    container = docker_client.containers.run(
+        image_tag,
+        name=container_name,
+        volumes=volumes,
+        shm_size='128m',
+        mem_limit=memory,
+        ports=ports,
+        ulimits=ulimits,
+        environment=env_variables,
+        init=True,
+        command=['/bin/bash', '-c',
+                 f'exec &>> /data/buildlogs.txt ;{run_cmd}'],
+        auto_remove=True,
+        detach=True
+    )
+    if container.status not in ('running', 'created') :
+        _logger.error('Container %s started but status is not running or created:  %s', container_name, container.status)  # TODO cleanup
+    else:
+        _logger.info('Started Docker container %s', container_name)
     return
 
 
@@ -195,19 +226,19 @@ def _docker_stop(container_name, build_dir):
     """Stops the container named container_name"""
     container_name = sanitize_container_name(container_name)
     _logger.info('Stopping container %s', container_name)
+    docker_client = docker.from_env()
     if build_dir:
         end_file = os.path.join(build_dir, 'end-%s' % container_name)
         subprocess.run(['touch', end_file])
     else:
         _logger.info('Stopping docker without defined build_dir')
-    subprocess.run(['docker', 'stop', container_name])
-
-
-def docker_is_running(container_name):
-    container_name = sanitize_container_name(container_name)
-    dinspect = subprocess.run(['docker', 'container', 'inspect', container_name], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-    return True if dinspect.returncode == 0 else False
-
+    try:
+        container = docker_client.containers.get(container_name)
+        container.stop(timeout=1)
+    except docker.errors.NotFound:
+        _logger.error('Cannnot stop container %s. Container not found', container_name)
+    except docker.errors.APIError as e:
+        _logger.error('Cannnot stop container %s. API Error "%s"', container_name, e)
 
 def docker_state(container_name, build_dir):
     container_name = sanitize_container_name(container_name)
@@ -221,13 +252,16 @@ def docker_state(container_name, build_dir):
     if ended:
         return 'END'
 
+    state = 'UNKNOWN'
     if started:
-        if docker_is_running(container_name):
-            return 'RUNNING'
-        else:
-            return 'GHOST'
-
-    return 'UNKNOWN'
+        docker_client = docker.from_env()
+        try:
+            container = docker_client.containers.get(container_name)
+            # possible statuses: created, restarting, running, removing, paused, exited, or dead
+            state = 'RUNNING' if container.status in ('created', 'running', 'paused') else 'GHOST'
+        except docker.errors.NotFound:
+            state = 'GHOST'
+    return state
 
 
 def docker_clear_state(container_name, build_dir):
@@ -243,14 +277,12 @@ def docker_clear_state(container_name, build_dir):
 
 def docker_get_gateway_ip():
     """Return the host ip of the docker default bridge gateway"""
-    docker_net_inspect = subprocess.run(['docker', 'network', 'inspect', 'bridge'], stdout=subprocess.PIPE)
-    if docker_net_inspect.returncode != 0:
+    docker_client = docker.from_env()
+    try:
+        bridge_net = docker_client.networks.get([n.id for n in docker_client.networks.list('bridge')][0])
+        return bridge_net.attrs['IPAM']['Config'][0]['Gateway']
+    except (KeyError, IndexError):
         return None
-    if docker_net_inspect.stdout:
-        try:
-            return json.loads(docker_net_inspect.stdout)[0]['IPAM']['Config'][0]['Gateway']
-        except KeyError:
-            return None
 
 
 def docker_ps():
@@ -259,35 +291,13 @@ def docker_ps():
 
 def _docker_ps():
     """Return a list of running containers names"""
-    try:
-        docker_ps = subprocess.run(['docker', 'ps', '--format', '{{.Names}}'], stderr=subprocess.DEVNULL, stdout=subprocess.PIPE)
-    except FileNotFoundError:
-        _logger.warning('Docker not found, returning an empty list.')
-        return []
-    if docker_ps.returncode != 0:
-        return []
-    output = docker_ps.stdout.decode()
-    if not output:
-        return []
-    return output.strip().split('\n')
-
-
-def build(args):
-    """Build container from CLI"""
-    _logger.info('Building the base image container')
-    logdir = os.path.join(args.build_dir, 'logs')
-    os.makedirs(logdir, exist_ok=True)
-    logfile = os.path.join(logdir, 'logs-build.txt')
-    _logger.info('Logfile is in %s', logfile)
-    docker_build(logfile, args.build_dir)
-    _logger.info('Finished building the base image container')
-
+    docker_client = docker.client.from_env()
+    return [ c.name for c in docker_client.containers.list()]
 
 def sanitize_container_name(name):
     """Returns a container name with unallowed characters removed"""
     name = re.sub('^[^a-zA-Z0-9]+', '', name)
     return re.sub('[^a-zA-Z0-9_.-]', '', name)
-
 
 
 ##############################################################################
