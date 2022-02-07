@@ -27,6 +27,8 @@ class ResConfigSettings(models.TransientModel):
 
     runbot_db_gc_days = fields.Integer('Days before gc', default=30, config_parameter='runbot.db_gc_days')
     runbot_db_gc_days_child = fields.Integer('Days before gc of child', default=15, config_parameter='runbot.db_gc_days_child')
+    runbot_full_gc_days = fields.Integer('Days before directory removal', default=365, config_parameter='runbot.full_gc_days',
+                                         help='Counting from the db removal date')
 
     runbot_pending_warning = fields.Integer('Pending warning limit', default=5, config_parameter='runbot.pending.warning')
     runbot_pending_critical = fields.Integer('Pending critical limit', default=5, config_parameter='runbot.pending.critical')
