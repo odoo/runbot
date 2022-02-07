@@ -191,7 +191,7 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
         for dp, hp in enumerate(exposed_ports, start=8069):
             ports[f'{dp}/tcp'] = ('127.0.0.1', hp)
 
-    ulimits = []
+    ulimits = [docker.types.Ulimit(name='core', soft=0, hard=0)]  # avoid core dump in containers
     if cpu_limit:
         ulimits.append(docker.types.Ulimit(name='cpu', soft=cpu_limit, hard=cpu_limit))
 
