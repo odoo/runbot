@@ -1252,20 +1252,12 @@ class PullRequests(models.Model):
             gh, target, pr_commits, related_prs=related_prs)
 
     def _stage_squash(self, gh, target, commits, related_prs=()):
-        original_head = gh.head(target)
+        assert len(commits) == 1, "can only squash a single commit"
         msg = self._build_merge_message(self, related_prs=related_prs)
-        [commit] = commits
-        merge_tree = gh.merge(commit['sha'], target, 'temp')['tree']['sha']
-        squashed = gh('post', 'git/commits', json={
-            'message': str(msg),
-            'tree': merge_tree,
-            'author': commit['commit']['author'],
-            'committer': commit['commit']['committer'],
-            'parents': [original_head],
-        }).json()['sha']
-        gh.set_ref(target, squashed)
-        self.commits_map = json.dumps({commit['sha']: squashed, '': squashed})
-        return squashed
+        commits[0]['commit']['message'] = str(msg)
+        head, mapping = gh.rebase(self.number, target, commits=commits)
+        self.commits_map = json.dumps({**mapping, '': head})
+        return head
 
     def _stage_rebase_ff(self, gh, target, commits, related_prs=()):
         # updates head commit with PR number (if necessary) then rebases

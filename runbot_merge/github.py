@@ -308,15 +308,14 @@ class GH(object):
         prev = original_head
         mapping = {}
         for c in commits:
+            committer = c['commit']['committer']
+            committer.pop('date')
             copy = self('post', 'git/commits', json={
                 'message': c['commit']['message'],
                 'tree': c['new_tree'],
                 'parents': [prev],
                 'author': c['commit']['author'],
-                'committer': dict(
-                    c['commit']['committer'],
-                    date=datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-                ),
+                'committer': committer,
             }, check={409: MergeError}).json()
             logger.debug('copied %s to %s (parent: %s)', c['sha'], copy['sha'], prev)
             prev = mapping[c['sha']] = copy['sha']
