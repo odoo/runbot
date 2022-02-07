@@ -56,21 +56,24 @@ class FreezeWizard(models.Model):
 
         return {'type': 'ir.actions.act_window_close'}
 
+    def action_open(self):
+        return {
+            'type': 'ir.actions.act_window',
+            'target': 'new',
+            'name': f'Freeze project {self.project_id.name}',
+            'view_mode': 'form',
+            'res_model': self._name,
+            'res_id': self.id,
+        }
+
     def action_freeze(self):
         """ Attempts to perform the freeze.
         """
-        project_id = self.project_id
         # if there are still errors, reopen the wizard
         if self.errors:
-            return {
-                'type': 'ir.actions.act_window',
-                'target': 'new',
-                'name': f'Freeze project {project_id.name}',
-                'view_mode': 'form',
-                'res_model': self._name,
-                'res_id': self.id,
-            }
+            return self.action_open()
 
+        project_id = self.project_id
         # need to create the new branch, but at the same time resequence
         # everything so the new branch is the second one, just after the branch
         # it "forks"

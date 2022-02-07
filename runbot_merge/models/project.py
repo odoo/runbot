@@ -117,4 +117,4 @@ class Project(models.Model):
             'branch_name': self._next_freeze(),
             'release_pr_ids': [(0, 0, {'repository_id': repo.id}) for repo in self.repo_ids]
         })
-        return w.action_freeze()
+        return w.action_open()

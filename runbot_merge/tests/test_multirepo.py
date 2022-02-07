@@ -1152,6 +1152,7 @@ def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
     w = project.action_prepare_freeze()
     w2 = project.action_prepare_freeze()
     assert w == w2, "each project should only have one freeze wizard active at a time"
+    assert w['res_model'] == 'runbot_merge.project.freeze'
 
     w_id = env[w['res_model']].browse([w['res_id']])
     assert w_id.branch_name == '1.1', "check that the forking incremented the minor by 1"
@@ -1188,6 +1189,14 @@ def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
 
     assert not w_id.errors
 
+    # assume the wizard is closed, re-open it
+    w = project.action_prepare_freeze()
+    assert w['res_model'] == 'runbot_merge.project.freeze'
+    assert w['res_id'] == w_id.id, "check that we're still getting the old wizard"
+    w_id = env[w['res_model']].browse([w['res_id']])
+    assert w_id.exists()
+
+    # actually perform the freeze
     r = w_id.action_freeze()
     # check that the wizard was deleted
     assert not w_id.exists()
