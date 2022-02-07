@@ -25,7 +25,7 @@
                     <group>
                         <group colspan="2">
                             <field name="release_pr_ids" nolabel="1">
-                                <tree editable="bottom" create="false" unlink="false">
+                                <tree editable="bottom" create="false">
                                     <field name="repository_id" readonly="1"/>
                                     <field name="pr_id" options="{'no_create': True}"/>
                                 </tree>
@@ -47,6 +47,17 @@
                     </footer>
                 </sheet>
             </form>
+        </field>
+    </record>
+
+    <record id="runbot_merge_repository_freeze" model="ir.ui.view">
+        <field name="name">Add freeze field to repo form</field>
+        <field name="model">runbot_merge.repository</field>
+        <field name="inherit_id" ref="form_repository"/>
+        <field name="arch" type="xml">
+            <field name="branch_filter" position="after">
+                <field name="freeze"/>
+            </field>
         </field>
     </record>
 </odoo>

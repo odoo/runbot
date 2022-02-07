@@ -1234,3 +1234,75 @@ def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
     assert c_c.message.startswith('Release 1.1 (C)')
     assert repo_c.read_tree(c_c) == {'f': '2', 'version': ''}
     assert repo_c.commit(c_c.parents[0]).parents[0] == masters[2]
+
+
+def test_freeze_subset(env, project, repo_a, repo_b, repo_c, users, config):
+    """It should be possible to only freeze a subset of a project when e.g. one
+    of the repository is managed differently than the rest and has
+    non-synchronous releases.
+
+    - it should be possible to mark repositories as non-freezed (just opted out
+      of the entire thing), in which case no freeze PRs should be asked of them
+    - it should be possible to remove repositories from the freeze wizard
+    - repositories which are not in the freeze wizard should just not be frozen
+
+    To do things correctly that should probably match with the branch filters
+    and stuff, but that's a configuration concern.
+    """
+    # have a project with 3 repos, and two branches (1.0 and master)
+    project.branch_ids = [
+        (1, project.branch_ids.id, {'sequence': 1}),
+        (0, 0, {'name': '1.0', 'sequence': 2}),
+    ]
+
+    masters = []
+    for r in [repo_a, repo_b, repo_c]:
+        with r:
+            [root, _] = r.make_commits(
+                None,
+                Commit('base', tree={'version': '', 'f': '0'}),
+                Commit('release 1.0', tree={'version': '1.0'} if r is repo_a else None),
+                ref='heads/1.0'
+            )
+            masters.extend(r.make_commits(root, Commit('other', tree={'f': '1'}), ref='heads/master'))
+
+    with repo_a:
+        repo_a.make_commits(
+            masters[0],
+            Commit('Release 1.1', tree={'version': '1.1'}),
+            ref='heads/release-1.1'
+        )
+        pr_rel_a = repo_a.make_pr(target='master', head='release-1.1')
+
+    # the third repository we opt out of freezing
+    project.repo_ids.filtered(lambda r: r.name == repo_c.name).freeze = False
+    env.run_crons() # process the PRs
+
+    # open the freeze wizard
+    w = project.action_prepare_freeze()
+    w_id = env[w['res_model']].browse([w['res_id']])
+    # check that there are only rels for repos A and B
+    assert w_id.mapped('release_pr_ids.repository_id.name') == [repo_a.name, repo_b.name]
+    # remove B from the set
+    b_id = w_id.release_pr_ids.filtered(lambda r: r.repository_id.name == repo_b.name)
+    w_id.write({'release_pr_ids': [(3, b_id.id, 0)]})
+    assert len(w_id.release_pr_ids) == 1
+    # set lone release PR
+    w_id.release_pr_ids.pr_id = to_pr(env, pr_rel_a).id
+    assert not w_id.errors
+
+    w_id.action_freeze()
+    assert not w_id.exists()
+
+    assert repo_a.commit('1.1'), "should have created branch in repo A"
+    try:
+        repo_b.commit('1.1')
+        pytest.fail("should *not* have created branch in repo B")
+    except AssertionError:
+        ...
+    try:
+        repo_c.commit('1.1')
+        pytest.fail("should *not* have created branch in repo C")
+    except AssertionError:
+        ...
+    # can't stage because we (wilfully) don't have branches 1.1 in repos B and C

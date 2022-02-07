@@ -115,6 +115,10 @@ class Project(models.Model):
         w = Freeze.search([('project_id', '=', self.id)]) or Freeze.create({
             'project_id': self.id,
             'branch_name': self._next_freeze(),
-            'release_pr_ids': [(0, 0, {'repository_id': repo.id}) for repo in self.repo_ids]
+            'release_pr_ids': [
+                (0, 0, {'repository_id': repo.id})
+                for repo in self.repo_ids
+                if repo.freeze
+            ]
         })
         return w.action_open()
