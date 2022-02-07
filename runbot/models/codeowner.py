@@ -28,7 +28,7 @@ class Codeowner(models.Model):
     def _validate_version_domain(self):
         for rec in self:
             try:
-                self._match_version(runbot.bundle_master.version_id)
+                self._match_version(self.env.ref('runbot.bundle_master').version_id)
             except Exception as e:
                 raise ValidationError("Unable to validate version_domain: %s" % e)
 
