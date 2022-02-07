@@ -1,12 +1,12 @@
 import datetime
 import itertools
 import json
-import re
 import textwrap
+import time
 from unittest import mock
 
 import pytest
-from lxml import html, etree
+from lxml import html
 
 import odoo
 from utils import _simple_init, seen, re_matches, get_partner, Commit, pr_page, to_pr, part_of
@@ -1958,7 +1958,11 @@ Part-of: {pr_id.display_name}"""
         with repo:
             repo.make_commits(None, Commit('initial', tree={'a': '0'}), ref='heads/master')
 
-            repo.make_commits('master', Commit('sub', tree={'b': '0'}), ref='heads/other')
+            repo.make_commits(
+                'master',
+                Commit('sub', tree={'b': '0'}, committer={'name': 'bob', 'email': 'builder@example.org', 'date': '1999-04-12T08:19:30Z'}),
+                ref='heads/other'
+            )
             pr1 = repo.make_pr(title='first pr', target='master', head='other')
             repo.post_status('other', 'success', 'legal/cla')
             repo.post_status('other', 'success', 'ci/runbot')
@@ -1988,12 +1992,21 @@ Part-of: {pr_id.display_name}"""
             (users['reviewer'], 'hansen r+ squash'),
             (users['user'], 'Merge method set to squash')
         ]
-        assert repo.commit('master').message == f"""first pr
+        merged_head = repo.commit('master')
+        assert merged_head.message == f"""first pr
 
 closes {pr1_id.display_name}
 
 Signed-off-by: {get_partner(env, users["reviewer"]).formatted_email}\
 """
+        assert merged_head.committer['name'] == 'bob'
+        assert merged_head.committer['email'] == 'builder@example.org'
+        commit_date = datetime.datetime.strptime(merged_head.committer['date'], '%Y-%m-%dT%H:%M:%SZ')
+        # using timestamp (and working in seconds) because `pytest.approx`
+        # silently fails on datetimes (#8395)
+        assert commit_date.timestamp() == pytest.approx(time.time(), abs=5*60), \
+            "the commit date of the merged commit should be about now, despite" \
+            " the source commit being >20 years old"
 
         pr2_id = to_pr(env, pr2)
         assert pr2_id.state == 'ready'
