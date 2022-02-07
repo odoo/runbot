@@ -393,7 +393,6 @@ class BuildResult(models.Model):
     @api.depends_context('batch')
     def _compute_build_url(self):
         batch = self.env.context.get('batch')
-        print(self.env.context)
         for build in self:
             if batch:
                 build.build_url = "/runbot/batch/%s/build/%s" % (batch.id, build.id)
@@ -483,6 +482,7 @@ class BuildResult(models.Model):
         ignored = set()
         icp = self.env['ir.config_parameter']
         hide_in_logs = icp.get_param('runbot.runbot_db_template', default='template0')
+        full_gc_days = int(icp.get_param('runbot.full_gc_days', default=365))
 
         for dest in dest_list:
             build = self._build_from_dest(dest)
@@ -499,14 +499,15 @@ class BuildResult(models.Model):
             dest_list = [dest for sublist in [dest_by_builds_ids[rem_id] for rem_id in remaining.ids] for dest in sublist]
             _logger.info('(%s) (%s) not deleted because no corresponding build found', label, " ".join(dest_list))
         for build in existing:
-            if fields.Datetime.from_string(build.gc_date) < datetime.datetime.now():
+            if build.gc_date < fields.datetime.now():
                 if build.local_state == 'done':
+                    full = build.gc_date + datetime.timedelta(days=(full_gc_days)) < fields.datetime.now()
                     for db in dest_by_builds_ids[build.id]:
-                        yield db
+                        yield (db, full)
                 elif build.local_state != 'running':
                     _logger.warning('db (%s) not deleted because state is not done', " ".join(dest_by_builds_ids[build.id]))
 
-    def _local_cleanup(self, force=False):
+    def _local_cleanup(self, force=False, full=False):
         """
         Remove datadir and drop databases of build older than db_gc_days or db_gc_days_child.
         If force is set to True, does the same cleaning based on recordset without checking build age.
@@ -520,7 +521,7 @@ class BuildResult(models.Model):
                 for dest in dest_list:
                     build = self._build_from_dest(dest)
                     if build and build in self:
-                        yield dest
+                        yield (dest, full)
                     elif not build:
                         _logger.info('%s (%s) skipped because not dest format', label, dest)
             _filter = filter_ids
@@ -529,7 +530,7 @@ class BuildResult(models.Model):
 
         existing_db = list_local_dbs(additionnal_conditions=additionnal_conditions)
 
-        for db in _filter(dest_list=existing_db, label='db'):
+        for db, _ in _filter(dest_list=existing_db, label='db'):
             self._logger('Removing database')
             self._local_pg_dropdb(db)
 
@@ -537,12 +538,16 @@ class BuildResult(models.Model):
         builds_dir = os.path.join(root, 'build')
 
         if force is True:
-            dests = [build.dest for build in self]
+            dests = [(build.dest, full) for build in self]
         else:
             dests = _filter(dest_list=os.listdir(builds_dir), label='workspace')
 
-        for dest in dests:
+        for dest, full in dests:
             build_dir = os.path.join(builds_dir, dest)
+            if full:
+                _logger.info('Removing build dir "%s"', dest)
+                shutil.rmtree(build_dir, ignore_errors=True)
+                continue
             for f in os.listdir(build_dir):
                 path = os.path.join(build_dir, f)
                 if os.path.isdir(path) and f not in ('logs', 'tests'):
@@ -553,7 +558,7 @@ class BuildResult(models.Model):
                         log_file_path = os.path.join(log_path, f)
                         if os.path.isdir(log_file_path):
                             shutil.rmtree(log_file_path)
-                        elif not f.endswith('.txt'):
+                        elif f in ('run.txt', 'wake_up.txt') or not f.endswith('.txt'):
                             os.unlink(log_file_path)
 
     def _find_port(self):
