@@ -35,12 +35,5 @@
             <field name="target">new</field>
         </record>
 
-        <menuitem
-            name="Stat Regex Wizard"
-            id="runbot_menu_stat_regex_wizard"
-            parent="runbot_menu_stat_root"
-            sequence="150"
-            action="runbot_stat_regex_wizard_action"
-            />
-  </data>
+    </data>
 </odoo>

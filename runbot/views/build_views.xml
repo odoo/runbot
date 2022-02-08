@@ -142,8 +142,5 @@
         <field name="res_model">runbot.build.params</field>
         <field name="view_mode">tree,form</field>
     </record>
-    <menuitem id="menu_build" name="Build" parent="runbot_menu_root"/>
-    <menuitem id="menu_build_build" action="action_build" parent="menu_build"/>
-    <menuitem id="menu_build_params" action="action_build_params" parent="menu_build"/>
   </data>
 </odoo>

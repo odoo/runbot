@@ -125,26 +125,5 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    <menuitem
-        name="Runbot Teams"
-        id="runbot_menu_team_tree"
-        parent="runbot_menu_manage_errors"
-        sequence="30"
-        action="open_view_runbot_team"
-        />
-    <menuitem
-        name="Runbot Dashboards"
-        id="runbot_menu_runbot_dashboard_tree"
-        parent="runbot_menu_manage_errors"
-        sequence="40"
-        action="open_view_runbot_dashboard"
-        />
-    <menuitem
-        name="Runbot Dashboard Tiles"
-        id="runbot_menu_runbot_dashboard_tile_tree"
-        parent="runbot_menu_manage_errors"
-        sequence="50"
-        action="open_view_runbot_dashboard_tile"
-        />
   </data>
 </odoo>

@@ -86,19 +86,5 @@
         <field name="context">{'search_default_sticky_bundles': True, 'search_default_failed_builds': True, 'search_default_log_date': True}</field>
     </record>
 
-    <menuitem
-      id="runbot_log_menu"
-      name="Logs"
-      parent="runbot_menu_root"
-      sequence="50"
-    />
-
-    <menuitem
-        name="Error Logs"
-        id="runbot_menu_error_logs"
-        parent="runbot_log_menu"
-        sequence="20"
-        action="open_view_error_log_tree"
-    />
   </data>
 </odoo>

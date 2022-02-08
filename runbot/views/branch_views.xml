@@ -43,14 +43,5 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    <menuitem name="Runbot" id="runbot_menu_root"/>
-
-    <menuitem
-        name="Branches"
-        id="runbot_menu_branch_tree"
-        parent="runbot_menu_root"
-        sequence="20"
-        action="open_view_branch_tree"
-        />
   </data>
 </odoo>

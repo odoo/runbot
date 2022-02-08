@@ -42,12 +42,5 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    <menuitem
-        name="CodeOwners"
-        id="runbot_menu_codeowner_tree"
-        parent="runbot_menu_manage_errors"
-        sequence="90"
-        action="open_view_codeowner_tree"
-        />
   </data>
 </odoo>

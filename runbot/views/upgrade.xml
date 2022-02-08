@@ -60,19 +60,5 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    <menuitem
-        name="Upgrade Exceptions"
-        id="runbot_menu_upgrade_exceptions_tree"
-        parent="runbot_menu_configs"
-        sequence="30"
-        action="open_view_upgrade_exception_tree"
-        />
-    <menuitem
-        name="Upgrade Regexes"
-        id="runbot_menu_upgrade_regex_tree"
-        parent="runbot_menu_configs"
-        sequence="30"
-        action="open_view_upgrade_regex_tree"
-        />
   </data>
 </odoo>
