@@ -24,9 +24,9 @@ def make_basic(env, config, make_repo, *, fp_token, fp_remote):
             'github_prefix': 'hansen',
             'fp_github_token': fp_token and config['github']['token'],
             'branch_ids': [
-                (0, 0, {'name': 'a', 'fp_sequence': 2, 'fp_target': True}),
-                (0, 0, {'name': 'b', 'fp_sequence': 1, 'fp_target': True}),
-                (0, 0, {'name': 'c', 'fp_sequence': 0, 'fp_target': True}),
+                (0, 0, {'name': 'a', 'sequence': 2, 'fp_target': True}),
+                (0, 0, {'name': 'b', 'sequence': 1, 'fp_target': True}),
+                (0, 0, {'name': 'c', 'sequence': 0, 'fp_target': True}),
             ],
         })
 
@@ -683,3 +683,47 @@ def test_approve_draft(env, config, make_repo, users):
         pr.post_comment('hansen r+', config['role_reviewer']['token'])
     env.run_crons()
     assert pr_id.state == 'approved'
+
+def test_freeze(env, config, make_repo, users):
+    """Freeze:
+
+    - should not forward-port the freeze PRs themselves
+    """
+    project, prod, _ = make_basic(env, config, make_repo, fp_token=True, fp_remote=True)
+    # branches here are "a" (older), "b", and "c" (master)
+    with prod:
+        [root, _] = prod.make_commits(
+            None,
+            Commit('base', tree={'version': '', 'f': '0'}),
+            Commit('release 1.0', tree={'version': '1.0'}),
+            ref='heads/b'
+        )
+        prod.make_commits(root, Commit('other', tree={'f': '1'}), ref='heads/c')
+    with prod:
+        prod.make_commits(
+            'c',
+            Commit('Release 1.1', tree={'version': '1.1'}),
+            ref='heads/release-1.1'
+        )
+        release = prod.make_pr(target='c', head='release-1.1')
+    env.run_crons()
+
+    w = project.action_prepare_freeze()
+    assert w['res_model'] == 'runbot_merge.project.freeze'
+    w_id = env[w['res_model']].browse([w['res_id']])
+    assert w_id.release_pr_ids.repository_id.name == prod.name
+    release_id = to_pr(env, release)
+    w_id.release_pr_ids.pr_id = release_id.id
+
+    assert not w_id.errors
+    w_id.action_freeze()
+    env.run_crons() # stage freeze PRs
+    with prod:
+        prod.post_status('staging.post-b', 'success', 'ci/runbot')
+        prod.post_status('staging.post-b', 'success', 'legal/cla')
+    env.run_crons()
+
+    assert release_id.state == 'merged'
+    assert not env['runbot_merge.pull_requests'].search([
+        ('state', '!=', 'merged')
+    ]), "the release PRs should not be forward-ported"
