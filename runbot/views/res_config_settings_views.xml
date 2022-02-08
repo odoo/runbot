@@ -87,7 +87,6 @@
             <field name="context">{'module' : 'runbot'}</field>
         </record>
 
-        <menuitem id="menu_runbot_global_settings" name="Settings"
-            parent="runbot_menu_root" sequence="0" action="action_runbot_configuration" groups="base.group_system"/>
+
     </data>
 </odoo>

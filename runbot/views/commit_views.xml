@@ -59,12 +59,6 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    <menuitem
-        name="Commits"
-        id="runbot_menu_commit_tree"
-        parent="runbot_menu_root"
-        sequence="20"
-        action="open_view_commit_tree"
-        />
+
   </data>
 </odoo>

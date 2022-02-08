@@ -47,12 +47,5 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    <menuitem
-        name="Build Hosts"
-        id="runbot_menu_host_tree"
-        parent="runbot_menu_root"
-        sequence="32"
-        action="open_view_host_tree"
-        />
   </data>
 </odoo>

@@ -189,28 +189,7 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    <menuitem
-        name="Configs"
-        id="runbot_menu_configs"
-        parent="runbot_menu_root"
-        sequence="30"
-        />
 
-    <menuitem
-        name="Build Configs"
-        id="runbot_menu_job_config_tree"
-        parent="runbot_menu_configs"
-        sequence="10"
-        action="open_view_job_config_tree"
-        />
-
-    <menuitem
-        name="Build Config Step"
-        id="runbot_menu_job_tree"
-        parent="runbot_menu_configs"
-        sequence="20"
-        action="open_view_job_tree"
-        />
 
   </data>
 </odoo>

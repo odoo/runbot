@@ -165,11 +165,5 @@
         <field name="res_model">runbot.batch</field>
         <field name="view_mode">tree,form</field>
     </record>
-
-    <menuitem id="menu_bundle" name="Bundle" parent="runbot_menu_root"/>
-    <menuitem id="menu_bundle_bundle" action="action_bundle" parent="menu_bundle"/>
-    <menuitem id="menu_bundle_project" action="action_bundle_project" parent="menu_bundle"/>
-    <menuitem id="menu_bundle_version" action="action_bundle_version" parent="menu_bundle"/>
-    <menuitem id="menu_bundle_batch" action="action_bundle_batch" parent="menu_bundle"/>
   </data>
 </odoo>

@@ -189,28 +189,5 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    <menuitem
-        name="Manage errors"
-        id="runbot_menu_manage_errors"
-        parent="runbot_menu_root"
-        sequence="40"
-        />
-
-    <menuitem
-        name="Build errors"
-        id="runbot_menu_build_error_tree"
-        parent="runbot_menu_manage_errors"
-        sequence="10"
-        action="open_view_build_error_tree"
-        />
-
-    <menuitem
-        name="Error regex"
-        id="runbot_menu_error_regex_tree"
-        parent="runbot_menu_manage_errors"
-        sequence="20"
-        action="open_view_error_regex"
-        />
-
   </data>
 </odoo>
