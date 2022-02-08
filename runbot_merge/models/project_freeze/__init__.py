@@ -41,7 +41,7 @@ class FreezeWizard(models.Model):
 
         labels = set(self.mapped('release_pr_ids.pr_id.label'))
         if len(labels) != 1:
-            errors.append("* All release PRs must have the same label, found %r." % ', '.join(labels))
+            errors.append("* All release PRs must have the same label, found %r." % ', '.join(sorted(labels)))
 
         unready = sum(p.state not in ('closed', 'merged') for p in self.required_pr_ids)
         if unready:

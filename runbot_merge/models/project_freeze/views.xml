@@ -27,7 +27,8 @@
                             <field name="release_pr_ids" nolabel="1">
                                 <tree editable="bottom" create="false">
                                     <field name="repository_id" readonly="1"/>
-                                    <field name="pr_id" options="{'no_create': True}"/>
+                                    <field name="pr_id" options="{'no_create': True}"
+                                           context="{'pr_include_title': 1}"/>
                                 </tree>
                             </field>
                         </group>

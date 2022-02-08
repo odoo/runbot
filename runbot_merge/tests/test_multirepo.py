@@ -1112,10 +1112,10 @@ def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
 
     # have 2 PRs required for the freeze
     with repo_a:
-        repo_a.make_commits('master', Commit('super important file', tree={'g': 'x'}), ref='heads/apr')
+        repo_a.make_commits(masters[0], Commit('super important file', tree={'g': 'x'}), ref='heads/apr')
         pr_required_a = repo_a.make_pr(target='master', head='apr')
     with repo_c:
-        repo_c.make_commits('master', Commit('update thing', tree={'f': '2'}), ref='heads/cpr')
+        repo_c.make_commits(masters[2], Commit('update thing', tree={'f': '2'}), ref='heads/cpr')
         pr_required_c = repo_c.make_pr(target='master', head='cpr')
 
     # have 3 release PRs, only the first one updates the tree (version file)
@@ -1134,6 +1134,8 @@ def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
         )
         pr_rel_b = repo_b.make_pr(target='master', head='release-1.1')
     with repo_c:
+        repo_c.make_commits(masters[2], Commit("Some change", tree={'a': '1'}), ref='heads/whocares')
+        pr_other = repo_c.make_pr(target='master', head='whocares')
         repo_c.make_commits(
             masters[2],
             Commit('Release 1.1 (C)', tree=None),
@@ -1147,7 +1149,6 @@ def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
         repo_b.name: to_pr(env, pr_rel_b),
         repo_c.name: to_pr(env, pr_rel_c),
     }
-
     # trigger the ~~tree~~ freeze wizard
     w = project.action_prepare_freeze()
     w2 = project.action_prepare_freeze()
@@ -1164,9 +1165,14 @@ def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
     # configure releases
     for r in w_id.release_pr_ids:
         r.pr_id = release_prs[r.repository_id.name].id
+    w_id.release_pr_ids[-1].pr_id = to_pr(env, pr_other).id
     r = w_id.action_freeze()
     assert r == w, "the freeze is not ready so the wizard should redirect to itself"
-    assert w_id.errors == "* 2 required PRs not ready."
+    owner = repo_c.owner
+    assert w_id.errors == f"""\
+* All release PRs must have the same label, found '{owner}:release-1.1, {owner}:whocares'.
+* 2 required PRs not ready."""
+    w_id.release_pr_ids[-1].pr_id = release_prs[repo_c.name].id
 
     with repo_a:
         pr_required_a.post_comment('hansen r+', config['role_reviewer']['token'])
