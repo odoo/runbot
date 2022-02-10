@@ -52,7 +52,7 @@ class Commit(models.Model):
                     module = os.path.basename(os.path.dirname(manifest_path))
                     yield (addons_path, module, manifest_file_name)
 
-    def export(self):
+    def _export(self):
         """Export a git repo into a sources"""
         #  TODO add automated tests
         self.ensure_one()

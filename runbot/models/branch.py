@@ -21,21 +21,21 @@ class Branch(models.Model):
     head_name = fields.Char('Head name', related='head.name', store=True)
 
     reference_name = fields.Char(compute='_compute_reference_name', string='Bundle name', store=True)
-    bundle_id = fields.Many2one('runbot.bundle', 'Bundle', compute='_compute_bundle_id', store=True, ondelete='cascade', index=True)
+    bundle_id = fields.Many2one('runbot.bundle', 'Bundle', index=True)
 
-    is_pr = fields.Boolean('IS a pr', required=True)
-    pull_head_name = fields.Char(compute='_compute_branch_infos', string='PR HEAD name', readonly=1, store=True)
-    pull_head_remote_id = fields.Many2one('runbot.remote', 'Pull head repository', compute='_compute_branch_infos', store=True, index=True)
-    target_branch_name = fields.Char(compute='_compute_branch_infos', string='PR target branch', store=True)
+    is_pr = fields.Boolean("Is a pr", required=True)
+    alive = fields.Boolean('Alive', default=True)
+    draft = fields.Boolean('Draft', store=True)
+    pull_head_name = fields.Char("PR head name", readonly=1)
+    pull_head_remote_id = fields.Many2one('runbot.remote', "Pull head repository", index=True)
+    target_branch_name = fields.Char("PR target branch")
+
     reviewers = fields.Char('Reviewers')
 
     reflog_ids = fields.One2many('runbot.ref.log', 'branch_id')
 
     branch_url = fields.Char(compute='_compute_branch_url', string='Branch url', readonly=1)
     dname = fields.Char('Display name', compute='_compute_dname', search='_search_dname')
-
-    alive = fields.Boolean('Alive', default=True)
-    draft = fields.Boolean('Draft', compute='_compute_branch_infos', store=True)
 
     @api.depends('name', 'remote_id.short_name')
     def _compute_dname(self):
@@ -74,7 +74,7 @@ class Branch(models.Model):
             branch.reference_name = reference_name
 
     @api.depends('name')
-    def _compute_branch_infos(self, pull_info=None):
+    def _setup_branch_infos(self, pull_info=None):
         """compute branch_url, pull_head_name and target_branch_name based on name"""
         name_to_remote = {}
         prs = self.filtered(lambda branch: branch.is_pr)
@@ -134,8 +134,7 @@ class Branch(models.Model):
             else:
                 branch.branch_url = ''
 
-    @api.depends('reference_name', 'remote_id.repo_id.project_id')
-    def _compute_bundle_id(self):
+    def _setup_bundle_id(self):
         dummy = self.env.ref('runbot.bundle_dummy')
         for branch in self:
             if branch.bundle_id == dummy:
@@ -144,39 +143,32 @@ class Branch(models.Model):
             project = branch.remote_id.repo_id.project_id or self.env.ref('runbot.main_project')
             project.ensure_one()
             bundle = self.env['runbot.bundle'].search([('name', '=', name), ('project_id', '=', project.id)])
-            need_new_base = not bundle and branch.match_is_base(name)
-            if (bundle.is_base or need_new_base) and branch.remote_id != branch.remote_id.repo_id.main_remote_id:
+            match_is_base = bool(not bundle and branch.match_is_base(name))
+            if (bundle.is_base or match_is_base) and branch.remote_id != branch.remote_id.repo_id.main_remote_id:
                 _logger.warning('Trying to add a dev branch to base bundle, falling back on dummy bundle')
                 bundle = dummy
             elif name and branch.remote_id and branch.remote_id.repo_id._is_branch_forbidden(name):
+                # this is not used anymore on runbot.oodoo.com
                 _logger.warning('Trying to add a forbidden branch, falling back on dummy bundle')
                 bundle = dummy
             elif bundle.is_base and branch.is_pr:
                 _logger.warning('Trying to add pr to base bundle, falling back on dummy bundle')
                 bundle = dummy
-            elif not bundle:
+            elif not bundle and name:
                 values = {
-                    'name': name,
+                    'name': branch.reference_name,
                     'project_id': project.id,
+                    'is_base': match_is_base,
                 }
-                if need_new_base:
-                    values['is_base'] = True
+                bundle = self.env['runbot.bundle'].create(values)  # this prevent creating a branch in UI
 
-                if branch.is_pr and branch.target_branch_name:  # most likely external_pr, use target as version
-                    base = self.env['runbot.bundle'].search([
-                        ('name', '=', branch.target_branch_name),
-                        ('is_base', '=', True),
-                        ('project_id', '=', project.id)
-                    ])
-                    if base:
-                        values['defined_base_id'] = base.id
-                if name:
-                    bundle = self.env['runbot.bundle'].create(values)  # this prevent creating a branch in UI
             branch.bundle_id = bundle
 
     @api.model_create_multi
     def create(self, value_list):
         branches = super().create(value_list)
+        branches._setup_branch_infos()
+        branches._setup_bundle_id()
         for branch in branches:
             if branch.head:
                 self.env['runbot.ref.log'].create({'commit_id': branch.head.id, 'branch_id': branch.id})
@@ -208,24 +200,18 @@ class Branch(models.Model):
         """ public method to recompute infos on demand """
         was_draft = self.draft
         was_alive = self.alive
-        init_target_branch_name = self.target_branch_name
-        self._compute_branch_infos(payload)
-        if self.target_branch_name != init_target_branch_name:
-            _logger.info('retargeting %s to %s', self.name, self.target_branch_name)
-            base = self.env['runbot.bundle'].search([
-                ('name', '=', self.target_branch_name),
-                ('is_base', '=', True),
-                ('project_id', '=', self.remote_id.repo_id.project_id.id)
-            ])
-            if base and self.bundle_id.defined_base_id != base:
-                _logger.info('Changing base of bundle %s to %s(%s)', self.bundle_id, base.name, base.id)
-                self.bundle_id.defined_base_id = base.id
-                self.bundle_id._force()
+        init_base = self.bundle_id.base_id
+
+        self._setup_branch_infos(payload)
 
         if self.draft:
             self.reviewers = ''  # reset reviewers on draft
 
-        if (not self.draft and was_draft) or (self.alive and not was_alive) or (self.target_branch_name != init_target_branch_name and self.alive):
+        if (
+                self.bundle_id.base_id != init_base or
+                (not self.draft and was_draft) or
+                (self.alive and not was_alive)
+        ):
             self.bundle_id._force()
 
     @api.model

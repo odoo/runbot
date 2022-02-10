@@ -158,8 +158,10 @@
                 <t t-esc="build.host"/>
                 <br/>
               </t>
-              <b>Total time:</b>
+              <b>Completion time:</b>
               <t t-esc="build.get_formated_build_time()"/>
+              <b>Total time:</b>
+              <t t-esc="build.get_formated_total_time()"/>
               <br/>
               <t t-if="build.stat_ids">
                 <b>Stats:</b>
@@ -369,6 +371,12 @@
                   </td>
                   <td>
                     <span t-esc="build.get_formated_build_time()"/>
+                  </td>
+                  <td>
+                    <span t-esc="build.get_formated_total_time()"/>
+                  </td>
+                  <td>
+                    <span t-esc="build.host"/>
                   </td>
                   <td>
                     <t t-call="runbot.build_button">
