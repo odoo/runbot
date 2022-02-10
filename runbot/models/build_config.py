@@ -330,7 +330,7 @@ class ConfigStep(models.Model):
                 return run()
             return eval_ctx.get('docker_params')
         except ValueError as e:
-            save_eval_value_error_re = r'<class \'odoo.addons.runbot.models.repo.RunbotException\'>: "(.*)" while evaluating\n.*'
+            save_eval_value_error_re = r'(.*)" while evaluating\n.*'
             message = e.args[0]
             groups = re.match(save_eval_value_error_re, message)
             if groups:

@@ -184,6 +184,7 @@ class BuildResult(models.Model):
     docker_start = fields.Datetime('Docker start')
     job_time = fields.Integer(compute='_compute_job_time', string='Job time')
     build_time = fields.Integer(compute='_compute_build_time', string='Build time')
+    total_time = fields.Integer(compute='_compute_total_time', string='Total computation time')
 
     gc_date = fields.Datetime('Local cleanup date', compute='_compute_gc_date')
     gc_delay = fields.Integer('Cleanup Delay', help='Used to compute gc_date')
@@ -374,8 +375,8 @@ class BuildResult(models.Model):
     def update_build_end(self):
         for build in self:
             build.build_end = now()
-            if build.parent_id and build.parent_id.local_state in ('running', 'done'):
-                build.parent_id.update_build_end()
+            #if build.parent_id and build.parent_id.local_state in ('running', 'done'):
+            #    build.parent_id.update_build_end()
 
     @api.depends('params_id.version_id.name')
     def _compute_dest(self):
@@ -414,12 +415,17 @@ class BuildResult(models.Model):
     @api.depends('build_start', 'build_end', 'global_state')
     def _compute_build_time(self):
         for build in self:
-            if build.build_end and build.global_state != 'waiting':
+            if build.build_end:
                 build.build_time = int(dt2time(build.build_end) - dt2time(build.build_start))
             elif build.build_start:
                 build.build_time = int(time.time() - dt2time(build.build_start))
             else:
                 build.build_time = 0
+
+    @api.depends('build_time', 'children_ids.total_time')
+    def _compute_total_time(self):
+        for build in self:
+            build.total_time = build.build_time + sum(build.children_ids.mapped('total_time'))
 
     @api.depends('job_start')
     def _compute_build_age(self):
@@ -812,7 +818,7 @@ class BuildResult(models.Model):
             if build_export_path in exports:
                 self._log('_checkout', 'Multiple repo have same export path in build, some source may be missing for %s' % build_export_path, level='ERROR')
                 self._kill(result='ko')
-            exports[build_export_path] = commit.export(self)
+            exports[build_export_path] = commit._export(self)
 
         checkout_time = time.time() - start
         if checkout_time > 60:
@@ -1134,6 +1140,9 @@ class BuildResult(models.Model):
 
     def get_formated_build_time(self):
         return s2human(self.build_time)
+
+    def get_formated_total_time(self):
+        return s2human(self.total_time)
 
     def get_formated_build_age(self):
         return s2human(self.build_age)

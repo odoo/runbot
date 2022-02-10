@@ -95,7 +95,7 @@ class Bundle(models.Model):
             project_id = bundle.project_id.id
             master_base = False
             fallback_id = False
-            pr = bundle.branch_ids.sorted('id desc').filtered(lambda branch: branch.alive and branch.is_pr)
+            pr = bundle.branch_ids.sorted('id', reverse=True).filtered(lambda branch: branch.alive and branch.is_pr)
 
             for base_id, base_name in self._get_base_ids(project_id):
                 if (pr and base_name == pr.target_branch_name) or bundle.name.startswith(f'{base_name}-'):

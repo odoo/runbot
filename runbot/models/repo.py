@@ -466,7 +466,7 @@ class Repo(models.Model):
                 if not branch.alive:
                     if branch.is_pr:
                         _logger.info('Recomputing infos of dead pr %s', branch.name)
-                        branch._compute_branch_infos()
+                        branch._setup_branch_infos()
                     else:
                         branch.alive = True
 
