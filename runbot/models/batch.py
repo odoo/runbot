@@ -286,7 +286,6 @@ class Batch(models.Model):
             for commit_link in self.commit_link_ids:
                 commit_link.commit_id = commit_link.commit_id._rebase_on(commit_link.base_commit_id)
         commit_link_by_repos = {commit_link.commit_id.repo_id.id: commit_link for commit_link in self.commit_link_ids}
-        bundle_repos = bundle.branch_ids.mapped('remote_id.repo_id')
         version_id = self.bundle_id.version_id.id
         project_id = self.bundle_id.project_id.id
         trigger_customs = {}
@@ -323,8 +322,10 @@ class Batch(models.Model):
 
             build = self.env['runbot.build']
             link_type = 'created'
-            if ((trigger.repo_ids & bundle_repos) or bundle.build_all or bundle.sticky) and not trigger.manual:  # only auto link build if bundle has a branch for this trigger
+
+            if trigger.should_build(bundle):
                 link_type, build = self._create_build(params)
+
             self.env['runbot.batch.slot'].create({
                 'batch_id': self.id,
                 'trigger_id': trigger.id,
