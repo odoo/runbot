@@ -50,6 +50,8 @@
                     <field name="build_all"/>
                     <field name="dockerfile_id"/>
                     <field name="host_id" readonly="0"/>
+                    <field name="commit_limit"/>
+                    <field name="file_limit"/>
                     <field name="branch_ids">
                         <tree>
                             <field name="dname"/>
