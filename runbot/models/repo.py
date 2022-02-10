@@ -41,6 +41,7 @@ class Trigger(models.Model):
     project_id = fields.Many2one('runbot.project', string="Project id", required=True)  # main/security/runbot
     repo_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_triggers', string="Triggers", domain="[('project_id', '=', project_id)]")
     dependency_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_dependencies', string="Dependencies")
+    pr_only = fields.Boolean("Only start trigger if bundle has PR alive")
     config_id = fields.Many2one('runbot.build.config', string="Config", required=True)
     batch_dependent = fields.Boolean('Batch Dependent', help="Force adding batch in build parameters to make it unique and give access to bundle")
 
@@ -90,6 +91,30 @@ class Trigger(models.Model):
         if self.version_domain:
             return safe_eval(self.version_domain)
         return []
+
+    def should_build(self, bundle, trigger_custom):
+
+
+
+        if trigger_custom and trigger_custom.start_mode == 'force':
+            return True
+
+        if self.manual:
+            return False
+
+        if (trigger_custom and trigger_custom.start_mode == 'disable') or self.manual:
+            return False
+
+        if bundle.build_all or bundle.sticky:
+            return True
+
+        if self.repo_ids & bundle.branch_ids.remote_id.repo_id:
+            if not self.pr_only:
+                return True
+            if any(branch.alive and branch.is_pr for branch in bundle.branch_ids):
+                return True
+
+        return False
 
 
 class Remote(models.Model):

@@ -83,7 +83,7 @@ class Bundle(models.Model):
         for bundle in self:
             bundle.to_upgrade = bundle.is_base
 
-    @api.depends('name', 'is_base', 'defined_base_id', 'base_id.is_base', 'project_id')
+    @api.depends('name', 'is_base', 'defined_base_id', 'base_id.is_base', 'project_id', 'branch_ids.target_branch_name', 'branch_ids.alive', 'branch_ids.is_pr')
     def _compute_base_id(self):
         for bundle in self:
             if bundle.is_base:
@@ -94,17 +94,19 @@ class Bundle(models.Model):
                 continue
             project_id = bundle.project_id.id
             master_base = False
-            fallback = False
-            for bid, bname in self._get_base_ids(project_id):
-                if bundle.name.startswith('%s-' % bname):
-                    bundle.base_id = self.browse(bid)
+            fallback_id = False
+            pr = bundle.branch_ids.sorted('id desc').filtered(lambda branch: branch.alive and branch.is_pr)
+
+            for base_id, base_name in self._get_base_ids(project_id):
+                if (pr and base_name == pr.target_branch_name) or bundle.name.startswith(f'{base_name}-'):
+                    bundle.base_id = self.browse(base_id)
                     break
-                elif bname == 'master':
-                    master_base = self.browse(bid)
-                elif not fallback or fallback.id < bid:
-                    fallback = self.browse(bid)
+                elif base_name == 'master':
+                    master_base = self.browse(base_id)
+                elif not fallback_id or fallback_id < base_id:
+                    fallback_id = base_id
             else:
-                bundle.base_id = master_base or fallback
+                bundle.base_id = bundle.base_id or master_base or self.browse(fallback_id)
 
     @tools.ormcache('project_id')
     def _get_base_ids(self, project_id):
@@ -226,11 +228,13 @@ class Bundle(models.Model):
             warnings.append(('warning', 'No base defined on this bundle'))
         else:
             for branch in self.branch_ids:
+                if not branch.alive:
+                    continue
                 if branch.is_pr and branch.target_branch_name != self.base_id.name:
                     if branch.target_branch_name.startswith(self.base_id.name):
                         warnings.append(('info', 'PR %s targeting a non base branch: %s' % (branch.dname, branch.target_branch_name)))
                     else:
-                        warnings.append(('warning' if branch.alive else 'info', 'PR %s targeting wrong version: %s (expecting %s)' % (branch.dname, branch.target_branch_name, self.base_id.name)))
+                        warnings.append(('warning', 'PR %s targeting wrong version: %s (expecting %s)' % (branch.dname, branch.target_branch_name, self.base_id.name)))
                 elif not branch.is_pr and not branch.name.startswith(self.base_id.name) and not self.defined_base_id:
                     warnings.append(('warning', 'Branch %s not starting with version name (%s)' % (branch.dname, self.base_id.name)))
         return warnings
