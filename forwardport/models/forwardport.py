@@ -34,7 +34,7 @@ class Queue:
     def _search_domain(self):
         return []
 
-class BatchQueue(models.Model, Queue):
+class ForwardPortTasks(models.Model, Queue):
     _name = 'forwardport.batches'
     _description = 'batches which got merged and are candidates for forward-porting'
 

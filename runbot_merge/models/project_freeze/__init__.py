@@ -41,7 +41,7 @@ class FreezeWizard(models.Model):
 
         labels = set(self.mapped('release_pr_ids.pr_id.label'))
         if len(labels) != 1:
-            errors.append("* All release PRs must have the same label, found %r." % ', '.join(labels))
+            errors.append("* All release PRs must have the same label, found %r." % ', '.join(sorted(labels)))
 
         unready = sum(p.state not in ('closed', 'merged') for p in self.required_pr_ids)
         if unready:
@@ -56,21 +56,24 @@ class FreezeWizard(models.Model):
 
         return {'type': 'ir.actions.act_window_close'}
 
+    def action_open(self):
+        return {
+            'type': 'ir.actions.act_window',
+            'target': 'new',
+            'name': f'Freeze project {self.project_id.name}',
+            'view_mode': 'form',
+            'res_model': self._name,
+            'res_id': self.id,
+        }
+
     def action_freeze(self):
         """ Attempts to perform the freeze.
         """
-        project_id = self.project_id
         # if there are still errors, reopen the wizard
         if self.errors:
-            return {
-                'type': 'ir.actions.act_window',
-                'target': 'new',
-                'name': f'Freeze project {project_id.name}',
-                'view_mode': 'form',
-                'res_model': self._name,
-                'res_id': self.id,
-            }
+            return self.action_open()
 
+        project_id = self.project_id
         # need to create the new branch, but at the same time resequence
         # everything so the new branch is the second one, just after the branch
         # it "forks"
@@ -94,7 +97,8 @@ class FreezeWizard(models.Model):
         # create new branch on every repository
         errors = []
         repository = None
-        for repository in project_id.repo_ids:
+        for rel in self.release_pr_ids:
+            repository = rel.repository_id
             gh = repository.github()
             # annoyance: can't directly alias a ref to an other ref, need to
             # resolve the "old" branch explicitely
@@ -114,11 +118,11 @@ class FreezeWizard(models.Model):
 
         # if an error occurred during creation, try to clean up then raise error
         if errors:
-            for r in project_id.repo_ids:
-                if r == repository:
+            for r in self.release_pr_ids:
+                if r.repository_id == repository:
                     break
 
-                deletion = r.github().delete(f'git/refs/heads/{self.branch_name}')
+                deletion = r.repository_id.github().delete(f'git/refs/heads/{self.branch_name}')
                 if not deletion.ok:
                     errors.append(f"Consequently unable to delete branch {self.branch_name} of repository {r.name}.")
                 time.sleep(1)
@@ -162,6 +166,11 @@ class ReleasePullRequest(models.Model):
                        .repository == self.repository_id
 
         return super().write(vals)
+
+class RepositoryFreeze(models.Model):
+    _inherit = 'runbot_merge.repository'
+    freeze = fields.Boolean(required=True, default=True,
+                            help="Freeze this repository by default")
 
 @enum.unique
 class Colors(enum.IntEnum):

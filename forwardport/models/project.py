@@ -176,7 +176,7 @@ class Branch(models.Model):
     _inherit = 'runbot_merge.branch'
 
     fp_sequence = fields.Integer(default=50)
-    fp_target = fields.Boolean(default=False)
+    fp_target = fields.Boolean(default=True)
     fp_enabled = fields.Boolean(compute='_compute_fp_enabled')
 
     @api.depends('active', 'fp_target')

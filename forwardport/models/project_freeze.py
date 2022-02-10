@@ -21,4 +21,12 @@ class FreezeWizard(models.Model):
             self.env.ref('forwardport.port_forward').active = True
         return r
 
-
+    def action_freeze(self):
+        # have to store wizard content as it's removed during freeze
+        project = self.project_id
+        branches_before = project.branch_ids
+        prs = self.mapped('release_pr_ids.pr_id')
+        r = super().action_freeze()
+        new_branch = project.branch_ids - branches_before
+        prs.write({'limit_id': new_branch.id})
+        return r
