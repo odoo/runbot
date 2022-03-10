@@ -58,6 +58,7 @@ class BuildParameters(models.Model):
     config_id = fields.Many2one('runbot.build.config', 'Run Config', required=True,
                                 default=lambda self: self.env.ref('runbot.runbot_build_config_default', raise_if_not_found=False), index=True)
     config_data = JsonDictField('Config Data')
+    used_custom_trigger = fields.Boolean('Custom trigger was used to generate this build')
 
     build_ids = fields.One2many('runbot.build', 'params_id')
     builds_reference_ids = fields.Many2many('runbot.build', relation='runbot_build_params_references', copy=True)
@@ -93,7 +94,10 @@ class BuildParameters(models.Model):
                 'skip_requirements': param.skip_requirements,
             }
             if param.trigger_id.batch_dependent:
-                cleaned_vals['create_batch_id'] = param.create_batch_id.id,
+                cleaned_vals['create_batch_id'] = param.create_batch_id.id
+            if param.used_custom_trigger:
+                cleaned_vals['used_custom_trigger'] = True
+
             param.fingerprint = hashlib.sha256(str(cleaned_vals).encode('utf8')).hexdigest()
 
     @api.depends('commit_link_ids')
@@ -1144,8 +1148,16 @@ class BuildResult(models.Model):
                     _logger.info('Skipping result for orphan build %s', self.id)
                 else:
                     build.parent_id._github_status(post_commit)
-            elif build.params_id.config_id == build.params_id.trigger_id.config_id:
-                if build.global_result in ('ko', 'warn'):
+            else:
+                trigger = self.params_id.trigger_id
+                if not trigger.ci_context:
+                    continue
+
+                desc = trigger.ci_description or " (runtime %ss)" % (build.job_time,)
+                if build.params_id.used_custom_trigger:
+                    state = 'error'
+                    desc = "This build used custom config. Remove custom trigger to restore default ci"
+                elif build.global_result in ('ko', 'warn'):
                     state = 'failure'
                 elif build.global_state in ('pending', 'testing'):
                     state = 'pending'
@@ -1158,11 +1170,8 @@ class BuildResult(models.Model):
                     continue
 
                 runbot_domain = self.env['runbot.runbot']._domain()
-                trigger = self.params_id.trigger_id
                 target_url = trigger.ci_url or "http://%s/runbot/build/%s" % (runbot_domain, build.id)
-                desc = trigger.ci_description or " (runtime %ss)" % (build.job_time,)
-                if trigger.ci_context:
-                    for build_commit in self.params_id.commit_link_ids:
-                        commit = build_commit.commit_id
-                        if 'base_' not in build_commit.match_type and commit.repo_id in trigger.repo_ids:
-                            commit._github_status(build, trigger.ci_context, state, target_url, desc, post_commit)
+                for build_commit in self.params_id.commit_link_ids:
+                    commit = build_commit.commit_id
+                    if 'base_' not in build_commit.match_type and commit.repo_id in trigger.repo_ids:
+                        commit._github_status(build, trigger.ci_context, state, target_url, desc, post_commit)

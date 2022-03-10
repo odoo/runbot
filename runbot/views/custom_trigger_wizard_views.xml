@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record model="ir.ui.view" id="runbot_trigger_custom_wizard_form">
+        <field name="name">runbot_trigger_custom_wizard</field>
+        <field name="model">runbot.trigger.custom.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Custom trigger wizard">
+                <group>
+                    <field name="bundle_id" invisible="1"/>
+                    <field name="project_id" invisible="1"/>
+                    <field name="warnings" decoration-warning="warnings"/>
+                    <field name="trigger_id"/>
+                    <field name="config_id"/>
+                    <field name="number_build"/>
+                    <field name="child_extra_params"/>
+                    <field name="child_dump_url"/>
+                    <field name="child_config_id"/>
+                    <field name="config_data"/>
+                </group>
+                <footer>
+                    <button name="submit" string="Submit" type="object" class="btn-primary"/>
+                    <button string="Cancel" special="cancel" class="btn-default"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record model="ir.actions.act_window" id="runbot_trigger_custom_wizard_action">
+        <field name="name">Generate custom trigger</field>
+        <field name="res_model">runbot.trigger.custom.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="runbot_trigger_custom_wizard_form"/>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="runbot.model_runbot_bundle"/>
+        <field name="binding_view_types">form</field>
+        <field name="context">{'default_bundle_id': active_id}</field>
+    </record>
+</odoo>

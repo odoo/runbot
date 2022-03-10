@@ -115,5 +115,46 @@
         <field name="step_order_ids" eval="[(5,0,0), (0, 0, {'step_id': ref('runbot_build_config_step_test_click_all')})]"/>
         <field name="protected" eval="True"/>
     </record>
+
+    <record id="runbot_build_config_step_restore" model="runbot.build.config.step">
+        <field name="name">restore</field>
+        <field name="job_type">restore</field>
+        <field name="default_sequence">2</field>
+    </record>
+
+    <record id="runbot_build_config_step_test_only" model="runbot.build.config.step">
+        <field name="name">test_only</field>
+        <field name="custom_db_name">all</field>
+        <field name="create_db" eval="False"/>
+        <field name="install_modules">-*</field>
+        <field name="test_enable" eval="True"/>
+        <field name="protected" eval="True"/>
+        <field name="default_sequence">30</field>
+    </record>
+
+    <record id="runbot_build_config_restore_and_test" model="runbot.build.config">
+        <field name="name">Restore and Test</field>
+        <field name="step_order_ids" eval="[(5,0,0),
+        (0, 0, {'step_id': ref('runbot_build_config_step_restore')}),
+        (0, 0, {'step_id': ref('runbot_build_config_step_test_only')})]"/>
+        <field name="protected" eval="True"/>
+    </record>
+
+    <!-- Multi build custom-->
+    <record id="runbot_build_config_step_custom_multi_create" model="runbot.build.config.step">
+        <field name="name">custom_create_multi</field>
+        <field name="job_type">create_build</field>
+        <field name="create_config_ids" eval="[(4, ref('runbot_build_config_restore_and_test'))]"/>
+        <field name="number_builds">1</field>
+        <field name="protected" eval="True"/>
+    </record>
+
+    <record id="runbot_build_config_custom_multi" model="runbot.build.config">
+        <field name="name">Custom Multi</field>
+        <field name="description">Generic multibuild to use with custom trigger wizard</field>
+        <field name="step_order_ids" eval="[(5,0,0), (0, 0, {'step_id': ref('runbot_build_config_step_create_light_multi')})]"/>
+        <field name="protected" eval="True"/>
+    </record>
+    
   </data>
 </odoo>

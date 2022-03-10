@@ -25,6 +25,7 @@ class Batch(models.Model):
     category_id = fields.Many2one('runbot.category', default=lambda self: self.env.ref('runbot.default_category', raise_if_not_found=False))
     log_ids = fields.One2many('runbot.batch.log', 'batch_id')
     has_warning = fields.Boolean("Has warning")
+    base_reference_batch_id = fields.Many2one('runbot.batch')
 
     @api.depends('slot_ids.build_id')
     def _compute_all_build_ids(self):
@@ -216,13 +217,12 @@ class Batch(models.Model):
         self._update_commits_infos(base_head_per_repo)  # set base_commit, diff infos, ...
 
         # 2. FIND missing commit in a compatible base bundle
-        if missing_repos and not bundle.is_base:
+        if not bundle.is_base:
             merge_base_commits = self.commit_link_ids.mapped('merge_base_commit_id')
             if auto_rebase:
-                batch = last_base_batch
-                self._log('Using last done batch %s to define missing commits (automatic rebase)', batch.id)
+                self.base_reference_batch_id = last_base_batch
             else:
-                batch = False
+                self.base_reference_batch_id = False
                 link_commit = self.env['runbot.commit.link'].search([
                     ('commit_id', 'in', merge_base_commits.ids),
                     ('match_type', 'in', ('new', 'head'))
@@ -234,16 +234,22 @@ class Batch(models.Model):
                     ('category_id', '=', self.category_id.id)
                 ]).sorted(lambda b: (len(b.commit_ids & merge_base_commits), b.id), reverse=True)
                 if batches:
-                    batch = batches[0]
-                    self._log('Using batch [%s](%s) to define missing commits', batch.id, batch._url())
-                    batch_exiting_commit = batch.commit_ids.filtered(lambda c: c.repo_id in merge_base_commits.repo_id)
-                    not_matching = (batch_exiting_commit - merge_base_commits)
-                    if not_matching:
-                        message = 'Only %s out of %s merge base matched. You may want to rebase your branches to ensure compatibility' % (len(merge_base_commits)-len(not_matching), len(merge_base_commits))
-                        suggestions = [('Tip: rebase %s to %s' % (commit.repo_id.name, commit.name)) for commit in not_matching]
-                        self.warning('%s\n%s' % (message, '\n'.join(suggestions)))
+                    self.base_reference_batch_id = batches[0]
+
+            batch = self.base_reference_batch_id
             if batch:
-                fill_missing({link.branch_id: link.commit_id for link in batch.commit_link_ids}, 'base_match')
+                if missing_repos:
+                    self._log('Using batch [%s](%s) to define missing commits', batch.id, batch._url())
+                    fill_missing({link.branch_id: link.commit_id for link in batch.commit_link_ids}, 'base_match')
+                # check if all mergebase match reference batch
+                batch_exiting_commit = batch.commit_ids.filtered(lambda c: c.repo_id in merge_base_commits.repo_id)
+                not_matching = (batch_exiting_commit - merge_base_commits)
+                if not_matching:
+                    message = 'Only %s out of %s merge base matched. You may want to rebase your branches to ensure compatibility' % (len(merge_base_commits)-len(not_matching), len(merge_base_commits))
+                    suggestions = [('Tip: rebase %s to %s' % (commit.repo_id.name, commit.name)) for commit in not_matching]
+                    self.warning('%s\n%s' % (message, '\n'.join(suggestions)))
+            else:
+                self._log('No reference batch found to fill missing commits')
 
         # 3.1 FIND missing commit in base heads
         if missing_repos:
@@ -283,32 +289,33 @@ class Batch(models.Model):
         bundle_repos = bundle.branch_ids.mapped('remote_id.repo_id')
         version_id = self.bundle_id.version_id.id
         project_id = self.bundle_id.project_id.id
-        config_by_trigger = {}
-        params_by_trigger = {}
+        trigger_customs = {}
         for trigger_custom in self.bundle_id.trigger_custom_ids:
-            config_by_trigger[trigger_custom.trigger_id.id] = trigger_custom.config_id
-            params_by_trigger[trigger_custom.trigger_id.id] = trigger_custom.extra_params
+            trigger_customs[trigger_custom.trigger_id] = trigger_custom
         for trigger in triggers:
+            trigger_custom = trigger_customs.get(trigger)
             trigger_repos = trigger.repo_ids | trigger.dependency_ids
             if trigger_repos & missing_repos:
                 self.warning('Missing commit for repo %s for trigger %s', (trigger_repos & missing_repos).mapped('name'), trigger.name)
                 continue
             # in any case, search for an existing build
-            config = config_by_trigger.get(trigger.id, trigger.config_id)
+            config = trigger_custom.config_id if trigger_custom else trigger.config_id
             if not config:
                 continue
-            extra_params = params_by_trigger.get(trigger.id, '')
+            extra_params = trigger_custom.extra_params if trigger_custom else ''
+            config_data = trigger_custom.config_data if trigger_custom else {}
             params_value = {
                 'version_id':  version_id,
                 'extra_params': extra_params,
                 'config_id': config.id,
                 'project_id': project_id,
                 'trigger_id': trigger.id,  # for future reference and access rights
-                'config_data': {},
+                'config_data': config_data,
                 'commit_link_ids': [(6, 0, [commit_link_by_repos[repo.id].id for repo in trigger_repos])],
                 'modules': bundle.modules,
                 'dockerfile_id': dockerfile_id,
                 'create_batch_id': self.id,
+                'used_custom_trigger': bool(trigger_custom),
             }
             params_value['builds_reference_ids'] = trigger._reference_builds(bundle)
 
