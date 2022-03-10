@@ -8,6 +8,7 @@ from . import build_error
 from . import bundle
 from . import codeowner
 from . import commit
+from . import custom_trigger
 from . import database
 from . import dockerfile
 from . import event

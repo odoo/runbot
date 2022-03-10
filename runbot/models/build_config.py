@@ -55,7 +55,8 @@ class Config(models.Model):
         super(Config, self).unlink()
 
     def step_ids(self):
-        self.ensure_one()
+        if self:
+            self.ensure_one()
         return [ordered_step.step_id for ordered_step in self.step_order_ids.sorted('sequence')]
 
     def _check_step_ids_order(self):
@@ -250,13 +251,18 @@ class ConfigStep(models.Model):
 
     def _run_create_build(self, build, log_path):
         count = 0
-        for create_config in self.create_config_ids:
-            for _ in range(self.number_builds):
+        config_data = build.params_id.config_data
+        config_ids = config_data.get('create_config_ids', self.create_config_ids)
+        for create_config in config_ids:
+            child_data = {'config_id': create_config.id}
+            if 'child_data' in config_data:
+                child_data.update(config_data['child_data'])
+            for _ in range(config_data.get('number_build', self.number_builds)):
                 count += 1
                 if count > 200:
                     build._logger('Too much build created')
                     break
-                child = build._add_child({'config_id': create_config.id}, orphan=self.make_orphan)
+                child = build._add_child(child_data, orphan=self.make_orphan)
                 build._log('create_build', 'created with config %s' % create_config.name, log_type='subbuild', path=str(child.id))
 
     def make_python_ctx(self, build):
@@ -677,6 +683,7 @@ class ConfigStep(models.Model):
             dump_url = params.config_data['dump_url']
             zip_name = dump_url.split('/')[-1]
             build._log('test-migration', 'Restoring db [%s](%s)' % (zip_name, dump_url), log_type='markdown')
+            suffix = 'all'
         else:
             download_db_suffix = params.dump_db.db_suffix or self.restore_download_db_suffix
             dump_build = params.dump_db.build_id or build.parent_id
@@ -685,7 +692,7 @@ class ConfigStep(models.Model):
             zip_name = '%s.zip' % download_db_name
             dump_url = '%s%s' % (dump_build.http_log_url(), zip_name)
             build._log('test-migration', 'Restoring dump [%s](%s) from build [%s](%s)' % (zip_name, dump_url, dump_build.id, dump_build.build_url), log_type='markdown')
-        restore_suffix = self.restore_rename_db_suffix or params.dump_db.db_suffix
+        restore_suffix = self.restore_rename_db_suffix or params.dump_db.db_suffix or suffix
         assert restore_suffix
         restore_db_name = '%s-%s' % (build.dest, restore_suffix)
 

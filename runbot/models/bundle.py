@@ -240,21 +240,3 @@ class Bundle(models.Model):
         for branch in self.branch_ids.sorted(key=lambda b: (b.is_pr)):
             branch_groups[branch.remote_id.repo_id].append(branch)
         return branch_groups
-
-
-class BundleTriggerCustomisation(models.Model):
-    _name = 'runbot.bundle.trigger.custom'
-    _description = 'Custom trigger'
-
-    trigger_id = fields.Many2one('runbot.trigger', domain="[('project_id', '=', bundle_id.project_id)]")
-    bundle_id = fields.Many2one('runbot.bundle')
-    config_id = fields.Many2one('runbot.build.config')
-    extra_params = fields.Char("Custom parameters")
-
-    _sql_constraints = [
-        (
-            "bundle_custom_trigger_unique",
-            "unique (bundle_id, trigger_id)",
-            "Only one custom trigger per trigger per bundle is allowed",
-        )
-    ]

@@ -52,8 +52,7 @@
         'views/stat_views.xml',
         'views/upgrade.xml',
         'views/warning_views.xml',
-
-        'wizards/mutli_build_wizard_views.xml',
+        'views/custom_trigger_wizard_views.xml',
         'wizards/stat_regex_wizard_views.xml',
     ],
     'license': 'LGPL-3',
