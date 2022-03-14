@@ -36,6 +36,8 @@
         'templates/nginx.xml',
         'templates/build_error.xml',
 
+        'views/assets.xml',
+
         'views/branch_views.xml',
         'views/build_error_views.xml',
         'views/build_views.xml',

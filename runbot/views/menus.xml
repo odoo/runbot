@@ -10,10 +10,9 @@
     <menuitem name="Branches" id="runbot_menu_branch_tree" parent="menu_objects" sequence="40" action="open_view_branch_tree"/>
     <menuitem name="Commits" id="runbot_menu_commit_tree" parent="menu_objects" sequence="50" action="open_view_commit_tree"/>
     <menuitem name="Statistics" id="runbot_menu_stat_tree" parent="menu_objects" sequence="60" action="open_view_stat_sql_tree"/>
-   
+    <menuitem  id="runbot_menu_bundle_custom_trigger" parent="menu_objects" sequence="70" action="action_bundle_custom_trigger"/>
 
     <menuitem name="Hosts" id="runbot_menu_host_tree" parent="runbot_menu_root" sequence="300" action="open_view_host_tree"/>
-
 
     <menuitem id="runbot_menu_trigger" parent="runbot_menu_root" sequence="500" action="runbot_triggers_action"/>
 
