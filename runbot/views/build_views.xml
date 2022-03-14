@@ -6,19 +6,37 @@
             <form string="Build Params">
                 <sheet>
                     <group>
-                        <field name="config_id"/>
-                        <field name="config_data"/>
-                        <field name="version_id"/>
-                        <field name="extra_params"/>
-                        <field name="commit_link_ids">
-                            <tree>
-                                <field name="commit_id"/>
-                                <field name="match_type"/>
-                            </tree>
-                        </field>
-                        <field name="trigger_id"/>
-                        <field name="create_batch_id"/>
-                        <field name="dockerfile_id"/>
+                        <group colspan="2">
+                            <field name="config_id"/>
+                            <field name="config_data"/>
+                            <field name="extra_params"/>
+                            <field name="dockerfile_id"/>
+                            <field name="dump_db"/>
+                        </group>
+                        <group colspan="2">
+                            <field name="trigger_id"/>
+                            <field name="create_batch_id"/>
+                            <field name="version_id"/>
+                            <field name="used_custom_trigger"/>
+                        </group>
+                    </group>
+                    <group>
+                        <notebook>
+                            <page string="Commits">
+                                <field name="commit_link_ids">
+                                    <tree>
+                                        <field name="commit_id"/>
+                                        <field name="match_type"/>
+                                    </tree>
+                                </field>
+                            </page>
+                            <page string="Builds">
+                                <field name="build_ids"/>
+                            </page>
+                            <page string="Reference Builds">
+                                <field name="builds_reference_ids"/>
+                            </page>
+                        </notebook>
                     </group>
                 </sheet>
             </form>
@@ -89,9 +107,7 @@
                 <field name="dest"/>
                 <field name="global_state"/>
                 <field name="global_result"/>
-                <field name="port"/>
                 <field name="job"/>
-                <field name="coverage_result"/>
                 <field name="host"/>
                 <field name="build_time"/>
                 <field name="build_age"/>

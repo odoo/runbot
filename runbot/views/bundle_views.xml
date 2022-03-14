@@ -65,6 +65,7 @@
                             <field name="trigger_id" domain="[('project_id', '=', parent.project_id)]"/>
                             <field name="config_id"/>
                             <field name="extra_params"/>
+                            <field name="config_data"/>
                         </tree>
                     </field>
                     <field string="Last batches" name="last_batchs">
@@ -79,6 +80,35 @@
             </form>
         </field>
     </record>
+
+    <record id="view_runbot_custom_trigger_tree" model="ir.ui.view">
+        <field name="model">runbot.bundle.trigger.custom</field>
+        <field name="arch" type="xml">
+            <tree string="Bundle">
+                <field name="bundle_id"/>
+                <field name="trigger_id"/>
+                <field name="config_id"/>
+                <field name="extra_params"/>
+                <field name="config_data"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_runbot_custom_trigger_form" model="ir.ui.view">
+        <field name="model">runbot.bundle.trigger.custom</field>
+        <field name="arch" type="xml">
+            <form string="Bundle">
+                <group>
+                    <field name="bundle_id"/>
+                    <field name="trigger_id"/>
+                    <field name="config_id"/>
+                    <field name="extra_params"/>
+                    <field name="config_data"/>
+                </group>
+            </form>
+        </field>
+    </record>
+
     <record id="view_runbot_bundle_tree" model="ir.ui.view">
         <field name="model">runbot.bundle</field>
         <field name="arch" type="xml">
@@ -121,6 +151,7 @@
             </form>
         </field>
     </record>
+
     <record id="view_runbot_batch_tree" model="ir.ui.view">
         <field name="model">runbot.batch</field>
         <field name="arch" type="xml">
@@ -142,7 +173,12 @@
             </tree>
         </field>
     </record>
-
+    <record id="action_bundle_custom_trigger" model="ir.actions.act_window">
+        <field name="name">Custom triggers</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">runbot.bundle.trigger.custom</field>
+        <field name="view_mode">tree,form</field>
+    </record>
     <record id="action_bundle" model="ir.actions.act_window">
         <field name="name">Bundles</field>
         <field name="type">ir.actions.act_window</field>

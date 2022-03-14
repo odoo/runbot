@@ -30,7 +30,7 @@ class CustomTriggerWizard(models.TransientModel):
     trigger_id = fields.Many2one('runbot.trigger', domain="[('project_id', '=', project_id)]")
     config_id = fields.Many2one('runbot.build.config', string="Config id", default=lambda self: self.env.ref('runbot.runbot_build_config_custom_multi'))
 
-    config_data = fields.Text("Config data") # Text, hack to make it editable  waiting for json widget
+    config_data = JsonDictField("Config data")
 
     number_build = fields.Integer('Number builds for config multi', default=10)
 
@@ -65,8 +65,7 @@ class CustomTriggerWizard(models.TransientModel):
     @api.onchange('number_build', 'child_extra_params', 'child_dump_url', 'child_config_id')
     def _onchange_config_data(self):
         for wizard in self:
-            config_data = self._get_config_data()
-            wizard.config_data = json.dumps(config_data, indent=True)
+            wizard.config_data = self._get_config_data()
 
     def _get_config_data(self):
         config_data = {}
@@ -93,5 +92,5 @@ class CustomTriggerWizard(models.TransientModel):
             'bundle_id': self.bundle_id.id,
             'trigger_id': self.trigger_id.id,
             'config_id': self.config_id.id,
-            'config_data': json.loads(self.config_data),
+            'config_data': self.config_data,
         })
