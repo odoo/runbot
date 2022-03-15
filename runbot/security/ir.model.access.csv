@@ -114,3 +114,5 @@ access_runbot_dockerfile_admin,access_runbot_dockerfile_admin,runbot.model_runbo
 
 access_runbot_codeowner_admin,runbot_codeowner_admin,runbot.model_runbot_codeowner,runbot.group_runbot_admin,1,1,1,1
 access_runbot_codeowner_user,runbot_codeowner_user,runbot.model_runbot_codeowner,group_user,1,0,0,0
+
+access_runbot_commit_export_admin,runbot_commit_export_admin,runbot.model_runbot_commit_export,runbot.group_runbot_admin,1,1,1,1

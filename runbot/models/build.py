@@ -729,6 +729,9 @@ class BuildResult(models.Model):
                 build._github_status()
             build._run_job()
 
+            if build.local_state == 'done':
+                self.env['runbot.commit.export'].search([('build_id', '=', build.id)]).unlink()
+
     def _run_job(self):
         # run job
         for build in self:
@@ -794,7 +797,7 @@ class BuildResult(models.Model):
             if build_export_path in exports:
                 self._log('_checkout', 'Multiple repo have same export path in build, some source may be missing for %s' % build_export_path, level='ERROR')
                 self._kill(result='ko')
-            exports[build_export_path] = commit.export()
+            exports[build_export_path] = commit.export(self)
 
         checkout_time = time.time() - start
         if checkout_time > 60:
