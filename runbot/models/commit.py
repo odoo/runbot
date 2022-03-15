@@ -52,11 +52,11 @@ class Commit(models.Model):
                     module = os.path.basename(os.path.dirname(manifest_path))
                     yield (addons_path, module, manifest_file_name)
 
-    def export(self):
+    def export(self, build):
         """Export a git repo into a sources"""
         #  TODO add automated tests
         self.ensure_one()
-
+        self.env['runbot.commit.export'].create({'commit_id': self.id, 'build_id': build.id})
         export_path = self._source_path()
 
         if os.path.isdir(export_path):
@@ -228,3 +228,13 @@ class CommitStatus(models.Model):
                 self._cr.after('commit', send_github_status_async)
             else:
                 send_github_status(self.env)
+
+
+class CommitExport(models.Model):
+    _name = 'runbot.commit.export'
+    _description = 'Commit export'
+
+    build_id = fields.Many2one('runbot.build', index=True)
+    commit_id = fields.Many2one('runbot.commit')
+
+    host = fields.Char(related='build_id.host', store=True)
