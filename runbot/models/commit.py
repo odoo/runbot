@@ -56,7 +56,8 @@ class Commit(models.Model):
         """Export a git repo into a sources"""
         #  TODO add automated tests
         self.ensure_one()
-        self.env['runbot.commit.export'].create({'commit_id': self.id, 'build_id': build.id})
+        if not self.env['runbot.commit.export'].search([('build_id', '=', build.id), ('commit_id', '=', self.id)]):
+            self.env['runbot.commit.export'].create({'commit_id': self.id, 'build_id': build.id})
         export_path = self._source_path()
 
         if os.path.isdir(export_path):
