@@ -244,7 +244,7 @@ class Batch(models.Model):
                 # check if all mergebase match reference batch
                 batch_exiting_commit = batch.commit_ids.filtered(lambda c: c.repo_id in merge_base_commits.repo_id)
                 not_matching = (batch_exiting_commit - merge_base_commits)
-                if not_matching:
+                if not_matching and not auto_rebase:
                     message = 'Only %s out of %s merge base matched. You may want to rebase your branches to ensure compatibility' % (len(merge_base_commits)-len(not_matching), len(merge_base_commits))
                     suggestions = [('Tip: rebase %s to %s' % (commit.repo_id.name, commit.name)) for commit in not_matching]
                     self.warning('%s\n%s' % (message, '\n'.join(suggestions)))
