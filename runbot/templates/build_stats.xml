@@ -11,7 +11,7 @@
                   <b>Build: </b><a t-attf-href="/runbot/build/{{build.id}}"><t t-esc="build.id"/></a><br/>
                   <t t-if="build.description">
                     <b>Description:</b>
-                    <t t-raw="build.md_description"/>
+                    <t t-out="build.md_description"/>
                     <br/>
                   </t>
                   <b>Date: </b><t t-esc="build.create_date" /><br/>

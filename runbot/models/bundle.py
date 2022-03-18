@@ -35,7 +35,7 @@ class Bundle(models.Model):
     base_id = fields.Many2one('runbot.bundle', 'Base bundle', compute='_compute_base_id', store=True)
     to_upgrade = fields.Boolean('To upgrade', compute='_compute_to_upgrade', store=True, index=False)
 
-    version_id = fields.Many2one('runbot.version', 'Version', compute='_compute_version_id', store=True)
+    version_id = fields.Many2one('runbot.version', 'Version', compute='_compute_version_id', store=True, recursive=True)
     version_number = fields.Char(related='version_id.number', store=True, index=True)
 
     previous_major_version_base_id = fields.Many2one('runbot.bundle', 'Previous base bundle', compute='_compute_relations_base_id')
@@ -129,7 +129,7 @@ class Bundle(models.Model):
     def _compute_last_batchs(self):
         batch_ids = defaultdict(list)
         if self.ids:
-            category_id = self.env.context.get('category_id', self.env['ir.model.data'].xmlid_to_res_id('runbot.default_category'))
+            category_id = self.env.context.get('category_id', self.env['ir.model.data']._xmlid_to_res_id('runbot.default_category'))
             self.env.cr.execute("""
                 SELECT
                     id
@@ -161,7 +161,7 @@ class Bundle(models.Model):
             # self.env['runbot.batch'].flush()
             for bundle in self:
                 bundle.last_done_batch = False
-            category_id = self.env.context.get('category_id', self.env['ir.model.data'].xmlid_to_res_id('runbot.default_category'))
+            category_id = self.env.context.get('category_id', self.env['ir.model.data']._xmlid_to_res_id('runbot.default_category'))
             self.env.cr.execute("""
                 SELECT
                     id

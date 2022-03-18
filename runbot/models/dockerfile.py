@@ -37,7 +37,7 @@ class Dockerfile(models.Model):
     def _compute_dockerfile(self):
         for rec in self:
             try:
-                res = rec.template_id._render().decode() if rec.template_id else ''
+                res = rec.template_id._render() if rec.template_id else ''
                 rec.dockerfile = re.sub(r'^\s*$', '', res, flags=re.M).strip()
             except QWebException:
                 rec.dockerfile = ''

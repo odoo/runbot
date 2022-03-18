@@ -23,7 +23,7 @@
 
                 </head>
                 <body>
-                    <t t-raw="0"/>
+                    <t t-out="0"/>
                 </body>
             </html>
         </template>
@@ -126,12 +126,12 @@
                                         </li>
                                     </t>
                                 </ul>
-                                <t t-raw="nav_form or ''">
+                                <t t-out="nav_form or ''">
                                 </t>
                             </div>
                         </nav>
                     </header>
-                    <t t-raw="0"/>
+                    <t t-out="0"/>
                 </body>
             </xpath>
         </template>

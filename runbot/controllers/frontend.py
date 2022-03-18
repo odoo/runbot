@@ -53,7 +53,7 @@ def route(routes, **kw):
                 response.qcontext['current_path'] = request.httprequest.full_path
                 response.qcontext['refresh'] = refresh
                 response.qcontext['filter_mode'] = filter_mode
-                response.qcontext['default_category'] = request.env['ir.model.data'].xmlid_to_res_id('runbot.default_category')
+                response.qcontext['default_category'] = request.env['ir.model.data']._xmlid_to_res_id('runbot.default_category')
                 response.qcontext['qu'] = QueryURL('/runbot/%s' % (slug(project)), path_args=['search'], search=search, refresh=refresh)
                 if 'title' not in response.qcontext:
                     response.qcontext['title'] = 'Runbot %s' % project.name or ''
@@ -152,7 +152,7 @@ class Runbot(Controller):
             query.limit=40
             bundles = env['runbot.bundle'].browse(query)
 
-            category_id = int(request.httprequest.cookies.get('category') or 0) or request.env['ir.model.data'].xmlid_to_res_id('runbot.default_category')
+            category_id = int(request.httprequest.cookies.get('category') or 0) or request.env['ir.model.data']._xmlid_to_res_id('runbot.default_category')
 
             trigger_display = request.httprequest.cookies.get('trigger_display_%s' % project.id, None)
             if trigger_display is not None:

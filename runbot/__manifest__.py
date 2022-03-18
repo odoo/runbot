@@ -36,8 +36,6 @@
         'templates/nginx.xml',
         'templates/build_error.xml',
 
-        'views/assets.xml',
-
         'views/branch_views.xml',
         'views/build_error_views.xml',
         'views/build_views.xml',
@@ -59,4 +57,11 @@
         'views/menus.xml',
     ],
     'license': 'LGPL-3',
+
+    'assets': {
+        'web.assets_backend': [
+            'runbot/static/src/js/json_field.js',
+        ],
+    }
+
 }
