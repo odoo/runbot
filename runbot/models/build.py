@@ -154,9 +154,9 @@ class BuildResult(models.Model):
     trigger_id = fields.Many2one('runbot.trigger', related='params_id.trigger_id', store=True, index=True)
 
     # state machine
-    global_state = fields.Selection(make_selection(state_order), string='Status', compute='_compute_global_state', store=True)
+    global_state = fields.Selection(make_selection(state_order), string='Status', compute='_compute_global_state', store=True, recursive=True)
     local_state = fields.Selection(make_selection(state_order), string='Build Status', default='pending', required=True, index=True)
-    global_result = fields.Selection(make_selection(result_order), string='Result', compute='_compute_global_result', store=True)
+    global_result = fields.Selection(make_selection(result_order), string='Result', compute='_compute_global_result', store=True, recursive=True)
     local_result = fields.Selection(make_selection(result_order), string='Build Result')
     triggered_result = fields.Selection(make_selection(result_order), string='Triggered Result')  # triggered by db only
 

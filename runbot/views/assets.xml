@@ -1,7 +1,0 @@
-<odoo>
-    <template id="runbot_json_field" inherit_id="web.assets_backend" active="True">
-        <xpath expr="." position="inside">
-            <script type="text/javascript" src="/runbot/static/src/js/json_field.js"></script>
-        </xpath>
-    </template>
-</odoo>

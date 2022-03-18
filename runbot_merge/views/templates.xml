@@ -311,7 +311,7 @@
                     <h3 t-if="not entry_first" t-esc="entry"/>
                     <ul>
                         <li t-foreach="sorted(entry_value)" t-as="item">
-                            <t t-raw="item"/>
+                            <t t-out="item"/>
                         </li>
                     </ul>
                 </section>
@@ -436,4 +436,3 @@
         </t>
     </template>
 </odoo>
-

@@ -135,7 +135,7 @@ RUN <t t-esc="values['python_version']"/> -m pip install --no-cache-dir setuptoo
       <t t-call="runbot.docker_install_debs">
         <t t-set="deb_packages" t-value="values['deb_packages_python']"/>
       </t>
-      <t t-raw="0"/><!-- custom content from caller t-call-->
+      <t t-out="0"/><!-- custom content from caller t-call-->
       <t t-call="runbot.docker_install_wkhtml"/>
       <t t-call="runbot.docker_install_nodejs"/>
       <t t-call="runbot.docker_install_node_packages"/>
