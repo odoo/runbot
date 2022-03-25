@@ -6,12 +6,9 @@ import pathlib
 import markdown
 import markupsafe
 import werkzeug.exceptions
-from lxml import etree
-from lxml.builder import ElementMaker
 
 from odoo.http import Controller, route, request
 
-A = ElementMaker(namespace="http://www.w3.org/2005/Atom")
 LIMIT = 20
 class MergebotDashboard(Controller):
     @route('/runbot_merge', auth="public", type="http", website=True)
