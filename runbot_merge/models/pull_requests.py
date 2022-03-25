@@ -805,6 +805,7 @@ class PullRequests(models.Model):
                         'repository': self.repository.id,
                         'number': self.number,
                     })
+                    ok = True
             elif command == 'review':
                 if self.draft:
                     msg = "Draft PRs can not be approved."
