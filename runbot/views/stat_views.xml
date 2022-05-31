@@ -1,29 +1,5 @@
 <odoo>
   <data>
-
-    <record id="view_stat_sql_tree" model="ir.ui.view">
-        <field name="name">runbot.stat.sql.tree</field>
-        <field name="model">runbot.build.stat.sql</field>
-        <field name="arch" type="xml">
-            <tree string="Statistics">
-                <field name="key"/>
-                <field name="value"/>
-                <field name="config_step_id"/>
-                <field name="build_id"/>
-                <field name="bundle_id"/>
-                <field name="batch_id"/>
-                <field name="trigger_id"/>
-                <field name="stat_id"/>
-            </tree>
-        </field>
-    </record>
-
-    <record id="open_view_stat_sql_tree" model="ir.actions.act_window">
-        <field name="name">Statistics</field>
-        <field name="res_model">runbot.build.stat.sql</field>
-        <field name="view_mode">tree,graph,pivot</field>
-    </record>
-
     <record id="build_stat_regex_form" model="ir.ui.view">
         <field name="name">runbot.build.stat.regex.form</field>
         <field name="model">runbot.build.stat.regex</field>
