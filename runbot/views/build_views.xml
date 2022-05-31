@@ -86,17 +86,6 @@
                         <field name="gc_delay"/>
                     </group>
                 </sheet>
-                <sheet>
-                  <group>
-                    <field name="stat_ids">
-                        <tree>
-                            <field name="config_step_id"/>
-                            <field name="key"/>
-                            <field name="value"/>
-                        </tree>
-                    </field>
-                  </group>
-                </sheet>
             </form>
         </field>
     </record>

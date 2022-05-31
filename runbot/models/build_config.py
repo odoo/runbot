@@ -1035,8 +1035,17 @@ class ConfigStep(models.Model):
             regex_ids = self.build_stat_regex_ids
             if not regex_ids:
                 regex_ids = regex_ids.search([('generic', '=', True)])
-            key_values = regex_ids._find_in_file(log_path)
-            self.env['runbot.build.stat']._write_key_values(build, self, key_values)
+            stats_per_regex = regex_ids._find_in_file(log_path)
+            if stats_per_regex:
+                build_stats = [
+                    {
+                        'config_step_id': self.id,
+                        'build_id': build.id,
+                        'category': category,
+                        'values': values,
+                    } for category, values in stats_per_regex.items()
+                ]
+                self.env['runbot.build.stat'].create(build_stats)
         except Exception as e:
             message = '**An error occured while computing statistics of %s:**\n`%s`' % (build.job, str(e).replace('\\n', '\n').replace("\\'", "'"))
             _logger.exception(message)

@@ -453,10 +453,9 @@ class Runbot(Controller):
             return request.not_found()
 
         build_stats = defaultdict(dict)
-        for stat in build.stat_ids.filtered(lambda rec: '.' in rec.key).sorted(key=lambda  rec: rec.value, reverse=True):
-            category, module = stat.key.split('.', maxsplit=1)
-            value = int(stat.value) if stat.value == int(stat.value) else stat.value
-            build_stats[category].update({module: value})
+        for stat in build.stat_ids:
+            for module, value in sorted(stat.values.items(), key=lambda item: item[1], reverse=True):
+                build_stats[stat.category][module] = value
 
         context = {
             'build': build,
@@ -500,10 +499,11 @@ class Runbot(Controller):
         builds = builds.search([('id', 'child_of', builds.ids)])
 
         parents = {b.id: b.top_parent.id for b in builds.with_context(prefetch_fields=False)}
-        request.env.cr.execute("SELECT build_id, key, value FROM runbot_build_stat WHERE build_id IN %s AND key like %s", [tuple(builds.ids), '%s.%%' % key_category]) # read manually is way faster than using orm
+        request.env.cr.execute("SELECT build_id, values FROM runbot_build_stat WHERE build_id IN %s AND category = %s", [tuple(builds.ids), key_category]) # read manually is way faster than using orm
         res = {}
-        for (builds_id, key, value) in request.env.cr.fetchall():
-            res.setdefault(parents[builds_id], {})[key.split('.', 1)[1]] = value
+        for (build_id, values) in request.env.cr.fetchall():
+            res.setdefault(parents[build_id], {}).update(values)
+            # we need to update here to manage the post install case: we want to combine stats from all post_install childrens.
         return res
 
     @route(['/runbot/stats/<model("runbot.bundle"):bundle>/<model("runbot.trigger"):trigger>'], type='http', auth="public", website=True, sitemap=False)
