@@ -50,11 +50,14 @@ import functools
 import http.client
 import itertools
 import os
+import pathlib
+import pprint
 import random
 import re
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 import warnings
@@ -271,7 +274,7 @@ class DbDict(dict):
         subprocess.run([
             'odoo', '--no-http',
             '--addons-path', self._adpath,
-            '-d', db, '-i', module,
+            '-d', db, '-i', module + ',auth_oauth',
             '--max-cron-threads', '0',
             '--stop-after-init',
             '--log-level', 'warn'
@@ -334,17 +337,38 @@ def port():
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         return s.getsockname()[1]
 
+@pytest.fixture(scope='session')
+def dummy_addons_path():
+    with tempfile.TemporaryDirectory() as dummy_addons_path:
+        mod = pathlib.Path(dummy_addons_path, 'saas_worker')
+        mod.mkdir(0o700)
+        (mod / '__init__.py').write_bytes(b'')
+        (mod / '__manifest__.py').write_text(pprint.pformat({
+            'name': 'dummy saas_worker',
+            'version': '1.0',
+        }), encoding='utf-8')
+        (mod / 'util.py').write_text("""\
+def from_role(_):
+    return lambda fn: fn
+""", encoding='utf-8')
+
+        yield dummy_addons_path
+
 @pytest.fixture
-def server(request, db, port, module):
+def server(request, db, port, module, dummy_addons_path):
     log_handlers = [
         'odoo.modules.loading:WARNING',
     ]
     if not request.config.getoption('--log-github'):
         log_handlers.append('github_requests:WARNING')
 
+    addons_path = ','.join(map(str, [
+        request.config.getoption('--addons-path'),
+        dummy_addons_path,
+    ]))
     p = subprocess.Popen([
         'odoo', '--http-port', str(port),
-        '--addons-path', request.config.getoption('--addons-path'),
+        '--addons-path', addons_path,
         '-d', db,
         '--max-cron-threads', '0', # disable cron threads (we're running crons by hand)
         *itertools.chain.from_iterable(('--log-handler', h) for h in log_handlers),
