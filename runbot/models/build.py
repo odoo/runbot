@@ -1166,8 +1166,7 @@ class BuildResult(models.Model):
                     _logger.info("skipping github status for build %s ", build.id)
                     continue
 
-                runbot_domain = self.env['runbot.runbot']._domain()
-                target_url = trigger.ci_url or "http://%s/runbot/build/%s" % (runbot_domain, build.id)
+                target_url = trigger.ci_url or "%s/runbot/build/%s" % (self.get_base_url(), build.id)
                 for build_commit in self.params_id.commit_link_ids:
                     commit = build_commit.commit_id
                     if 'base_' not in build_commit.match_type and commit.repo_id in trigger.repo_ids:

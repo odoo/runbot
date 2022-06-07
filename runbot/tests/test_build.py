@@ -161,11 +161,8 @@ class TestBuildResult(RunbotCase):
         self.assertEqual(build.dest, '%05d-13-0' % build.id)
 
         # Test domain compute with fqdn and ir.config_parameter
-        self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_nginx', False)
         self.patchers['fqdn_patcher'].return_value = 'runbot98.nowhere.org'
-        self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_domain', False)
         self.assertEqual(build.domain, 'runbot98.nowhere.org:1234')
-        self.env['ir.config_parameter'].set_param('runbot.runbot_domain', 'runbot99.example.org')
         build._compute_domain()
         self.assertEqual(build.domain, 'runbot99.example.org:1234')
 

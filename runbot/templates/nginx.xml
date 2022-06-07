@@ -37,20 +37,6 @@ proxy_set_header X-Forwarded-Host $host;
 proxy_set_header X-Forwarded-Proto $real_scheme;
 proxy_set_header Host $host;
 
-server {
-    listen 8080 default;
-    location / { proxy_pass http://127.0.0.1:<t t-esc="port"/>; }
-    location /longpolling/im/poll { return 404; }
-    location /longpolling/poll { return 404; }
-    location /runbot/static/ {
-       alias <t t-esc="runbot_static"/>;
-       autoindex off;
-       location ~ /runbot/static/build/[^/]+/(logs|tests)/ {
-          autoindex on;
-          add_header 'Access-Control-Allow-Origin' 'https://<t t-esc="runbot_domain"/>';
-       }
-    }
-}
 <t t-foreach="builds" t-as="build">
 server {
     listen 8080;

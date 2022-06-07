@@ -15,7 +15,6 @@ class ResConfigSettings(models.TransientModel):
     runbot_running_max = fields.Integer('Maximum number of running builds')
     runbot_timeout = fields.Integer('Max allowed step timeout (in seconds)')
     runbot_starting_port = fields.Integer('Starting port for running builds')
-    runbot_domain = fields.Char('Runbot domain')
     runbot_max_age = fields.Integer('Max commit age (in days)')
     runbot_logdb_uri = fields.Char('Runbot URI for build logs')
     runbot_update_frequency = fields.Integer('Update frequency (in seconds)')
@@ -47,7 +46,6 @@ class ResConfigSettings(models.TransientModel):
                    runbot_running_max=int(get_param('runbot.runbot_running_max', default=5)),
                    runbot_timeout=int(get_param('runbot.runbot_timeout', default=10000)),
                    runbot_starting_port=int(get_param('runbot.runbot_starting_port', default=2000)),
-                   runbot_domain=get_param('runbot.runbot_domain', default=common.fqdn()),
                    runbot_max_age=int(get_param('runbot.runbot_max_age', default=30)),
                    runbot_logdb_uri=get_param('runbot.runbot_logdb_uri', default=False),
                    runbot_update_frequency=int(get_param('runbot.runbot_update_frequency', default=10)),
@@ -67,7 +65,6 @@ class ResConfigSettings(models.TransientModel):
         set_param("runbot.runbot_running_max", self.runbot_running_max)
         set_param("runbot.runbot_timeout", self.runbot_timeout)
         set_param("runbot.runbot_starting_port", self.runbot_starting_port)
-        set_param("runbot.runbot_domain", self.runbot_domain)
         set_param("runbot.runbot_max_age", self.runbot_max_age)
         set_param("runbot.runbot_logdb_uri", self.runbot_logdb_uri)
         set_param('runbot.runbot_update_frequency', self.runbot_update_frequency)

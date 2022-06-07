@@ -76,8 +76,18 @@ Note:
 - --limit-time-real-cron is important to ensure that cron has enough time to build docker images and clone repos the first time. It may be reduced to a lower value later (600 is advised).
 - --limit-memory-* is not mandatory, but fetching odoo on multiple remote with only 2Gib may result in a failure of the fetch command. If git fails to create async thread or run out of memory, increasing memory limit may be a good idea. *cf. odoo-bin --help for more info.*
 
+This is an example command line, starting runbot in worker mode is advised.
 You may want to configure a service or launch odoo in a screen depending on your preferences.
 
+You also may need to configure nginx depending on your preferences
+
+```
+server {
+    listen 443 default;
+    location / { proxy_pass http://127.0.0.1:8069; }
+    ...
+}
+```
 ### Configuration
 
 *Note: Runbot is optimized to run commit discovery and build scheduling on different hosts to allow load share on different machines. This basic configuration will show how to run runbot on a single machine, a less-tested use case*
@@ -137,7 +147,6 @@ Acces the runbot settings and tweak the default parameters.
 - The *number of worker* is the default number of parallel testing builds per machine. It is advised to keep one physical core per worker on a dedicated machine. On a local machine,keep it low, **2** is a good start (using 8 on runbot.odoo.com).
 
 - The *number of running build* is the number of parallel running builds. Runbot will start to kill running builds once this limit is reached. This number can be pumped up on a server (using 60 on runbot.odoo.com).
-- *Runbot domain* will mainly be used for nginx to access running builds.
 - Max commit age is the limit after which a branch head will be ignored in processing. This will reduce the processing of old non deleted branches. Keep in mind that pushing an old commit on a branch will also be ignored by runbot.
 
 - **Discover new commits** is disabled by default but is needed to fetch repositories and create new commits/batches/builds. **Check** this option.

@@ -46,8 +46,6 @@
                         <div class="content-group">
                           <label for="runbot_do_schedule" class="col-xs-3 o_light_label" style="width: 40%;"/>
                           <field name="runbot_do_schedule"/>
-                          <label for="runbot_domain" class="col-xs-3 o_light_label" style="width: 40%;"/>
-                          <field name="runbot_domain" style="width: 55%;"/>
                           <label for="runbot_template" class="col-xs-3 o_light_label" style="width: 40%;"/>
                           <field name="runbot_template" style="width: 55%;"/>
                           <label for="runbot_is_base_regex" class="col-xs-3 o_light_label" style="width: 40%;"/>

@@ -140,50 +140,41 @@ class Runbot(models.AbstractModel):
         self.env.cr.execute(query, [host.name] + select_params + [nb_slots])
         return self.env.cr.fetchall()
 
-    def _domain(self):
-        return self.env.get('ir.config_parameter').sudo().get_param('runbot.runbot_domain', fqdn())
-
     def _reload_nginx(self):
         env = self.env
         settings = {}
         settings['port'] = config.get('http_port')
-        settings['runbot_domain'] = self._domain()
-        settings['runbot_static'] = os.path.join(get_module_resource('runbot', 'static'), '')
         nginx_dir = os.path.join(self._root(), 'nginx')
         settings['nginx_dir'] = nginx_dir
         settings['re_escape'] = re.escape
         settings['fqdn'] = fqdn()
 
-        icp = env['ir.config_parameter'].sudo()
-        nginx = icp.get_param('runbot.runbot_nginx', True)  # or just force nginx?
+        settings['builds'] = env['runbot.build'].search([('local_state', '=', 'running'), ('host', '=', fqdn())])
 
-        if nginx:
-            settings['builds'] = env['runbot.build'].search([('local_state', '=', 'running'), ('host', '=', fqdn())])
-
-            nginx_config = env['ir.ui.view']._render_template("runbot.nginx_config", settings)
-            os.makedirs(nginx_dir, exist_ok=True)
-            content = None
-            nginx_conf_path = os.path.join(nginx_dir, 'nginx.conf')
-            content = ''
-            if os.path.isfile(nginx_conf_path):
-                with open(nginx_conf_path, 'rb') as f:
-                    content = f.read()
-            if content != nginx_config:
-                _logger.info('reload nginx')
-                with open(nginx_conf_path, 'wb') as f:
-                    f.write(nginx_config)
-                try:
-                    pid = int(open(os.path.join(nginx_dir, 'nginx.pid')).read().strip(' \n'))
-                    os.kill(pid, signal.SIGHUP)
-                except Exception:
-                    _logger.info('start nginx')
-                    if subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf']):
-                        # obscure nginx bug leaving orphan worker listening on nginx port
-                        if not subprocess.call(['pkill', '-f', '-P1', 'nginx: worker']):
-                            _logger.warning('failed to start nginx - orphan worker killed, retrying')
-                            subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf'])
-                        else:
-                            _logger.warning('failed to start nginx - failed to kill orphan worker - oh well')
+        nginx_config = env['ir.ui.view']._render_template("runbot.nginx_config", settings)
+        os.makedirs(nginx_dir, exist_ok=True)
+        content = None
+        nginx_conf_path = os.path.join(nginx_dir, 'nginx.conf')
+        content = ''
+        if os.path.isfile(nginx_conf_path):
+            with open(nginx_conf_path, 'rb') as f:
+                content = f.read()
+        if content != nginx_config:
+            _logger.info('reload nginx')
+            with open(nginx_conf_path, 'wb') as f:
+                f.write(nginx_config)
+            try:
+                pid = int(open(os.path.join(nginx_dir, 'nginx.pid')).read().strip(' \n'))
+                os.kill(pid, signal.SIGHUP)
+            except Exception:
+                _logger.info('start nginx')
+                if subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf']):
+                    # obscure nginx bug leaving orphan worker listening on nginx port
+                    if not subprocess.call(['pkill', '-f', '-P1', 'nginx: worker']):
+                        _logger.warning('failed to start nginx - orphan worker killed, retrying')
+                        subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf'])
+                    else:
+                        _logger.warning('failed to start nginx - failed to kill orphan worker - oh well')
 
     def _get_cron_period(self):
         """ Compute a randomized cron period with a 2 min margin below
