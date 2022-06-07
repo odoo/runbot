@@ -35,7 +35,6 @@ class ResConfigSettings(models.TransientModel):
 
     # TODO other icp
     # runbot.runbot_maxlogs 100
-    # runbot.runbot_nginx True
     # migration db
     # ln path
 

@@ -387,14 +387,8 @@ class BuildResult(models.Model):
 
     @api.depends('port', 'dest', 'host')
     def _compute_domain(self):
-        icp = self.env['ir.config_parameter'].sudo()
-        nginx = icp.get_param('runbot.runbot_nginx', False)  # or just force nginx?
-        domain = icp.get_param('runbot.runbot_domain', fqdn())
         for build in self:
-            if nginx:
-                build.domain = "%s.%s" % (build.dest, build.host)
-            else:
-                build.domain = "%s:%s" % (domain, build.port)
+            build.domain = "%s.%s" % (build.dest, build.host)
 
     @api.depends_context('batch')
     def _compute_build_url(self):

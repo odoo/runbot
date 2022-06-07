@@ -345,15 +345,12 @@ class ConfigStep(models.Model):
         cmd += ['-d', '%s-%s' % (build.dest, db_name)]
 
         icp = self.env['ir.config_parameter'].sudo()
-        nginx = icp.get_param('runbot.runbot_nginx', True)
-        if grep(build._server("tools/config.py"), "proxy-mode") and nginx:
+        if grep(build._server("tools/config.py"), "proxy-mode"):
             cmd += ["--proxy-mode"]
 
         if grep(build._server("tools/config.py"), "db-filter"):
-            if nginx:
-                cmd += ['--db-filter', '%d.*$']
-            else:
-                cmd += ['--db-filter', '%s.*$' % build.dest]
+            cmd += ['--db-filter', '%d.*$']
+
         smtp_host = docker_get_gateway_ip()
         if smtp_host:
             cmd += ['--smtp', smtp_host]
