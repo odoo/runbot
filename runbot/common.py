@@ -13,9 +13,8 @@ from collections import OrderedDict
 from datetime import timedelta
 from babel.dates import format_timedelta
 from markupsafe import Markup
-from werkzeug import utils
 
-from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT
+from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT, html_escape
 
 _logger = logging.getLogger(__name__)
 
@@ -121,7 +120,7 @@ def list_local_dbs(additionnal_conditions=None):
 
 
 def pseudo_markdown(text):
-    text = utils.escape(text)
+    text = html_escape(text)
 
     # first, extract code blocs:
     codes = []
