@@ -129,5 +129,5 @@ class TestIrLogging(RunbotCase):
         log.message = 'foo <script>console.log("hello world")</script>'
         self.assertEqual(
             log._markdown(),
-            'foo &lt;script&gt;console.log(&quot;hello world&quot;)&lt;/script&gt;'
+            'foo &lt;script&gt;console.log(&#34;hello world&#34;)&lt;/script&gt;'
         )
