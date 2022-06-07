@@ -40,7 +40,7 @@ proxy_set_header Host $host;
 <t t-foreach="builds" t-as="build">
 server {
     listen 8080;
-    server_name ~^<t t-out="re_escape(build.dest)"/>(-[a-z0-9_]+)?\.<t t-esc="re_escape(fqdn)"/>$;
+    server_name ~^<t t-out="re_escape(build.dest)"/>(-[a-z0-9_]+)?\.<t t-esc="re_escape(build.host)"/>$;
     location / { proxy_pass http://127.0.0.1:<t t-esc="build.port"/>; }
     location /longpolling { proxy_pass http://127.0.0.1:<t t-esc="build.port + 1"/>; }
 }
