@@ -180,8 +180,8 @@ class TestBuildResult(RunbotCase):
         })
         self.assertEqual(build.md_description, 'A nice <strong>description</strong>')
 
-        build.description = "<script>console.log('foo')</script>"
-        self.assertEqual(build.md_description, "&lt;script&gt;console.log('foo')&lt;/script&gt;")
+        build.description = "<script>console.log(foo)</script>"
+        self.assertEqual(build.md_description, "&lt;script&gt;console.log(foo)&lt;/script&gt;")
 
     @patch('odoo.addons.runbot.models.build.BuildResult._get_available_modules')
     def test_filter_modules(self, mock_get_available_modules):

@@ -11,8 +11,8 @@ import os
 
 from collections import OrderedDict
 from datetime import timedelta
-
 from babel.dates import format_timedelta
+from markupsafe import Markup
 from werkzeug import utils
 
 from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT
@@ -151,5 +151,5 @@ def pseudo_markdown(text):
     def code_replace(match):
         return f'<code>{codes[int(match.group(1))]}</code>'
 
-    text = re.sub(r'<code>(\d+)</code>', code_replace, text, flags=re.DOTALL)
+    text = Markup(re.sub(r'<code>(\d+)</code>', code_replace, text, flags=re.DOTALL))
     return text
