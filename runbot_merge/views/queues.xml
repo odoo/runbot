@@ -1,0 +1,97 @@
+<odoo>
+    <!--
+    Queues mergebot menu: contains various list views inspecting the cron tasks
+    (mostly)
+    -->
+    <record id="action_splits" model="ir.actions.act_window">
+        <field name="name">Splits</field>
+        <field name="res_model">runbot_merge.split</field>
+    </record>
+    <record id="tree_splits" model="ir.ui.view">
+        <field name="name">Splits</field>
+        <field name="model">runbot_merge.split</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="id"/>
+                <field name="target"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_feedback" model="ir.actions.act_window">
+        <field name="name">Feedback</field>
+        <field name="res_model">runbot_merge.pull_requests.feedback</field>
+    </record>
+    <record id="tree_feedback" model="ir.ui.view">
+        <field name="name">Feedback</field>
+        <field name="model">runbot_merge.pull_requests.feedback</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="repository"/>
+                <field name="pull_request"/>
+                <field name="message"/>
+                <field name="close"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_tagging" model="ir.actions.act_window">
+        <field name="name">Tagging</field>
+        <field name="res_model">runbot_merge.pull_requests.tagging</field>
+    </record>
+    <record id="tree_tagging" model="ir.ui.view">
+        <field name="name">Tagging</field>
+        <field name="model">runbot_merge.pull_requests.tagging</field>
+        <field name="arch" type="xml">
+            <tree editable="bottom">
+                <field name="repository"/>
+                <field name="pull_request"/>
+                <field name="tags_add"/>
+                <field name="tags_remove"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_fetches" model="ir.actions.act_window">
+        <field name="name">PRs to fetch</field>
+        <field name="res_model">runbot_merge.fetch_job</field>
+        <field name="view_mode">tree</field>
+        <field name="context">{'default_active': True}</field>
+    </record>
+    <record id="search_fetches" model="ir.ui.view">
+        <field name="name">Fetches Search</field>
+        <field name="model">runbot_merge.fetch_job</field>
+        <field name="arch" type="xml">
+            <search>
+                <filter string="Active" name="active"
+                        domain="[('active', '=', True)]"/>
+                <field name="repository"/>
+                <field name="number"/>
+            </search>
+        </field>
+    </record>
+    <record id="tree_fetches" model="ir.ui.view">
+        <field name="name">Fetches Tree</field>
+        <field name="model">runbot_merge.fetch_job</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="repository"/>
+                <field name="number"/>
+            </tree>
+        </field>
+    </record>
+
+    <menuitem name="Queues" id="menu_queues" parent="runbot_merge_menu"/>
+        <menuitem name="Splits" id="menu_queues_splits"
+                  parent="menu_queues"
+                  action="action_splits"/>
+        <menuitem name="Feedback" id="menu_queues_feedback"
+                  parent="menu_queues"
+                  action="action_feedback"/>
+        <menuitem name="Tagging" id="menu_queues_tagging"
+                  parent="menu_queues"
+                  action="action_tagging"/>
+        <menuitem name="Fetches" id="menu_fetches"
+                  parent="menu_queues"
+                  action="action_fetches"/>
+</odoo>

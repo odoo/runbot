@@ -846,7 +846,7 @@ class PullRequests(models.Model):
                                 'pull_request': self.number,
                                 'message': "PR priority reset to 1, as pull requests with priority 0 ignore review state.",
                             })
-                        self.unstage("unreview (r-) by %s", author.github_login)
+                        self.unstage("unreviewed (r-) by %s", author.github_login)
                         ok = True
                     else:
                         msg = "r- makes no sense in the current PR state."
@@ -1349,7 +1349,7 @@ class PullRequests(models.Model):
                 # else remove this batch from the split
                 b.split_id = False
 
-        self.staging_id.cancel(reason, *args)
+        self.staging_id.cancel('%s ' + reason, self.display_name, *args)
 
     def _try_closing(self, by):
         # ignore if the PR is already being updated in a separate transaction
@@ -1369,11 +1369,7 @@ class PullRequests(models.Model):
         ''', [self.id])
         self.env.cr.commit()
         self.modified(['state'])
-        self.unstage(
-            "PR %s closed by %s",
-            self.display_name,
-            by
-        )
+        self.unstage("closed by %s", by)
         return True
 
 # state changes on reviews

@@ -135,11 +135,15 @@
                     <t t-if="staging_index >= 4">visible-lg-block</t>
                 </t>
                 <t t-set="title">
-                    <t t-if="staging.state == 'canceled'">Cancelled: <t t-esc="staging.reason"/></t>
-                    <t t-if="staging.state == 'ff_failed'">Fast Forward Failed</t>
-                    <t t-if="staging.state not in ('canceled', 'ff_failed')"><t t-esc="staging.reason"/></t>
+                    <t t-if="staging.state == 'ff_failed'">fast forward failed</t>
+                    <t t-if="staging.state == 'pending'">last status</t>
+                    <t t-if="staging.state not in ('pending', 'ff_failed')"><t t-esc="staging.reason"/></t>
                 </t>
-                <li t-attf-class="staging {{stateclass.strip()}} {{decorationclass.strip()}}" t-att-title="title.strip() or None">
+                <!-- separate concatenation to avoid having line-break in title as some browsers trigger it -->
+                <!-- write-date may have microsecond precision, strip that information -->
+                <!-- use write-date under assumption that a staging is last modified when it ends -->
+                <t t-set="title"><t t-esc="title.strip()"/> at <t t-esc="staging.write_date.replace(microsecond=0)"/>Z</t>
+                <li t-attf-class="staging {{stateclass.strip()}} {{decorationclass.strip()}}" t-att-title="title">
                     <ul class="list-unstyled">
                         <li t-foreach="staging.batch_ids" t-as="batch" class="batch">
                             <t t-esc="batch.prs[:1].label"/>
@@ -152,7 +156,7 @@
                     <t t-if="staging.heads">
                         <div class="dropdown">
                             <button class="btn btn-link dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"
-                                    t-attf-title="{{staging.staged_at}}Z">
+                                    t-attf-title="Staged at {{staging.staged_at}}Z">
                                 Staged <span t-field="staging.staged_at" t-options="{'widget': 'relative'}"/>
                                 <span class="caret"></span>
                             </button>

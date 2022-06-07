@@ -171,11 +171,7 @@ def handle_pr(env, event):
             return "It's my understanding that closed/merged PRs don't get sync'd"
 
         if pr_obj.state == 'ready':
-            pr_obj.unstage(
-                "PR %s updated by %s",
-                pr_obj.display_name,
-                event['sender']['login']
-            )
+            pr_obj.unstage("updated by %s", event['sender']['login'])
 
         _logger.info(
             "PR %s updated to %s by %s, resetting to 'open' and squash=%s",

@@ -12,6 +12,7 @@
                 <t t-set="outstanding" t-value="env['runbot_merge.pull_requests'].search_count([
                     ('source_id', '!=', False),
                     ('state', 'not in', ['merged', 'closed']),
+                    ('source_id.merge_date', '&lt;', datetime.datetime.now() - relativedelta(days=3)),
                 ])"/>
                 <div t-if="outstanding != 0" class="alert col-md-12 alert-warning mb-0">
                     <a href="/forwardport/outstanding">
@@ -175,6 +176,9 @@
         <field name="inherit_id" ref="runbot_merge.runbot_merge_form_prs"/>
         <field name="model">runbot_merge.pull_requests</field>
         <field name="arch" type="xml">
+            <xpath expr="//field[@name='state']" position="after">
+                <field name="merge_date" attrs="{'invisible': [('state', '!=', 'merged')]}"/>
+            </xpath>
             <xpath expr="//sheet/group[2]" position="after">
                 <separator string="Forward Port" attrs="{'invisible': [('source_id', '=', False)]}"/>
                 <group attrs="{'invisible': [('source_id', '!=', False)]}">
