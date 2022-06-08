@@ -157,7 +157,7 @@ class Runbot(models.AbstractModel):
         nginx_conf_path = os.path.join(nginx_dir, 'nginx.conf')
         content = ''
         if os.path.isfile(nginx_conf_path):
-            with open(nginx_conf_path, 'rb') as f:
+            with open(nginx_conf_path, 'r') as f:
                 content = f.read()
         if content != nginx_config:
             _logger.info('reload nginx')
