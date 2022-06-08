@@ -479,8 +479,8 @@ class Repo(models.Model):
                 git_config_path = os.path.join(repo.path, 'config')
                 template_params = {'repo': repo}
                 git_config = self.env['ir.ui.view']._render_template("runbot.git_config", template_params)
-                with open(git_config_path, 'wb') as config_file:
-                    config_file.write(git_config)
+                with open(git_config_path, 'w') as config_file:
+                    config_file.write(str(git_config))
                 _logger.info('Config updated for repo %s' % repo.name)
             else:
                 _logger.info('Repo not cloned, skiping config update for %s' % repo.name)
