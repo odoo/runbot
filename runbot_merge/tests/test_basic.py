@@ -574,7 +574,7 @@ def test_staging_ci_failure_single(env, repo, users, config, page):
     assert dangerbox
     assert dangerbox[0].text == 'ci/runbot'
 
-def test_ff_failure(env, repo, config):
+def test_ff_failure(env, repo, config, page):
     """ target updated while the PR is being staged => redo staging """
     with repo:
         m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
@@ -587,10 +587,11 @@ def test_ff_failure(env, repo, config):
         repo.post_status(prx.head, 'success', 'ci/runbot')
         prx.post_comment('hansen r+ rebase-merge', config['role_reviewer']['token'])
     env.run_crons()
-    assert env['runbot_merge.pull_requests'].search([
+    st = env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', repo.name),
         ('number', '=', prx.number)
     ]).staging_id
+    assert st
 
     with repo:
         m2 = repo.make_commit('heads/master', 'cockblock', None, tree={'m': 'm', 'm2': 'm2'})
@@ -602,6 +603,14 @@ def test_ff_failure(env, repo, config):
         repo.post_status(staging.id, 'success', 'legal/cla')
         repo.post_status(staging.id, 'success', 'ci/runbot')
     env.run_crons()
+
+    assert st.reason == 'update is not a fast forward'
+    # check that it's added as title on the staging
+    doc = html.fromstring(page('/runbot_merge'))
+    _new, prev = doc.cssselect('li.staging')
+
+    assert 'bg-gray-lighter' in prev.classes, "ff failure is ~ cancelling"
+    assert prev.get('title') == re_matches('fast forward failed \(update is not a fast forward\)')
 
     assert env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', repo.name),

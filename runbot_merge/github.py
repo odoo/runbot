@@ -202,10 +202,19 @@ class GH(object):
             def _wait_for_update():
                 if not self._check_updated(branch, sha):
                     return
-                raise exceptions.FastForwardError(self._repo)
-        except requests.HTTPError:
+                raise exceptions.FastForwardError(self._repo) \
+                    from Exception("timeout: never saw %s" % sha)
+        except requests.HTTPError as e:
             _logger.debug('fast_forward(%s, %s, %s) -> ERROR', self._repo, branch, sha, exc_info=True)
-            raise exceptions.FastForwardError(self._repo)
+            if e.response.status_code == 422:
+                try:
+                    r = e.response.json()
+                except Exception:
+                    pass
+                else:
+                    if isinstance(r, dict) and 'message' in r:
+                        e = Exception(r['message'].lower())
+            raise exceptions.FastForwardError(self._repo) from e
 
     def set_ref(self, branch, sha):
         # force-update ref

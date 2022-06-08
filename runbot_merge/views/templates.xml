@@ -135,14 +135,13 @@
                     <t t-if="staging_index >= 4">visible-lg-block</t>
                 </t>
                 <t t-set="title">
-                    <t t-if="staging.state == 'ff_failed'">fast forward failed</t>
+                    <t t-if="staging.state == 'ff_failed'">fast forward failed (<t t-esc="staging.reason"/>)</t>
                     <t t-if="staging.state == 'pending'">last status</t>
-                    <t t-if="staging.state not in ('pending', 'ff_failed')"><t t-esc="staging.reason"/></t>
                 </t>
                 <!-- separate concatenation to avoid having line-break in title as some browsers trigger it -->
                 <!-- write-date may have microsecond precision, strip that information -->
                 <!-- use write-date under assumption that a staging is last modified when it ends -->
-                <t t-set="title"><t t-esc="title.strip()"/> at <t t-esc="staging.write_date.replace(microsecond=0)"/>Z</t>
+                <t t-set="title"><t t-esc="title.strip() or staging.reason"/> at <t t-esc="staging.write_date.replace(microsecond=0)"/>Z</t>
                 <li t-attf-class="staging {{stateclass.strip()}} {{decorationclass.strip()}}" t-att-title="title">
                     <ul class="list-unstyled">
                         <li t-foreach="staging.batch_ids" t-as="batch" class="batch">
