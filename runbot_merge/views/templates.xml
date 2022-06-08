@@ -10,6 +10,18 @@
         </xpath>
     </template>
 
+    <template id="link-pr" name="create a link to `pr`">
+        <t t-set="title">
+            <t t-if="pr.repository.group_id &lt;= env.user.groups_id">
+                <t t-esc="pr.message.split('\n')[0]"/>
+            </t>
+        </t>
+        <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
+           t-att-title="pr.blocked or title.strip()"
+           t-att-target="target or None"
+        ><t t-esc="pr.display_name"/></a>
+    </template>
+
     <template id="dashboard" name="mergebot dashboard">
         <t t-call="website.layout">
             <div id="wrap"><div class="container-fluid">
@@ -63,10 +75,7 @@
                                 <li t-foreach="splits" t-as="split">
                                     <ul class="pr-listing list-inline list-unstyled mb0">
                                         <li t-foreach="split.mapped('batch_ids.prs')" t-as="pr">
-                                            <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
-                                               t-att-title="pr.message.split('\n')[0]">
-                                                <t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/>
-                                            </a>
+                                            <t t-call="runbot_merge.link-pr"/>
                                         </li>
                                     </ul>
                                 </li>
@@ -76,10 +85,7 @@
                             <h5>Awaiting</h5>
                             <ul class="list-inline">
                                 <li t-foreach="ready" t-as="pr">
-                                    <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
-                                       t-att-title="pr.message.split('\n')[0]">
-                                        <t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/>
-                                    </a>
+                                    <t t-call="runbot_merge.link-pr"/>
                                 </li>
                             </ul>
                         </div>
@@ -87,10 +93,7 @@
                             <h5>Blocked</h5>
                             <ul class="list-inline">
                                 <li t-foreach="blocked" t-as="pr">
-                                    <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
-                                       t-att-title="pr.blocked">
-                                        <t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/>
-                                    </a>
+                                    <t t-call="runbot_merge.link-pr"/>
                                 </li>
                             </ul>
                         </div>
@@ -105,10 +108,7 @@
                             <h5>Failed</h5>
                             <ul class="list-inline">
                                 <li t-foreach="failed" t-as="pr">
-                                    <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
-                                       t-att-title="pr.message.split('\n')[0]">
-                                        <t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/>
-                                    </a>
+                                    <t t-call="runbot_merge.link-pr"/>
                                 </li>
                             </ul>
                         </div>
@@ -147,8 +147,7 @@
                         <li t-foreach="staging.batch_ids" t-as="batch" class="batch">
                             <t t-esc="batch.prs[:1].label"/>
                             <t t-foreach="batch.prs" t-as="pr">
-                                <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
-                                   t-att-title="pr.message.split('\n')[0]"><t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/></a>
+                                <t t-call="runbot_merge.link-pr"/>
                             </t>
                         </li>
                     </ul>
@@ -274,21 +273,15 @@
                                                     data-toggle="dropdown"
                                                     aria-haspopup="true"
                                                     aria-expanded="true"
-                                                    t-att-title="first_pr.message.split('\n')[0]"
                                             >
                                                 <t t-esc="first_pr.label"/>
                                                 <span class="caret"></span>
                                             </button>
                                             <ul class="dropdown-menu">
-                                                <li t-foreach="batch.prs"
-                                                    t-as="pr">
-                                                    <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
-                                                       t-att-title="pr.message.split('\n')[0]"
-                                                       target="new">
-                                                        <t t-esc="pr.repository.name"/>
-                                                        #
-                                                        <t t-esc="pr.number"/>
-                                                    </a>
+                                                <li t-foreach="batch.prs" t-as="pr">
+                                                    <t t-call="runbot_merge.link-pr">
+                                                        <t t-set="target">new</t>
+                                                    </t>
                                                 </li>
                                             </ul>
                                         </li>
