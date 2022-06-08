@@ -161,8 +161,8 @@ class Runbot(models.AbstractModel):
                 content = f.read()
         if content != nginx_config:
             _logger.info('reload nginx')
-            with open(nginx_conf_path, 'wb') as f:
-                f.write(nginx_config)
+            with open(nginx_conf_path, 'w') as f:
+                f.write(str(nginx_config))
             try:
                 pid = int(open(os.path.join(nginx_dir, 'nginx.pid')).read().strip(' \n'))
                 os.kill(pid, signal.SIGHUP)
