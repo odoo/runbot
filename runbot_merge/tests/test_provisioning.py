@@ -8,7 +8,6 @@ GEORGE = {
     'sub': '19321102'
 }
 def test_basic_provisioning(env, port):
-
     r = provision_user(port, [GEORGE])
     assert r == [1, 0]
 
@@ -16,6 +15,10 @@ def test_basic_provisioning(env, port):
     assert g.partner_id.name == GEORGE['name']
     assert g.partner_id.github_login == GEORGE['github_login']
     assert g.oauth_uid == GEORGE['sub']
+    (model, g_id) = env['ir.model.data']\
+        .check_object_reference('base', 'group_user')
+    assert model == 'res.groups'
+    assert g.groups_id.id == g_id, "check that users were provisioned as internal (not portal)"
 
     # repeated provisioning should be a no-op
     r = provision_user(port, [GEORGE])
@@ -78,6 +81,12 @@ def test_upgrade_partner(env, port):
 
     p.user_ids.unlink()
     p.unlink()
+
+def test_no_email(env, port):
+    """ Provisioning system should ignore email-less entries
+    """
+    r = provision_user(port, [{**GEORGE, 'email': None}])
+    assert r == [0, 0]
 
 def provision_user(port, users):
     r = requests.post(f'http://localhost:{port}/runbot_merge/provision', json={

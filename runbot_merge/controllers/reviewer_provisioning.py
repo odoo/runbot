@@ -20,6 +20,7 @@ class MergebotReviewerProvisioning(Controller):
                 'email': u.email,
             }
             for u in env['res.users'].search([])
+            if u.github_login
         ]
 
     @from_role('accounts')
@@ -56,22 +57,27 @@ class MergebotReviewerProvisioning(Controller):
                 # unique, and should not be able to collide with emails
                 partners[p.github_login] = p
 
-        if 'oauth_provider_id' in Users:
-            odoo_provider = env.ref('auth_oauth.provider_openerp', False)
-            if odoo_provider:
-                for new in users:
-                    if 'sub' in new:
-                        new['oauth_provider_id'] = odoo_provider.id
-                        new['oauth_uid'] = new.pop('sub')
+        internal = env.ref('base.group_user')
+        odoo_provider = env.ref('auth_oauth.provider_openerp')
 
         to_create = []
         created = updated = 0
         for new in users:
+            if 'sub' in new:
+                new['oauth_provider_id'] = odoo_provider.id
+                new['oauth_uid'] = new.pop('sub')
+
             # prioritise by github_login as that's the unique-est point of information
             current = partners.get(new['github_login']) or partners.get(new['email']) or Partners
             # entry doesn't have user -> create user
             if not current.user_ids:
+                # skip users without an email (= login) as that
+                # fails
+                if not new['email']:
+                    continue
+
                 new['login'] = new['email']
+                new['groups_id'] = [(4, internal.id)]
                 # entry has partner -> create user linked to existing partner
                 # (and update partner implicitly)
                 if current:
@@ -94,8 +100,9 @@ class MergebotReviewerProvisioning(Controller):
                 user.write(update_vals)
                 updated += 1
         if to_create:
-            Users.create(to_create)
-            created = len(to_create)
+            # only create 100 users at a time to avoid request timeout
+            Users.create(to_create[:100])
+            created = len(to_create[:100])
 
         _logger.info("Provisioning: created %d updated %d.", created, updated)
         return [created, updated]
@@ -121,3 +128,4 @@ class MergebotReviewerProvisioning(Controller):
         partners.mapped('user_ids').write({
             'groups_id': [(6, 0, [request.env.ref('base.group_portal').id])]
         })
+        return True

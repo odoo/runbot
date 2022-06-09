@@ -1129,17 +1129,8 @@ class Model:
     def create(self, values):
         return Model(self._env, self._model, [self._env(self._model, 'create', values)])
 
-    def write(self, values):
-        return self._env(self._model, 'write', self._ids, values)
-
-    def read(self, fields):
-        return self._env(self._model, 'read', self._ids, fields)
-
-    def name_get(self):
-        return self._env(self._model, 'name_get', self._ids)
-
-    def unlink(self):
-        return self._env(self._model, 'unlink', self._ids)
+    def check_object_reference(self, *args, **kwargs):
+        return self.env(self._model, 'check_object_reference', *args, **kwargs)
 
     def sorted(self, field):
         rs = sorted(self.read([field]), key=lambda r: r[field])
