@@ -262,7 +262,7 @@ class Runbot(models.AbstractModel):
             for pr_number, t in pull_info_failures.items():
                 if t + 15*60 < time.time():
                     _logger.warning('Removing %s from pull_info_failures', pr_number)
-                    del self.pull_info_failures[pr_number]
+                    del pull_info_failures[pr_number]
 
         return manager.get('sleep', default_sleep)
 
