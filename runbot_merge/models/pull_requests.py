@@ -1090,6 +1090,12 @@ class PullRequests(models.Model):
     def write(self, vals):
         if vals.get('squash'):
             vals['merge_method'] = False
+        prev = None
+        if 'target' in vals or 'message' in vals:
+            prev = {
+                pr.id: {'target': pr.target, 'message': pr.message}
+                for pr in self
+            }
 
         w = super().write(vals)
 
@@ -1097,6 +1103,18 @@ class PullRequests(models.Model):
         if newhead:
             c = self.env['runbot_merge.commit'].search([('sha', '=', newhead)])
             self._validate(json.loads(c.statuses or '{}'))
+
+        if prev:
+            for pr in self:
+                old_target = prev[pr.id]['target']
+                if pr.target != old_target:
+                    pr.unstage(
+                        "target (base) branch was changed from %r to %r",
+                        old_target.display_name, pr.target.display_name,
+                    )
+                old_message = prev[pr.id]['message']
+                if pr.merge_method in ('merge', 'rebase-merge') and pr.message != old_message:
+                    pr.unstage("merge message updated")
         return w
 
     def _check_linked_prs_statuses(self, commit=False):

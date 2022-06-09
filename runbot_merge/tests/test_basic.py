@@ -693,7 +693,7 @@ def test_ff_failure_batch(env, repo, users, config):
     }
 
 class TestPREdition:
-    def test_edit(self, env, repo):
+    def test_edit(self, env, repo, config):
         """ Editing PR:
 
         * title (-> message)
@@ -714,15 +714,27 @@ class TestPREdition:
             c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
             c2 = repo.make_commit(c1, 'second', None, tree={'m': 'c2'})
             prx = repo.make_pr(title='title', body='body', target='master', head=c2)
+            repo.post_status(prx.head, 'success', 'legal/cla')
+            repo.post_status(prx.head, 'success', 'ci/runbot')
+            prx.post_comment('hansen rebase-ff r+', config['role_reviewer']['token'])
+        env.run_crons()
+
         pr = env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
-            ('number', '=', prx.number)
+            ('number', '=', prx.number),
         ])
+        assert pr.state == 'ready'
+        st = pr.staging_id
+        assert st
         assert pr.message == 'title\n\nbody'
         with repo: prx.title = "title 2"
         assert pr.message == 'title 2\n\nbody'
+        assert pr.staging_id, \
+            "message edition does not affect staging of rebased PRs"
         with repo: prx.base = '1.0'
         assert pr.target == branch_1
+        assert not pr.staging_id, "updated the base of a staged PR should have unstaged it"
+        assert st.reason == f"{pr.display_name} target (base) branch was changed from 'master' to '1.0'"
 
         with repo: prx.base = '2.0'
         assert not pr.exists()
@@ -1507,6 +1519,20 @@ class TestMergeMethod:
             frozenset([nm2, nb1])
         )
         assert staging == merge_head
+        st = pr_id.staging_id
+        assert st
+
+        with repo: prx.title = 'title 2'
+        assert not pr_id.staging_id, "updating the message of a merge-staged PR should unstage rien"
+        assert st.reason == f'{pr_id.display_name} merge message updated'
+        # since we updated the description, the merge_head value is impacted,
+        # and it's checked again later on
+        merge_head = (
+            merge_head[0].replace('title', 'title 2'),
+            merge_head[1],
+        )
+        env.run_crons()
+        assert pr_id.staging_id, "PR should immediately be re-stageable"
 
         with repo:
             repo.post_status('heads/staging.master', 'success', 'legal/cla')
