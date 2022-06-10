@@ -117,7 +117,10 @@ class Batch(models.Model):
         Create a build with given params_id if it does not already exists.
         In the case that a very same build already exists that build is returned
         """
-        build = self.env['runbot.build'].search([('params_id', '=', params.id), ('parent_id', '=', False)], limit=1, order='id desc')
+        domain = [('params_id', '=', params.id), ('parent_id', '=', False)]
+        if self.bundle_id.host_id:
+            domain += [('host', '=', self.bundle_id.host_id.name), ('keep_host', '=', True)]
+        build = self.env['runbot.build'].search(domain, limit=1, order='id desc')
         link_type = 'matched'
         if build:
             if build.killable:

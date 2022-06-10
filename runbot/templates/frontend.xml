@@ -57,6 +57,9 @@
                         <t t-call="runbot.branch_github_menu"/>
                       </div>
                     </div>
+                    <div t-if="bundle.host_id">
+                      <span class="badge badge-info" t-esc="bundle.host_id.name"></span>
+                    </div>
                   </div>
                   <div class="col-md-9 col-lg-10">
                     <div class="row no-gutters">
