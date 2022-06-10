@@ -721,6 +721,7 @@ class ConfigStep(models.Model):
             'rm -r restore',
             'echo "### listing modules"',
             """psql %s -c "select name from ir_module_module where state = 'installed'" -t -A > /data/build/logs/restore_modules_installed.txt""" % restore_db_name,
+            'echo "### restore" "successful"', # two part string to avoid miss grep
 
             ])
 
@@ -872,6 +873,9 @@ class ConfigStep(models.Model):
                 build_values.update(self._make_tests_results(build))
         elif self.job_type == 'test_upgrade':
             build_values.update(self._make_upgrade_results(build))
+        elif self.job_type == 'restore':
+            build_values.update(self._make_restore_results(build))
+
         return build_values
 
     def _make_python_results(self, build):
@@ -966,6 +970,13 @@ class ConfigStep(models.Model):
             return 'ko'
         return 'ok'
 
+    def _check_restore_ended(self, build):
+        log_path = build._path('logs', '%s.txt' % self.name)
+        if not grep(log_path, "### restore successful"):
+            build._log('_make_tests_results', 'Restore failed, check text logs for more info', level="ERROR")
+            return 'ko'
+        return 'ok'
+
     def _get_log_last_write(self, build):
         log_path = build._path('logs', '%s.txt' % self.name)
         if os.path.isfile(log_path):
@@ -992,6 +1003,17 @@ class ConfigStep(models.Model):
             if build.local_result != 'warn':
                 checkers.append(self._check_warning)
 
+            local_result = self._get_checkers_result(build, checkers)
+            build_values['local_result'] = build._get_worst_result([build.local_result, local_result])
+        return build_values
+
+    def _make_restore_results(self, build):
+        build_values = {}
+        if build.local_result != 'warn':
+            checkers = [
+                self._check_log,
+                self._check_restore_ended
+            ]
             local_result = self._get_checkers_result(build, checkers)
             build_values['local_result'] = build._get_worst_result([build.local_result, local_result])
         return build_values
