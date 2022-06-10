@@ -251,7 +251,12 @@ class ConfigStep(models.Model):
     def _run(self, build):
         log_path = build._path('logs', '%s.txt' % self.name)
         build.write({'job_start': now(), 'job_end': False})  # state, ...
-        build._log('run', 'Starting step **%s** from config **%s**' % (self.name, build.params_id.config_id.name), log_type='markdown', level='SEPARATOR')
+        log_link = ''
+        if self._has_log():
+            log_url = f'http://{build.host}'
+            url = f"{log_url}/runbot/static/build/{build.dest}/logs/{self.name}.txt"
+            log_link = f'[@icon-file-text]({url})'
+        build._log('run', 'Starting step **%s** from config **%s** %s' % (self.name, build.params_id.config_id.name, log_link), log_type='markdown', level='SEPARATOR')
         self._run_step(build, log_path)
 
     def _run_step(self, build, log_path, **kwargs):
@@ -714,7 +719,7 @@ class ConfigStep(models.Model):
             'echo "### restoring filestore"',
             'mkdir -p /data/build/datadir/filestore/%s' % restore_db_name,
             'mv filestore/* /data/build/datadir/filestore/%s' % restore_db_name,
-            'echo "###restoring db"',
+            'echo "### restoring db"',
             'psql -q %s < dump.sql' % (restore_db_name),
             'cd /data/build',
             'echo "### cleaning"',
