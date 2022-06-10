@@ -58,7 +58,7 @@
           <tree string="Dockerfile" decoration-danger="dockerfile == ''" decoration-warning="to_build == False">
             <field name="name"/>
             <field name="image_tag"/>
-            <field name="to_build"/>
+            <field name="to_build" widget="boolean_toggle"/>
             <field name="version_ids" widget="many2many_tags"/>
             <field name="project_ids" widget="many2many_tags"/>
             <field name="bundle_ids"/>
