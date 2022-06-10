@@ -35,7 +35,7 @@
             <tree string="Builds">
                 <field name="name"/>
                 <field name="disp_name"/>
-                <field name="assigned_only"/>
+                <field name="assigned_only" widget="boolean_toggle"/>
                 <field name="nb_worker"/>
             </tree>
         </field>
