@@ -409,28 +409,28 @@ class TestUpgradeFlow(RunbotCase):
 
         def docker_run_restore(cmd, *args, **kwargs):
             source_dest = first_build.params_id.dump_db.build_id.dest
+            dump_url='http://host.runbot.com/runbot/static/build/%s/logs/%s-account.zip' % (source_dest, source_dest)
+            zip_name='%s-account.zip' % source_dest
+            db_name='%s-master-account' % str(first_build.id).zfill(5)
             self.assertEqual(
-                str(cmd),
-                ' && '.join([
+                str(cmd).split(' && '),
+                [
                     'mkdir /data/build/restore',
                     'cd /data/build/restore',
-                    'wget {dump_url}',
-                    'unzip -q {zip_name}',
+                    f'wget {dump_url}',
+                    f'unzip -q {zip_name}',
                     'echo "### restoring filestore"',
-                    'mkdir -p /data/build/datadir/filestore/{db_name}',
-                    'mv filestore/* /data/build/datadir/filestore/{db_name}',
-                    'echo "###restoring db"',
-                    'psql -q {db_name} < dump.sql',
+                    f'mkdir -p /data/build/datadir/filestore/{db_name}',
+                    f'mv filestore/* /data/build/datadir/filestore/{db_name}',
+                    'echo "### restoring db"',
+                    f'psql -q {db_name} < dump.sql',
                     'cd /data/build',
                     'echo "### cleaning"',
                     'rm -r restore',
                     'echo "### listing modules"',
-                    'psql {db_name} -c "select name from ir_module_module where state = \'installed\'" -t -A > /data/build/logs/restore_modules_installed.txt'
-                ]).format(
-                    dump_url='http://host.runbot.com/runbot/static/build/%s/logs/%s-account.zip' % (source_dest, source_dest),
-                    zip_name='%s-account.zip' % source_dest,
-                    db_name='%s-master-account' % str(first_build.id).zfill(5),
-                )
+                    f'psql {db_name} -c "select name from ir_module_module where state = \'installed\'" -t -A > /data/build/logs/restore_modules_installed.txt',
+                    'echo "### restore" "successful"'
+                ]
             )
         self.patchers['docker_run'].side_effect = docker_run_restore
         first_build.host = host.name
