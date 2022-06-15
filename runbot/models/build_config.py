@@ -33,6 +33,10 @@ class ReProxy():
     def compile(cls, *args, **kwrags):
         return re.compile(*args, **kwrags)
 
+    @classmethod
+    def findall(cls, *args, **kwrags):
+        return re.findall(*args, **kwrags)
+
     VERBOSE = re.VERBOSE
 
 class Config(models.Model):
