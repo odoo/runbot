@@ -4,8 +4,10 @@ import logging
 import os
 import sys
 import threading
+import random
 import signal
 
+from datetime import datetime, timedelta
 from logging.handlers import WatchedFileHandler
 
 LOG_FORMAT = '%(asctime)s %(levelname)s %(name)s: %(message)s'
@@ -24,6 +26,7 @@ class RunbotClient():
         self.host = None
         self.count = 0
         self.max_count = 60
+        self.next_git_gc_date = datetime.now() + timedelta(minutes=random.randint(5, 15))
 
     def on_start(self):
         pass
@@ -80,6 +83,13 @@ class RunbotClient():
     def sleep(self, t):
         self.ask_interrupt.wait(t)
 
+    def git_gc(self):
+        """ git gc once a day """
+        if datetime.now() > self.next_git_gc_date:
+            _logger.info('Starting git gc on repositories')
+            self.env['runbot.runbot']._git_gc(self.host)
+            self.next_git_gc_date = datetime.now() + timedelta(hours=2, minutes=random.randint(0, 59))
+            _logger.info('Next git gc scheduled on %s', self.next_git_gc_date)
 
 def run(client_class):
     # parse args
