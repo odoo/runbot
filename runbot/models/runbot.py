@@ -9,6 +9,7 @@ import shutil
 
 from contextlib import contextmanager
 from requests.exceptions import HTTPError
+from subprocess import CalledProcessError
 
 from ..common import fqdn, dest_reg, os
 from ..container import docker_ps, docker_stop
@@ -366,6 +367,17 @@ class Runbot(models.AbstractModel):
         ignored = {dc for dc in docker_ps_result if not dest_reg.match(dc)}
         if ignored:
             _logger.info('docker (%s) not deleted because not dest format', list(ignored))
+
+    def _git_gc(self, host):
+        """
+        cleanup and optimize git repositories on the host
+        """
+        for repo in self.env['runbot.repo'].search():
+            try:
+                repo._git(['gc', '--prune=all', '--quiet'])
+            except CalledProcessError as e:
+                message = f'git gc failed on host {host} with exit status {e.returncode} and message "{e.output[:30]} ..."'
+                self.warning.create({'message': message})
 
     def warning(self, message, *args):
         if args:

@@ -10,7 +10,13 @@ class LeaderClient(RunbotClient):  # Conductor, Director, Main, Maestro, Lead
         self.pull_info_failures = {}
         super().__init__(env)
 
+    def on_start(self):
+        self.env['runbot.repo'].search([('mode', '!=', 'disabled')])._update(force=True)
+
     def loop_turn(self):
+        if self.count == 0:
+            self.env['runbot.repo']._update_git_config()
+        self.git_gc()
         return self.env['runbot.runbot']._fetch_loop_turn(self.host, self.pull_info_failures)
 
 
