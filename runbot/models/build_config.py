@@ -38,6 +38,7 @@ class ReProxy():
         return re.findall(*args, **kwrags)
 
     VERBOSE = re.VERBOSE
+    MULTILINE = re.MULTILINE
 
 class Config(models.Model):
     _name = 'runbot.build.config'
