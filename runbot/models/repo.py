@@ -114,6 +114,7 @@ class Remote(models.Model):
     sequence = fields.Integer('Sequence', tracking=True)
     fetch_heads = fields.Boolean('Fetch branches', default=True, tracking=True)
     fetch_pull = fields.Boolean('Fetch PR', default=False, tracking=True)
+    send_status = fields.Boolean('Send status', default=True, tracking=True)
 
     token = fields.Char("Github token", groups="runbot.group_runbot_admin")
 
@@ -155,24 +156,28 @@ class Remote(models.Model):
         self._cr.postcommit.add(self.repo_id._update_git_config)
         return res
 
-    def _github(self, url, payload=None, ignore_errors=False, nb_tries=2, recursive=False):
-        generator = self.sudo()._github_generator(url, payload=payload, ignore_errors=ignore_errors, nb_tries=nb_tries, recursive=recursive)
+    def _make_github_session(self):
+        session = requests.Session()
+        if self.token:
+            session.auth = (self.token, 'x-oauth-basic')
+        session.headers.update({'Accept': 'application/vnd.github.she-hulk-preview+json'})
+        return session
+
+    def _github(self, url, payload=None, ignore_errors=False, nb_tries=2, recursive=False, session=None):
+        generator = self.sudo()._github_generator(url, payload=payload, ignore_errors=ignore_errors, nb_tries=nb_tries, recursive=recursive, session=session)
         if recursive:
             return generator
         result = list(generator)
         return result[0] if result else False
 
-    def _github_generator(self, url, payload=None, ignore_errors=False, nb_tries=2, recursive=False):
+    def _github_generator(self, url, payload=None, ignore_errors=False, nb_tries=2, recursive=False, session=None):
         """Return a http request to be sent to github"""
         for remote in self:
             if remote.owner and remote.repo_name and remote.repo_domain:
                 url = url.replace(':owner', remote.owner)
                 url = url.replace(':repo', remote.repo_name)
                 url = 'https://api.%s%s' % (remote.repo_domain, url)
-                session = requests.Session()
-                if remote.token:
-                    session.auth = (remote.token, 'x-oauth-basic')
-                session.headers.update({'Accept': 'application/vnd.github.she-hulk-preview+json'})
+                session = session or remote._make_github_session()
                 while url:
                     if recursive:
                         _logger.info('Getting page %s', url)
