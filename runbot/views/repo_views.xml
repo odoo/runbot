@@ -94,6 +94,7 @@
                     <field name="sequence"/>
                     <field name="fetch_heads" string="Branch"/>
                     <field name="fetch_pull" string="PR"/>
+                    <field name="send_status"/>
                     <field name="token"/>
                   </tree>
                 </field>
@@ -118,6 +119,7 @@
                 <field name="token"/>
                 <field name="fetch_pull"/>
                 <field name="fetch_heads"/>
+                <field name="send_status"/>
               </group>
             </sheet>
           </form>
@@ -133,6 +135,7 @@
                 <field name="repo_id"/>
                 <field name="fetch_pull"/>
                 <field name="fetch_heads"/>
+                <field name="send_status"/>
             </tree>
         </field>
     </record>

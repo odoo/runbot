@@ -1136,7 +1136,7 @@ class BuildResult(models.Model):
         if self.global_result in ('skipped', 'killed', 'manually_killed'):
             return 'killed'
 
-    def _github_status(self, post_commit=True):
+    def _github_status(self):
         """Notify github of failed/successful builds"""
         for build in self:
             # TODO maybe avoid to send status if build is killable (another new build exist and will send the status)
@@ -1144,7 +1144,7 @@ class BuildResult(models.Model):
                 if build.orphan_result:
                     _logger.info('Skipping result for orphan build %s', self.id)
                 else:
-                    build.parent_id._github_status(post_commit)
+                    build.parent_id._github_status()
             else:
                 trigger = self.params_id.trigger_id
                 if not trigger.ci_context:
@@ -1170,4 +1170,4 @@ class BuildResult(models.Model):
                 for build_commit in self.params_id.commit_link_ids:
                     commit = build_commit.commit_id
                     if 'base_' not in build_commit.match_type and commit.repo_id in trigger.repo_ids:
-                        commit._github_status(build, trigger.ci_context, state, target_url, desc, post_commit)
+                        commit._github_status(build, trigger.ci_context, state, target_url, desc)

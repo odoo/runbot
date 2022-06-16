@@ -260,11 +260,15 @@ class Runbot(models.AbstractModel):
                         self._commit()
             self._commit()
 
+            self.env['runbot.commit.status']._send_to_process()
+            self._commit()
+
             # cleanup old pull_info_failures
             for pr_number, t in pull_info_failures.items():
                 if t + 15*60 < time.time():
                     _logger.warning('Removing %s from pull_info_failures', pr_number)
                     del pull_info_failures[pr_number]
+
 
         return manager.get('sleep', default_sleep)
 
