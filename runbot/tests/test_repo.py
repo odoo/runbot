@@ -71,7 +71,7 @@ class TestRepo(RunbotCaseMinimalSetup):
         first_commit = [(
             'refs/%s/heads/%s' % (self.remote_server_dev.remote_name, branch_name),
             'd0d0caca',
-            datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
+            str(int(time.time())),
             'Marc Bidule',
             '<marc.bidule@somewhere.com>',
             'Server subject',
@@ -99,7 +99,7 @@ class TestRepo(RunbotCaseMinimalSetup):
         # create a addons branch in the same bundle
         self.commit_list[self.repo_addons.id] = [('refs/%s/heads/%s' % (self.remote_addons_dev.remote_name, branch_name),
                                                   'deadbeef',
-                                                  datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
+                                                   str(int(time.time())),
                                                   'Marc Bidule',
                                                   '<marc.bidule@somewhere.com>',
                                                   'Addons subject',
@@ -127,7 +127,7 @@ class TestRepo(RunbotCaseMinimalSetup):
         self.commit_list[self.repo_server.id] += [
             ('refs/%s/pull/123' % self.remote_server.remote_name,
              'd0d0caca',
-             datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
+             str(int(time.time())),
              'Marc Bidule',
              '<marc.bidule@somewhere.com>',
              'Another subject',
@@ -157,7 +157,7 @@ class TestRepo(RunbotCaseMinimalSetup):
             (
                 'refs/%s/heads/%s' % (self.remote_server_dev.remote_name, branch_name),
                 'b00b',
-                datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
+                str(int(time.time())),
                 'Marc Bidule',
                 '<marc.bidule@somewhere.com>',
                 'A new subject',
@@ -167,7 +167,7 @@ class TestRepo(RunbotCaseMinimalSetup):
             (
                 'refs/%s/pull/123' % self.remote_server.remote_name,
                 'b00b',
-                datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
+                str(int(time.time())),
                 'Marc Bidule',
                 '<marc.bidule@somewhere.com>',
                 'A new subject',
@@ -207,7 +207,7 @@ class TestRepo(RunbotCaseMinimalSetup):
         self.commit_list[self.repo_server.id] = [
             ('refs/%s/heads/%s' % (self.remote_server_dev.remote_name, branch_name),
              'dead1234',
-             datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
+             str(int(time.time())),
              'Marc Bidule',
              '<marc.bidule@somewhere.com>',
              'A last subject',
@@ -262,7 +262,7 @@ class TestRepo(RunbotCaseMinimalSetup):
         for i in range(20005):
             self.commit_list[self.repo_server.id].append(['refs/heads/bidon-%05d' % i,
                                                           'd0d0caca %s' % i,
-                                                          datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
+                                                          str(int(time.time())),
                                                           'Marc Bidule',
                                                           '<marc.bidule@somewhere.com>',
                                                           'A nice subject',
