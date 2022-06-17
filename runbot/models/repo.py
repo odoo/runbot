@@ -552,11 +552,11 @@ class Repo(models.Model):
 
     def _update(self, force=False, poll_delay=5*60):
         """ Update the physical git reposotories on FS"""
-        for repo in self:
-            try:
-                return repo._update_git(force, poll_delay)
-            except Exception:
-                _logger.exception('Fail to update repo %s', repo.name)
+        self.ensure_one()
+        try:
+            return self._update_git(force, poll_delay)
+        except Exception:
+            _logger.exception('Fail to update repo %s', self.name)
 
 class RefTime(models.Model):
     _name = 'runbot.repo.reftime'

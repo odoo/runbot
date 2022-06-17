@@ -343,7 +343,7 @@ class Batch(models.Model):
         if not bundle.sticky and self.category_id == default_category:
             skippable = self.env['runbot.batch'].search([
                 ('bundle_id', '=', bundle.id),
-                ('state', '!=', 'done'),
+                ('state', 'not in', ('done', 'skipped')),
                 ('id', '<', self.id),
                 ('category_id', '=', default_category.id)
             ])
