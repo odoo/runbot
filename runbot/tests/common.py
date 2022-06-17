@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import datetime
-
+import time
 from odoo.tests.common import TransactionCase
 from unittest.mock import patch, DEFAULT
 
@@ -37,7 +37,7 @@ class RunbotCase(TransactionCase):
         self.commit_list[self.repo_server.id] = [(
             'refs/%s/heads/%s' % (remote.remote_name, branch_name),
             sha or 'd0d0caca',
-            tstamp or datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
+            str(tstamp or int(time.time())),
             committer,
             commiter_email,
             subject,

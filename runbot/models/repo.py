@@ -6,7 +6,6 @@ import re
 import subprocess
 import time
 
-import dateutil
 import requests
 
 from pathlib import Path
@@ -358,10 +357,11 @@ class Repo(models.Model):
         """
         self.ensure_one()
         get_ref_time = round(self._get_fetch_head_time(), 4)
+        commit_limit = time.time() - 60*60*24*max_age
         if not self.get_ref_time or get_ref_time > self.get_ref_time:
             try:
                 self.set_ref_time(get_ref_time)
-                fields = ['refname', 'objectname', 'committerdate:iso8601', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail']
+                fields = ['refname', 'objectname', 'committerdate:unix', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail']
                 fmt = "%00".join(["%(" + field + ")" for field in fields])
                 cmd = ['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/*/heads/*']
                 if any(remote.fetch_pull for remote in self.remote_ids):
@@ -371,7 +371,7 @@ class Repo(models.Model):
                 if not git_refs:
                     return []
                 refs = [tuple(field for field in line.split('\x00')) for line in git_refs.split('\n')]
-                refs = [r for r in refs if dateutil.parser.parse(r[2][:19]) + datetime.timedelta(days=max_age) > datetime.datetime.now() or self.env['runbot.branch'].match_is_base(r[0].split('\n')[-1])]
+                refs = [r for r in refs if int(r[2]) > commit_limit or self.env['runbot.branch'].match_is_base(r[0].split('\n')[-1])]
                 if ignore:
                     refs = [r for r in refs if r[0].split('/')[-1] not in ignore]
                 return refs
@@ -432,7 +432,7 @@ class Repo(models.Model):
                         'committer': committer,
                         'committer_email': committer_email,
                         'subject': subject,
-                        'date': dateutil.parser.parse(date[:19]),
+                        'date': datetime.datetime.fromtimestamp(int(date)),
                     })
                 branch.head = commit
                 if not branch.alive:
