@@ -117,7 +117,7 @@ class Runbot(Controller):
             'pending_total': pending_count,
             'pending_level': level,
             'scheduled_count': scheduled_count,
-            'hosts_data': request.env['runbot.host'].search([]),
+            'hosts_data': request.env['runbot.host'].search([('assigned_only', '=', False)]),
         }
         if project:
             domain = [('last_batch', '!=', False), ('project_id', '=', project.id), ('no_build', '=', False)]
