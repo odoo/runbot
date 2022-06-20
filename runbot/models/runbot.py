@@ -372,7 +372,7 @@ class Runbot(models.AbstractModel):
         """
         cleanup and optimize git repositories on the host
         """
-        for repo in self.env['runbot.repo'].search():
+        for repo in self.env['runbot.repo'].search([]):
             try:
                 repo._git(['gc', '--prune=all', '--quiet'])
             except CalledProcessError as e:
