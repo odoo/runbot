@@ -399,18 +399,20 @@ class TestNotAllBranches:
         assert pr_a.comments == [
             (users['reviewer'], 'hansen r+'),
             seen(env, pr_a, users),
-            (users['user'], "This pull request can not be forward ported: next "
-                            "branch is 'b' but linked pull request %s#%d has a"
-                            " next branch 'c'." % (b.name, pr_b.number)
-            )
+            (users['user'], "@%s @%s this pull request can not be forward ported:"
+                            " next branch is 'b' but linked pull request %s "
+                            "has a next branch 'c'." % (
+                users['user'], users['reviewer'], pr_b_id.display_name,
+            )),
         ]
         assert pr_b.comments == [
             (users['reviewer'], 'hansen r+'),
             seen(env, pr_b, users),
-            (users['user'], "This pull request can not be forward ported: next "
-                            "branch is 'c' but linked pull request %s#%d has a"
-                            " next branch 'b'." % (a.name, pr_a.number)
-            )
+            (users['user'], "@%s @%s this pull request can not be forward ported:"
+                            " next branch is 'c' but linked pull request %s "
+                            "has a next branch 'b'." % (
+                users['user'], users['reviewer'], pr_a_id.display_name,
+            )),
         ]
 
 def test_new_intermediate_branch(env, config, make_repo):
@@ -755,7 +757,7 @@ def test_approve_draft(env, config, make_repo, users):
     assert pr.comments == [
         (users['reviewer'], 'hansen r+'),
         seen(env, pr, users),
-        (users['user'], f"I'm sorry, @{users['reviewer']}. Draft PRs can not be approved."),
+        (users['user'], f"I'm sorry, @{users['reviewer']}: draft PRs can not be approved."),
     ]
 
     with prod:

@@ -218,7 +218,7 @@ def handle_pr(env, event):
         if pr_obj.state == 'merged':
             feedback(
                 close=True,
-                message="@%s ya silly goose you can't reopen a PR that's been merged PR." % event['sender']['login']
+                message="@%s ya silly goose you can't reopen a merged PR." % event['sender']['login']
             )
 
         if pr_obj.state == 'closed':

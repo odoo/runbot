@@ -63,7 +63,6 @@ def test_trivial_flow(env, repo, page, users, config):
     ]
     assert statuses == [('legal/cla', 'ok'), ('ci/runbot', 'ok')]
 
-
     with repo:
         pr.post_comment('hansen r+ rebase-merge', config['role_reviewer']['token'])
     assert pr_id.state == 'ready'
@@ -443,8 +442,8 @@ def test_staging_conflict_first(env, repo, users, config, page):
     assert pr.comments == [
         (users['reviewer'], 'hansen r+ rebase-merge'),
         seen(env, pr, users),
-        (users['user'], 'Merge method set to rebase and merge, using the PR as merge commit message'),
-        (users['user'], re_matches('^Unable to stage PR')),
+        (users['user'], 'Merge method set to rebase and merge, using the PR as merge commit message.'),
+        (users['user'], '@%(user)s @%(reviewer)s unable to stage: merge conflict' % users),
     ]
 
     dangerbox = pr_page(page, pr).cssselect('.alert-danger span')
@@ -566,8 +565,8 @@ def test_staging_ci_failure_single(env, repo, users, config, page):
     assert pr.comments == [
         (users['reviewer'], 'hansen r+ rebase-merge'),
         seen(env, pr, users),
-        (users['user'], "Merge method set to rebase and merge, using the PR as merge commit message"),
-        (users['user'], 'Staging failed: ci/runbot')
+        (users['user'], "Merge method set to rebase and merge, using the PR as merge commit message."),
+        (users['user'], '@%(user)s @%(reviewer)s staging failed: ci/runbot' % users)
     ]
 
     dangerbox = pr_page(page, pr).cssselect('.alert-danger span')
@@ -970,9 +969,9 @@ def test_ci_failure_after_review(env, repo, users, config):
     assert prx.comments == [
         (users['reviewer'], 'hansen r+'),
         seen(env, prx, users),
-        (users['user'], "'ci/runbot' failed on this reviewed PR.".format_map(users)),
-        (users['user'], "'legal/cla' failed on this reviewed PR.".format_map(users)),
-        (users['user'], "'legal/cla' failed on this reviewed PR.".format_map(users)),
+        (users['user'], "@{user} @{reviewer} 'ci/runbot' failed on this reviewed PR.".format_map(users)),
+        (users['user'], "@{user} @{reviewer} 'legal/cla' failed on this reviewed PR.".format_map(users)),
+        (users['user'], "@{user} @{reviewer} 'legal/cla' failed on this reviewed PR.".format_map(users)),
     ]
 
 def test_reopen_merged_pr(env, repo, config, users):
@@ -1016,7 +1015,7 @@ def test_reopen_merged_pr(env, repo, config, users):
     assert prx.comments == [
         (users['reviewer'], 'hansen r+'),
         seen(env, prx, users),
-        (users['user'], "@%s ya silly goose you can't reopen a PR that's been merged PR." % users['other'])
+        (users['user'], "@%s ya silly goose you can't reopen a merged PR." % users['other'])
     ]
 
 class TestNoRequiredStatus:
@@ -1212,7 +1211,7 @@ class TestRetry:
             (users['reviewer'], 'hansen r+'),
             (users['reviewer'], 'hansen retry'),
             seen(env, prx, users),
-            (users['user'], "I'm sorry, @{}. Retry makes no sense when the PR is not in error.".format(users['reviewer'])),
+            (users['user'], "I'm sorry, @{reviewer}: retry makes no sense when the PR is not in error.".format_map(users)),
         ]
 
     @pytest.mark.parametrize('disabler', ['user', 'other', 'reviewer'])
@@ -1408,12 +1407,13 @@ class TestMergeMethod:
         assert prx.comments == [
             (users['reviewer'], 'hansen r+'),
             seen(env, prx, users),
-            (users['user'], """Because this PR has multiple commits, I need to know how to merge it:
+            (users['user'], """@{user} @{reviewer} because this PR has multiple \
+commits, I need to know how to merge it:
 
 * `merge` to merge directly, using the PR as merge commit message
 * `rebase-merge` to rebase and merge, using the PR as merge commit message
 * `rebase-ff` to rebase and fast-forward
-"""),
+""".format_map(users)),
         ]
 
     def test_pr_method_no_review(self, repo, env, users, config):
@@ -1453,11 +1453,11 @@ class TestMergeMethod:
         assert prx.comments == [
             (users['reviewer'], 'hansen rebase-merge'),
             seen(env, prx, users),
-            (users['user'], "Merge method set to rebase and merge, using the PR as merge commit message"),
+            (users['user'], "Merge method set to rebase and merge, using the PR as merge commit message."),
             (users['reviewer'], 'hansen merge'),
-            (users['user'], "Merge method set to merge directly, using the PR as merge commit message"),
+            (users['user'], "Merge method set to merge directly, using the PR as merge commit message."),
             (users['reviewer'], 'hansen rebase-ff'),
-            (users['user'], "Merge method set to rebase and fast-forward"),
+            (users['user'], "Merge method set to rebase and fast-forward."),
         ]
 
     def test_pr_rebase_merge(self, repo, env, users, config):
@@ -2025,7 +2025,7 @@ Part-of: {pr_id.display_name}"""
         assert pr1.comments == [
             seen(env, pr1, users),
             (users['reviewer'], 'hansen r+ squash'),
-            (users['user'], 'Merge method set to squash')
+            (users['user'], 'Merge method set to squash.')
         ]
         merged_head = repo.commit('master')
         assert merged_head.message == f"""first pr
@@ -2049,13 +2049,13 @@ Signed-off-by: {get_partner(env, users["reviewer"]).formatted_email}\
         assert pr2.comments == [
             seen(env, pr2, users),
             (users['reviewer'], 'hansen r+ squash'),
-            (users['user'], f"I'm sorry, @{users['reviewer']}. Squash can only be used with a single commit at this time."),
-            (users['user'], """Because this PR has multiple commits, I need to know how to merge it:
+            (users['user'], f"I'm sorry, @{users['reviewer']}: squash can only be used with a single commit at this time."),
+            (users['user'], """@{user} @{reviewer} because this PR has multiple commits, I need to know how to merge it:
 
 * `merge` to merge directly, using the PR as merge commit message
 * `rebase-merge` to rebase and merge, using the PR as merge commit message
 * `rebase-ff` to rebase and fast-forward
-""")
+""".format_map(users))
         ]
 
     @pytest.mark.xfail(reason="removed support for squash- command")
@@ -2859,7 +2859,7 @@ class TestReviewing(object):
             (users['user'], "I'm sorry, @{}. I'm afraid I can't do that.".format(users['other'])),
             (users['reviewer'], 'hansen r+'),
             (users['reviewer'], 'hansen r+'),
-            (users['user'], "I'm sorry, @{}. This PR is already reviewed, reviewing it again is useless.".format(
+            (users['user'], "I'm sorry, @{}: this PR is already reviewed, reviewing it again is useless.".format(
                  users['reviewer'])),
         ]
 
@@ -2888,7 +2888,7 @@ class TestReviewing(object):
         assert prx.comments == [
             (users['reviewer'], 'hansen r+'),
             seen(env, prx, users),
-            (users['user'], "I'm sorry, @{}. You can't review+.".format(users['reviewer'])),
+            (users['user'], "I'm sorry, @{}: you can't review+.".format(users['reviewer'])),
         ]
 
     def test_self_review_success(self, env, repo, users, config):
@@ -3044,7 +3044,7 @@ class TestReviewing(object):
             seen(env, pr, users),
             (users['reviewer'], 'hansen delegate+'),
             (users['user'], 'hansen r+'),
-            (users['user'], f"I'm sorry, @{users['user']}. I must know your email before you can review PRs. Please contact an administrator."),
+            (users['user'], f"I'm sorry, @{users['user']}: I must know your email before you can review PRs. Please contact an administrator."),
         ]
         user_partner.fetch_github_email()
         assert user_partner.email
@@ -3108,9 +3108,9 @@ class TestUnknownPR:
             seen(env, prx, users),
             (users['reviewer'], 'hansen r+'),
             (users['reviewer'], 'hansen r+'),
-            (users['user'], "Sorry, I didn't know about this PR and had to "
+            (users['user'], "I didn't know about this PR and had to "
                             "retrieve its information, you may have to "
-                            "re-approve it."),
+                            "re-approve it as I didn't see previous commands."),
             seen(env, prx, users),
         ]
 
@@ -3161,9 +3161,9 @@ class TestUnknownPR:
         assert pr.comments == [
             seen(env, pr, users),
             (users['reviewer'], 'hansen r+'),
-            (users['user'], "Sorry, I didn't know about this PR and had to "
-                            "retrieve its information, you may have to "
-                            "re-approve it."),
+            (users['user'], "I didn't know about this PR and had to retrieve "
+                            "its information, you may have to re-approve it "
+                            "as I didn't see previous commands."),
             seen(env, pr, users),
         ]
 
@@ -3189,7 +3189,7 @@ class TestUnknownPR:
         assert prx.comments == [
             (users['reviewer'], 'hansen r+'),
             (users['user'], "This PR targets the un-managed branch %s:branch, it can not be merged." % repo.name),
-            (users['user'], "I'm sorry. Branch `branch` is not within my remit."),
+            (users['user'], "Branch `branch` is not within my remit, imma just ignore it."),
         ]
 
     def test_rplus_review_unmanaged(self, env, repo, users, config):
@@ -3586,7 +3586,7 @@ class TestFeedback:
         assert prx.comments == [
             (users['reviewer'], 'hansen r+'),
             seen(env, prx, users),
-            (users['user'], "'ci/runbot' failed on this reviewed PR.")
+            (users['user'], "@%(user)s @%(reviewer)s 'ci/runbot' failed on this reviewed PR." % users)
         ]
 
     def test_review_failed(self, repo, env, users, config):
@@ -3616,8 +3616,9 @@ class TestFeedback:
         assert prx.comments == [
             seen(env, prx, users),
             (users['reviewer'], 'hansen r+'),
-            (users['user'], "@%s, you may want to rebuild or fix this PR as it has failed CI." % users['reviewer'])
+            (users['user'], "@%s you may want to rebuild or fix this PR as it has failed CI." % users['reviewer'])
         ]
+
 class TestInfrastructure:
     def test_protection(self, repo):
         """ force-pushing on a protected ref should fail

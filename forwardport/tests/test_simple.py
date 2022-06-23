@@ -125,8 +125,11 @@ def test_straightforward_flow(env, config, make_repo, users):
     assert pr.comments == [
         (users['reviewer'], 'hansen r+ rebase-ff'),
         seen(env, pr, users),
-        (users['user'], 'Merge method set to rebase and fast-forward'),
-        (users['user'], 'This pull request has forward-port PRs awaiting action (not merged or closed): ' + ', '.join((pr1 | pr2).mapped('display_name'))),
+        (users['user'], 'Merge method set to rebase and fast-forward.'),
+        (users['user'], '@%s @%s this pull request has forward-port PRs awaiting action (not merged or closed):\n%s' % (
+            users['other'], users['reviewer'],
+            '\n- '.join((pr1 | pr2).mapped('display_name'))
+        )),
     ]
 
     assert pr0_ == pr0
@@ -148,8 +151,7 @@ def test_straightforward_flow(env, config, make_repo, users):
     assert pr2_remote.comments == [
         seen(env, pr2_remote, users),
         (users['user'], """\
-Ping @%s, @%s
-This PR targets c and is the last of the forward-port chain containing:
+@%s @%s this PR targets c and is the last of the forward-port chain containing:
 * %s
 
 To merge the full chain, say
@@ -314,11 +316,18 @@ def test_empty(env, config, make_repo, users):
     env.run_crons('forwardport.reminder', 'runbot_merge.feedback_cron', context={'forwardport_updated_before': FAKE_PREV_WEEK})
     env.run_crons('forwardport.reminder', 'runbot_merge.feedback_cron', context={'forwardport_updated_before': FAKE_PREV_WEEK})
 
+    awaiting = (
+        users['other'],
+        '@%s @%s this pull request has forward-port PRs awaiting action (not merged or closed):\n%s' % (
+            users['user'], users['reviewer'],
+            fail_id.display_name
+        )
+    )
     assert pr1.comments == [
         (users['reviewer'], 'hansen r+'),
         seen(env, pr1, users),
-        (users['other'], 'This pull request has forward-port PRs awaiting action (not merged or closed): ' + fail_id.display_name),
-        (users['other'], 'This pull request has forward-port PRs awaiting action (not merged or closed): ' + fail_id.display_name),
+        awaiting,
+        awaiting,
     ], "each cron run should trigger a new message on the ancestor"
     # check that this stops if we close the PR
     with prod:
@@ -327,8 +336,8 @@ def test_empty(env, config, make_repo, users):
     assert pr1.comments == [
         (users['reviewer'], 'hansen r+'),
         seen(env, pr1, users),
-        (users['other'], 'This pull request has forward-port PRs awaiting action (not merged or closed): ' + fail_id.display_name),
-        (users['other'], 'This pull request has forward-port PRs awaiting action (not merged or closed): ' + fail_id.display_name),
+        awaiting,
+        awaiting,
     ]
 
 def test_partially_empty(env, config, make_repo):
@@ -562,8 +571,7 @@ def test_delegate_fw(env, config, make_repo, users):
 
     assert pr2.comments == [
         seen(env, pr2, users),
-        (users['user'], '''Ping @{self_reviewer}, @{reviewer}
-This PR targets c and is the last of the forward-port chain.
+        (users['user'], '''@{self_reviewer} @{reviewer} this PR targets c and is the last of the forward-port chain.
 
 To merge the full chain, say
 > @{user} r+

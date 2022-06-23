@@ -429,7 +429,7 @@ def test_merge_fail(env, project, repo_a, repo_b, users, config):
     assert pr1b.comments == [
         (users['reviewer'], 'hansen r+'),
         seen(env, pr1b, users),
-        (users['user'], re_matches('^Unable to stage PR')),
+        (users['user'], '@%(user)s @%(reviewer)s unable to stage: merge conflict' % users),
     ]
     other = to_pr(env, pr1a)
     reviewer = get_partner(env, users["reviewer"]).formatted_email
@@ -527,14 +527,22 @@ class TestCompanionsNotReady:
         assert p_a.comments == [
             (users['reviewer'], 'hansen r+'),
             seen(env, p_a, users),
-            (users['user'], "Linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (repo_b.name, p_b.number)),
+            (users['user'], "@%s @%s linked pull request(s) %s not ready. Linked PRs are not staged until all of them are ready." % (
+                users['user'],
+                users['reviewer'],
+                pr_b.display_name,
+            )),
         ]
         # ensure the message is only sent once per PR
         env.run_crons('runbot_merge.check_linked_prs_status')
         assert p_a.comments == [
             (users['reviewer'], 'hansen r+'),
             seen(env, p_a, users),
-            (users['user'], "Linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (repo_b.name, p_b.number)),
+            (users['user'], "@%s @%s linked pull request(s) %s not ready. Linked PRs are not staged until all of them are ready." % (
+                users['user'],
+                users['reviewer'],
+                pr_b.display_name,
+            )),
         ]
         assert p_b.comments == [seen(env, p_b, users)]
 
@@ -570,7 +578,8 @@ class TestCompanionsNotReady:
         assert pr_b.comments == [
             (users['reviewer'], 'hansen r+'),
             seen(env, pr_b, users),
-            (users['user'], "Linked pull request(s) %s#%d, %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
+            (users['user'], "@%s @%s linked pull request(s) %s#%d, %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
+                users['user'], users['reviewer'],
                 repo_a.name, pr_a.number,
                 repo_c.name, pr_c.number
             ))
@@ -609,7 +618,8 @@ class TestCompanionsNotReady:
         assert pr_b.comments == [
             (users['reviewer'], 'hansen r+'),
             seen(env, pr_b, users),
-            (users['user'], "Linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
+            (users['user'], "@%s @%s linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
+                users['user'], users['reviewer'],
                 repo_a.name, pr_a.number
             ))
         ]
@@ -617,7 +627,8 @@ class TestCompanionsNotReady:
             (users['reviewer'], 'hansen r+'),
             seen(env, pr_c, users),
             (users['user'],
-             "Linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
+             "@%s @%s linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
+                 users['user'], users['reviewer'],
                  repo_a.name, pr_a.number
              ))
         ]
@@ -655,7 +666,10 @@ def test_other_failed(env, project, repo_a, repo_b, users, config):
     assert pr_a.comments == [
         (users['reviewer'], 'hansen r+'),
         seen(env, pr_a, users),
-        (users['user'], 'Staging failed: ci/runbot on %s (view more at http://example.org/b)' % sth)
+        (users['user'], '@%s @%s staging failed: ci/runbot on %s (view more at http://example.org/b)' % (
+            users['user'], users['reviewer'],
+            sth
+        ))
     ]
 
 class TestMultiBatches:

@@ -3,6 +3,7 @@
 import ast
 import base64
 import collections
+import contextlib
 import datetime
 import io
 import itertools
@@ -116,7 +117,7 @@ All substitutions are tentatively applied sequentially to the input.
             feedback({
                 'repository': self.id,
                 'pull_request': number,
-                'message': "I'm sorry. Branch `{}` is not within my remit.".format(pr['base']['ref']),
+                'message': "Branch `{}` is not within my remit, imma just ignore it.".format(pr['base']['ref']),
             })
             return
 
@@ -142,8 +143,9 @@ All substitutions are tentatively applied sequentially to the input.
         feedback({
             'repository': self.id,
             'pull_request': number,
-            'message': "Sorry, I didn't know about this PR and had to retrieve "
-                       "its information, you may have to re-approve it."
+            'message': "%sI didn't know about this PR and had to retrieve "
+                       "its information, you may have to re-approve it as "
+                       "I didn't see previous commands." % pr_id.ping()
         })
         # init the PR to the null commit so we can later synchronise it back
         # back to the "proper" head while resetting reviews
@@ -338,14 +340,20 @@ class Branch(models.Model):
                 _logger.exception("Failed to merge %s into staging branch", pr.display_name)
                 if first or isinstance(e, exceptions.Unmergeable):
                     if len(e.args) > 1 and e.args[1]:
-                        message = e.args[1]
+                        reason = e.args[1]
                     else:
-                        message = "Unable to stage PR (%s)" % e.__context__
+                        reason = e.__context__
+                    # if the reason is a json document, assume it's a github
+                    # error and try to extract the error message to give it to
+                    # the user
+                    with contextlib.suppress(Exception):
+                        reason = json.loads(str(reason))['message'].lower()
+
                     pr.state = 'error'
                     self.env['runbot_merge.pull_requests.feedback'].create({
                         'repository': pr.repository.id,
                         'pull_request': pr.number,
-                        'message': message,
+                        'message': f'{pr.ping()}unable to stage: {reason}',
                     })
             else:
                 first = False
@@ -533,6 +541,17 @@ class PullRequests(models.Model):
 
     repo_name = fields.Char(related='repository.name')
     message_title = fields.Char(compute='_compute_message_title')
+
+    def ping(self, author=True, reviewer=True):
+        P = self.env['res.partner']
+        s = ' '.join(
+            f'@{p.github_login}'
+            for p in (self.author if author else P) | (self.reviewed_by if reviewer else P)
+            if p
+        )
+        if s:
+            s += ' '
+        return s
 
     @api.depends('repository.name', 'number')
     def _compute_url(self):
@@ -791,14 +810,14 @@ class PullRequests(models.Model):
         msgs = []
         for command, param in commands:
             ok = False
-            msg = []
+            msg = None
             if command == 'retry':
                 if is_author:
                     if self.state == 'error':
                         ok = True
                         self.state = 'ready'
                     else:
-                        msg = "Retry makes no sense when the PR is not in error."
+                        msg = "retry makes no sense when the PR is not in error."
             elif command == 'check':
                 if is_author:
                     self.env['runbot_merge.fetch_job'].create({
@@ -808,14 +827,14 @@ class PullRequests(models.Model):
                     ok = True
             elif command == 'review':
                 if self.draft:
-                    msg = "Draft PRs can not be approved."
+                    msg = "draft PRs can not be approved."
                 elif param and is_reviewer:
                     oldstate = self.state
                     newstate = RPLUS.get(self.state)
                     if not author.email:
                         msg = "I must know your email before you can review PRs. Please contact an administrator."
                     elif not newstate:
-                        msg = "This PR is already reviewed, reviewing it again is useless."
+                        msg = "this PR is already reviewed, reviewing it again is useless."
                     else:
                         self.state = newstate
                         self.reviewed_by = author
@@ -832,7 +851,7 @@ class PullRequests(models.Model):
                         Feedback.create({
                             'repository': self.repository.id,
                             'pull_request': self.number,
-                            'message': "@{}, you may want to rebuild or fix this PR as it has failed CI.".format(author.github_login),
+                            'message': "@{} you may want to rebuild or fix this PR as it has failed CI.".format(login),
                         })
                 elif not param and is_author:
                     newstate = RMINUS.get(self.state)
@@ -846,7 +865,7 @@ class PullRequests(models.Model):
                                 'pull_request': self.number,
                                 'message': "PR priority reset to 1, as pull requests with priority 0 ignore review state.",
                             })
-                        self.unstage("unreviewed (r-) by %s", author.github_login)
+                        self.unstage("unreviewed (r-) by %s", login)
                         ok = True
                     else:
                         msg = "r- makes no sense in the current PR state."
@@ -875,7 +894,7 @@ class PullRequests(models.Model):
             elif command == 'method':
                 if is_reviewer:
                     if param == 'squash' and not self.squash:
-                        msg = "Squash can only be used with a single commit at this time."
+                        msg = "squash can only be used with a single commit at this time."
                     else:
                         self.merge_method = param
                         ok = True
@@ -883,7 +902,7 @@ class PullRequests(models.Model):
                         Feedback.create({
                             'repository': self.repository.id,
                             'pull_request': self.number,
-                            'message':"Merge method set to %s" % explanation
+                            'message':"Merge method set to %s." % explanation
                         })
             elif command == 'override':
                 overridable = author.override_rights\
@@ -905,7 +924,7 @@ class PullRequests(models.Model):
                         c.create({'sha': self.head, 'statuses': '{}'})
                     ok = True
                 else:
-                    msg = f"You are not allowed to override this status."
+                    msg = "you are not allowed to override this status."
             else:
                 # ignore unknown commands
                 continue
@@ -920,21 +939,23 @@ class PullRequests(models.Model):
                 applied.append(reformat(command, param))
             else:
                 ignored.append(reformat(command, param))
-                msgs.append(msg or "You can't {}.".format(reformat(command, param)))
+                msgs.append(msg or "you can't {}.".format(reformat(command, param)))
+
+        if msgs:
+            joiner = ' ' if len(msgs) == 1 else '\n- '
+            msgs.insert(0, "I'm sorry, @{}:".format(login))
+            Feedback.create({
+                'repository': self.repository.id,
+                'pull_request': self.number,
+                'message': joiner.join(msgs),
+            })
+
         msg = []
         if applied:
             msg.append('applied ' + ' '.join(applied))
         if ignored:
             ignoredstr = ' '.join(ignored)
             msg.append('ignored ' + ignoredstr)
-
-        if msgs:
-            msgs.insert(0, "I'm sorry, @{}.".format(login))
-            Feedback.create({
-                'repository': self.repository.id,
-                'pull_request': self.number,
-                'message': ' '.join(msgs),
-            })
         return '\n'.join(msg)
 
     def _pr_acl(self, user):
@@ -1021,7 +1042,7 @@ class PullRequests(models.Model):
             self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': self.repository.id,
                 'pull_request': self.number,
-                'message': "%r failed on this reviewed PR." % ci,
+                'message': "%s%r failed on this reviewed PR." % (self.ping(), ci),
             })
 
     def _auto_init(self):
@@ -1158,11 +1179,9 @@ class PullRequests(models.Model):
                 self.env['runbot_merge.pull_requests.feedback'].create({
                     'repository': r.repository.id,
                     'pull_request': r.number,
-                    'message': "Linked pull request(s) {} not ready. Linked PRs are not staged until all of them are ready.".format(
-                        ', '.join(map(
-                            '{0.display_name}'.format,
-                            unready
-                        ))
+                    'message': "{}linked pull request(s) {} not ready. Linked PRs are not staged until all of them are ready.".format(
+                        r.ping(),
+                        ', '.join(map('{0.display_name}'.format, unready))
                     )
                 })
                 r.link_warned = True
@@ -1171,6 +1190,11 @@ class PullRequests(models.Model):
 
         # send feedback for multi-commit PRs without a merge_method (which
         # we've not warned yet)
+        methods = ''.join(
+            '* `%s` to %s\n' % pair
+            for pair in type(self).merge_method.selection
+            if pair[0] != 'squash'
+        )
         for r in self.search([
             ('state', '=', 'ready'),
             ('squash', '=', False),
@@ -1180,10 +1204,9 @@ class PullRequests(models.Model):
             self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': r.repository.id,
                 'pull_request': r.number,
-                'message': "Because this PR has multiple commits, I need to know how to merge it:\n\n" + ''.join(
-                    '* `%s` to %s\n' % pair
-                    for pair in type(self).merge_method.selection
-                    if pair[0] != 'squash'
+                'message': "%sbecause this PR has multiple commits, I need to know how to merge it:\n\n%s" % (
+                    r.ping(),
+                    methods,
                 )
             })
             r.method_warned = True
@@ -1740,7 +1763,7 @@ class Stagings(models.Model):
             self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': pr.repository.id,
                 'pull_request': pr.number,
-                'message':"Staging failed: %s" % message
+                'message': "%sstaging failed: %s" % (pr.ping(), message),
             })
 
         self.batch_ids.write({'active': False})
@@ -2042,11 +2065,11 @@ class Batch(models.Model):
                 self.env['runbot_merge.pull_requests.feedback'].create({
                     'repository': pr.repository.id,
                     'pull_request': pr.number,
-                    'message': "We apparently missed an update to this PR "
+                    'message': "%swe apparently missed an update to this PR "
                                "and tried to stage it in a state which "
                                "might not have been approved. PR has been "
                                "updated to %s, please check and approve or "
-                               "re-approve." % new_head
+                               "re-approve." % (pr.ping(), new_head)
                 })
                 return self.env['runbot_merge.batch']
 

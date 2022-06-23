@@ -79,12 +79,12 @@ class ForwardPortTasks(models.Model, Queue):
         batch.active = False
 
 
-CONFLICT_TEMPLATE = "WARNING: the latest change ({previous.head}) triggered " \
+CONFLICT_TEMPLATE = "{ping}WARNING: the latest change ({previous.head}) triggered " \
                     "a conflict when updating the next forward-port " \
                     "({next.display_name}), and has been ignored.\n\n" \
                     "You will need to update this pull request differently, " \
                     "or fix the issue by hand on {next.display_name}."
-CHILD_CONFLICT = "WARNING: the update of {previous.display_name} to " \
+CHILD_CONFLICT = "{ping}WARNING: the update of {previous.display_name} to " \
                  "{previous.head} has caused a conflict in this pull request, " \
                  "data may have been lost."
 class UpdateQueue(models.Model, Queue):
@@ -118,14 +118,15 @@ class UpdateQueue(models.Model, Queue):
                     Feedback.create({
                         'repository': child.repository.id,
                         'pull_request': child.number,
-                        'message': "Ancestor PR %s has been updated but this PR"
+                        'message': "%sancestor PR %s has been updated but this PR"
                                    " is %s and can't be updated to match."
                                    "\n\n"
                                    "You may want or need to manually update any"
                                    " followup PR." % (
-                                       self.new_root.display_name,
-                                       child.state,
-                                   )
+                            child.ping(),
+                            self.new_root.display_name,
+                            child.state,
+                        )
                     })
                     return
 
@@ -137,6 +138,7 @@ class UpdateQueue(models.Model, Queue):
                         'repository': previous.repository.id,
                         'pull_request': previous.number,
                         'message': CONFLICT_TEMPLATE.format(
+                            ping=previous.ping(),
                             previous=previous,
                             next=child
                         )
@@ -144,7 +146,7 @@ class UpdateQueue(models.Model, Queue):
                     Feedback.create({
                         'repository': child.repository.id,
                         'pull_request': child.number,
-                        'message': CHILD_CONFLICT.format(previous=previous, next=child)\
+                        'message': CHILD_CONFLICT.format(ping=child.ping(), previous=previous, next=child)\
                             + (f'\n\nstdout:\n```\n{out.strip()}\n```' if out.strip() else '')
                             + (f'\n\nstderr:\n```\n{err.strip()}\n```' if err.strip() else '')
                     })

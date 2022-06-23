@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import collections
+import time
 
 import pytest
 
@@ -157,12 +158,12 @@ def test_disable(env, config, make_repo, users, enabled):
     # responses and we don't care that much
     assert set(pr.comments) == {
         (users['reviewer'], "hansen r+\n%s up to" % bot_name),
+        (users['other'], "@%s please provide a branch to forward-port to." % users['reviewer']),
         (users['reviewer'], "%s up to b" % bot_name),
+        (users['other'], "@%s branch 'b' is disabled, it can't be used as a forward port target." % users['reviewer']),
         (users['reviewer'], "%s up to foo" % bot_name),
+        (users['other'], "@%s there is no branch 'foo', it can't be used as a forward port target." % users['reviewer']),
         (users['reviewer'], "%s up to c" % bot_name),
-        (users['other'], "Please provide a branch to forward-port to."),
-        (users['other'], "Branch 'b' is disabled, it can't be used as a forward port target."),
-        (users['other'], "There is no branch 'foo', it can't be used as a forward port target."),
         (users['other'], "Forward-porting to 'c'."),
         seen(env, pr, users),
     }
@@ -201,14 +202,13 @@ def test_default_disabled(env, config, make_repo, users):
     assert pr2.comments == [
         seen(env, pr2, users),
         (users['user'], """\
-Ping @%s, @%s
-This PR targets b and is the last of the forward-port chain.
+@%(user)s @%(reviewer)s this PR targets b and is the last of the forward-port chain.
 
 To merge the full chain, say
-> @%s r+
+> @%(user)s r+
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
-""" % (users['user'], users['reviewer'], users['user'])),
+""" % users)
     ]
 
 def test_limit_after_merge(env, config, make_repo, users):
@@ -247,7 +247,7 @@ def test_limit_after_merge(env, config, make_repo, users):
         (users['reviewer'], "hansen r+"),
         seen(env, pr1, users),
         (users['reviewer'], bot_name + ' up to b'),
-        (bot_name, "Sorry, forward-port limit can only be set before the PR is merged."),
+        (bot_name, "@%s forward-port limit can only be set before the PR is merged." % users['reviewer']),
     ]
     assert pr2.comments == [
         seen(env, pr2, users),
@@ -257,9 +257,11 @@ This PR targets b and is part of the forward-port chain. Further PRs will be cre
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """),
         (users['reviewer'], bot_name + ' up to b'),
-        (bot_name, "Sorry, forward-port limit can only be set on an origin PR"
-                   " (%s here) before it's merged and forward-ported." % p1.display_name
-         ),
+        (bot_name, "@%s forward-port limit can only be set on an origin PR"
+                   " (%s here) before it's merged and forward-ported." % (
+            users['reviewer'],
+            p1.display_name,
+        )),
     ]
 
     # update pr2 to detach it from pr1
@@ -279,10 +281,13 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     env.run_crons()
 
     assert pr2.comments[4:] == [
-        (bot_name, "This PR was modified / updated and has become a normal PR. "
-                   "It should be merged the normal way (via @hansen)"),
+        (bot_name, "@%s @%s this PR was modified / updated and has become a normal PR. "
+                   "It should be merged the normal way (via @%s)" % (
+            users['user'], users['reviewer'],
+            p2.repository.project_id.github_prefix
+        )),
         (users['reviewer'], bot_name + ' up to b'),
-        (bot_name, "Sorry, forward-port limit can only be set on an origin PR "
+        (bot_name, f"@{users['reviewer']} forward-port limit can only be set on an origin PR "
                    f"({p1.display_name} here) before it's merged and forward-ported."
          ),
     ]

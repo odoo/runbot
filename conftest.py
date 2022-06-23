@@ -582,17 +582,6 @@ class Repo:
             parents=[p['sha'] for p in gh_commit['parents']],
         )
 
-    def log(self, ref_or_sha):
-        for page in itertools.count(1):
-            r = self._session.get(
-                'https://api.github.com/repos/{}/commits'.format(self.name),
-                params={'sha': ref_or_sha, 'page': page}
-            )
-            assert 200 <= r.status_code < 300, r.json()
-            yield from map(self._commit_from_gh, r.json())
-            if not r.links.get('next'):
-                return
-
     def read_tree(self, commit):
         """ read tree object from commit
 

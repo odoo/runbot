@@ -261,8 +261,11 @@ class PullRequests(models.Model):
                     self.env['runbot_merge.pull_requests.feedback'].create({
                         'repository': p.repository.id,
                         'pull_request': p.number,
-                        'message': "This PR was modified / updated and has become a normal PR. "
-                                   "It should be merged the normal way (via @%s)" % p.repository.project_id.github_prefix,
+                        'message': "%sthis PR was modified / updated and has become a normal PR. "
+                                   "It should be merged the normal way (via @%s)" % (
+                            p.source_id.ping(),
+                            p.repository.project_id.github_prefix,
+                        ),
                         'token_field': 'fp_github_token',
                     })
         if vals.get('state') == 'merged':
@@ -298,7 +301,6 @@ class PullRequests(models.Model):
             )
             return
 
-        Feedback = self.env['runbot_merge.pull_requests.feedback']
         # TODO: don't use a mutable tokens iterator
         tokens = iter(tokens)
         while True:
@@ -306,6 +308,7 @@ class PullRequests(models.Model):
             if token is None:
                 break
 
+            ping = False
             close = False
             msg = None
             if token in ('ci', 'skipci'):
@@ -314,7 +317,8 @@ class PullRequests(models.Model):
                     pr.fw_policy = token
                     msg = "Not waiting for CI to create followup forward-ports." if token == 'skipci' else "Waiting for CI to create followup forward-ports."
                 else:
-                    msg = "I don't trust you enough to do that @{}.".format(login)
+                    ping = True
+                    msg = "you can't configure ci."
 
             if token == 'ignore': # replace 'ignore' by 'up to <pr_branch>'
                 token = 'up'
@@ -322,55 +326,51 @@ class PullRequests(models.Model):
 
             if token in ('r+', 'review+'):
                 if not self.source_id:
-                    Feedback.create({
-                        'repository': self.repository.id,
-                        'pull_request': self.number,
-                        'message': "I'm sorry, @{}. I can only do this on forward-port PRs and this ain't one.".format(login),
-                        'token_field': 'fp_github_token',
-                    })
-                    continue
-                merge_bot = self.repository.project_id.github_prefix
-                # don't update the root ever
-                for pr in (p for p in self._iter_ancestors() if p.parent_id if p.state in RPLUS):
-                    # only the author is delegated explicitely on the
-                    pr._parse_commands(author, {**comment, 'body': merge_bot + ' r+'}, login)
+                    ping = True
+                    msg = "I can only do this on forward-port PRs and this is not one, see {}.".format(
+                        self.repository.project_id.github_prefix
+                    )
+                else:
+                    merge_bot = self.repository.project_id.github_prefix
+                    # don't update the root ever
+                    for pr in (p for p in self._iter_ancestors() if p.parent_id if p.state in RPLUS):
+                        # only the author is delegated explicitely on the
+                        pr._parse_commands(author, {**comment, 'body': merge_bot + ' r+'}, login)
             elif token == 'close':
-                msg = "I'm sorry, @{}. I can't close this PR for you.".format(
-                    login)
                 if self.source_id._pr_acl(author).is_reviewer:
                     close = True
-                    msg = None
+                else:
+                    ping = True
+                    msg = "you can't close PRs."
+
             elif token == 'up' and next(tokens, None) == 'to':
                 limit = next(tokens, None)
+                ping = True
                 if not self._pr_acl(author).is_author:
-                    Feedback.create({
-                        'repository': self.repository.id,
-                        'pull_request': self.number,
-                        'message': "I'm sorry, @{}. You can't set a forward-port limit.".format(login),
-                        'token_field': 'fp_github_token',
-                    })
-                    continue
-                if not limit:
-                    msg = "Please provide a branch to forward-port to."
+                    msg = "you can't set a forward-port limit.".format(login)
+                elif not limit:
+                    msg = "please provide a branch to forward-port to."
                 else:
                     limit_id = self.env['runbot_merge.branch'].with_context(active_test=False).search([
                         ('project_id', '=', self.repository.project_id.id),
                         ('name', '=', limit),
                     ])
                     if self.source_id:
-                        msg = "Sorry, forward-port limit can only be set on " \
+                        msg = "forward-port limit can only be set on " \
                               f"an origin PR ({self.source_id.display_name} " \
                               "here) before it's merged and forward-ported."
                     elif self.state in ['merged', 'closed']:
-                        msg = "Sorry, forward-port limit can only be set before the PR is merged."
+                        msg = "forward-port limit can only be set before the PR is merged."
                     elif not limit_id:
-                        msg = "There is no branch %r, it can't be used as a forward port target." % limit
+                        msg = "there is no branch %r, it can't be used as a forward port target." % limit
                     elif limit_id == self.target:
+                        ping = False
                         msg = "Forward-port disabled."
                         self.limit_id = limit_id
                     elif not limit_id.fp_enabled:
-                        msg = "Branch %r is disabled, it can't be used as a forward port target." % limit_id.name
+                        msg = "branch %r is disabled, it can't be used as a forward port target." % limit_id.name
                     else:
+                        ping = False
                         msg = "Forward-porting to %r." % limit_id.name
                         self.limit_id = limit_id
 
@@ -382,7 +382,7 @@ class PullRequests(models.Model):
                 self.env['runbot_merge.pull_requests.feedback'].create({
                     'repository': self.repository.id,
                     'pull_request': self.number,
-                    'message': msg,
+                    'message': f'@{author.github_login} {msg}' if msg and ping else msg,
                     'close': close,
                     'token_field': 'fp_github_token',
                 })
@@ -397,8 +397,8 @@ class PullRequests(models.Model):
             'repository': self.repository.id,
             'pull_request': self.number,
             'token_field': 'fp_github_token',
-            'message': '%s\n\n%s failed on this forward-port PR' % (
-                self.source_id._pingline(),
+            'message': '%s%s failed on this forward-port PR' % (
+                self.source_id.ping(),
                 ci,
             )
         })
@@ -578,10 +578,10 @@ class PullRequests(models.Model):
                     'repository': pr.repository.id,
                     'pull_request': pr.number,
                     'token_field': 'fp_github_token',
-                    'message': "This pull request can not be forward ported: "
+                    'message': "%sthis pull request can not be forward ported: "
                                "next branch is %r but linked pull request %s "
                                "has a next branch %r." % (
-                        t.name, linked.display_name, other.name
+                        pr.ping(), t.name, linked.display_name, other.name
                     )
                 })
             _logger.warning(
@@ -678,8 +678,8 @@ class PullRequests(models.Model):
                 'delegates': [(6, False, (source.delegates | pr.delegates).ids)]
             })
             if has_conflicts and pr.parent_id and pr.state not in ('merged', 'closed'):
-                message = source._pingline() + """
-The next pull request (%s) is in conflict. You can merge the chain up to here by saying
+                message = source.ping() + """\
+the next pull request (%s) is in conflict. You can merge the chain up to here by saying
 > @%s r+
 %s""" % (new_pr.display_name, pr.repository.project_id.fp_github_name, footer)
                 self.env['runbot_merge.pull_requests.feedback'].create({
@@ -710,19 +710,21 @@ The next pull request (%s) is in conflict. You can merge the chain up to here by
                         '* %s%s\n' % (sha, ' <- on this commit' if sha == h else '')
                         for sha in hh
                     )
-                message = f"""{source._pingline()} cherrypicking of pull request {source.display_name} failed.
+                message = f"""{source.ping()}cherrypicking of pull request {source.display_name} failed.
 {lines}{sout}{serr}
 Either perform the forward-port manually (and push to this branch, proceeding as usual) or close this PR (maybe?).
 
 In the former case, you may want to edit this PR message as well.
 """
             elif has_conflicts:
-                message = """%s
-While this was properly forward-ported, at least one co-dependent PR (%s) did not succeed. You will need to fix it before this can be merged.
+                message = """%s\
+while this was properly forward-ported, at least one co-dependent PR (%s) did \
+not succeed. You will need to fix it before this can be merged.
 
-Both this PR and the others will need to be approved via `@%s r+` as they are all considered "in conflict".
+Both this PR and the others will need to be approved via `@%s r+` as they are \
+all considered "in conflict".
 %s""" % (
-                    source._pingline(),
+                    source.ping(),
                     ', '.join(p.display_name for p in (new_batch - new_pr)),
                     proj.github_prefix,
                     footer
@@ -733,8 +735,8 @@ Both this PR and the others will need to be approved via `@%s r+` as they are al
                     for p in pr._iter_ancestors()
                     if p.parent_id
                 )
-                message = source._pingline() + """
-This PR targets %s and is the last of the forward-port chain%s
+                message = source.ping() + """\
+this PR targets %s and is the last of the forward-port chain%s
 %s
 To merge the full chain, say
 > @%s r+
@@ -771,14 +773,6 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
         if any(p.source_id.fw_policy == 'skipci' for p in b.prs):
             b.prs[0]._schedule_fp_followup()
         return b
-
-    def _pingline(self):
-        assignees = (self.author | self.reviewed_by).mapped('github_login')
-        return "Ping %s" % ', '.join(
-            '@' + login
-            for login in assignees
-            if login
-        )
 
     def _create_fp_branch(self, target_branch, fp_branch_name, cleanup):
         """ Creates a forward-port for the current PR to ``target_branch`` under
@@ -1084,8 +1078,9 @@ stderr:
             self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': source.repository.id,
                 'pull_request': source.number,
-                'message': "This pull request has forward-port PRs awaiting action (not merged or closed): %s" % ', '.join(
-                    pr.display_name for pr in sorted(prs, key=lambda p: p.number)
+                'message': "%sthis pull request has forward-port PRs awaiting action (not merged or closed):\n%s" % (
+                    source.ping(),
+                    '\n- '.join(pr.display_name for pr in sorted(prs, key=lambda p: p.number))
                 ),
                 'token_field': 'fp_github_token',
             })

@@ -44,7 +44,7 @@ This PR targets b and is part of the forward-port chain. Further PRs will be cre
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 ''')
-    ci_warning = (users['user'], 'Ping @%(user)s, @%(reviewer)s\n\nci/runbot failed on this forward-port PR' % users)
+    ci_warning = (users['user'], '@%(user)s @%(reviewer)s ci/runbot failed on this forward-port PR' % users)
 
     # oh no CI of the first FP PR failed!
     # simulate status being sent multiple times (e.g. on multiple repos) with
@@ -103,7 +103,11 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     assert pr1_remote.comments == [
         seen(env, pr1_remote, users),
         fp_intermediate, ci_warning, ci_warning,
-        (users['user'], "This PR was modified / updated and has become a normal PR. It should be merged the normal way (via @%s)" % pr1_id.repository.project_id.github_prefix),
+        (users['user'], "@%s @%s this PR was modified / updated and has become a normal PR. "
+                        "It should be merged the normal way (via @%s)" % (
+            users['user'], users['reviewer'],
+            pr1_id.repository.project_id.github_prefix
+        )),
     ], "users should be warned that the PR has become non-FP"
     # NOTE: should the followup PR wait for pr1 CI or not?
     assert pr2_id.head != pr2_head
@@ -210,9 +214,13 @@ def test_update_merged(env, make_repo, config, users):
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 '''),
         (users['reviewer'], 'hansen r+'),
-        (users['user'], """Ancestor PR %s has been updated but this PR is merged and can't be updated to match.
+        (users['user'], """@%s @%s ancestor PR %s has been updated but this PR is merged and can't be updated to match.
 
-You may want or need to manually update any followup PR.""" % pr1_id.display_name)
+You may want or need to manually update any followup PR.""" % (
+            users['user'],
+            users['reviewer'],
+            pr1_id.display_name,
+        ))
     ]
 
 def test_duplicate_fw(env, make_repo, setreviewers, config, users):
@@ -377,7 +385,7 @@ conflict!
     # 2. "forward port chain" bit
     # 3. updated / modified & got detached
     assert pr2.comments[3:] == [
-        (users['user'], f"WARNING: the latest change ({pr2_id.head}) triggered "
+        (users['user'], f"@{users['user']} WARNING: the latest change ({pr2_id.head}) triggered "
                         f"a conflict when updating the next forward-port "
                         f"({pr3_id.display_name}), and has been ignored.\n\n"
                         f"You will need to update this pull request "
@@ -389,7 +397,7 @@ conflict!
     # 2. forward-port chain thing
     assert repo.get_pr(pr3_id.number).comments[2:] == [
         (users['user'], re_matches(f'''\
-WARNING: the update of {pr2_id.display_name} to {pr2_id.head} has caused a \
+@{users['user']} WARNING: the update of {pr2_id.display_name} to {pr2_id.head} has caused a \
 conflict in this pull request, data may have been lost.
 
 stdout:

@@ -73,8 +73,8 @@ This PR targets b and is part of the forward-port chain. Further PRs will be cre
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 '''),
-        (users['user'], """Ping @%s, @%s
-The next pull request (%s) is in conflict. You can merge the chain up to here by saying
+        (users['user'], """@%s @%s the next pull request (%s) is in conflict. \
+You can merge the chain up to here by saying
 > @%s r+
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
@@ -343,11 +343,12 @@ b
 
     assert pr2.comments == [
         seen(env, pr2, users),
-        (users['user'], re_matches(r'Ping.*CONFLICT', re.DOTALL)),
+        (users['user'], re_matches(r'@%s @%s .*CONFLICT' % (users['user'], users['reviewer']), re.DOTALL)),
         (users['reviewer'], 'hansen r+'),
-        (users['user'], f"All commits must have author and committer email, "
+        (users['user'], f"@{users['user']} @{users['reviewer']} unable to stage: "
+                        "All commits must have author and committer email, "
                         f"missing email on {pr2_id.head} indicates the "
-                        f"authorship is most likely incorrect."),
+                        "authorship is most likely incorrect."),
     ]
     assert pr2_id.state == 'error'
     assert not pr2_id.staging_id, "staging should have been rejected"
