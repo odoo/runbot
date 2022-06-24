@@ -870,7 +870,7 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
             # switch back to the PR branch
             conf.checkout(fp_branch_name)
             # cherry-pick the squashed commit to generate the conflict
-            conf.with_params('merge.renamelimit=0')\
+            conf.with_params('merge.renamelimit=0', 'merge.conflictstyle=diff3')\
                 .with_config(check=False)\
                 .cherry_pick(squashed, no_commit=True)
             status = conf.stdout().status(short=True, untracked_files='no').stdout.decode()

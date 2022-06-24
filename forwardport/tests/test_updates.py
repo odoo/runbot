@@ -374,9 +374,10 @@ def test_subsequent_conflict(env, make_repo, config, users):
         'g': 'a',
         'h': re_matches(r'''<<<\x3c<<< HEAD
 a
+|||||||| parent of [\da-f]{7,}.*
 =======
 conflict!
->>>\x3e>>> [0-9a-f]{7,}.*
+>>>\x3e>>> [\da-f]{7,}.*
 '''),
         'x': '0',
     }

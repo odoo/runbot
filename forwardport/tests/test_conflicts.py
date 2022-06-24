@@ -60,9 +60,10 @@ def test_conflict(env, config, make_repo, users):
         'g': 'a',
         'h': re_matches(r'''<<<\x3c<<< HEAD
 a
+|||||||| parent of [\da-f]{7,}.*
 =======
 xxx
->>>\x3e>>> [0-9a-f]{7,}.*
+>>>\x3e>>> [\da-f]{7,}.*
 '''),
     }
     prb = prod.get_pr(prb_id.number)
@@ -323,9 +324,10 @@ def test_multiple_commits_different_authorship(env, config, make_repo, users, ro
 
     assert re.match(r'''<<<\x3c<<< HEAD
 b
+|||||||| parent of [\da-f]{7,}.*
 =======
 2
->>>\x3e>>> [0-9a-f]{7,}.*
+>>>\x3e>>> [\da-f]{7,}.*
 ''', prod.read_tree(c)['g'])
 
     # I'd like to fix the conflict so everything is clean and proper *but*
