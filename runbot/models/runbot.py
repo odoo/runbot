@@ -376,7 +376,7 @@ class Runbot(models.AbstractModel):
             try:
                 repo._git(['gc', '--prune=all', '--quiet'])
             except CalledProcessError as e:
-                message = f'git gc failed on host {host} with exit status {e.returncode} and message "{e.output[:30]} ..."'
+                message = f'git gc failed for {repo.name} on {host.name} with exit status {e.returncode} and message "{e.output[:60]} ..."'
                 self.warning(message)
 
     def warning(self, message, *args):
