@@ -84,3 +84,7 @@ dl.runbot-merge-fields {
     @extend .col-sm-10;
   }
 }
+
+.staging-statuses {
+  cursor: wait;
+}

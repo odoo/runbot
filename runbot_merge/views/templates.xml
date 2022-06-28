@@ -22,6 +22,41 @@
         ><t t-esc="pr.display_name"/></a>
     </template>
 
+    <template id="staging-statuses" name="dropdown statuses list of stagings">
+        <div class="dropdown" t-if="staging.heads">
+            <button class="btn btn-link dropdown-toggle"
+                    type="button"
+                    data-toggle="dropdown"
+                    aria-haspopup="true"
+                    aria-expanded="true"
+                    t-attf-title="Staged at {{staging.staged_at}}Z"
+            >
+                <t t-raw="0"/>
+                <span class="caret"></span>
+            </button>
+            <ul class="dropdown-menu staging-statuses">
+                <li groups="runbot_merge.group_admin">
+                    <a t-attf-href="/web#id={{staging.id}}&amp;view_type=form&amp;model=runbot_merge.stagings"
+                       target="new">
+                        Open Staging
+                    </a>
+                </li>
+                <t t-set="statuses" t-value="{(r, c): (s, t) for r, c, s, t in staging.statuses}"/>
+                <t t-foreach="repo_statuses._for_staging(staging)" t-as="req">
+                    <t t-set="st" t-value="statuses.get((req.repo_id.name, req.context)) or (None, None)"/>
+                    <li t-att-class="
+                            'bg-success' if st[0] == 'success'
+                       else 'bg-danger' if st[0] in ('error', 'failure')
+                       else 'bg-info' if st[0]
+                       else 'bg-light'"
+                    ><a t-att-href="st[1]" target="new">
+                        <t t-esc="req.repo_id.name"/>: <t t-esc="req.context"/>
+                    </a></li>
+                </t>
+            </ul>
+        </div>
+    </template>
+
     <template id="dashboard" name="mergebot dashboard">
         <t t-call="website.layout">
             <div id="wrap"><div class="container-fluid">
@@ -151,35 +186,8 @@
                             </t>
                         </li>
                     </ul>
-                    <t t-if="staging.heads">
-                        <div class="dropdown">
-                            <button class="btn btn-link dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"
-                                    t-attf-title="Staged at {{staging.staged_at}}Z">
-                                Staged <span t-field="staging.staged_at" t-options="{'widget': 'relative'}"/>
-                                <span class="caret"></span>
-                            </button>
-                            <ul class="dropdown-menu">
-                                <li groups="runbot_merge.group_admin">
-                                    <a t-attf-href="/web#id={{staging.id}}&amp;view_type=form&amp;model=runbot_merge.stagings" target="new">
-                                        Open Staging
-                                    </a>
-                                </li>
-
-                                <t t-set="statuses" t-value="{(r, c): (s, t) for r, c, s, t in staging.statuses}"/>
-                                <t t-foreach="repo_statuses._for_staging(staging)" t-as="req">
-                                    <t t-set="st" t-value="statuses.get((req.repo_id.name, req.context)) or ('pending', None)"/>
-                                    <li t-att-class="
-                                            'bg-success' if st[0] == 'success'
-                                       else 'bg-danger' if st[0] in ('error', 'failure')
-                                       else 'bg-info'"
-                                    >
-                                        <a t-att-href="st[1]" target="new">
-                                            <t t-esc="req.repo_id.name"/>: <t t-esc="req.context"/>
-                                        </a>
-                                    </li>
-                                </t>
-                            </ul>
-                        </div>
+                    <t t-call="runbot_merge.staging-statuses">
+                        Staged <span t-field="staging.staged_at" t-options="{'widget': 'relative'}"/>
                     </t>
                 </li>
             </t>
@@ -226,40 +234,10 @@
                                     <span t-field="staging.staged_at"
                                           t-options="{'format': 'yyyy-MM-dd\'T\'HH:mm:ssZ'}"/>
                                 </t>
-                                <div class="dropdown" t-if="staging.heads">
-                                    <button class="btn btn-link dropdown-toggle"
-                                            type="button"
-                                            data-toggle="dropdown"
-                                            aria-haspopup="true"
-                                            aria-expanded="true">
-                                        <span t-field="staging.staged_at"
-                                              t-options="{'format': 'yyyy-MM-dd\'T\'HH:mm:ssZ'}"/>
-                                        <span class="caret"></span>
-                                    </button>
-                                    <ul class="dropdown-menu">
-                                        <li groups="runbot_merge.group_admin">
-                                            <a t-attf-href="/web#id={{staging.id}}&amp;view_type=form&amp;model=runbot_merge.stagings"
-                                               target="new">
-                                                Open Staging
-                                            </a>
-                                        </li>
-                                        <t t-set="statuses" t-value="{(r, c): (s, t) for r, c, s, t in staging.statuses}"/>
-                                        <t t-foreach="repo_statuses._for_staging(staging)" t-as="req">
-                                            <t t-set="st" t-value="statuses.get((req.repo_id.name, req.context)) or ('pending', None)"/>
-                                            <li t-att-class="
-                                                    'bg-success' if st[0] == 'success'
-                                               else 'bg-danger' if st[0] in ('error', 'failure')
-                                               else 'bg-info'"
-                                            >
-                                                <a t-att-href="st[1]"
-                                                   target="new">
-                                                    <t t-esc="req.repo_id.name"/>:
-                                                    <t t-esc="req.context"/>
-                                                </a>
-                                            </li>
-                                        </t>
-                                    </ul>
-                                </div>
+                                <t t-call="runbot_merge.staging-statuses">
+                                    <span t-field="staging.staged_at"
+                                          t-options="{'format': 'yyyy-MM-dd\'T\'HH:mm:ssZ'}"/>
+                                </t>
                             </th>
                             <td>
                                 <ul class="list-inline list-unstyled mb0">
