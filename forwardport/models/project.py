@@ -240,6 +240,7 @@ class PullRequests(models.Model):
         # again 2 PRs with same head is weird so...
         newhead = vals.get('head')
         with_parents = self.filtered('parent_id')
+        closed_fp = self.filtered(lambda p: p.state == 'closed' and p.source_id)
         if newhead and not self.env.context.get('ignore_head_update') and newhead != self.head:
             vals.setdefault('parent_id', False)
             # if any children, this is an FP PR being updated, enqueue
@@ -268,6 +269,17 @@ class PullRequests(models.Model):
                         ),
                         'token_field': 'fp_github_token',
                     })
+        for p in closed_fp.filtered(lambda p: p.state != 'closed'):
+            self.env['runbot_merge.pull_requests.feedback'].create({
+                'repository': p.repository.id,
+                'pull_request': p.number,
+                'message': "%sthis PR was closed then reopened. "
+                           "It should be merged the normal way (via @%s)" % (
+                    p.source_id.ping(),
+                    p.repository.project_id.github_prefix,
+                ),
+                'token_field': 'fp_github_token',
+            })
         if vals.get('state') == 'merged':
             for p in self:
                 self.env['forwardport.branch_remover'].create({
@@ -285,6 +297,7 @@ class PullRequests(models.Model):
         r = super()._try_closing(by)
         if r:
             self.with_context(forwardport_detach_warn=False).parent_id = False
+            self.search([('parent_id', '=', self.id)]).parent_id = False
         return r
 
     def _parse_commands(self, author, comment, login):
@@ -328,6 +341,11 @@ class PullRequests(models.Model):
                 if not self.source_id:
                     ping = True
                     msg = "I can only do this on forward-port PRs and this is not one, see {}.".format(
+                        self.repository.project_id.github_prefix
+                    )
+                elif not self.parent_id:
+                    ping = True
+                    msg = "I can only do this on unmodified forward-port PRs, ask {}.".format(
                         self.repository.project_id.github_prefix
                     )
                 else:

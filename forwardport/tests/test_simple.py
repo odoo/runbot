@@ -798,11 +798,12 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """)
         ]
 
-    def test_closing_after_fp(self, env, config, make_repo):
+    def test_closing_after_fp(self, env, config, make_repo, users):
         """ Closing a PR which has been forward-ported should not touch the
         followups
         """
         prod, other = make_basic(env, config, make_repo)
+        project = env['runbot_merge.project'].search([])
         with prod:
             [p_1] = prod.make_commits(
                 'a',
@@ -822,23 +823,51 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         # should merge the staging then create the FP PR
         env.run_crons()
 
-        pr0, pr1 = env['runbot_merge.pull_requests'].search([], order='number')
+        pr0_id, pr1_id = env['runbot_merge.pull_requests'].search([], order='number')
         with prod:
-            prod.post_status(pr1.head, 'success', 'legal/cla')
-            prod.post_status(pr1.head, 'success', 'ci/runbot')
+            prod.post_status(pr1_id.head, 'success', 'legal/cla')
+            prod.post_status(pr1_id.head, 'success', 'ci/runbot')
         # should create the second staging
         env.run_crons()
 
-        pr0_1, pr1_1, pr2_1 = env['runbot_merge.pull_requests'].search([], order='number')
-        assert pr0_1 == pr0
-        assert pr1_1 == pr1
+        pr0_id2, pr1_id2, pr2_id = env['runbot_merge.pull_requests'].search([], order='number')
+        assert pr0_id2 == pr0_id
+        assert pr1_id2 == pr1_id
+
+        pr1 = prod.get_pr(pr1_id.number)
+        with prod:
+            pr1.close()
+
+        assert pr1_id.state == 'closed'
+        assert not pr1_id.parent_id
+        assert pr2_id.state == 'opened'
+        assert not pr2_id.parent_id, \
+            "the descendant of a closed PR doesn't really make sense, maybe?"
 
         with prod:
-            prod.get_pr(pr1.number).close()
+            pr1.open()
+        assert pr1_id.state == 'validated'
+        env.run_crons()
+        assert pr1.comments[-1] == (
+            users['user'],
+            "@{} @{} this PR was closed then reopened. "
+            "It should be merged the normal way (via @{})".format(
+                users['user'],
+                users['reviewer'],
+                project.github_prefix,
+            )
+        )
 
-        assert pr1_1.state == 'closed'
-        assert not pr1_1.parent_id
-        assert pr2_1.state == 'opened'
+        with prod:
+            pr1.post_comment(f'{project.fp_github_name} r+', config['role_reviewer']['token'])
+        env.run_crons()
+        assert pr1.comments[-1] == (
+            users['user'],
+            "@{} I can only do this on unmodified forward-port PRs, ask {}.".format(
+                users['reviewer'],
+                project.github_prefix,
+            ),
+        )
 
 class TestBranchDeletion:
     def test_delete_normal(self, env, config, make_repo):
