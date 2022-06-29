@@ -109,6 +109,11 @@
                     <a t-att-href="pr.source_id.url">
                         <span t-field="pr.source_id.display_name"/>
                     </a>
+                    <span t-if="not pr.parent_id"
+                          class="badge badge-danger user-select-none"
+                          title="A detached PR behaves like a non-forward-port, it has to be approved via the mergebot, this is usually caused by the forward-port having been in conflict or updated.">
+                        DETACHED
+                    </span>
                 </dd>
             </t>
             <t t-if="pr.forwardport_ids">
