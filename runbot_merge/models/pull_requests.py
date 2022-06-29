@@ -2026,8 +2026,9 @@ class Batch(models.Model):
             gh = meta[pr.repository]['gh']
 
             _logger.info(
-                "Staging pr %s for target %s; squash=%s",
-                pr.display_name, pr.target.name, pr.squash
+                "Staging pr %s for target %s; method=%s",
+                pr.display_name, pr.target.name,
+                pr.merge_method or (pr.squash and 'single') or None
             )
 
             target = 'tmp.{}'.format(pr.target.name)
