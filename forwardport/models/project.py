@@ -806,6 +806,7 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
         :rtype: (None | (str, str, str, list[str]), Repo)
         """
         source = self._get_local_directory()
+        root = self._get_root()
         # update all the branches & PRs
         r = source.with_params('gc.pruneExpire=1.day.ago')\
             .with_config(
@@ -814,17 +815,16 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
             )\
             .fetch('-p', 'origin')
         _logger.info("Updated %s:\n%s", source._directory, r.stdout.decode())
-        # FIXME: check that pr.head is pull/{number}'s head instead?
-        source.cat_file(e=self.head)
+        source.cat_file(e=root.head)
         # create working copy
-        _logger.info("Create working copy to forward-port %s:%d to %s",
-                     self.repository.name, self.number, target_branch.name)
+        _logger.info(
+            "Create working copy to forward-port %s (really %s) to %s",
+            self.display_name, root.display_name, target_branch.name)
         working_copy = source.clone(
             cleanup.enter_context(
                 tempfile.TemporaryDirectory(
-                    prefix='%s:%d-to-%s-' % (
-                        self.repository.name,
-                        self.number,
+                    prefix='%s-to-%s-' % (
+                        root.display_name,
                         target_branch.name
                     ),
                     dir=user_cache_dir('forwardport')
@@ -843,7 +843,6 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
         _logger.info("Create FP branch %s", fp_branch_name)
         working_copy.checkout(b=fp_branch_name)
 
-        root = self._get_root()
         try:
             root._cherry_pick(working_copy)
             return None, working_copy
