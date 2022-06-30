@@ -291,6 +291,7 @@ class Runbot(Controller):
         if not build.exists():
             return request.not_found()
         siblings = (build.parent_id.children_ids if build.parent_id else from_batch.slot_ids.build_id if from_batch else build).sorted('id')
+        host_id = request.env['runbot.host'].search([('name', '=', build.host)])
         context = {
             'build': build,
             'from_batch': from_batch,
@@ -302,6 +303,7 @@ class Runbot(Controller):
             'prev_bu': next((b for b in reversed(siblings) if b.id < build.id), Build),
             'next_bu': next((b for b in siblings if b.id > build.id), Build),
             'next_ko': next((b for b in siblings if b.id > build.id and b.global_result != 'ok'), Build),
+            'host_id': host_id,
         }
         return request.render("runbot.build", context)
 
