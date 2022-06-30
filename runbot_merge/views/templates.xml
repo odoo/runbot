@@ -57,22 +57,26 @@
         </div>
     </template>
 
+    <template id="alerts">
+        <div id="alerts" class="row text-center">
+            <div class="alert alert-light col-md-12 h6 mb-0">
+                <a href="/runbot_merge/changelog">Changelog</a>
+            </div>
+            <t t-set="stagingcron" t-value="env(user=1).ref('runbot_merge.staging_cron')"/>
+            <div t-if="not stagingcron.active" class="alert alert-warning col-12 mb-0" role="alert">
+                Staging is disabled, "ready" pull requests will not be staged.
+            </div>
+            <t t-set="mergecron" t-value="env(user=1).ref('runbot_merge.merge_cron')"/>
+            <div t-if="not mergecron.active" class="alert alert-warning col-12 mb-0" role="alert">
+                Merging is disabled, stagings will not be disabled.
+            </div>
+        </div>
+    </template>
+
     <template id="dashboard" name="mergebot dashboard">
         <t t-call="website.layout">
             <div id="wrap"><div class="container-fluid">
-                <div id="alerts" class="row text-center">
-                    <div class="alert alert-light col-md-12 h6 mb-0">
-                        <a href="/runbot_merge/changelog">Changelog</a>
-                    </div>
-                    <t t-set="stagingcron" t-value="env(user=1).ref('runbot_merge.staging_cron')"/>
-                    <div t-if="not stagingcron.active" class="alert alert-warning col-12 mb-0" role="alert">
-                        Staging is disabled, "ready" pull requests will not be staged.
-                    </div>
-                    <t t-set="mergecron" t-value="env(user=1).ref('runbot_merge.merge_cron')"/>
-                    <div t-if="not mergecron.active" class="alert alert-warning col-12 mb-0" role="alert">
-                        Merging is disabled, stagings will not be disabled.
-                    </div>
-                </div>
+                <t t-call="runbot_merge.alerts"/>
                 <section t-foreach="projects.with_context(active_test=False)" t-as="project" class="row">
                     <h1 class="col-md-12"><t t-esc="project.name"/></h1>
                     <div class="col-md-12">
@@ -385,12 +389,13 @@
     <template id="view_pull_request">
         <t t-call="website.layout">
             <div id="wrap"><div class="container-fluid">
+                <t t-call="runbot_merge.alerts"/>
                 <h1>
-                <a t-att-href="pr.github_url" t-field="pr.display_name">
-                </a>
-                <a t-attf-href="/web#view_type=form&amp;model=runbot_merge.pull_requests&amp;id={{pr.id}}"
-                    class="btn btn-sm btn-secondary align-top float-right"
-                    groups="base.group_user">View in backend</a>
+                    <a t-att-href="pr.github_url" t-field="pr.display_name">
+                    </a>
+                    <a t-attf-href="/web#view_type=form&amp;model=runbot_merge.pull_requests&amp;id={{pr.id}}"
+                        class="btn btn-sm btn-secondary align-top float-right"
+                        groups="base.group_user">View in backend</a>
                 </h1>
                 <h6>Created by <span t-field="pr.author.display_name"/></h6>
                 <t t-set="tmpl">

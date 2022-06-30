@@ -1,5 +1,5 @@
 <odoo>
-    <template id="dashboard" inherit_id="runbot_merge.dashboard">
+    <template id="alerts" inherit_id="runbot_merge.alerts">
         <xpath expr="//div[@id='alerts']">
             <t t-set="fpcron" t-value="env(user=1).ref('forwardport.port_forward')"/>
             <div t-if="not fpcron.active" class="alert alert-warning col-12" role="alert">
