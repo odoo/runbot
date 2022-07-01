@@ -2,6 +2,7 @@ odoo.define('runbot.json_field', function (require) {
 "use strict";
     
 var basic_fields = require('web.basic_fields');
+var relational_fields = require('web.relational_fields');
 var registry = require('web.field_registry');
 var field_utils = require('web.field_utils');
 var dom = require('web.dom');
@@ -34,7 +35,26 @@ var FieldJson = basic_fields.FieldChar.extend({
 });
 
 registry.add('jsonb', FieldJson)
-console.log(field_utils);
+
+
+var FrontendUrl = relational_fields.FieldMany2One.extend({
+    isQuickEditable: false,
+    events: _.extend({'click .external_link': '_stopPropagation'}, relational_fields.FieldMany2One.prototype.events),
+    init() {
+        this._super.apply(this, arguments);
+        const model = this.value.model.split('.').slice(1).join('_')
+        const res_id = this.value.res_id
+        this.route = '/runbot/' + model+ '/' + res_id
+    },
+    _renderReadonly: function () {
+        this._super.apply(this, arguments);
+        this.$el.html('<span>' + this.$el.html() + ' <a href="'+this.route+'" ><i class="external_link fa fa-fw o_button_icon fa-external-link "/></a><span>')
+    },
+    _stopPropagation: function(event) {
+        event.stopPropagation()
+    }
+});
+registry.add('frontend_url', FrontendUrl)
 
 function stringify(obj) {
     return JSON.stringify(obj, null, '\t')

@@ -25,9 +25,9 @@
                 <field name="trigger_ids" widget="many2many_tags"/>
                 <field name="tag_ids" widget="many2many_tags"/>
                 <field name="first_seen_date"/>
-                <field name="first_seen_build_id"/>
+                <field name="first_seen_build_id" widget="frontend_url"/>
                 <field name="last_seen_date"/>
-                <field name="last_seen_build_id"/>
+                <field name="last_seen_build_id" widget="frontend_url"/>
                 <field name="test_tags"/>
               </group>
               <notebook>
