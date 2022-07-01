@@ -12,6 +12,12 @@ class UpgradeExceptions(models.Model):
     bundle_id = fields.Many2one('runbot.bundle', index=True)
     info = fields.Text('Info')
     team_id = fields.Many2one('runbot.team', 'Assigned team', index=True)
+    message = fields.Text('Upgrade exception message', compute="_compute_message")
+
+    def _compute_message(self):
+        message_layout = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_upgrade_exception_message')
+        for exception in self:
+            exception.message = message_layout.format(exception=exception, base_url=exception.get_base_url())
 
     def _generate(self):
         exceptions = self.search([])
@@ -36,13 +42,13 @@ class BuildResult(models.Model):
         ir_logs = self.env['ir.logging'].search([('level', 'in', ('ERROR', 'WARNING', 'CRITICAL')), ('type', '=', 'server'), ('build_id', 'in', self.ids)])
 
         upgrade_regexes = self.env['runbot.upgrade.regex'].search([])
-        exception = []
+        exception = {}
         for log in ir_logs:
             for upgrade_regex in upgrade_regexes:
                 m = re.search(upgrade_regex.regex, log.message)
                 if m:
-                    exception.append('%s:%s' % (upgrade_regex.prefix, m.groups()[0]))
-
+                    exception['%s:%s' % (upgrade_regex.prefix, m.groups()[0])] = None
+        exception = list(exception)
         if exception:
             bundle = False
             batches = self.top_parent.slot_ids.mapped('batch_id')

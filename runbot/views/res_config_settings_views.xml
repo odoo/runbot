@@ -70,6 +70,8 @@
                     <field name="runbot_logdb_uri" style="width: 100%;"/>
                     <label for="runbot_message" class="col-xs-3 o_light_label" style="width: 60%;"/>
                     <field name="runbot_message" style="width: 100%;"/>
+                    <label for="runbot_upgrade_exception_message" class="col-xs-3 o_light_label" style="width: 60%;"/>
+                    <field name="runbot_upgrade_exception_message" style="width: 100%;"/>
                   </div>
                 </div>
               </xpath>
