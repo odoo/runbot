@@ -126,6 +126,7 @@ def handle_pr(env, event):
             updates['squash'] = pr['commits'] == 1
         if event['changes'].keys() & {'title', 'body'}:
             updates['message'] = "{}\n\n{}".format(pr['title'].strip(), pr['body'].strip())
+        _logger.info("update: %s#%d = %s (by %s)", repo.name, pr['number'], updates, event['sender']['login'])
         if updates:
             pr_obj = find(source_branch)
             pr_obj.write(updates)
@@ -145,16 +146,13 @@ def handle_pr(env, event):
     if not branch:
         return "Not set up to care about {}:{}".format(r, b)
 
-    author_name = pr['user']['login']
-    author = env['res.partner'].search([('github_login', '=', author_name)], limit=1)
-    if not author:
-        author = env['res.partner'].create({
-            'name': author_name,
-            'github_login': author_name,
-        })
 
-    _logger.info("%s: %s#%s (%s) (%s)", event['action'], repo.name, pr['number'], pr['title'].strip(), author.github_login)
+    _logger.info("%s: %s#%s (%s) (by %s)", event['action'], repo.name, pr['number'], pr['title'].strip(), event['sender']['login'])
     if event['action'] == 'opened':
+        author_name = pr['user']['login']
+        author = env['res.partner'].search([('github_login', '=', author_name)], limit=1)
+        if not author:
+            env['res.partner'].create({'name': author_name, 'github_login': author_name})
         pr_obj = env['runbot_merge.pull_requests']._from_gh(pr)
         return "Tracking PR as {}".format(pr_obj.id)
 

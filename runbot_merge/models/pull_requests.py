@@ -147,6 +147,7 @@ All substitutions are tentatively applied sequentially to the input.
                        "its information, you may have to re-approve it as "
                        "I didn't see previous commands." % pr_id.ping()
         })
+        sender = {'login': self.project_id.github_prefix}
         # init the PR to the null commit so we can later synchronise it back
         # back to the "proper" head while resetting reviews
         controllers.handle_pr(self.env, {
@@ -156,6 +157,7 @@ All substitutions are tentatively applied sequentially to the input.
                 'head': {**pr['head'], 'sha': '0'*40},
                 'state': 'open',
             },
+            'sender': sender,
         })
         # fetch & set up actual head
         for st in gh.statuses(pr['head']['sha']):
@@ -177,20 +179,21 @@ All substitutions are tentatively applied sequentially to the input.
                     'review': item,
                     'pull_request': pr,
                     'repository': {'full_name': self.name},
+                    'sender': sender,
                 })
             else:
                 controllers.handle_comment(self.env, {
                     'action': 'created',
                     'issue': issue,
-                    'sender': item['user'],
                     'comment': item,
                     'repository': {'full_name': self.name},
+                    'sender': sender,
                 })
         # sync to real head
         controllers.handle_pr(self.env, {
             'action': 'synchronize',
             'pull_request': pr,
-            'sender': {'login': self.project_id.github_prefix}
+            'sender': sender,
         })
         if pr['state'] == 'closed':
             # don't go through controller because try_closing does weird things

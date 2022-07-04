@@ -930,7 +930,8 @@ class TestSubstitutions:
                             'label': original,
                             'sha': format(pr_number, 'x')*40,
                         }
-                    }
+                    },
+                    'sender': {'login': 'pytest'}
                 }
             )
             pr = env['runbot_merge.pull_requests'].search([
