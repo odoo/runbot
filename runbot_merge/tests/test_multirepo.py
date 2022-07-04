@@ -684,12 +684,16 @@ class TestMultiBatches:
             make_branch(repo_b, 'master', 'initial', {'b': 'b0'})
 
             prs = [(
-                a and to_pr(env, make_pr(repo_a, 'batch{}'.format(i), [{'a{}'.format(i): 'a{}'.format(i)}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token'],)),
-                b and to_pr(env, make_pr(repo_b, 'batch{}'.format(i), [{'b{}'.format(i): 'b{}'.format(i)}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token'],))
+                a and make_pr(repo_a, 'batch{}'.format(i), [{'a{}'.format(i): 'a{}'.format(i)}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token']),
+                b and make_pr(repo_b, 'batch{}'.format(i), [{'b{}'.format(i): 'b{}'.format(i)}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token']),
             )
                 for i, (a, b) in enumerate([(1, 1), (0, 1), (1, 1), (1, 1), (1, 0)])
             ]
         env.run_crons()
+        prs = [
+            (a and to_pr(env, a), b and to_pr(env, b))
+            for (a, b) in prs
+        ]
 
         st = env['runbot_merge.stagings'].search([])
         assert st
@@ -713,12 +717,16 @@ class TestMultiBatches:
             make_branch(repo_b, 'master', 'initial', {'b': 'b0'})
 
             prs = [(
-                a and to_pr(env, make_pr(repo_a, 'batch{}'.format(i), [{'a{}'.format(i): 'a{}'.format(i)}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token'],)),
-                b and to_pr(env, make_pr(repo_b, 'batch{}'.format(i), [{'b{}'.format(i): 'b{}'.format(i)}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token'],))
+                a and make_pr(repo_a, 'batch{}'.format(i), [{'a{}'.format(i): 'a{}'.format(i)}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token']),
+                b and make_pr(repo_b, 'batch{}'.format(i), [{'b{}'.format(i): 'b{}'.format(i)}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token']),
             )
                 for i, (a, b) in enumerate([(1, 1), (0, 1), (1, 1), (1, 1), (1, 0)])
             ]
         env.run_crons()
+        prs = [
+            (a and to_pr(env, a), b and to_pr(env, b))
+            for (a, b) in prs
+        ]
 
         st0 = env['runbot_merge.stagings'].search([])
         assert len(st0.batch_ids) == 5
