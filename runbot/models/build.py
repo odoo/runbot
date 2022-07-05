@@ -966,7 +966,7 @@ class BuildResult(models.Model):
             if not self.params_id.skip_requirements and os.path.isfile(commit_id._source_path('requirements.txt')):
                 repo_dir = self._docker_source_folder(commit_id)
                 requirement_path = os.path.join(repo_dir, 'requirements.txt')
-                pres.append(['sudo', 'pip%s' % py_version, 'install', '--progress-bar', 'off', '-r', '%s' % requirement_path])
+                pres.append([f'python{py_version}', '-m', 'pip', 'install','--user', '--progress-bar', 'off', '-r', f'{requirement_path}'])
 
         addons_paths = self._get_addons_path()
         (server_commit, server_file) = self._get_server_info()
