@@ -280,6 +280,10 @@ class Runbot(Controller):
 
         if from_batch:
             from_batch = request.env['runbot.batch'].browse(int(from_batch))
+            if build_id not in from_batch.with_context(active_test=False).slot_ids.build_id.ids:
+                # the url may have been forged replacing the build id, redirect to hide the batch
+                return werkzeug.utils.redirect('/runbot/build/%s' % build_id)
+
             from_batch = from_batch.with_context(batch=from_batch)
         Build = request.env['runbot.build'].with_context(batch=from_batch)
 
