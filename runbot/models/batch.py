@@ -455,5 +455,6 @@ class BatchSlot(models.Model):
         self.ensure_one()
         if self.build_id:
             return self.build_id
+        self.batch_id._log(f'Trigger {self.trigger_id.name} was started by {self.env.user.name}')
         self.link_type, self.build_id = self.batch_id._create_build(self.params_id)
         return self.build_id
