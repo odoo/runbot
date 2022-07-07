@@ -495,6 +495,8 @@ class Runbot(Controller):
             limit -= len(builds)
 
         builds |= builds.search(builds_domain, order='id desc', limit=limit)
+        if not builds:
+            return {}
 
         builds = builds.search([('id', 'child_of', builds.ids)])
 
