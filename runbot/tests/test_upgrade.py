@@ -273,6 +273,7 @@ class TestUpgradeFlow(RunbotCase):
         host = self.env['runbot.host']._get_current()
         upgrade_current_build.host = host.name
         upgrade_current_build._init_pendings(host)
+        self.start_patcher('fetch_local_logs', 'odoo.addons.runbot.models.host.Host._fetch_local_logs', [])  # the local logs have to be empty
         upgrade_current_build._schedule()
         self.assertEqual(upgrade_current_build.local_state, 'done')
         self.assertEqual(len(upgrade_current_build.children_ids), 4)

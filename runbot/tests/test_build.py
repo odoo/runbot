@@ -211,15 +211,12 @@ class TestBuildResult(RunbotCase):
         self.assertEqual(modules_to_test, sorted(['good_module', 'bad_module', 'other_good', 'l10n_be', 'hwgood', 'hw_explicit', 'other_mod_1', 'other_mod_2']))
 
     def test_build_cmd_log_db(self, ):
-        """ test that the logdb connection URI is taken from the .odoorc file """
-        uri = 'postgres://someone:pass@somewhere.com/db'
-        self.env['ir.config_parameter'].sudo().set_param("runbot.runbot_logdb_uri", uri)
-
+        """ test that the log_db parameter is set in the .odoorc file """
         build = self.Build.create({
             'params_id': self.server_params.id,
         })
         cmd = build._cmd(py_version=3)
-        self.assertIn('log_db = %s' % uri, cmd.get_config())
+        self.assertIn('log_db = runbot_logs', cmd.get_config())
 
     def test_build_cmd_server_path_no_dep(self):
         """ test that the server path and addons path """
@@ -242,7 +239,8 @@ class TestBuildResult(RunbotCase):
                 '/tmp/runbot_test/static/sources/addons/d0d0caca0000ffffffffffffffffffffffffffff/requirements.txt',
                 '/tmp/runbot_test/static/sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/requirements.txt',
                 '/tmp/runbot_test/static/sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/server.py',
-                '/tmp/runbot_test/static/sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/openerp/tools/config.py'
+                '/tmp/runbot_test/static/sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/openerp/tools/config.py',
+                '/tmp/runbot_test/static/sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/openerp/sql_db.py'
             ])
             if file == '/tmp/runbot_test/static/sources/addons/d0d0caca0000ffffffffffffffffffffffffffff/requirements.txt':
                 return False

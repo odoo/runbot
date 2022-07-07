@@ -42,6 +42,8 @@ class Runbot(models.AbstractModel):
         for build in self._get_builds_with_requested_actions(host):
             build._process_requested_actions()
             self._commit()
+        host.process_logs()
+        self._commit()
         for build in self._get_builds_to_schedule(host):
             build._schedule()
             self._commit()

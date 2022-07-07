@@ -529,7 +529,8 @@ class BuildResult(models.Model):
             for _id in self.exists().ids:
                 additionnal_conditions.append("datname like '%s-%%'" % _id)
 
-        existing_db = list_local_dbs(additionnal_conditions=additionnal_conditions)
+        log_db = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
+        existing_db = [db for db in list_local_dbs(additionnal_conditions=additionnal_conditions) if db != log_db]
 
         for db, _ in _filter(dest_list=existing_db, label='db'):
             self._logger('Removing database')
@@ -662,6 +663,8 @@ class BuildResult(models.Model):
     def _schedule(self):
         """schedule the build"""
         icp = self.env['ir.config_parameter'].sudo()
+        hosts_by_name = {h.name: h for h in self.env['runbot.host'].search([('name', 'in', self.mapped('host'))])}
+        hosts_by_build = {b.id: hosts_by_name[b.host] for b in self}
         for build in self:
             if build.local_state not in ['testing', 'running']:
                 raise UserError("Build %s is not testing/running: %s" % (build.id, build.local_state))
@@ -689,6 +692,8 @@ class BuildResult(models.Model):
                     continue
                 else:
                     build._log('_schedule', 'Docker with state %s not started after 60 seconds, skipping' % _docker_state, level='ERROR')
+            if hosts_by_build[build.id]._fetch_local_logs(build_ids=build.ids):
+                continue  # avoid to make results with remaining logs
             # No job running, make result and select nex job
             build_values = {
                 'job_end': now(),
@@ -1015,11 +1020,7 @@ class BuildResult(models.Model):
                 command.add_config_tuple("xmlrpc_interface", "127.0.0.1")
 
         if grep(config_path, "log-db"):
-            logdb_uri = self.env['ir.config_parameter'].get_param('runbot.runbot_logdb_uri')
-            logdb = self.env.cr.dbname
-            if logdb_uri: # this looks useless
-                logdb = '%s' % logdb_uri
-            command.add_config_tuple("log_db", "%s" % logdb)
+            command.add_config_tuple("log_db", "runbot_logs")
             if grep(config_path, 'log-db-level'):
                 command.add_config_tuple("log_db_level", '25')
 

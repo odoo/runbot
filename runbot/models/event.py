@@ -5,7 +5,7 @@ import logging
 from collections import defaultdict
 
 from ..common import pseudo_markdown
-from odoo import models, fields, tools
+from odoo import models, fields, tools, api
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
@@ -24,59 +24,22 @@ class runbot_event(models.Model):
     error_id = fields.Many2one('runbot.build.error', compute='_compute_known_error')  # remember to never store this field
     dbname = fields.Char(string='Database Name', index=False)
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        logs_by_build_id = defaultdict(list)
+        for log in vals_list:
+            if 'build_id' in log:
+                logs_by_build_id[log['build_id']].append(log)
 
-    def init(self):
-        parent_class = super(runbot_event, self)
-        if hasattr(parent_class, 'init'):
-            parent_class.init()
-
-        self._cr.execute("""
-CREATE OR REPLACE FUNCTION runbot_set_logging_build() RETURNS TRIGGER AS $runbot_set_logging_build$
-BEGIN
-  IF (NEW.build_id IS NULL AND NEW.dbname IS NOT NULL AND NEW.dbname != current_database()) THEN
-    NEW.build_id := split_part(NEW.dbname, '-', 1)::integer;
-    SELECT active_step INTO NEW.active_step_id FROM runbot_build WHERE runbot_build.id = NEW.build_id;
-  END IF;
-  IF (NEW.build_id IS NOT NULL) AND (NEW.type = 'server') THEN
-    DECLARE
-        counter INTEGER;
-    BEGIN
-        UPDATE runbot_build b
-            SET log_counter = log_counter - 1
-        WHERE b.id = NEW.build_id;
-        SELECT log_counter
-        INTO counter
-        FROM runbot_build
-        WHERE runbot_build.id = NEW.build_id;
-        IF (counter = 0) THEN
-            NEW.message = 'Log limit reached (full logs are still available in the log file)';
-            NEW.level = 'SEPARATOR';
-            NEW.func = '';
-            NEW.type = 'runbot';
-            RETURN NEW;
-        ELSIF (counter < 0) THEN
-                RETURN NULL;
-        END IF;
-    END;
-  END IF;
-  IF (NEW.build_id IS NOT NULL AND UPPER(NEW.level) NOT IN ('INFO', 'SEPARATOR')) THEN
-    BEGIN
-        UPDATE runbot_build b
-            SET triggered_result = CASE WHEN UPPER(NEW.level) = 'WARNING' THEN 'warn'
-                                        ELSE 'ko'
-                                   END
-        WHERE b.id = NEW.build_id;
-    END;
-  END IF;
-RETURN NEW;
-END;
-$runbot_set_logging_build$ language plpgsql;
-
-DROP TRIGGER IF EXISTS runbot_new_logging ON ir_logging;
-CREATE TRIGGER runbot_new_logging BEFORE INSERT ON ir_logging
-FOR EACH ROW EXECUTE PROCEDURE runbot_set_logging_build();
-
-        """)
+        builds = self.env['runbot.build'].browse(logs_by_build_id.keys())
+        for build in builds:
+            build_logs = logs_by_build_id[build.id]
+            for ir_log in build_logs:
+                if ir_log['level'].upper() == 'WARNING':
+                    build.triggered_result = 'warn'
+                elif ir_log['level'].upper() == 'ERROR':
+                    build.triggered_result = 'ko'
+        return super().create(vals_list)
 
     def _markdown(self):
         """ Apply pseudo markdown parser for message.
