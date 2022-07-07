@@ -1,12 +1,17 @@
 import logging
 import getpass
+
+from collections import defaultdict
+
 from odoo import models, fields, api
 from odoo.tools import config
-from ..common import fqdn, local_pgadmin_cursor, os
+from ..common import fqdn, local_pgadmin_cursor, os, list_local_dbs, local_pg_cursor
 from ..container import docker_build
+
 _logger = logging.getLogger(__name__)
 
 forced_host_name = None
+
 
 class Host(models.Model):
     _name = 'runbot.host'
@@ -52,6 +57,31 @@ class Host(models.Model):
             values['disp_name'] = values['name']
         return super().create(values)
 
+    def _bootstrap_local_logs_db(self):
+        """ bootstrap a local database that will collect logs from builds """
+        logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
+        if logs_db_name not in list_local_dbs():
+            _logger.info('Logging database %s not found. Creating it ...', logs_db_name)
+            with local_pgadmin_cursor() as local_cr:
+                local_cr.execute(f"""CREATE DATABASE "{logs_db_name}" TEMPLATE template0 LC_COLLATE 'C' ENCODING 'unicode'""")
+            try:
+                with local_pg_cursor(logs_db_name) as local_cr:
+                    # create_date, type, dbname, name, level, message, path, line, func
+                    local_cr.execute("""CREATE TABLE ir_logging (
+                        id bigserial NOT NULL,
+                        create_date timestamp without time zone,
+                        name character varying NOT NULL,
+                        level character varying,
+                        dbname character varying,
+                        func character varying NOT NULL,
+                        path character varying NOT NULL,
+                        line character varying NOT NULL,
+                        type character varying NOT NULL,
+                        message text NOT NULL);
+                    """)
+            except Exception as e:
+                _logger.exception('Failed to create local logs database: %s', e)
+
     def _bootstrap_db_template(self):
         """ boostrap template database if needed """
         icp = self.env['ir.config_parameter']
@@ -72,6 +102,7 @@ class Host(models.Model):
         for dir, path in static_dirs.items():
             os.makedirs(path, exist_ok=True)
         self._bootstrap_db_template()
+        self._bootstrap_local_logs_db()
 
     def _docker_build(self):
         """ build docker images needed by locally pending builds"""
@@ -144,3 +175,66 @@ class Host(models.Model):
         nb_reserved = self.env['runbot.host'].search_count([('assigned_only', '=', True)])
         if nb_reserved < (nb_hosts / 2):
             self.assigned_only = True
+
+    def _fetch_local_logs(self, build_ids=None):
+        """ fetch build logs from local database """
+        logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
+        try:
+            with local_pg_cursor(logs_db_name) as local_cr:
+                res = []
+                where_clause = 'WHERE build_id IN (%s)' if build_ids else ''
+                query = f"""
+                        SELECT * 
+                        FROM (
+                                SELECT id, create_date, name, level, dbname, func, path, line, type, message, split_part(dbname, '-', 1)::integer as build_id 
+                                FROM ir_logging
+                                )
+                            AS ir_logs 
+                        {where_clause}
+                    ORDER BY id
+                    """
+                local_cr.execute(query, build_ids)
+                col_names = [col.name for col in local_cr.description]
+                for row in local_cr.fetchall():
+                    res.append({name:value for name,value in zip(col_names, row)})
+                return res
+        except Exception:
+            return []
+
+    def process_logs(self, build_ids=None):
+        """move logs from host to the leader"""
+        ir_logs = self._fetch_local_logs()
+        logs_by_build_id = defaultdict(list)
+
+        for log in ir_logs:
+            logs_by_build_id[int(log['dbname'].split('-', maxsplit=1)[0])].append(log)
+
+        builds = self.env['runbot.build'].browse(logs_by_build_id.keys())
+
+        logs_to_send = []
+        local_log_ids = []
+        for build in builds.exists():
+            build_logs = logs_by_build_id[build.id]
+            for ir_log in build_logs:
+                local_log_ids.append(ir_log['id'])
+                ir_log['active_step_id'] = build.active_step.id
+                ir_log['type'] = 'server'
+                build.log_counter -= 1
+                build.flush()
+                if build.log_counter == 0:
+                    ir_log['level'] = 'SEPARATOR'
+                    ir_log['func'] = ''
+                    ir_log['type'] = 'runbot'
+                    ir_log['message'] = 'Log limit reached (full logs are still available in the log file)'
+                elif build.log_counter < 0:
+                    continue
+                ir_log['build_id'] = build.id
+                logs_to_send.append({k:ir_log[k] for k in ir_log if k != 'id'})
+
+        if logs_to_send:
+            self.env['ir.logging'].create(logs_to_send)
+        self.env.cr.commit()  # we don't want to remove local logs that were not inserted in main runbot db
+        if local_log_ids:
+            logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
+            with local_pg_cursor(logs_db_name) as local_cr:
+                local_cr.execute("DELETE FROM ir_logging WHERE id in %s", [tuple(local_log_ids)])

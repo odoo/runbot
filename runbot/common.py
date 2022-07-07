@@ -108,6 +108,16 @@ def local_pgadmin_cursor():
         if cnx:
             cnx.close()
 
+@contextlib.contextmanager
+def local_pg_cursor(db_name):
+    cnx = None
+    try:
+        cnx = psycopg2.connect(f"dbname={db_name}")
+        yield cnx.cursor()
+    finally:
+        if cnx:
+            cnx.commit()
+            cnx.close()
 
 def list_local_dbs(additionnal_conditions=None):
     additionnal_condition_str = ''

@@ -15,6 +15,7 @@ class TestCron(RunbotCase):
 
     def setUp(self):
         super(TestCron, self).setUp()
+        self.start_patcher('list_local_dbs_patcher', 'odoo.addons.runbot.models.host.list_local_dbs', ['runbot_logs'])
         self.start_patcher('_get_cron_period', 'odoo.addons.runbot.models.runbot.Runbot._get_cron_period', 2)
 
     @patch('time.sleep', side_effect=sleep)

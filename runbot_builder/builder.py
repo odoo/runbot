@@ -1,8 +1,10 @@
 #!/usr/bin/python3
-from tools import RunbotClient, run
 import logging
 
+from tools import RunbotClient, run
+
 _logger = logging.getLogger(__name__)
+
 
 class BuilderClient(RunbotClient):
 

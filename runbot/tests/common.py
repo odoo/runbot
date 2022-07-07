@@ -172,6 +172,7 @@ class RunbotCase(TransactionCase):
         self.start_patcher('makedirs', 'odoo.addons.runbot.common.os.makedirs', True)
         self.start_patcher('mkdir', 'odoo.addons.runbot.common.os.mkdir', True)
         self.start_patcher('local_pgadmin_cursor', 'odoo.addons.runbot.common.local_pgadmin_cursor', False)  # avoid to create databases
+        self.start_patcher('host_local_pg_cursor', 'odoo.addons.runbot.models.host.local_pg_cursor')
         self.start_patcher('isdir', 'odoo.addons.runbot.common.os.path.isdir', True)
         self.start_patcher('isfile', 'odoo.addons.runbot.common.os.path.isfile', True)
         self.start_patcher('docker_run', 'odoo.addons.runbot.container._docker_run')

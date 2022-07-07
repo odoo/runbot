@@ -14,3 +14,4 @@ from . import test_runbot
 from . import test_commit
 from . import test_upgrade
 from . import test_dockerfile
+from . import test_host
