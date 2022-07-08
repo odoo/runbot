@@ -32,7 +32,7 @@
               </group>
               <notebook>
                 <page string="Builds">
-                  <field name="build_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}">
+                  <field name="build_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
                     <tree>
                       <field name="create_date"/>
                       <field name="id"/>
@@ -54,7 +54,7 @@
                   </field>
                 </page>
                 <page string="Linked Errors">
-                  <field name="child_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}">
+                  <field name="child_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}"  readonly="1">
                     <tree>
                       <field name="create_date"/>
                       <field name="module_name"/>
@@ -102,6 +102,7 @@
                 <field name="last_seen_date" string="Last Seen"/>
                 <field name="build_count"/>
                 <field name="responsible"/>
+                <field name="team_id" />
                 <field name="test_tags"/>
             </tree>
         </field>
