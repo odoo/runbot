@@ -44,7 +44,7 @@
               </group>
               <notebook>
                 <page string="Builds">
-                  <field name="build_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}">
+                  <field name="build_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
                     <tree>
                       <field name="create_date"/>
                       <field name="host" groups="base.group_no_one"/>
@@ -67,7 +67,7 @@
                   </field>
                 </page>
                 <page string="Linked Errors">
-                  <field name="child_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}">
+                  <field name="child_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}"  readonly="1">
                     <tree>
                       <field name="create_date"/>
                       <field name="module_name"/>
