@@ -826,6 +826,12 @@ mutation setDraft($pid: ID!) {
     }
 }
 '''
+def state_prop(name: str) -> property:
+    @property
+    def _prop(self):
+        return self._pr[name]
+    return _prop.setter(lambda self, v: self._set_prop(name, v))
+
 class PR:
     def __init__(self, repo, number):
         self.repo = repo
@@ -850,15 +856,9 @@ class PR:
             caching['If-Modified-Since']= r.headers['Last-Modified']
         return contents
 
-    @property
-    def title(self):
-        return self._pr['title']
-    title = title.setter(lambda self, v: self._set_prop('title', v))
-
-    @property
-    def base(self):
-        return self._pr['base']
-    base = base.setter(lambda self, v: self._set_prop('base', v))
+    title = state_prop('title')
+    body = state_prop('body')
+    base = state_prop('base')
 
     @property
     def draft(self):
@@ -887,10 +887,6 @@ class PR:
     @property
     def state(self):
         return self._pr['state']
-
-    @property
-    def body(self):
-        return self._pr['body']
 
     @property
     def comments(self):

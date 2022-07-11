@@ -120,15 +120,25 @@ def handle_pr(env, event):
         if not source_branch:
             return handle_pr(env, dict(event, action='opened'))
 
+        pr_obj = find(source_branch)
         updates = {}
         if source_branch != branch:
-            updates['target'] = branch.id
-            updates['squash'] = pr['commits'] == 1
-        if event['changes'].keys() & {'title', 'body'}:
-            updates['message'] = "{}\n\n{}".format(pr['title'].strip(), pr['body'].strip())
+            if branch != pr_obj.target:
+                updates['target'] = branch.id
+                updates['squash'] = pr['commits'] == 1
+
+        # turns out github doesn't bother sending a change key if the body is
+        # changing from empty (None), therefore ignore that entirely, just
+        # generate the message and check if it changed
+        message = pr['title'].strip()
+        body = (pr['body'] or '').strip()
+        if body:
+            message += f"\n\n{body}"
+        if message != pr_obj.message:
+            updates['message'] = message
+
         _logger.info("update: %s#%d = %s (by %s)", repo.name, pr['number'], updates, event['sender']['login'])
         if updates:
-            pr_obj = find(source_branch)
             pr_obj.write(updates)
             return 'Updated {}'.format(pr_obj.id)
         return "Nothing to update ({})".format(event['changes'].keys())

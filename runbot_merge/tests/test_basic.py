@@ -728,6 +728,8 @@ class TestPREdition:
         assert pr.message == 'title\n\nbody'
         with repo: prx.title = "title 2"
         assert pr.message == 'title 2\n\nbody'
+        with repo: prx.body = None
+        assert pr.message == "title 2"
         assert pr.staging_id, \
             "message edition does not affect staging of rebased PRs"
         with repo: prx.base = '1.0'
