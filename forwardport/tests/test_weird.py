@@ -801,10 +801,9 @@ def test_freeze(env, config, make_repo, users):
 
     assert not w_id.errors
     w_id.action_freeze()
-    env.run_crons() # stage freeze PRs
-    with prod:
-        prod.post_status('staging.post-b', 'success', 'ci/runbot')
-        prod.post_status('staging.post-b', 'success', 'legal/cla')
+    # run crons to process the feedback, run a second time in case of e.g.
+    # forward porting
+    env.run_crons()
     env.run_crons()
 
     assert release_id.state == 'merged'

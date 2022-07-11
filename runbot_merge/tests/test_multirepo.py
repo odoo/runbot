@@ -7,12 +7,13 @@ are staged concurrently in all repos
 """
 import json
 import time
+import xmlrpc.client
 
 import pytest
 import requests
-from lxml.etree import XPath, tostring
+from lxml.etree import XPath
 
-from utils import seen, re_matches, get_partner, pr_page, to_pr, Commit
+from utils import seen, get_partner, pr_page, to_pr, Commit
 
 
 @pytest.fixture
@@ -1104,6 +1105,7 @@ def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
     * have a project with 3 repos, and two branches (1.0 and master) each
     * have 2 PRs required for the freeze
     * prep 3 freeze PRs
+    * prep 1 bump PR
     * trigger the freeze wizard
     * trigger it again (check that the same object is returned, there should
       only be one freeze per project at a time)
@@ -1122,49 +1124,13 @@ def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
         (0, 0, {'name': '1.0', 'sequence': 2}),
     ]
 
-    masters = []
-    for r in [repo_a, repo_b, repo_c]:
-        with r:
-            [root, _] = r.make_commits(
-                None,
-                Commit('base', tree={'version': '', 'f': '0'}),
-                Commit('release 1.0', tree={'version': '1.0'} if r is repo_a else None),
-                ref='heads/1.0'
-            )
-            masters.extend(r.make_commits(root, Commit('other', tree={'f': '1'}), ref='heads/master'))
-
-    # have 2 PRs required for the freeze
-    with repo_a:
-        repo_a.make_commits(masters[0], Commit('super important file', tree={'g': 'x'}), ref='heads/apr')
-        pr_required_a = repo_a.make_pr(target='master', head='apr')
-    with repo_c:
-        repo_c.make_commits(masters[2], Commit('update thing', tree={'f': '2'}), ref='heads/cpr')
-        pr_required_c = repo_c.make_pr(target='master', head='cpr')
-
-    # have 3 release PRs, only the first one updates the tree (version file)
-    with repo_a:
-        repo_a.make_commits(
-            masters[0],
-            Commit('Release 1.1 (A)', tree={'version': '1.1'}),
-            ref='heads/release-1.1'
-        )
-        pr_rel_a = repo_a.make_pr(target='master', head='release-1.1')
-    with repo_b:
-        repo_b.make_commits(
-            masters[1],
-            Commit('Release 1.1 (B)', tree=None),
-            ref='heads/release-1.1'
-        )
-        pr_rel_b = repo_b.make_pr(target='master', head='release-1.1')
-    with repo_c:
-        repo_c.make_commits(masters[2], Commit("Some change", tree={'a': '1'}), ref='heads/whocares')
-        pr_other = repo_c.make_pr(target='master', head='whocares')
-        repo_c.make_commits(
-            masters[2],
-            Commit('Release 1.1 (C)', tree=None),
-            ref='heads/release-1.1'
-        )
-        pr_rel_c = repo_c.make_pr(target='master', head='release-1.1')
+    [
+        (master_head_a, master_head_b, master_head_c),
+        (pr_required_a, _, pr_required_c),
+        (pr_rel_a, pr_rel_b, pr_rel_c),
+        pr_bump_a,
+        pr_other
+    ] = setup_mess(repo_a, repo_b, repo_c)
     env.run_crons() # process the PRs
 
     release_prs = {
@@ -1172,6 +1138,7 @@ def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
         repo_b.name: to_pr(env, pr_rel_b),
         repo_c.name: to_pr(env, pr_rel_c),
     }
+    pr_bump_id = to_pr(env, pr_bump_a)
     # trigger the ~~tree~~ freeze wizard
     w = project.action_prepare_freeze()
     w2 = project.action_prepare_freeze()
@@ -1189,6 +1156,11 @@ def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
     for r in w_id.release_pr_ids:
         r.pr_id = release_prs[r.repository_id.name].id
     w_id.release_pr_ids[-1].pr_id = to_pr(env, pr_other).id
+    # configure bump
+    assert not w_id.bump_pr_ids, "there is no bump pr by default"
+    w_id.write({'bump_pr_ids': [
+        (0, 0, {'repository_id': pr_bump_id.repository.id, 'pr_id': pr_bump_id.id})
+    ]})
     r = w_id.action_freeze()
     assert r == w, "the freeze is not ready so the wizard should redirect to itself"
     owner = repo_c.owner
@@ -1233,15 +1205,34 @@ def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
     assert r['res_model'] == 'runbot_merge.project'
     assert r['res_id'] == project.id
 
-    env.run_crons() # stage the release prs
-    for repo in [repo_a, repo_b, repo_c]:
-        with repo:
-            repo.post_status('staging.1.1', 'success', 'ci/runbot')
-            repo.post_status('staging.1.1', 'success', 'legal/cla')
-    env.run_crons() # get the release prs merged
+    # stuff that's done directly
+    for pr_id in release_prs.values():
+        assert pr_id.state == 'merged'
+    assert pr_bump_id.state == 'merged'
+
+    # stuff that's behind a cron
+    env.run_crons()
+
+    assert pr_rel_a.state == "closed"
+    assert pr_rel_a.base['ref'] == '1.1'
+    assert pr_rel_b.state == "closed"
+    assert pr_rel_b.base['ref'] == '1.1'
+    assert pr_rel_c.state == "closed"
+    assert pr_rel_c.base['ref'] == '1.1'
     for pr_id in release_prs.values():
         assert pr_id.target.name == '1.1'
-        assert pr_id.state == 'merged'
+
+    assert pr_bump_a.state == 'closed'
+    assert pr_bump_a.base['ref'] == 'master'
+    assert pr_bump_id.target.name == 'master'
+
+    m_a = repo_a.commit('master')
+    assert m_a.message.startswith('Bump A')
+    assert repo_a.read_tree(m_a) == {
+        'f': '1', # from master
+        'g': 'x', # from required PR (merged into master before forking)
+        'version': '1.2-alpha', # from bump PR
+    }
 
     c_a = repo_a.commit('1.1')
     assert c_a.message.startswith('Release 1.1 (A)')
@@ -1252,18 +1243,70 @@ def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
     }
     c_a_parent = repo_a.commit(c_a.parents[0])
     assert c_a_parent.message.startswith('super important file')
-    assert c_a_parent.parents[0] == masters[0]
+    assert c_a_parent.parents[0] == master_head_a
 
     c_b = repo_b.commit('1.1')
     assert c_b.message.startswith('Release 1.1 (B)')
     assert repo_b.read_tree(c_b) == {'f': '1', 'version': ''}
-    assert c_b.parents[0] == masters[1]
+    assert c_b.parents[0] == master_head_b
 
     c_c = repo_c.commit('1.1')
     assert c_c.message.startswith('Release 1.1 (C)')
     assert repo_c.read_tree(c_c) == {'f': '2', 'version': ''}
-    assert repo_c.commit(c_c.parents[0]).parents[0] == masters[2]
+    assert repo_c.commit(c_c.parents[0]).parents[0] == master_head_c
 
+
+def setup_mess(repo_a, repo_b, repo_c):
+    master_heads = []
+    for r in [repo_a, repo_b, repo_c]:
+        with r:
+            [root, _] = r.make_commits(
+                None,
+                Commit('base', tree={'version': '', 'f': '0'}),
+                Commit('release 1.0', tree={'version': '1.0'} if r is repo_a else None),
+                ref='heads/1.0'
+            )
+            master_heads.extend(r.make_commits(root, Commit('other', tree={'f': '1'}), ref='heads/master'))
+    # have 2 PRs required for the freeze
+    with repo_a:
+        repo_a.make_commits(master_heads[0], Commit('super important file', tree={'g': 'x'}), ref='heads/apr')
+        pr_required_a = repo_a.make_pr(target='master', head='apr')
+    with repo_c:
+        repo_c.make_commits(master_heads[2], Commit('update thing', tree={'f': '2'}), ref='heads/cpr')
+        pr_required_c = repo_c.make_pr(target='master', head='cpr')
+    # have 3 release PRs, only the first one updates the tree (version file)
+    with repo_a:
+        repo_a.make_commits(
+            master_heads[0],
+            Commit('Release 1.1 (A)', tree={'version': '1.1'}),
+            ref='heads/release-1.1'
+        )
+        pr_rel_a = repo_a.make_pr(target='master', head='release-1.1')
+    with repo_b:
+        repo_b.make_commits(
+            master_heads[1],
+            Commit('Release 1.1 (B)', tree=None),
+            ref='heads/release-1.1'
+        )
+        pr_rel_b = repo_b.make_pr(target='master', head='release-1.1')
+    with repo_c:
+        repo_c.make_commits(master_heads[2], Commit("Some change", tree={'a': '1'}), ref='heads/whocares')
+        pr_other = repo_c.make_pr(target='master', head='whocares')
+        repo_c.make_commits(
+            master_heads[2],
+            Commit('Release 1.1 (C)', tree=None),
+            ref='heads/release-1.1'
+        )
+        pr_rel_c = repo_c.make_pr(target='master', head='release-1.1')
+    # have one bump PR on repo A
+    with repo_a:
+        repo_a.make_commits(
+            master_heads[0],
+            Commit("Bump A", tree={'version': '1.2-alpha'}),
+            ref='heads/bump-1.1',
+        )
+        pr_bump_a = repo_a.make_pr(target='master', head='bump-1.1')
+    return master_heads, (pr_required_a, None, pr_required_c), (pr_rel_a, pr_rel_b, pr_rel_c), pr_bump_a, pr_other
 
 def test_freeze_subset(env, project, repo_a, repo_b, repo_c, users, config):
     """It should be possible to only freeze a subset of a project when e.g. one
@@ -1335,3 +1378,61 @@ def test_freeze_subset(env, project, repo_a, repo_b, repo_c, users, config):
     except AssertionError:
         ...
     # can't stage because we (wilfully) don't have branches 1.1 in repos B and C
+
+@pytest.mark.skip("env's session is not thread-safe sadface")
+def test_race_conditions():
+    """need the ability to dup the env in order to send concurrent requests to
+    the inner odoo
+
+    - try to run the action_freeze during a cron (merge or staging), should
+      error (recover and return nice message?)
+    - somehow get ahead of the action and update master's commit between moment
+      where it is fetched and moment where the bump pr is fast-forwarded,
+      there's actually a bit of time thanks to the rate limiting (fetch of base,
+      update of tmp to base, rebase of commits on tmp, wait 1s, for each release
+      and bump PR, then the release branches are created, and finally the bump
+      prs)
+    """
+    ...
+
+def test_freeze_conflict(env, project, repo_a, repo_b, repo_c, users, config):
+    """If one of the branches we're trying to create already exists, the wizard
+    fails.
+    """
+    project.branch_ids = [
+        (1, project.branch_ids.id, {'sequence': 1}),
+        (0, 0, {'name': '1.0', 'sequence': 2}),
+    ]
+    heads, _, (pr_rel_a, pr_rel_b, pr_rel_c), bump, other = \
+        setup_mess(repo_a, repo_b, repo_c)
+    env.run_crons()
+
+    release_prs = {
+        repo_a.name: to_pr(env, pr_rel_a),
+        repo_b.name: to_pr(env, pr_rel_b),
+        repo_c.name: to_pr(env, pr_rel_c),
+    }
+
+    w = project.action_prepare_freeze()
+    w_id = env[w['res_model']].browse([w['res_id']])
+    for repo, release_pr in release_prs.items():
+        w_id.release_pr_ids\
+            .filtered(lambda r: r.repository_id.name == repo)\
+            .pr_id = release_pr.id
+
+    # create conflicting branch
+    with repo_c:
+        repo_c.make_ref('heads/1.1', heads[2])
+
+    # actually perform the freeze
+    with pytest.raises(xmlrpc.client.Fault) as e:
+        w_id.action_freeze()
+    assert f"Unable to create branch {repo_c.name}:1.1" in e.value.faultString
+
+    # branches a and b should have been deleted
+    with pytest.raises(AssertionError) as e:
+        repo_a.get_ref('heads/1.1')
+    assert e.value.args[0].startswith("Not Found")
+    with pytest.raises(AssertionError) as e:
+        repo_b.get_ref('heads/1.1')
+    assert e.value.args[0].startswith("Not Found")

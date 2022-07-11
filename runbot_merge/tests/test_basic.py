@@ -3620,6 +3620,7 @@ class TestFeedback:
         ]
 
 class TestInfrastructure:
+    @pytest.mark.skip(reason="Don't want to implement")
     def test_protection(self, repo):
         """ force-pushing on a protected ref should fail
         """

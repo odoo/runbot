@@ -1542,20 +1542,24 @@ class Feedback(models.Model):
 
             try:
                 message = f.message
-                if f.close:
-                    gh.close(f.pull_request)
-                    try:
-                        data = json.loads(message or '')
-                    except json.JSONDecodeError:
-                        pass
-                    else:
+                with contextlib.suppress(json.JSONDecodeError):
+                    data = json.loads(message or '')
+                    message = data.get('message')
+
+                    if data.get('base'):
+                        gh('PATCH', f'pulls/{f.pull_request}', json={'base': data['base']})
+
+                    if f.close:
                         pr_to_notify = self.env['runbot_merge.pull_requests'].search([
                             ('repository', '=', repo.id),
                             ('number', '=', f.pull_request),
                         ])
                         if pr_to_notify:
                             pr_to_notify._notify_merged(gh, data)
-                            message = None
+
+                if f.close:
+                    gh.close(f.pull_request)
+
                 if message:
                     gh.comment(f.pull_request, message)
             except Exception:
@@ -2150,9 +2154,8 @@ def parse_refs_smart(read):
         return read(length - 4)
 
     header = read_line()
-    assert header == b'# service=git-upload-pack\n', header
-    sep = read_line()
-    assert sep is None, sep
+    assert header.rstrip() == b'# service=git-upload-pack', header
+    assert read_line() is None, "failed to find first flush line"
     # read lines until second delimiter
     for line in iter(read_line, None):
         if line.startswith(ZERO_REF):
