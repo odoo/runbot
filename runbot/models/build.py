@@ -1221,3 +1221,24 @@ class BuildResult(models.Model):
 
     def _parse_config(self):
         return set(findall(self._server("tools/config.py"), '--[\w-]+', ))
+
+    def _get_description(self):
+        return[
+            {
+                'id': r.id,
+                'dest': r.dest,
+                'url': f'{r.get_base_url()}/runbot/json/builds/{r.id}',
+                'parent_build_url': f'{r.get_base_url()}/runbot/json/builds/{r.parent_id}' if r.parent_id else False,
+                'params_url': f'{r.get_base_url()}/runbot/json/build_params/{r.params_id.id}',
+                'version': r.version_id.name,
+                'config': r.config_id.name,
+                'trigger': r.trigger_id.name,
+                'global_state': r.global_state,
+                'local_state': r.local_state,
+                'global_result': r.global_result,
+                'local_result': r.local_result,
+                'host': r.host,
+                'children': [info for child in r.children_ids for info in child._get_description()],
+            }
+            for r in self
+        ]

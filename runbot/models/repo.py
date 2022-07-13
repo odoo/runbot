@@ -710,6 +710,22 @@ class Repo(models.Model):
             if file.startswith(base_path):
                 return file[len(base_path):].strip('/').split('/')[0]
 
+    def _get_description(self):
+        return[
+            {
+                'id': r.id,
+                'url': f'{r.get_base_url()}/runbot/json/repos/{r.id}',
+                'name': r.name,
+                'project': r.project_id.name,
+                'project_url': f'{r.get_base_url()}/runbot/json/projects/{r.project_id.id}',
+                'hook_time': r.hook_time,
+                'hook_time_string': datetime.datetime.fromtimestamp(r.hook_time),
+                'last_processed_hook_time': r.last_processed_hook_time,
+                'last_processed_hook_time_string': datetime.datetime.fromtimestamp(r.last_processed_hook_time),
+            }
+            for r in self
+        ]
+
 
 class RefTime(models.Model):
     _name = 'runbot.repo.reftime'

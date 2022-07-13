@@ -296,3 +296,18 @@ class Bundle(models.Model):
             'default_number_build': 0,
         }
         return self._generate_custom_trigger_action(context)
+    def _get_description(self):
+        return[
+            {
+                'id': r.id,
+                'url': f'{r.get_base_url()}/runbot/json/bundles/{r.id}',
+                'name': r.name,
+                'sticky': r.sticky,
+                'version_number': r.version_number,
+                'project_url': f'{r.get_base_url()}/runbot/json/projects/{r.project_id.id}',
+                'last_batch_url': f'{r.get_base_url()}/runbot/json/batches/{r.last_batch.id}',
+                'last_batch' : r.last_batch._get_description()[0] if r.last_batch else False,
+                'batches_url': f'{r.get_base_url()}/runbot/json/bundles/{r.id}/batches'
+            }
+            for r in self
+        ]
