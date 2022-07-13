@@ -246,3 +246,19 @@ class Bundle(models.Model):
         for branch in self.branch_ids.sorted(key=lambda b: (b.is_pr)):
             branch_groups[branch.remote_id.repo_id].append(branch)
         return branch_groups
+
+    def _get_description(self):
+        return[
+            {
+                'id': r.id,
+                'url': f'{r.get_base_url()}/runbot/json/bundles/{r.id}',
+                'name': r.name,
+                'sticky': r.sticky,
+                'version_number': r.version_number,
+                'project_url': f'{r.get_base_url()}/runbot/json/projects/{r.project_id.id}',
+                'last_batch_url': f'{r.get_base_url()}/runbot/json/batches/{r.last_batch.id}',
+                'last_batch' : r.last_batch._get_description()[0] if r.last_batch else False,
+                'batches_url': f'{r.get_base_url()}/runbot/json/bundles/{r.id}/batches'
+            }
+            for r in self
+        ]

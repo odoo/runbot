@@ -130,5 +130,35 @@
         <field name="perm_read" eval="False"/>
     </record>
 
+    <record id="runbot_bundle_access_user" model="ir.rule">
+      <field name="name">User can read bundle from public projects or specific groups</field>
+      <field name="model_id" ref="model_runbot_bundle"/>
+      <field name="domain_force">['|', ('project_id.group_ids.users', 'in', user.id), ('project_id.group_ids', '=', False)]</field>
+    </record>
+
+    <record id="runbot_batch_access_user" model="ir.rule">
+      <field name="name">User can read batch from public projects or specific groups</field>
+      <field name="model_id" ref="model_runbot_batch"/>
+      <field name="domain_force">['|', ('bundle_id.project_id.group_ids.users', 'in', user.id), ('bundle_id.project_id.group_ids', '=', False)]</field>
+    </record>
+
+    <record id="runbot_commit_access_user" model="ir.rule">
+      <field name="name">User can read commits from public projects or specific groups</field>
+      <field name="model_id" ref="model_runbot_commit"/>
+      <field name="domain_force">['|', ('repo_id.project_id.group_ids.users', 'in', user.id), ('repo_id.project_id.group_ids', '=', False)]</field>
+    </record>
+
+    <record id="runbot_batch_slot_access_user" model="ir.rule">
+      <field name="name">User can read batch slot from public projects or specific groups</field>
+      <field name="model_id" ref="model_runbot_batch_slot"/>
+      <field name="domain_force">['|', ('batch_id.bundle_id.project_id.group_ids.users', 'in', user.id), ('batch_id.bundle_id.project_id.group_ids', '=', False)]</field>
+    </record>
+
+    <record id="runbot_build_access_user" model="ir.rule">
+      <field name="name">User can read build from public projects or specific groups</field>
+      <field name="model_id" ref="model_runbot_build"/>
+      <field name="domain_force">['|', ('params_id.project_id.group_ids.users', 'in', user.id), ('params_id.project_id.group_ids', '=', False)]</field>
+    </record>
+
   </data>
 </odoo>

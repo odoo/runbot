@@ -153,6 +153,23 @@ class Commit(models.Model):
             'to_process': True,
         })
 
+    def _get_description(self):
+        return[
+            {
+                'id': r.id,
+                'url': f'{r.get_base_url()}/runbot/json/commits/{r.id}',
+                'hash': r.name,
+                'repo': r.repo_id.name,
+                'repo_url': f'{r.get_base_url()}/runbot/json/repos/{r.repo_id.id}',
+                'author': r.author,
+                'author_email': r.author_email,
+                'committer': r.committer,
+                'committer_email': r.committer_email,
+                'subject': r.subject,
+                'commit_links_url': f'{r.get_base_url()}/runbot/json/commits/{r.id}/commit_links',
+            }
+            for r in self
+        ]
 
 class CommitLink(models.Model):
     _name = 'runbot.commit.link'
@@ -170,6 +187,30 @@ class CommitLink(models.Model):
     file_changed = fields.Integer('# file changed')
     diff_add = fields.Integer('# line added')
     diff_remove = fields.Integer('# line removed')
+
+    def _get_description(self):
+        return[
+            {
+                'id': r.id,
+                'url': f'{r.get_base_url()}/runbot/json/commit_links/{r.id}',
+                'commit_url': f'{r.get_base_url()}/runbot/json/commits/{r.id}',
+                'hash': r.commit_id.name,
+                'match_type': r.match_type,
+                'author': r.commit_id.author,
+                'author_email': r.commit_id.author_email,
+                'committer': r.commit_id.committer,
+                'committer_email': r.commit_id.committer_email,
+                'subject': r.commit_id.subject,
+                'base_commit': r.base_commit_id.name,
+                'base_commit_url': f'{r.get_base_url()}/runbot/json/commits/{r.base_commit_id.id}' if r.base_commit_id else False,
+                'merge_base_commit': r.merge_base_commit_id.name,
+                'merge_base_commit_url': f'{r.get_base_url()}/runbot/json/commits/{r.merge_base_commit_id.id}' if r.merge_base_commit_id else False,
+                'branch_url': f'{r.get_base_url()}/runbot/json/branches/{r.id}',
+                'branch_name': r.branch_id.name,
+                'github_branch_url': f'https://{r.branch_id.remote_id.base_url}/commit/{r.commit_id.name}',
+            }
+            for r in self
+        ]
 
 
 class CommitStatus(models.Model):

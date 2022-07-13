@@ -42,6 +42,17 @@ class Project(models.Model):
             project.dummy_bundle_id = bundle
         return projects
 
+    def _get_description(self):
+        return[
+            {
+                'id': r.id,
+                'url': f'{r.get_base_url()}/runbot/json/projects/{r.id}',
+                'name': r.name,
+                'keep_sticky_running': r.keep_sticky_running,
+                'bundles_url': f'{r.get_base_url()}/runbot/json/projects/{r.id}/bundles'
+            }
+            for r in self
+        ]
 
 class Category(models.Model):
     _name = 'runbot.category'
