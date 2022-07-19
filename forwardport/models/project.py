@@ -1026,7 +1026,7 @@ stderr:
             subprocess.run([
                 'git', 'clone', '--bare',
                 'https://{}:{}@github.com/{}'.format(
-                    self.repository.project_id.fp_github_name,
+                    self.repository.project_id.fp_github_name or '',
                     self.repository.project_id.fp_github_token,
                     self.repository.name,
                 ),
@@ -1146,7 +1146,7 @@ class Repo:
         try:
             return self._opener(args, **opts)
         except subprocess.CalledProcessError as e:
-            _logger.error("git call error:\n%s", e.stderr.decode())
+            _logger.error("git call error:%s", ('\n' + e.stderr.decode()) if e.stderr else e    )
             raise
 
     def stdout(self, flag=True):

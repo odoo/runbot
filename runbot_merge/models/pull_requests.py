@@ -2143,7 +2143,7 @@ def to_status(v):
         return v
     return {'state': v, 'target_url': None, 'description': None}
 
-refline = re.compile(rb'([0-9a-f]{40}) ([^\0\n]+)(\0.*)?\n$')
+refline = re.compile(rb'([\da-f]{40}) ([^\0\n]+)(\0.*)?\n?$')
 ZERO_REF = b'0'*40
 def parse_refs_smart(read):
     """ yields pkt-line data (bytes), or None for flush lines """
