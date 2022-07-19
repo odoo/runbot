@@ -271,14 +271,18 @@ class DbDict(dict):
         self._adpath = adpath
     def __missing__(self, module):
         self[module] = db = 'template_%s' % uuid.uuid4()
-        subprocess.run([
-            'odoo', '--no-http',
-            '--addons-path', self._adpath,
-            '-d', db, '-i', module + ',auth_oauth',
-            '--max-cron-threads', '0',
-            '--stop-after-init',
-            '--log-level', 'warn'
-        ], check=True)
+        with tempfile.TemporaryDirectory() as d:
+            subprocess.run([
+                'odoo', '--no-http',
+                '--addons-path', self._adpath,
+                '-d', db, '-i', module + ',auth_oauth',
+                '--max-cron-threads', '0',
+                '--stop-after-init',
+                '--log-level', 'warn'
+            ],
+                check=True,
+                env={**os.environ, 'XDG_DATA_HOME': d}
+            )
         return db
 
 @pytest.fixture(scope='session')
@@ -355,7 +359,7 @@ def from_role(_):
         yield dummy_addons_path
 
 @pytest.fixture
-def server(request, db, port, module, dummy_addons_path):
+def server(request, db, port, module, dummy_addons_path, tmpdir):
     log_handlers = [
         'odoo.modules.loading:WARNING',
     ]
@@ -372,7 +376,13 @@ def server(request, db, port, module, dummy_addons_path):
         '-d', db,
         '--max-cron-threads', '0', # disable cron threads (we're running crons by hand)
         *itertools.chain.from_iterable(('--log-handler', h) for h in log_handlers),
-    ])
+    ], env={
+        **os.environ,
+        # stop putting garbage in the user dirs, and potentially creating conflicts
+        # TODO: way to override this with macOS?
+        'XDG_DATA_HOME': str(tmpdir.mkdir('share')),
+        'XDG_CACHE_HOME': str(tmpdir.mkdir('cache')),
+    })
 
     try:
         wait_for_server(db, port, p, module)
