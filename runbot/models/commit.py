@@ -75,7 +75,7 @@ class Commit(models.Model):
             self.rebase_on_id.repo_id._fetch(export_sha)
 
         p1 = subprocess.Popen(['git', '--git-dir=%s' % self.repo_id.path, 'archive', export_sha], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        p2 = subprocess.Popen(['tar', '-xmC', export_path], stdin=p1.stdout, stdout=subprocess.PIPE)
+        p2 = subprocess.Popen(['tar', '--mtime', self.date.strftime('%Y-%m-%d %H:%M:%S'), '-xC', export_path], stdin=p1.stdout, stdout=subprocess.PIPE)
         p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
         (_, err) = p2.communicate()
         p1.poll()  # fill the returncode
