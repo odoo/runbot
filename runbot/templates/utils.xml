@@ -121,7 +121,7 @@
                                     <t t-else="">
                                         <li class="nav-item dropdown" t-ignore="true">
                                             <b>
-                                                <a class="nav-link" t-attf-href="/web/login?redirect=/">Login</a>
+                                                <a class="nav-link" t-attf-href="/web/login?redirect={{request.httprequest.path}}">Login</a>
                                             </b>
                                         </li>
                                     </t>
