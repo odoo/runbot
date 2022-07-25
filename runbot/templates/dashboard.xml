@@ -226,5 +226,58 @@
       </t>
     </template>
 
+    <template id="runbot.load_info">
+      <t t-call='runbot.layout'>
+        <div class="container-fluid frontend">
+          <div class="row">
+            <div class="col-md-12">
+                <t t-call="runbot.slots_infos"/>
+            </div>
+          </div>
+
+          <div t-foreach="build_by_bundle" t-as="bundle_builds" class="row bundle_row">
+            <t t-set="bundle" t-value="bundle_builds[0]"/>
+            <t t-set="builds" t-value="bundle_builds[1]"/>
+
+            <div class="col-md-3 col-lg-2 cell">
+              <div class="one_line">
+                <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e" />
+                <a t-attf-href="/runbot/bundle/#{bundle.id}" title="View Bundle">
+                  <b t-esc="bundle.name"/>
+                </a>
+              </div>
+              <div class="badge badge-info" t-out="len(builds)"/>
+            </div>
+            <div class="col-md-9 col-lg-10">
+              <div class="table-responsive">
+                <table class="table table-condensed">
+                  <t t-foreach="builds" t-as="build">
+                    <t t-set="rowclass">
+                      <t t-call="runbot.build_class">
+                        <t t-set="build" t-value="build"/>
+                      </t>
+                    </t>
+                    <tr t-attf-class="bg-{{rowclass.strip()}}-light{{'line-through' if build.orphan_result else ''}}">
+                      <td> Batch: <a t-attf-href="/runbot/batch/{{build.params_id.create_batch_id.id}}"><t t-out="build.params_id.create_batch_id.id"/></a></td>
+                      <td><a t-attf-href="/runbot/build/{{build.id}}"><t t-out="build.parent_path"/></a></td>
+                      <td t-out="build.local_state"/>
+                      <td t-out="build.host"/>
+                      <td t-out="build.config_id.name"/>
+                      <td>
+                        <t t-call="runbot.build_button">
+                          <t t-set="bu" t-value="build"/>
+                          <t t-set="klass" t-value="'btn-group-ssm'"/>
+                        </t>
+                      </td>
+                    </tr>
+                  </t>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </t>
+    </template>
   </data>
 </odoo>

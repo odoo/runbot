@@ -508,7 +508,8 @@ class Runbot(Controller):
         request.env.cr.execute("SELECT build_id, values FROM runbot_build_stat WHERE build_id IN %s AND category = %s", [tuple(builds.ids), key_category]) # read manually is way faster than using orm
         res = {}
         for (build_id, values) in request.env.cr.fetchall():
-            res.setdefault(parents[build_id], {}).update(values)
+            if values:
+                res.setdefault(parents[build_id], {}).update(values)
             # we need to update here to manage the post install case: we want to combine stats from all post_install childrens.
         return res
 
@@ -525,3 +526,23 @@ class Runbot(Controller):
         }
 
         return request.render("runbot.modules_stats", context)
+
+    @route(['/runbot/load_info'], type='http', auth="user", website=True, sitemap=False)
+    def load_infos(self, **post):
+        build_by_bundle = {}
+
+        for build in request.env['runbot.build'].search([('local_state', 'in', ('pending', 'testing'))], order='id'):
+            build_by_bundle.setdefault(build.params_id.create_batch_id.bundle_id, []).append(build)
+
+        build_by_bundle = list(build_by_bundle.items())
+        build_by_bundle.sort(key=lambda x: -len(x[1]))
+        pending_count, level, scheduled_count = self._pending()
+        context = {
+            'build_by_bundle': build_by_bundle,
+            'pending_total': pending_count,
+            'pending_level': level,
+            'scheduled_count': scheduled_count,
+            'hosts_data': request.env['runbot.host'].search([('assigned_only', '=', False)]),
+        }
+
+        return request.render("runbot.load_info", context)
