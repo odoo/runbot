@@ -11,6 +11,7 @@
                 <field name="regex" placeholder="odoo.addons.(?P&lt;key&gt;.+) tested in .+, (?P&lt;value&gt;\d+) queries"/>
                 <field name="generic"/>
                 <field name="description"/>
+                <field name="sequence"/>
               </group>
             </sheet>
           </form>
@@ -26,6 +27,7 @@
                 <field name="generic"/>
                 <field name="description"/>
                 <field name="regex"/>
+                <field name="sequence" widget="handle"/>
             </tree>
         </field>
     </record>

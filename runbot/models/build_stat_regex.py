@@ -24,12 +24,14 @@ class BuildStatRegex(models.Model):
 
     _name = "runbot.build.stat.regex"
     _description = "Statistics regex"
+    _order = 'sequence,id'
 
     name = fields.Char("Key Name")
     regex = fields.Char("Regular Expression")
     description = fields.Char("Description")
     generic = fields.Boolean('Generic', help='Executed when no regex on the step', default=True)
     config_step_ids = fields.Many2many('runbot.build.config.step', string='Config Steps')
+    sequence = fields.Integer('Sequence')
 
     @api.constrains("name", "regex")
     def _check_regex(self):
