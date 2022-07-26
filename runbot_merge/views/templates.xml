@@ -68,7 +68,7 @@
             </div>
             <t t-set="mergecron" t-value="env(user=1).ref('runbot_merge.merge_cron')"/>
             <div t-if="not mergecron.active" class="alert alert-warning col-12 mb-0" role="alert">
-                Merging is disabled, stagings will not be disabled.
+                Merging is disabled, stagings will not be integrated.
             </div>
         </div>
     </template>
