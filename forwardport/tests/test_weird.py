@@ -590,9 +590,11 @@ def test_author_can_close_via_fwbot(env, config, make_repo):
     pr0_id, pr1_id = env['runbot_merge.pull_requests'].search([], order='number')
     assert pr0_id.number == pr.number
     pr1 = prod.get_pr(pr1_id.number)
-    # user can't close PR directly
+    # `other` can't close fw PR directly, because that requires triage (and even
+    # write depending on account type) access to the repo, which an external
+    # contributor probably does not have
     with prod, pytest.raises(Exception):
-        pr1.close(other_token) # what the fuck?
+        pr1.close(other_token)
     # use can close via fwbot
     with prod:
         pr1.post_comment('%s close' % project.fp_github_name, other_token)
