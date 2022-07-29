@@ -1683,6 +1683,17 @@ class Stagings(models.Model):
 
     statuses = fields.Binary(compute='_compute_statuses')
 
+    def name_get(self):
+        return [
+            (staging.id, "%d (%s, %s%s)" % (
+                staging.id,
+                staging.target.name,
+                staging.state,
+                (', ' + staging.reason) if staging.reason else '',
+            ))
+            for staging in self
+        ]
+
     @api.depends('heads')
     def _compute_statuses(self):
         """ Fetches statuses associated with the various heads, returned as

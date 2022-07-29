@@ -70,7 +70,14 @@
                     </group>
                     <group>
                         <group colspan="4" string="Delegate On">
-                            <field name="delegate_reviewer" nolabel="1"/>
+                            <field name="delegate_reviewer" nolabel="1">
+                                <tree>
+                                    <field name="repository"/>
+                                    <field name="number"/>
+                                    <field name="target"/>
+                                    <field name="state"/>
+                                </tree>
+                            </field>
                         </group>
                     </group>
                 </page>

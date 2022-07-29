@@ -77,6 +77,8 @@
                 <field name="number"/>
                 <field name="target"/>
                 <field name="state"/>
+                <field name="author"/>
+                <field name="reviewed_by"/>
             </tree>
         </field>
     </record>
@@ -198,7 +200,8 @@
                     <group string="Batches">
                         <field name="batch_ids" colspan="4" nolabel="1">
                             <tree>
-                                <field name="prs"/>
+                                <field name="prs" widget="many2many_tags"
+                                       options="{'no_quick_create': True}"/>
                             </tree>
                         </field>
                     </group>
