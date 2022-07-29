@@ -248,8 +248,8 @@
                                     <t t-foreach="staging.batch_ids"
                                        t-as="batch">
                                         <t t-set="first_pr"
-                                           t-value="batch.prs[-1]"/>
-                                        <li class="dropdown">
+                                           t-value="batch.prs[-1:]"/>
+                                        <li class="dropdown" t-if="first_pr">
                                             <button class="btn btn-link dropdown-toggle"
                                                     type="button"
                                                     data-toggle="dropdown"
