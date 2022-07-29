@@ -404,11 +404,14 @@
                     <t t-else="">open</t>
                 </t>
                 <t t-call="runbot_merge.view_pull_request_info_{{tmpl.strip()}}"/>
+                <t t-set="target_cls" t-value="None if pr.target.active else 'text-muted bg-warning'"/>
                 <dl class="runbot-merge-fields">
                     <dt>label</dt>
                     <dd><span t-field="pr.label"/></dd>
                     <dt>head</dt>
                     <dd><a t-attf-href="{{pr.github_url}}/commits/{{pr.head}}"><span t-field="pr.head"/></a></dd>
+                    <dt t-att-class="target_cls">target</dt>
+                    <dd t-att-class="target_cls"><span t-field="pr.target"/></dd>
                 </dl>
                 <p t-field="pr.message"/>
             </div></div>

@@ -6,7 +6,7 @@ import time
 from unittest import mock
 
 import pytest
-from lxml import html
+from lxml import html, etree
 
 import odoo
 from utils import _simple_init, seen, re_matches, get_partner, Commit, pr_page, to_pr, part_of
@@ -26,21 +26,34 @@ def repo(env, project, make_repo, users, setreviewers):
 def test_trivial_flow(env, repo, page, users, config):
     # create base branch
     with repo:
-        m = repo.make_commit(None, "initial", None, tree={'a': 'some content'})
-        repo.make_ref('heads/master', m)
+        [m] = repo.make_commits(None, Commit("initial", tree={'a': 'some content'}), ref='heads/master')
 
         # create PR with 2 commits
-        c0 = repo.make_commit(m, 'replace file contents', None, tree={'a': 'some other content'})
-        c1 = repo.make_commit(c0, 'add file', None, tree={'a': 'some other content', 'b': 'a second file'})
-        pr = repo.make_pr(title="gibberish", body="blahblah", target='master', head=c1,)
+        _, c1 = repo.make_commits(
+            m,
+            Commit('replace file contents', tree={'a': 'some other content'}),
+            Commit('add file', tree={'b': 'a second file'}),
+            ref='heads/other'
+        )
+        pr = repo.make_pr(title="gibberish", body="blahblah", target='master', head='other')
 
     pr_id = to_pr(env, pr)
     assert pr_id.state == 'opened'
     env.run_crons()
     assert pr.comments == [seen(env, pr, users)]
-    s = pr_page(page, pr).cssselect('.alert-info > ul > li')
+
+    pr_dashboard = pr_page(page, pr)
+    s = pr_dashboard.cssselect('.alert-info > ul > li')
     assert [it.get('class') for it in s] == ['fail', 'fail', ''],\
         "merge method unset, review missing, no CI"
+    assert dict(zip(
+        [e.text_content() for e in pr_dashboard.cssselect('dl.runbot-merge-fields dt')],
+        [e.text_content() for e in pr_dashboard.cssselect('dl.runbot-merge-fields dd')],
+    )) == {
+        'label': f"{config['github']['owner']}:other",
+        'head': c1,
+        'target': 'master',
+    }
 
     with repo:
         repo.post_status(c1, 'success', 'legal/cla')
@@ -3190,7 +3203,7 @@ class TestUnknownPR:
 
         assert prx.comments == [
             (users['reviewer'], 'hansen r+'),
-            (users['user'], "This PR targets the un-managed branch %s:branch, it can not be merged." % repo.name),
+            (users['user'], "This PR targets the un-managed branch %s:branch, it needs to be retargeted before it can be merged." % repo.name),
             (users['user'], "Branch `branch` is not within my remit, imma just ignore it."),
         ]
 

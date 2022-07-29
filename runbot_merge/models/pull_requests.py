@@ -249,6 +249,23 @@ class Branch(models.Model):
             self._table, ['name', 'project_id'])
         return res
 
+    @api.depends('active')
+    def _compute_display_name(self):
+        super()._compute_display_name()
+        for b in self.filtered(lambda b: not b.active):
+            b.display_name += ' (inactive)'
+
+    def write(self, vals):
+        super().write(vals)
+        if vals.get('active') is False:
+            self.env['runbot_merge.pull_requests.feedback'].create([{
+                'repository': pr.repository.id,
+                'pull_request': pr.number,
+                'close': True,
+                'message': f'{pr.ping()}the target branch {pr.target.name!r} has been disabled, closing this PR.',
+            } for pr in self.prs])
+        return True
+
     @api.depends('staging_ids.active')
     def _compute_active_staging(self):
         for b in self:

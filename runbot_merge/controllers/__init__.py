@@ -145,11 +145,11 @@ def handle_pr(env, event):
 
     message = None
     if not branch:
-        message = f"This PR targets the un-managed branch {r}:{b}, it can not be merged."
+        message = f"This PR targets the un-managed branch {r}:{b}, it needs to be retargeted before it can be merged."
         _logger.info("Ignoring event %s on PR %s#%d for un-managed branch %s",
                      event['action'], r, pr['number'], b)
     elif not branch.active:
-        message = f"This PR targets the disabled branch {r}:{b}, it can not be merged."
+        message = f"This PR targets the disabled branch {r}:{b}, it needs to be retargeted before it can be merged."
     if message and event['action'] not in ('synchronize', 'closed'):
         feedback(message=message)
 
