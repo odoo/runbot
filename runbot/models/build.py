@@ -238,20 +238,6 @@ class BuildResult(models.Model):
             build.log_list = ','.join({step.name for step in build.params_id.config_id.step_ids() if step._has_log()})
         # TODO replace logic, add log file to list when executed (avoid 404, link log on docker start, avoid fake is_docker_step)
 
-    @api.depends('children_ids.global_state', 'local_state')
-    def _compute_global_state(self):
-        for record in self:
-            waiting_score = record._get_state_score('waiting')
-            children_ids = [child for child in record.children_ids if not child.orphan_result]
-            if record._get_state_score(record.local_state) > waiting_score and children_ids:  # if finish, check children
-                children_state = record._get_youngest_state([child.global_state for child in children_ids])
-                if record._get_state_score(children_state) > waiting_score:
-                    record.global_state = record.local_state
-                else:
-                    record.global_state = 'waiting'
-            else:
-                record.global_state = record.local_state
-
     @api.depends('gc_delay', 'job_end')
     def _compute_gc_date(self):
         icp = self.env['ir.config_parameter'].sudo()
@@ -283,8 +269,7 @@ class BuildResult(models.Model):
     def _get_state_score(self, result):
         return state_order.index(result)
 
-    @api.depends('children_ids.global_result', 'local_result', 'children_ids.orphan_result')
-    def _compute_global_result(self):
+    def _update_globals(self):
         for record in self:
             if record.local_result and record._get_result_score(record.local_result) >= record._get_result_score('ko'):
                 record.global_result = record.local_result
@@ -298,6 +283,18 @@ class BuildResult(models.Model):
                         record.global_result = children_result
                 else:
                     record.global_result = record.local_result
+
+        for record in self:
+            waiting_score = record._get_state_score('waiting')
+            children_ids = [child for child in record.children_ids if not child.orphan_result]
+            if record._get_state_score(record.local_state) > waiting_score and children_ids:  # if finish, check children
+                children_state = record._get_youngest_state([child.global_state for child in children_ids])
+                if record._get_state_score(children_state) > waiting_score:
+                    record.global_state = record.local_state
+                else:
+                    record.global_state = 'waiting'
+            else:
+                record.global_state = record.local_state
 
     def _get_worst_result(self, results, max_res=False):
         results = [result for result in results if result]  # filter Falsy values
