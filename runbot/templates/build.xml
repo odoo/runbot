@@ -376,6 +376,18 @@
                       <t t-set="klass" t-value="'btn-group-ssm'"/>
                     </t>
                   </td>
+                  <td>
+                    <t t-set="commits" t-value="build.params_id.commit_link_ids.commit_id.sorted(key=lambda c: c.repo_id.id)"/>
+                    <t t-if="build_index+1 &lt; len(builds)" t-set="previous_commits" t-value="list(builds[build_index+1].params_id.commit_link_ids.commit_id.sorted(key=lambda c: c.repo_id.id))"/>
+                    <t t-else="" t-set="previous_commits" t-value="[]"/>
+                    <t t-foreach="zip(previous_commits, commits)" t-as="compare">
+                      <t t-set="previous_commit" t-value="compare[0]"/>
+                      <t t-set="commit" t-value="compare[1]"/>
+                      <a t-attf-href="https://{{commit.repo_id.main_remote_id.base_url}}/compare/{{previous_commit.name}}..{{commit.name}}" t-att-title="commit.repo_id.name">
+                        <i class="fa fa-plus"/>
+                      </a>
+                    </t>
+                  </td>
                 </tr>
               </t>
             </table>
