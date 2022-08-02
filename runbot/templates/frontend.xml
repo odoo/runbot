@@ -32,7 +32,7 @@
                   <div class="col-md-3 col-lg-2 cell">
                     <div class="one_line">
                       <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e" />
-                      <a t-attf-href="/runbot/bundle/#{bundle.id}" title="View Bundle">
+                      <a t-attf-href="/runbot/bundle/#{bundle.id}" t-attf-title="View Bundle #{bundle.name}">
                         <b t-esc="bundle.name"/>
                       </a>
                     </div>
