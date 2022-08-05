@@ -126,10 +126,12 @@ def pr_page(page, pr):
     return html.fromstring(page(f'/{pr.repo.name}/pull/{pr.number}'))
 
 def to_pr(env, pr):
-    return env['runbot_merge.pull_requests'].search([
+    pr = env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', pr.repo.name),
         ('number', '=', pr.number),
     ])
+    assert len(pr) == 1, f"Expected to find {pr.repo.name}#{pr.number}, got {pr}."
+    return pr
 
 def part_of(label, pr_id, *, separator='\n\n'):
     """ Adds the "part-of" pseudo-header in the footer.

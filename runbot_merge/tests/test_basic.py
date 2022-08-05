@@ -2733,14 +2733,16 @@ class TestBatching(object):
             repo.make_ref('heads/master', m)
 
             pr1 = self._pr(repo, 'PR1', [{'a': 'AAA'}, {'b': 'BBB'}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token'])
-            p_1 = to_pr(env, pr1)
             pr2 = self._pr(repo, 'PR2', [{'a': 'some content', 'c': 'CCC'}, {'d': 'DDD'}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token'])
-            p_2 = to_pr(env, pr2)
         env.run_crons()
 
+        p_1 = to_pr(env, pr1)
+        p_2 = to_pr(env, pr2)
         st = env['runbot_merge.stagings'].search([])
+
         # both prs should be part of the staging
         assert st.mapped('batch_ids.prs') == p_1 | p_2
+
         # add CI failure
         with repo:
             repo.post_status('heads/staging.master', 'failure', 'ci/runbot')
