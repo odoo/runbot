@@ -113,9 +113,15 @@
                   <t t-set="dashboard" t-value="team.dashboard_id"/>
                 </t>
               </div>
-              <h3 t-if="team.build_error_ids">Team assigned Errors</h3>
+              <div class="d-flex">
+                <h3 t-if="build_error_ids">Team assigned Errors</h3>
+                <t t-call="portal.portal_searchbar">
+                  <t t-set="classes" t-valuef="o_runbot_team_searchbar border-0"/>
+                  <t t-set="title">&amp;nbsp;</t>
+                </t>
+              </div>
               <t t-call="runbot.build_error_cards">
-                <t t-set="build_errors" t-value="team.build_error_ids"/>
+                <t t-set="build_errors" t-value="build_error_ids"/>
                 <t t-set="accordion_id">team_errors</t>
               </t>
             </div>
