@@ -7,7 +7,7 @@ import functools
 import werkzeug.utils
 import werkzeug.urls
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from werkzeug.exceptions import NotFound, Forbidden
 
 from odoo.addons.http_routing.models.ir_http import slug
@@ -431,10 +431,33 @@ class Runbot(Controller):
     @route(['/runbot/teams', '/runbot/teams/<model("runbot.team"):team>',], type='http', auth='user', website=True, sitemap=False)
     def team_dashboards(self, team=None, hide_empty=False, **kwargs):
         teams = request.env['runbot.team'].search([]) if not team else None
+        domain = [('id', 'in', team.build_error_ids.ids)] if team else []
+
+        # Sort & Filter
+        sortby = kwargs.get('sortby', 'count')
+        filterby = kwargs.get('filterby', 'not_one')
+        searchbar_sortings = {
+            'date': {'label': 'Recently Seen', 'order': 'last_seen_date desc'},
+            'count': {'label': 'Nb Seen', 'order': 'build_count desc'},
+        }
+        order = searchbar_sortings[sortby]['order']
+        searchbar_filters = {
+            'all': {'label': 'All', 'domain': []},
+            'unassigned': {'label': 'Unassigned', 'domain': [('responsible', '=', False)]},
+            'not_one': {'label': 'Seen more than once', 'domain': [('build_count', '>', 1)]},
+        }
+        domain = expression.AND([domain, searchbar_filters[filterby]['domain']])
+
         qctx = {
             'team': team,
             'teams': teams,
+            'build_error_ids': request.env['runbot.build.error'].search(domain, order=order),
             'hide_empty': bool(hide_empty),
+            'searchbar_sortings': searchbar_sortings,
+            'sortby': sortby,
+            'searchbar_filters': OrderedDict(sorted(searchbar_filters.items())),
+            'filterby': filterby,
+            'default_url': request.httprequest.path,
         }
         return request.render('runbot.team', qctx)
 

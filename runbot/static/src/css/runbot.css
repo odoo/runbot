@@ -324,3 +324,6 @@ body, .table {
 	background-color: #DDD;
 }
 
+.o_runbot_team_searchbar .nav {
+	margin-left: 0px !important;
+}
