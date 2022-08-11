@@ -242,12 +242,11 @@ def docker_state(container_name, build_dir):
     container_name = sanitize_container_name(container_name)
     exist = os.path.exists(os.path.join(build_dir, 'exist-%s' % container_name))
     started = os.path.exists(os.path.join(build_dir, 'start-%s' % container_name))
-    ended = os.path.exists(os.path.join(build_dir, 'end-%s' % container_name))
 
     if not exist:
         return 'VOID'
 
-    if ended:
+    if os.path.exists(os.path.join(build_dir, f'end-{container_name}')):
         return 'END'
 
     state = 'UNKNOWN'
@@ -259,6 +258,9 @@ def docker_state(container_name, build_dir):
             state = 'RUNNING' if container.status in ('created', 'running', 'paused') else 'GHOST'
         except docker.errors.NotFound:
             state = 'GHOST'
+        # check if the end- file has been written in between time
+        if state == 'GHOST' and os.path.exists(os.path.join(build_dir, f'end-{container_name}')):
+            state = 'END'
     return state
 
 
