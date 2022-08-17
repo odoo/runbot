@@ -507,9 +507,7 @@ class Runbot(Controller):
             return request.not_found()
 
         builds_domain = [
-            ('build_type', '=', 'normal'),
             ('global_state', 'in', ('running', 'done')),
-            ('global_result', '=', 'ok'),
             ('slot_ids.batch_id.bundle_id', '=', bundle_id),
             ('params_id.trigger_id', '=', trigger.id),
         ]
