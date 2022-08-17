@@ -56,6 +56,8 @@ class Trigger(models.Model):
     ci_description = fields.Char("ci description")
     has_stats = fields.Boolean('Has a make_stats config step', compute="_compute_has_stats", store=True)
 
+    team_ids = fields.Many2many('runbot.team', string="Runbot Teams", help="Teams responsible of this trigger, mainly usefull for nightly")
+
     @api.depends('config_id.step_order_ids.step_id.make_stats')
     def _compute_has_stats(self):
         for trigger in self:
