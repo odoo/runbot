@@ -14,7 +14,7 @@
                         <field name="description"/>
                         <field name="step_order_ids">
                             <tree string="Step list" editable="bottom">
-                                <field name="step_id"/>
+                                <field name="step_id" widget="Many2one" options="{'no_edit': 1}"/>
                                 <field name="sequence" widget="handle"/>
                             </tree>
                         </field>

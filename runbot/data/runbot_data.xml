@@ -27,14 +27,15 @@
             <field name="no_build">True</field>
             <field name="project_id" ref="runbot.main_project"/>
         </record>
-    </data>
 
-    <record model="ir.config_parameter" id="runbot.runbot_upgrade_exception_message">
-        <field name="key">runbot.runbot_upgrade_exception_message</field>
-        <field name="value">Upgrade exception [#{exception.id}]({base_url}/web/#id={exception.id}&amp;view_type=form&amp;model=runbot.upgrade.exception) added\
-{exception.elements}
-        </field>
-    </record>
+        <record model="ir.config_parameter" id="runbot.runbot_upgrade_exception_message">
+            <field name="key">runbot.runbot_upgrade_exception_message</field>
+            <field name="value">Upgrade exception [#{exception.id}]({base_url}/web/#id={exception.id}&amp;view_type=form&amp;model=runbot.upgrade.exception) added\
+    {exception.elements}
+            </field>
+        </record>
+
+    </data>
 
     <record model="ir.config_parameter" id="runbot.runbot_is_base_regex">
         <field name="key">runbot.runbot_is_base_regex</field>
