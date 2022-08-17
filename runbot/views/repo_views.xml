@@ -8,7 +8,9 @@
             <header>
             </header>
             <sheet>
+              <widget name="web_ribbon" title="Archived" bg_color="bg-danger" attrs="{'invisible': [('active', '=', True)]}"/>
               <group name="repo_group">
+                <field name="active" invisible="1"/>
                 <field name="name"/>
                 <field name="sequence"/>
                 <field name="description"/>
