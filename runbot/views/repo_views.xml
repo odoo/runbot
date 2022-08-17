@@ -27,6 +27,7 @@
                 <field name="ci_url"/>
                 <field name="ci_description"/>
                 <field name="has_stats"/>
+                <field name="team_ids"/>
               </group>
             </sheet>
           </form>
