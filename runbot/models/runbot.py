@@ -8,6 +8,7 @@ import subprocess
 import shutil
 
 from contextlib import contextmanager
+from pathlib import Path
 from requests.exceptions import HTTPError
 from subprocess import CalledProcessError
 
@@ -162,7 +163,7 @@ class Runbot(models.AbstractModel):
         if os.path.isfile(nginx_conf_path):
             with open(nginx_conf_path, 'r') as f:
                 content = f.read()
-        if content != nginx_config:
+        if content != nginx_config or self._write_nginx_blacklist():
             _logger.info('reload nginx')
             with open(nginx_conf_path, 'w') as f:
                 f.write(str(nginx_config))
@@ -178,6 +179,19 @@ class Runbot(models.AbstractModel):
                         subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf'])
                     else:
                         _logger.warning('failed to start nginx - failed to kill orphan worker - oh well')
+
+    def _write_nginx_blacklist(self):
+        """ Build and write an nginx black list of ip adresses.
+        :returns: True if the file changed and thus nginx needs a reload
+        """
+        ips = self.env['ir.config_parameter'].get_param('runbot.client.blacklist', default='')
+        if ips:
+            new_content = '\n'.join([f'deny {ip.strip()};' for ip in ips.split(' ')])
+            blacklist_path = Path(self._root()) / 'nginx/blacklist.conf'
+            content = blacklist_path.exists() and blacklist_path.read_text()
+            if new_content != content:
+                blacklist_path.write_text()
+                return True
 
     def _get_cron_period(self):
         """ Compute a randomized cron period with a 2 min margin below
