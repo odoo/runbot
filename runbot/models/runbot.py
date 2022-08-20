@@ -273,7 +273,7 @@ class Runbot(models.AbstractModel):
 
         return manager.get('sleep', default_sleep)
 
-    def _scheduler_loop_turn(self, host, default_sleep=1):
+    def _scheduler_loop_turn(self, host, default_sleep=5):
         _logger.info('Scheduling...')
         with self.manage_host_exception(host) as manager:
             self._scheduler(host)
