@@ -89,7 +89,7 @@ def test_basic(env, project, make_repo, users, setreviewers, config):
         (users['reviewer'], 'hansen r+'),
         seen(env, pr, users),
         (users['reviewer'], 'hansen override=l/int'),
-        (users['user'], "I'm sorry, @{}. You are not allowed to override this status.".format(users['reviewer'])),
+        (users['user'], "I'm sorry, @{}: you are not allowed to override this status.".format(users['reviewer'])),
         (users['other'], "hansen override=l/int"),
     ]
     assert pr_id.statuses == '{}'

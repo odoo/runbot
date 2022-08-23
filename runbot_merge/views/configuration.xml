@@ -1,0 +1,43 @@
+<odoo>
+    <record id="action_overrides" model="ir.actions.act_window">
+        <field name="name">CI / statuses overrides</field>
+        <field name="res_model">res.partner.override</field>
+    </record>
+    <record id="tree_overrides" model="ir.ui.view">
+        <field name="name">Overrides List</field>
+        <field name="model">res.partner.override</field>
+        <field name="arch" type="xml">
+            <tree editable="bottom">
+                <field name="context"/>
+                <field name="repository_id"/>
+                <field name="partner_ids" widget="many2many_tags"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_review" model="ir.actions.act_window">
+        <field name="name">Review Rights</field>
+        <field name="res_model">res.partner.review</field>
+        <field name="context">{'search_default_group_by_repository': True}</field>
+    </record>
+    <record id="tree_review" model="ir.ui.view">
+        <field name="name">Review Rights</field>
+        <field name="model">res.partner.review</field>
+        <field name="arch" type="xml">
+            <tree editable="bottom">
+                <field name="repository_id"/>
+                <field name="partner_id"/>
+                <field name="review"/>
+                <field name="self_review"/>
+            </tree>
+        </field>
+    </record>
+
+    <menuitem name="Configuration" id="menu_configuration" parent="runbot_merge_menu"/>
+        <menuitem name="CI Overrides" id="menu_configuration_overrides"
+                  parent="menu_configuration"
+                  action="action_overrides"/>
+        <menuitem name="Review Rights" id="menu_configuration_review"
+                  parent="menu_configuration"
+                  action="action_review"/>
+</odoo>

@@ -1,12 +1,8 @@
 # -*- coding: utf-8 -*-
-import pathlib
 import re
-import requests
-from shutil import rmtree
 
 import pytest
-
-from odoo.tools.appdirs import user_cache_dir
+import requests
 
 @pytest.fixture
 def default_crons():
@@ -46,20 +42,6 @@ def _check_scopes(config):
         token_scopes = set(re.split(r',\s+', x_oauth_scopes))
         assert token_scopes >= required_scopes, \
             "%s should have scopes %s, found %s" % (section, token_scopes, required_scopes)
-
-@pytest.fixture(autouse=True)
-def _cleanup_cache(config, users):
-    """ forwardport has a repo cache which it assumes is unique per name
-    but tests always use the same repo paths / names for different repos
-    (the repos get re-created), leading to divergent repo histories.
-
-    So clear cache after each test, two tests should not share repos.
-    """
-    yield
-    cache_root = pathlib.Path(user_cache_dir('forwardport'))
-    rmtree(cache_root / config['github']['owner'], ignore_errors=True)
-    for login in users.values():
-        rmtree(cache_root / login, ignore_errors=True)
 
 @pytest.fixture()
 def module():

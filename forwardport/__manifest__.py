@@ -8,6 +8,7 @@
         'data/security.xml',
         'data/crons.xml',
         'data/views.xml',
+        'data/queues.xml',
     ],
     'license': 'LGPL-3',
 }

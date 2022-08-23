@@ -10,6 +10,8 @@
         'views/res_partner.xml',
         'views/runbot_merge_project.xml',
         'views/mergebot.xml',
+        'views/queues.xml',
+        'views/configuration.xml',
         'views/templates.xml',
         'models/project_freeze/views.xml',
     ],

@@ -120,41 +120,49 @@ def handle_pr(env, event):
         if not source_branch:
             return handle_pr(env, dict(event, action='opened'))
 
+        pr_obj = find(source_branch)
         updates = {}
         if source_branch != branch:
-            updates['target'] = branch.id
-            updates['squash'] = pr['commits'] == 1
-        if event['changes'].keys() & {'title', 'body'}:
-            updates['message'] = "{}\n\n{}".format(pr['title'].strip(), pr['body'].strip())
+            if branch != pr_obj.target:
+                updates['target'] = branch.id
+                updates['squash'] = pr['commits'] == 1
+
+        # turns out github doesn't bother sending a change key if the body is
+        # changing from empty (None), therefore ignore that entirely, just
+        # generate the message and check if it changed
+        message = pr['title'].strip()
+        body = (pr['body'] or '').strip()
+        if body:
+            message += f"\n\n{body}"
+        if message != pr_obj.message:
+            updates['message'] = message
+
+        _logger.info("update: %s#%d = %s (by %s)", repo.name, pr['number'], updates, event['sender']['login'])
         if updates:
-            pr_obj = find(source_branch)
             pr_obj.write(updates)
             return 'Updated {}'.format(pr_obj.id)
         return "Nothing to update ({})".format(event['changes'].keys())
 
     message = None
     if not branch:
-        message = f"This PR targets the un-managed branch {r}:{b}, it can not be merged."
+        message = f"This PR targets the un-managed branch {r}:{b}, it needs to be retargeted before it can be merged."
         _logger.info("Ignoring event %s on PR %s#%d for un-managed branch %s",
                      event['action'], r, pr['number'], b)
     elif not branch.active:
-        message = f"This PR targets the disabled branch {r}:{b}, it can not be merged."
+        message = f"This PR targets the disabled branch {r}:{b}, it needs to be retargeted before it can be merged."
     if message and event['action'] not in ('synchronize', 'closed'):
         feedback(message=message)
 
     if not branch:
         return "Not set up to care about {}:{}".format(r, b)
 
-    author_name = pr['user']['login']
-    author = env['res.partner'].search([('github_login', '=', author_name)], limit=1)
-    if not author:
-        author = env['res.partner'].create({
-            'name': author_name,
-            'github_login': author_name,
-        })
 
-    _logger.info("%s: %s#%s (%s) (%s)", event['action'], repo.name, pr['number'], pr['title'].strip(), author.github_login)
+    _logger.info("%s: %s#%s (%s) (by %s)", event['action'], repo.name, pr['number'], pr['title'].strip(), event['sender']['login'])
     if event['action'] == 'opened':
+        author_name = pr['user']['login']
+        author = env['res.partner'].search([('github_login', '=', author_name)], limit=1)
+        if not author:
+            env['res.partner'].create({'name': author_name, 'github_login': author_name})
         pr_obj = env['runbot_merge.pull_requests']._from_gh(pr)
         return "Tracking PR as {}".format(pr_obj.id)
 
@@ -171,11 +179,7 @@ def handle_pr(env, event):
             return "It's my understanding that closed/merged PRs don't get sync'd"
 
         if pr_obj.state == 'ready':
-            pr_obj.unstage(
-                "PR %s updated by %s",
-                pr_obj.display_name,
-                event['sender']['login']
-            )
+            pr_obj.unstage("updated by %s", event['sender']['login'])
 
         _logger.info(
             "PR %s updated to %s by %s, resetting to 'open' and squash=%s",
@@ -222,7 +226,7 @@ def handle_pr(env, event):
         if pr_obj.state == 'merged':
             feedback(
                 close=True,
-                message="@%s ya silly goose you can't reopen a PR that's been merged PR." % event['sender']['login']
+                message="@%s ya silly goose you can't reopen a merged PR." % event['sender']['login']
             )
 
         if pr_obj.state == 'closed':

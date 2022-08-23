@@ -125,8 +125,11 @@ def test_straightforward_flow(env, config, make_repo, users):
     assert pr.comments == [
         (users['reviewer'], 'hansen r+ rebase-ff'),
         seen(env, pr, users),
-        (users['user'], 'Merge method set to rebase and fast-forward'),
-        (users['user'], 'This pull request has forward-port PRs awaiting action (not merged or closed): ' + ', '.join((pr1 | pr2).mapped('display_name'))),
+        (users['user'], 'Merge method set to rebase and fast-forward.'),
+        (users['user'], '@%s @%s this pull request has forward-port PRs awaiting action (not merged or closed):\n%s' % (
+            users['other'], users['reviewer'],
+            '\n- '.join((pr1 | pr2).mapped('display_name'))
+        )),
     ]
 
     assert pr0_ == pr0
@@ -148,8 +151,7 @@ def test_straightforward_flow(env, config, make_repo, users):
     assert pr2_remote.comments == [
         seen(env, pr2_remote, users),
         (users['user'], """\
-Ping @%s, @%s
-This PR targets c and is the last of the forward-port chain containing:
+@%s @%s this PR targets c and is the last of the forward-port chain containing:
 * %s
 
 To merge the full chain, say
@@ -314,11 +316,18 @@ def test_empty(env, config, make_repo, users):
     env.run_crons('forwardport.reminder', 'runbot_merge.feedback_cron', context={'forwardport_updated_before': FAKE_PREV_WEEK})
     env.run_crons('forwardport.reminder', 'runbot_merge.feedback_cron', context={'forwardport_updated_before': FAKE_PREV_WEEK})
 
+    awaiting = (
+        users['other'],
+        '@%s @%s this pull request has forward-port PRs awaiting action (not merged or closed):\n%s' % (
+            users['user'], users['reviewer'],
+            fail_id.display_name
+        )
+    )
     assert pr1.comments == [
         (users['reviewer'], 'hansen r+'),
         seen(env, pr1, users),
-        (users['other'], 'This pull request has forward-port PRs awaiting action (not merged or closed): ' + fail_id.display_name),
-        (users['other'], 'This pull request has forward-port PRs awaiting action (not merged or closed): ' + fail_id.display_name),
+        awaiting,
+        awaiting,
     ], "each cron run should trigger a new message on the ancestor"
     # check that this stops if we close the PR
     with prod:
@@ -327,8 +336,8 @@ def test_empty(env, config, make_repo, users):
     assert pr1.comments == [
         (users['reviewer'], 'hansen r+'),
         seen(env, pr1, users),
-        (users['other'], 'This pull request has forward-port PRs awaiting action (not merged or closed): ' + fail_id.display_name),
-        (users['other'], 'This pull request has forward-port PRs awaiting action (not merged or closed): ' + fail_id.display_name),
+        awaiting,
+        awaiting,
     ]
 
 def test_partially_empty(env, config, make_repo):
@@ -562,8 +571,7 @@ def test_delegate_fw(env, config, make_repo, users):
 
     assert pr2.comments == [
         seen(env, pr2, users),
-        (users['user'], '''Ping @{self_reviewer}, @{reviewer}
-This PR targets c and is the last of the forward-port chain.
+        (users['user'], '''@{self_reviewer} @{reviewer} this PR targets c and is the last of the forward-port chain.
 
 To merge the full chain, say
 > @{user} r+
@@ -790,11 +798,12 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """)
         ]
 
-    def test_closing_after_fp(self, env, config, make_repo):
+    def test_closing_after_fp(self, env, config, make_repo, users):
         """ Closing a PR which has been forward-ported should not touch the
         followups
         """
         prod, other = make_basic(env, config, make_repo)
+        project = env['runbot_merge.project'].search([])
         with prod:
             [p_1] = prod.make_commits(
                 'a',
@@ -814,23 +823,51 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         # should merge the staging then create the FP PR
         env.run_crons()
 
-        pr0, pr1 = env['runbot_merge.pull_requests'].search([], order='number')
+        pr0_id, pr1_id = env['runbot_merge.pull_requests'].search([], order='number')
         with prod:
-            prod.post_status(pr1.head, 'success', 'legal/cla')
-            prod.post_status(pr1.head, 'success', 'ci/runbot')
+            prod.post_status(pr1_id.head, 'success', 'legal/cla')
+            prod.post_status(pr1_id.head, 'success', 'ci/runbot')
         # should create the second staging
         env.run_crons()
 
-        pr0_1, pr1_1, pr2_1 = env['runbot_merge.pull_requests'].search([], order='number')
-        assert pr0_1 == pr0
-        assert pr1_1 == pr1
+        pr0_id2, pr1_id2, pr2_id = env['runbot_merge.pull_requests'].search([], order='number')
+        assert pr0_id2 == pr0_id
+        assert pr1_id2 == pr1_id
+
+        pr1 = prod.get_pr(pr1_id.number)
+        with prod:
+            pr1.close()
+
+        assert pr1_id.state == 'closed'
+        assert not pr1_id.parent_id
+        assert pr2_id.state == 'opened'
+        assert not pr2_id.parent_id, \
+            "the descendant of a closed PR doesn't really make sense, maybe?"
 
         with prod:
-            prod.get_pr(pr1.number).close()
+            pr1.open()
+        assert pr1_id.state == 'validated'
+        env.run_crons()
+        assert pr1.comments[-1] == (
+            users['user'],
+            "@{} @{} this PR was closed then reopened. "
+            "It should be merged the normal way (via @{})".format(
+                users['user'],
+                users['reviewer'],
+                project.github_prefix,
+            )
+        )
 
-        assert pr1_1.state == 'closed'
-        assert not pr1_1.parent_id
-        assert pr2_1.state == 'opened'
+        with prod:
+            pr1.post_comment(f'{project.fp_github_name} r+', config['role_reviewer']['token'])
+        env.run_crons()
+        assert pr1.comments[-1] == (
+            users['user'],
+            "@{} I can only do this on unmodified forward-port PRs, ask {}.".format(
+                users['reviewer'],
+                project.github_prefix,
+            ),
+        )
 
 class TestBranchDeletion:
     def test_delete_normal(self, env, config, make_repo):

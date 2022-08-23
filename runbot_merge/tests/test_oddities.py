@@ -1,11 +1,10 @@
+import requests
+
 from utils import Commit, to_pr
 
 
 def test_partner_merge(env):
     p_src = env['res.partner'].create({
-        'name': 'kfhsf',
-        'github_login': 'tyu'
-    }) |  env['res.partner'].create({
         'name': "xxx",
         'github_login': 'xxx'
     })
@@ -97,3 +96,36 @@ def test_message_desync(env, project, make_repo, users, setreviewers, config):
     assert st.message.startswith('title\n\nbody'),\
         "the stored PR message should have been ignored when staging"
     assert st.parents == [m, c], "check the staging's ancestry is the right one"
+
+def test_unreviewer(env, project, port):
+    repo = env['runbot_merge.repository'].create({
+        'project_id': project.id,
+        'name': 'a_test_repo',
+        'status_ids': [(0, 0, {'context': 'status'})]
+    })
+    p = env['res.partner'].create({
+        'name': 'George Pearce',
+        'github_login': 'emubitch',
+        'review_rights': [(0, 0, {'repository_id': repo.id, 'review': True})]
+    })
+
+    r = requests.post(f'http://localhost:{port}/runbot_merge/get_reviewers', json={
+        'jsonrpc': '2.0',
+        'id': None,
+        'method': 'call',
+        'params': {},
+    })
+    r.raise_for_status()
+    assert 'error' not in r.json()
+    assert r.json()['result'] == ['emubitch']
+
+    r = requests.post(f'http://localhost:{port}/runbot_merge/remove_reviewers', json={
+        'jsonrpc': '2.0',
+        'id': None,
+        'method': 'call',
+        'params': {'github_logins': ['emubitch']},
+    })
+    r.raise_for_status()
+    assert 'error' not in r.json()
+
+    assert p.review_rights == env['res.partner.review']

@@ -399,18 +399,20 @@ class TestNotAllBranches:
         assert pr_a.comments == [
             (users['reviewer'], 'hansen r+'),
             seen(env, pr_a, users),
-            (users['user'], "This pull request can not be forward ported: next "
-                            "branch is 'b' but linked pull request %s#%d has a"
-                            " next branch 'c'." % (b.name, pr_b.number)
-            )
+            (users['user'], "@%s @%s this pull request can not be forward ported:"
+                            " next branch is 'b' but linked pull request %s "
+                            "has a next branch 'c'." % (
+                users['user'], users['reviewer'], pr_b_id.display_name,
+            )),
         ]
         assert pr_b.comments == [
             (users['reviewer'], 'hansen r+'),
             seen(env, pr_b, users),
-            (users['user'], "This pull request can not be forward ported: next "
-                            "branch is 'c' but linked pull request %s#%d has a"
-                            " next branch 'b'." % (a.name, pr_a.number)
-            )
+            (users['user'], "@%s @%s this pull request can not be forward ported:"
+                            " next branch is 'c' but linked pull request %s "
+                            "has a next branch 'b'." % (
+                users['user'], users['reviewer'], pr_a_id.display_name,
+            )),
         ]
 
 def test_new_intermediate_branch(env, config, make_repo):
@@ -588,9 +590,11 @@ def test_author_can_close_via_fwbot(env, config, make_repo):
     pr0_id, pr1_id = env['runbot_merge.pull_requests'].search([], order='number')
     assert pr0_id.number == pr.number
     pr1 = prod.get_pr(pr1_id.number)
-    # user can't close PR directly
+    # `other` can't close fw PR directly, because that requires triage (and even
+    # write depending on account type) access to the repo, which an external
+    # contributor probably does not have
     with prod, pytest.raises(Exception):
-        pr1.close(other_token) # what the fuck?
+        pr1.close(other_token)
     # use can close via fwbot
     with prod:
         pr1.post_comment('%s close' % project.fp_github_name, other_token)
@@ -755,7 +759,7 @@ def test_approve_draft(env, config, make_repo, users):
     assert pr.comments == [
         (users['reviewer'], 'hansen r+'),
         seen(env, pr, users),
-        (users['user'], f"I'm sorry, @{users['reviewer']}. Draft PRs can not be approved."),
+        (users['user'], f"I'm sorry, @{users['reviewer']}: draft PRs can not be approved."),
     ]
 
     with prod:
@@ -799,10 +803,9 @@ def test_freeze(env, config, make_repo, users):
 
     assert not w_id.errors
     w_id.action_freeze()
-    env.run_crons() # stage freeze PRs
-    with prod:
-        prod.post_status('staging.post-b', 'success', 'ci/runbot')
-        prod.post_status('staging.post-b', 'success', 'legal/cla')
+    # run crons to process the feedback, run a second time in case of e.g.
+    # forward porting
+    env.run_crons()
     env.run_crons()
 
     assert release_id.state == 'merged'
