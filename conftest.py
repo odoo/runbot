@@ -50,11 +50,14 @@ import functools
 import http.client
 import itertools
 import os
+import pathlib
+import pprint
 import random
 import re
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 import warnings
@@ -268,14 +271,18 @@ class DbDict(dict):
         self._adpath = adpath
     def __missing__(self, module):
         self[module] = db = 'template_%s' % uuid.uuid4()
-        subprocess.run([
-            'odoo', '--no-http',
-            '--addons-path', self._adpath,
-            '-d', db, '-i', module,
-            '--max-cron-threads', '0',
-            '--stop-after-init',
-            '--log-level', 'warn'
-        ], check=True)
+        with tempfile.TemporaryDirectory() as d:
+            subprocess.run([
+                'odoo', '--no-http',
+                '--addons-path', self._adpath,
+                '-d', db, '-i', module + ',auth_oauth',
+                '--max-cron-threads', '0',
+                '--stop-after-init',
+                '--log-level', 'warn'
+            ],
+                check=True,
+                env={**os.environ, 'XDG_DATA_HOME': d}
+            )
         return db
 
 @pytest.fixture(scope='session')
@@ -334,21 +341,48 @@ def port():
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         return s.getsockname()[1]
 
+@pytest.fixture(scope='session')
+def dummy_addons_path():
+    with tempfile.TemporaryDirectory() as dummy_addons_path:
+        mod = pathlib.Path(dummy_addons_path, 'saas_worker')
+        mod.mkdir(0o700)
+        (mod / '__init__.py').write_bytes(b'')
+        (mod / '__manifest__.py').write_text(pprint.pformat({
+            'name': 'dummy saas_worker',
+            'version': '1.0',
+        }), encoding='utf-8')
+        (mod / 'util.py').write_text("""\
+def from_role(_):
+    return lambda fn: fn
+""", encoding='utf-8')
+
+        yield dummy_addons_path
+
 @pytest.fixture
-def server(request, db, port, module):
+def server(request, db, port, module, dummy_addons_path, tmpdir):
     log_handlers = [
         'odoo.modules.loading:WARNING',
     ]
     if not request.config.getoption('--log-github'):
         log_handlers.append('github_requests:WARNING')
 
+    addons_path = ','.join(map(str, [
+        request.config.getoption('--addons-path'),
+        dummy_addons_path,
+    ]))
     p = subprocess.Popen([
         'odoo', '--http-port', str(port),
-        '--addons-path', request.config.getoption('--addons-path'),
+        '--addons-path', addons_path,
         '-d', db,
         '--max-cron-threads', '0', # disable cron threads (we're running crons by hand)
         *itertools.chain.from_iterable(('--log-handler', h) for h in log_handlers),
-    ])
+    ], env={
+        **os.environ,
+        # stop putting garbage in the user dirs, and potentially creating conflicts
+        # TODO: way to override this with macOS?
+        'XDG_DATA_HOME': str(tmpdir.mkdir('share')),
+        'XDG_CACHE_HOME': str(tmpdir.mkdir('cache')),
+    })
 
     try:
         wait_for_server(db, port, p, module)
@@ -557,17 +591,6 @@ class Repo:
             committer=c['committer'],
             parents=[p['sha'] for p in gh_commit['parents']],
         )
-
-    def log(self, ref_or_sha):
-        for page in itertools.count(1):
-            r = self._session.get(
-                'https://api.github.com/repos/{}/commits'.format(self.name),
-                params={'sha': ref_or_sha, 'page': page}
-            )
-            assert 200 <= r.status_code < 300, r.json()
-            yield from map(self._commit_from_gh, r.json())
-            if not r.links.get('next'):
-                return
 
     def read_tree(self, commit):
         """ read tree object from commit
@@ -813,6 +836,12 @@ mutation setDraft($pid: ID!) {
     }
 }
 '''
+def state_prop(name: str) -> property:
+    @property
+    def _prop(self):
+        return self._pr[name]
+    return _prop.setter(lambda self, v: self._set_prop(name, v))
+
 class PR:
     def __init__(self, repo, number):
         self.repo = repo
@@ -837,15 +866,9 @@ class PR:
             caching['If-Modified-Since']= r.headers['Last-Modified']
         return contents
 
-    @property
-    def title(self):
-        return self._pr['title']
-    title = title.setter(lambda self, v: self._set_prop('title', v))
-
-    @property
-    def base(self):
-        return self._pr['base']
-    base = base.setter(lambda self, v: self._set_prop('base', v))
+    title = state_prop('title')
+    body = state_prop('body')
+    base = state_prop('base')
 
     @property
     def draft(self):
@@ -874,10 +897,6 @@ class PR:
     @property
     def state(self):
         return self._pr['state']
-
-    @property
-    def body(self):
-        return self._pr['body']
 
     @property
     def comments(self):
@@ -1105,17 +1124,8 @@ class Model:
     def create(self, values):
         return Model(self._env, self._model, [self._env(self._model, 'create', values)])
 
-    def write(self, values):
-        return self._env(self._model, 'write', self._ids, values)
-
-    def read(self, fields):
-        return self._env(self._model, 'read', self._ids, fields)
-
-    def name_get(self):
-        return self._env(self._model, 'name_get', self._ids)
-
-    def unlink(self):
-        return self._env(self._model, 'unlink', self._ids)
+    def check_object_reference(self, *args, **kwargs):
+        return self.env(self._model, 'check_object_reference', *args, **kwargs)
 
     def sorted(self, field):
         rs = sorted(self.read([field]), key=lambda r: r[field])

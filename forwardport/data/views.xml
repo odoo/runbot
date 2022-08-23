@@ -1,5 +1,5 @@
 <odoo>
-    <template id="dashboard" inherit_id="runbot_merge.dashboard">
+    <template id="alerts" inherit_id="runbot_merge.alerts">
         <xpath expr="//div[@id='alerts']">
             <t t-set="fpcron" t-value="env(user=1).ref('forwardport.port_forward')"/>
             <div t-if="not fpcron.active" class="alert alert-warning col-12" role="alert">
@@ -12,6 +12,7 @@
                 <t t-set="outstanding" t-value="env['runbot_merge.pull_requests'].search_count([
                     ('source_id', '!=', False),
                     ('state', 'not in', ['merged', 'closed']),
+                    ('source_id.merge_date', '&lt;', datetime.datetime.now() - relativedelta(days=3)),
                 ])"/>
                 <div t-if="outstanding != 0" class="alert col-md-12 alert-warning mb-0">
                     <a href="/forwardport/outstanding">
@@ -108,6 +109,11 @@
                     <a t-att-href="pr.source_id.url">
                         <span t-field="pr.source_id.display_name"/>
                     </a>
+                    <span t-if="not pr.parent_id"
+                          class="badge badge-danger user-select-none"
+                          title="A detached PR behaves like a non-forward-port, it has to be approved via the mergebot, this is usually caused by the forward-port having been in conflict or updated.">
+                        DETACHED
+                    </span>
                 </dd>
             </t>
             <t t-if="pr.forwardport_ids">
@@ -175,6 +181,9 @@
         <field name="inherit_id" ref="runbot_merge.runbot_merge_form_prs"/>
         <field name="model">runbot_merge.pull_requests</field>
         <field name="arch" type="xml">
+            <xpath expr="//field[@name='state']" position="after">
+                <field name="merge_date" attrs="{'invisible': [('state', '!=', 'merged')]}"/>
+            </xpath>
             <xpath expr="//sheet/group[2]" position="after">
                 <separator string="Forward Port" attrs="{'invisible': [('source_id', '=', False)]}"/>
                 <group attrs="{'invisible': [('source_id', '!=', False)]}">

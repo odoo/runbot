@@ -10,22 +10,73 @@
         </xpath>
     </template>
 
+    <template id="link-pr" name="create a link to `pr`">
+        <t t-set="title">
+            <t t-if="pr.repository.group_id &lt;= env.user.groups_id">
+                <t t-esc="pr.message.split('\n')[0]"/>
+            </t>
+        </t>
+        <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
+           t-att-title="pr.blocked or title.strip()"
+           t-att-target="target or None"
+        ><t t-esc="pr.display_name"/></a>
+    </template>
+
+    <template id="staging-statuses" name="dropdown statuses list of stagings">
+        <div class="dropdown" t-if="staging.heads">
+            <button class="btn btn-link dropdown-toggle"
+                    type="button"
+                    data-toggle="dropdown"
+                    aria-haspopup="true"
+                    aria-expanded="true"
+                    t-attf-title="Staged at {{staging.staged_at}}Z"
+            >
+                <t t-raw="0"/>
+                <span class="caret"></span>
+            </button>
+            <ul class="dropdown-menu staging-statuses">
+                <li groups="runbot_merge.group_admin">
+                    <a t-attf-href="/web#id={{staging.id}}&amp;view_type=form&amp;model=runbot_merge.stagings"
+                       target="new">
+                        Open Staging
+                    </a>
+                </li>
+                <t t-set="statuses" t-value="{(r, c): (s, t) for r, c, s, t in staging.statuses}"/>
+                <t t-foreach="repo_statuses._for_staging(staging)" t-as="req">
+                    <t t-set="st" t-value="statuses.get((req.repo_id.name, req.context)) or (None, None)"/>
+                    <li t-att-class="
+                            'bg-success' if st[0] == 'success'
+                       else 'bg-danger' if st[0] in ('error', 'failure')
+                       else 'bg-info' if st[0]
+                       else 'bg-light'"
+                    ><a t-att-href="st[1]" target="new">
+                        <t t-esc="req.repo_id.name"/>: <t t-esc="req.context"/>
+                    </a></li>
+                </t>
+            </ul>
+        </div>
+    </template>
+
+    <template id="alerts">
+        <div id="alerts" class="row text-center">
+            <div class="alert alert-light col-md-12 h6 mb-0">
+                <a href="/runbot_merge/changelog">Changelog</a>
+            </div>
+            <t t-set="stagingcron" t-value="env(user=1).ref('runbot_merge.staging_cron')"/>
+            <div t-if="not stagingcron.active" class="alert alert-warning col-12 mb-0" role="alert">
+                Staging is disabled, "ready" pull requests will not be staged.
+            </div>
+            <t t-set="mergecron" t-value="env(user=1).ref('runbot_merge.merge_cron')"/>
+            <div t-if="not mergecron.active" class="alert alert-warning col-12 mb-0" role="alert">
+                Merging is disabled, stagings will not be integrated.
+            </div>
+        </div>
+    </template>
+
     <template id="dashboard" name="mergebot dashboard">
         <t t-call="website.layout">
             <div id="wrap"><div class="container-fluid">
-                <div id="alerts" class="row text-center">
-                    <div class="alert alert-light col-md-12 h6 mb-0">
-                        <a href="/runbot_merge/changelog">Changelog</a>
-                    </div>
-                    <t t-set="stagingcron" t-value="env(user=1).ref('runbot_merge.staging_cron')"/>
-                    <div t-if="not stagingcron.active" class="alert alert-warning col-12 mb-0" role="alert">
-                        Staging is disabled, "ready" pull requests will not be staged.
-                    </div>
-                    <t t-set="mergecron" t-value="env(user=1).ref('runbot_merge.merge_cron')"/>
-                    <div t-if="not mergecron.active" class="alert alert-warning col-12 mb-0" role="alert">
-                        Merging is disabled, stagings will not be disabled.
-                    </div>
-                </div>
+                <t t-call="runbot_merge.alerts"/>
                 <section t-foreach="projects.with_context(active_test=False)" t-as="project" class="row">
                     <h1 class="col-md-12"><t t-esc="project.name"/></h1>
                     <div class="col-md-12">
@@ -63,10 +114,7 @@
                                 <li t-foreach="splits" t-as="split">
                                     <ul class="pr-listing list-inline list-unstyled mb0">
                                         <li t-foreach="split.mapped('batch_ids.prs')" t-as="pr">
-                                            <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
-                                               t-att-title="pr.message.split('\n')[0]">
-                                                <t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/>
-                                            </a>
+                                            <t t-call="runbot_merge.link-pr"/>
                                         </li>
                                     </ul>
                                 </li>
@@ -76,10 +124,7 @@
                             <h5>Awaiting</h5>
                             <ul class="list-inline">
                                 <li t-foreach="ready" t-as="pr">
-                                    <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
-                                       t-att-title="pr.message.split('\n')[0]">
-                                        <t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/>
-                                    </a>
+                                    <t t-call="runbot_merge.link-pr"/>
                                 </li>
                             </ul>
                         </div>
@@ -87,10 +132,7 @@
                             <h5>Blocked</h5>
                             <ul class="list-inline">
                                 <li t-foreach="blocked" t-as="pr">
-                                    <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
-                                       t-att-title="pr.blocked">
-                                        <t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/>
-                                    </a>
+                                    <t t-call="runbot_merge.link-pr"/>
                                 </li>
                             </ul>
                         </div>
@@ -105,10 +147,7 @@
                             <h5>Failed</h5>
                             <ul class="list-inline">
                                 <li t-foreach="failed" t-as="pr">
-                                    <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
-                                       t-att-title="pr.message.split('\n')[0]">
-                                        <t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/>
-                                    </a>
+                                    <t t-call="runbot_merge.link-pr"/>
                                 </li>
                             </ul>
                         </div>
@@ -135,49 +174,24 @@
                     <t t-if="staging_index >= 4">visible-lg-block</t>
                 </t>
                 <t t-set="title">
-                    <t t-if="staging.state == 'canceled'">Cancelled: <t t-esc="staging.reason"/></t>
-                    <t t-if="staging.state == 'ff_failed'">Fast Forward Failed</t>
-                    <t t-if="staging.state not in ('canceled', 'ff_failed')"><t t-esc="staging.reason"/></t>
+                    <t t-if="staging.state == 'ff_failed'">fast forward failed (<t t-esc="staging.reason"/>)</t>
+                    <t t-if="staging.state == 'pending'">last status</t>
                 </t>
-                <li t-attf-class="staging {{stateclass.strip()}} {{decorationclass.strip()}}" t-att-title="title.strip() or None">
+                <!-- separate concatenation to avoid having line-break in title as some browsers trigger it -->
+                <!-- write-date may have microsecond precision, strip that information -->
+                <!-- use write-date under assumption that a staging is last modified when it ends -->
+                <t t-set="title"><t t-esc="title.strip() or staging.reason"/> at <t t-esc="staging.write_date.replace(microsecond=0)"/>Z</t>
+                <li t-attf-class="staging {{stateclass.strip()}} {{decorationclass.strip()}}" t-att-title="title">
                     <ul class="list-unstyled">
                         <li t-foreach="staging.batch_ids" t-as="batch" class="batch">
                             <t t-esc="batch.prs[:1].label"/>
                             <t t-foreach="batch.prs" t-as="pr">
-                                <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
-                                   t-att-title="pr.message.split('\n')[0]"><t t-esc="pr.repository.name"/>#<t t-esc="pr.number"/></a>
+                                <t t-call="runbot_merge.link-pr"/>
                             </t>
                         </li>
                     </ul>
-                    <t t-if="staging.heads">
-                        <div class="dropdown">
-                            <button class="btn btn-link dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"
-                                    t-attf-title="{{staging.staged_at}}Z">
-                                Staged <span t-field="staging.staged_at" t-options="{'widget': 'relative'}"/>
-                                <span class="caret"></span>
-                            </button>
-                            <ul class="dropdown-menu">
-                                <li groups="runbot_merge.group_admin">
-                                    <a t-attf-href="/web#id={{staging.id}}&amp;view_type=form&amp;model=runbot_merge.stagings" target="new">
-                                        Open Staging
-                                    </a>
-                                </li>
-
-                                <t t-set="statuses" t-value="{(r, c): (s, t) for r, c, s, t in staging.statuses}"/>
-                                <t t-foreach="repo_statuses._for_staging(staging)" t-as="req">
-                                    <t t-set="st" t-value="statuses.get((req.repo_id.name, req.context)) or ('pending', None)"/>
-                                    <li t-att-class="
-                                            'bg-success' if st[0] == 'success'
-                                       else 'bg-danger' if st[0] in ('error', 'failure')
-                                       else 'bg-info'"
-                                    >
-                                        <a t-att-href="st[1]" target="new">
-                                            <t t-esc="req.repo_id.name"/>: <t t-esc="req.context"/>
-                                        </a>
-                                    </li>
-                                </t>
-                            </ul>
-                        </div>
+                    <t t-call="runbot_merge.staging-statuses">
+                        Staged <span t-field="staging.staged_at" t-options="{'widget': 'relative'}"/>
                     </t>
                 </li>
             </t>
@@ -224,68 +238,32 @@
                                     <span t-field="staging.staged_at"
                                           t-options="{'format': 'yyyy-MM-dd\'T\'HH:mm:ssZ'}"/>
                                 </t>
-                                <div class="dropdown" t-if="staging.heads">
-                                    <button class="btn btn-link dropdown-toggle"
-                                            type="button"
-                                            data-toggle="dropdown"
-                                            aria-haspopup="true"
-                                            aria-expanded="true">
-                                        <span t-field="staging.staged_at"
-                                              t-options="{'format': 'yyyy-MM-dd\'T\'HH:mm:ssZ'}"/>
-                                        <span class="caret"></span>
-                                    </button>
-                                    <ul class="dropdown-menu">
-                                        <li groups="runbot_merge.group_admin">
-                                            <a t-attf-href="/web#id={{staging.id}}&amp;view_type=form&amp;model=runbot_merge.stagings"
-                                               target="new">
-                                                Open Staging
-                                            </a>
-                                        </li>
-                                        <t t-set="statuses" t-value="{(r, c): (s, t) for r, c, s, t in staging.statuses}"/>
-                                        <t t-foreach="repo_statuses._for_staging(staging)" t-as="req">
-                                            <t t-set="st" t-value="statuses.get((req.repo_id.name, req.context)) or ('pending', None)"/>
-                                            <li t-att-class="
-                                                    'bg-success' if st[0] == 'success'
-                                               else 'bg-danger' if st[0] in ('error', 'failure')
-                                               else 'bg-info'"
-                                            >
-                                                <a t-att-href="st[1]"
-                                                   target="new">
-                                                    <t t-esc="req.repo_id.name"/>:
-                                                    <t t-esc="req.context"/>
-                                                </a>
-                                            </li>
-                                        </t>
-                                    </ul>
-                                </div>
+                                <t t-call="runbot_merge.staging-statuses">
+                                    <span t-field="staging.staged_at"
+                                          t-options="{'format': 'yyyy-MM-dd\'T\'HH:mm:ssZ'}"/>
+                                </t>
                             </th>
                             <td>
                                 <ul class="list-inline list-unstyled mb0">
                                     <t t-foreach="staging.batch_ids"
                                        t-as="batch">
                                         <t t-set="first_pr"
-                                           t-value="batch.prs[-1]"/>
-                                        <li class="dropdown">
+                                           t-value="batch.prs[-1:]"/>
+                                        <li class="dropdown" t-if="first_pr">
                                             <button class="btn btn-link dropdown-toggle"
                                                     type="button"
                                                     data-toggle="dropdown"
                                                     aria-haspopup="true"
                                                     aria-expanded="true"
-                                                    t-att-title="first_pr.message.split('\n')[0]"
                                             >
                                                 <t t-esc="first_pr.label"/>
                                                 <span class="caret"></span>
                                             </button>
                                             <ul class="dropdown-menu">
-                                                <li t-foreach="batch.prs"
-                                                    t-as="pr">
-                                                    <a t-attf-href="https://github.com/{{ pr.repository.name }}/pull/{{ pr.number }}"
-                                                       t-att-title="pr.message.split('\n')[0]"
-                                                       target="new">
-                                                        <t t-esc="pr.repository.name"/>
-                                                        #
-                                                        <t t-esc="pr.number"/>
-                                                    </a>
+                                                <li t-foreach="batch.prs" t-as="pr">
+                                                    <t t-call="runbot_merge.link-pr">
+                                                        <t t-set="target">new</t>
+                                                    </t>
                                                 </li>
                                             </ul>
                                         </li>
@@ -411,12 +389,13 @@
     <template id="view_pull_request">
         <t t-call="website.layout">
             <div id="wrap"><div class="container-fluid">
+                <t t-call="runbot_merge.alerts"/>
                 <h1>
-                <a t-att-href="pr.github_url" t-field="pr.display_name">
-                </a>
-                <a t-attf-href="/web#view_type=form&amp;model=runbot_merge.pull_requests&amp;id={{pr.id}}"
-                    class="btn btn-sm btn-secondary align-top float-right"
-                    groups="base.group_user">View in backend</a>
+                    <a t-att-href="pr.github_url" t-field="pr.display_name">
+                    </a>
+                    <a t-attf-href="/web#view_type=form&amp;model=runbot_merge.pull_requests&amp;id={{pr.id}}"
+                        class="btn btn-sm btn-secondary align-top float-right"
+                        groups="base.group_user">View in backend</a>
                 </h1>
                 <h6>Created by <span t-field="pr.author.display_name"/></h6>
                 <t t-set="tmpl">
@@ -425,11 +404,14 @@
                     <t t-else="">open</t>
                 </t>
                 <t t-call="runbot_merge.view_pull_request_info_{{tmpl.strip()}}"/>
+                <t t-set="target_cls" t-value="None if pr.target.active else 'text-muted bg-warning'"/>
                 <dl class="runbot-merge-fields">
                     <dt>label</dt>
                     <dd><span t-field="pr.label"/></dd>
                     <dt>head</dt>
                     <dd><a t-attf-href="{{pr.github_url}}/commits/{{pr.head}}"><span t-field="pr.head"/></a></dd>
+                    <dt t-att-class="target_cls">target</dt>
+                    <dd t-att-class="target_cls"><span t-field="pr.target"/></dd>
                 </dl>
                 <p t-field="pr.message"/>
             </div></div>

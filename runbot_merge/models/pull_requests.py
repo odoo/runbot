@@ -3,6 +3,7 @@
 import ast
 import base64
 import collections
+import contextlib
 import datetime
 import io
 import itertools
@@ -116,7 +117,7 @@ All substitutions are tentatively applied sequentially to the input.
             feedback({
                 'repository': self.id,
                 'pull_request': number,
-                'message': "I'm sorry. Branch `{}` is not within my remit.".format(pr['base']['ref']),
+                'message': "Branch `{}` is not within my remit, imma just ignore it.".format(pr['base']['ref']),
             })
             return
 
@@ -142,9 +143,11 @@ All substitutions are tentatively applied sequentially to the input.
         feedback({
             'repository': self.id,
             'pull_request': number,
-            'message': "Sorry, I didn't know about this PR and had to retrieve "
-                       "its information, you may have to re-approve it."
+            'message': "%sI didn't know about this PR and had to retrieve "
+                       "its information, you may have to re-approve it as "
+                       "I didn't see previous commands." % pr_id.ping()
         })
+        sender = {'login': self.project_id.github_prefix}
         # init the PR to the null commit so we can later synchronise it back
         # back to the "proper" head while resetting reviews
         controllers.handle_pr(self.env, {
@@ -154,6 +157,7 @@ All substitutions are tentatively applied sequentially to the input.
                 'head': {**pr['head'], 'sha': '0'*40},
                 'state': 'open',
             },
+            'sender': sender,
         })
         # fetch & set up actual head
         for st in gh.statuses(pr['head']['sha']):
@@ -175,20 +179,21 @@ All substitutions are tentatively applied sequentially to the input.
                     'review': item,
                     'pull_request': pr,
                     'repository': {'full_name': self.name},
+                    'sender': sender,
                 })
             else:
                 controllers.handle_comment(self.env, {
                     'action': 'created',
                     'issue': issue,
-                    'sender': item['user'],
                     'comment': item,
                     'repository': {'full_name': self.name},
+                    'sender': sender,
                 })
         # sync to real head
         controllers.handle_pr(self.env, {
             'action': 'synchronize',
             'pull_request': pr,
-            'sender': {'login': self.project_id.github_prefix}
+            'sender': sender,
         })
         if pr['state'] == 'closed':
             # don't go through controller because try_closing does weird things
@@ -243,6 +248,23 @@ class Branch(models.Model):
             self._cr, 'runbot_merge_unique_branch_per_repo',
             self._table, ['name', 'project_id'])
         return res
+
+    @api.depends('active')
+    def _compute_display_name(self):
+        super()._compute_display_name()
+        for b in self.filtered(lambda b: not b.active):
+            b.display_name += ' (inactive)'
+
+    def write(self, vals):
+        super().write(vals)
+        if vals.get('active') is False:
+            self.env['runbot_merge.pull_requests.feedback'].create([{
+                'repository': pr.repository.id,
+                'pull_request': pr.number,
+                'close': True,
+                'message': f'{pr.ping()}the target branch {pr.target.name!r} has been disabled, closing this PR.',
+            } for pr in self.prs])
+        return True
 
     @api.depends('staging_ids.active')
     def _compute_active_staging(self):
@@ -338,14 +360,20 @@ class Branch(models.Model):
                 _logger.exception("Failed to merge %s into staging branch", pr.display_name)
                 if first or isinstance(e, exceptions.Unmergeable):
                     if len(e.args) > 1 and e.args[1]:
-                        message = e.args[1]
+                        reason = e.args[1]
                     else:
-                        message = "Unable to stage PR (%s)" % e.__context__
+                        reason = e.__context__
+                    # if the reason is a json document, assume it's a github
+                    # error and try to extract the error message to give it to
+                    # the user
+                    with contextlib.suppress(Exception):
+                        reason = json.loads(str(reason))['message'].lower()
+
                     pr.state = 'error'
                     self.env['runbot_merge.pull_requests.feedback'].create({
                         'repository': pr.repository.id,
                         'pull_request': pr.number,
-                        'message': message,
+                        'message': f'{pr.ping()}unable to stage: {reason}',
                     })
             else:
                 first = False
@@ -533,6 +561,17 @@ class PullRequests(models.Model):
 
     repo_name = fields.Char(related='repository.name')
     message_title = fields.Char(compute='_compute_message_title')
+
+    def ping(self, author=True, reviewer=True):
+        P = self.env['res.partner']
+        s = ' '.join(
+            f'@{p.github_login}'
+            for p in (self.author if author else P) | (self.reviewed_by if reviewer else P)
+            if p
+        )
+        if s:
+            s += ' '
+        return s
 
     @api.depends('repository.name', 'number')
     def _compute_url(self):
@@ -791,30 +830,31 @@ class PullRequests(models.Model):
         msgs = []
         for command, param in commands:
             ok = False
-            msg = []
+            msg = None
             if command == 'retry':
                 if is_author:
                     if self.state == 'error':
                         ok = True
                         self.state = 'ready'
                     else:
-                        msg = "Retry makes no sense when the PR is not in error."
+                        msg = "retry makes no sense when the PR is not in error."
             elif command == 'check':
                 if is_author:
                     self.env['runbot_merge.fetch_job'].create({
                         'repository': self.repository.id,
                         'number': self.number,
                     })
+                    ok = True
             elif command == 'review':
                 if self.draft:
-                    msg = "Draft PRs can not be approved."
+                    msg = "draft PRs can not be approved."
                 elif param and is_reviewer:
                     oldstate = self.state
                     newstate = RPLUS.get(self.state)
                     if not author.email:
                         msg = "I must know your email before you can review PRs. Please contact an administrator."
                     elif not newstate:
-                        msg = "This PR is already reviewed, reviewing it again is useless."
+                        msg = "this PR is already reviewed, reviewing it again is useless."
                     else:
                         self.state = newstate
                         self.reviewed_by = author
@@ -831,7 +871,7 @@ class PullRequests(models.Model):
                         Feedback.create({
                             'repository': self.repository.id,
                             'pull_request': self.number,
-                            'message': "@{}, you may want to rebuild or fix this PR as it has failed CI.".format(author.github_login),
+                            'message': "@{} you may want to rebuild or fix this PR as it has failed CI.".format(login),
                         })
                 elif not param and is_author:
                     newstate = RMINUS.get(self.state)
@@ -845,7 +885,7 @@ class PullRequests(models.Model):
                                 'pull_request': self.number,
                                 'message': "PR priority reset to 1, as pull requests with priority 0 ignore review state.",
                             })
-                        self.unstage("unreview (r-) by %s", author.github_login)
+                        self.unstage("unreviewed (r-) by %s", login)
                         ok = True
                     else:
                         msg = "r- makes no sense in the current PR state."
@@ -874,7 +914,7 @@ class PullRequests(models.Model):
             elif command == 'method':
                 if is_reviewer:
                     if param == 'squash' and not self.squash:
-                        msg = "Squash can only be used with a single commit at this time."
+                        msg = "squash can only be used with a single commit at this time."
                     else:
                         self.merge_method = param
                         ok = True
@@ -882,7 +922,7 @@ class PullRequests(models.Model):
                         Feedback.create({
                             'repository': self.repository.id,
                             'pull_request': self.number,
-                            'message':"Merge method set to %s" % explanation
+                            'message':"Merge method set to %s." % explanation
                         })
             elif command == 'override':
                 overridable = author.override_rights\
@@ -904,7 +944,7 @@ class PullRequests(models.Model):
                         c.create({'sha': self.head, 'statuses': '{}'})
                     ok = True
                 else:
-                    msg = f"You are not allowed to override this status."
+                    msg = "you are not allowed to override this status."
             else:
                 # ignore unknown commands
                 continue
@@ -919,21 +959,23 @@ class PullRequests(models.Model):
                 applied.append(reformat(command, param))
             else:
                 ignored.append(reformat(command, param))
-                msgs.append(msg or "You can't {}.".format(reformat(command, param)))
+                msgs.append(msg or "you can't {}.".format(reformat(command, param)))
+
+        if msgs:
+            joiner = ' ' if len(msgs) == 1 else '\n- '
+            msgs.insert(0, "I'm sorry, @{}:".format(login))
+            Feedback.create({
+                'repository': self.repository.id,
+                'pull_request': self.number,
+                'message': joiner.join(msgs),
+            })
+
         msg = []
         if applied:
             msg.append('applied ' + ' '.join(applied))
         if ignored:
             ignoredstr = ' '.join(ignored)
             msg.append('ignored ' + ignoredstr)
-
-        if msgs:
-            msgs.insert(0, "I'm sorry, @{}.".format(login))
-            Feedback.create({
-                'repository': self.repository.id,
-                'pull_request': self.number,
-                'message': ' '.join(msgs),
-            })
         return '\n'.join(msg)
 
     def _pr_acl(self, user):
@@ -1020,7 +1062,7 @@ class PullRequests(models.Model):
             self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': self.repository.id,
                 'pull_request': self.number,
-                'message': "%r failed on this reviewed PR." % ci,
+                'message': "%s%r failed on this reviewed PR." % (self.ping(), ci),
             })
 
     def _auto_init(self):
@@ -1089,6 +1131,12 @@ class PullRequests(models.Model):
     def write(self, vals):
         if vals.get('squash'):
             vals['merge_method'] = False
+        prev = None
+        if 'target' in vals or 'message' in vals:
+            prev = {
+                pr.id: {'target': pr.target, 'message': pr.message}
+                for pr in self
+            }
 
         w = super().write(vals)
 
@@ -1096,6 +1144,18 @@ class PullRequests(models.Model):
         if newhead:
             c = self.env['runbot_merge.commit'].search([('sha', '=', newhead)])
             self._validate(json.loads(c.statuses or '{}'))
+
+        if prev:
+            for pr in self:
+                old_target = prev[pr.id]['target']
+                if pr.target != old_target:
+                    pr.unstage(
+                        "target (base) branch was changed from %r to %r",
+                        old_target.display_name, pr.target.display_name,
+                    )
+                old_message = prev[pr.id]['message']
+                if pr.merge_method in ('merge', 'rebase-merge') and pr.message != old_message:
+                    pr.unstage("merge message updated")
         return w
 
     def _check_linked_prs_statuses(self, commit=False):
@@ -1139,11 +1199,9 @@ class PullRequests(models.Model):
                 self.env['runbot_merge.pull_requests.feedback'].create({
                     'repository': r.repository.id,
                     'pull_request': r.number,
-                    'message': "Linked pull request(s) {} not ready. Linked PRs are not staged until all of them are ready.".format(
-                        ', '.join(map(
-                            '{0.display_name}'.format,
-                            unready
-                        ))
+                    'message': "{}linked pull request(s) {} not ready. Linked PRs are not staged until all of them are ready.".format(
+                        r.ping(),
+                        ', '.join(map('{0.display_name}'.format, unready))
                     )
                 })
                 r.link_warned = True
@@ -1152,6 +1210,11 @@ class PullRequests(models.Model):
 
         # send feedback for multi-commit PRs without a merge_method (which
         # we've not warned yet)
+        methods = ''.join(
+            '* `%s` to %s\n' % pair
+            for pair in type(self).merge_method.selection
+            if pair[0] != 'squash'
+        )
         for r in self.search([
             ('state', '=', 'ready'),
             ('squash', '=', False),
@@ -1161,10 +1224,9 @@ class PullRequests(models.Model):
             self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': r.repository.id,
                 'pull_request': r.number,
-                'message': "Because this PR has multiple commits, I need to know how to merge it:\n\n" + ''.join(
-                    '* `%s` to %s\n' % pair
-                    for pair in type(self).merge_method.selection
-                    if pair[0] != 'squash'
+                'message': "%sbecause this PR has multiple commits, I need to know how to merge it:\n\n%s" % (
+                    r.ping(),
+                    methods,
                 )
             })
             r.method_warned = True
@@ -1348,7 +1410,7 @@ class PullRequests(models.Model):
                 # else remove this batch from the split
                 b.split_id = False
 
-        self.staging_id.cancel(reason, *args)
+        self.staging_id.cancel('%s ' + reason, self.display_name, *args)
 
     def _try_closing(self, by):
         # ignore if the PR is already being updated in a separate transaction
@@ -1368,11 +1430,7 @@ class PullRequests(models.Model):
         ''', [self.id])
         self.env.cr.commit()
         self.modified(['state'])
-        self.unstage(
-            "PR %s closed by %s",
-            self.display_name,
-            by
-        )
+        self.unstage("closed by %s", by)
         return True
 
 # state changes on reviews
@@ -1501,20 +1559,24 @@ class Feedback(models.Model):
 
             try:
                 message = f.message
-                if f.close:
-                    gh.close(f.pull_request)
-                    try:
-                        data = json.loads(message or '')
-                    except json.JSONDecodeError:
-                        pass
-                    else:
+                with contextlib.suppress(json.JSONDecodeError):
+                    data = json.loads(message or '')
+                    message = data.get('message')
+
+                    if data.get('base'):
+                        gh('PATCH', f'pulls/{f.pull_request}', json={'base': data['base']})
+
+                    if f.close:
                         pr_to_notify = self.env['runbot_merge.pull_requests'].search([
                             ('repository', '=', repo.id),
                             ('number', '=', f.pull_request),
                         ])
                         if pr_to_notify:
                             pr_to_notify._notify_merged(gh, data)
-                            message = None
+
+                if f.close:
+                    gh.close(f.pull_request)
+
                 if message:
                     gh.comment(f.pull_request, message)
             except Exception:
@@ -1621,6 +1683,17 @@ class Stagings(models.Model):
 
     statuses = fields.Binary(compute='_compute_statuses')
 
+    def name_get(self):
+        return [
+            (staging.id, "%d (%s, %s%s)" % (
+                staging.id,
+                staging.target.name,
+                staging.state,
+                (', ' + staging.reason) if staging.reason else '',
+            ))
+            for staging in self
+        ]
+
     @api.depends('heads')
     def _compute_statuses(self):
         """ Fetches statuses associated with the various heads, returned as
@@ -1725,7 +1798,7 @@ class Stagings(models.Model):
             self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': pr.repository.id,
                 'pull_request': pr.number,
-                'message':"Staging failed: %s" % message
+                'message': "%sstaging failed: %s" % (pr.ping(), message),
             })
 
         self.batch_ids.write({'active': False})
@@ -1988,8 +2061,9 @@ class Batch(models.Model):
             gh = meta[pr.repository]['gh']
 
             _logger.info(
-                "Staging pr %s for target %s; squash=%s",
-                pr.display_name, pr.target.name, pr.squash
+                "Staging pr %s for target %s; method=%s",
+                pr.display_name, pr.target.name,
+                pr.merge_method or (pr.squash and 'single') or None
             )
 
             target = 'tmp.{}'.format(pr.target.name)
@@ -2027,11 +2101,11 @@ class Batch(models.Model):
                 self.env['runbot_merge.pull_requests.feedback'].create({
                     'repository': pr.repository.id,
                     'pull_request': pr.number,
-                    'message': "We apparently missed an update to this PR "
+                    'message': "%swe apparently missed an update to this PR "
                                "and tried to stage it in a state which "
                                "might not have been approved. PR has been "
                                "updated to %s, please check and approve or "
-                               "re-approve." % new_head
+                               "re-approve." % (pr.ping(), new_head)
                 })
                 return self.env['runbot_merge.batch']
 
@@ -2097,7 +2171,7 @@ def to_status(v):
         return v
     return {'state': v, 'target_url': None, 'description': None}
 
-refline = re.compile(rb'([0-9a-f]{40}) ([^\0\n]+)(\0.*)?\n$')
+refline = re.compile(rb'([\da-f]{40}) ([^\0\n]+)(\0.*)?\n?$')
 ZERO_REF = b'0'*40
 def parse_refs_smart(read):
     """ yields pkt-line data (bytes), or None for flush lines """
@@ -2108,9 +2182,8 @@ def parse_refs_smart(read):
         return read(length - 4)
 
     header = read_line()
-    assert header == b'# service=git-upload-pack\n', header
-    sep = read_line()
-    assert sep is None, sep
+    assert header.rstrip() == b'# service=git-upload-pack', header
+    assert read_line() is None, "failed to find first flush line"
     # read lines until second delimiter
     for line in iter(read_line, None):
         if line.startswith(ZERO_REF):
