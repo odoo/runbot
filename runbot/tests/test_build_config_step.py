@@ -22,6 +22,7 @@ class TestBuildConfigStep(RunbotCase):
             'params_id': self.base_params.copy({'commit_link_ids': [(0, 0, {'commit_id': server_commit.id})]}).id,
         })
         self.start_patcher('find_patcher', 'odoo.addons.runbot.common.find', 0)
+        self.start_patcher('findall_patcher', 'odoo.addons.runbot.models.build.BuildResult.parse_config', {})
 
     def test_config_step_create_results(self):
         """ Test child builds are taken into account"""

@@ -343,13 +343,21 @@ class ConfigStep(models.Model):
         build._log('run', 'Start running build %s' % build.dest)
         # run server
         cmd = build._cmd(local_only=False)
-        if os.path.exists(build._get_server_commit()._source_path('addons/im_livechat')):
+
+        available_options = build.parse_config()
+
+        if "--workers" in available_options:
             cmd += ["--workers", "2"]
+
+        if "--gevent-port" in available_options:
+            cmd += ["--gevent-port", "8070"]
+
+        elif "--longpolling-port" in available_options:
             cmd += ["--longpolling-port", "8070"]
+
+        if "--max-cron-threads" in available_options:
             cmd += ["--max-cron-threads", "1"]
-        else:
-            # not sure, to avoid old server to check other dbs
-            cmd += ["--max-cron-threads", "0"]
+
 
         install_steps = [step.db_name for step in build.params_id.config_id.step_ids() if step.job_type == 'install_odoo']
         db_name = build.params_id.config_data.get('db_name') or 'all' in install_steps and 'all' or install_steps[0]
@@ -357,15 +365,16 @@ class ConfigStep(models.Model):
         cmd += ['-d', '%s-%s' % (build.dest, db_name)]
 
         icp = self.env['ir.config_parameter'].sudo()
-        if grep(build._server("tools/config.py"), "proxy-mode"):
+        if "--proxy-mode" in available_options:
             cmd += ["--proxy-mode"]
 
-        if grep(build._server("tools/config.py"), "db-filter"):
+        if "--db-filter" in available_options:
             cmd += ['--db-filter', '%d.*$']
 
-        smtp_host = docker_get_gateway_ip()
-        if smtp_host:
-            cmd += ['--smtp', smtp_host]
+        if "--smtp" in available_options:
+            smtp_host = docker_get_gateway_ip()
+            if smtp_host:
+                cmd += ['--smtp', smtp_host]
 
         extra_params = self.extra_params or ''
         if extra_params:
@@ -406,14 +415,16 @@ class ConfigStep(models.Model):
         if mods and '-i' not in extra_params:
             cmd += ['-i', mods]
         config_path = build._server("tools/config.py")
+
+        available_options = build.parse_config()
         if self.test_enable:
-            if grep(config_path, "test-enable"):
+            if "--test-enable" in available_options:
                 cmd.extend(['--test-enable'])
             else:
                 build._log('test_all', 'Installing modules without testing', level='WARNING')
         test_tags_in_extra = '--test-tags' in extra_params
         if self.test_tags or test_tags_in_extra:
-            if grep(config_path, "test-tags"):
+            if "--test-tags" in available_options:
                 if not test_tags_in_extra:
                     test_tags = self.test_tags.replace(' ', '')
                     if self.enable_auto_tags:
@@ -429,10 +440,10 @@ class ConfigStep(models.Model):
                     test_tags = ','.join(auto_tags)
                     cmd.extend(['--test-tags', test_tags])
 
-        if grep(config_path, "--screenshots"):
+        if "--screenshots" in available_options:
             cmd.add_config_tuple('screenshots', '/data/build/tests')
 
-        if grep(config_path, "--screencasts") and self.env['ir.config_parameter'].sudo().get_param('runbot.enable_screencast', False):
+        if "--screencasts" in available_options and self.env['ir.config_parameter'].sudo().get_param('runbot.enable_screencast', False):
             cmd.add_config_tuple('screencasts', '/data/build/tests')
 
         cmd.append('--stop-after-init')  # install job should always finish

@@ -42,6 +42,10 @@ def now():
     return time.strftime(DEFAULT_SERVER_DATETIME_FORMAT)
 
 
+def findall(filename, pattern):
+    return set(re.findall(pattern, open(filename).read()))
+
+
 def grep(filename, string):
     if os.path.isfile(filename):
         return find(filename, string) != -1
