@@ -8,7 +8,7 @@ import subprocess
 import time
 import datetime
 import hashlib
-from ..common import dt2time, fqdn, now, grep, local_pgadmin_cursor, s2human, dest_reg, os, list_local_dbs, pseudo_markdown, RunbotException
+from ..common import dt2time, fqdn, now, grep, local_pgadmin_cursor, s2human, dest_reg, os, list_local_dbs, pseudo_markdown, RunbotException, findall
 from ..container import docker_stop, docker_state, Command, docker_run
 from ..fields import JsonDictField
 from odoo import models, fields, api
@@ -1171,3 +1171,6 @@ class BuildResult(models.Model):
                     commit = build_commit.commit_id
                     if 'base_' not in build_commit.match_type and commit.repo_id in trigger.repo_ids:
                         commit._github_status(build, trigger.ci_context, state, target_url, desc)
+
+    def parse_config(self):
+        return set(findall(self._server("tools/config.py"), '--[\w-]+', ))
