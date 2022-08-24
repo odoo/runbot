@@ -154,7 +154,7 @@ class ConfigStep(models.Model):
     enable_auto_tags = fields.Boolean('Allow auto tag', default=False, tracking=True)
     sub_command = fields.Char('Subcommand', tracking=True)
     extra_params = fields.Char('Extra cmd args', tracking=True)
-    additionnal_env = fields.Char('Extra env', help='Example: foo="bar",bar="foo". Cannot contains \' ', tracking=True)
+    additionnal_env = fields.Char('Extra env', help='Example: foo="bar";bar="foo". Cannot contains \' ', tracking=True)
     # python
     python_code = fields.Text('Python code', tracking=True, default=PYTHON_DEFAULT)
     python_result_code = fields.Text('Python code for result', tracking=True, default=PYTHON_DEFAULT)
