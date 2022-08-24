@@ -78,7 +78,7 @@ def pytest_addoption(parser):
     parser.addoption('--log-github', action='store_true')
 
     parser.addoption(
-        '--tunnel', action="store", type="choice", choices=['ngrok', 'localtunnel'], default='ngrok',
+        '--tunnel', action="store", type="choice", choices=['', 'ngrok', 'localtunnel'], default='',
         help="Which tunneling method to use to expose the local Odoo server "
              "to hook up github's webhook. ngrok is more reliable, but "
              "creating a free account is necessary to avoid rate-limiting "
@@ -91,7 +91,7 @@ def pytest_addoption(parser):
 # noinspection PyUnusedLocal
 def pytest_configure(config):
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'mergebot_test_utils'))
-    print(sys.path)
+
 
 @pytest.fixture(scope='session', autouse=True)
 def _set_socket_timeout():
@@ -183,7 +183,9 @@ def tunnel(pytestconfig, port):
     publicly routable address & terminate the process at the end of the session
     """
     tunnel = pytestconfig.getoption('--tunnel')
-    if tunnel == 'ngrok':
+    if tunnel == '':
+        return f'http://localhost:{port}'
+    elif tunnel == 'ngrok':
         web_addr = 'http://localhost:4040/api'
         addr = 'localhost:%d' % port
         # try to find out if ngrok is running, and if it's not attempt
