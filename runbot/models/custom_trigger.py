@@ -12,6 +12,7 @@ class BundleTriggerCustomization(models.Model):
     config_id = fields.Many2one('runbot.build.config')
     extra_params = fields.Char("Custom parameters")
     config_data = JsonDictField("Config data")
+    target_version_id = fields.Many2one('runbot.version', string="Target Version")
 
     _sql_constraints = [
         (
@@ -29,6 +30,7 @@ class CustomTriggerWizard(models.TransientModel):
     project_id = fields.Many2one(related='bundle_id.project_id', string='Project')
     trigger_id = fields.Many2one('runbot.trigger', domain="[('project_id', '=', project_id)]")
     config_id = fields.Many2one('runbot.build.config', string="Config id", default=lambda self: self.env.ref('runbot.runbot_build_config_custom_multi'))
+    target_version_id = fields.Many2one('runbot.version', string="Target Version")
 
     config_data = JsonDictField("Config data")
 
@@ -93,4 +95,5 @@ class CustomTriggerWizard(models.TransientModel):
             'trigger_id': self.trigger_id.id,
             'config_id': self.config_id.id,
             'config_data': self.config_data,
+            'target_version_id': self.target_version_id.id or False,
         })

@@ -113,6 +113,9 @@ class Bundle(models.Model):
     @api.depends('is_base', 'base_id.version_id')
     def _compute_version_id(self):
         for bundle in self.sorted(key='is_base', reverse=True):
+            if bundle.project_id.multi_versions_branch:
+                bundle.version_id = False
+                continue
             if not bundle.is_base:
                 bundle.version_id = bundle.base_id.version_id
                 continue
@@ -231,7 +234,12 @@ class Bundle(models.Model):
                         warnings.append(('info', 'PR %s targeting a non base branch: %s' % (branch.dname, branch.target_branch_name)))
                     else:
                         warnings.append(('warning' if branch.alive else 'info', 'PR %s targeting wrong version: %s (expecting %s)' % (branch.dname, branch.target_branch_name, self.base_id.name)))
-                elif not branch.is_pr and not branch.name.startswith(self.base_id.name) and not self.defined_base_id:
+                elif (
+                    not branch.is_pr
+                    and not branch.name.startswith(self.base_id.name)
+                    and not self.defined_base_id
+                    and not self.project_id.multi_versions_branch
+                ):
                     warnings.append(('warning', 'Branch %s not starting with version name (%s)' % (branch.dname, self.base_id.name)))
         return warnings
 

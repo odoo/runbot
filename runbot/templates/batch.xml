@@ -16,7 +16,7 @@
                             <td>Category</td>
                             <td t-esc="batch.category_id.name"></td>
                         </tr>
-                        <tr>
+                        <tr t-if="not batch.bundle_id.project_id.multi_versions_branch">
                             <td>Version</td>
                             <td t-esc="batch.slot_ids[0].params_id.version_id.name if batch.slot_ids else batch.bundle_id.version_id.name"/>
                         </tr>

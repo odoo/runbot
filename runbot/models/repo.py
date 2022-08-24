@@ -44,6 +44,9 @@ class Trigger(models.Model):
     config_id = fields.Many2one('runbot.build.config', string="Config", required=True)
     batch_dependent = fields.Boolean('Batch Dependent', help="Force adding batch in build parameters to make it unique and give access to bundle")
 
+    target_version_id = fields.Many2one('runbot.version', help="Target a specific version")
+    dockerfile_id = fields.Many2one('runbot.dockerfile', help="Use a custom Dockerfile")
+
     ci_context = fields.Char("Ci context", default='ci/runbot', tracking=True)
     category_id = fields.Many2one('runbot.category', default=lambda self: self.env.ref('runbot.default_category', raise_if_not_found=False))
     version_domain = fields.Char(string="Version domain")

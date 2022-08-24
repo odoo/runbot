@@ -6,6 +6,7 @@ class Project(models.Model):
     _description = 'Project'
 
     name = fields.Char('Project name', required=True)
+    multi_versions_branch = fields.Boolean(string="Multi-Versions Branch", help="Project's bundles can target multiple Odoo versions")
     group_ids = fields.Many2many('res.groups', string='Required groups')
     keep_sticky_running = fields.Boolean('Keep last sticky builds running')
     trigger_ids = fields.One2many('runbot.trigger', 'project_id', string='Triggers')

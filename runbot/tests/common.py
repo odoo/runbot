@@ -34,7 +34,7 @@ class RunbotCase(TransactionCase):
         commiter_email = '%s@somewhere.com' % committer.lower().replace(' ', '_')
         author = author or committer
         author_email = '%s@somewhere.com' % author.lower().replace(' ', '_')
-        self.commit_list[self.repo_server.id] = [(
+        self.commit_list[remote.repo_id.id] = [(
             'refs/%s/heads/%s' % (remote.remote_name, branch_name),
             sha or 'd0d0caca',
             str(tstamp or int(time.time())),

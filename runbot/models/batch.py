@@ -305,18 +305,58 @@ class Batch(models.Model):
             config = trigger_custom.config_id if trigger_custom else trigger.config_id
             if not config:
                 continue
+
+            trigger_commit_link_by_repos = dict(commit_link_by_repos)
+            target_version = trigger.target_version_id
+            if trigger_custom and trigger_custom.target_version_id:
+                target_version = trigger_custom.target_version_id
+
+            if target_version and trigger.dependency_ids:
+                # we need to use a specific version for this trigger, build
+                # commit list for this target
+                for repo in trigger.dependency_ids:
+                    target_version = target_version.with_context(project_id=repo.project_id.id)
+                    target_bundle = target_version.base_bundle_id
+                    if not target_bundle:
+                        self._log("No base bundle found for trigger's '%s' dependency repo '%s' with forced version '%s'",
+                            trigger.name, repo.name, target_version.name
+                        )
+                        continue
+                    target_branches = target_bundle.branch_ids
+                    repo_branches = target_branches.filtered_domain([('remote_id.repo_id', '=', repo.id)])
+                    for branch in repo_branches:
+                        link_commit = self.env['runbot.commit.link'].search([
+                            ('commit_id', 'in', branch.head.ids),
+                            ('match_type', 'in', ('new', 'head'))
+                        ])
+                        if len(link_commit) > 1:
+                            # can happends if multiple branch have same HEAD (ex. 11.0, staging-11.0)
+                            for commit in link_commit:
+                                if commit.branch_id.name == target_version.name:
+                                    link_commit = commit
+                                    break
+                            else:
+                                link_commit = link_commit[0]
+                        if not link_commit:
+                            link_commit = self.env['runbot.commit.link'].create({
+                                'commit_id': branch.head.id,
+                                'match_type': 'head',
+                                'branch_id': branch.id,
+                            })
+                        trigger_commit_link_by_repos[branch.head.repo_id.id] = link_commit
+
             extra_params = trigger_custom.extra_params if trigger_custom else ''
             config_data = trigger_custom.config_data if trigger_custom else {}
             params_value = {
-                'version_id':  version_id,
+                'version_id':  target_version.id or version_id,
                 'extra_params': extra_params,
                 'config_id': config.id,
                 'project_id': project_id,
                 'trigger_id': trigger.id,  # for future reference and access rights
                 'config_data': config_data,
-                'commit_link_ids': [(6, 0, [commit_link_by_repos[repo.id].id for repo in trigger_repos])],
+                'commit_link_ids': [(6, 0, [trigger_commit_link_by_repos[repo.id].id for repo in trigger_repos])],
                 'modules': bundle.modules,
-                'dockerfile_id': dockerfile_id,
+                'dockerfile_id': trigger.dockerfile_id.id or dockerfile_id,
                 'create_batch_id': self.id,
                 'used_custom_trigger': bool(trigger_custom),
             }

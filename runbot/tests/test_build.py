@@ -124,6 +124,53 @@ class TestBuildParams(RunbotCaseMinimalSetup):
         build_slot = bundle.last_batch.slot_ids.filtered(lambda rec: rec.trigger_id == self.trigger_server)
         self.assertEqual(build_slot.build_id.params_id.config_id, custom_config)
 
+    def test_trigger_forced_version(self):
+        """Test that a trigger with forced version create a build with appropriate commits"""
+        self.additionnal_setup()
+        self.start_patchers()
+
+        version_master = self.Version.search([('name', '=', 'master')])
+        dockerfile_default = self.env.ref('runbot.docker_default')
+
+        # Create trigger that force build to be targeting version 13.0
+        dockerfile_custom = dockerfile_default.copy()
+        trigger_addons_13 = self.Trigger.create({
+            'name': 'Addons trigger (forced 13.0)',
+            'repo_ids': [(4, self.repo_addons.id)],
+            'dependency_ids': [(4, self.repo_server.id)],
+            'config_id': self.default_config.id,
+            'project_id': self.project.id,
+            'target_version_id': self.version_13.id,
+            'dockerfile_id': dockerfile_custom.id,
+        })
+
+        # Push commits on server repo for 'master' and '13.0' branches and update related batches
+        self.push_commit(self.remote_server, 'master', 'last commit of master', sha='feed0999')
+        self.repo_server._update_batches()
+        self.push_commit(self.remote_server, '13.0', 'last commit of 13.0', sha='feed0130')
+        self.repo_server._update_batches()
+
+        # A commit is found on the addons dev remote
+        branch_a_name = 'master-forced-target-version'
+        self.push_commit(self.remote_addons_dev, branch_a_name, 'nice subject', sha='feedc0de')
+        self.repo_addons._update_batches()
+
+        # get branch bundle and force prepation of builds
+        bundle = self.Bundle.search([('name', '=', branch_a_name), ('project_id', '=', self.project.id)])
+        bundle.last_batch._prepare()
+
+        # # build with normal trigger should use version 'master' and default dockerfile
+        build = bundle.last_batch.slot_ids.filtered(lambda rec: rec.trigger_id == self.trigger_addons).build_id
+        self.assertEqual(build.params_id.version_id, version_master)
+        self.assertEqual(build.params_id.dockerfile_id, dockerfile_default)
+        self.assertEqual(build.params_id.commit_link_ids.commit_id.mapped('name'), ['feedc0de', 'feed0999'])
+
+        # build with forced version trigger should use version '13.0' and custom dockerfile
+        build = bundle.last_batch.slot_ids.filtered(lambda rec: rec.trigger_id == trigger_addons_13).build_id
+        self.assertEqual(build.params_id.version_id, self.version_13)
+        self.assertEqual(build.params_id.dockerfile_id, dockerfile_custom)
+        self.assertEqual(build.params_id.commit_link_ids.commit_id.mapped('name'), ['feedc0de', 'feed0130'])
+
 
 class TestBuildResult(RunbotCase):
 

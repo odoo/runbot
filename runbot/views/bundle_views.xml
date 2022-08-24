@@ -7,6 +7,7 @@
             <form string="Projects">
                 <group>
                     <field name="name"/>
+                    <field name="multi_versions_branch"/>
                     <field name="keep_sticky_running"/>
                     <field name="dockerfile_id"/>
                     <field name="group_ids"/>
@@ -66,6 +67,7 @@
                             <field name="config_id"/>
                             <field name="extra_params"/>
                             <field name="config_data"/>
+                            <field name="target_version_id"/>
                         </tree>
                     </field>
                     <field string="Last batches" name="last_batchs">
@@ -90,6 +92,7 @@
                 <field name="config_id"/>
                 <field name="extra_params"/>
                 <field name="config_data"/>
+                <field name="target_version_id"/>
             </tree>
         </field>
     </record>
@@ -104,6 +107,7 @@
                     <field name="config_id"/>
                     <field name="extra_params"/>
                     <field name="config_data"/>
+                    <field name="target_version_id"/>
                 </group>
             </form>
         </field>

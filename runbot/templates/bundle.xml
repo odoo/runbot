@@ -30,7 +30,7 @@
                             </div>
                             <div>
                                 <table class="table table-condensed table-responsive table-stripped">
-                                    <tr>
+                                    <tr t-if="bundle.version_id">
                                         <td>Version</td>
                                         <td>
                                             <t t-esc="bundle.version_id.name"/>

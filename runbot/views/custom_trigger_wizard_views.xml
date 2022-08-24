@@ -11,6 +11,7 @@
                     <field name="warnings" decoration-warning="warnings"/>
                     <field name="trigger_id"/>
                     <field name="config_id"/>
+                    <field name="target_version_id"/>
                     <field name="number_build"/>
                     <field name="child_extra_params"/>
                     <field name="child_dump_url"/>
