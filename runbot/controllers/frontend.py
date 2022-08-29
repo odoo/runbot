@@ -512,7 +512,7 @@ class Runbot(Controller):
             ('slot_ids.batch_id.bundle_id', '=', bundle_id),
             ('params_id.trigger_id', '=', trigger.id),
         ]
-        builds = request.env['runbot.build']
+        builds = request.env['runbot.build'].with_context(active_test=False)
         if center_build_id:
             builds = builds.search(
                 expression.AND([builds_domain, [('id', '>=', center_build_id)]]), 

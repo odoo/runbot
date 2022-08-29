@@ -42,13 +42,21 @@ var FrontendUrl = relational_fields.FieldMany2One.extend({
     events: _.extend({'click .external_link': '_stopPropagation'}, relational_fields.FieldMany2One.prototype.events),
     init() {
         this._super.apply(this, arguments);
-        const model = this.value.model.split('.').slice(1).join('_')
-        const res_id = this.value.res_id
-        this.route = '/runbot/' + model+ '/' + res_id
+        if (this.value) {
+            const model = this.value.model.split('.').slice(1).join('_');
+            const res_id = this.value.res_id;
+            this.route = '/runbot/' + model+ '/' + res_id;
+        } else {
+            this.route = false;
+        }
     },
     _renderReadonly: function () {
         this._super.apply(this, arguments);
-        this.$el.html('<span>' + this.$el.html() + ' <a href="'+this.route+'" ><i class="external_link fa fa-fw o_button_icon fa-external-link "/></a><span>')
+        var link = ''
+        if (this.route) {
+            link = ' <a href="'+this.route+'" ><i class="external_link fa fa-fw o_button_icon fa-external-link "/></a>'
+        }
+        this.$el.html('<span>' + this.$el.html() + link + '<span>')
     },
     _stopPropagation: function(event) {
         event.stopPropagation()
