@@ -321,6 +321,9 @@
                       <a groups="runbot.group_build_config_user" t-attf-href="/web#id={{l.error_id.id}}&amp;view_type=form&amp;model=runbot.build.error" title="View in Backend" target="new">
                         <i class="fa fa-list"/>
                       </a>
+                      <span groups="base.group_user" t-attf-class="text-{{'primary' if l.error_id.responsible else 'danger'}}">
+                        Fixer: <t t-esc="l.error_id.responsible.name or 'Unassigned'"/>
+                      </span>
                     </td>
                   </tr>
                 </t>
