@@ -90,7 +90,7 @@
                 <t t-esc="batch.get_formated_age()"/>
                 <i class="fa fa-exclamation-triangle" t-if="batch.has_warning"/>
               </span>
-              <span class="float-right header_hover">View batch...</span>
+              <span class="float-right header_hover" t-field="batch.create_date" t-options="{'format': 'yyyy-MM-dd HH:mmZ'}"/>
             </div>
           </a>
           <t t-if="batch.state=='preparing'">

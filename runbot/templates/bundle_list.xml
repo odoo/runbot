@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <template id="runbot.bundle_list">
+            <t t-call="runbot.layout">
+                <t t-call="runbot.bundle_list_top_bar" />
+                <div class="container-fluid">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="row bundle_row" t-foreach="bundles" t-as="bundle">
+                                <div class="col-xl-2 align-self-center">
+                                        <div class="one_line">
+                                            <a t-esc="bundle.name" t-attf-href="/runbot/bundle/{{bundle.id}}"/>
+                                        </div>
+                                        <t t-foreach="bundle.tag_ids" t-as="bundle_tag">
+                                            <span class="badge badge-info"><t t-esc="bundle_tag.name"/></span>
+                                        </t>
+                                </div>
+                                <div class="col-xl-10">
+                                    <div class="row no-gutters">
+                                        <div class="col-xl-7 align-self-center">
+                                            <t t-foreach="bundle.branch_groups().items()" t-as="group">
+                                                <t t-foreach="group[1]" t-as="branch">
+                                                    <small>
+                                                        <div class="btn-toolbar mb-1" role="toolbar">
+                                                            <div class="btn-group btn-group-ssm" role="group">
+                                                                <a t-att-href="branch.branch_url" class="btn btn-default text-left" title="View Branch on Github"><i class="fa fa-github"/></a>
+                                                                <a groups="runbot.group_runbot_admin" class="btn btn-default fa fa-list text-left" t-attf-href="/web/#id={{branch.id}}&amp;view_type=form&amp;model=runbot.branch" target="new" title="View Branch in Backend"/>
+                                                                <a href="#" t-esc="branch.remote_id.short_name" class="btn btn-default disabled text-left"/>
+                                                                <a t-attf-href="/runbot/branch/{{branch.id}}" class="btn btn-default text-left" title="View Branch Details"><span t-att-class="'' if branch.alive else 'line-through'" t-esc="branch.name"/> <i t-if="not branch.alive" title="deleted/closed" class="fa fa-ban text-danger"/></a>
+                                                            </div>
+                                                        </div>
+                                                    </small>
+                                                </t>
+                                            </t>
+                                        </div>
+                                        <div class="col-xl-5 align-self-center">
+                                            <t t-set="batch" t-value="bundle.last_batch"/>
+                                            <t t-call="runbot.batch_tile"/>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="navbar navbar-default">
+                        <span class="pull-right">
+                            <t t-call="website.pager" />
+                        </span>
+                    </div>
+                </div>
+            </t>
+        </template>
+
+        <template id="bundle_list_top_bar" name="Topbar">
+            <nav class="navbar navbar-light border-top shadow-sm d-print-none">
+                <div class="container-fluid">
+                    <div class="d-flex flex-column flex-sm-row justify-content-between w-100">
+                        <t t-call="website.pager" />
+                        <span class="navbar-brand h4 my-0 mr-auto">Filters</span>
+                        <ul class="nav">
+                            <li class="nav-item dropdown mr-2 my-1">
+                                <a href="#" role="button" class="btn dropdown-toggle" data-toggle="dropdown">
+                                    <i class="fa fa-filter"/>PR
+                                </a>
+                                <div class="dropdown-menu">
+                                    <t t-foreach="pr_filters" t-as="pr_filter">
+                                        <a class="dropdown-item d-flex align-items-center justify-content-between" 
+                                           t-attf-href="/runbot/bundle?{{ keep_query('*', pr_filter=pr_filter if pr_filter != 'all' else None) }}">
+                                            <span t-esc="pr_filters[pr_filter].get('text')"/>
+                                        </a>
+                                    </t>
+                                </div>
+                            </li>
+                            <li class="nav-item dropdown mr-2 my-1">
+                                <a href="#" role="button" class="btn dropdown-toggle" data-toggle="dropdown">
+                                    <i class="fa fa-users"/>Team
+                                </a>
+                                <div class="dropdown-menu">
+                                    <a class="dropdown-item d-flex align-items-center justify-content-between" 
+                                           t-attf-href="/runbot/bundle?{{ keep_query('*', team_id=None) }}">
+                                            <span>Any</span>
+                                    </a>
+                                    <t t-foreach="teams" t-as="team">
+                                        <a class="dropdown-item d-flex align-items-center justify-content-between" 
+                                           t-attf-href="/runbot/bundle?{{ keep_query('*', team_id=team.id) }}">
+                                            <span t-esc="team.name"/>
+                                        </a>
+                                    </t>
+                                </div>
+                            </li>
+                            <li class="nav-item dropdown mr-2 my-1">
+                                <a href="#" role="button" class="btn dropdown-toggle" data-toggle="dropdown">
+                                    <i class="fa fa-tags"/>Tags
+                                </a>
+                                <div class="dropdown-menu">
+                                    <a class="dropdown-item d-flex align-items-center justify-content-between" 
+                                           t-attf-href="/runbot/bundle?{{ keep_query('*', tag_id=None) }}">
+                                            <span>Any</span>
+                                    </a>
+                                    <t t-foreach="tags" t-as="tag">
+                                        <a class="dropdown-item d-flex align-items-center justify-content-between" 
+                                           t-attf-href="/runbot/bundle?{{ keep_query('*', tag_id=tag.id) }}">
+                                            <span t-esc="tag.name"/>
+                                        </a>
+                                    </t>
+                                </div>
+                            </li>
+                        </ul>
+                        <div class="col-md-4 d-none d-md-flex flex-row align-items-center justify-content-end">
+                            <t t-call="website.website_search_box_input">
+                                <t t-set="_form_classes" t-valuef="mt8 float-right"/>
+                                <t t-set="action" t-valuef="/runbot/bundle"/>
+                                <t t-set="placeholder">Search Bundle Names</t>
+                                <t t-set="search" t-value="search"/>
+                            </t>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+        </template>
+    </data>
+</odoo>

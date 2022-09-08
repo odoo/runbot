@@ -50,6 +50,10 @@ class Bundle(models.Model):
     commit_limit = fields.Integer("Commit limit")
     file_limit = fields.Integer("File limit")
 
+    # Administrative fields
+    owner_id = fields.Many2one('res.users', 'Bundle Owner')
+    tag_ids = fields.Many2many('runbot.bundle.tag', string='Tags')
+
     @api.depends('name')
     def _compute_host_id(self):
         assigned_only = None
@@ -241,3 +245,64 @@ class Bundle(models.Model):
         for branch in self.branch_ids.sorted(key=lambda b: (b.is_pr)):
             branch_groups[branch.remote_id.repo_id].append(branch)
         return branch_groups
+
+
+class BundleTag(models.Model):
+
+    _name = "runbot.bundle.tag"
+    _description = "Bundle tag"
+
+    _sql_constraints = [
+        ('unique_bundle_tag_nam', 'unique (name)', 'avoid duplicate tags'),
+    ]
+
+    name = fields.Char('Tag', )
+    bundle_ids = fields.Many2many('runbot.bundle', string='Bundles')
+
+
+class BundlePr(models.Model):
+
+    _name = "runbot.bundle.pr"
+    _description = "Bundle PR Link"
+    _auto = False
+    _order = 'id desc'
+
+    id = fields.Many2one('runbot.bundle', string='Bundle', readonly=True)
+    name = fields.Char(string='Bundle Name', readonly=True)
+    project_id = fields.Many2one('runbot.project', readonly=True)
+    is_base = fields.Boolean('Is base', readonly=True)
+    owner_id = fields.Many2one('res.users', string='Bundle Owner', readonly=True)
+    tags = fields.Char('Comma Separated Tags', readonly=True)
+    branch_count = fields.Integer('Branch count', readonly=True)
+    pr_count = fields.Integer('PR count', readonly=True)
+    pr_open_count = fields.Integer('Open PR count', readonly=True)
+    pr_closed_count = fields.Integer('Closed PR count', readonly=True)
+
+    def init(self):
+        """ Create an SQL view for bundle """
+        tools.drop_view_if_exists(self._cr, 'runbot_bundle_pr')
+        self._cr.execute("""
+            CREATE VIEW runbot_bundle_pr AS (
+                SELECT 
+                    runbot_bundle.id AS id,
+                    runbot_bundle.name AS name,
+                    runbot_bundle.project_id AS project_id,
+                    runbot_bundle.is_base AS is_base,
+                    runbot_bundle.owner_id AS owner_id,
+                    STRING_AGG(runbot_bundle_tag.name,',') AS tags,
+                    count(runbot_branch.id) AS branch_count,
+                    SUM(CASE WHEN runbot_branch.is_pr THEN 1 ELSE 0 END) AS pr_count,
+                    SUM(CASE WHEN runbot_branch.is_pr AND runbot_branch.alive THEN 1 ELSE 0 END) AS pr_open_count,
+                    SUM(CASE WHEN runbot_branch.is_pr AND NOT runbot_branch.alive THEN 1 ELSE 0 END) AS pr_closed_count
+                FROM
+                    runbot_bundle
+                JOIN
+                    runbot_branch ON runbot_branch.bundle_id = runbot_bundle.id
+                LEFT JOIN
+                    runbot_bundle_runbot_bundle_tag_rel ON runbot_bundle_runbot_bundle_tag_rel.runbot_bundle_id = runbot_bundle.id
+                LEFT JOIN
+                    runbot_bundle_tag ON runbot_bundle_tag.id = runbot_bundle_runbot_bundle_tag_rel.runbot_bundle_tag_id
+                GROUP BY
+                    runbot_bundle.id
+            )"""
+        )

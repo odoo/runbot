@@ -73,6 +73,10 @@ access_runbot_project_runbot_admin,access_runbot_project_runbot_admin,runbot.mod
 access_runbot_bundle_user,access_runbot_bundle_user,runbot.model_runbot_bundle,runbot.group_user,1,0,0,0
 access_runbot_bundle_runbot_admin,access_runbot_bundle_runbot_admin,runbot.model_runbot_bundle,runbot.group_runbot_admin,1,1,1,1
 
+access_runbot_bundle_pr_user,access_runbot_bundle_pr_usr,runbot.model_runbot_bundle_pr,runbot.group_user,1,0,0,0
+access_runbot_bundle_tag_admin,access_runbot_bundle_tag_admin,runbot.model_runbot_bundle_tag,runbot.group_runbot_admin,1,1,1,1
+access_runbot_bundle_tag_user,access_runbot_bundle_tag_user,runbot.model_runbot_bundle_tag,runbot.group_user,1,0,0,0
+
 access_runbot_batch_user,access_runbot_batch_user,runbot.model_runbot_batch,runbot.group_user,1,0,0,0
 access_runbot_batch_runbot_admin,access_runbot_batch_runbot_admin,runbot.model_runbot_batch,runbot.group_runbot_admin,1,1,1,1
 

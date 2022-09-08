@@ -29,6 +29,7 @@
         'templates/build.xml',
         'templates/build_stats.xml',
         'templates/bundle.xml',
+        'templates/bundle_list.xml',
         'templates/commit.xml',
         'templates/dashboard.xml',
         'templates/frontend.xml',

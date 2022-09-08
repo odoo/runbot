@@ -197,6 +197,56 @@ class Runbot(Controller):
 
         return request.render('runbot.bundle', context)
 
+    @route(['/runbot/bundle', '/runbot/bundle/page/<int:page>'], website=True, auth='user', type='http', sitemap=False)
+    def bundle_list(self, project_id=None, is_base='0', pr_filter=None, team_id=None, tag_id=None, search=None, page=1, **kwargs):
+        if not project_id:
+            project_id = request.env.ref('runbot.main_project').id
+
+        is_base = bool(int(is_base))
+
+        pr_filters = {
+            'all':  { 'text': 'All', 'domain': False},
+            'has_pr': { 'text': 'With Pull Request(s)', 'domain': ('pr_count', '>', 0)},
+            'has_no_pr': { 'text': 'Without Pull Request(s)', 'domain': ('pr_count', '=', 0)},
+            'has_open_pr': { 'text': 'With Open Pull Request(s)', 'domain': ('pr_open_count', '>', 0)},
+            'has_no_open_pr': { 'text': 'Without Open Pull Request(s)', 'domain': ('pr_open_count', '=', 0)},
+        }
+        teams = request.env['runbot.team'].search([], order='name')
+        tags = request.env['runbot.bundle.tag'].search([], order='name')
+        domain = [('project_id', '=', project_id), ('is_base', '=', is_base)]
+
+        if pr_filter:
+            domain.append(pr_filters.get(pr_filter, {}).get('domain', ()))
+        if team_id:
+            team = request.env['runbot.team'].browse(int(team_id))
+            domain.append(('owner_id', 'in', team.user_ids.ids))
+        if tag_id:
+            tag_name = request.env['runbot.bundle.tag'].browse(int(tag_id)).name
+            domain.append(('tags', 'like', f'%{tag_name}%'))
+
+        if search:
+            search = search if len(search) < 60 else search[:60]
+            domain.append(('name', 'like', f'%{search}%'))
+
+        bundle_count = request.env['runbot.bundle.pr'].search_count(domain)
+        pager = request.website.pager(
+            url='/runbot/bundle',
+            url_args={'is_base': '1' if is_base else 0, 'pr_filter': pr_filter, 'team_id': team_id},
+            total=bundle_count,
+            page=page,
+            step=20,
+        )
+        bundle_ids = request.env['runbot.bundle.pr'].search(domain, limit=20, offset=pager.get('offset', 0), order='id desc').ids
+
+        context = {
+            'pager': pager,
+            'pr_filters': pr_filters,
+            'teams': teams,
+            'tags': tags,
+            'bundles': request.env['runbot.bundle'].browse(bundle_ids),
+        }
+        return request.render('runbot.bundle_list', context)
+
     @o_route([
         '/runbot/bundle/<model("runbot.bundle"):bundle>/force',
         '/runbot/bundle/<model("runbot.bundle"):bundle>/force/<int:auto_rebase>',
