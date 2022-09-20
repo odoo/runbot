@@ -17,8 +17,8 @@ from odoo.http import request
 from odoo.tools import appdirs
 from odoo.tools.safe_eval import safe_eval
 from collections import defaultdict
+from pathlib import Path
 from psycopg2 import sql
-from subprocess import CalledProcessError
 import getpass
 
 _logger = logging.getLogger(__name__)
@@ -535,32 +535,32 @@ class BuildResult(models.Model):
             self._logger('Removing database')
             self._local_pg_dropdb(db)
 
-        root = self.env['runbot.runbot']._root()
-        builds_dir = os.path.join(root, 'build')
+        builds_dir = Path(self.env['runbot.runbot']._root()) / 'build'
 
         if force is True:
             dests = [(build.dest, full) for build in self]
         else:
-            dests = _filter(dest_list=os.listdir(builds_dir), label='workspace')
+            dests = _filter(dest_list=builds_dir.iterdir(), label='workspace')
 
         for dest, full in dests:
-            build_dir = os.path.join(builds_dir, dest)
+            build_dir = Path(builds_dir) / dest
             if full:
                 _logger.info('Removing build dir "%s"', dest)
                 shutil.rmtree(build_dir, ignore_errors=True)
                 continue
-            for f in os.listdir(build_dir):
-                path = os.path.join(build_dir, f)
-                if os.path.isdir(path) and f not in ('logs', 'tests'):
-                    shutil.rmtree(path)
-                elif f == 'logs':
-                    log_path = os.path.join(build_dir, 'logs')
-                    for f in os.listdir(log_path):
-                        log_file_path = os.path.join(log_path, f)
-                        if os.path.isdir(log_file_path):
+            gcstamp = build_dir / '.gcstamp'
+            if gcstamp.exists():
+                continue
+            for bdir_file in build_dir.iterdir():
+                if bdir_file.is_dir() and bdir_file.name not in ('logs', 'tests'):
+                    shutil.rmtree(bdir_file)
+                elif bdir_file.name == 'logs':
+                    for log_file_path in (bdir_file / 'logs').iterdir():
+                        if log_file_path.is_dir():
                             shutil.rmtree(log_file_path)
-                        elif f in ('run.txt', 'wake_up.txt') or not f.endswith('.txt'):
-                            os.unlink(log_file_path)
+                        elif log_file_path.name in ('run.txt', 'wake_up.txt') or not log_file_path.name.endswith('.txt'):
+                            log_file_path.unlink()
+                gcstamp.write_text(f'gc date: {datetime.datetime.now()}')
 
     def _find_port(self):
         # currently used port
