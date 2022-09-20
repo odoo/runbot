@@ -30,3 +30,17 @@ function copyToClipboard(text) {
     }
     navigator.clipboard.writeText(text);
 }
+
+function toggleMoreInfo() {
+    let batches_commits_infos = document.getElementsByClassName("batch_commits");
+    for (let i = 0; i < batches_commits_infos.length; i++) {
+        info_block = batches_commits_infos[i];
+        console.log(info_block.style.display);
+        if (info_block.style.display === "none") {
+            info_block.style.display = "block";
+        }
+        else {
+            info_block.style.display = "none";
+        }
+    }
+}

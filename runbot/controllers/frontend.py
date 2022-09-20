@@ -25,14 +25,12 @@ def route(routes, **kw):
         @functools.wraps(f)
         def response_wrap(*args, **kwargs):
             projects = request.env['runbot.project'].search([])
-            more = request.httprequest.cookies.get('more', False) == '1'
             filter_mode = request.httprequest.cookies.get('filter_mode', 'all')
             keep_search = request.httprequest.cookies.get('keep_search', False) == '1'
             cookie_search = request.httprequest.cookies.get('search', '')
             refresh = kwargs.get('refresh', False)
             nb_build_errors = request.env['runbot.build.error'].search_count([('random', '=', True), ('parent_id', '=', False)])
             nb_assigned_errors = request.env['runbot.build.error'].search_count([('responsible', '=', request.env.user.id)])
-            kwargs['more'] = more
             kwargs['projects'] = projects
 
             response = f(*args, **kwargs)
@@ -47,7 +45,6 @@ def route(routes, **kw):
                 project = response.qcontext.get('project') or projects[0]
 
                 response.qcontext['projects'] = projects
-                response.qcontext['more'] = more
                 response.qcontext['keep_search'] = keep_search
                 response.qcontext['search'] = search
                 response.qcontext['current_path'] = request.httprequest.full_path
@@ -78,9 +75,8 @@ class Runbot(Controller):
     @o_route([
         '/runbot/submit'
     ], type='http', auth="public", methods=['GET', 'POST'], csrf=False)
-    def submit(self, more=False, redirect='/', keep_search=False, category=False, filter_mode=False, update_triggers=False, **kwargs):
+    def submit(self, redirect='/', keep_search=False, category=False, filter_mode=False, update_triggers=False, **kwargs):
         response = werkzeug.utils.redirect(redirect)
-        response.set_cookie('more', '1' if more else '0')
         response.set_cookie('keep_search', '1' if keep_search else '0')
         response.set_cookie('filter_mode', filter_mode or 'all')
         response.set_cookie('category', category or '0')
@@ -101,8 +97,9 @@ class Runbot(Controller):
     @route(['/',
             '/runbot',
             '/runbot/<model("runbot.project"):project>',
-            '/runbot/<model("runbot.project"):project>/search/<search>'], website=True, auth='public', type='http')
-    def bundles(self, project=None, search='', projects=False, refresh=False, **kwargs):
+            '/runbot/<model("runbot.project"):project>/search/<search>',
+            '/runbot/page/<int:page>'], website=True, auth='public', type='http')
+    def bundles(self, limit=40, page=1, project=None, search='', projects=False, refresh=False, **kwargs):
         search = search if len(search) < 60 else search[:60]
         env = request.env
         categories = env['runbot.category'].search([])
@@ -149,8 +146,21 @@ class Runbot(Controller):
                     case when "runbot_bundle".sticky then "runbot_bundle".version_number end collate "C" desc,
                     "runbot_bundle".last_batch desc
             """
-            query.limit=40
-            bundles = env['runbot.bundle'].browse(query)
+
+            bundle_count = request.env['runbot.bundle.pr'].search_count(domain)
+            limit = min(float(limit), 200)
+            pager = request.website.pager(
+                url='/runbot/',
+                url_args={'search': search},
+                total=bundle_count,
+                scope=3,
+                page=page,
+                step=limit,
+            )
+            query.limit = limit
+            query.offset = pager.get('offset', 0)
+            bundles_pr = env['runbot.bundle.pr'].browse(query)
+            bundles = env['runbot.bundle'].browse(bundles_pr.ids)
 
             category_id = int(request.httprequest.cookies.get('category') or 0) or request.env['ir.model.data']._xmlid_to_res_id('runbot.default_category')
 
@@ -161,12 +171,21 @@ class Runbot(Controller):
 
             triggers = env['runbot.trigger'].search([('project_id', '=', project.id)])
             context.update({
+                'pager': pager,
                 'active_category_id': category_id,
                 'bundles': bundles,
                 'project': project,
                 'triggers': triggers,
                 'trigger_display': trigger_display,
             })
+
+        pr_filters = {
+            'all':  { 'text': 'All', 'domain': False},
+            'has_pr': { 'text': 'With Pull Request(s)', 'domain': ('pr_count', '>', 0)},
+            'has_no_pr': { 'text': 'Without Pull Request(s)', 'domain': ('pr_count', '=', 0)},
+            'has_open_pr': { 'text': 'With Open Pull Request(s)', 'domain': ('pr_open_count', '>', 0)},
+            'has_no_open_pr': { 'text': 'Without Open Pull Request(s)', 'domain': ('pr_open_count', '=', 0)},
+        }
 
         context.update({'message': request.env['ir.config_parameter'].sudo().get_param('runbot.runbot_message')})
         res = request.render('runbot.bundles', context)

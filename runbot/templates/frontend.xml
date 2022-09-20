@@ -4,6 +4,7 @@
     <template id="runbot.bundles">
       <t t-call='runbot.layout'>
         <t t-set="nav_form">
+          <t t-call="website.pager" />
           <form class="form-inline my-2 my-lg-0" role="search" t-att-action="qu(search='')" method="get">
             <div class="input-group md-form form-sm form-2 pl-0">
               <input class="form-control my-0 py-1" type="text" placeholder="Search" aria-label="Search" name="search" t-att-value="search"/>
@@ -73,6 +74,9 @@
             </div>
           </div>
         </div>
+        <div class="pull-right">
+          <t t-call="website.pager" />
+        </div>
       </t>
     </template>
 
@@ -105,7 +109,7 @@
             </t>
             <div class="slot_filler" t-foreach="range(10)" t-as="x"/>
           </div>
-          <div t-if='more' class="batch_commits">
+          <div class="batch_commits" style="display: none;">
             <div t-foreach="batch.commit_link_ids.sorted(lambda cl: (cl.commit_id.repo_id.sequence, cl.commit_id.repo_id.id))" t-as="commit_link" class="one_line">
 
               <a t-attf-href="/runbot/commit/#{commit_link.commit_id.id}" t-attf-class="badge badge-light batch_commit match_type_{{commit_link.match_type}}">

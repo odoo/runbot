@@ -53,6 +53,14 @@
                                         </t>
                                     </t>
                                     <li class="nav-item divider"/>
+                                    <li>
+                                        <a href="#" class="nav-link" title="Toggle More Batch Infos" aria-label="Toggle More Batch Infos" onclick="toggleMoreInfo()">
+                                            <i t-attf-class="fa fa-info"/>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item divider"/>
+                                    <t t-call="runbot.filter_dropdown" />
+                                    <li class="nav-item divider"/>
                                     <li class="nav-item dropdown">
                                         <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown">
                                             <i class="fa fa-gear"/>
@@ -61,10 +69,6 @@
                                             <form class="px-4 py-3" method="post" action="/runbot/submit">
                                                 <input type="hidden" name="save" value="1"/>
                                                 <input type="hidden" name="redirect" t-att-value="current_path"/>
-                                                <div class="text-nowrap">
-                                                    <input type="checkbox" name="more" id="more" t-att-checked="more"/>
-                                                    <label for="more">More info</label>
-                                                </div>
                                                 <div class="text-nowrap">
                                                     <input type="checkbox" name="keep_search" id="keep_search" t-att-checked="keep_search"/>
                                                     <label for="keep_search">Persistent search</label>
@@ -354,6 +358,22 @@
                     </a>
                 </t>
             </div>
+        </template>
+
+        <template id="runbot.filter_dropdown">
+            <li class="nav-item dropdown">
+                <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown">
+                    <i class="fa fa-filter"/>
+                </a>
+                <div class="dropdown-menu" role="menu">
+                    <t t-foreach="pr_filters" t-as="pr_filter">
+                        <a class="dropdown-item d-flex align-items-center justify-content-between" t-attf-href="/runbot/bundle?{{ keep_query('*', pr_filter=pr_filter if pr_filter != 'all' else None) }}">
+                            <span t-esc="pr_filters[pr_filter].get('text')"/>
+                        </a>
+                    </t>
+                        <hr class="separator"/>
+                </div>
+            </li>
         </template>
     </data>
 </odoo>

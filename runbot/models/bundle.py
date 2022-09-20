@@ -270,13 +270,17 @@ class BundlePr(models.Model):
     id = fields.Many2one('runbot.bundle', string='Bundle', readonly=True)
     name = fields.Char(string='Bundle Name', readonly=True)
     project_id = fields.Many2one('runbot.project', readonly=True)
+    no_build = fields.Boolean('No build', readonly=True)
+    last_batch = fields.Many2one('runbot.batch', readonly=True)
     is_base = fields.Boolean('Is base', readonly=True)
+    sticky = fields.Boolean('Sticky', readonly=True)
     owner_id = fields.Many2one('res.users', string='Bundle Owner', readonly=True)
     tags = fields.Char('Comma Separated Tags', readonly=True)
     branch_count = fields.Integer('Branch count', readonly=True)
     pr_count = fields.Integer('PR count', readonly=True)
     pr_open_count = fields.Integer('Open PR count', readonly=True)
     pr_closed_count = fields.Integer('Closed PR count', readonly=True)
+
 
     def init(self):
         """ Create an SQL view for bundle """
@@ -287,7 +291,10 @@ class BundlePr(models.Model):
                     runbot_bundle.id AS id,
                     runbot_bundle.name AS name,
                     runbot_bundle.project_id AS project_id,
+                    runbot_bundle.no_build AS no_build,
+                    runbot_bundle.last_batch AS last_batch,
                     runbot_bundle.is_base AS is_base,
+                    runbot_bundle.sticky AS sticky,
                     runbot_bundle.owner_id AS owner_id,
                     STRING_AGG(runbot_bundle_tag.name,',') AS tags,
                     count(runbot_branch.id) AS branch_count,
