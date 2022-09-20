@@ -298,7 +298,7 @@ class TestBuildResult(RunbotCase):
         # test the real _local_cleanup method
         self.stop_patcher('_local_cleanup_patcher')
         self.start_patcher('build_local_pgadmin_cursor_patcher', 'odoo.addons.runbot.models.build.local_pgadmin_cursor')
-        self.start_patcher('build_os_listdirr_patcher', 'odoo.addons.runbot.models.build.os.listdir')
+        self.start_patcher('build_path_patcher', 'odoo.addons.runbot.models.build.Path')
         dbname = '%s-foobar' % build.dest
         self.start_patcher('list_local_dbs_patcher', 'odoo.addons.runbot.models.build.list_local_dbs', return_value=[dbname])
 
