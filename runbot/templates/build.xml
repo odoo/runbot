@@ -156,6 +156,7 @@
                 </t>
                 <b>Host:</b>
                 <t t-esc="build.host"/>
+                <a groups="runbot.group_runbot_admin" class="fa fa-list text-left" t-attf-href="/web/#id={{host_id.id}}&amp;view_type=form&amp;model=runbot.host" target="new" title="View Host in Backend"/>
                 <br/>
               </t>
               <b>Total time:</b>

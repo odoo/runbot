@@ -38,6 +38,7 @@ class Runbot(models.AbstractModel):
 
     def _scheduler(self, host):
         self._gc_testing(host)
+        host._set_host_infos()
         self._commit()
         for build in self._get_builds_with_requested_actions(host):
             build._process_requested_actions()
@@ -230,6 +231,7 @@ class Runbot(models.AbstractModel):
 
     def _fetch_loop_turn(self, host, pull_info_failures, default_sleep=1):
         with self.manage_host_exception(host) as manager:
+            host._set_host_infos()
             repos = self.env['runbot.repo'].search([('mode', '!=', 'disabled')])
             processing_batch = self.env['runbot.batch'].search([('state', 'in', ('preparing', 'ready'))], order='id asc')
             preparing_batch = processing_batch.filtered(lambda b: b.state == 'preparing')
