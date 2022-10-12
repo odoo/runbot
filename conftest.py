@@ -184,7 +184,7 @@ def tunnel(pytestconfig, port):
     """
     tunnel = pytestconfig.getoption('--tunnel')
     if tunnel == '':
-        return f'http://localhost:{port}'
+        yield f'http://localhost:{port}'
     elif tunnel == 'ngrok':
         web_addr = 'http://localhost:4040/api'
         addr = 'localhost:%d' % port
