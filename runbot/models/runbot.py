@@ -150,9 +150,10 @@ class Runbot(models.AbstractModel):
         nginx_dir = os.path.join(self._root(), 'nginx')
         settings['nginx_dir'] = nginx_dir
         settings['re_escape'] = re.escape
-        settings['fqdn'] = fqdn()
+        host_name = self.env['runbot.host']._get_current_name()
+        settings['host_name'] = self.env['runbot.host']._get_current_name()
 
-        settings['builds'] = env['runbot.build'].search([('local_state', '=', 'running'), ('host', '=', fqdn())])
+        settings['builds'] = env['runbot.build'].search([('local_state', '=', 'running'), ('host', '=', host_name)])
 
         nginx_config = env['ir.ui.view']._render_template("runbot.nginx_config", settings)
         os.makedirs(nginx_dir, exist_ok=True)
@@ -309,13 +310,14 @@ class Runbot(models.AbstractModel):
                 return
             _logger.info('Source cleaning')
 
+            host_name = self.env['runbot.host']._get_current_name()
             cannot_be_deleted_path = set()
-            for commit in self.env['runbot.commit.export'].search([('host', '=', fqdn())]).mapped('commit_id'):
+            for commit in self.env['runbot.commit.export'].search([('host', '=', host_name)]).mapped('commit_id'):
                 cannot_be_deleted_path.add(commit._source_path())
 
 
             # the following part won't be usefull anymore once runbot.commit.export is populated
-            cannot_be_deleted_builds = self.env['runbot.build'].search([('host', '=', fqdn()), ('local_state', '!=', 'done')])
+            cannot_be_deleted_builds = self.env['runbot.build'].search([('host', '=', host_name), ('local_state', '!=', 'done')])
             cannot_be_deleted_builds |= cannot_be_deleted_builds.mapped('params_id.builds_reference_ids')
             for build in cannot_be_deleted_builds:
                 for build_commit in build.params_id.commit_link_ids:

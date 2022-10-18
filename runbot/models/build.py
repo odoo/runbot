@@ -563,7 +563,8 @@ class BuildResult(models.Model):
 
     def _find_port(self):
         # currently used port
-        ids = self.search([('local_state', 'not in', ['pending', 'done']), ('host', '=', fqdn())])
+        host_name = self.env['runbot.host']._get_current_name()
+        ids = self.search([('local_state', 'not in', ['pending', 'done']), ('host', '=', host_name)])
         ports = set(i['port'] for i in ids.read(['port']))
 
         # starting port
@@ -900,9 +901,9 @@ class BuildResult(models.Model):
         })
 
     def _kill(self, result=None):
-        host = fqdn()
+        host_name = self.env['runbot.host']._get_current_name()
         for build in self:
-            if build.host != host:
+            if build.host != host_name:
                 continue
             build._log('kill', 'Kill build %s' % build.dest)
             docker_stop(build._get_docker_name(), build._path())
