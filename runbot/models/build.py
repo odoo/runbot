@@ -998,7 +998,7 @@ class BuildResult(models.Model):
         if grep(config_path, "log-db"):
             logdb_uri = self.env['ir.config_parameter'].get_param('runbot.runbot_logdb_uri')
             logdb = self.env.cr.dbname
-            if logdb_uri and grep(build._server('sql_db.py'), 'allow_uri'):
+            if logdb_uri: # this looks useless
                 logdb = '%s' % logdb_uri
             command.add_config_tuple("log_db", "%s" % logdb)
             if grep(config_path, 'log-db-level'):
