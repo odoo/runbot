@@ -312,7 +312,7 @@
                         <i class="fa fa-search"/>
                         Find similar builds
                     </a>
-                    <a class="dropdown-item" t-attf-href="/web/#id={{bu['id']}}&amp;view_type=form&amp;model=runbot.build" target="new">
+                    <a class="dropdown-item" t-attf-href="/web/#id={{bu['id']}}&amp;view_type=form&amp;model=runbot.build&amp;menu_id={{env.ref('runbot.runbot_menu_root').id}}" target="new">
                         <i class="fa fa-list"/>
                         View in backend
                     </a>
