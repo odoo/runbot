@@ -326,7 +326,7 @@
                     <td/><td/><td/>
                     <td t-attf-class="bg-info-light {{size}}">
                       This error is already known.
-                      <a groups="runbot.group_build_config_user" t-attf-href="/web#id={{l.error_id.id}}&amp;view_type=form&amp;model=runbot.build.error&amp;menu_id={{env.ref('runbot.runbot_menu_root').id}}" title="View in Backend" target="new">
+                      <a groups="runbot.group_user" t-attf-href="/web#id={{l.error_id.id}}&amp;view_type=form&amp;model=runbot.build.error&amp;menu_id={{env.ref('runbot.runbot_menu_root').id}}" title="View in Backend" target="new">
                         <i t-attf-class="fa fa-{{icon}}"/>
                       </a>
                       <span groups="runbot.group_runbot_admin" t-if="error.responsible or error.responsible.id == uid">(<i t-esc="error.responsible.name"/>)</span>
