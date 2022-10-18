@@ -11,6 +11,7 @@
                     <field name="dockerfile_id"/>
                     <field name="group_ids"/>
                     <field name="trigger_ids"/>
+                    <field name="sequence"/>
                 </group>
             </form>
         </field>
@@ -25,6 +26,7 @@
                 <field name="dockerfile_id"/>
                 <field name="group_ids"/>
                 <field name="trigger_ids"/>
+                <field name="sequence"/>
             </tree>
         </field>
     </record>
@@ -62,6 +64,7 @@
                     </field>
                     <field string="Trigger customisations" name="trigger_custom_ids">
                         <tree editable="bottom">
+                            <field name="start_mode"/>
                             <field name="trigger_id" domain="[('project_id', '=', parent.project_id)]"/>
                             <field name="config_id"/>
                             <field name="extra_params"/>

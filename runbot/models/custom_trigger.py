@@ -8,6 +8,7 @@ class BundleTriggerCustomization(models.Model):
     _description = 'Custom trigger'
 
     trigger_id = fields.Many2one('runbot.trigger')
+    start_mode = fields.Selection([('disabled', 'Disabled'), ('auto', 'Auto'), ('force', 'Force')], required=True, default='auto')
     bundle_id = fields.Many2one('runbot.bundle')
     config_id = fields.Many2one('runbot.build.config')
     extra_params = fields.Char("Custom parameters")
