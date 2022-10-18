@@ -35,9 +35,10 @@
                   <field name="build_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}">
                     <tree>
                       <field name="create_date"/>
-                      <field name="id"/>
                       <field name="host" groups="base.group_no_one"/>
                       <field name="dest"/>
+                      <field name="trigger_id"/>
+                      <field name="description"/>
                       <field name="build_url" widget="url" readonly="1" text="View build"/>
                     </tree>
                   </field>
@@ -122,6 +123,7 @@
           <filter string="No Parent" name="no_parent_error" domain="[('parent_id', '=', False)]"/>
           <separator/>
           <filter string="Undeterministic" name="random_error" domain="[('random', '=', True)]"/>
+          <filter string="Deterministic" name="random_error" domain="[('random', '=', False)]"/>
           <separator/>
           <filter string="Fixed" name="fixed_errors" domain="[('active', '=', False)]"/>
           <filter string="Not Fixed" name="not_fixed_errors" domain="[('active', '=', True)]"/>
