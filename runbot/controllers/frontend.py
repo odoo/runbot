@@ -44,7 +44,7 @@ def route(routes, **kw):
                 if keep_search and cookie_search != search:
                     response.set_cookie('search', search)
 
-                project = response.qcontext.get('project') or projects[0]
+                project = response.qcontext.get('project') or projects and projects[0]
 
                 response.qcontext['projects'] = projects
                 response.qcontext['more'] = more
@@ -54,7 +54,8 @@ def route(routes, **kw):
                 response.qcontext['refresh'] = refresh
                 response.qcontext['filter_mode'] = filter_mode
                 response.qcontext['default_category'] = request.env['ir.model.data']._xmlid_to_res_id('runbot.default_category')
-                response.qcontext['qu'] = QueryURL('/runbot/%s' % (slug(project)), path_args=['search'], search=search, refresh=refresh)
+
+                response.qcontext['qu'] = QueryURL('/runbot/%s' % (slug(project) if project else ''), path_args=['search'], search=search, refresh=refresh)
                 if 'title' not in response.qcontext:
                     response.qcontext['title'] = 'Runbot %s' % project.name or ''
                 response.qcontext['nb_build_errors'] = nb_build_errors

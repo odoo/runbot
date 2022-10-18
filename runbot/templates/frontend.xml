@@ -25,7 +25,7 @@
                 <t t-esc="message" />
               </div>
               <div t-if="not project" class="mb32">
-                <h1>No project</h1>
+                <h3>No project</h3>
               </div>
               <div t-else="">
                 <div t-foreach="bundles" t-as="bundle" class="row bundle_row">
