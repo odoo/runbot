@@ -35,6 +35,11 @@
             </field>
         </record>
 
+        <record model="ir.config_parameter" id="runbot.runbot_default_odoorc">
+            <field name="key">runbot.runbot_default_odoorc</field>
+            <field name="value">[options]\nadmin_passwd=running_master_password</field>
+        </record>
+
     </data>
 
     <record model="ir.config_parameter" id="runbot.runbot_is_base_regex">

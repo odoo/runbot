@@ -20,6 +20,7 @@ class ResConfigSettings(models.TransientModel):
     runbot_update_frequency = fields.Integer('Update frequency (in seconds)')
     runbot_template = fields.Char('Postgresql template', help="Postgresql template to use when creating DB's")
     runbot_message = fields.Text('Frontend warning message')
+    runbot_default_odoorc = fields.Text('Default odoorc for builds')
     runbot_upgrade_exception_message = fields.Text('Upgrade exception message')
     runbot_do_fetch = fields.Boolean('Discover new commits')
     runbot_do_schedule = fields.Boolean('Schedule builds')
@@ -52,6 +53,7 @@ class ResConfigSettings(models.TransientModel):
                    runbot_update_frequency=int(get_param('runbot.runbot_update_frequency', default=10)),
                    runbot_template=get_param('runbot.runbot_db_template'),
                    runbot_message=get_param('runbot.runbot_message', default=''),
+                   runbot_default_odoorc=get_param('runbot.runbot_default_odoorc'),
                    runbot_upgrade_exception_message=get_param('runbot.runbot_upgrade_exception_message'),
                    runbot_do_fetch=get_param('runbot.runbot_do_fetch', default=False),
                    runbot_do_schedule=get_param('runbot.runbot_do_schedule', default=False),
@@ -72,6 +74,7 @@ class ResConfigSettings(models.TransientModel):
         set_param('runbot.runbot_update_frequency', self.runbot_update_frequency)
         set_param('runbot.runbot_db_template', self.runbot_template)
         set_param('runbot.runbot_message', self.runbot_message)
+        set_param('runbot.runbot_default_odoorc', self.runbot_default_odoorc)
         set_param('runbot.runbot_upgrade_exception_message', self.runbot_upgrade_exception_message)
         set_param('runbot.runbot_do_fetch', self.runbot_do_fetch)
         set_param('runbot.runbot_do_schedule', self.runbot_do_schedule)

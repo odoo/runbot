@@ -744,8 +744,12 @@ class BuildResult(models.Model):
                     build._log("run", message, level='ERROR')
                     build._kill(result='ko')
 
-    def _docker_run(self, **kwargs):
+    def _docker_run(self, cmd=None, ro_volumes=None, **kwargs):
         self.ensure_one()
+        _ro_volumes = ro_volumes or {}
+        ro_volumes = {}
+        for dest, source in _ro_volumes.items():
+            ro_volumes[f'/data/build/{dest}'] = source
         if 'image_tag' not in kwargs:
             kwargs.update({'image_tag': self.params_id.dockerfile_id.image_tag})
         if kwargs['image_tag'] != 'odoo:DockerDefault':
@@ -758,7 +762,16 @@ class BuildResult(models.Model):
             start_step_time = int(dt2time(self.docker_start) - dt2time(self.job_start))
             if start_step_time > 60:
                 _logger.info('Step took %s seconds before starting docker', start_step_time)
-        docker_run(**kwargs)
+
+        starting_config = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_default_odoorc')
+        if isinstance(cmd, Command):
+            rc_content = cmd.get_config(starting_config=starting_config)
+        else:
+            rc_content = starting_config
+        self.write_file('.odoorc', rc_content)
+        ro_volumes['/home/odoo/.odoorc'] = self._path('.odoorc')
+        kwargs.pop('build_dir', False)  # todo check python steps
+        docker_run(cmd=cmd, build_dir=self._path(), ro_volumes=ro_volumes, **kwargs)
 
     def _path(self, *l, **kw):
         """Return the repo build path"""
