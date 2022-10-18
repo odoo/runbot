@@ -35,7 +35,7 @@ class BuildError(models.Model):
     build_ids = fields.Many2many('runbot.build', 'runbot_build_error_ids_runbot_build_rel', string='Affected builds')
     bundle_ids = fields.One2many('runbot.bundle', compute='_compute_bundle_ids')
     version_ids = fields.One2many('runbot.version', compute='_compute_version_ids', string='Versions', search='_search_version')
-    trigger_ids = fields.Many2many('runbot.trigger', compute='_compute_trigger_ids')
+    trigger_ids = fields.Many2many('runbot.trigger', compute='_compute_trigger_ids', string='Triggers', search='_search_trigger_ids')
     active = fields.Boolean('Error is not fixed', default=True, tracking=True)
     tag_ids = fields.Many2many('runbot.build.error.tag', string='Tags')
     build_count = fields.Integer(compute='_compute_build_counts', string='Nb seen', store=True)
@@ -47,7 +47,7 @@ class BuildError(models.Model):
     first_seen_date = fields.Datetime(string='First Seen Date', related='first_seen_build_id.create_date')
     last_seen_build_id = fields.Many2one('runbot.build', compute='_compute_last_seen_build_id', string='Last Seen build', store=True)
     last_seen_date = fields.Datetime(string='Last Seen Date', related='last_seen_build_id.create_date', store=True)
-    test_tags = fields.Char(string='Test tags', help="Comma separated list of test_tags to use to reproduce/remove this error")
+    test_tags = fields.Char(string='Test tags', help="Comma separated list of test_tags to use to reproduce/remove this error", tracking=True)
 
     @api.constrains('test_tags')
     def _check_test_tags(self):
@@ -92,7 +92,7 @@ class BuildError(models.Model):
     @api.depends('build_ids')
     def _compute_trigger_ids(self):
         for build_error in self:
-            build_error.trigger_ids = build_error.mapped('build_ids.params_id.trigger_id')
+            build_error.trigger_ids = build_error.build_ids.trigger_id
 
     @api.depends('content')
     def _compute_summary(self):
@@ -201,6 +201,8 @@ class BuildError(models.Model):
     def _search_version(self, operator, value):
         return [('build_ids.version_id', operator, value)]
 
+    def _search_trigger_ids(self, operator, value):
+        return [('build_ids.trigger_id', operator, value)]
 
 class BuildErrorTag(models.Model):
 
