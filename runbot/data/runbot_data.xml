@@ -75,6 +75,7 @@
 
     <record id="ir_cron_runbot" model="ir.cron">
         <field name="name">Runbot</field>
+        <field name="active" eval="False"/>
         <field name="interval_number">10</field>
         <field name="interval_type">seconds</field>
         <field name="numbercall">-1</field>
