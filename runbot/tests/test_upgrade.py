@@ -1,3 +1,4 @@
+import getpass
 import logging
 import getpass
 from odoo.exceptions import UserError

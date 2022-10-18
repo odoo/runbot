@@ -116,7 +116,7 @@ class Remote(models.Model):
     sequence = fields.Integer('Sequence', tracking=True)
     fetch_heads = fields.Boolean('Fetch branches', default=True, tracking=True)
     fetch_pull = fields.Boolean('Fetch PR', default=False, tracking=True)
-    send_status = fields.Boolean('Send status', default=True, tracking=True)
+    send_status = fields.Boolean('Send status', default=False, tracking=True)
 
     token = fields.Char("Github token", groups="runbot.group_runbot_admin")
 
@@ -374,7 +374,7 @@ class Repo(models.Model):
                 if not git_refs:
                     return []
                 refs = [tuple(field for field in line.split('\x00')) for line in git_refs.split('\n')]
-                refs = [r for r in refs if int(r[2]) > commit_limit or self.env['runbot.branch'].match_is_base(r[0].split('\n')[-1])]
+                refs = [r for r in refs if int(r[2]) > commit_limit or self.env['runbot.branch'].match_is_base(r[0].split('/')[-1])]
                 if ignore:
                     refs = [r for r in refs if r[0].split('/')[-1] not in ignore]
                 return refs
