@@ -302,9 +302,8 @@ class Batch(models.Model):
                 self.warning('Missing commit for repo %s for trigger %s', (trigger_repos & missing_repos).mapped('name'), trigger.name)
                 continue
             # in any case, search for an existing build
+
             config = trigger_custom.config_id if trigger_custom else trigger.config_id
-            if not config:
-                continue
             extra_params = trigger_custom.extra_params if trigger_custom else ''
             config_data = trigger_custom.config_data if trigger_custom else {}
             params_value = {
@@ -326,7 +325,10 @@ class Batch(models.Model):
 
             build = self.env['runbot.build']
             link_type = 'created'
-            if ((trigger.repo_ids & bundle_repos) or bundle.build_all or bundle.sticky) and not trigger.manual:  # only auto link build if bundle has a branch for this trigger
+            force_trigger = trigger_custom and trigger_custom.start_mode == 'force'
+            skip_trigger = (trigger_custom and trigger_custom.start_mode == 'disable') or trigger.manual
+            should_start = ((trigger.repo_ids & bundle_repos) or bundle.build_all or bundle.sticky)
+            if force_trigger or (should_start and not skip_trigger):  # only auto link build if bundle has a branch for this trigger
                 link_type, build = self._create_build(params)
             self.env['runbot.batch.slot'].create({
                 'batch_id': self.id,

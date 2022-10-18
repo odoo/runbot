@@ -4,6 +4,7 @@ from odoo import models, fields
 class Project(models.Model):
     _name = 'runbot.project'
     _description = 'Project'
+    _order = 'sequence, id'
 
     name = fields.Char('Project name', required=True)
     group_ids = fields.Many2many('res.groups', string='Required groups')
@@ -11,6 +12,7 @@ class Project(models.Model):
     trigger_ids = fields.One2many('runbot.trigger', 'project_id', string='Triggers')
     dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, help="Project Default Dockerfile")
     repo_ids = fields.One2many('runbot.repo', 'project_id', string='Repos')
+    sequence = fields.Integer('Sequence')
 
 
 class Category(models.Model):
