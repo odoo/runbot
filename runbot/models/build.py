@@ -19,6 +19,7 @@ from odoo.tools.safe_eval import safe_eval
 from collections import defaultdict
 from psycopg2 import sql
 from subprocess import CalledProcessError
+import getpass
 
 _logger = logging.getLogger(__name__)
 
@@ -770,7 +771,8 @@ class BuildResult(models.Model):
         else:
             rc_content = starting_config
         self.write_file('.odoorc', rc_content)
-        ro_volumes['/home/odoo/.odoorc'] = self._path('.odoorc')
+        user = getpass.getuser()
+        ro_volumes[f'/home/{user}/.odoorc'] = self._path('.odoorc')
         kwargs.pop('build_dir', False)  # todo check python steps
         docker_run(cmd=cmd, build_dir=self._path(), ro_volumes=ro_volumes, **kwargs)
 

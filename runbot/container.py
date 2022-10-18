@@ -28,15 +28,6 @@ with warnings.catch_warnings():
 
 _logger = logging.getLogger(__name__)
 
-DOCKERUSER = """
-RUN groupadd -g %(group_id)s odoo \\
-&& useradd -u %(user_id)s -g odoo -G audio,video odoo \\
-&& mkdir /home/odoo \\
-&& chown -R odoo:odoo /home/odoo
-USER odoo
-ENV COVERAGE_FILE /data/build/.coverage
-""" % {'group_id': os.getgid(), 'user_id': os.getuid()}
-
 
 class Command():
 
@@ -113,9 +104,6 @@ def _docker_build(build_dir, image_tag):
     :param image_tag: name used to tag the resulting docker image
     :return: tuple(success, msg) where success is a boolean and msg is the error message or None
     """
-    # synchronise the current user with the odoo user inside the Dockerfile
-    with open(os.path.join(build_dir, 'Dockerfile'), 'a') as df:
-        df.write(DOCKERUSER)
     docker_client = docker.from_env()
     try:
         docker_client.images.build(path=build_dir, tag=image_tag, rm=True)

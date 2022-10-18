@@ -1,4 +1,5 @@
 import logging
+import getpass
 from odoo import models, fields, api
 from odoo.tools import config
 from ..common import fqdn, local_pgadmin_cursor, os
@@ -79,16 +80,32 @@ class Host(models.Model):
         static_path = self._get_work_path()
         self.clear_caches()  # needed to ensure that content is updated on all hosts
         for dockerfile in self.env['runbot.dockerfile'].search([('to_build', '=', True)]):
-            _logger.info('Building %s, %s', dockerfile.name, hash(str(dockerfile.dockerfile)))
-            docker_build_path = os.path.join(static_path, 'docker', dockerfile.image_tag)
-            os.makedirs(docker_build_path, exist_ok=True)
-            with open(os.path.join(docker_build_path, 'Dockerfile'), 'w') as Dockerfile:
-                Dockerfile.write(dockerfile.dockerfile)
-            docker_build_success, msg = docker_build(docker_build_path, dockerfile.image_tag)
-            if not docker_build_success:
-                dockerfile.to_build = False
-                dockerfile.message_post(body=f'Build failure:\n{msg}')
-                self.env['runbot.runbot'].warning(f'Dockerfile build "{dockerfile.image_tag}" failed on host {self.name}')
+            self._docker_build_dockerfile(dockerfile, static_path)
+
+    def _docker_build_dockerfile(self, dockerfile, workdir):
+        _logger.info('Building %s, %s', dockerfile.name, hash(str(dockerfile.dockerfile)))
+        docker_build_path = os.path.join(workdir, 'docker', dockerfile.image_tag)
+        os.makedirs(docker_build_path, exist_ok=True)
+
+        user = getpass.getuser()
+
+        docker_append = f"""
+            RUN groupadd -g {os.getgid()} {user} \\
+            && useradd -u {os.getuid()} -g {user} -G audio,video {user} \\
+            && mkdir /home/{user} \\
+            && chown -R {user}:{user} /home/{user}
+            USER {user}
+            ENV COVERAGE_FILE /data/build/.coverage
+            """
+
+        with open(os.path.join(docker_build_path, 'Dockerfile'), 'w') as Dockerfile:
+            Dockerfile.write(dockerfile.dockerfile + docker_append)
+
+        docker_build_success, msg = docker_build(docker_build_path, dockerfile.image_tag)
+        if not docker_build_success:
+            dockerfile.to_build = False
+            dockerfile.message_post(body=f'Build failure:\n{msg}')
+            self.env['runbot.runbot'].warning(f'Dockerfile build "{dockerfile.image_tag}" failed on host {self.name}')
 
     def _get_work_path(self):
         return os.path.abspath(os.path.join(os.path.dirname(__file__), '../static'))
