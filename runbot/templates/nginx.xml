@@ -67,7 +67,7 @@ server {
 </t>
 server {
     listen 8080;
-    server_name ~.+\.<t t-out="re_escape(fqdn)"/>$;
+    server_name ~.+\.<t t-out="re_escape(host_name)"/>$;
     location / { return 404; }
 }
 }

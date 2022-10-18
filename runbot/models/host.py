@@ -95,8 +95,12 @@ class Host(models.Model):
 
     @api.model
     def _get_current(self):
-        name = config.get('forced_host_name') or fqdn()
+        name = self._get_current_name()
         return self.search([('name', '=', name)]) or self.create({'name': name})
+
+    @api.model
+    def _get_current_name(self):
+        return config.get('forced_host_name') or fqdn()
 
     def get_running_max(self):
         icp = self.env['ir.config_parameter']
