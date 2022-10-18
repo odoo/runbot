@@ -1,0 +1,15 @@
+[Unit]
+Description=runbot
+
+[Service]
+PassEnvironment=LANG
+Type=simple
+User=runbot_user
+WorkingDirectory=/home/runbot_user/odoo
+ExecStart=/home/runbot_user/bin/runbot/builder.sh
+Restart=on-failure
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
+

@@ -254,7 +254,7 @@ class BuildResult(models.Model):
 
     @api.depends('gc_delay', 'job_end')
     def _compute_gc_date(self):
-        icp = self.env['ir.config_parameter']
+        icp = self.env['ir.config_parameter'].sudo()
         max_days_main = int(icp.get_param('runbot.db_gc_days', default=30))
         max_days_child = int(icp.get_param('runbot.db_gc_days_child', default=15))
         for build in self:
@@ -661,7 +661,7 @@ class BuildResult(models.Model):
 
     def _schedule(self):
         """schedule the build"""
-        icp = self.env['ir.config_parameter']
+        icp = self.env['ir.config_parameter'].sudo()
         for build in self:
             if build.local_state not in ['testing', 'running']:
                 raise UserError("Build %s is not testing/running: %s" % (build.id, build.local_state))
