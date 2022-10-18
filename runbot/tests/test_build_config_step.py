@@ -4,11 +4,9 @@ from odoo.exceptions import UserError
 from odoo.addons.runbot.common import RunbotException
 from .common import RunbotCase
 
-
-class TestBuildConfigStep(RunbotCase):
-
+class TestBuildConfigStepCommon(RunbotCase):
     def setUp(self):
-        super(TestBuildConfigStep, self).setUp()
+        super().setUp()
 
         self.Build = self.env['runbot.build']
         self.ConfigStep = self.env['runbot.build.config.step']
@@ -24,20 +22,24 @@ class TestBuildConfigStep(RunbotCase):
         self.start_patcher('find_patcher', 'odoo.addons.runbot.common.find', 0)
         self.start_patcher('findall_patcher', 'odoo.addons.runbot.models.build.BuildResult.parse_config', {})
 
-    def test_config_step_create_results(self):
-        """ Test child builds are taken into account"""
 
-        config_step = self.ConfigStep.create({
+class TestBuildConfigStepCreate(TestBuildConfigStepCommon):
+
+    def setUp(self):
+        super().setUp()
+        self.config_step = self.ConfigStep.create({
             'name': 'test_step',
             'job_type': 'create_build',
             'number_builds': 2,
-            'make_orphan': False,
         })
+        self.child_config = self.Config.create({'name': 'test_config'})
+        self.config_step.create_config_ids = [self.child_config.id]
 
-        config = self.Config.create({'name': 'test_config'})
-        config_step.create_config_ids = [config.id]
+    def test_config_step_create_results(self):
+        """ Test child builds are taken into account"""
 
-        config_step._run_create_build(self.parent_build, '/tmp/essai')
+
+        self.config_step._run_create_build(self.parent_build, '/tmp/essai')
         self.assertEqual(len(self.parent_build.children_ids), 2, 'Two sub-builds should have been generated')
 
         # check that the result will be ignored by parent build
@@ -50,18 +52,8 @@ class TestBuildConfigStep(RunbotCase):
 
     def test_config_step_create(self):
         """ Test the config step of type create """
-
-        config_step = self.ConfigStep.create({
-            'name': 'test_step',
-            'job_type': 'create_build',
-            'number_builds': 2,
-            'make_orphan': True,
-        })
-
-        config = self.Config.create({'name': 'test_config'})
-        config_step.create_config_ids = [config.id]
-
-        config_step._run_create_build(self.parent_build, '/tmp/essai')
+        self.config_step.make_orphan = True
+        self.config_step._run_create_build(self.parent_build, '/tmp/essai')
         self.assertEqual(len(self.parent_build.children_ids), 2, 'Two sub-builds should have been generated')
 
         # check that the result will be ignored by parent build
@@ -70,6 +62,73 @@ class TestBuildConfigStep(RunbotCase):
             child_build.local_result = 'ko'
 
         self.assertFalse(self.parent_build.global_result)
+
+    def test_config_step_create_child_data(self):
+        """ Test the config step of type create """
+        self.config_step.number_builds = 5
+        json_config = {'child_data': [{'extra_params': '-i m1'}, {'extra_params': '-i m2'}]}
+        self.parent_build = self.Build.create({
+            'params_id': self.base_params.create({
+                'version_id': self.version_13.id,
+                'project_id': self.project.id,
+                'config_id': self.default_config.id,
+                'config_data': json_config,
+            }).id,
+        })
+
+        self.config_step._run_create_build(self.parent_build, '/tmp/essai')
+        self.assertEqual(len(self.parent_build.children_ids), 10, '10 build should have been generated')
+
+        # check that the result will be ignored by parent build
+        for child_build in self.parent_build.children_ids:
+            self.assertTrue(child_build.config_id, self.child_config)
+
+    def test_config_step_create_child_data_unique(self):
+        """ Test the config step of type create """
+        self.config_step.number_builds = 5
+        json_config = {'child_data': {'extra_params': '-i m1'}}
+        self.parent_build = self.Build.create({
+            'params_id': self.base_params.create({
+                'version_id': self.version_13.id,
+                'project_id': self.project.id,
+                'config_id': self.default_config.id,
+                'config_data': json_config,
+            }).id,
+        })
+
+        self.config_step._run_create_build(self.parent_build, '/tmp/essai')
+        self.assertEqual(len(self.parent_build.children_ids), 5, '5 build should have been generated')
+
+        # check that the result will be ignored by parent build
+        for child_build in self.parent_build.children_ids:
+            self.assertTrue(child_build.config_id, self.child_config)
+
+    def test_config_step_create_child_data_with_config(self):
+        """ Test the config step of type create """
+
+        test_config_1 = self.Config.create({'name': 'test_config1'})
+        test_config_2 = self.Config.create({'name': 'test_config2'})
+
+        self.config_step.number_builds = 5
+        json_config = {'child_data': [{'extra_params': '-i m1', 'config_id': test_config_1.id}, {'config_id': test_config_2.id}]}
+        self.parent_build = self.Build.create({
+            'params_id': self.base_params.create({
+                'version_id': self.version_13.id,
+                'project_id': self.project.id,
+                'config_id': self.default_config.id,
+                'config_data': json_config,
+            }).id,
+        })
+
+        self.config_step._run_create_build(self.parent_build, '/tmp/essai')
+        self.assertEqual(len(self.parent_build.children_ids), 10, '10 build should have been generated')
+        self.assertEqual(len(self.parent_build.children_ids.filtered(lambda b: b.config_id == test_config_1)), 5)
+        self.assertEqual(len(self.parent_build.children_ids.filtered(lambda b: b.config_id == test_config_2)), 5)
+
+
+
+
+class TestBuildConfigStep(TestBuildConfigStepCommon):
 
     def test_config_step_raises(self):
         """ Test a config raises when run step position is wrong"""
