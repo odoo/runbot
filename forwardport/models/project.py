@@ -1146,7 +1146,8 @@ class Repo:
         try:
             return self._opener(args, **opts)
         except subprocess.CalledProcessError as e:
-            _logger.error("git call error:%s", ('\n' + e.stderr.decode()) if e.stderr else e    )
+            stream = e.stderr if e.stderr else e.stdout if e.stdout else ''
+            _logger.error("git call error%s%s", stream and ': ', stream)
             raise
 
     def stdout(self, flag=True):
