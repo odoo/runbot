@@ -504,7 +504,7 @@ class BuildResult(models.Model):
                 if build.local_state == 'done':
                     full = build.gc_date + datetime.timedelta(days=(full_gc_days)) < fields.datetime.now()
                     for db in dest_by_builds_ids[build.id]:
-                        yield (db, full)
+                        yield (db, full, build)
                 elif build.local_state != 'running':
                     _logger.warning('db (%s) not deleted because state is not done', " ".join(dest_by_builds_ids[build.id]))
 
@@ -522,7 +522,7 @@ class BuildResult(models.Model):
                 for dest in dest_list:
                     build = self._build_from_dest(dest)
                     if build and build in self:
-                        yield (dest, full)
+                        yield (dest, full, build)
                     elif not build:
                         _logger.info('%s (%s) skipped because not dest format', label, dest)
             _filter = filter_ids
@@ -531,9 +531,16 @@ class BuildResult(models.Model):
 
         existing_db = list_local_dbs(additionnal_conditions=additionnal_conditions)
 
-        for db, _ in _filter(dest_list=existing_db, label='db'):
+        dropped_db_builds_ids = []
+        for db, _, build in _filter(dest_list=existing_db, label='db'):
             self._logger('Removing database')
             self._local_pg_dropdb(db)
+            dropped_db_builds_ids.append(build.id)
+
+        gced_builds = self.browse(dropped_db_builds_ids)
+        gced_builds.database_ids = False
+        for gced_build in gced_builds:
+            gced_build._log('build', 'Build was garbage collected')
 
         builds_dir = Path(self.env['runbot.runbot']._root()) / 'build'
 
@@ -542,7 +549,7 @@ class BuildResult(models.Model):
         else:
             dests = _filter(dest_list=builds_dir.iterdir(), label='workspace')
 
-        for dest, full in dests:
+        for dest, full, _ in dests:
             build_dir = Path(builds_dir) / dest
             if full:
                 _logger.info('Removing build dir "%s"', dest)
