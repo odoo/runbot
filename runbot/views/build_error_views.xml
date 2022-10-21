@@ -7,7 +7,6 @@
           <form>
             <header>
             </header>
-            <sheet>
               <group name="build_error_group">
                 <field name="fingerprint" readonly="1"/>
                 <field name="content"/>
@@ -83,7 +82,6 @@
                   </group>
                 </page>
               </notebook>
-            </sheet>
             <div class="oe_chatter">
                 <field name="message_follower_ids" widget="mail_followers"/>
                 <field name="message_ids" widget="mail_thread"/>

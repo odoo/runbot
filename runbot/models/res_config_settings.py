@@ -16,20 +16,32 @@ class ResConfigSettings(models.TransientModel):
     runbot_timeout = fields.Integer('Max allowed step timeout (in seconds)')
     runbot_starting_port = fields.Integer('Starting port for running builds')
     runbot_max_age = fields.Integer('Max commit age (in days)')
-    runbot_logdb_uri = fields.Char('Runbot URI for build logs')
+    runbot_logdb_uri = fields.Char('Runbot URI for build logs',
+        help='postgres://user:password@host/db formated uri to give to a build to log in database. Should be a user with limited access rights (ir_logging, runbot_build)')
     runbot_update_frequency = fields.Integer('Update frequency (in seconds)')
     runbot_template = fields.Char('Postgresql template', help="Postgresql template to use when creating DB's")
-    runbot_message = fields.Text('Frontend warning message')
+    runbot_message = fields.Text('Frontend warning message', help="Will be displayed on the frontend when not empty")
     runbot_default_odoorc = fields.Text('Default odoorc for builds')
-    runbot_upgrade_exception_message = fields.Text('Upgrade exception message')
+    runbot_upgrade_exception_message = fields.Text('Upgrade exception message', help='Template to auto-generate a github message when creating an upgrade exception')
     runbot_do_fetch = fields.Boolean('Discover new commits')
     runbot_do_schedule = fields.Boolean('Schedule builds')
     runbot_is_base_regex = fields.Char('Regex is_base')
 
-    runbot_db_gc_days = fields.Integer('Days before gc', default=30, config_parameter='runbot.db_gc_days')
-    runbot_db_gc_days_child = fields.Integer('Days before gc of child', default=15, config_parameter='runbot.db_gc_days_child')
-    runbot_full_gc_days = fields.Integer('Days before directory removal', default=365, config_parameter='runbot.full_gc_days',
-                                         help='Counting from the db removal date')
+    runbot_db_gc_days = fields.Integer(
+        'Days before gc',
+        default=30,
+        config_parameter='runbot.db_gc_days',
+        help="Time after the build finished (running time included) to wait before droping db and non log files")
+    runbot_db_gc_days_child = fields.Integer(
+        'Days before gc of child',
+        default=15,
+        config_parameter='runbot.db_gc_days_child',
+        help='Children should have a lower gc delay since the   database usually comes from the parent or a multibuild')
+    runbot_full_gc_days = fields.Integer(
+        'Days before directory removal',
+        default=365,
+        config_parameter='runbot.full_gc_days',
+        help='Number of days to wait after to first gc to completely remove build directory (remaining test/log files)')
 
     runbot_pending_warning = fields.Integer('Pending warning limit', default=5, config_parameter='runbot.pending.warning')
     runbot_pending_critical = fields.Integer('Pending critical limit', default=5, config_parameter='runbot.pending.critical')
