@@ -12,7 +12,7 @@
                   <div class="row mt16 o_settings_container">
                     <div class="col-12 col-lg-6 o_setting_box">
                       <div class="o_setting_right_pane">
-                        <span class="o_form_label">General Runbot Settings</span>
+                        <span class="o_form_label">Builder settings</span>
                         <div class="content-group">
                           <label for="runbot_workers" class="col-xs-3 o_light_label" style="width: 60%;"/>
                           <field name="runbot_workers" style="width: 15%;"/>
@@ -30,22 +30,16 @@
                     </div>
                     <div class="col-12 col-lg-6 o_setting_box">
                       <div class="o_setting_right_pane">
-                        <span class="o_form_label">Git Related Settings</span>
+                        <span class="o_form_label">Leader settings</span>
                         <div class="content-group">
-                          <label for="runbot_do_fetch" class="col-xs-3 o_light_label" style="width: 40%;"/>
-                          <field name="runbot_do_fetch"/>
                           <label for="runbot_max_age" class="col-xs-3 o_light_label" style="width: 60%;"/>
                           <field name="runbot_max_age" style="width: 15%;"/>
-                          <label for="runbot_update_frequency" class="col-xs-3 o_light_label" style="width: 60%;"/>
-                          <field name="runbot_update_frequency" style="width: 15%;"/>
                         </div>
                       </div>
                     </div>
-                    <div class="col-12 col-lg-6 o_setting_box">
+                    <div class="col-12 col-lg-12 o_setting_box">
                       <div class="o_setting_right_pane">
                         <div class="content-group">
-                          <label for="runbot_do_schedule" class="col-xs-3 o_light_label" style="width: 40%;"/>
-                          <field name="runbot_do_schedule"/>
                           <label for="runbot_template" class="col-xs-3 o_light_label" style="width: 40%;"/>
                           <field name="runbot_template" style="width: 55%;"/>
                           <label for="runbot_is_base_regex" class="col-xs-3 o_light_label" style="width: 40%;"/>
