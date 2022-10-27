@@ -76,6 +76,7 @@ def pytest_addoption(parser):
     parser.addoption('--addons-path')
     parser.addoption("--no-delete", action="store_true", help="Don't delete repo after a failed run")
     parser.addoption('--log-github', action='store_true')
+    parser.addoption('--coverage', action='store_true')
 
     parser.addoption(
         '--tunnel', action="store", type="choice", choices=['', 'ngrok', 'localtunnel'], default='',
@@ -372,7 +373,13 @@ def server(request, db, port, module, dummy_addons_path, tmpdir):
         request.config.getoption('--addons-path'),
         dummy_addons_path,
     ]))
+
+    cov = []
+    if request.config.getoption('--coverage'):
+        cov = ['coverage', 'run', '-p', '--source=odoo.addons.runbot_merge,odoo.addons.forwardport', '--branch']
+
     p = subprocess.Popen([
+        *cov,
         'odoo', '--http-port', str(port),
         '--addons-path', addons_path,
         '-d', db,
