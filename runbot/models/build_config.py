@@ -285,7 +285,7 @@ class ConfigStep(models.Model):
         for child_data in child_data_list:
             for create_config in self.env['runbot.build.config'].browse(child_data.get('config_id', config_ids.ids)):
                 _child_data = {**child_data, 'config_id': create_config}
-                for _ in range(_child_data.get('number_build', self.number_builds)):
+                for _ in range(config_data.get('number_build', self.number_builds)):
                     count += 1
                     if count > 200:
                         build._logger('Too much build created')
