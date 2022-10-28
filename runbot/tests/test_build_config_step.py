@@ -85,8 +85,7 @@ class TestBuildConfigStepCreate(TestBuildConfigStepCommon):
 
     def test_config_step_create_child_data_unique(self):
         """ Test the config step of type create """
-        self.config_step.number_builds = 5
-        json_config = {'child_data': {'extra_params': '-i m1'}}
+        json_config = {'child_data': {'extra_params': '-i m1'}, 'number_build': 5}
         self.parent_build = self.Build.create({
             'params_id': self.base_params.create({
                 'version_id': self.version_13.id,
