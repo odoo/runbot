@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from datetime import datetime
+
 import pytest
 
 from utils import seen, Commit, to_pr
@@ -812,3 +814,62 @@ def test_freeze(env, config, make_repo, users):
     assert not env['runbot_merge.pull_requests'].search([
         ('state', '!=', 'merged')
     ]), "the release PRs should not be forward-ported"
+
+def test_missing_magic_ref(env, config, make_repo):
+    """There are cases where github fails to create / publish or fails to update
+    the magic refs in refs/pull/*.
+
+    In that case, pulling from the regular remote does not bring in the contents
+    of the PR we're trying to forward port, and the forward porting process
+    fails.
+
+    Emulate this behaviour by updating the PR with a commit which lives in the
+    repo but has no ref.
+    """
+    _, prod, _ = make_basic(env, config, make_repo, fp_token=True, fp_remote=True)
+    a_head = prod.commit('refs/heads/a')
+    with prod:
+        [c] = prod.make_commits(a_head.id, Commit('x', tree={'x': '0'}), ref='heads/change')
+        pr = prod.make_pr(target='a', head='change')
+        prod.post_status(c, 'success', 'legal/cla')
+        prod.post_status(c, 'success', 'ci/runbot')
+        pr.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+
+    # create variant of pr head in fork, update PR with that commit as head so
+    # it's not found after a fetch, simulating an outdated or missing magic ref
+    pr_id = to_pr(env, pr)
+    assert pr_id.staging_id
+
+    pr_id.head = '0'*40
+    with prod:
+        prod.post_status('staging.a', 'success', 'legal/cla')
+        prod.post_status('staging.a', 'success', 'ci/runbot')
+    env.run_crons()
+
+    assert not pr_id.staging_id
+    assert pr_id.state == 'merged'
+
+    # check that the fw failed
+    assert not env['runbot_merge.pull_requests'].search([('source_id', '=', pr_id.id)]),\
+        "forward port should not have been created"
+    # check that the batch is still here and targeted for the future
+    req = env['forwardport.batches'].search([])
+    assert len(req) == 1
+    assert req.retry_after > datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    # reset retry_after
+    req.retry_after = '1900-01-01 01:01:01'
+
+    # add a real commit
+    with prod:
+        [c2] = prod.make_commits(a_head.id, Commit('y', tree={'x': '0'}))
+    assert c2 != c
+    pr_id.head = c2
+    env.run_crons()
+
+    fp_id = env['runbot_merge.pull_requests'].search([('source_id', '=', pr_id.id)])
+    assert fp_id
+    # the cherrypick process fetches the commits on the PR in order to know
+    # what they are (rather than e.g. diff the HEAD it branch with the target)
+    # as a result it doesn't forwardport our fake, we'd have to reset the PR's
+    # branch for that to happen

@@ -271,7 +271,7 @@ def test_multiple_commits_same_authorship(env, config, make_repo):
 
 def test_multiple_commits_different_authorship(env, config, make_repo, users, rolemap):
     """ When a PR has multiple commits by different authors, the resulting
-    (squashed) conflict commit should have
+    (squashed) conflict commit should have an empty email
     """
     author = {'name': 'George Pearce', 'email': 'gp@example.org'}
     committer = {'name': 'G. P. W. Meredith', 'email': 'gpwm@example.org'}
@@ -307,7 +307,7 @@ def test_multiple_commits_different_authorship(env, config, make_repo, users, ro
     for _ in range(20):
         pr_ids = env['runbot_merge.pull_requests'].search([], order='number')
         if len(pr_ids) == 2:
-            _   , pr2_id = pr_ids
+            _, pr2_id = pr_ids
             break
         time.sleep(0.5)
     else:

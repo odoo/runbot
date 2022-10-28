@@ -26,6 +26,7 @@ import re
 import subprocess
 import tempfile
 import typing
+from functools import partial
 
 import dateutil.relativedelta
 import requests
@@ -805,21 +806,30 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
                  cherrypick and a list of all PR commit hashes
         :rtype: (None | (str, str, str, list[str]), Repo)
         """
-        source = self._get_local_directory()
+        logger = _logger.getChild(str(self.id))
         root = self._get_root()
-        # update all the branches & PRs
-        r = source.with_params('gc.pruneExpire=1.day.ago')\
-            .with_config(
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT
-            )\
-            .fetch('-p', 'origin')
-        _logger.info("Updated %s:\n%s", source._directory, r.stdout.decode())
-        source.cat_file(e=root.head)
-        # create working copy
-        _logger.info(
-            "Create working copy to forward-port %s (really %s) to %s",
-            self.display_name, root.display_name, target_branch.name)
+        logger.info(
+            "Forward-porting %s (%s) to %s",
+            self.display_name, root.display_name, target_branch.name
+        )
+        source = self._get_local_directory()
+
+        check_commit = partial(source.check(False).cat_file, e=root.head)
+        r = source.with_config(stdout=subprocess.PIPE, stderr=subprocess.STDOUT)\
+            .fetch('origin')
+        logger.info("Updated %s:\n%s", source._directory, r.stdout.decode())
+        if check_commit().returncode:
+            # fallback: try to fetch the commit directly if the magic ref doesn't work?
+            r = source.with_config(stdout=subprocess.PIPE, stderr=subprocess.STDOUT) \
+                .fetch('origin', root.head)
+            logger.info("Updated %s:\n%s", source._directory, r.stdout.decode())
+            if check_commit().returncode:
+                raise ForwardPortError(
+                    f"During forward port of {self.display_name}, unable to find "
+                    f"expected head of {root.display_name} ({root.head})"
+                )
+
+        logger.info("Create working copy...")
         working_copy = source.clone(
             cleanup.enter_context(
                 tempfile.TemporaryDirectory(
@@ -840,7 +850,7 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
                 p=project_id
             )
         )
-        _logger.info("Create FP branch %s", fp_branch_name)
+        logger.info("Create FP branch %s in %s", fp_branch_name, working_copy._directory)
         working_copy.checkout(b=fp_branch_name)
 
         try:
@@ -921,7 +931,7 @@ stderr:
         :return: ``True`` if the cherrypick was successful, ``False`` otherwise
         """
         # <xxx>.cherrypick.<number>
-        logger = _logger.getChild('cherrypick').getChild(str(self.number))
+        logger = _logger.getChild(str(self.id)).getChild('cherrypick')
 
         # original head so we can reset
         prev = original_head = working_copy.stdout().rev_parse('HEAD').stdout.decode().strip()
@@ -1207,6 +1217,9 @@ class GitCommand:
 
 class CherrypickError(Exception):
     ...
+
+class ForwardPortError(Exception):
+    pass
 
 def _clean_rename(s):
     """ Filters out the "inexact rename detection" spam of cherry-pick: it's

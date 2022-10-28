@@ -2,7 +2,7 @@
 import logging
 import uuid
 from contextlib import ExitStack
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from dateutil import relativedelta
 
@@ -30,7 +30,11 @@ class Queue:
             except Exception:
                 _logger.exception("Error while processing %s, skipping", b)
                 self.env.cr.rollback()
-            self.clear_caches()
+                b._on_failure()
+                self.env.cr.commit()
+
+    def _on_failure(self):
+        pass
 
     def _search_domain(self):
         return []
@@ -47,6 +51,16 @@ class ForwardPortTasks(models.Model, Queue):
         ('fp', 'Forward Port Followup'),
         ('insert', 'New branch port')
     ], required=True)
+    retry_after = fields.Datetime(required=True, default='1900-01-01 01:01:01')
+
+    def _search_domain(self):
+        return super()._search_domain() + [
+            ('retry_after', '<=', fields.Datetime.to_string(fields.Datetime.now())),
+        ]
+
+    def _on_failure(self):
+        super()._on_failure()
+        self.retry_after = fields.Datetime.to_string(fields.Datetime.now() + timedelta(minutes=30))
 
     def _process_item(self):
         batch = self.batch_id
