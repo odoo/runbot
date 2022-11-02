@@ -42,9 +42,15 @@ def test_existing_pr_disabled_branch(env, project, make_repo, setreviewers, conf
     branch_id.active = False
     env.run_crons()
 
+    # the PR should not have been closed implicitly
+    assert pr_id.state == 'ready'
+    # but it should be unstaged
+    assert not pr_id.staging_id
+
     assert not branch_id.active_staging_id
     assert staging_id.state == 'cancelled', \
         "closing the PRs should have canceled the staging"
+    assert staging_id.reason == f"Target branch deactivated by 'admin'."
 
     p = pr_page(page, pr)
     target = dict(zip(
@@ -54,22 +60,10 @@ def test_existing_pr_disabled_branch(env, project, make_repo, setreviewers, conf
     assert target.text_content() == 'other (inactive)'
     assert target.get('class') == 'text-muted bg-warning'
 
-    # the PR should have been closed implicitly
-    assert pr_id.state == 'closed'
-    assert not pr_id.staging_id
-
-    with repo:
-        pr.open()
-        pr.post_comment('hansen r+', config['role_reviewer']['token'])
-    assert pr_id.state == 'ready', "pr should be reopenable"
-    env.run_crons()
-
     assert pr.comments == [
         (users['reviewer'], "hansen r+"),
         seen(env, pr, users),
-        (users['user'], "@%(user)s @%(reviewer)s the target branch 'other' has been disabled, closing this PR." % users),
-        (users['reviewer'], "hansen r+"),
-        (users['user'], "This PR targets the disabled branch %s:other, it needs to be retargeted before it can be merged." % repo.name),
+        (users['user'], "@%(user)s @%(reviewer)s the target branch 'other' has been disabled, you may want to close this PR." % users),
     ]
 
     with repo:

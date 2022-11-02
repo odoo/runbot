@@ -258,11 +258,14 @@ class Branch(models.Model):
     def write(self, vals):
         super().write(vals)
         if vals.get('active') is False:
+            self.active_staging_id.cancel(
+                "Target branch deactivated by %r.",
+                self.env.user.login,
+            )
             self.env['runbot_merge.pull_requests.feedback'].create([{
                 'repository': pr.repository.id,
                 'pull_request': pr.number,
-                'close': True,
-                'message': f'{pr.ping()}the target branch {pr.target.name!r} has been disabled, closing this PR.',
+                'message': f'{pr.ping()}the target branch {pr.target.name!r} has been disabled, you may want to close this PR.',
             } for pr in self.prs])
         return True
 
