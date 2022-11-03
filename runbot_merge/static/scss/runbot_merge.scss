@@ -45,6 +45,10 @@ h5 { font-size: 1em; }
   display: inline-block;
 }
 
+.btn {
+  user-select: text;
+}
+
 // mergebot layouting
 .stagings {
   display: flex;
