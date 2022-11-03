@@ -121,7 +121,7 @@ class RunbotCase(TransactionCase):
         self.commit_list = {}
 
         self.start_patcher('git_patcher', 'odoo.addons.runbot.models.repo.Repo._git', new=self.mock_git_helper())
-        self.start_patcher('fqdn_patcher', 'odoo.addons.runbot.common.socket.getfqdn', 'host.runbot.com')
+        self.start_patcher('hostname_patcher', 'odoo.addons.runbot.common.socket.gethostname', 'host.runbot.com')
         self.start_patcher('github_patcher', 'odoo.addons.runbot.models.repo.Remote._github', {})
         self.start_patcher('repo_root_patcher', 'odoo.addons.runbot.models.runbot.Runbot._root', '/tmp/runbot_test/static')
         self.start_patcher('makedirs', 'odoo.addons.runbot.common.os.makedirs', True)
