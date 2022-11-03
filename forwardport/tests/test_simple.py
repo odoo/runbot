@@ -71,7 +71,7 @@ def test_straightforward_flow(env, config, make_repo, users):
     # should merge the staging then create the FP PR
     env.run_crons()
 
-    assert datetime.now() - datetime.strptime(pr_id.merge_date, FMT) <= timedelta(minutes=1),\
+    assert datetime.utcnow() - datetime.strptime(pr_id.merge_date, FMT) <= timedelta(minutes=1),\
         "check if merge date was set about now (within a minute as crons and " \
         "RPC calls yield various delays before we're back)"
 
@@ -108,6 +108,12 @@ def test_straightforward_flow(env, config, make_repo, users):
     # TODO: add original committer (if !author) as co-author in commit message?
     assert c.author['name'] == other_user['user'], "author should still be original's probably"
     assert c.committer['name'] == other_user['user'], "committer should also still be the original's, really"
+
+    assert pr1.ping() == "@%s @%s " % (
+        config['role_other']['user'],
+        config['role_reviewer']['user'],
+    ), "ping of forward-port PR should include author and reviewer of source"
+
     assert prod.read_tree(c) == {
         'f': 'c',
         'g': 'b',

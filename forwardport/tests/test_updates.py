@@ -386,7 +386,7 @@ conflict!
     # 2. "forward port chain" bit
     # 3. updated / modified & got detached
     assert pr2.comments[3:] == [
-        (users['user'], f"@{users['user']} WARNING: the latest change ({pr2_id.head}) triggered "
+        (users['user'], f"@{users['user']} @{users['reviewer']} WARNING: the latest change ({pr2_id.head}) triggered "
                         f"a conflict when updating the next forward-port "
                         f"({pr3_id.display_name}), and has been ignored.\n\n"
                         f"You will need to update this pull request "
@@ -398,7 +398,7 @@ conflict!
     # 2. forward-port chain thing
     assert repo.get_pr(pr3_id.number).comments[2:] == [
         (users['user'], re_matches(f'''\
-@{users['user']} WARNING: the update of {pr2_id.display_name} to {pr2_id.head} has caused a \
+@{users['user']} @{users['reviewer']} WARNING: the update of {pr2_id.display_name} to {pr2_id.head} has caused a \
 conflict in this pull request, data may have been lost.
 
 stdout:

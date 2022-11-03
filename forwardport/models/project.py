@@ -1112,6 +1112,22 @@ stderr:
                 'token_field': 'fp_github_token',
             })
 
+    def ping(self, author=True, reviewer=True):
+        source = self.source_id
+        if not source:
+            return super().ping(author=author, reviewer=reviewer)
+
+        # use a dict literal to maintain ordering (3.6+)
+        pingline = ' '.join(
+            f'@{p.github_login}'
+            for p in filter(None, {
+                author and source.author: None,
+                reviewer and source.reviewed_by: None,
+                reviewer and self.reviewed_by: None,
+            })
+        )
+        return pingline and (pingline + ' ')
+
 class Stagings(models.Model):
     _inherit = 'runbot_merge.stagings'
 
