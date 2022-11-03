@@ -420,7 +420,6 @@ class TestRepoScheduler(RunbotCase):
         # as the _scheduler method commits, we need to protect the database
         super(TestRepoScheduler, self).setUp()
 
-        self.fqdn_patcher = patch('odoo.addons.runbot.models.host.fqdn')
         mock_root = self.patchers['repo_root_patcher']
         mock_root.return_value = '/tmp/static'
 

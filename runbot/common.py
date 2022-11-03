@@ -26,7 +26,7 @@ class RunbotException(Exception):
 
 
 def fqdn():
-    return socket.getfqdn()
+    return socket.gethostname()
 
 
 def time2str(t):
