@@ -1714,6 +1714,25 @@ class Stagings(models.Model):
     head_ids = fields.Many2many('runbot_merge.commit', compute='_compute_statuses')
 
     statuses = fields.Binary(compute='_compute_statuses')
+    statuses_cache = fields.Text()
+
+    def write(self, vals):
+        # don't allow updating the statuses_cache
+        vals.pop('statuses_cache', None)
+
+        if 'state' not in vals:
+            return super().write(vals)
+
+        previously_pending = self.filtered(lambda s: s.state == 'pending')
+        super(Stagings, self).write(vals)
+        for staging in previously_pending:
+            if staging.state != 'pending':
+                super(Stagings, staging).write({
+                    'statuses_cache': json.dumps(staging.statuses)
+                })
+
+        return True
+
 
     def name_get(self):
         return [
@@ -1738,6 +1757,10 @@ class Stagings(models.Model):
                 if not repo.endswith('^')
             }
             commits = st.head_ids = Commits.search([('sha', 'in', list(heads.keys()))])
+            if st.statuses_cache:
+                st.statuses = json.loads(st.statuses_cache)
+                continue
+
             st.statuses = [
                 (
                     heads[commit.sha],

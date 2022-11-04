@@ -783,7 +783,8 @@ class Repo:
     def post_status(self, ref, status, context='default', **kw):
         assert self.hook
         assert status in ('error', 'failure', 'pending', 'success')
-        r = self._session.post('https://api.github.com/repos/{}/statuses/{}'.format(self.name, self.commit(ref).id), json={
+        commit = ref if isinstance(ref, Commit) else self.commit(ref)
+        r = self._session.post('https://api.github.com/repos/{}/statuses/{}'.format(self.name, commit.id), json={
             'state': status,
             'context': context,
             **kw
