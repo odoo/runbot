@@ -2043,74 +2043,44 @@ Part-of: {pr_id.display_name}"""
             (users['reviewer'], 'hansen r+ squash'),
             (users['user'], 'Merge method set to squash.')
         ]
-        merged_head = repo.commit('master')
-        assert merged_head.message == f"""first pr
+
+        pr2_id = to_pr(env, pr2)
+        assert pr2_id.state == 'merged'
+        assert pr2.comments == [
+            seen(env, pr2, users),
+            (users['reviewer'], 'hansen r+ squash'),
+            (users['user'], 'Merge method set to squash.'),
+        ]
+
+        two, one, _root = repo.log('master')
+
+        assert one['commit']['message'] == f"""first pr
 
 closes {pr1_id.display_name}
 
 Signed-off-by: {get_partner(env, users["reviewer"]).formatted_email}\
 """
-        assert merged_head.committer['name'] == 'bob'
-        assert merged_head.committer['email'] == 'builder@example.org'
-        commit_date = datetime.datetime.strptime(merged_head.committer['date'], '%Y-%m-%dT%H:%M:%SZ')
+        assert one['commit']['committer']['name'] == 'bob'
+        assert one['commit']['committer']['email'] == 'builder@example.org'
+        commit_date = datetime.datetime.strptime(one['commit']['committer']['date'], '%Y-%m-%dT%H:%M:%SZ')
         # using timestamp (and working in seconds) because `pytest.approx`
         # silently fails on datetimes (#8395)
         assert commit_date.timestamp() == pytest.approx(time.time(), abs=5*60), \
             "the commit date of the merged commit should be about now, despite" \
             " the source commit being >20 years old"
 
-        pr2_id = to_pr(env, pr2)
-        assert pr2_id.state == 'ready'
-        assert not pr2_id.merge_method
-        assert pr2.comments == [
-            seen(env, pr2, users),
-            (users['reviewer'], 'hansen r+ squash'),
-            (users['user'], f"I'm sorry, @{users['reviewer']}: squash can only be used with a single commit at this time."),
-            (users['user'], """@{user} @{reviewer} because this PR has multiple commits, I need to know how to merge it:
+        assert two['commit']['message'] == f"""second pr
 
-* `merge` to merge directly, using the PR as merge commit message
-* `rebase-merge` to rebase and merge, using the PR as merge commit message
-* `rebase-ff` to rebase and fast-forward
-""".format_map(users))
-        ]
+closes {pr2_id.display_name}
 
-    @pytest.mark.xfail(reason="removed support for squash- command")
-    def test_disable_squash_merge(self, repo, env, config):
-        m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
-        m2 = repo.make_commit(m, 'second', None, tree={'m': 'm', 'm2': 'm2'})
-        repo.make_ref('heads/master', m2)
-
-        c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
-        prx = repo.make_pr(title='title', body='body', target='master', head=c1)
-        repo.post_status(prx.head, 'success', 'legal/cla')
-        repo.post_status(prx.head, 'success', 'ci/runbot')
-        prx.post_comment('hansen r+ squash-', config['role_reviewer']['token'])
-        assert not env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number)
-        ]).squash
-
-        env.run_crons()
-        assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number)
-        ]).staging_id
-
-        staging = repo.commit('heads/staging.master')
-        assert repo.is_ancestor(prx.head, of=staging.id)
-        assert staging.parents == [m2, c1]
-        assert repo.read_tree(staging) == {
-            'm': 'c1', 'm2': 'm2',
+Signed-off-by: {get_partner(env, users["reviewer"]).formatted_email}\
+"""
+        assert repo.read_tree(repo.commit(two['sha'])) == {
+            'a': '0',
+            'b': '0',
+            'x': '1',
         }
 
-        repo.post_status(staging.id, 'success', 'legal/cla')
-        repo.post_status(staging.id, 'success', 'ci/runbot')
-        env.run_crons()
-        assert env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number)
-        ]).state == 'merged'
-        assert prx.state == 'closed'
 
 class TestPRUpdate(object):
     """ Pushing on a PR should update the HEAD except for merged PRs, it
