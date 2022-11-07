@@ -1152,6 +1152,7 @@ class Feedback(models.Model):
 
     token_field = fields.Selection(selection_add=[('fp_github_token', 'Forwardport Bot')])
 
+ALWAYS = ('gc.auto=0', 'maintenance.auto=0')
 def git(directory): return Repo(directory, check=True)
 class Repo:
     def __init__(self, directory, **config):
@@ -1167,7 +1168,7 @@ class Repo:
     def _run(self, *args, **kwargs):
         opts = {**self._config, **kwargs}
         args = ('git', '-C', self._directory)\
-            + tuple(itertools.chain.from_iterable(('-c', p) for p in self._params))\
+            + tuple(itertools.chain.from_iterable(('-c', p) for p in self._params + ALWAYS))\
             + args
         try:
             return self._opener(args, **opts)

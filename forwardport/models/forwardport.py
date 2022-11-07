@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 import logging
+import pathlib
+import resource
+import subprocess
 import uuid
 from contextlib import ExitStack
 from datetime import datetime, timedelta
@@ -8,6 +11,7 @@ from dateutil import relativedelta
 
 from odoo import fields, models
 from odoo.addons.runbot_merge.github import GH
+from odoo.tools.appdirs import user_cache_dir
 
 # how long a merged PR survives
 MERGE_AGE = relativedelta.relativedelta(weeks=2)
@@ -266,3 +270,46 @@ class DeleteBranches(models.Model, Queue):
                 r.json()
             )
         _deleter.info('✔ deleted branch %s of PR %s', self.pr_id.label, self.pr_id.display_name)
+
+_gc = _logger.getChild('maintenance')
+def _bypass_limits():
+    """Allow git to go beyond the limits set for Odoo.
+
+    On large repositories, git gc can take a *lot* of memory (especially with
+    `--aggressive`), if the Odoo limits are too low this can prevent the gc
+    from running, leading to a lack of packing and a massive amount of cruft
+    accumulating in the working copy.
+    """
+    resource.setrlimit(resource.RLIMIT_AS, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
+
+class GC(models.TransientModel):
+    _name = 'forwardport.maintenance'
+    _description = "Weekly maintenance of... cache repos?"
+
+    def _run(self):
+        # lock out the forward port cron to avoid concurrency issues while we're
+        # GC-ing it: wait until it's available, then SELECT FOR UPDATE it,
+        # which should prevent cron workers from running it
+        fp_cron = self.env.ref('forwardport.port_forward')
+        self.env.cr.execute("""
+            SELECT 1 FROM ir_cron
+            WHERE id = %s
+            FOR UPDATE
+        """, [fp_cron.id])
+
+        repos_dir = pathlib.Path(user_cache_dir('forwardport'))
+        # run on all repos with a forwardport target (~ forwardport enabled)
+        for repo in self.env['runbot_merge.repository'].search([('fp_remote_target', '!=', False)]):
+            repo_dir = repos_dir / repo.name
+            if not repo_dir.is_dir():
+                continue
+
+            _gc.info('Running maintenance on %s', repo.name)
+            r = subprocess.run(
+                ['git', '--git-dir', repo_dir, 'gc', '--aggressive', '--prune=now'],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                encoding='utf-8',
+                preexec_fn = _bypass_limits,
+            )
+            if r.returncode:
+                _gc.warning("Maintenance failure (status=%d):\n%s", r.returncode, r.stdout)
