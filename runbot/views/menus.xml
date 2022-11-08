@@ -51,6 +51,7 @@
     <menuitem id="runbot_menu_ir_cron_act" action="base.ir_cron_act" parent="runbot_menu_technical"/>
     <menuitem id="runbot_menu_base_automation_act" action="base_automation.base_automation_act" parent="runbot_menu_technical"/>
     <menuitem id="runbot_menu_action_ui_view" action="base.action_ui_view" parent="runbot_menu_technical"/>
+    <menuitem id="runbot_menu_action_res_users" action="base.action_res_users" parent="runbot_menu_technical"/>
 
     <menuitem name="▶" id="runbot_menu_website" parent="runbot_menu_root" sequence="20000" action="website.action_website"/>
 

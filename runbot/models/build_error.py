@@ -5,9 +5,10 @@ import logging
 import re
 
 from collections import defaultdict
+from dateutil.relativedelta import relativedelta
 from fnmatch import fnmatch
 from odoo import models, fields, api
-from odoo.exceptions import ValidationError
+from odoo.exceptions import ValidationError, UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class BuildError(models.Model):
     responsible = fields.Many2one('res.users', 'Assigned fixer', tracking=True)
     team_id = fields.Many2one('runbot.team', 'Assigned team')
     fixing_commit = fields.Char('Fixing commit', tracking=True)
-    fixing_pr_id = fields.Many2one('runbot.branch', 'Fixing PR', tracking=True)
+    fixing_pr_id = fields.Many2one('runbot.branch', 'Fixing PR', tracking=True, domain=[('is_pr', '=', True)])
     build_ids = fields.Many2many('runbot.build', 'runbot_build_error_ids_runbot_build_rel', string='Affected builds')
     bundle_ids = fields.One2many('runbot.bundle', compute='_compute_bundle_ids')
     version_ids = fields.One2many('runbot.version', compute='_compute_version_ids', string='Versions', search='_search_version')
@@ -71,6 +72,15 @@ class BuildError(models.Model):
         if 'active' in vals:
             for build_error in self:
                 (build_error.child_ids - self).write({'active': vals['active']})
+                if not self.user_has_groups('runbot.group_runbot_admin'):
+                    if build_error.test_tags:
+                        raise UserError(f"This error as a test-tag and can only be (de)activated by admin")
+                    if not vals['active'] and build_error.last_seen_date + relativedelta(days=1) > fields.Datetime.now():
+                        raise UserError(f"This error broke less than one day ago can only be deactivated by admin")
+        if vals.get('parent_id') and not self.env.su:
+            for build_error in self:
+                if build_error.test_tags:
+                    raise UserError(f"Cannot parent an error with test tags: {build_error.test_tags}")
         return super(BuildError, self).write(vals)
 
     @api.depends('build_ids', 'child_ids.build_ids')
