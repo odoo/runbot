@@ -7,27 +7,39 @@
           <form>
             <header>
             </header>
-              <group name="build_error_group">
-                <field name="fingerprint" readonly="1"/>
-                <field name="content"/>
-                <field name="module_name"/>
-                <field name="function"/>
-                <field name="random"/>
-                <field name="responsible"/>
-                <field name="team_id"/>
-                <field name="fixing_commit"/>
-                <field name="fixing_pr_id"/>
-                <field name="active"/>
-                <field name="parent_id" />
-                <field name="bundle_ids" widget="many2many_tags"/>
-                <field name="version_ids" widget="many2many_tags"/>
-                <field name="trigger_ids" widget="many2many_tags"/>
-                <field name="tag_ids" widget="many2many_tags"/>
-                <field name="first_seen_date"/>
-                <field name="first_seen_build_id" widget="frontend_url"/>
-                <field name="last_seen_date"/>
-                <field name="last_seen_build_id" widget="frontend_url"/>
-                <field name="test_tags"/>
+              <group>
+                <group name="build_error_group" string="Base info">
+                  <field name="content" readonly="1"/>
+                  <field name="module_name" readonly="1"/>
+                  <field name="function" readonly="1"/>
+                </group>
+              </group>
+              <group col="2">
+                <group name="fixer_info" string="Fixing">
+                  <field name="responsible"/>
+                  <field name="team_id"/>
+                  <field name="fixing_pr_id"/>
+                  <field name="active"/>
+                  <field name="test_tags" readonly="1" groups="!runbot.group_runbot_admin"/>
+                  <field name="test_tags" readonly="0" groups="runbot.group_runbot_admin"/>
+                </group>
+                  <group name="fixer_info" string="Fixing">
+                  <field name="version_ids" widget="many2many_tags"/>
+                  <field name="trigger_ids" widget="many2many_tags"/>
+                  <field name="tag_ids" widget="many2many_tags" readonly="1"/>
+                </group>
+              </group>
+              <group name="fixer_info" string="More info" col="2">
+                <group>
+                  <field name="random"/>
+                  <field name="first_seen_date"/>
+                  <field name="first_seen_build_id" widget="frontend_url"/>
+                </group>
+                <group>
+                  <field name="parent_id"/>
+                  <field name="last_seen_date"/>
+                  <field name="last_seen_build_id" widget="frontend_url"/>
+                </group>
               </group>
               <notebook>
                 <page string="Builds">
@@ -76,9 +88,12 @@
                     </tree>
                   </field>
                 </page>
-                <page string="Cleaned" groups="base.group_no_one">
+                <page string="Debug" groups="base.group_no_one">
                   <group name="build_error_group">
+                    <field name="fingerprint" readonly="1"/>
                     <field name="cleaned_content"/>
+                    <field name="fixing_commit"/>
+                    <field name="bundle_ids" widget="many2many_tags"/>
                   </group>
                 </page>
               </notebook>

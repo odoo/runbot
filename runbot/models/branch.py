@@ -12,6 +12,8 @@ class Branch(models.Model):
     _name = 'runbot.branch'
     _description = "Branch"
     _order = 'name'
+    _rec_name = 'dname'
+
     _sql_constraints = [('branch_repo_uniq', 'unique (name,remote_id)', 'The branch must be unique per repository !')]
 
     name = fields.Char('Name', required=True)
@@ -44,7 +46,7 @@ class Branch(models.Model):
 
     def _search_dname(self, operator, value):
         if ':' not in value:
-            return [('name', operator, 'value')]
+            return [('name', operator, value)]
         repo_short_name, branch_name = value.split(':')
         owner, repo_name = repo_short_name.split('/')
         return ['&', ('remote_id', '=', self.env['runbot.remote'].search([('owner', '=', owner), ('repo_name', '=', repo_name)]).id), ('name', operator, branch_name)]
