@@ -793,6 +793,14 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
             b.prs[0]._schedule_fp_followup()
         return b
 
+    @property
+    def _source_url(self):
+        return 'https://{}:{}@github.com/{}'.format(
+            self.repository.project_id.fp_github_name or '',
+            self.repository.project_id.fp_github_token,
+            self.repository.name,
+        )
+
     def _create_fp_branch(self, target_branch, fp_branch_name, cleanup):
         """ Creates a forward-port for the current PR to ``target_branch`` under
         ``fp_branch_name``.
@@ -804,7 +812,7 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
                  present the conflict information is composed of the hash of the
                  conflicting commit, the stderr and stdout of the failed
                  cherrypick and a list of all PR commit hashes
-        :rtype: (None | (str, str, str, list[str]), Repo)
+        :rtype: (None | (str, str, str, list[commit]), Repo)
         """
         logger = _logger.getChild(str(self.id))
         root = self._get_root()
@@ -813,21 +821,8 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
             self.display_name, root.display_name, target_branch.name
         )
         source = self._get_local_directory()
-
-        check_commit = partial(source.check(False).cat_file, e=root.head)
-        r = source.with_config(stdout=subprocess.PIPE, stderr=subprocess.STDOUT)\
-            .fetch('origin')
-        logger.info("Updated %s:\n%s", source._directory, r.stdout.decode())
-        if check_commit().returncode:
-            # fallback: try to fetch the commit directly if the magic ref doesn't work?
-            r = source.with_config(stdout=subprocess.PIPE, stderr=subprocess.STDOUT) \
-                .fetch('origin', root.head)
-            logger.info("Updated %s:\n%s", source._directory, r.stdout.decode())
-            if check_commit().returncode:
-                raise ForwardPortError(
-                    f"During forward port of {self.display_name}, unable to find "
-                    f"expected head of {root.display_name} ({root.head})"
-                )
+        r = source.with_config(stdout=subprocess.PIPE, stderr=subprocess.STDOUT).fetch()
+        logger.info("Updated cache repo %s:\n%s", source._directory, r.stdout.decode())
 
         logger.info("Create working copy...")
         working_copy = source.clone(
@@ -841,6 +836,21 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
                 )),
             branch=target_branch.name
         )
+
+        r = working_copy.with_config(stdout=subprocess.PIPE, stderr=subprocess.STDOUT) \
+            .fetch(self._source_url, root.head)
+        logger.info(
+            "Fetched head of %s into %s:\n%s",
+            root.display_name,
+            working_copy._directory,
+            r.stdout.decode()
+        )
+        if working_copy.check(False).cat_file(e=root.head).returncode:
+            raise ForwardPortError(
+                f"During forward port of {self.display_name}, unable to find "
+                f"expected head of {root.display_name} ({root.head})"
+            )
+
         project_id = self.repository.project_id
         # add target remote
         working_copy.remote(
@@ -857,17 +867,17 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
             root._cherry_pick(working_copy)
             return None, working_copy
         except CherrypickError as e:
+            h, out, err, commits = e.args
+
             # using git diff | git apply -3 to get the entire conflict set
             # turns out to not work correctly: in case files have been moved
             # / removed (which turns out to be a common source of conflicts
             # when forward-porting) it'll just do nothing to the working copy
             # so the "conflict commit" will be empty
             # switch to a squashed-pr branch
-            root_branch = 'origin/pull/%d' % root.number
-            working_copy.checkout('-bsquashed', root_branch)
-            root_commits = root.commits()
+            working_copy.check(True).checkout('-bsquashed', root.head)
             # commits returns oldest first, so youngest (head) last
-            head_commit = root_commits[-1]['commit']
+            head_commit = commits[-1]['commit']
 
             to_tuple = operator.itemgetter('name', 'email')
             to_dict = lambda term, vals: {
@@ -876,7 +886,7 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
                 'GIT_%s_DATE' % term: vals[2],
             }
             authors, committers = set(), set()
-            for c in (c['commit'] for c in root_commits):
+            for c in (c['commit'] for c in commits):
                 authors.add(to_tuple(c['author']))
                 committers.add(to_tuple(c['committer']))
             fp_authorship = (project_id.fp_github_name, '', '')
@@ -890,7 +900,7 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
                 'GIT_COMMITTER_DATE': '',
             })
             # squash to a single commit
-            conf.reset('--soft', root_commits[0]['parents'][0]['sha'])
+            conf.reset('--soft', commits[0]['parents'][0]['sha'])
             conf.commit(a=True, message="temp")
             squashed = conf.stdout().rev_parse('HEAD').stdout.strip().decode()
 
@@ -901,7 +911,6 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
                 .with_config(check=False)\
                 .cherry_pick(squashed, no_commit=True)
             status = conf.stdout().status(short=True, untracked_files='no').stdout.decode()
-            h, out, err, hh = e.args
             if err.strip():
                 err = err.rstrip() + '\n----------\nstatus:\n' + status
             else:
@@ -909,9 +918,9 @@ This PR targets %s and is part of the forward-port chain. Further PRs will be cr
             # if there was a single commit, reuse its message when committing
             # the conflict
             # TODO: still add conflict information to this?
-            if len(root_commits) == 1:
-                msg = root._make_fp_message(root_commits[0])
-                conf.with_config(input=str(msg).encode())\
+            if len(commits) == 1:
+                msg = root._make_fp_message(commits[0])
+                conf.with_config(input=str(msg).encode()) \
                     .commit(all=True, allow_empty=True, file='-')
             else:
                 conf.commit(
@@ -923,7 +932,7 @@ stdout:
 stderr:
 %s
 """ % (h, out, err))
-            return (h, out, err, hh), working_copy
+            return (h, out, err, [c['sha'] for c in commits]), working_copy
 
     def _cherry_pick(self, working_copy):
         """ Cherrypicks ``self`` into the working copy
@@ -982,7 +991,7 @@ stderr:
                     commit_sha,
                     r.stdout.decode(),
                     _clean_rename(r.stderr.decode()),
-                    [commit['sha'] for commit in commits]
+                    commits
                 )
 
             msg = self._make_fp_message(commit)
@@ -1033,22 +1042,15 @@ stderr:
             return git(repo_dir)
         else:
             _logger.info("Cloning out %s to %s", self.repository.name, repo_dir)
-            subprocess.run([
-                'git', 'clone', '--bare',
-                'https://{}:{}@github.com/{}'.format(
-                    self.repository.project_id.fp_github_name or '',
-                    self.repository.project_id.fp_github_token,
-                    self.repository.name,
-                ),
-                str(repo_dir)
-            ], check=True)
-            # add PR branches as local but namespaced (?)
+            subprocess.run(['git', 'clone', '--bare', self._source_url, str(repo_dir)], check=True)
+            # bare repos don't have fetch specs by default, and fetching *into*
+            # them is a pain in the ass, configure fetch specs so `git fetch`
+            # works properly
             repo = git(repo_dir)
-            # bare repos don't have a fetch spec by default (!) so adding one
-            # removes the default behaviour and stops fetching the base
-            # branches unless we add an explicit fetch spec for them
             repo.config('--add', 'remote.origin.fetch', '+refs/heads/*:refs/heads/*')
-            repo.config('--add', 'remote.origin.fetch', '+refs/pull/*/head:refs/heads/pull/*')
+            # negative refspecs require
+            # repo.config('--add', 'remote.origin.fetch', '^refs/heads/tmp.*')
+            # repo.config('--add', 'remote.origin.fetch', '^refs/heads/staging.*')
             return repo
 
     def _outstanding(self, cutoff):
