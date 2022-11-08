@@ -540,7 +540,7 @@ class BuildResult(models.Model):
         if force is True:
             dests = [(build.dest, full) for build in self]
         else:
-            dests = _filter(dest_list=builds_dir.iterdir(), label='workspace')
+            dests = _filter(dest_list=(p.name for p in builds_dir.iterdir()), label='workspace')
 
         for dest, full in dests:
             build_dir = Path(builds_dir) / dest
@@ -555,7 +555,7 @@ class BuildResult(models.Model):
                 if bdir_file.is_dir() and bdir_file.name not in ('logs', 'tests'):
                     shutil.rmtree(bdir_file)
                 elif bdir_file.name == 'logs':
-                    for log_file_path in (bdir_file / 'logs').iterdir():
+                    for log_file_path in bdir_file.iterdir():
                         if log_file_path.is_dir():
                             shutil.rmtree(log_file_path)
                         elif log_file_path.name in ('run.txt', 'wake_up.txt') or not log_file_path.name.endswith('.txt'):
