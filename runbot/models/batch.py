@@ -296,16 +296,15 @@ class Batch(models.Model):
         for trigger_custom in self.bundle_id.trigger_custom_ids:
             trigger_customs[trigger_custom.trigger_id] = trigger_custom
         for trigger in triggers:
-            trigger_custom = trigger_customs.get(trigger)
+            trigger_custom = trigger_customs.get(trigger, self.env['runbot.bundle.trigger.custom'])
             trigger_repos = trigger.repo_ids | trigger.dependency_ids
             if trigger_repos & missing_repos:
                 self.warning('Missing commit for repo %s for trigger %s', (trigger_repos & missing_repos).mapped('name'), trigger.name)
                 continue
             # in any case, search for an existing build
-
-            config = trigger_custom.config_id if trigger_custom else trigger.config_id
-            extra_params = trigger_custom.extra_params if trigger_custom else ''
-            config_data = trigger_custom.config_data if trigger_custom else {}
+            config = trigger_custom.config_id or trigger.config_id
+            extra_params = trigger_custom.extra_params or ''
+            config_data = trigger_custom.config_data or {}
             params_value = {
                 'version_id':  version_id,
                 'extra_params': extra_params,
