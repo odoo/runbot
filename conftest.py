@@ -1117,28 +1117,27 @@ class Model:
     def __repr__(self):
         return "{}({})".format(self._model, ', '.join(str(id_) for id_ in self._ids))
 
+    # method: (model, rebrowse)
+    _conf = {
+        'check_object_reference': (True, False),
+        'create': (True, True),
+        'exists': (False, True),
+        'fields_get': (True, False),
+        'name_create': (False, True),
+        'name_search': (True, False),
+        'search': (True, True),
+        'search_count': (True, False),
+        'search_read': (True, False),
+        'filtered': (False, True),
+    }
+
     def browse(self, ids):
         return Model(self._env, self._model, ids)
 
-    def exists(self):
-        ids = self._env(self._model, 'exists', self._ids)
-        return Model(self._env, self._model, ids)
-
-    def search(self, *args, **kwargs):
-        ids = self._env(self._model, 'search', *args, **kwargs)
-        return Model(self._env, self._model, ids)
-
-    def name_search(self, *args, **kwargs):
-        return self._env(self._model, 'name_search', *args, **kwargs)
-
-    def create(self, values):
-        return Model(self._env, self._model, [self._env(self._model, 'create', values)])
-
-    def check_object_reference(self, *args, **kwargs):
-        return self.env(self._model, 'check_object_reference', *args, **kwargs)
-
+    # because sorted is not xmlrpc-compatible (it doesn't downgrade properly)
     def sorted(self, field):
-        rs = sorted(self.read([field]), key=lambda r: r[field])
+        rs = self.read([field])
+        rs.sort(key=lambda r: r[field])
         return Model(self._env, self._model, [r['id'] for r in rs])
 
     def __getitem__(self, index):
@@ -1176,7 +1175,18 @@ class Model:
 
     # because it's difficult to discriminate between methods and fields
     def _call(self, name, *args, **kwargs):
-        return self._env(self._model, name, self._ids, *args, **kwargs)
+        model, rebrowse = self._conf.get(name, (False, False))
+
+        if model:
+            res = self._env(self._model, name, *args, **kwargs)
+        else:
+            res = self._env(self._model, name, self._ids, *args, **kwargs)
+
+        if not rebrowse:
+            return res
+        if isinstance(res, int):
+            return self.browse([res])
+        return self.browse(res)
 
     def __setattr__(self, fieldname, value):
         self._env(self._model, 'write', self._ids, {fieldname: value})
