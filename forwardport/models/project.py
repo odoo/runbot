@@ -26,7 +26,6 @@ import re
 import subprocess
 import tempfile
 import typing
-from functools import partial
 
 import dateutil.relativedelta
 import requests
@@ -89,14 +88,58 @@ class Project(models.Model):
                 raise UserError(_("The forward-port bot needs a primary email set up."))
 
     def write(self, vals):
-        Branches = self.env['runbot_merge.branch']
         # check on branches both active and inactive so disabling branches doesn't
         # make it look like the sequence changed.
         self_ = self.with_context(active_test=False)
+        previously_active_branches = {project: project.branch_ids.filtered('active') for project in self_}
         branches_before = {project: project._forward_port_ordered() for project in self_}
 
         r = super().write(vals)
-        for p in self_:
+        self_._followup_prs(previously_active_branches)
+        self_._insert_intermediate_prs(branches_before)
+        return r
+
+    def _followup_prs(self, previously_active_branches):
+        """If a branch has been disabled and had PRs without a followup (e.g.
+        because no CI or CI failed), create followup, as if the branch had been
+        originally disabled (and thus skipped over)
+        """
+        PRs = self.env['runbot_merge.pull_requests']
+        for p in self:
+            actives = previously_active_branches[p]
+            for deactivated in p.branch_ids.filtered(lambda b: not b.active) & actives:
+                # if a PR targets a deactivated branch, and that's not its limit,
+                # and it doesn't have a child (e.g. CI failed), enqueue a forward
+                # port as if the now deactivated branch had been skipped over (which
+                # is the normal fw behaviour)
+                extant = PRs.search([
+                    ('target', '=', deactivated.id),
+                    ('source_id.limit_id', '!=', deactivated.id),
+                    ('state', 'not in', ('closed', 'merged')),
+                ])
+                for p in extant.with_context(force_fw=True):
+                    next_target = p.source_id._find_next_target(p)
+                    # should not happen since we already filtered out limits
+                    if not next_target:
+                        continue
+
+                    # check if it has a descendant in the next branch, if so skip
+                    if PRs.search_count([
+                        ('source_id', '=', p.source_id.id),
+                        ('target', '=', next_target.id)
+                    ]):
+                        continue
+
+                    # otherwise enqueue a followup
+                    p._schedule_fp_followup()
+
+    def _insert_intermediate_prs(self, branches_before):
+        """If new branches have been added to the sequence inbetween existing
+        branches (mostly a freeze inserted before the main branch), fill in
+        forward-ports for existing sequences
+        """
+        Branches = self.env['runbot_merge.branch']
+        for p in self:
             # check if the branches sequence has been modified
             bbefore = branches_before[p]
             bafter = p._forward_port_ordered()
@@ -153,7 +196,6 @@ class Project(models.Model):
                     }).id,
                     'source': 'insert',
                 })
-        return r
 
     def _forward_port_ordered(self, domain=()):
         Branches = self.env['runbot_merge.branch']
@@ -435,7 +477,7 @@ class PullRequests(models.Model):
             if not pr.parent_id:
                 _logger.info('-> no parent %s (%s)', pr.display_name, pr.parent_id)
                 continue
-            if self.source_id.fw_policy != 'skipci' and pr.state not in ['validated', 'ready']:
+            if not self.env.context.get('force_fw') and self.source_id.fw_policy != 'skipci' and pr.state not in ['validated', 'ready']:
                 _logger.info('-> wrong state %s (%s)', pr.display_name, pr.state)
                 continue
 
@@ -460,7 +502,7 @@ class PullRequests(models.Model):
             # check if batch-mate are all valid
             mates = batch.prs
             # wait until all of them are validated or ready
-            if any(pr.source_id.fw_policy != 'skipci' and pr.state not in ('validated', 'ready') for pr in mates):
+            if not self.env.context.get('force_fw') and any(pr.source_id.fw_policy != 'skipci' and pr.state not in ('validated', 'ready') for pr in mates):
                 _logger.info("-> not ready (%s)", [(pr.display_name, pr.state) for pr in mates])
                 continue
 

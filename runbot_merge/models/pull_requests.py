@@ -265,7 +265,7 @@ class Branch(models.Model):
             self.env['runbot_merge.pull_requests.feedback'].create([{
                 'repository': pr.repository.id,
                 'pull_request': pr.number,
-                'message': f'{pr.ping()}the target branch {pr.target.name!r} has been disabled, you may want to close this PR.',
+                'message': f'Hey {pr.ping()}the target branch {pr.target.name!r} has been disabled, you may want to close this PR.',
             } for pr in self.prs])
         return True
 

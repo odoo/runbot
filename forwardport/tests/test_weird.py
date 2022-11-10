@@ -432,14 +432,13 @@ def test_new_intermediate_branch(env, config, make_repo):
     original_c_tree = prod.read_tree(prod.commit('c'))
     prs = []
     with prod:
-        for i in ['0', '1', '2']:
+        for i in ['0', '1']:
             prod.make_commits('a', Commit(i, tree={i:i}), ref='heads/branch%s' % i)
             pr = prod.make_pr(target='a', head='branch%s' % i)
             prs.append(pr)
             validate(pr.head)
             pr.post_comment('hansen r+', config['role_reviewer']['token'])
-        # cancel validation of PR2
-        prod.post_status(prs[2].head, 'failure', 'ci/runbot')
+
         # also add a PR targeting b forward-ported to c, in order to check
         # for an insertion right after the source
         prod.make_commits('b', Commit('x', tree={'x': 'x'}), ref='heads/branchx')
@@ -455,10 +454,7 @@ def test_new_intermediate_branch(env, config, make_repo):
     # should have merged pr1, pr2 and prx and created their forward ports, now
     # validate pr0's FP so the c-targeted FP is created
     PRs = env['runbot_merge.pull_requests']
-    pr0_id = PRs.search([
-        ('repository.name', '=', prod.name),
-        ('number', '=', prs[0].number),
-    ])
+    pr0_id = to_pr(env, prs[0])
     pr0_fp_id = PRs.search([
         ('source_id', '=', pr0_id.id),
     ])
@@ -471,8 +467,12 @@ def test_new_intermediate_branch(env, config, make_repo):
     assert original0, "Could not find FP of PR0 to C"
     assert original0.target.name == 'c'
 
+    pr1_id = to_pr(env, prs[1])
+    pr1_fp_id = PRs.search([('source_id', '=', pr1_id.id)])
+    assert pr1_fp_id.target.name == 'b'
+
     # also check prx's fp
-    prx_id = PRs.search([('repository.name', '=', prod.name), ('number', '=', prx.number)])
+    prx_id = to_pr(env, prx)
     prx_fp_id = PRs.search([('source_id', '=', prx_id.id)])
     assert prx_fp_id
     assert prx_fp_id.target.name == 'c'
@@ -487,77 +487,85 @@ def test_new_intermediate_branch(env, config, make_repo):
     project.write({
         'branch_ids': [
             (1, currents['a'], {'fp_sequence': 3}),
-            (1, currents['b'], {'fp_sequence': 2}),
-            (0, False, {'name': 'new', 'fp_sequence': 1, 'fp_target': True}),
+            (1, currents['b'], {'fp_sequence': 2, 'active': False}),
             (1, currents['c'], {'fp_sequence': 0})
         ]
     })
     env.run_crons()
-    descendants = PRs.search([('source_id', '=', pr0_id.id)])
-    new0 = descendants - pr0_fp_id - original0
+    project.write({
+        'branch_ids': [
+            (0, False, {'name': 'new', 'fp_sequence': 1, 'fp_target': True}),
+        ]
+    })
+    env.run_crons()
+
+    # created an intermediate PR for 0 and x
+    desc0 = PRs.search([('source_id', '=', pr0_id.id)])
+    new0 = desc0 - pr0_fp_id - original0
     assert len(new0) == 1
     assert new0.parent_id == pr0_fp_id
+    assert new0.target.name == 'new'
     assert original0.parent_id == new0
 
     descx = PRs.search([('source_id', '=', prx_id.id)])
     newx = descx - prx_fp_id
     assert len(newx) == 1
     assert newx.parent_id == prx_id
+    assert newx.target.name == 'new'
     assert prx_fp_id.parent_id == newx
 
-    # finish up: merge pr1 and pr2, ensure all the content is present in both
-    # "new" (the newly inserted branch) and "c" (the tippity tip)
-    with prod: # validate pr2
-        prod.post_status(prs[2].head, 'success', 'ci/runbot')
-    env.run_crons()
-    # merge pr2
-    with prod:
-        validate('staging.a')
-    env.run_crons()
+    # created followups for 1
+    # earliest followup is followup from deactivating a branch, creates fp in
+    # n+1 = c (from b), then inserting a new branch between b and c should
+    # create a bridge forward port
+    _, pr1_c, pr1_new = PRs.search([('source_id', '=', pr1_id.id)], order='number')
+    assert pr1_c.target.name == 'c'
+    assert pr1_new.target.name == 'new'
+    assert pr1_c.parent_id == pr1_new
+    assert pr1_new.parent_id == pr1_fp_id
+
     # ci on pr1/pr2 fp to b
-    sources = [
-        env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', prod.name),
-            ('number', '=', pr.number),
-        ]).id
-        for pr in prs
-    ]
+    sources = [to_pr(env, pr).id for pr in prs]
     sources.append(prx_id.id)
     # CI all the forward port PRs (shouldn't hurt to re-ci the forward port of
     # prs[0] to b aka pr0_fp_id
-    for target in ['b', 'new', 'c']:
+    for target in ['new', 'c']:
         fps = PRs.search([('source_id', 'in', sources), ('target.name', '=', target)])
         with prod:
             for fp in fps:
                 validate(fp.head)
         env.run_crons()
-    # now fps should be the last PR of each sequence, and thus r+-able
+    # now fps should be the last PR of each sequence, and thus r+-able (via
+    # fwbot so preceding PR is also r+'d)
     with prod:
         for pr in fps:
             assert pr.target.name == 'c'
             prod.get_pr(pr.number).post_comment(
                 '%s r+' % project.fp_github_name,
                 config['role_reviewer']['token'])
-    assert all(p.state == 'merged' for p in PRs.browse(sources)), \
+    assert all(p.state == 'merged' for p in PRs.browse(sources)),\
         "all sources should be merged"
-    assert all(p.state == 'ready' for p in PRs.search([('id', 'not in', sources)])),\
-        "All PRs except sources should be ready"
+    assert all(p.state == 'ready' for p in PRs.search([('source_id', '!=', False), ('target.name', '!=', 'b')])), \
+        "All PRs except sources and prs on disabled branch should be ready"
     env.run_crons()
+
+    assert len(env['runbot_merge.stagings'].search([])) == 2,\
+        "enabled branches should have been staged"
     with prod:
-        for target in ['b', 'new', 'c']:
-            validate('staging.' + target)
+        for target in ['new', 'c']:
+            validate(f'staging.{target}')
     env.run_crons()
-    assert all(p.state == 'merged' for p in PRs.search([])), \
-        "All PRs should be merged now"
+    assert all(p.state == 'merged' for p in PRs.search([('target.name', '!=', 'b')])), \
+        "All PRs except disabled branch should be merged now"
 
     assert prod.read_tree(prod.commit('c')) == {
         **original_c_tree,
-        '0': '0', '1': '1', '2': '2', # updates from PRs
+        '0': '0', '1': '1', # updates from PRs
         'x': 'x',
     }, "check that C got all the updates"
     assert prod.read_tree(prod.commit('new')) == {
         **original_c_tree,
-        '0': '0', '1': '1', '2': '2', # updates from PRs
+        '0': '0', '1': '1', # updates from PRs
         'x': 'x',
     }, "check that new got all the updates (should be in the same state as c really)"
 

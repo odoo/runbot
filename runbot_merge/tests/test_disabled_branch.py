@@ -63,7 +63,7 @@ def test_existing_pr_disabled_branch(env, project, make_repo, setreviewers, conf
     assert pr.comments == [
         (users['reviewer'], "hansen r+"),
         seen(env, pr, users),
-        (users['user'], "@%(user)s @%(reviewer)s the target branch 'other' has been disabled, you may want to close this PR." % users),
+        (users['user'], "Hey @%(user)s @%(reviewer)s the target branch 'other' has been disabled, you may want to close this PR." % users),
     ]
 
     with repo:
