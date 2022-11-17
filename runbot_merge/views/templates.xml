@@ -4,12 +4,6 @@
         <value eval="{'active': False}"/>
     </function>
 
-    <template id="assets_frontend" inherit_id="web.assets_frontend">
-        <xpath expr="link[last()]" position="after">
-            <link rel="stylesheet" type="text/scss" href="/runbot_merge/static/scss/runbot_merge.scss"/>
-        </xpath>
-    </template>
-
     <template id="link-pr" name="create a link to `pr`">
         <t t-set="title">
             <t t-if="pr.repository.group_id &lt;= env.user.groups_id">

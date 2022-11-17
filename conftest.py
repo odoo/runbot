@@ -1075,7 +1075,7 @@ class Environment:
         for xid in crons:
             t0 = time.time()
             print('\trunning cron', xid, '...', file=sys.stderr)
-            _, model, cron_id = self('ir.model.data', 'xmlid_lookup', xid)
+            model, cron_id = self('ir.model.data', 'check_object_reference', *xid.split('.', 1))
             assert model == 'ir.cron', "Expected {} to be a cron, got {}".format(xid, model)
             self('ir.cron', 'method_direct_trigger', [cron_id], **kw)
             print('\tdone %.3fs' % (time.time() - t0), file=sys.stderr)

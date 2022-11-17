@@ -1,10 +1,4 @@
 <odoo>
-    <template id="runbot_merge_freeze_assets" inherit_id="web.assets_backend" active="True">
-        <xpath expr="." position="inside">
-            <script type="text/javascript" src="/runbot_merge/static/project_freeze/index.js"></script>
-        </xpath>
-    </template>
-
     <record id="runbot_merge_project_freeze_form" model="ir.ui.view">
         <field name="name">Freeze Wizard Configuration Screen</field>
         <field name="model">runbot_merge.project.freeze</field>

@@ -15,6 +15,14 @@
         'views/templates.xml',
         'models/project_freeze/views.xml',
     ],
+    'assets': {
+        'web.assets_frontend': [
+            'runbot_merge/static/scss/runbot_merge.scss',
+        ],
+        'web.assets_backend': [
+            'runbot_merge/static/project_freeze/index.js',
+        ],
+    },
     'post_load': 'enable_sentry',
     'pre_init_hook': '_check_citext',
     'license': 'LGPL-3',

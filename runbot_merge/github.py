@@ -1,4 +1,4 @@
-import collections
+import collections.abc
 import itertools
 import json as json_
 import logging
@@ -8,7 +8,6 @@ import pathlib
 import pprint
 import textwrap
 import unicodedata
-from datetime import datetime, timezone
 
 import requests
 import werkzeug.urls
@@ -114,7 +113,7 @@ class GH(object):
         )
         self._log_gh(_gh, method, path, params, json, r)
         if check:
-            if isinstance(check, collections.Mapping):
+            if isinstance(check, collections.abc.Mapping):
                 exc = check.get(r.status_code)
                 if exc:
                     raise exc(r.text)
