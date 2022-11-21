@@ -38,4 +38,4 @@ class Codeowner(models.Model):
         return ast.literal_eval(self.version_domain) if self.version_domain else []
 
     def _match_version(self, version):
-        return version.filtered_domain(self._get_version_domain())
+        return not self.version_domain or version.filtered_domain(self._get_version_domain())

@@ -27,7 +27,9 @@ class RunbotTeam(models.Model):
         help='Comma separated list of `fnmatch` wildcards used to assign errors automaticaly\n'
         'Negative wildcards starting with a `-` can be used to discard some path\n'
         'e.g.: `*website*,-*website_sale*`')
+    module_ownership_ids = fields.One2many('runbot.module.ownership', 'team_id')
     upgrade_exception_ids = fields.One2many('runbot.upgrade.exception', 'team_id', string='Team Upgrade Exceptions')
+    github_team = fields.Char('Github team')
 
     @api.model_create_single
     def create(self, values):
@@ -46,6 +48,22 @@ class RunbotTeam(models.Model):
             if any([fnmatch(module_name, pattern.strip()) for pattern in team.path_glob.split(',') if not pattern.strip().startswith('-')]):
                 return team.id
         return False
+
+class Module(models.Model):
+    _name = 'runbot.module'
+    _description = 'Modules'
+
+    name = fields.Char('Name')
+    ownership_ids = fields.One2many('runbot.module.ownership', 'module_id')
+
+
+class ModuleOwnership(models.Model):
+    _name = 'runbot.module.ownership'
+    _description = "Module ownership"
+
+    module_id = fields.Many2one('runbot.module', string='Module', required=True, ondelete='cascade')
+    team_id = fields.Many2one('runbot.team', string='Team', required=True)
+    is_fallback = fields.Boolean('Fallback')
 
 
 class RunbotDashboard(models.Model):

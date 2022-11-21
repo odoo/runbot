@@ -6,19 +6,18 @@ from .common import RunbotCase, RunbotCaseMinimalSetup
 class TestBranch(RunbotCase):
 
     def test_base_fields(self):
-        branch = self.Branch.create({
-            'remote_id': self.remote_server.id,
-            'name': 'master',
-            'is_pr': False,
-        })
-
-        self.assertEqual(branch.branch_url, 'https://example.com/base/server/tree/master')
+        self.assertEqual(self.branch_server.branch_url, 'https://example.com/base/server/tree/master')
 
     def test_pull_request(self):
         mock_github = self.patchers['github_patcher']
         mock_github.return_value = {
             'base': {'ref': 'master'},
             'head': {'label': 'foo-dev:bar_branch', 'repo': {'full_name': 'foo-dev/bar'}},
+            'title': '[IMP] Title',
+            'body': 'Body',
+            'creator': {
+                'login': 'Pr author'
+            },
         }
         pr = self.Branch.create({
             'remote_id': self.remote_server.id,
@@ -43,7 +42,7 @@ class TestBranchRelations(RunbotCase):
             })
             branch.bundle_id.is_base = True
             return branch
-        self.master = create_base('master')
+        self.master = self.branch_server
         create_base('11.0')
         create_base('saas-11.1')
         create_base('12.0')
@@ -125,7 +124,12 @@ class TestBranchRelations(RunbotCase):
         self.patchers['github_patcher'].return_value = {
             'base': {'ref': 'master-test-tri'},
             'head': {'label': 'dev:master-test-tri-imp', 'repo': {'full_name': 'dev/server'}},
-            }
+            'title': '[IMP] Title',
+            'body': 'Body',
+            'creator': {
+                'login': 'Pr author'
+            },
+        }
         b = self.Branch.create({
                 'remote_id': self.remote_server_dev.id,
                 'name': '100',

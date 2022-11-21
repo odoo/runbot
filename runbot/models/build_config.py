@@ -11,7 +11,13 @@ from ..common import now, grep, time2str, rfind, s2human, os, RunbotException
 from ..container import docker_get_gateway_ip, Command
 from odoo import models, fields, api
 from odoo.exceptions import UserError, ValidationError
-from odoo.tools.safe_eval import safe_eval, test_python_expr
+from odoo.tools.safe_eval import safe_eval, test_python_expr, _SAFE_OPCODES, to_opcodes
+
+# adding some additionnal optcode to safe_eval. This is not 100% needed and won't be done in standard but will help
+# to simplify some python step by wraping the content in a function to allow return statement and get closer to other
+# steps
+
+_SAFE_OPCODES |= set(to_opcodes(['LOAD_DEREF', 'STORE_DEREF', 'LOAD_CLOSURE']))
 
 _logger = logging.getLogger(__name__)
 
@@ -122,7 +128,7 @@ TYPES = [
         ('configure_upgrade', 'Configure Upgrade'),
         ('configure_upgrade_complement', 'Configure Upgrade Complement'),
         ('test_upgrade', 'Test Upgrade'),
-        ('restore', 'Restore')
+        ('restore', 'Restore'),
     ]
 class ConfigStep(models.Model):
     _name = 'runbot.build.config.step'
@@ -188,6 +194,9 @@ class ConfigStep(models.Model):
 
     restore_download_db_suffix = fields.Char('Download db suffix')
     restore_rename_db_suffix = fields.Char('Rename db suffix')
+
+    commit_limit = fields.Integer('Commit limit', default=50)
+    file_limit = fields.Integer('File limit', default=450)
 
     @api.constrains('python_code')
     def _check_python_code(self):
@@ -315,6 +324,9 @@ class ConfigStep(models.Model):
         eval_ctx = self.make_python_ctx(build)
         try:
             safe_eval(self.python_code.strip(), eval_ctx, mode="exec", nocopy=True)
+            run = eval_ctx.get('run')
+            if run and callable(run):
+                return run()
             return eval_ctx.get('docker_params')
         except ValueError as e:
             save_eval_value_error_re = r'<class \'odoo.addons.runbot.models.repo.RunbotException\'>: "(.*)" while evaluating\n.*'
@@ -1085,6 +1097,33 @@ class ConfigStep(models.Model):
     def _has_log(self):
         self.ensure_one()
         return self._is_docker_step()
+
+    def _check_limits(self, build):
+        bundle = build.params_id.create_batch_id.bundle_id
+        commit_limit = bundle.commit_limit or self.commit_limit
+        file_limit = bundle.file_limit or self.file_limit
+        message = 'Limit reached: %s has more than %s %s (%s) and will be skipped. Contact runbot team to increase your limit if it was intended'
+        success = True
+        for commit_link in build.params_id.commit_link_ids:
+            if commit_link.base_ahead > commit_limit:
+                build._log('', message % (commit_link.commit_id.name, commit_limit, 'commit', commit_link.base_ahead), level="ERROR")
+                build.local_result = 'ko'
+                success = False
+            if commit_link.file_changed > file_limit:
+                build._log('', message % (commit_link.commit_id.name, file_limit, 'modified files', commit_link.file_changed), level="ERROR")
+                build.local_result = 'ko'
+                success = False
+        return success
+
+    def _modified_files(self, build, commit_link_links = None):
+        modified_files = {}
+        for commit_link in commit_link_links or build.params_id.commit_link_ids:
+            commit = commit_link.commit_id
+            modified = commit.repo_id._git(['diff', '--name-only', '%s..%s' % (commit_link.merge_base_commit_id.name, commit.name)])
+            if modified:
+                files = [('%s/%s' % (build._docker_source_folder(commit), file)) for file in modified.split('\n') if file]
+                modified_files[commit_link] = files
+        return modified_files
 
 
 class ConfigStepOrder(models.Model):

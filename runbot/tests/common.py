@@ -23,6 +23,8 @@ class RunbotCase(TransactionCase):
                     return '\n'.join(['\0'.join(commit_fields) for commit_fields in self.commit_list[repo.id]])
                 else:
                     return ''
+            if cmd[0] == 'diff':
+                return self.diff
             else:
                 _logger.warning('Unsupported mock command %s' % cmd)
         return mock_git
@@ -54,6 +56,7 @@ class RunbotCase(TransactionCase):
         self.Trigger = self.env['runbot.trigger'].with_context(mail_create_nolog=True, mail_notrack=True)
         self.Branch = self.env['runbot.branch']
         self.Bundle = self.env['runbot.bundle']
+        self.Batch = self.env['runbot.batch']
         self.Version = self.env['runbot.version']
         self.Config = self.env['runbot.build.config'].with_context(mail_create_nolog=True, mail_notrack=True)
         self.Step = self.env['runbot.build.config.step'].with_context(mail_create_nolog=True, mail_notrack=True)
@@ -95,10 +98,52 @@ class RunbotCase(TransactionCase):
         self.version_13 = self.Version.create({'name': '13.0'})
         self.default_config = self.env.ref('runbot.runbot_build_config_default')
 
+        self.initial_server_commit = self.Commit.create({
+            'name': 'aaaaaaa',
+            'repo_id': self.repo_server.id,
+            'date': '2006-12-07',
+            'subject': 'New trunk',
+            'author': 'purply',
+            'author_email': 'puprly@somewhere.com'
+        })
+        self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_is_base_regex', r'^((master)|(saas-)?\d+\.\d+)$')
+
+        self.branch_server = self.Branch.create({
+            'name': 'master',
+            'remote_id': self.remote_server.id,
+            'is_pr': False,
+            'head': self.initial_server_commit.id,
+        })
+        self.branch_server.bundle_id # compute
+        self.dev_bundle = self.Bundle.create({
+            'name': 'master-dev-tri',
+            'project_id': self.project.id
+        })
+        self.dev_branch = self.Branch.create({
+            'name': 'master-dev-tri',
+            'bundle_id': self.dev_bundle.id,
+            'is_pr': False,
+            'remote_id': self.remote_server.id,
+        })
+        self.dev_pr = self.Branch.create({
+            'name': '1234',
+            'is_pr': True,
+            'remote_id': self.remote_server.id,
+            'target_branch_name': self.dev_bundle.base_id.name,
+            'pull_head_remote_id': self.remote_server.id,
+        })
+        self.dev_pr.pull_head_name = f'{self.remote_server.owner}:{self.dev_branch.name}'
+        self.dev_pr.bundle_id = self.dev_bundle.id,
+
+        self.dev_batch = self.Batch.create({
+            'bundle_id': self.dev_bundle.id,
+        })
+
         self.base_params = self.BuildParameters.create({
             'version_id': self.version_13.id,
             'project_id': self.project.id,
             'config_id': self.default_config.id,
+            'create_batch_id': self.dev_batch.id,
         })
 
         self.trigger_server = self.Trigger.create({
@@ -119,7 +164,7 @@ class RunbotCase(TransactionCase):
         self.patchers = {}
         self.patcher_objects = {}
         self.commit_list = {}
-
+        self.diff = ''
         self.start_patcher('git_patcher', 'odoo.addons.runbot.models.repo.Repo._git', new=self.mock_git_helper())
         self.start_patcher('hostname_patcher', 'odoo.addons.runbot.common.socket.gethostname', 'host.runbot.com')
         self.start_patcher('github_patcher', 'odoo.addons.runbot.models.repo.Remote._github', {})
@@ -148,6 +193,7 @@ class RunbotCase(TransactionCase):
 
         self.start_patcher('_get_py_version', 'odoo.addons.runbot.models.build.BuildResult._get_py_version', 3)
 
+
     def start_patcher(self, patcher_name, patcher_path, return_value=DEFAULT, side_effect=DEFAULT, new=DEFAULT):
 
         def stop_patcher_wrapper():
@@ -171,25 +217,6 @@ class RunbotCase(TransactionCase):
 
     def additionnal_setup(self):
         """Helper that setup a the repos with base branches and heads"""
-
-        self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_is_base_regex', r'^((master)|(saas-)?\d+\.\d+)$')
-
-        self.initial_server_commit = self.Commit.create({
-            'name': 'aaaaaaa',
-            'repo_id': self.repo_server.id,
-            'date': '2006-12-07',
-            'subject': 'New trunk',
-            'author': 'purply',
-            'author_email': 'puprly@somewhere.com'
-        })
-
-        self.branch_server = self.Branch.create({
-            'name': 'master',
-            'remote_id': self.remote_server.id,
-            'is_pr': False,
-            'head': self.initial_server_commit.id,
-        })
-        self.assertEqual(self.branch_server.bundle_id.name, 'master')
         self.branch_server.bundle_id.is_base = True
         initial_addons_commit = self.Commit.create({
             'name': 'cccccc',

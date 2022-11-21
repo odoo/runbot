@@ -47,7 +47,12 @@ class Runbot(models.AbstractModel):
                             'head': {
                                 'label': '%s:%s' % (dev_remote.owner, bundle.name),
                                 'repo': {'full_name': '%s/%s' % (dev_remote.owner, dev_remote.repo_name)}
-                            }
+                            },
+                            'title': '[IMP] Title',
+                            'body': 'Body',
+                            'creator': {
+                                'login': 'Pr author'
+                            },
                         }
                         branch = self.env['runbot.branch'].create({
                             'remote_id': main_remote.id,

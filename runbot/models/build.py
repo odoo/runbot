@@ -992,7 +992,10 @@ class BuildResult(models.Model):
         cmd = ['python%s' % py_version] + python_params + [os.path.join(server_dir, server_file)]
         if sub_command:
             cmd += [sub_command]
-        cmd += ['--addons-path', ",".join(addons_paths)]
+
+        if not self.params_id.extra_params or '--addons-path' not in self.params_id.extra_params :
+            cmd += ['--addons-path', ",".join(addons_paths)]
+
         # options
         config_path = build._server("tools/config.py")
         if grep(config_path, "no-xmlrpcs"):  # move that to configs ?

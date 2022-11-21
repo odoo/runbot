@@ -4,6 +4,7 @@ from . import batch
 from . import branch
 from . import build
 from . import build_config
+from . import build_config_codeowner
 from . import build_error
 from . import bundle
 from . import codeowner
@@ -20,6 +21,7 @@ from . import repo
 from . import res_config_settings
 from . import res_users
 from . import runbot
+from . import team
 from . import upgrade
 from . import user
 from . import version
