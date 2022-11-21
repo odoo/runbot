@@ -52,7 +52,7 @@
             <group>
               <field name="name"/>
               <field name="ownership_ids">
-                <tree>
+                <tree editable="bottom">
                   <field name="team_id"/>
                   <field name="is_fallback"/>
                 </tree>
@@ -70,6 +70,18 @@
             <tree string="Runbot modules">
               <field name="name"/>
               <field name="ownership_ids"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="module_ownership_tree" model="ir.ui.view">
+      <field name="name">runbot.module.ownership.tree</field>
+        <field name="model">runbot.module.ownership</field>
+        <field name="arch" type="xml">
+            <tree string="Runbot modules ownership" editable="bottom">
+              <field name="team_id"/>
+              <field name="module_id"/>
+              <field name="is_fallback"/>
             </tree>
         </field>
     </record>
@@ -166,6 +178,12 @@
     <record id="open_view_runbot_module" model="ir.actions.act_window">
       <field name="name">Runbot modules</field>
       <field name="res_model">runbot.module</field>
+      <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="open_view_runbot_module_ownership" model="ir.actions.act_window">
+      <field name="name">Runbot modules ownership</field>
+      <field name="res_model">runbot.module.ownership</field>
       <field name="view_mode">tree,form</field>
     </record>
 
