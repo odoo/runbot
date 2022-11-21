@@ -50,7 +50,7 @@ class Runbot(models.AbstractModel):
                             },
                             'title': '[IMP] Title',
                             'body': 'Body',
-                            'creator': {
+                            'user': {
                                 'login': 'Pr author'
                             },
                         }

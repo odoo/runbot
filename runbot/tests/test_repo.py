@@ -66,7 +66,7 @@ class TestRepo(RunbotCaseMinimalSetup):
                 'head': {'label': 'dev:%s' % branch_name, 'repo': {'full_name': 'dev/server'}},
                 'title': '[IMP] Title',
                 'body': 'Body',
-                'creator': {
+                'user': {
                     'login': 'Pr author'
                 },
             }

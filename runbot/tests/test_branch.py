@@ -15,7 +15,7 @@ class TestBranch(RunbotCase):
             'head': {'label': 'foo-dev:bar_branch', 'repo': {'full_name': 'foo-dev/bar'}},
             'title': '[IMP] Title',
             'body': 'Body',
-            'creator': {
+            'user': {
                 'login': 'Pr author'
             },
         }
@@ -126,7 +126,7 @@ class TestBranchRelations(RunbotCase):
             'head': {'label': 'dev:master-test-tri-imp', 'repo': {'full_name': 'dev/server'}},
             'title': '[IMP] Title',
             'body': 'Body',
-            'creator': {
+            'user': {
                 'login': 'Pr author'
             },
         }

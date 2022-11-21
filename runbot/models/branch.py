@@ -119,7 +119,7 @@ class Branch(models.Model):
                         branch.pull_head_name = pi['head']['label']
                         branch.pr_title = pi['title']
                         branch.pr_body = pi['body']
-                        branch.pr_author = pi['creator']['login']
+                        branch.pr_author = pi['user']['login']
                         pull_head_repo_name = False
                         if pi['head'].get('repo'):
                             pull_head_repo_name = pi['head']['repo'].get('full_name')
