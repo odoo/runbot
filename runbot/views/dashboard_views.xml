@@ -8,8 +8,15 @@
             <sheet>
               <group name="team_group">
                 <field name="name"/>
+                <field name="github_team"/>
                 <field name="dashboard_id"/>
                 <field name="path_glob"/>
+                <field name="module_ownership_ids">
+                  <tree>
+                    <field name="module_id"/>
+                    <field name="is_fallback"/>
+                  </tree>
+                </field>
               </group>
               <notebook>
                 <page string="Team Errors">
@@ -32,6 +39,37 @@
                 <field name="name"/>
                 <field name="path_glob"/>
                 <field name="build_error_ids"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="module_form" model="ir.ui.view">
+      <field name="name">runbot.module.form</field>
+      <field name="model">runbot.module</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <group>
+              <field name="name"/>
+              <field name="ownership_ids">
+                <tree>
+                  <field name="team_id"/>
+                  <field name="is_fallback"/>
+                </tree>
+              </field>
+            </group>
+          </sheet>
+        </form>
+      </field>
+    </record>
+
+    <record id="module_tree" model="ir.ui.view">
+      <field name="name">runbot.module.tree</field>
+        <field name="model">runbot.module</field>
+        <field name="arch" type="xml">
+            <tree string="Runbot modules">
+              <field name="name"/>
+              <field name="ownership_ids"/>
             </tree>
         </field>
     </record>
@@ -107,10 +145,16 @@
         </field>
     </record>
 
+    <record id="open_view_runbot_dashboard_tile" model="ir.actions.act_window">
+      <field name="name">Runbot Dashboards Tiles</field>
+      <field name="res_model">runbot.dashboard.tile</field>
+      <field name="view_mode">tree,form</field>
+    </record>
+
     <record id="open_view_runbot_team" model="ir.actions.act_window">
-        <field name="name">Runbot Teams</field>
-        <field name="res_model">runbot.team</field>
-        <field name="view_mode">tree,form</field>
+      <field name="name">Runbot teams</field>
+      <field name="res_model">runbot.team</field>
+      <field name="view_mode">tree,form</field>
     </record>
 
     <record id="open_view_runbot_dashboard" model="ir.actions.act_window">
@@ -119,10 +163,10 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    <record id="open_view_runbot_dashboard_tile" model="ir.actions.act_window">
-        <field name="name">Runbot Dashboards Tiles</field>
-        <field name="res_model">runbot.dashboard.tile</field>
-        <field name="view_mode">tree,form</field>
+    <record id="open_view_runbot_module" model="ir.actions.act_window">
+      <field name="name">Runbot modules</field>
+      <field name="res_model">runbot.module</field>
+      <field name="view_mode">tree,form</field>
     </record>
 
   </data>

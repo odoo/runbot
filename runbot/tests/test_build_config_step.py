@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from unittest.mock import patch, mock_open
+from odoo import Command
 from odoo.exceptions import UserError
 from odoo.addons.runbot.common import RunbotException
 from .common import RunbotCase
@@ -12,15 +13,177 @@ class TestBuildConfigStepCommon(RunbotCase):
         self.ConfigStep = self.env['runbot.build.config.step']
         self.Config = self.env['runbot.build.config']
 
-        server_commit = self.Commit.create({
-            'name': 'dfdfcfcf0000ffffffffffffffffffffffffffff',
+        self.server_commit = self.Commit.create({
+            'name': 'dfdfcfcf',
             'repo_id': self.repo_server.id
         })
         self.parent_build = self.Build.create({
-            'params_id': self.base_params.copy({'commit_link_ids': [(0, 0, {'commit_id': server_commit.id})]}).id,
+            'params_id': self.base_params.copy({'commit_link_ids': [(0, 0, {'commit_id': self.server_commit.id})]}).id,
+            'local_result': 'ok',
         })
         self.start_patcher('find_patcher', 'odoo.addons.runbot.common.find', 0)
         self.start_patcher('findall_patcher', 'odoo.addons.runbot.models.build.BuildResult.parse_config', {})
+
+class TestCodeowner(TestBuildConfigStepCommon):
+    def setUp(self):
+        super().setUp()
+        self.config_step = self.ConfigStep.create({
+            'name': 'test_codeowner',
+            'job_type': 'codeowner',
+            'fallback_reviewer': 'codeowner-team',
+        })
+        self.child_config = self.Config.create({'name': 'test_config'})
+        self.config_step.create_config_ids = [self.child_config.id]
+        self.team1 = self.env['runbot.team'].create({'name': "Team1", 'github_team': "team_01"})
+        self.team2 = self.env['runbot.team'].create({'name': "Team2", 'github_team': "team_02"})
+        self.env['runbot.codeowner'].create({'github_teams': 'team_py', 'project_id': self.project.id, 'regex': '.*.py'})
+        self.env['runbot.codeowner'].create({'github_teams': 'team_js', 'project_id': self.project.id, 'regex': '.*.js'})
+        self.server_commit.name = 'dfdfcfcf'
+
+
+    def test_codeowner_is_base(self):
+        self.dev_bundle.is_base = True
+        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.assertEqual(self.parent_build.log_ids.mapped('message'), [
+            'Skipping base bundle',
+        ])
+        self.assertEqual(self.parent_build.local_result, 'ok')
+
+    def test_codeowner_check_limits(self):
+        self.parent_build.params_id.commit_link_ids[0].file_changed = 451
+        self.parent_build.params_id.commit_link_ids[0].base_ahead = 51
+        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.assertEqual(self.parent_build.log_ids.mapped('message'), [
+            'Limit reached: dfdfcfcf has more than 50 commit (51) and will be skipped. Contact runbot team to increase your limit if it was intended',
+            'Limit reached: dfdfcfcf has more than 450 modified files (451) and will be skipped. Contact runbot team to increase your limit if it was intended',
+        ])
+        self.assertEqual(self.parent_build.local_result, 'ko')
+        
+    def test_codeowner_draft(self):
+        self.dev_pr.draft=True
+        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.assertEqual(self.parent_build.log_ids.mapped('message'), [
+            'Some pr are draft, skipping: 1234'
+        ])
+        self.assertEqual(self.parent_build.local_result, 'warn')
+
+    def test_codeowner_draft_closed(self):
+        self.dev_pr.draft=True
+        self.dev_pr.alive=False
+        self.assertEqual(self.parent_build.local_result, 'ok')
+
+    def test_codeowner_forwardpot(self):
+        self.dev_pr.pr_author='fw-bot'
+        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.assertEqual(self.parent_build.log_ids.mapped('message'), [
+            'Ignoring forward port pull request: 1234'
+        ])
+        self.assertEqual(self.parent_build.local_result, 'ok')
+
+    def test_codeowner_invalid_target(self):
+        self.dev_pr.target_branch_name = 'master-other-dev-branch'
+        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.assertEqual(self.parent_build.log_ids.mapped('message'), [
+            'Some pr have an invalid target: 1234'
+        ])
+        self.assertEqual(self.parent_build.local_result, 'ko')
+
+    def test_codeowner_pr_duplicate(self):
+        second_pr = self.Branch.create({
+            'name': '1235',
+            'is_pr': True,
+            'remote_id': self.remote_server.id,
+            'target_branch_name': self.dev_bundle.base_id.name,
+            'pull_head_remote_id': self.remote_server.id,
+        })
+        second_pr.pull_head_name = f'{self.remote_server.owner}:{self.dev_branch.name}'
+        second_pr.bundle_id = self.dev_bundle.id
+        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.assertEqual(self.parent_build.log_ids.mapped('message'), [
+            "More than one open pr in this bundle for server: ['1234', '1235']"
+        ])
+        self.assertEqual(self.parent_build.local_result, 'ko')
+
+    def test_get_module(self):
+        self.assertEqual(self.repo_server.addons_paths, 'addons,core/addons')
+        self.assertEqual('module1', self.config_step._get_module(self.repo_server, 'server/core/addons/module1/some/file.py'))
+        self.assertEqual('module1', self.config_step._get_module(self.repo_server, 'server/addons/module1/some/file.py'))
+        self.assertEqual(None, self.config_step._get_module(self.repo_server, 'server/core/module1/some/file.py'))
+
+    def test_codeowner_regex_multiple(self):
+        self.diff = 'file.js\nfile.py\nfile.xml'
+        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        messages = self.parent_build.log_ids.mapped('message')
+        self.assertEqual(messages[1], 'Checking 2 codeowner regexed on 3 files')
+        self.assertEqual(messages[2], 'Adding team_js to reviewers for file [server/file.js](https://False/blob/dfdfcfcf/file.js)')
+        self.assertEqual(messages[3], 'Adding team_py to reviewers for file [server/file.py](https://False/blob/dfdfcfcf/file.py)')
+        self.assertEqual(messages[4], 'Adding codeowner-team to reviewers for file [server/file.xml](https://False/blob/dfdfcfcf/file.xml)')
+        self.assertEqual(messages[5], 'Requesting review for pull request [base/server:1234](https://example.com/base/server/pull/1234): codeowner-team, team_js, team_py')
+        self.assertEqual(self.dev_pr.reviewers, 'codeowner-team,team_js,team_py')
+        
+    def test_codeowner_regex_some_already_on(self):
+        self.diff = 'file.js\nfile.py\nfile.xml'
+        self.dev_pr.reviewers = 'codeowner-team,team_js'
+        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        messages = self.parent_build.log_ids.mapped('message')        
+        self.assertEqual(messages[5], 'Requesting review for pull request [base/server:1234](https://example.com/base/server/pull/1234): team_py')
+     
+    def test_codeowner_regex_all_already_on(self):
+        self.diff = 'file.js\nfile.py\nfile.xml'
+        self.dev_pr.reviewers = 'codeowner-team,team_js,team_py'
+        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        messages = self.parent_build.log_ids.mapped('message')        
+        self.assertEqual(messages[5], 'All reviewers are already on pull request [base/server:1234](https://example.com/base/server/pull/1234)')
+
+    def test_codeowner_ownership_base(self):
+        module1 = self.env['runbot.module'].create({'name': "module1"})
+        self.env['runbot.module.ownership'].create({'team_id': self.team1.id, 'module_id': module1.id})
+        self.diff = '\n'.join([
+            'core/addons/module1/some/file.py',
+        ])
+        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        messages = self.parent_build.log_ids.mapped('message')
+        self.assertEqual(
+            messages[2], 
+            'Adding team_01, team_py to reviewers for file [server/core/addons/module1/some/file.py](https://False/blob/dfdfcfcf/core/addons/module1/some/file.py)'
+        )
+
+    def test_codeowner_ownership_fallback(self):
+        module1 = self.env['runbot.module'].create({'name': "module1"})
+        self.env['runbot.module.ownership'].create({'team_id': self.team1.id, 'module_id': module1.id, 'is_fallback': True})
+        self.diff = '\n'.join([
+            'core/addons/module1/some/file.py',
+        ])
+        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        messages = self.parent_build.log_ids.mapped('message')
+        self.assertEqual(
+            messages[2], 
+            'Adding team_py to reviewers for file [server/core/addons/module1/some/file.py](https://False/blob/dfdfcfcf/core/addons/module1/some/file.py)'
+        )
+
+    def test_codeowner_ownership(self):
+        module1 = self.env['runbot.module'].create({'name': "module1"})
+        module2 = self.env['runbot.module'].create({'name': "module2"})
+        self.env['runbot.module.ownership'].create({'team_id': self.team1.id, 'module_id': module1.id})
+        self.env['runbot.module.ownership'].create({'team_id': self.team2.id, 'module_id': module2.id})
+        self.diff = '\n'.join([
+            'core/addons/module1/some/file.py',
+            'core/addons/module2/some/file.ext',
+            'core/addons/module3/some/file.js',
+            'core/addons/module4/some/file.txt',
+        ])
+        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        messages = self.parent_build.log_ids.mapped('message')
+        self.assertEqual(messages, [
+            'PR [base/server:1234](https://example.com/base/server/pull/1234) found for repo **server**',
+            'Checking 2 codeowner regexed on 4 files',
+            'Adding team_01, team_py to reviewers for file [server/core/addons/module1/some/file.py](https://False/blob/dfdfcfcf/core/addons/module1/some/file.py)',
+            'Adding team_02 to reviewers for file [server/core/addons/module2/some/file.ext](https://False/blob/dfdfcfcf/core/addons/module2/some/file.ext)',
+            'Adding team_js to reviewers for file [server/core/addons/module3/some/file.js](https://False/blob/dfdfcfcf/core/addons/module3/some/file.js)',
+            'Adding codeowner-team to reviewers for file [server/core/addons/module4/some/file.txt](https://False/blob/dfdfcfcf/core/addons/module4/some/file.txt)',
+            'Requesting review for pull request [base/server:1234](https://example.com/base/server/pull/1234): codeowner-team, team_01, team_02, team_js, team_py'
+        ])
+
 
 
 class TestBuildConfigStepCreate(TestBuildConfigStepCommon):
@@ -61,7 +224,7 @@ class TestBuildConfigStepCreate(TestBuildConfigStepCommon):
             self.assertTrue(child_build.orphan_result, 'An orphan result config step should mark the build as orphan_result')
             child_build.local_result = 'ko'
 
-        self.assertFalse(self.parent_build.global_result)
+        self.assertEqual(self.parent_build.global_result, 'ok')
 
     def test_config_step_create_child_data(self):
         """ Test the config step of type create """
@@ -317,6 +480,21 @@ docker_params = dict(cmd=cmd)
         self.patchers['docker_run'].assert_called_once()
         db = self.env['runbot.database'].search([('name', '=', 'test_database')])
         self.assertEqual(db.build_id, self.parent_build)
+
+    def test_run_python_run(self):
+        """minimal test for python steps. Also test that `-d` in cmd creates a database"""
+        test_code = """
+def run():
+    return {'a': 'b'}
+"""
+        config_step = self.ConfigStep.create({
+            'name': 'default',
+            'job_type': 'python',
+            'python_code': test_code,
+        })
+
+        retult = config_step._run_python(self.parent_build, 'dev/null/logpath')
+        self.assertEqual(retult, {'a': 'b'})
 
     @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
     def test_sub_command(self, mock_checkout):

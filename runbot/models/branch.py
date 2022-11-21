@@ -26,6 +26,10 @@ class Branch(models.Model):
     bundle_id = fields.Many2one('runbot.bundle', 'Bundle', compute='_compute_bundle_id', store=True, ondelete='cascade', index=True)
 
     is_pr = fields.Boolean('IS a pr', required=True)
+    pr_title = fields.Char('Pr Title')
+    pr_body = fields.Char('Pr Body')
+    pr_author = fields.Char('Pr Author')
+    
     pull_head_name = fields.Char(compute='_compute_branch_infos', string='PR HEAD name', readonly=1, store=True)
     pull_head_remote_id = fields.Many2one('runbot.remote', 'Pull head repository', compute='_compute_branch_infos', store=True, index=True)
     target_branch_name = fields.Char(compute='_compute_branch_infos', string='PR target branch', store=True)
@@ -102,9 +106,9 @@ class Branch(models.Model):
                         break
 
         for branch in self:
-            branch.target_branch_name = False
-            branch.pull_head_name = False
-            branch.pull_head_remote_id = False
+            #branch.target_branch_name = False
+            #branch.pull_head_name = False
+            #branch.pull_head_remote_id = False
             if branch.name:
                 pi = branch.is_pr and (pull_info or pull_info_dict.get((branch.remote_id, branch.name)) or branch._get_pull_info())
                 if pi:
@@ -113,6 +117,9 @@ class Branch(models.Model):
                         branch.alive = pi.get('state', False) != 'closed'
                         branch.target_branch_name = pi['base']['ref']
                         branch.pull_head_name = pi['head']['label']
+                        branch.pr_title = pi['title']
+                        branch.pr_body = pi['body']
+                        branch.pr_author = pi['creator']['login']
                         pull_head_repo_name = False
                         if pi['head'].get('repo'):
                             pull_head_repo_name = pi['head']['repo'].get('full_name')
