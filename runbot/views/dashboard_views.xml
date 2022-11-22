@@ -74,6 +74,19 @@
         </field>
     </record>
 
+    <record id="module_ownership_search_view" model="ir.ui.view">
+      <field name="name">runbot.module.ownership.search</field>
+      <field name="model">runbot.module.ownership</field>
+      <field name="arch" type="xml">
+        <search string="Search ownership">
+          <field name="team_id"/>
+          <field name="module_id"/>
+          <filter string="Is Fallback" name='fallback' domain="[(['is_fallback', '=', True])]"/>
+          <filter string="Not Fallback" name='not_fallback' domain="[(['is_fallback', '=', False])]"/>
+        </search>
+      </field>
+    </record>
+
     <record id="module_ownership_tree" model="ir.ui.view">
       <field name="name">runbot.module.ownership.tree</field>
         <field name="model">runbot.module.ownership</field>
