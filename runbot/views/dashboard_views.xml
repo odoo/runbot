@@ -38,6 +38,8 @@
             <tree string="Runbot Teams">
                 <field name="name"/>
                 <field name="path_glob"/>
+                <field name="github_team"/>
+                <field name="module_ownership_ids"/>
                 <field name="build_error_ids"/>
             </tree>
         </field>
