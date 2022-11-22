@@ -91,7 +91,7 @@
       <field name="name">runbot.module.ownership.tree</field>
         <field name="model">runbot.module.ownership</field>
         <field name="arch" type="xml">
-            <tree string="Runbot modules ownership" editable="bottom">
+            <tree string="Runbot modules ownership" editable="bottom" multi_edit="1">
               <field name="team_id"/>
               <field name="module_id"/>
               <field name="is_fallback"/>
