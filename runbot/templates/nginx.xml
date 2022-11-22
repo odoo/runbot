@@ -42,7 +42,9 @@ server {
     location /runbot/static/ {
       alias <t t-esc="runbot_static"/>;
       autoindex off;
-      location ~ /runbot/static/build/[^/]+/(logs|tests)/ {
+      return 404;
+      location /runbot/static/src { }
+      location ~ /runbot/static/build/[^/]+/(logs|tests|coverage)/ {
           autoindex on;
           add_header 'Access-Control-Allow-Origin' '<t t-esc="base_url"/>';
       }
