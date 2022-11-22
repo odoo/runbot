@@ -52,12 +52,18 @@
       <field name="category_id" ref="module_project"/>
     </record>
 
+    <record id="group_runbot_team_manager" model="res.groups">
+      <field name="name">Team manager</field>
+      <field name="category_id" ref="module_project"/>
+    </record>
+
     <record id="group_runbot_admin" model="res.groups">
       <field name="name">Runbot administrator</field>
       <field name="category_id" ref="module_project"/>
       <field name="users" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
       <field name="implied_ids" eval="[(4, ref('runbot.group_user')), (4, ref('runbot.group_build_config_administrator'))]"/>
     </record>
+    
 
     <!-- config access rules-->
     <record id="runbot_build_config_access_administrator" model="ir.rule">
