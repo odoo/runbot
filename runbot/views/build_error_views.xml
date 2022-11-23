@@ -204,5 +204,33 @@
         <field name="view_mode">tree,form</field>
     </record>
 
+    <record model="ir.ui.view" id="runbot_error_closing_wizard_form">
+        <field name="name">runbot_error_closing_wizard</field>
+        <field name="model">runbot.error.closing.wizard</field>
+        <field name="arch" type="xml">
+          <form>
+            <sheet>
+              <group name="closing_group">
+                <field name="reason"/>
+              </group>
+              <footer>
+                <button string="Submit" name="submit" type="object" class="btn-primary"/>
+                <button string="Cancel" class="btn-secondary" special="cancel"/>
+              </footer>
+            </sheet>
+          </form>
+        </field>
+    </record>
+
+    <record id="runbot_open_error_closing_wizard" model="ir.actions.act_window">
+        <field name="name">Close Errors With A Reason</field>
+        <field name="res_model">runbot.error.closing.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="view_id" ref="runbot_error_closing_wizard_form"/>
+        <field name="binding_model_id" ref="runbot.model_runbot_build_error"/>
+        <field name="binding_view_types">form,list</field>
+    </record>
+
   </data>
 </odoo>
