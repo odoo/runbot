@@ -138,6 +138,7 @@ class ConfigStep(models.Model):
     # general info
     name = fields.Char('Step name', required=True, tracking=True, help="Unique name for step please use trigram as postfix for custom step_ids")
     domain_filter = fields.Char('Domain filter', tracking=True)
+
     job_type = fields.Selection(TYPES, default='install_odoo', required=True, tracking=True, ondelete={t[0]: 'cascade' for t in [TYPES]})
     protected = fields.Boolean('Protected', default=False, tracking=True)
     default_sequence = fields.Integer('Sequence', default=100, tracking=True)  # or run after? # or in many2many rel?
@@ -244,7 +245,7 @@ class ConfigStep(models.Model):
         return super(ConfigStep, self).write(values)
 
     def unlink(self):
-        if self.protected:
+        if any(record.protected for record in self):
             raise UserError('Protected step')
         super(ConfigStep, self).unlink()
 
