@@ -45,6 +45,10 @@
                     <td>Target Branch</td>
                     <td t-esc="branch.target_branch_name"></td>
                   </tr>
+                  <tr>
+                    <td>Pr title</td>
+                    <td t-esc="branch.pr_title"/>
+                  </tr>
                 </t>
                 <t t-elif="branch_pr">
                   <tr>
