@@ -19,6 +19,8 @@
                 <field name="target_branch_name"/>
                 <field name="head"/>
                 <field name="alive"/>
+                <field name="pr_title"/>
+                <field name="pr_body"/>
               </group>
             </sheet>
           </form>

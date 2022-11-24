@@ -113,11 +113,11 @@ class Branch(models.Model):
                 pi = branch.is_pr and (pull_info or pull_info_dict.get((branch.remote_id, branch.name)) or branch._get_pull_info())
                 if pi:
                     try:
-                        branch.draft = pi.get('draft', False)
                         branch.alive = pi.get('state', False) != 'closed'
                         branch.target_branch_name = pi['base']['ref']
                         branch.pull_head_name = pi['head']['label']
                         branch.pr_title = pi['title']
+                        branch.draft = pi.get('draft', False) or branch.pr_title and (branch.pr_title.startswith('[DRAFT]') or branch.pr_title.startswith('[WIP]'))
                         branch.pr_body = pi['body']
                         branch.pr_author = pi['user']['login']
                         pull_head_repo_name = False
