@@ -117,6 +117,13 @@
                     <group string="Codeowner settings" attrs="{'invisible': [('job_type', 'not in', ('codeowner', 'python'))]}">
                         <field name="fallback_reviewer"/>
                     </group>
+                    <group>
+                      <field name="step_order_ids" groups="base.group_no_one" readonly="1">
+                        <tree>
+                            <field name="config_id" widget="Many2one" options="{'no_edit': 1}"/>
+                        </tree>
+                      </field>
+                    </group>
                 </sheet>
                 <div class="oe_chatter">
                     <field name="message_follower_ids" widget="mail_followers"/>

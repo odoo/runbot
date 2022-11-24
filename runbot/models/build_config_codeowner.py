@@ -25,7 +25,7 @@ class ConfigStep(models.Model):
         return pr_by_commit
     
     def _get_module(self, repo, file):
-        for addons_path in repo.addons_paths.split(','):
+        for addons_path in (repo.addons_paths or '').split(','):
             base_path = f'{repo.name}/{addons_path}'
             if file.startswith(base_path):
                 return file.replace(base_path, '').strip('/').split('/')[0]
@@ -110,7 +110,6 @@ class ConfigStep(models.Model):
         codeowners = build.env['runbot.codeowner'].search([('project_id', '=', bundle.project_id.id)])
         regexes = self._codeowners_regexes(codeowners, build.params_id.version_id)
         modified_files = self._modified_files(build, pr_by_commit.keys())
-        
         for commit_link, files in modified_files.items():
             build._log('','Checking %s codeowner regexed on %s files' % (len(regexes), len(files)))
             
@@ -118,8 +117,11 @@ class ConfigStep(models.Model):
             reviewer_per_file = self._reviewer_per_file(files, regexes, ownerships, commit_link.commit_id.repo_id)
             for file, file_reviewers in reviewer_per_file.items():
                 href = 'https://%s/blob/%s/%s' % (commit_link.branch_id.remote_id.base_url, commit_link.commit_id.name, file.split('/', 1)[-1])
-                build._log('', 'Adding %s to reviewers for file [%s](%s)' % (', '.join(sorted(file_reviewers)), file, href), log_type='markdown')
-                reviewers |= file_reviewers
+                if file_reviewers:
+                    build._log('', 'Adding %s to reviewers for file [%s](%s)' % (', '.join(sorted(file_reviewers)), file, href), log_type='markdown')
+                    reviewers |= file_reviewers
+                else:
+                    build._log('', 'No reviewer for file [%s](%s)' % (file, href), log_type='markdown')
 
             if reviewers:
                 pr = pr_by_commit[commit_link]
