@@ -45,9 +45,11 @@ class ConfigStep(models.Model):
             for regex, teams in regexes:
                 if re.match(regex, file):
                     if not teams or 'none' in teams:
-                        file_reviewers = set()
+                        file_reviewers = None
                         break # blacklisted, break
                     file_reviewers |= teams
+            if file_reviewers is None:
+                continue
 
             file_module = self._get_module(repo, file)
             for ownership in ownerships:
