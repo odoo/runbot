@@ -206,13 +206,16 @@ class Host(models.Model):
         ir_logs = self._fetch_local_logs()
         logs_by_build_id = defaultdict(list)
 
+        local_log_ids = []
         for log in ir_logs:
-            logs_by_build_id[int(log['dbname'].split('-', maxsplit=1)[0])].append(log)
+            if log['dbname'] and '-' in log['dbname']:
+                logs_by_build_id[int(log['dbname'].split('-', maxsplit=1)[0])].append(log)
+            else:
+                local_log_ids.append(log['id'])
 
         builds = self.env['runbot.build'].browse(logs_by_build_id.keys())
 
         logs_to_send = []
-        local_log_ids = []
         for build in builds.exists():
             build_logs = logs_by_build_id[build.id]
             for ir_log in build_logs:
