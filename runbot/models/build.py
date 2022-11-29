@@ -335,9 +335,6 @@ class BuildResult(models.Model):
     def write(self, values):
         # some validation to ensure db consistency
         if 'local_state' in values:
-            build_by_old_values = defaultdict(lambda: self.env['runbot.build'])
-            for record in self:
-                build_by_old_values[record.local_state] += record
             if values['local_state'] == 'done':
                 self.env['runbot.commit.export'].search([('build_id', 'in', self.ids)]).unlink()
         local_result = values.get('local_result')
