@@ -11,13 +11,13 @@
                                     <t t-esc="bundle.name"/>
                                     <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e" />
                                     <div class="btn-group" role="group">
-                                        <a groups="runbot.group_runbot_admin" t-attf-href="/web/#id={{bundle.id}}&amp;view_type=form&amp;model=runbot.bundle&amp;menu_id={{env.ref('runbot.runbot_menu_root').id}}" class="btn btn-default btn-sm" target="new" title="View in Backend">
+                                        <a groups="runbot.group_runbot_advanced_user" t-attf-href="/web/#id={{bundle.id}}&amp;view_type=form&amp;model=runbot.bundle&amp;menu_id={{env.ref('runbot.runbot_menu_root').id}}" class="btn btn-default btn-sm" target="new" title="View in Backend">
                                           <i class="fa fa-list"/>
                                         </a>
-                                        <a class="btn btn-default" groups="base.group_user" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Force A New Batch">
+                                        <a groups="runbot.group_runbot_advanced_user" class="btn btn-default" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Force A New Batch">
                                             <i class="fa fa-refresh"/>
                                         </a>
-                                        <a class="btn btn-default" groups="base.group_user" t-attf-href="/runbot/bundle/{{bundle.id}}/force/1" title="Force A New Batch with automatic rebase">
+                                        <a groups="runbot.group_runbot_advanced_user" class="btn btn-default" t-attf-href="/runbot/bundle/{{bundle.id}}/force/1" title="Force A New Batch with automatic rebase">
                                             <i class="fa fa-fast-forward"/>
                                         </a>
                                         <t t-call="runbot.branch_copy_button"/>
