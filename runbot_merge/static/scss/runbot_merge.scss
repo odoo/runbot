@@ -1,7 +1,12 @@
 // FIX: bs4 shit-heap colors and styles
-body {
+html {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   color: #666666;
+  font-size: 14px;
+}
+body {
+  color: inherit;
+  font-family: inherit;
 }
 h1, h2, h3, h4, h5, h6{
   color: inherit;
@@ -36,6 +41,8 @@ h5 { font-size: 1em; }
 .list-inline > li {
   padding: 0 5px;
   margin-right: 0;
+  // TODO: find better way to do this
+  display: inline-block;
 }
 
 // mergebot layouting
