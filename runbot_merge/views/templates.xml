@@ -26,7 +26,7 @@
                     aria-expanded="true"
                     t-attf-title="Staged at {{staging.staged_at}}Z"
             >
-                <t t-raw="0"/>
+                <t t-out="0"/>
                 <span class="caret"></span>
             </button>
             <div class="dropdown-menu staging-statuses">
