@@ -217,22 +217,23 @@ class Host(models.Model):
 
         logs_to_send = []
         for build in builds.exists():
+            log_counter = build.log_counter
             build_logs = logs_by_build_id[build.id]
             for ir_log in build_logs:
                 local_log_ids.append(ir_log['id'])
                 ir_log['active_step_id'] = build.active_step.id
                 ir_log['type'] = 'server'
-                build.log_counter -= 1
-                build.flush()
-                if build.log_counter == 0:
+                log_counter -= 1
+                if log_counter == 0:
                     ir_log['level'] = 'SEPARATOR'
                     ir_log['func'] = ''
                     ir_log['type'] = 'runbot'
                     ir_log['message'] = 'Log limit reached (full logs are still available in the log file)'
-                elif build.log_counter < 0:
+                elif log_counter < 0:
                     continue
                 ir_log['build_id'] = build.id
                 logs_to_send.append({k:ir_log[k] for k in ir_log if k != 'id'})
+            build.log_counter = log_counter
 
         if logs_to_send:
             self.env['ir.logging'].create(logs_to_send)
