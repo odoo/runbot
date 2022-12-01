@@ -90,7 +90,7 @@ class ConfigStep(models.Model):
         fw_prs = prs.filtered(lambda pr: pr.pr_author == fw_bot and len(pr.reflog_ids) <= 1)
         if fw_prs:
             build._log('', 'Ignoring forward port pull request: %s' % ','.join([pr.name for pr in fw_prs]))
-            prs = list(set(prs) - set(fw_prs))
+            prs -= fw_prs
 
         if not prs:
             return
