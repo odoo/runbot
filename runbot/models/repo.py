@@ -11,7 +11,7 @@ import requests
 from pathlib import Path
 
 from odoo import models, fields, api
-from ..common import os, RunbotException
+from ..common import os, RunbotException, _make_github_session
 from odoo.exceptions import UserError
 from odoo.tools.safe_eval import safe_eval
 
@@ -38,7 +38,7 @@ class Trigger(models.Model):
     sequence = fields.Integer('Sequence')
     name = fields.Char("Name")
     description = fields.Char("Description", help="Informative description")
-    project_id = fields.Many2one('runbot.project', string="Project id", required=True)  # main/security/runbot
+    project_id = fields.Many2one('runbot.project', string="Project id", required=True, default=lambda self: self.env.ref('runbot.main_project', raise_if_not_found=False))
     repo_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_triggers', string="Triggers", domain="[('project_id', '=', project_id)]")
     dependency_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_dependencies', string="Dependencies")
     config_id = fields.Many2one('runbot.build.config', string="Config", required=True)
@@ -158,13 +158,6 @@ class Remote(models.Model):
         self._cr.postcommit.add(self.repo_id._update_git_config)
         return res
 
-    def _make_github_session(self):
-        session = requests.Session()
-        if self.token:
-            session.auth = (self.token, 'x-oauth-basic')
-        session.headers.update({'Accept': 'application/vnd.github.she-hulk-preview+json'})
-        return session
-
     def _github(self, url, payload=None, ignore_errors=False, nb_tries=2, recursive=False, session=None):
         generator = self.sudo()._github_generator(url, payload=payload, ignore_errors=ignore_errors, nb_tries=nb_tries, recursive=recursive, session=session)
         if recursive:
@@ -179,7 +172,7 @@ class Remote(models.Model):
                 url = url.replace(':owner', remote.owner)
                 url = url.replace(':repo', remote.repo_name)
                 url = 'https://api.%s%s' % (remote.repo_domain, url)
-                session = session or remote._make_github_session()
+                session = session or _make_github_session(remote.token)
                 while url:
                     if recursive:
                         _logger.info('Getting page %s', url)
@@ -560,6 +553,13 @@ class Repo(models.Model):
             return self._update_git(force, poll_delay)
         except Exception:
             _logger.exception('Fail to update repo %s', self.name)
+
+    def _get_module(self, file):
+        for addons_path in (self.addons_paths or '').split(','):
+            base_path = f'{self.name}/{addons_path}'
+            if file.startswith(base_path):
+                return file.replace(base_path, '').strip('/').split('/')[0]
+
 
 class RefTime(models.Model):
     _name = 'runbot.repo.reftime'

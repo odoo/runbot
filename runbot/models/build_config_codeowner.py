@@ -23,19 +23,15 @@ class ConfigStep(models.Model):
             else:
                 build._log('', 'No pr for repo %s, skipping' % commit.repo_id.name)
         return pr_by_commit
-    
-    def _get_module(self, repo, file):
-        for addons_path in (repo.addons_paths or '').split(','):
-            base_path = f'{repo.name}/{addons_path}'
-            if file.startswith(base_path):
-                return file.replace(base_path, '').strip('/').split('/')[0]
+
 
     def _codeowners_regexes(self, codeowners, version_id):
         regexes = {}
         for codeowner in codeowners:
-            if codeowner.github_teams and codeowner.regex and (codeowner._match_version(version_id)):
+            github_teams = codeowner._get_github_teams()
+            if github_teams and codeowner.regex and (codeowner._match_version(version_id)):
                 team_set = regexes.setdefault(codeowner.regex.strip(), set()) 
-                team_set |= set(t.strip() for t in codeowner.github_teams.split(','))
+                team_set |= set(t.strip() for t in github_teams)
         return list(regexes.items())
 
     def _reviewer_per_file(self, files, regexes, ownerships, repo):
@@ -51,7 +47,7 @@ class ConfigStep(models.Model):
             if file_reviewers is None:
                 continue
 
-            file_module = self._get_module(repo, file)
+            file_module = repo._get_module(file)
             for ownership in ownerships:
                 if file_module == ownership.module_id.name and not ownership.is_fallback and ownership.team_id.github_team not in file_reviewers:
                     file_reviewers.add(ownership.team_id.github_team)
@@ -64,13 +60,17 @@ class ConfigStep(models.Model):
                 file_reviewers.add(self.fallback_reviewer)
             reviewer_per_file[file] = file_reviewers
         return reviewer_per_file
-    
+
     def _run_codeowner(self, build, log_path):
         bundle = build.params_id.create_batch_id.bundle_id
         if bundle.is_base:
             build._log('', 'Skipping base bundle')
             return
-   
+
+        if bundle.disable_codeowner:
+            build._log('', 'Skipping explicitly, disabled codeowner')
+            return
+
         if not self._check_limits(build):
             return
 
@@ -113,8 +113,7 @@ class ConfigStep(models.Model):
         regexes = self._codeowners_regexes(codeowners, build.params_id.version_id)
         modified_files = self._modified_files(build, pr_by_commit.keys())
         for commit_link, files in modified_files.items():
-            build._log('','Checking %s codeowner regexed on %s files' % (len(regexes), len(files)))
-            
+            build._log('', 'Checking %s codeowner regexed on %s files' % (len(regexes), len(files)))
             reviewers = set()
             reviewer_per_file = self._reviewer_per_file(files, regexes, ownerships, commit_link.commit_id.repo_id)
             for file, file_reviewers in reviewer_per_file.items():
@@ -127,12 +126,19 @@ class ConfigStep(models.Model):
 
             if reviewers:
                 pr = pr_by_commit[commit_link]
-                new_reviewers = sorted(reviewers - set((pr.reviewers or '').split(',')))
+                new_reviewers = reviewers - set((pr.reviewers or '').split(','))
                 if new_reviewers:
+                    skippable_teams = self.env['runbot.team'].search([('github_team', 'in', list(new_reviewers)), ('skip_team_pr', '=', True)])
+                    skippable_teams = skippable_teams.filtered(lambda team: pr.pr_author in team._get_members_logins())
+                    skipped_teams = set(skippable_teams.mapped('github_team'))
+                    if skipped_teams:
+                        new_reviewers = new_reviewers - skipped_teams
+                        build._log('', 'Skipping teams %s since author is part of the team members' % (sorted(skipped_teams),), log_type='markdown')
+                    new_reviewers = sorted(new_reviewers)
+
                     build._log('', 'Requesting review for pull request [%s](%s): %s' % (pr.dname, pr.branch_url, ', '.join(new_reviewers)), log_type='markdown')
-                    response = pr.remote_id._github('/repos/:owner/:repo/pulls/%s/requested_reviewers' % pr.name, {"team_reviewers":list(new_reviewers)}, ignore_errors=False)
+                    response = pr.remote_id._github('/repos/:owner/:repo/pulls/%s/requested_reviewers' % pr.name, {"team_reviewers": list(new_reviewers)}, ignore_errors=False)
                     pr._compute_branch_infos(response)
                     pr['reviewers'] = ','.join(sorted(reviewers))
                 else:
                     build._log('', 'All reviewers are already on pull request [%s](%s)' % (pr.dname, pr.branch_url,), log_type='markdown')
-

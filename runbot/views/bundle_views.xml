@@ -12,6 +12,7 @@
                     <field name="group_ids"/>
                     <field name="trigger_ids"/>
                     <field name="sequence"/>
+                    <field name="token" password="True"/>
                 </group>
             </form>
         </field>
@@ -54,6 +55,7 @@
                     <field name="host_id" readonly="0"/>
                     <field name="commit_limit"/>
                     <field name="file_limit"/>
+                    <field name="disable_codeowner"/>
                     <field name="branch_ids">
                         <tree>
                             <field name="dname"/>
@@ -78,8 +80,12 @@
                             <field name="slot_ids"/>
                         </tree>
                     </field>
-
                 </group>
+
+                <div class="oe_chatter">
+                    <field name="message_follower_ids" widget="mail_followers"/>
+                    <field name="message_ids" widget="mail_thread"/>
+                </div>
             </form>
         </field>
     </record>

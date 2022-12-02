@@ -1,7 +1,7 @@
 
 import subprocess
 
-from ..common import os, RunbotException
+from ..common import os, RunbotException, _make_github_session
 import glob
 import shutil
 
@@ -212,7 +212,7 @@ class CommitStatus(models.Model):
                         _logger.warning('No token on remote %s, skipping status', remote.mapped("name"))
                     else:
                         if remote.token not in session_cache:
-                            session_cache[remote.token] = remote._make_github_session()
+                            session_cache[remote.token] = _make_github_session(remote.token)
                         session = session_cache[remote.token]
                         _logger.info(
                             "github updating %s status %s to %s in repo %s",

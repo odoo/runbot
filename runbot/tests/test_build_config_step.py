@@ -24,6 +24,7 @@ class TestBuildConfigStepCommon(RunbotCase):
         self.start_patcher('find_patcher', 'odoo.addons.runbot.common.find', 0)
         self.start_patcher('findall_patcher', 'odoo.addons.runbot.models.build.BuildResult.parse_config', {})
 
+
 class TestCodeowner(TestBuildConfigStepCommon):
     def setUp(self):
         super().setUp()
@@ -39,7 +40,6 @@ class TestCodeowner(TestBuildConfigStepCommon):
         self.env['runbot.codeowner'].create({'github_teams': 'team_py', 'project_id': self.project.id, 'regex': '.*.py'})
         self.env['runbot.codeowner'].create({'github_teams': 'team_js', 'project_id': self.project.id, 'regex': '.*.js'})
         self.server_commit.name = 'dfdfcfcf'
-
 
     def test_codeowner_is_base(self):
         self.dev_bundle.is_base = True
@@ -58,9 +58,9 @@ class TestCodeowner(TestBuildConfigStepCommon):
             'Limit reached: dfdfcfcf has more than 450 modified files (451) and will be skipped. Contact runbot team to increase your limit if it was intended',
         ])
         self.assertEqual(self.parent_build.local_result, 'ko')
-        
+
     def test_codeowner_draft(self):
-        self.dev_pr.draft=True
+        self.dev_pr.draft = True
         self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
         self.assertEqual(self.parent_build.log_ids.mapped('message'), [
             'Some pr are draft, skipping: 1234'
@@ -68,12 +68,12 @@ class TestCodeowner(TestBuildConfigStepCommon):
         self.assertEqual(self.parent_build.local_result, 'warn')
 
     def test_codeowner_draft_closed(self):
-        self.dev_pr.draft=True
-        self.dev_pr.alive=False
+        self.dev_pr.draft = True
+        self.dev_pr.alive = False
         self.assertEqual(self.parent_build.local_result, 'ok')
 
     def test_codeowner_forwardpot(self):
-        self.dev_pr.pr_author='fw-bot'
+        self.dev_pr.pr_author = 'fw-bot'
         self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
         self.assertEqual(self.parent_build.log_ids.mapped('message'), [
             'Ignoring forward port pull request: 1234'
@@ -106,9 +106,9 @@ class TestCodeowner(TestBuildConfigStepCommon):
 
     def test_get_module(self):
         self.assertEqual(self.repo_server.addons_paths, 'addons,core/addons')
-        self.assertEqual('module1', self.config_step._get_module(self.repo_server, 'server/core/addons/module1/some/file.py'))
-        self.assertEqual('module1', self.config_step._get_module(self.repo_server, 'server/addons/module1/some/file.py'))
-        self.assertEqual(None, self.config_step._get_module(self.repo_server, 'server/core/module1/some/file.py'))
+        self.assertEqual('module1', self.repo_server._get_module('server/core/addons/module1/some/file.py'))
+        self.assertEqual('module1', self.repo_server._get_module('server/addons/module1/some/file.py'))
+        self.assertEqual(None, self.repo_server._get_module('server/core/module1/some/file.py'))
 
     def test_codeowner_regex_multiple(self):
         self.diff = 'file.js\nfile.py\nfile.xml'
@@ -120,20 +120,32 @@ class TestCodeowner(TestBuildConfigStepCommon):
         self.assertEqual(messages[4], 'Adding codeowner-team to reviewers for file [server/file.xml](https://False/blob/dfdfcfcf/file.xml)')
         self.assertEqual(messages[5], 'Requesting review for pull request [base/server:1234](https://example.com/base/server/pull/1234): codeowner-team, team_js, team_py')
         self.assertEqual(self.dev_pr.reviewers, 'codeowner-team,team_js,team_py')
-        
+
     def test_codeowner_regex_some_already_on(self):
         self.diff = 'file.js\nfile.py\nfile.xml'
         self.dev_pr.reviewers = 'codeowner-team,team_js'
         self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
         messages = self.parent_build.log_ids.mapped('message')        
         self.assertEqual(messages[5], 'Requesting review for pull request [base/server:1234](https://example.com/base/server/pull/1234): team_py')
-     
+
     def test_codeowner_regex_all_already_on(self):
         self.diff = 'file.js\nfile.py\nfile.xml'
         self.dev_pr.reviewers = 'codeowner-team,team_js,team_py'
         self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
         messages = self.parent_build.log_ids.mapped('message')        
         self.assertEqual(messages[5], 'All reviewers are already on pull request [base/server:1234](https://example.com/base/server/pull/1234)')
+
+    def test_codeowner_author_in_team(self):
+        self.diff = 'file.js\nfile.py\nfile.xml'
+        self.team1.github_team = 'team_py'
+        self.team1.github_logins = 'some_member,another_member'
+        self.team1.skip_team_pr = True
+        self.dev_pr.pr_author = 'some_member'
+        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        messages = self.parent_build.log_ids.mapped('message')
+        self.assertEqual(messages[5], "Skipping teams ['team_py'] since author is part of the team members")
+        self.assertEqual(messages[6], 'Requesting review for pull request [base/server:1234](https://example.com/base/server/pull/1234): codeowner-team, team_js')
+        self.assertEqual(self.dev_pr.reviewers, 'codeowner-team,team_js,team_py')
 
     def test_codeowner_ownership_base(self):
         module1 = self.env['runbot.module'].create({'name': "module1"})
@@ -183,7 +195,6 @@ class TestCodeowner(TestBuildConfigStepCommon):
             'Adding codeowner-team to reviewers for file [server/core/addons/module4/some/file.txt](https://False/blob/dfdfcfcf/core/addons/module4/some/file.txt)',
             'Requesting review for pull request [base/server:1234](https://example.com/base/server/pull/1234): codeowner-team, team_01, team_02, team_js, team_py'
         ])
-
 
 
 class TestBuildConfigStepCreate(TestBuildConfigStepCommon):

@@ -58,6 +58,11 @@ admin_passwd=running_master_password</field>
         <field name="value">fw-bot</field>
     </record>
 
+    <record model="ir.config_parameter" id="runbot.runbot_organisation">
+        <field name="key">runbot.runbot_organisation</field>
+        <field name="value">odoo</field>
+    </record>
+
     <record model="ir.actions.server" id="action_toggle_is_base">
         <field name="name">Mark is base</field>
         <field name="model_id" ref="runbot.model_runbot_bundle" />

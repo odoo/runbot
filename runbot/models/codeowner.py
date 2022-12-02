@@ -10,17 +10,26 @@ class Codeowner(models.Model):
     _description = "Notify github teams based on filenames regex"
     _inherit = "mail.thread"
 
-    project_id = fields.Many2one('runbot.project', required=True)
+    project_id = fields.Many2one('runbot.project', required=True, default=lambda self: self.env.ref('runbot.main_project', raise_if_not_found=False))
     regex = fields.Char('Regular Expression', help='Regex to match full file paths', required=True, tracking=True)
-    github_teams = fields.Char(help='Comma separated list of github teams to notify', required=True, tracking=True)
-    team_id = fields.Many2one('runbot.team', help='Not mandatory runbot team')
+    github_teams = fields.Char(help='Comma separated list of github teams to notify', tracking=True)
+    team_id = fields.Many2one('runbot.team', help='Not mandatory runbot team', tracking=True)
     version_domain = fields.Char('Version Domain', help='Codeowner only applies to the filtered versions')
+    organisation = fields.Char('organisation', related='project_id.organisation')
+
+    @api.constrains('github_teams', 'team_id')
+    def _check_team(self):
+        for codeowner in self:
+            if not codeowner.team_id and not codeowner.github_teams:
+                raise ValidationError('Codeowner should at least have a runbot team or a github team')
+            if codeowner.team_id and not codeowner.team_id.github_team:
+                raise ValidationError('Team %s should have a github team defined to be used in codeowner' % codeowner.team_id.name)
 
     @api.constrains('regex')
     def _validate_regex(self):
         for rec in self:
             try:
-                r = re.compile(rec.regex)
+                re.compile(rec.regex)
             except re.error as e:
                 raise ValidationError("Unable to compile regular expression: %s" % e)
 
@@ -31,6 +40,14 @@ class Codeowner(models.Model):
                 self._match_version(self.env.ref('runbot.bundle_master').version_id)
             except Exception as e:
                 raise ValidationError("Unable to validate version_domain: %s" % e)
+
+    def _get_github_teams(self):
+        github_teams = []
+        if self.github_teams:
+            github_teams = self.github_teams.split(',')
+        if self.team_id.github_team:
+            github_teams.append(self.team_id.github_team)
+        return github_teams
 
     def _get_version_domain(self):
         """ Helper to get the evaluated version domain """
