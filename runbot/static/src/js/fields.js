@@ -67,6 +67,39 @@ registry.add('frontend_url', FrontendUrl)
 function stringify(obj) {
     return JSON.stringify(obj, null, '\t')
 }
+
 field_utils.format.jsonb = stringify;
 field_utils.parse.jsonb = JSON.parse;
+
+var GithubTeamWidget = basic_fields.InputField.extend({
+    events: _.extend({'click': '_onClick'}, basic_fields.InputField.prototype.events),
+    _renderReadonly: function () {
+        if (!this.value) {
+            return;
+        }
+        this.el.textContent = '';
+        const organisation = this.record.data.organisation;
+        this.value.split(',').forEach((value) => {
+            const href = 'https://github.com/orgs/' + organisation + '/teams/' + value.trim() + '/members';
+            const anchorEl = Object.assign(document.createElement('a'), {
+                text: value + " ",
+                href: href,
+                target: '_blank',
+            });
+            this.el.appendChild(anchorEl);
+        });
+      
+    },
+
+    /**
+     * Prevent the URL click from opening the record (when used on a list).
+     * @private
+     * @param {MouseEvent} ev
+     */
+    _onClick: function (ev) {
+        ev.stopPropagation();
+    },
+});
+registry.add('github_team', GithubTeamWidget)
+
 });

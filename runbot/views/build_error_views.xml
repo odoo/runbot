@@ -12,6 +12,7 @@
                   <field name="content" readonly="1"/>
                   <field name="module_name" readonly="1"/>
                   <field name="function" readonly="1"/>
+                  <field name="file_path" readonly="1"/>
                 </group>
               </group>
               <group col="2">

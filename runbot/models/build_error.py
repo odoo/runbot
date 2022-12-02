@@ -56,17 +56,25 @@ class BuildError(models.Model):
             if build_error.test_tags and '-' in build_error.test_tags:
                 raise ValidationError('Build error test_tags should not be negated')
 
-    @api.model_create_single
-    def create(self, vals):
+    @api.model_create_multi
+    def create(self, vals_list):
         cleaners = self.env['runbot.error.regex'].search([('re_type', '=', 'cleaning')])
-        content = vals.get('content')
-        cleaned_content = cleaners.r_sub('%', content)
-        vals.update({'cleaned_content': cleaned_content,
-                     'fingerprint': self._digest(cleaned_content)
-        })
-        if not 'team_id' in vals and 'module_name' in vals:
-            vals.update({'team_id': self.env['runbot.team']._get_team(vals['module_name'])})
-        return super().create(vals)
+        teams = None
+        repos = None
+        for vals in vals_list:
+            content = vals.get('content')
+            cleaned_content = cleaners.r_sub('%', content)
+            vals.update({
+                'cleaned_content': cleaned_content,
+                'fingerprint': self._digest(cleaned_content)
+            })
+            if 'team_id' not in vals and 'file_path' in vals:
+                teams = teams or self.env['runbot.team'].search(['|', ('path_glob', '!=', False), ('module_ownership_ids', '!=', False)])
+                repos = repos or self.env['runbot.repo'].search([])
+                team = teams._get_team(vals['file_path'], repos)
+                if team:
+                    vals.update({'team_id': team.id})
+        return super().create(vals_list)
 
     def write(self, vals):
         if 'active' in vals:
@@ -140,25 +148,31 @@ class BuildError(models.Model):
 
     @api.model
     def _parse_logs(self, ir_logs):
-
         regexes = self.env['runbot.error.regex'].search([])
         search_regs = regexes.filtered(lambda r: r.re_type == 'filter')
         cleaning_regs = regexes.filtered(lambda r: r.re_type == 'cleaning')
 
-        hash_dict = defaultdict(list)
+        hash_dict = defaultdict(self.env['ir.logging'].browse)
         for log in ir_logs:
             if search_regs.r_search(log.message):
                 continue
             fingerprint = self._digest(cleaning_regs.r_sub('%', log.message))
-            hash_dict[fingerprint].append(log)
+            hash_dict[fingerprint] |= log
 
         build_errors = self.env['runbot.build.error']
         # add build ids to already detected errors
         existing_errors = self.env['runbot.build.error'].search([('fingerprint', 'in', list(hash_dict.keys())), ('active', '=', True)])
         build_errors |= existing_errors
         for build_error in existing_errors:
-            for build in {rec.build_id for rec in hash_dict[build_error.fingerprint]}:
+            logs = hash_dict[build_error.fingerprint]
+            for build in logs.mapped('build_id'):
                 build.build_error_ids += build_error
+
+            # update filepath if it changed. This is optionnal and mainly there in case we adapt the OdooRunner log 
+            if logs[0].path != build_error.file_path:
+                build_error.file_path = logs[0].path
+                build_error.function = logs[0].func
+
             del hash_dict[build_error.fingerprint]
 
         # create an error for the remaining entries

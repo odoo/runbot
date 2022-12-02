@@ -98,7 +98,7 @@
                     <field name="fetch_heads" string="Branch"/>
                     <field name="fetch_pull" string="PR"/>
                     <field name="send_status"/>
-                    <field name="token"/>
+                    <field name="token" password="True"/>
                   </tree>
                 </field>
               </group>

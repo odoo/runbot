@@ -13,6 +13,7 @@ _logger = logging.getLogger(__name__)
 class Bundle(models.Model):
     _name = 'runbot.bundle'
     _description = "Bundle"
+    _inherit = 'mail.thread'
 
     name = fields.Char('Bundle name', required=True, help="Name of the base branch")
     project_id = fields.Many2one('runbot.project', required=True, index=True)
@@ -49,6 +50,7 @@ class Bundle(models.Model):
     dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, help="Use a custom Dockerfile")
     commit_limit = fields.Integer("Commit limit")
     file_limit = fields.Integer("File limit")
+    disable_codeowner = fields.Boolean("Disable codeowners", tracking=True)
 
     @api.depends('name')
     def _compute_host_id(self):
@@ -188,7 +190,6 @@ class Bundle(models.Model):
     def _url(self):
         self.ensure_one()
         return "/runbot/bundle/%s" % self.id
-
 
     def create(self, values_list):
         res = super().create(values_list)

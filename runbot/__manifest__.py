@@ -56,12 +56,13 @@
         'views/custom_trigger_wizard_views.xml',
         'wizards/stat_regex_wizard_views.xml',
         'views/menus.xml',
+        'views/user.xml',
     ],
     'license': 'LGPL-3',
 
     'assets': {
         'web.assets_backend': [
-            'runbot/static/src/js/json_field.js',
+            'runbot/static/src/js/fields.js',
         ],
     }
 

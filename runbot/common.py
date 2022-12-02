@@ -5,6 +5,7 @@ import itertools
 import logging
 import psycopg2
 import re
+import requests
 import socket
 import time
 import os
@@ -166,3 +167,11 @@ def pseudo_markdown(text):
 
     text = Markup(re.sub(r'<code>(\d+)</code>', code_replace, text, flags=re.DOTALL))
     return text
+
+
+def _make_github_session(token):
+    session = requests.Session()
+    if token:
+        session.auth = (token, 'x-oauth-basic')
+    session.headers.update({'Accept': 'application/vnd.github.she-hulk-preview+json'})
+    return session

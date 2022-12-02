@@ -26,6 +26,7 @@ class ResConfigSettings(models.TransientModel):
     runbot_do_schedule = fields.Boolean('Schedule builds')
     runbot_is_base_regex = fields.Char('Regex is_base')
     runbot_forwardport_author = fields.Char('Forwardbot author')
+    runbot_organisation = fields.Char('Organisation')
 
     runbot_db_gc_days = fields.Integer(
         'Days before gc',
@@ -70,6 +71,7 @@ class ResConfigSettings(models.TransientModel):
                    runbot_do_schedule=get_param('runbot.runbot_do_schedule', default=False),
                    runbot_is_base_regex=get_param('runbot.runbot_is_base_regex', default=''),
                    runbot_forwardport_author = get_param('runbot.runbot_forwardport_author', default=''),
+                   runbot_organisation = get_param('runbot.runbot_organisation', default=''),
                    )
         return res
 
@@ -91,6 +93,7 @@ class ResConfigSettings(models.TransientModel):
         set_param('runbot.runbot_do_schedule', self.runbot_do_schedule)
         set_param('runbot.runbot_is_base_regex', self.runbot_is_base_regex)
         set_param('runbot.runbot_forwardport_author', self.runbot_forwardport_author)
+        set_param('runbot.runbot_organisation', self.runbot_organisation)
 
     @api.onchange('runbot_is_base_regex')
     def _on_change_is_base_regex(self):

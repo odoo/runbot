@@ -4,6 +4,7 @@ import hashlib
 import logging
 import re
 
+from ..common import _make_github_session
 from collections import defaultdict
 from dateutil.relativedelta import relativedelta
 from fnmatch import fnmatch
@@ -20,16 +21,23 @@ class RunbotTeam(models.Model):
     _order = 'name, id'
 
     name = fields.Char('Team', required=True)
+    project_id = fields.Many2one('runbot.project', 'Project', help='Project to monitor', required=True,
+                                 default=lambda self: self.env.ref('runbot.main_project'))
+    organisation = fields.Char('organisation', related="project_id.organisation")
     user_ids = fields.Many2many('res.users', string='Team Members', domain=[('share', '=', False)])
     dashboard_id = fields.Many2one('runbot.dashboard', string='Dashboard')
     build_error_ids = fields.One2many('runbot.build.error', 'team_id', string='Team Errors', domain=[('parent_id', '=', False)])
-    path_glob = fields.Char('Module Wildcards',
+    path_glob = fields.Char(
+        'Module Wildcards',
         help='Comma separated list of `fnmatch` wildcards used to assign errors automaticaly\n'
         'Negative wildcards starting with a `-` can be used to discard some path\n'
-        'e.g.: `*website*,-*website_sale*`')
+        'e.g.: `*website*,-*website_sale*`'
+    )
     module_ownership_ids = fields.One2many('runbot.module.ownership', 'team_id')
     upgrade_exception_ids = fields.One2many('runbot.upgrade.exception', 'team_id', string='Team Upgrade Exceptions')
     github_team = fields.Char('Github team')
+    github_logins = fields.Char('Github logins', help='Additional github logins, prefer adding the login on the member of the team')
+    skip_team_pr = fields.Boolean('Skip team pr', help="Don't add codeowner if pr was created by a member of the team")
 
     @api.model_create_single
     def create(self, values):
@@ -41,13 +49,53 @@ class RunbotTeam(models.Model):
         return super().create(values)
 
     @api.model
-    def _get_team(self, module_name):
-        for team in self.env['runbot.team'].search([('path_glob', '!=', False)]):
-            if any([fnmatch(module_name, pattern.strip().strip('-')) for pattern in team.path_glob.split(',') if pattern.strip().startswith('-')]):
+    def _get_team(self, file_path, repos=None):
+        # path = file_path.removeprefix('/data/build/')
+        path = file_path
+        if path.startswith('/data/build/'):
+            path = path.split('/', 3)[3]
+
+        repo_name = path.split('/')[0]
+        module = None
+        if repos:
+            repos = repos.filtered(lambda repo: repo.name == repo_name)
+        else:
+            repos = self.env['runbot.repo'].search([('name', '=', repo_name)])
+        for repo in repos:
+            module = repo._get_module(path)
+            if module:
+                break
+        if module:
+            for ownership in self.module_ownership_ids.sorted(lambda t: t.is_fallback):
+                if module == ownership.module_id.name:
+                    return ownership.team_id
+
+        for team in self:
+            if any([fnmatch(file_path, pattern.strip().strip('-')) for pattern in team.path_glob.split(',') if pattern.strip().startswith('-')]):
                 continue
-            if any([fnmatch(module_name, pattern.strip()) for pattern in team.path_glob.split(',') if not pattern.strip().startswith('-')]):
-                return team.id
+            if any([fnmatch(file_path, pattern.strip()) for pattern in team.path_glob.split(',') if not pattern.strip().startswith('-')]):
+                return team
         return False
+
+    def _get_members_logins(self):
+        self.ensure_one()
+        return set(self.github_logins.split(',')) | set(self.user_ids.filtered(lambda user: user.github_login).mapped('github_login'))
+
+    def _fetch_members(self):
+        for team in self:
+            if team.github_team:
+                url = f"https://api.github.com/orgs/{team.organisation}/teams/{team.github_team}"
+                session = _make_github_session(team.project_id.token)
+                response = session.get(url)
+                if response.status_code != 200:
+                    raise UserError(f'Cannot find team {team.github_team}')
+                team_infos = response.json()
+                members_url = team_infos['members_url'].replace('{/member}', '')
+                members = session.get(members_url).json()
+                team_members_logins = set(team.user_ids.mapped('github_login'))
+                members = [member['login'] for member in members if member['login'] not in team_members_logins]
+                team.github_logins = ','.join(sorted(members))
+
 
 class Module(models.Model):
     _name = 'runbot.module'
@@ -55,6 +103,12 @@ class Module(models.Model):
 
     name = fields.Char('Name')
     ownership_ids = fields.One2many('runbot.module.ownership', 'module_id')
+    team_ids = fields.Many2many('runbot.team', string="Teams", compute='_compute_team_ids')
+
+    @api.depends('ownership_ids')
+    def _compute_team_ids(self):
+        for record in self:
+            record.team_ids = record.ownership_ids.team_id
 
 
 class ModuleOwnership(models.Model):
@@ -64,6 +118,9 @@ class ModuleOwnership(models.Model):
     module_id = fields.Many2one('runbot.module', string='Module', required=True, ondelete='cascade')
     team_id = fields.Many2one('runbot.team', string='Team', required=True)
     is_fallback = fields.Boolean('Fallback')
+
+    def name_get(self):
+        return [(record.id, f'{record.module_id.name} -> {record.team_id.name}{" (fallback)" if record.is_fallback else ""}' ) for record in self]
 
 
 class RunbotDashboard(models.Model):

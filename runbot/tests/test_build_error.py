@@ -38,17 +38,18 @@ class TestBuildError(RunbotCase):
 
         error_team = self.BuildErrorTeam.create({
             'name': 'test-error-team',
-            'path_glob': '*build-error-n*'
+            'path_glob': '*/test_ui.py'
         })
 
-        log = {'message': RTE_ERROR,
-               'build_id': ko_build.id,
-               'level': 'ERROR',
-               'type': 'server',
-               'name': 'test-build-error-name',
-               'path': 'test-build-error-path',
-               'func': 'test-build-error-func',
-               'line': 1,
+        log = {
+            'message': RTE_ERROR,
+            'build_id': ko_build.id,
+            'level': 'ERROR',
+            'type': 'server',
+            'name': 'test-build-error-name',
+            'path': '/data/build/server/addons/web_studio/tests/test_ui.py',
+            'func': 'test-build-error-func',
+            'line': 1,
         }
 
         # Test the build parse and ensure that an 'ok' build is not parsed
@@ -58,6 +59,7 @@ class TestBuildError(RunbotCase):
         ko_build._parse_logs()
         ok_build._parse_logs()
         build_error = self.BuildError.search([('build_ids', 'in', [ko_build.id])])
+        self.assertTrue(build_error)
         self.assertIn(ko_build, build_error.build_ids, 'The parsed build should be added to the runbot.build.error')
         self.assertFalse(self.BuildError.search([('build_ids', 'in', [ok_build.id])]), 'A successful build should not associated to a runbot.build.error')
         self.assertEqual(error_team, build_error.team_id)
@@ -166,11 +168,37 @@ class TestBuildError(RunbotCase):
         })
 
         self.assertTrue(website_team.dashboard_id.exists())
+        teams = self.env['runbot.team'].search(['|', ('path_glob', '!=', False), ('module_ownership_ids', '!=', False)])
+        self.assertFalse(teams._get_team('/data/build/odoo/addons/web_studio/tests/test_ui.py'))
+        self.assertFalse(teams._get_team('/data/build/enterprise/website_sale/tests/test_sale_process.py'))
+        self.assertEqual(website_team, teams._get_team('/data/build/odoo/addons/website_crm/tests/test_website_crm'))
+        self.assertEqual(website_team, teams._get_team('/data/build/odoo/addons/website/tests/test_ui'))
 
-        self.assertFalse(self.BuildErrorTeam._get_team('odoo/addons/web_studio/tests/test_ui.py'))
-        self.assertFalse(self.BuildErrorTeam._get_team('odoo/addons/website_sale/tests/test_sale_process.py'))
-        self.assertEqual(website_team.id, self.BuildErrorTeam._get_team('odoo/addons/website_crm/tests/test_website_crm'))
-        self.assertEqual(website_team.id, self.BuildErrorTeam._get_team('odoo/addons/website/tests/test_ui'))
+    def test_build_error_team_ownership(self):
+        website_team = self.BuildErrorTeam.create({
+            'name': 'website_test',
+            'path_glob': ''
+        })
+        sale_team = self.BuildErrorTeam.create({
+            'name': 'sale_test',
+            'path_glob': ''
+        })
+        module_website = self.env['runbot.module'].create({
+            'name': 'website_crm'
+        })
+        module_sale = self.env['runbot.module'].create({
+            'name': 'website_sale'
+        })
+        self.env['runbot.module.ownership'].create({'module_id': module_website.id, 'team_id': website_team.id, 'is_fallback': True})
+        self.env['runbot.module.ownership'].create({'module_id': module_sale.id, 'team_id': sale_team.id, 'is_fallback': False})
+        self.env['runbot.module.ownership'].create({'module_id': module_sale.id, 'team_id': website_team.id, 'is_fallback': True})
+
+        self.repo_server.name = 'odoo'
+        self.repo_addons.name = 'enterprise'
+        teams = self.env['runbot.team'].search(['|', ('path_glob', '!=', False), ('module_ownership_ids', '!=', False)])
+        self.assertFalse(teams._get_team('/data/build/odoo/addons/web_studio/tests/test_ui.py'))
+        self.assertEqual(website_team, teams._get_team('/data/build/odoo/addons/website_crm/tests/test_website_crm'))
+        self.assertEqual(sale_team, teams._get_team('/data/build/enterprise/website_sale/tests/test_sale_process.py'))
 
     def test_dashboard_tile_simple(self):
         self.additionnal_setup()
