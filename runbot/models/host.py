@@ -221,7 +221,6 @@ class Host(models.Model):
             build_logs = logs_by_build_id[build.id]
             for ir_log in build_logs:
                 local_log_ids.append(ir_log['id'])
-                ir_log['active_step_id'] = build.active_step.id
                 ir_log['type'] = 'server'
                 log_counter -= 1
                 if log_counter == 0:

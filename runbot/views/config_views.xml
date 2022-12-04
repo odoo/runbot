@@ -40,6 +40,7 @@
                     </div>
                     <group string="General settings">
                         <field name="name"/>
+                        <field name="description"/>
                         <field name="domain_filter"/>
                         <field name="job_type"/>
                         <field name="make_stats"/>

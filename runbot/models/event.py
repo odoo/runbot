@@ -35,6 +35,7 @@ class runbot_event(models.Model):
         for build in builds:
             build_logs = logs_by_build_id[build.id]
             for ir_log in build_logs:
+                ir_log['active_step_id'] = build.active_step.id
                 if ir_log['level'].upper() == 'WARNING':
                     build.triggered_result = 'warn'
                 elif ir_log['level'].upper() == 'ERROR':

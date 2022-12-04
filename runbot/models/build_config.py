@@ -138,6 +138,7 @@ class ConfigStep(models.Model):
     # general info
     name = fields.Char('Step name', required=True, tracking=True, help="Unique name for step please use trigram as postfix for custom step_ids")
     domain_filter = fields.Char('Domain filter', tracking=True)
+    description = fields.Char('Config step description')
 
     job_type = fields.Selection(TYPES, default='install_odoo', required=True, tracking=True, ondelete={t[0]: 'cascade' for t in [TYPES]})
     protected = fields.Boolean('Protected', default=False, tracking=True)
