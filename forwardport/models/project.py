@@ -1090,9 +1090,9 @@ stderr:
             # works properly
             repo = git(repo_dir)
             repo.config('--add', 'remote.origin.fetch', '+refs/heads/*:refs/heads/*')
-            # negative refspecs require
-            # repo.config('--add', 'remote.origin.fetch', '^refs/heads/tmp.*')
-            # repo.config('--add', 'remote.origin.fetch', '^refs/heads/staging.*')
+            # negative refspecs require git 2.29
+            repo.config('--add', 'remote.origin.fetch', '^refs/heads/tmp.*')
+            repo.config('--add', 'remote.origin.fetch', '^refs/heads/staging.*')
             return repo
 
     def _outstanding(self, cutoff):
