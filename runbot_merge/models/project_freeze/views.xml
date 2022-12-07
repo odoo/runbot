@@ -16,46 +16,40 @@
                                 options="{'color_field': 'state_color', 'no_create': True}"/>
                         </group>
                     </group>
-                    <group>
-                        <group colspan="2" string="Release">
-                            <p>
-                                Release (freeze) PRs, provide the first commit
-                                of the new branches. Each PR must have a single
-                                commit.
-                            </p>
-                            <p class="alert alert-warning" role="alert">
-                                These PRs will be merged directly, not staged.
-                            </p>
-                            <field name="release_label"/>
-                            <field name="release_pr_ids" nolabel="1">
-                                <tree editable="bottom" create="false">
-                                    <field name="repository_id" readonly="1"/>
-                                    <field name="pr_id" options="{'no_create': True}"
-                                           context="{'pr_include_title': 1}"/>
-                                    <field name="label"/>
-                                </tree>
-                            </field>
-                        </group>
+                    <group string="Release">
+                        <p colspan="2">
+                            Release (freeze) PRs, provide the first commit
+                            of the new branches. Each PR must have a single
+                            commit.
+                        </p>
+                        <p class="alert alert-warning" role="alert" colspan="2">
+                            These PRs will be merged directly, not staged.
+                        </p>
+                        <field name="release_label" colspan="2"/>
+                        <field name="release_pr_ids" nolabel="1" colspan="2">
+                            <tree editable="bottom" create="false" delete="false">
+                                <field name="repository_id" readonly="1"/>
+                                <field name="pr_id" options="{'no_create': True}"/>
+                                <field name="label"/>
+                            </tree>
+                        </field>
                     </group>
-                    <group>
-                        <group colspan="2" string="Bump">
-                            <p>
-                                Bump PRs, provide the first commit of the source
-                                branches after the release has been cut.
-                            </p>
-                            <p class="alert alert-warning" role="alert">
-                                These PRs will be merged directly, not staged.
-                            </p>
-                            <field name="bump_label"/>
-                            <field name="bump_pr_ids" nolabel="1">
-                                <tree editable="bottom" create="false">
-                                    <field name="repository_id" readonly="1"/>
-                                    <field name="pr_id" options="{'no_create': True}"
-                                           context="{'pr_include_title': 1}"/>
-                                    <field name="label"/>
-                                </tree>
-                            </field>
-                        </group>
+                    <group string="Bump">
+                        <p colspan="2">
+                            Bump PRs, provide the first commit of the source
+                            branches after the release has been cut.
+                        </p>
+                        <p class="alert alert-warning" role="alert" colspan="2">
+                            These PRs will be merged directly, not staged.
+                        </p>
+                        <field name="bump_label" colspan="2"/>
+                        <field name="bump_pr_ids" nolabel="1" colspan="2">
+                            <tree editable="bottom">
+                                <field name="repository_id" options="{'no_create': True}"/>
+                                <field name="pr_id" options="{'no_create': True}"/>
+                                <field name="label"/>
+                            </tree>
+                        </field>
                     </group>
                     <footer>
                         <!--

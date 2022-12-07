@@ -4,8 +4,9 @@ import itertools
 import json
 import logging
 import time
+from collections import Counter
 
-from odoo import models, fields, api
+from odoo import models, fields, api, Command
 from odoo.exceptions import UserError
 from odoo.addons.runbot_merge.exceptions import FastForwardError
 
@@ -24,20 +25,28 @@ class FreezeWizard(models.Model):
         help="Pull requests which must have been merged before the freeze is allowed",
     )
 
-    release_label = fields.Char()
+    release_label = fields.Char(
+        string="Find by label",
+        help="Setting a (complete) PR label will automatically find and "
+             "configure the corresponding PRs as release",
+    )
     release_pr_ids = fields.One2many(
         'runbot_merge.project.freeze.prs', 'wizard_id',
         string="Release pull requests",
         help="Pull requests used as tips for the freeze branches, "
-             "one per repository"
+             "one per repository",
     )
 
-    bump_label = fields.Char()
+    bump_label = fields.Char(
+        string="Find by label",
+        help="Setting a (complete) PR label will automatically find and "
+             "configure the corresponding PRs as bump",
+    )
     bump_pr_ids = fields.One2many(
         'runbot_merge.project.freeze.bumps', 'wizard_id',
         string="Bump pull requests",
         help="Pull requests used as tips of the frozen-off branches, "
-             "one per repository"
+             "one per repository",
     )
 
     _sql_constraints = [
@@ -47,39 +56,57 @@ class FreezeWizard(models.Model):
 
     @api.onchange('release_label')
     def _onchange_release_label(self):
+        if not self.release_label:
+            return
+
         prs = self.env['runbot_merge.pull_requests'].search([
             ('label', '=', self.release_label)
         ])
         for release_pr in self.release_pr_ids:
-            release_pr.pd_id = next((
-                p.id for p in prs
-                if p.repository == release_pr.repository_id
-            ), False)
+            release_pr.pr_id = prs.filtered(lambda p: p.repository == release_pr.repository_id)
 
     @api.onchange('release_pr_ids')
     def _onchange_release_prs(self):
-        labels = {p.pr_id.label for p in self.release_pr_ids}
+        labels = {p.pr_id.label for p in self.release_pr_ids if p.pr_id}
         self.release_label = len(labels) == 1 and labels.pop()
 
     @api.onchange('bump_label')
     def _onchange_bump_label(self):
+        if not self.release_label:
+            return
+
         prs = self.env['runbot_merge.pull_requests'].search([
             ('label', '=', self.bump_label)
         ])
-        for bump_pr in self.bump_pr_ids:
-            bump_pr.pd_id = next((
-                p.id for p in prs
-                if p.repository == bump_pr.repository_id
-            ), False)
+
+        commands = [Command.clear()]
+        for pr in prs:
+            current = self.bump_pr_ids.filtered(lambda bump_pr: bump_pr.repository_id == pr.repository)
+            if current:
+                commands.append(Command.update(current.id, {'pr_id': pr.id}))
+            else:
+                commands.append(Command.create({
+                    'repository_id': pr.repository.id,
+                    'pr_id': pr.id
+                }))
+
+        self.write({'bump_pr_ids': commands})
 
     @api.onchange('bump_pr_ids')
     def _onchange_bump_prs(self):
-        labels = {p.pr_id.label for p in self.bump_pr_ids}
+        labels = {p.pr_id.label for p in self.bump_pr_ids if p.pr_id}
         self.bump_label = len(labels) == 1 and labels.pop()
 
     @api.depends('release_pr_ids.pr_id.label', 'required_pr_ids.state')
     def _compute_errors(self):
         errors = []
+
+        release_repos = Counter(self.mapped('release_pr_ids.repository_id'))
+        release_repos.subtract(self.project_id.repo_ids)
+        excess = {k.name for k, v in release_repos.items() if v > 0}
+        if excess:
+            errors.append("* Every repository must have one release PR, found multiple for %s" % ', '.join(excess))
+
         without = self.release_pr_ids.filtered(lambda p: not p.pr_id)
         if without:
             errors.append("* Every repository must have a release PR, missing release PRs for %s." % ', '.join(
@@ -92,6 +119,11 @@ class FreezeWizard(models.Model):
         non_squash = self.mapped('release_pr_ids.pr_id').filtered(lambda p: not p.squash)
         if non_squash:
             errors.append("* Release PRs should have a single commit, found more in %s." % ', '.join(p.display_name for p in non_squash))
+
+        bump_repos = Counter(self.mapped('bump_pr_ids.repository_id'))
+        excess = {k.name for k, v in bump_repos.items() if v > 1}
+        if excess:
+            errors.append("* Every repository may have one bump PR, found multiple for %s" % ', '.join(excess))
 
         bump_labels = set(self.mapped('bump_pr_ids.pr_id.label'))
         if len(bump_labels) > 1:
@@ -327,20 +359,24 @@ class BumpPullRequest(models.Model):
     _description = "links to pull requests used to \"bump\" the development branches"
 
     wizard_id = fields.Many2one('runbot_merge.project.freeze', required=True, index=True, ondelete='cascade')
+    # FIXME: repo = wizard.repo?
     repository_id = fields.Many2one('runbot_merge.repository', required=True)
     pr_id = fields.Many2one(
         'runbot_merge.pull_requests',
         domain='[("repository", "=", repository_id), ("state", "not in", ("closed", "merged"))]',
-        string="Release Pull Request",
+        string="Bump Pull Request",
     )
     label = fields.Char(related='pr_id.label')
+
+    @api.onchange('repository_id')
+    def _onchange_repository(self):
+        self.pr_id = False
 
     def write(self, vals):
         # only the pr should be writeable after initial creation
         assert 'wizard_id' not in vals
-        assert 'repository_id' not in vals
         # and if the PR gets set, it should match the requested repository
-        if 'pr_id' in vals:
+        if vals.get('pr_id'):
             assert self.env['runbot_merge.pull_requests'].browse(vals['pr_id'])\
                        .repository == self.repository_id
 
