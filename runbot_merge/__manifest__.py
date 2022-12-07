@@ -14,6 +14,7 @@
         'views/configuration.xml',
         'views/templates.xml',
         'models/project_freeze/views.xml',
+        'models/staging_cancel/views.xml',
     ],
     'assets': {
         'web.assets_frontend': [

@@ -1831,8 +1831,17 @@ class Stagings(models.Model):
             s.write(vals)
 
     def action_cancel(self):
-        self.cancel("explicitly cancelled by %s", self.env.user.display_name)
-        return { 'type': 'ir.actions.act_window_close' }
+        w = self.env['runbot_merge.stagings.cancel'].create({
+            'staging_id': self.id,
+        })
+        return {
+            'type': 'ir.actions.act_window',
+            'target': 'new',
+            'name': f'Cancel staging {self.id} ({self.target.name})',
+            'view_mode': 'form',
+            'res_model': w._name,
+            'res_id': w.id,
+        }
 
     def cancel(self, reason, *args):
         self = self.filtered('active')

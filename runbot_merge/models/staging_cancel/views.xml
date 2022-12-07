@@ -1,0 +1,17 @@
+<odoo>
+    <record id="runbot_merge_stagings_cancel_form" model="ir.ui.view">
+        <field name="name">Staging Cancel Form</field>
+        <field name="model">runbot_merge.stagings.cancel</field>
+        <field name="arch" type="xml">
+            <form>
+                <group>
+                    <group colspan="4"><field name="reason"/></group>
+                    <group colspan="4"><field name="cancel_splits"/></group>
+                </group>
+                <footer>
+                    <button string="Confirm" name="action_cancel" type="object" class="btn btn-primary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>
