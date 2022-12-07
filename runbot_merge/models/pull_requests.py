@@ -1323,35 +1323,37 @@ class PullRequests(models.Model):
 
     def _stage_squash(self, gh, target, commits, related_prs=()):
         msg = self._build_merge_message(self, related_prs=related_prs)
+        authorship = {}
+
         authors = {
             (c['commit']['author']['name'], c['commit']['author']['email'])
             for c in commits
         }
-        author = None
         if len(authors) == 1:
             name, email = authors.pop()
-            author = {'name': name, 'email': email}
-        for author in authors:
-            msg.headers['Co-Authored-By'] = "%s <%s>" % author
+            authorship['author']  = {'name': name, 'email': email}
+        else:
+            msg.headers.extend(sorted(
+                ('Co-Authored-By', "%s <%s>" % author)
+                for author in authors
+            ))
 
         committers = {
             (c['commit']['committer']['name'], c['commit']['committer']['email'])
             for c in commits
         }
-        committer = None
         if len(committers) == 1:
             name, email = committers.pop()
-            committer = {'name': name, 'email': email}
+            authorship['committer'] = {'name': name, 'email': email}
         # should committers also be added to co-authors?
 
         original_head = gh.head(target)
         merge_tree = gh.merge(self.head, target, 'temp merge')['tree']['sha']
         head = gh('post', 'git/commits', json={
+            **authorship,
             'message': str(msg),
             'tree': merge_tree,
             'parents': [original_head],
-            'author': author,
-            'committer': committer,
         }).json()['sha']
         gh.set_ref(target, head)
 

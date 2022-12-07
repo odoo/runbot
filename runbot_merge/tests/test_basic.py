@@ -6,6 +6,7 @@ import time
 from unittest import mock
 
 import pytest
+import requests
 from lxml import html, etree
 
 import odoo
@@ -2006,19 +2007,36 @@ Part-of: {pr_id.display_name}"""
         assert log_to_node(repo.log('heads/master')), expected
 
     def test_squash_merge(self, repo, env, config, users):
+        other_user = requests.get(f'https://api.github.com/user', headers={
+            'Authorization': 'token %s' % config['role_other']['token'],
+        }).json()
+        other_user = {
+            'name': other_user['name'] or other_user['login'],
+            # FIXME: not guaranteed
+            'email': other_user['email'] or 'other@example.org',
+        }
+        a_user = {'name': 'bob', 'email': 'builder@example.org', 'date': '1999-04-12T08:19:30Z'}
         with repo:
             repo.make_commits(None, Commit('initial', tree={'a': '0'}), ref='heads/master')
 
             repo.make_commits(
                 'master',
-                Commit('sub', tree={'b': '0'}, committer={'name': 'bob', 'email': 'builder@example.org', 'date': '1999-04-12T08:19:30Z'}),
+                Commit('sub', tree={'b': '0'}, committer=a_user),
                 ref='heads/other'
             )
             pr1 = repo.make_pr(title='first pr', target='master', head='other')
             repo.post_status('other', 'success', 'legal/cla')
             repo.post_status('other', 'success', 'ci/runbot')
 
-            repo.make_commits('master', Commit('x', tree={'x': '0'}), Commit('y', tree={'x': '1'}), ref='heads/other2')
+            pr_2_commits = repo.make_commits(
+                'master',
+                Commit('x', tree={'x': '0'}, author=other_user, committer=a_user),
+                Commit('y', tree={'x': '1'}, author=a_user, committer=other_user),
+                ref='heads/other2',
+            )
+            c1, c2 = map(repo.commit, pr_2_commits)
+            assert c1.author['name'] != c2.author['name']
+            assert c1.committer['name'] != c2.committer['name']
             pr2 = repo.make_pr(title='second pr', target='master', head='other2')
             repo.post_status('other2', 'success', 'legal/cla')
             repo.post_status('other2', 'success', 'ci/runbot')
@@ -2060,8 +2078,8 @@ closes {pr1_id.display_name}
 
 Signed-off-by: {get_partner(env, users["reviewer"]).formatted_email}\
 """
-        assert one['commit']['committer']['name'] == 'bob'
-        assert one['commit']['committer']['email'] == 'builder@example.org'
+        assert one['commit']['committer']['name'] == a_user['name']
+        assert one['commit']['committer']['email'] == a_user['email']
         commit_date = datetime.datetime.strptime(one['commit']['committer']['date'], '%Y-%m-%dT%H:%M:%SZ')
         # using timestamp (and working in seconds) because `pytest.approx`
         # silently fails on datetimes (#8395)
@@ -2069,11 +2087,27 @@ Signed-off-by: {get_partner(env, users["reviewer"]).formatted_email}\
             "the commit date of the merged commit should be about now, despite" \
             " the source commit being >20 years old"
 
+        # FIXME: should probably get the token from the project to be sure it's
+        #        the bot user
+        current_user = repo._session.get(f'https://api.github.com/user').json()
+        current_user = {
+            'name': current_user['name'] or current_user['login'],
+            # FIXME: not guaranteed
+            'email': current_user['email'] or 'user@example.org',
+        }
+        # since there are two authors & two committers on pr2, the auhor and
+        # committer of a squash commit should be reset to the bot's identity
+        assert two['commit']['committer']['name'] == current_user['name']
+        assert two['commit']['committer']['email'] == current_user['email']
+        assert two['commit']['author']['name'] == current_user['name']
+        assert two['commit']['author']['email'] == current_user['email']
         assert two['commit']['message'] == f"""second pr
 
 closes {pr2_id.display_name}
 
-Signed-off-by: {get_partner(env, users["reviewer"]).formatted_email}\
+Signed-off-by: {get_partner(env, users["reviewer"]).formatted_email}
+Co-authored-by: {a_user['name']} <{a_user['email']}>
+Co-authored-by: {other_user['name']} <{other_user['email']}>\
 """
         assert repo.read_tree(repo.commit(two['sha'])) == {
             'a': '0',
