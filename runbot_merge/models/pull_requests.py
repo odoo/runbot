@@ -64,7 +64,7 @@ class Repository(models.Model):
     _name = _description = 'runbot_merge.repository'
     _order = 'sequence, id'
 
-    sequence = fields.Integer(default=50)
+    sequence = fields.Integer(default=50, group_operator=None)
     name = fields.Char(required=True)
     project_id = fields.Many2one('runbot_merge.project', required=True)
     status_ids = fields.One2many('runbot_merge.repository.status', 'repo_id', string="Required Statuses")
@@ -240,7 +240,7 @@ class Branch(models.Model):
     ])
 
     active = fields.Boolean(default=True)
-    sequence = fields.Integer()
+    sequence = fields.Integer(group_operator=None)
 
     def _auto_init(self):
         res = super(Branch, self)._auto_init()
@@ -509,7 +509,7 @@ class PullRequests(models.Model):
         ('error', 'Error'),
     ], default='opened', index=True)
 
-    number = fields.Integer(required=True, index=True)
+    number = fields.Integer(required=True, index=True, group_operator=None)
     author = fields.Many2one('res.partner')
     head = fields.Char(required=True)
     label = fields.Char(
@@ -530,7 +530,7 @@ class PullRequests(models.Model):
 
     reviewed_by = fields.Many2one('res.partner')
     delegates = fields.Many2many('res.partner', help="Delegate reviewers, not intrinsically reviewers but can review this PR")
-    priority = fields.Integer(default=2, index=True)
+    priority = fields.Integer(default=2, index=True, group_operator=None)
 
     overrides = fields.Char(required=True, default='{}')
     statuses = fields.Text(
@@ -1505,7 +1505,7 @@ class Tagging(models.Model):
     repository = fields.Many2one('runbot_merge.repository', required=True)
     # store the PR number (not id) as we need a Tagging for PR objects
     # being deleted (retargeted to non-managed branches)
-    pull_request = fields.Integer()
+    pull_request = fields.Integer(group_operator=None)
 
     tags_remove = fields.Char(required=True, default='[]')
     tags_add = fields.Char(required=True, default='[]')
@@ -1572,7 +1572,7 @@ class Feedback(models.Model):
     repository = fields.Many2one('runbot_merge.repository', required=True)
     # store the PR number (not id) as we may want to send feedback to PR
     # objects on non-handled branches
-    pull_request = fields.Integer()
+    pull_request = fields.Integer(group_operator=None)
     message = fields.Char()
     close = fields.Boolean()
     token_field = fields.Selection(
@@ -2188,7 +2188,7 @@ class FetchJob(models.Model):
 
     active = fields.Boolean(default=True)
     repository = fields.Many2one('runbot_merge.repository', required=True)
-    number = fields.Integer(required=True)
+    number = fields.Integer(required=True, group_operator=None)
 
     def _check(self, commit=False):
         """

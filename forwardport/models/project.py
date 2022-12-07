@@ -218,7 +218,7 @@ class Repository(models.Model):
 class Branch(models.Model):
     _inherit = 'runbot_merge.branch'
 
-    fp_sequence = fields.Integer(default=50)
+    fp_sequence = fields.Integer(default=50, group_operator=None)
     fp_target = fields.Boolean(default=True)
     fp_enabled = fields.Boolean(compute='_compute_fp_enabled')
 
@@ -238,7 +238,7 @@ class PullRequests(models.Model):
     )
     source_id = fields.Many2one('runbot_merge.pull_requests', index=True, help="the original source of this FP even if parents were detached along the way")
     forwardport_ids = fields.One2many('runbot_merge.pull_requests', 'source_id')
-    reminder_backoff_factor = fields.Integer(default=-4)
+    reminder_backoff_factor = fields.Integer(default=-4, group_operator=None)
     merge_date = fields.Datetime()
 
     fw_policy = fields.Selection([

@@ -21,7 +21,7 @@ class Project(models.Model):
     )
 
     ci_timeout = fields.Integer(
-        default=60, required=True,
+        default=60, required=True, group_operator=None,
         help="Delay (in minutes) before a staging is considered timed out and failed"
     )
 
@@ -34,7 +34,7 @@ class Project(models.Model):
     )
 
     batch_limit = fields.Integer(
-        default=8, help="Maximum number of PRs staged together")
+        default=8, group_operator=None, help="Maximum number of PRs staged together")
 
     secret = fields.Char(
         help="Webhook secret. If set, will be checked against the signature "
