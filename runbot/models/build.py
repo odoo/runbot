@@ -770,6 +770,7 @@ class BuildResult(models.Model):
         containers_memory_limit = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_containers_memory', 0)
         if containers_memory_limit and 'memory' not in kwargs:
             kwargs['memory'] = int(float(containers_memory_limit) * 1024 ** 3)
+
         self.docker_start = now()
         if self.job_start:
             start_step_time = int(dt2time(self.docker_start) - dt2time(self.job_start))

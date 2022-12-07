@@ -3,6 +3,7 @@ import glob
 import json
 import logging
 import fnmatch
+import psutil
 import re
 import shlex
 import time
@@ -154,6 +155,7 @@ class ConfigStep(models.Model):
     install_modules = fields.Char('Modules to install', help="List of module patterns to install, use * to install all available modules, prefix the pattern with dash to remove the module.", default='')
     db_name = fields.Char('Db Name', compute='_compute_db_name', inverse='_inverse_db_name', tracking=True)
     cpu_limit = fields.Integer('Cpu limit', default=3600, tracking=True)
+    container_cpus = fields.Integer('Allowed CPUs', help='Allowed container CPUs. Fallback on config parameter if 0.', default=0, tracking=True)
     coverage = fields.Boolean('Coverage', default=False, tracking=True)
     paths_to_omit = fields.Char('Paths to omit from coverage', tracking=True)
     flamegraph = fields.Boolean('Allow Flamegraph', default=False, tracking=True)
@@ -282,6 +284,11 @@ class ConfigStep(models.Model):
         run_method = getattr(self, '_run_%s' % self.job_type)
         docker_params = run_method(build, log_path, **kwargs)
         if docker_params:
+            container_cpus = float(self.container_cpus or self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_containers_cpus', 0))
+            if 'cpus' not in docker_params and container_cpus:
+                logical_cpu_count = psutil.cpu_count(logical=True)
+                physical_cpu_count = psutil.cpu_count(logical=False)
+                docker_params['cpus'] = float((logical_cpu_count / physical_cpu_count) * container_cpus)
             build._docker_run(**docker_params)
 
     def _run_create_build(self, build, log_path):

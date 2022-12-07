@@ -16,6 +16,8 @@
                         <div class="content-group">
                           <label for="runbot_workers" class="col-xs-3 o_light_label" style="width: 60%;"/>
                           <field name="runbot_workers" style="width: 15%;"/>
+                          <label for="runbot_containers_cpus" class="col-xs-3 o_light_label" style="width: 60%;"/>
+                          <field name="runbot_containers_cpus" style="width: 15%;"/>&amp;nbsp;
                           <label for="runbot_containers_memory" class="col-xs-3 o_light_label" style="width: 60%;"/>
                           <field name="runbot_containers_memory" style="width: 15%;"/>&amp;nbsp;
                           <field name="runbot_memory_bytes" readonly='1' style="width: 15%;"/>
