@@ -750,7 +750,9 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         main2.get_pr(pr2c.number).post_comment('%s r+' % project.fp_github_name, config['role_reviewer']['token'])
     env.run_crons()
 
-    stb, stc = env['runbot_merge.stagings'].search([], order='target')
+    env['runbot_merge.stagings'].search([]).mapped('target.display_name')
+    env['runbot_merge.stagings'].search([], order='target').mapped('target.display_name')
+    stc, stb = env['runbot_merge.stagings'].search([], order='target')
     assert stb.target.name == 'b'
     assert stc.target.name == 'c'
 

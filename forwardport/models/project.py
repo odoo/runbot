@@ -34,6 +34,7 @@ from odoo import _, models, fields, api
 from odoo.osv import expression
 from odoo.exceptions import UserError
 from odoo.tools import topological_sort, groupby
+from odoo.tools.sql import reverse_order
 from odoo.tools.appdirs import user_cache_dir
 from odoo.addons.runbot_merge import utils
 from odoo.addons.runbot_merge.models.pull_requests import RPLUS
@@ -199,17 +200,10 @@ class Project(models.Model):
 
     def _forward_port_ordered(self, domain=()):
         Branches = self.env['runbot_merge.branch']
-        ordering_items = re.split(r',\s*', 'fp_sequence,' + Branches._order)
-        ordering = ','.join(
-            # reverse order (desc -> asc, asc -> desc) as we want the "lower"
-            # branches to be first in the ordering
-            f[:-5] if f.lower().endswith(' desc') else f + ' desc'
-            for f in ordering_items
-        )
         return Branches.search(expression.AND([
             [('project_id', '=', self.id)],
             domain or [],
-        ]), order=ordering)
+        ]), order=reverse_order(Branches._order))
 
 class Repository(models.Model):
     _inherit = 'runbot_merge.repository'
@@ -218,7 +212,6 @@ class Repository(models.Model):
 class Branch(models.Model):
     _inherit = 'runbot_merge.branch'
 
-    fp_sequence = fields.Integer(default=50, group_operator=None)
     fp_target = fields.Boolean(default=True)
     fp_enabled = fields.Boolean(compute='_compute_fp_enabled')
 

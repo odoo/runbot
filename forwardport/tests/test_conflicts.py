@@ -16,7 +16,7 @@ def test_conflict(env, config, make_repo, users):
     project = env['runbot_merge.project'].search([])
     project.write({
         'branch_ids': [
-            (0, 0, {'name': 'd', 'fp_sequence': 4, 'fp_target': True})
+            (0, 0, {'name': 'd', 'sequence': 40, 'fp_target': True})
         ]
     })
 

@@ -263,9 +263,9 @@ class TestNotAllBranches:
             'github_prefix': 'hansen',
             'fp_github_token': config['github']['token'],
             'branch_ids': [
-                (0, 0, {'name': 'a', 'fp_sequence': 2, 'fp_target': True}),
-                (0, 0, {'name': 'b', 'fp_sequence': 1, 'fp_target': True}),
-                (0, 0, {'name': 'c', 'fp_sequence': 0, 'fp_target': True}),
+                (0, 0, {'name': 'a', 'sequence': 2, 'fp_target': True}),
+                (0, 0, {'name': 'b', 'sequence': 1, 'fp_target': True}),
+                (0, 0, {'name': 'c', 'sequence': 0, 'fp_target': True}),
             ]
         })
         repo_a = env['runbot_merge.repository'].create({
@@ -486,15 +486,15 @@ def test_new_intermediate_branch(env, config, make_repo):
     # insert a branch between "b" and "c"
     project.write({
         'branch_ids': [
-            (1, currents['a'], {'fp_sequence': 3}),
-            (1, currents['b'], {'fp_sequence': 2, 'active': False}),
-            (1, currents['c'], {'fp_sequence': 0})
+            (1, currents['a'], {'sequence': 3}),
+            (1, currents['b'], {'sequence': 2, 'active': False}),
+            (1, currents['c'], {'sequence': 0})
         ]
     })
     env.run_crons()
     project.write({
         'branch_ids': [
-            (0, False, {'name': 'new', 'fp_sequence': 1, 'fp_target': True}),
+            (0, False, {'name': 'new', 'sequence': 1, 'fp_target': True}),
         ]
     })
     env.run_crons()
@@ -707,18 +707,16 @@ def test_retarget_after_freeze(env, config, make_repo, users):
     assert port_id.source_id == original_pr_id
     assert port_id.parent_id == original_pr_id
 
-    # because the module doesn't update the ordering of `branch_ids` to take
-    # `fp_sequence` in account so it's misleading
-    branch_c, branch_b, branch_a = branches_before = project.branch_ids.sorted('fp_sequence')
+    branch_c, branch_b, branch_a = branches_before = project.branch_ids
     assert [branch_a.name, branch_b.name, branch_c.name] == ['a', 'b', 'c']
     # create branch so cron runs correctly
     with prod: prod.make_ref('heads/bprime', prod.get_ref('c'))
     project.write({
         'branch_ids': [
-            (1, branch_c.id, {'sequence': 1, 'fp_sequence': 20}),
-            (0, 0, {'name': 'bprime', 'sequence': 2, 'fp_sequence': 20, 'fp_target': True}),
-            (1, branch_b.id, {'sequence': 3, 'fp_sequence': 20}),
-            (1, branch_a.id, {'sequence': 4, 'fp_sequence': 20}),
+            (1, branch_c.id, {'sequence': 1}),
+            (0, 0, {'name': 'bprime', 'sequence': 2, 'fp_target': True}),
+            (1, branch_b.id, {'sequence': 3}),
+            (1, branch_a.id, {'sequence': 4}),
         ]
     })
     new_branch = project.branch_ids - branches_before

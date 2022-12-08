@@ -157,9 +157,6 @@
                 <field name="fp_target" string="FP to"
                        help="This branch will be forward-ported to (from lower ones)"
                 />
-                <field name="fp_sequence" string="FP sequence"
-                       help="Overrides the normal sequence"
-                />
             </xpath>
         </field>
     </record>
