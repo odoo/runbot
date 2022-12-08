@@ -162,8 +162,9 @@ class Batch(models.Model):
             _logger.error('No dockerfile found !')
 
         triggers = self.env['runbot.trigger'].search([  # could be optimised for multiple batches. Ormcached method?
-            ('project_id', '=', project.id),
-            ('category_id', '=', self.category_id.id)
+            ('category_id', 'in', [False, self.category_id.id]),
+            ('project_id', 'in', [project.id, False] if project.enable_base_triggers else [project.id]),
+            ('project_id', '=', False),
         ]).filtered(
             lambda t: not t.version_domain or \
             self.bundle_id.version_id.filtered_domain(t.get_version_domain())
@@ -172,6 +173,8 @@ class Batch(models.Model):
         pushed_repo = self.commit_link_ids.mapped('commit_id.repo_id')
         dependency_repos = triggers.mapped('dependency_ids')
         all_repos = triggers.mapped('repo_ids') | dependency_repos
+        if any(not trigger.project_id for trigger in triggers):
+            all_repos |= project.repo_ids
         missing_repos = all_repos - pushed_repo
 
         ######################################
@@ -298,6 +301,8 @@ class Batch(models.Model):
         for trigger in triggers:
             trigger_custom = trigger_customs.get(trigger, self.env['runbot.bundle.trigger.custom'])
             trigger_repos = trigger.repo_ids | trigger.dependency_ids
+            if not trigger.project_id:
+                trigger_repos |= project.repo_ids
             if trigger_repos & missing_repos:
                 self.warning('Missing commit for repo %s for trigger %s', (trigger_repos & missing_repos).mapped('name'), trigger.name)
                 continue
@@ -306,7 +311,7 @@ class Batch(models.Model):
             extra_params = trigger_custom.extra_params or ''
             config_data = trigger_custom.config_data or {}
             params_value = {
-                'version_id':  version_id,
+                'version_id': version_id,
                 'extra_params': extra_params,
                 'config_id': config.id,
                 'project_id': project_id,

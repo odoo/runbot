@@ -8,6 +8,7 @@
                 <group>
                     <field name="name"/>
                     <field name="keep_sticky_running"/>
+                    <field name="enable_base_triggers"/>
                     <field name="dockerfile_id"/>
                     <field name="group_ids"/>
                     <field name="trigger_ids"/>
@@ -23,6 +24,7 @@
             <tree string="Projects">
                 <field name="name"/>
                 <field name="keep_sticky_running"/>
+                <field name="enable_base_triggers"/>
                 <field name="dockerfile_id"/>
                 <field name="group_ids"/>
                 <field name="trigger_ids"/>
