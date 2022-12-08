@@ -60,7 +60,7 @@ class ConfigStep(models.Model):
             reviewer_per_file[file] = file_reviewers
         return reviewer_per_file
 
-    def _run_codeowner(self, build, log_path):
+    def _run_codeowner(self, build):
         bundle = build.params_id.create_batch_id.bundle_id
         if bundle.is_base:
             build._log('', 'Skipping base bundle')

@@ -641,8 +641,6 @@ class BuildResult(models.Model):
                     build._log('wake_up', 'Impossible to wake-up, **build dir does not exists anymore**', log_type='markdown', level='SEPARATOR')
                 else:
                     try:
-                        log_path = build._path('logs', 'wake_up.txt')
-
                         port = self._find_port()
                         build.write({
                             'job_start': now(),
@@ -658,7 +656,7 @@ class BuildResult(models.Model):
                             run_step = step_ids[-1]
                         else:
                             run_step = self.env.ref('runbot.runbot_build_config_step_run')
-                        run_step._run_step(build, log_path, force=True)
+                        run_step._run_step(build, force=True)
                         # reload_nginx will be triggered by _run_run_odoo
                     except Exception:
                         _logger.exception('Failed to wake up build %s', build.dest)
