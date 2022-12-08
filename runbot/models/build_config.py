@@ -284,6 +284,10 @@ class ConfigStep(models.Model):
         run_method = getattr(self, '_run_%s' % self.job_type)
         docker_params = run_method(build, log_path, **kwargs)
         if docker_params:
+            if 'cpu_limit' not in docker_params:
+                max_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=10000))
+                docker_params['cpu_limit'] = min(self.cpu_limit, max_timeout)
+
             container_cpus = float(self.container_cpus or self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_containers_cpus', 0))
             if 'cpus' not in docker_params and container_cpus:
                 logical_cpu_count = psutil.cpu_count(logical=True)
@@ -493,10 +497,8 @@ class ConfigStep(models.Model):
         if self.flamegraph:
             cmd.finals.append(['flamegraph.pl', '--title', 'Flamegraph %s for build %s' % (self.name, build.id), self._perfs_data_path(), '>', self._perfs_data_path(ext='svg')])
             cmd.finals.append(['gzip', '-f', self._perfs_data_path()])  # keep data but gz them to save disc space
-        max_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=10000))
-        timeout = min(self.cpu_limit, max_timeout)
         env_variables = self.additionnal_env.split(';') if self.additionnal_env else []
-        return dict(cmd=cmd, log_path=log_path, container_name=build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports, env_variables=env_variables)
+        return dict(cmd=cmd, log_path=log_path, container_name=build._get_docker_name(), ro_volumes=exports, env_variables=env_variables)
 
     def _upgrade_create_childs(self):
         pass
@@ -730,7 +732,6 @@ class ConfigStep(models.Model):
         # migrate_cmd += ['--upgrades-paths', '/%s' % migration_scripts] upgrades-paths is broken, ln is created automatically in sources
 
         build._log('run', 'Start migration build %s' % build.dest)
-        timeout = self.cpu_limit
 
         migrate_cmd.finals.append(['psql', migrate_db_name, '-c', '"SELECT id, name, state FROM ir_module_module WHERE state NOT IN (\'installed\', \'uninstalled\', \'uninstallable\') AND name NOT LIKE \'test_%\' "', '>', '/data/build/logs/modules_states.txt'])
 
@@ -738,7 +739,7 @@ class ConfigStep(models.Model):
         exception_env = self.env['runbot.upgrade.exception']._generate()
         if exception_env:
             env_variables.append(exception_env)
-        return dict(cmd=migrate_cmd, log_path=log_path, container_name=build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports, env_variables=env_variables, image_tag=target.params_id.dockerfile_id.image_tag)
+        return dict(cmd=migrate_cmd, log_path=log_path, container_name=build._get_docker_name(), ro_volumes=exports, env_variables=env_variables, image_tag=target.params_id.dockerfile_id.image_tag)
 
     def _run_restore(self, build, log_path):
         # exports = build._checkout()
@@ -781,7 +782,7 @@ class ConfigStep(models.Model):
 
             ])
 
-        return dict(cmd=cmd, log_path=log_path, container_name=build._get_docker_name(), cpu_limit=self.cpu_limit)
+        return dict(cmd=cmd, log_path=log_path, container_name=build._get_docker_name())
 
     def _reference_builds(self, bundle, trigger):
         upgrade_dumps_trigger_id = trigger.upgrade_dumps_trigger_id
