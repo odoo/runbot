@@ -111,7 +111,7 @@ RUN <t t-esc="values['python_version']"/> -m pip install --no-cache-dir setuptoo
 'from': 'ubuntu:focal',
 'odoo_branch': 'master',
 'chrome_source': 'google',
-'chrome_version': '90.0.4430.93-1',
+'chrome_version': '101.0.4951.64-1',
 'node_packages': 'rtlcss es-check eslint',
 'node_version': '15',
 'psql_version': '12',
