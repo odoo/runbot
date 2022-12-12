@@ -30,6 +30,7 @@ import typing
 import dateutil.relativedelta
 import requests
 
+import resource
 from odoo import _, models, fields, api
 from odoo.osv import expression
 from odoo.exceptions import UserError
@@ -1190,6 +1191,10 @@ class Feedback(models.Model):
     token_field = fields.Selection(selection_add=[('fp_github_token', 'Forwardport Bot')])
 
 ALWAYS = ('gc.auto=0', 'maintenance.auto=0')
+
+def _bypass_limits():
+    resource.setrlimit(resource.RLIMIT_AS, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
+
 def git(directory): return Repo(directory, check=True)
 class Repo:
     def __init__(self, directory, **config):
@@ -1208,7 +1213,7 @@ class Repo:
             + tuple(itertools.chain.from_iterable(('-c', p) for p in self._params + ALWAYS))\
             + args
         try:
-            return self._opener(args, **opts)
+            return self._opener(args, preexec_fn=_bypass_limits, **opts)
         except subprocess.CalledProcessError as e:
             stream = e.stderr if e.stderr else e.stdout
             if stream:
