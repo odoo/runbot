@@ -179,27 +179,27 @@ class Host(models.Model):
     def _fetch_local_logs(self, build_ids=None):
         """ fetch build logs from local database """
         logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
-        try:
-            with local_pg_cursor(logs_db_name) as local_cr:
-                res = []
-                where_clause = 'WHERE build_id IN (%s)' if build_ids else ''
-                query = f"""
-                        SELECT * 
-                        FROM (
-                                SELECT id, create_date, name, level, dbname, func, path, line, type, message, split_part(dbname, '-', 1)::integer as build_id 
-                                FROM ir_logging
-                                )
-                            AS ir_logs 
-                        {where_clause}
-                    ORDER BY id
-                    """
-                local_cr.execute(query, build_ids)
-                col_names = [col.name for col in local_cr.description]
-                for row in local_cr.fetchall():
-                    res.append({name:value for name,value in zip(col_names, row)})
-                return res
-        except Exception:
-            return []
+        with local_pg_cursor(logs_db_name) as local_cr:
+            res = []
+            where_clause = "WHERE split_part(dbname, '-', 1) IN %s" if build_ids else ''
+            query = f"""
+                    SELECT *
+                    FROM (
+                            SELECT id, create_date, name, level, dbname, func, path, line, type, message, split_part(dbname, '-', 1) as build_id
+                            FROM ir_logging
+                            )
+                        AS ir_logs
+                    {where_clause}
+                ORDER BY id
+                LIMIT 10000
+                """
+            if build_ids:
+                build_ids = [tuple(str(build) for build in build_ids)]
+            local_cr.execute(query, build_ids)
+            col_names = [col.name for col in local_cr.description]
+            for row in local_cr.fetchall():
+                res.append({name:value for name, value in zip(col_names, row)})
+            return res
 
     def process_logs(self, build_ids=None):
         """move logs from host to the leader"""
@@ -209,7 +209,10 @@ class Host(models.Model):
         local_log_ids = []
         for log in ir_logs:
             if log['dbname'] and '-' in log['dbname']:
-                logs_by_build_id[int(log['dbname'].split('-', maxsplit=1)[0])].append(log)
+                try:
+                    logs_by_build_id[int(log['dbname'].split('-', maxsplit=1)[0])].append(log)
+                except ValueError:
+                    pass
             else:
                 local_log_ids.append(log['id'])
 
