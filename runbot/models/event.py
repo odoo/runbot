@@ -19,10 +19,10 @@ class runbot_event(models.Model):
     _order = 'id'
     _log_access = False
 
-    create_uid = fields.Many2one('res.users', string='Created by', automatic=True, readonly=True)
-    create_date = fields.Datetime(string='Created on', automatic=True, readonly=True)
-    write_uid = fields.Many2one('res.users', string='Last Updated by', automatic=True, readonly=True)
-    write_date = fields.Datetime(string='Last Updated on', automatic=True, readonly=True)
+    create_uid = fields.Many2one('res.users', string='Created by', readonly=True)
+    create_date = fields.Datetime(string='Created on', readonly=True)
+    write_uid = fields.Many2one('res.users', string='Last Updated by', readonly=True)
+    write_date = fields.Datetime(string='Last Updated on', readonly=True)
 
     build_id = fields.Many2one('runbot.build', 'Build', index=True, ondelete='cascade')
     active_step_id = fields.Many2one('runbot.build.config.step', 'Active step', index=True)
