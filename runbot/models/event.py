@@ -17,12 +17,6 @@ class runbot_event(models.Model):
 
     _inherit = "ir.logging"
     _order = 'id'
-    _log_access = False
-
-    create_uid = fields.Many2one('res.users', string='Created by', readonly=True)
-    create_date = fields.Datetime(string='Created on', readonly=True)
-    write_uid = fields.Many2one('res.users', string='Last Updated by', readonly=True)
-    write_date = fields.Datetime(string='Last Updated on', readonly=True)
 
     build_id = fields.Many2one('runbot.build', 'Build', index=True, ondelete='cascade')
     active_step_id = fields.Many2one('runbot.build.config.step', 'Active step', index=True)
@@ -32,12 +26,6 @@ class runbot_event(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        for vals in vals_list:
-            vals.setdefault('write_uid', self.env.uid)
-            vals.setdefault('write_date', self.env.cr.now())
-            vals.setdefault('create_uid', self.env.uid)
-            vals.setdefault('create_date', self.env.cr.now())
-
         logs_by_build_id = defaultdict(list)
         for log in vals_list:
             if 'build_id' in log:
@@ -54,17 +42,11 @@ class runbot_event(models.Model):
                     build.triggered_result = 'ko'
         return super().create(vals_list)
 
-    def write(self, vals):
-        vals.setdefault('write_uid', self.env.uid)
-        vals.setdefault('write_date', self.env.cr.now())
-        super().write(vals)
-
     def _markdown(self):
         """ Apply pseudo markdown parser for message.
         """
         self.ensure_one()
         return pseudo_markdown(self.message)
-
 
     def _compute_known_error(self):
         cleaning_regexes = self.env['runbot.error.regex'].search([('re_type', '=', 'cleaning')])
