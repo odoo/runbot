@@ -1,13 +1,17 @@
 #!/usr/bin/python3
 import argparse
+import docker
 import logging
 import os
+import psutil
+import re
 import sys
 import threading
-import random
+import time
 import signal
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from logging.handlers import WatchedFileHandler
 
 LOG_FORMAT = '%(asctime)s %(levelname)s %(name)s: %(message)s'
@@ -15,6 +19,7 @@ logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 logging.getLogger('odoo.addons.runbot').setLevel(logging.DEBUG)
 logging.addLevelName(25, "!NFO")
 
+CPU_COUNT = os.cpu_count()
 _logger = logging.getLogger(__name__)
 
 
@@ -149,3 +154,89 @@ def run(client_class):
                 _logger.exception(str(e))
                 raise e
     _logger.info("Stopping gracefully")
+
+def human_size(nb):
+    for i, u in enumerate(['', ' KiB', ' MiB', ' GiB']):
+        if nb < 1000 or i == 3:  # 1000 to avoid things like 1001 MiB
+            break
+        nb = nb / 1024
+    return f'{nb:.2f}{u}'
+
+def get_cpu_time():
+    """returns system cpus times in microseconds"""
+    return sum([t for t in psutil.cpu_times()]) * 10 ** 6
+
+def get_docker_stats(container_id):
+    """
+    Cgroup V1 path is /sys/fs/cgroup/memory/docker/{container_id}/memory.usage_in_bytes'
+    https://docs.docker.com/config/containers/runmetrics/#find-the-cgroup-for-a-given-container
+    on our runbot, we use cgroup V2 + systemd driver
+    We could add a method to find the right path instead of hard coding
+    Returns a tupple with:
+    (time, current memory usage, cpu usage in microseconds, current system usage microseconds)
+    """
+    try:
+        memory_current = int(Path(f'/sys/fs/cgroup/system.slice/docker-{container_id}.scope/memory.current').read_text().strip())
+    except Exception:  # should we log exception in order to debug ... but will spam the logs ...
+        memory_current = 0
+    try:
+        cpu_stats = Path(f'/sys/fs/cgroup/system.slice/docker-{container_id}.scope/cpu.stat').read_text()
+        cpu_usage_line = cpu_stats.split('\n')[0]
+        usage_usec = cpu_usage_line and int(cpu_usage_line.split()[1])
+    except Exception:
+        usage_usec = 0
+    return (time.time(), memory_current, usage_usec, get_cpu_time())
+
+def prepare_stats_log(dest, previous_stats, current_stats):
+    current_time, current_mem, current_cpu, current_cpu_time = current_stats
+
+    if not previous_stats:
+        return (current_time, 0, 0, current_cpu, current_cpu_time), ''
+
+    _, logged_mem, logged_cpu_percent, previous_cpu, previous_cpu_time,  = previous_stats
+
+    mem_ratio = (current_mem - logged_mem) / (logged_mem or 1) * 100
+    cpu_delta = current_cpu - previous_cpu
+    system_delta = (current_cpu_time - previous_cpu_time) / CPU_COUNT
+    cpu_percent = cpu_delta / system_delta * 100
+    cpu_percent_delta = (cpu_percent - logged_cpu_percent)
+    cpu_percent_ratio =  cpu_percent_delta / (logged_cpu_percent or 0.000001) * 100
+
+    log_lines = []
+    date_time = datetime.fromtimestamp(current_time).astimezone(tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]
+    if abs(mem_ratio) > 10:  #  hard-coded values. We should find a way to configure.
+        humanized = f'({human_size(current_mem)})'
+        log_lines.append(f'{date_time} Memory: {current_mem:>11} {humanized:>11} ({mem_ratio:>+5.1f}%)')
+        logged_mem = current_mem
+    if abs(cpu_percent_ratio) > 20 and abs(cpu_percent_delta) > 2:
+        log_lines.append(f'{date_time}    CPU: {cpu_percent:>11.2f} ({cpu_percent_ratio:>+5.1f}%)')
+        logged_cpu_percent = cpu_percent
+    previous_stats = current_time, logged_mem, logged_cpu_percent, current_cpu, current_cpu_time
+    return previous_stats, '\n'.join(log_lines)
+
+def docker_monitoring_loop(builds_dir):
+    docker_client = docker.from_env()
+    previous_stats_per_docker = {}
+    _logger.info('Starting docker monitoring loop thread')
+    while True:
+        try:
+            stats_per_docker = dict()
+            for container in docker_client.containers.list(filters={'status': 'running'}):
+                if re.match(r'^\d+-.+_.+', container.name):
+                    dest, suffix = container.name.split('_', maxsplit=1)
+                    container_log_dir = builds_dir / dest / 'logs'
+                    if not container_log_dir.exists():
+                        _logger.warning('Log dir not found: `%s`', container_log_dir)
+                        continue
+                    current_stats = get_docker_stats(container.id)
+                    previous_stats = previous_stats_per_docker.get(container.name)
+                    previous_stats, log_line = prepare_stats_log(dest, previous_stats, current_stats)
+                    if log_line:
+                        stat_log_file = container_log_dir / f'{suffix}-stats.txt'
+                        stat_log_file.open(mode='a').write(f'{log_line}\n')
+                    stats_per_docker[container.name] = previous_stats
+            previous_stats_per_docker = stats_per_docker
+            time.sleep(1)
+        except Exception as e:
+            _logger.exception('Monitoring loop thread exception: %s', e)
+            time.sleep(60)

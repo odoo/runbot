@@ -1,7 +1,10 @@
 #!/usr/bin/python3
 import logging
+import threading
 
-from tools import RunbotClient, run
+from pathlib import Path
+
+from tools import RunbotClient, run, docker_monitoring_loop
 
 _logger = logging.getLogger(__name__)
 
@@ -9,6 +12,10 @@ _logger = logging.getLogger(__name__)
 class BuilderClient(RunbotClient):
 
     def on_start(self):
+        builds_path = Path(self.env['runbot.runbot']._root()) / 'build'
+        monitoring_thread = threading.Thread(target=docker_monitoring_loop, args=(builds_path,), daemon=True)
+        monitoring_thread.start()
+
         for repo in self.env['runbot.repo'].search([('mode', '!=', 'disabled')]):
             repo._update(force=True)
 
