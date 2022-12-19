@@ -59,6 +59,7 @@ class runbot_event(models.Model):
             for ir_logging in fingerprints[build_error.fingerprint]:
                 ir_logging.error_id = build_error.id
 
+
 class RunbotErrorLog(models.Model):
     _name = 'runbot.error.log'
     _description = "Error log"

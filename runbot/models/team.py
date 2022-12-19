@@ -79,7 +79,7 @@ class RunbotTeam(models.Model):
 
     def _get_members_logins(self):
         self.ensure_one()
-        return set(self.github_logins.split(',')) | set(self.user_ids.filtered(lambda user: user.github_login).mapped('github_login'))
+        return set((self.github_logins or '').split(',')) | set(self.user_ids.filtered(lambda user: user.github_login).mapped('github_login'))
 
     def _fetch_members(self):
         for team in self:
