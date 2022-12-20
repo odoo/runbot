@@ -100,6 +100,7 @@
                       </group>
                       <group string="Upgrade settings" class="o_group_col_12">
                         <field name="upgrade_flat"/>
+                        <field name="upgrade_sticky_only"/>
                         <field name="upgrade_config_id"/>
                         <field string="Db to upgrade" name="upgrade_dbs">
                           <tree editable="bottom">

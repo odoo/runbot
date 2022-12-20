@@ -194,6 +194,7 @@ class ConfigStep(models.Model):
     upgrade_config_id = fields.Many2one('runbot.build.config',string='Upgrade Config', tracking=True, index=True)
     upgrade_dbs = fields.One2many('runbot.config.step.upgrade.db', 'step_id', tracking=True)
 
+
     restore_download_db_suffix = fields.Char('Download db suffix')
     restore_rename_db_suffix = fields.Char('Rename db suffix')
 
@@ -799,13 +800,18 @@ class ConfigStep(models.Model):
 
         upgrade_complement_step = trigger.upgrade_dumps_trigger_id.upgrade_step_id
 
-        if next_versions and bundle.base_id.to_upgrade:
+        if next_versions and bundle.base_id.to_upgrade and (bundle.base_id.sticky or not upgrade_complement_step.upgrade_sticky_only):
             for next_version in next_versions:
                 if bundle.version_id in upgrade_complement_step._get_upgrade_source_versions(next_version):
                     target_versions |= next_version
-        return target_versions.with_context(
+
+        bundles = target_versions.with_context(
             category_id=category_id, project_id=bundle.project_id.id
-            ).mapped('base_bundle_id').filtered('to_upgrade').mapped('last_done_batch')
+        ).mapped('base_bundle_id').filtered('to_upgrade')
+        if upgrade_complement_step.upgrade_sticky_only:
+            bundles = bundles.filtered('sticky')
+
+        return bundles.mapped('last_done_batch')
 
     def _reference_batches_upgrade(self, bundle, category_id):
         target_refs_bundles = self.env['runbot.bundle']
