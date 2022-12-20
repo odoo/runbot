@@ -9,14 +9,21 @@
                 return; 
             }
             var xhr = new XMLHttpRequest();
+            var url = e.target.href
+            if (data.runbotBuild) {
+                url = '/runbot/build/' + data.runbotBuild + '/' + operation
+            }
+            var elem = e.target 
             xhr.addEventListener('load', function () {
                 if (operation == 'rebuild' && window.location.href.split('?')[0].endsWith('/build/' + data.runbotBuild)){
                     window.location.href = window.location.href.replace('/build/' + data.runbotBuild, '/build/' + xhr.responseText);
+                } else if (operation == 'action') {
+                    elem.parentElement.innerText = this.responseText
                 } else {
                     window.location.reload();
                 }
             });
-            xhr.open('POST', '/runbot/build/' + data.runbotBuild + '/' + operation);
+            xhr.open('POST', url);
             xhr.send();
         });
     });

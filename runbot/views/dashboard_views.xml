@@ -14,12 +14,6 @@
                 <field name="skip_team_pr"/>
                 <field name="dashboard_id"/>
                 <field name="path_glob"/>
-                <field name="module_ownership_ids">
-                  <tree>
-                    <field name="module_id" readonly="1"/>
-                    <field name="is_fallback" widget="boolean_toggle"/>
-                  </tree>
-                </field>
               </group>
               <notebook>
                 <page string="Team Members">
@@ -33,8 +27,27 @@
                 <page string="Team Errors">
                   <field name="build_error_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}"/>
                 </page>
+                <page string="Modules">
+                  <field name="module_ownership_ids">
+                    <tree create="0" delete="0">
+                      <field name="module_id" readonly="1"/>
+                      <field name="is_fallback" widget="boolean_toggle"/>
+                    </tree>
+                  </field>
+                </page>
+                <page string="Codeowners">
+                  <field name="codeowner_ids">
+                  </field>
+                </page>
+
+
+
               </notebook>
             </sheet>
+            <div class="oe_chatter">
+              <field name="message_follower_ids" widget="mail_followers"/>
+              <field name="message_ids" widget="mail_thread"/>
+          </div>
           </form>
         </field>
     </record>

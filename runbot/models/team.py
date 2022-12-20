@@ -19,6 +19,7 @@ class RunbotTeam(models.Model):
     _name = 'runbot.team'
     _description = "Runbot Team"
     _order = 'name, id'
+    _inherit = 'mail.thread'
 
     name = fields.Char('Team', required=True)
     project_id = fields.Many2one('runbot.project', 'Project', help='Project to monitor', required=True,
@@ -34,10 +35,11 @@ class RunbotTeam(models.Model):
         'e.g.: `*website*,-*website_sale*`'
     )
     module_ownership_ids = fields.One2many('runbot.module.ownership', 'team_id')
+    codeowner_ids = fields.One2many('runbot.codeowner', 'team_id')
     upgrade_exception_ids = fields.One2many('runbot.upgrade.exception', 'team_id', string='Team Upgrade Exceptions')
-    github_team = fields.Char('Github team')
-    github_logins = fields.Char('Github logins', help='Additional github logins, prefer adding the login on the member of the team')
-    skip_team_pr = fields.Boolean('Skip team pr', help="Don't add codeowner if pr was created by a member of the team")
+    github_team = fields.Char('Github team', tracking=True)
+    github_logins = fields.Char('Github logins', help='Additional github logins, prefer adding the login on the member of the team', tracking=True)
+    skip_team_pr = fields.Boolean('Skip team pr', help="Don't add codeowner if pr was created by a member of the team", tracking=True)
 
     @api.model_create_single
     def create(self, values):

@@ -25,7 +25,7 @@
                 <page string="Dockerfile">
                   <field name="dockerfile"/>
                 </page>
-                <page string="Views">
+                <page string="Views" groups="runbot.group_runbot_admin">
                   <field name="view_ids" widget="one2many">
                     <tree>
                       <field name="id"/>
@@ -58,7 +58,8 @@
           <tree string="Dockerfile" decoration-danger="dockerfile == ''" decoration-warning="to_build == False">
             <field name="name"/>
             <field name="image_tag"/>
-            <field name="to_build" widget="boolean_toggle"/>
+            <field name="to_build" groups="!runbot.group_runbot_admin"/>
+            <field name="to_build" widget="boolean_toggle" groups="runbot.group_runbot_admin"/>
             <field name="version_ids" widget="many2many_tags"/>
             <field name="project_ids" widget="many2many_tags"/>
             <field name="bundle_ids"/>
