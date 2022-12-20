@@ -149,10 +149,18 @@
         <field name="protected" eval="True"/>
     </record>
 
+    <record id="runbot_build_config_step_create_custom_multi" model="runbot.build.config.step">
+        <field name="name">custom_multi</field>
+        <field name="job_type">create_build</field>
+        <field name="number_builds">0</field>
+        <field name="protected" eval="True"/>
+    </record>
+
+
     <record id="runbot_build_config_custom_multi" model="runbot.build.config">
         <field name="name">Custom Multi</field>
         <field name="description">Generic multibuild to use with custom trigger wizard</field>
-        <field name="step_order_ids" eval="[(5,0,0), (0, 0, {'step_id': ref('runbot_build_config_step_create_light_multi')})]"/>
+        <field name="step_order_ids" eval="[(5,0,0), (0, 0, {'step_id': ref('runbot_build_config_step_create_custom_multi')})]"/>
         <field name="protected" eval="True"/>
     </record>
     
