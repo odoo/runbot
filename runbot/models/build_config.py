@@ -289,13 +289,13 @@ class ConfigStep(models.Model):
         config_data = build.params_id.config_data
         config_ids = config_data.get('create_config_ids', self.create_config_ids)
 
-        child_data_list = config_data.get('child_data',[{}])
+        child_data_list = config_data.get('child_data', [{}])
         if not isinstance(child_data_list, list):
             child_data_list = [child_data_list]
 
         for child_data in child_data_list:
             for create_config in self.env['runbot.build.config'].browse(child_data.get('config_id', config_ids.ids)):
-                _child_data = {**child_data, 'config_id': create_config}
+                _child_data = {'config_data': {}, **child_data, 'config_id': create_config}
                 for _ in range(config_data.get('number_build', self.number_builds)):
                     count += 1
                     if count > 200:
@@ -303,7 +303,6 @@ class ConfigStep(models.Model):
                         break
                     child = build._add_child(_child_data, orphan=self.make_orphan)
                     build._log('create_build', 'created with config %s' % create_config.name, log_type='subbuild', path=str(child.id))
-
 
     def make_python_ctx(self, build):
         return {

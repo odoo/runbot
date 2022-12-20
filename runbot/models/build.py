@@ -345,6 +345,11 @@ class BuildResult(models.Model):
         return res
 
     def _add_child(self, param_values, orphan=False, description=False, additionnal_commit_links=False):
+
+        if len(self.parent_path.split('/')) > 8:
+            self._log('_run_create_build', 'This is too deep, skipping create')
+            return self
+
         if additionnal_commit_links:
             commit_link_ids = self.params_id.commit_link_ids
             commit_link_ids |= additionnal_commit_links
