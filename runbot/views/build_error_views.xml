@@ -117,6 +117,7 @@
                 <field name="last_seen_date" string="Last Seen"/>
                 <field name="build_count"/>
                 <field name="responsible"/>
+                <field name="team_id"/>
                 <field name="test_tags"/>
             </tree>
         </field>
