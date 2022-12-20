@@ -120,7 +120,7 @@ class BuildError(models.Model):
     @api.depends('content')
     def _compute_summary(self):
         for build_error in self:
-            build_error.summary = build_error.content[:50]
+            build_error.summary = build_error.content[:80]
 
     @api.depends('build_ids', 'child_ids.build_ids')
     def _compute_children_build_ids(self):

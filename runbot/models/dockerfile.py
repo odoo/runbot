@@ -14,12 +14,12 @@ class Dockerfile(models.Model):
     name = fields.Char('Dockerfile name', required=True, help="Name of Dockerfile")
     image_tag = fields.Char(compute='_compute_image_tag', store=True)
     template_id = fields.Many2one('ir.ui.view', string='Docker Template', domain=[('type', '=', 'qweb')], context={'default_type': 'qweb', 'default_arch_base': '<t></t>'})
-    arch_base = fields.Text(related='template_id.arch_base', readonly=False)
+    arch_base = fields.Text(related='template_id.arch_base', readonly=False, related_sudo=True)
     dockerfile = fields.Text(compute='_compute_dockerfile', tracking=True)
     to_build = fields.Boolean('To Build', help='Build Dockerfile. Check this when the Dockerfile is ready.', default=False)
     version_ids = fields.One2many('runbot.version', 'dockerfile_id', string='Versions')
     description = fields.Text('Description')
-    view_ids = fields.Many2many('ir.ui.view', compute='_compute_view_ids')
+    view_ids = fields.Many2many('ir.ui.view', compute='_compute_view_ids', groups="runbot.group_runbot_admin")
     project_ids = fields.One2many('runbot.project', 'dockerfile_id', string='Default for Projects')
     bundle_ids = fields.One2many('runbot.bundle', 'dockerfile_id', string='Used in Bundles')
 
@@ -37,7 +37,7 @@ class Dockerfile(models.Model):
     def _compute_dockerfile(self):
         for rec in self:
             try:
-                res = rec.template_id._render() if rec.template_id else ''
+                res = rec.template_id.sudo()._render() if rec.template_id else ''
                 rec.dockerfile = re.sub(r'^\s*$', '', res, flags=re.M).strip()
             except QWebException:
                 rec.dockerfile = ''

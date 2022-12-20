@@ -32,6 +32,7 @@ def route(routes, **kw):
             refresh = kwargs.get('refresh', False)
             nb_build_errors = request.env['runbot.build.error'].search_count([('random', '=', True), ('parent_id', '=', False)])
             nb_assigned_errors = request.env['runbot.build.error'].search_count([('responsible', '=', request.env.user.id)])
+            nb_team_errors = request.env['runbot.build.error'].search_count([('responsible', '=', False), ('team_id', 'in', request.env.user.runbot_team_ids.ids)])
             kwargs['more'] = more
             kwargs['projects'] = projects
 
@@ -60,6 +61,7 @@ def route(routes, **kw):
                     response.qcontext['title'] = 'Runbot %s' % project.name or ''
                 response.qcontext['nb_build_errors'] = nb_build_errors
                 response.qcontext['nb_assigned_errors'] = nb_assigned_errors
+                response.qcontext['nb_team_errors'] = nb_team_errors
             return response
         return response_wrap
     return decorator
@@ -390,6 +392,17 @@ class Runbot(Controller):
         }
         return request.render(view_id if view_id else "runbot.monitoring", qctx)
 
+    @route(['/runbot/errors/assign/<int:build_error_id>'
+            ], type='http', auth='user', methods=['POST'], csrf=False, sitemap=False)
+    def build_errors_assign(self, build_error_id=None, **kwargs):
+        build_error = request.env['runbot.build.error'].browse(build_error_id)
+        if build_error.responsible:
+            return build_error.responsible.name
+        if request.env.user._is_internal():
+            build_error.sudo().responsible = request.env.user
+            return request.env.user.name
+        return 'Error'
+
     @route(['/runbot/errors',
             '/runbot/errors/page/<int:page>'
             ], type='http', auth='user', website=True, sitemap=False)
@@ -409,9 +422,11 @@ class Runbot(Controller):
 
         current_user_errors = request.env['runbot.build.error'].search([
             ('responsible', '=', request.env.user.id),
-            ('parent_id', '=', False),
         ], order='last_seen_date desc, build_count desc')
-
+        current_team_errors = request.env['runbot.build.error'].search([
+            ('responsible', '=', False),
+            ('team_id', 'in', request.env.user.runbot_team_ids.ids)
+        ], order='last_seen_date desc, build_count desc')
         domain = [('parent_id', '=', False), ('responsible', '!=', request.env.user.id), ('build_count', '>', 1)]
         build_errors_count = request.env['runbot.build.error'].search_count(domain)
         url_args = {}
@@ -422,10 +437,12 @@ class Runbot(Controller):
 
         qctx = {
             'current_user_errors': current_user_errors,
+            'current_team_errors': current_team_errors,
             'build_errors': build_errors,
             'title': 'Build Errors',
             'sort_order_choices': sort_order_choices,
-            'pager': pager
+            'page': page,
+            'pager': pager,
         }
         return request.render('runbot.build_error', qctx)
 

@@ -26,3 +26,8 @@ class ResUsers(models.Model):
         if list(values.keys()) == ['github_login'] and self.env.user.has_group('runbot.group_runbot_team_manager'):
             return super(ResUsers, self.sudo()).write(values)
         return super().write(values)
+
+    # backport of 16.0 feature TODO remove after migration
+    def _is_internal(self):
+        self.ensure_one()
+        return not self.sudo().share

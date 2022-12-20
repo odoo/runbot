@@ -7,7 +7,7 @@ from odoo.exceptions import ValidationError
 
 class Codeowner(models.Model):
     _name = 'runbot.codeowner'
-    _description = "Notify github teams based on filenames regex"
+    _description = "Codeowner regex"
     _inherit = "mail.thread"
 
     project_id = fields.Many2one('runbot.project', required=True, default=lambda self: self.env.ref('runbot.main_project', raise_if_not_found=False))

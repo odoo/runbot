@@ -137,13 +137,26 @@
         </template>
 
         <template id="runbot.build_errors_link">
-            <t t-if="nb_assigned_errors and nb_assigned_errors > 0">
+            <t t-if="nb_assigned_errors">
                 <li class="nav-item divider"/>
                 <li class="nav-item">
-                    <a href="/runbot/errors" class="nav-link text-danger" t-attf-title="You have {{nb_assigned_errors}} random bug assigned"><i class="fa fa-bug"/><t t-esc="nb_assigned_errors"/></a>
+                    <a href="/runbot/errors" class="nav-link text-danger" t-attf-title="You have {{nb_assigned_errors}} random bug assigned">
+                        <i class="fa fa-bug"/>
+                        <t t-esc="nb_assigned_errors"/>
+                        <span class="text-warning" t-if="nb_team_errors">+<t t-esc="nb_team_errors"/></span>
+                    </a>
                 </li>
             </t>
-            <t t-elif="nb_build_errors and nb_build_errors > 0">
+            <t t-elif="nb_team_errors">
+                <li class="nav-item divider"/>
+                <li class="nav-item">
+                    <a href="/runbot/errors" class="nav-link text-warning" t-attf-title="Your team has {{nb_team_errors}} random bug assigned">
+                        <i class="fa fa-bug"/>
+                        <t t-esc="nb_team_errors"/>
+                    </a>
+                </li>
+            </t>
+            <t t-elif="nb_build_errors">
                 <li class="nav-item divider"/>
                 <li class="nav-item">
                     <a href="/runbot/errors" class="nav-link" title="Random Bugs"><i class="fa fa-bug"/></a>
