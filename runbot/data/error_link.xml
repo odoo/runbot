@@ -19,4 +19,14 @@
             records.clean_content()
         </field>
     </record>
+    <record model="ir.actions.server" id="action_reassign_build_errors">
+        <field name="name">Re-assign build errors</field>
+        <field name="model_id" ref="runbot.model_runbot_build_error" />
+        <field name="binding_model_id" ref="runbot.model_runbot_build_error" />
+        <field name="type">ir.actions.server</field>
+        <field name="state">code</field>
+        <field name="code">
+            records.assign()
+        </field>
+    </record>
 </odoo>

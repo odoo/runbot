@@ -59,8 +59,6 @@ class BuildError(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         cleaners = self.env['runbot.error.regex'].search([('re_type', '=', 'cleaning')])
-        teams = None
-        repos = None
         for vals in vals_list:
             content = vals.get('content')
             cleaned_content = cleaners.r_sub('%', content)
@@ -68,13 +66,20 @@ class BuildError(models.Model):
                 'cleaned_content': cleaned_content,
                 'fingerprint': self._digest(cleaned_content)
             })
-            if 'team_id' not in vals and 'file_path' in vals:
-                teams = teams or self.env['runbot.team'].search(['|', ('path_glob', '!=', False), ('module_ownership_ids', '!=', False)])
-                repos = repos or self.env['runbot.repo'].search([])
-                team = teams._get_team(vals['file_path'], repos)
+        records = super().create(vals_list)
+        records.assign()
+        return records
+
+    def assign(self):
+        if not any((not record.responsible and not record.team_id and record.file_path) for record in self):
+            return
+        teams = self.env['runbot.team'].search(['|', ('path_glob', '!=', False), ('module_ownership_ids', '!=', False)])
+        repos = self.env['runbot.repo'].search([])
+        for record in self:
+            if not record.responsible and not record.team_id and record.file_path:
+                team = teams._get_team(record.file_path, repos)
                 if team:
-                    vals.update({'team_id': team.id})
-        return super().create(vals_list)
+                    record.team_id = team
 
     def write(self, vals):
         if 'active' in vals:
