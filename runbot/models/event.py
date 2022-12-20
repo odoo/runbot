@@ -60,6 +60,14 @@ class runbot_event(models.Model):
             for ir_logging in fingerprints[build_error.fingerprint]:
                 ir_logging.error_id = build_error.id
 
+    def _prepare_create_values(self, vals_list):
+        # keep the given create date
+        result_vals_list = super()._prepare_create_values(vals_list)
+        for result_vals, vals in zip(result_vals_list, vals_list):
+            if 'create_date' in vals:
+                result_vals['create_date'] = vals['create_date']
+        return result_vals_list
+
 
 class RunbotErrorLog(models.Model):
     _name = 'runbot.error.log'
