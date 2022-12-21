@@ -280,3 +280,19 @@ class ErrorClosingWizard(models.TransientModel):
             for build_error in error_ids:
                 build_error.message_post(body=self.reason, subject="Closing Error")
             error_ids['active'] = False
+
+
+class ErrorReassignWizard(models.TransientModel):
+    _name = 'runbot.error.reassign.wizard'
+    _description = "Errors reassign Wizard"
+
+    team_id = fields.Many2one('runbot.team', 'Assigned team')
+    responsible_id = fields.Many2one('res.users', 'Assigned fixer')
+
+    def submit(self):
+        error_ids = self.env['runbot.build.error'].browse(self.env.context.get('active_ids'))
+        if error_ids:
+            if self.team_id:
+                error_ids['team_id'] = self.team_id
+            if self.responsible_id:
+                error_ids['responsible'] = self.responsible_id

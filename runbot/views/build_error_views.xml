@@ -110,12 +110,12 @@
         <field name="name">runbot.build.error.tree</field>
         <field name="model">runbot.build.error</field>
         <field name="arch" type="xml">
-            <tree string="Errors">
-                <field name="module_name"/>
-                <field name="summary"/>
+            <tree string="Errors" decoration-danger="test_tags" multi_edit="1">
+                <field name="module_name" readonly="1"/>
+                <field name="summary" readonly="1"/>
                 <field name="random" string="Random"/>
-                <field name="last_seen_date" string="Last Seen"/>
-                <field name="build_count"/>
+                <field name="last_seen_date" string="Last Seen" readonly="1"/>
+                <field name="build_count" readonly="1"/>
                 <field name="responsible"/>
                 <field name="team_id"/>
                 <field name="test_tags"/>
@@ -232,6 +232,35 @@
         <field name="view_id" ref="runbot_error_closing_wizard_form"/>
         <field name="binding_model_id" ref="runbot.model_runbot_build_error"/>
         <field name="binding_view_types">form,list</field>
+    </record>
+
+  <record model="ir.ui.view" id="runbot_error_reassign_wizard_form">
+        <field name="name">runbot_error_reassign_wizard</field>
+        <field name="model">runbot.error.reassign.wizard</field>
+        <field name="arch" type="xml">
+          <form>
+            <sheet>
+              <group name="team_group">
+                <field name="team_id"/>
+                <field name="responsible_id"/>
+              </group>
+              <footer>
+                <button string="Submit" name="submit" type="object" class="btn-primary"/>
+                <button string="Cancel" class="btn-secondary" special="cancel"/>
+              </footer>
+            </sheet>
+          </form>
+        </field>
+    </record>
+
+    <record id="runbot_open_reassign_wizard" model="ir.actions.act_window">
+        <field name="name">Reassign to another Team and/or User</field>
+        <field name="res_model">runbot.error.reassign.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="view_id" ref="runbot_error_reassign_wizard_form"/>
+        <field name="binding_model_id" ref="runbot.model_runbot_build_error"/>
+        <field name="binding_view_types">list</field>
     </record>
 
   </data>
