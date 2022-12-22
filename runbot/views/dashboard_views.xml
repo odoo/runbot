@@ -39,9 +39,10 @@
                   <field name="codeowner_ids">
                   </field>
                 </page>
-
-
-
+                <page string="Followed triggers">
+                  <field name="trigger_ids">
+                  </field>
+                </page>
               </notebook>
             </sheet>
             <div class="oe_chatter">
