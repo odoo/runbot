@@ -196,6 +196,7 @@ class BuildResult(models.Model):
                                    ('rebuild', 'This build is a rebuild'),
                                    ('normal', 'normal build'),
                                    ('indirect', 'Automatic rebuild'), # TODO cleanup remove
+                                   ('priority', 'Priority'),
                                    ],
                                   default='normal',
                                   string='Build type')

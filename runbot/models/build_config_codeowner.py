@@ -24,7 +24,6 @@ class ConfigStep(models.Model):
                 build._log('', 'No pr for repo %s, skipping' % commit.repo_id.name)
         return pr_by_commit
 
-
     def _codeowners_regexes(self, codeowners, version_id):
         regexes = {}
         for codeowner in codeowners:
