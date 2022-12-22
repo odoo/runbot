@@ -24,7 +24,7 @@
                     </tree>
                   </field>
                 </page>
-                <page string="Team Errors">
+                <page string="Errors" attrs="{'invisible': [('build_error_ids', '=', [])]}">
                   <field name="build_error_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}"/>
                 </page>
                 <page string="Modules">
@@ -39,9 +39,12 @@
                   <field name="codeowner_ids">
                   </field>
                 </page>
-                <page string="Followed triggers">
+                <page string="Followed triggers" attrs="{'invisible': [('trigger_ids', '=', [])]}">
                   <field name="trigger_ids">
                   </field>
+                </page>
+                <page string="Exceptions" attrs="{'invisible': [('upgrade_exception_ids', '=', [])]}">
+                  <field name="upgrade_exception_ids" readonly="1"/>
                 </page>
               </notebook>
             </sheet>
