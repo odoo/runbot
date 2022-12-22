@@ -313,7 +313,7 @@
                     </t>
                   </td>
                 </tr>
-                <t t-if="l.error_id">
+                <t t-if="l.with_context(active_test=False).error_id">
                   <t t-set="icon" t-value="'list'"/>
                   <t t-set="error" t-value="l.error_id"/>
                   <t t-set="size" t-value=""/>
@@ -324,8 +324,8 @@
                   </t>
                   <tr>
                     <td/><td/><td/>
-                    <td t-attf-class="bg-info-light {{size}}">
-                      This error is already known.
+                    <td t-attf-class="bg-{{'info' if error.active else 'success'}}-light {{size}}">
+                      This error is already <t t-esc="'known' if error.active else 'fixed'"/>.
                       <a groups="runbot.group_user" t-attf-href="/web#id={{l.error_id.id}}&amp;view_type=form&amp;model=runbot.build.error&amp;menu_id={{env.ref('runbot.runbot_menu_root').id}}" title="View in Backend" target="new">
                         <i t-attf-class="fa fa-{{icon}}"/>
                       </a>
