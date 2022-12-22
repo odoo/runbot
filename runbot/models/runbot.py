@@ -40,11 +40,13 @@ class Runbot(models.AbstractModel):
         self._gc_testing(host)
         self._commit()
         for build in self._get_builds_with_requested_actions(host):
+            build = build.browse(build.id)  # remove preftech ids, manage build one by one
             build._process_requested_actions()
             self._commit()
         host.process_logs()
         self._commit()
         for build in self._get_builds_to_schedule(host):
+            build = build.browse(build.id)  # remove preftech ids, manage build one by one
             build._schedule()
             self._commit()
         self._assign_pending_builds(host, host.nb_worker, [('build_type', '!=', 'scheduled')])
@@ -52,6 +54,7 @@ class Runbot(models.AbstractModel):
         self._assign_pending_builds(host, host.nb_worker-1 or host.nb_worker)
         self._commit()
         for build in self._get_builds_to_init(host):
+            build = build.browse(build.id)  # remove preftech ids, manage build one by one
             build._init_pendings(host)
             self._commit()
         self._gc_running(host)
