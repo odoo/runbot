@@ -74,6 +74,8 @@ class RunbotTeam(models.Model):
                     return ownership.team_id
 
         for team in self:
+            if not team.path_glob:
+                continue
             if any([fnmatch(file_path, pattern.strip().strip('-')) for pattern in team.path_glob.split(',') if pattern.strip().startswith('-')]):
                 continue
             if any([fnmatch(file_path, pattern.strip()) for pattern in team.path_glob.split(',') if not pattern.strip().startswith('-')]):
