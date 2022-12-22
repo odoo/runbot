@@ -128,10 +128,17 @@ class Batch(models.Model):
         else:
             description = params.trigger_id.description if params.trigger_id.description else False
             link_type = 'created'
+
+            build_type = 'normal'
+            if self.category_id != self.env.ref('runbot.default_category'):
+                build_type = 'scheduled'
+            elif self.bundle_id.priority:
+                build_type = 'priority'
+
             build = self.env['runbot.build'].create({
                 'params_id': params.id,
                 'description': description,
-                'build_type': 'normal' if self.category_id == self.env.ref('runbot.default_category') else 'scheduled',
+                'build_type': build_type,
                 'no_auto_run': self.bundle_id.no_auto_run,
             })
             if self.bundle_id.host_id:

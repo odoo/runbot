@@ -42,7 +42,7 @@ class Bundle(models.Model):
     previous_major_version_base_id = fields.Many2one('runbot.bundle', 'Previous base bundle', compute='_compute_relations_base_id')
     intermediate_version_base_ids = fields.Many2many('runbot.bundle', 'Intermediate base bundles', compute='_compute_relations_base_id')
 
-    priority = fields.Boolean('Build priority', default=False)
+    priority = fields.Boolean('Build priority', default=False, groups="runbot.group_runbot_admin")
 
     # Custom parameters
     trigger_custom_ids = fields.One2many('runbot.bundle.trigger.custom', 'bundle_id')

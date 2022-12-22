@@ -51,7 +51,9 @@ class Runbot(models.AbstractModel):
             self._commit()
         self._assign_pending_builds(host, host.nb_worker, [('build_type', '!=', 'scheduled')])
         self._commit()
-        self._assign_pending_builds(host, host.nb_worker-1 or host.nb_worker)
+        self._assign_pending_builds(host, host.nb_worker - 1 or host.nb_worker)
+        self._commit()
+        self._assign_pending_builds(host, host.nb_worker and host.nb_worker + 1, [('build_type', '=', 'priority')])
         self._commit()
         for build in self._get_builds_to_init(host):
             build = build.browse(build.id)  # remove preftech ids, manage build one by one
@@ -80,7 +82,6 @@ class Runbot(models.AbstractModel):
         if assignable_slots > 0:
             allocated = self._allocate_builds(host, assignable_slots, domain)
             if allocated:
-
                 _logger.info('Builds %s where allocated to runbot', allocated)
 
     def _get_builds_to_init(self, host):
