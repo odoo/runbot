@@ -1116,9 +1116,11 @@ class ConfigStep(models.Model):
                 success = False
         return success
 
-    def _modified_files(self, build, commit_link_links = None):
+    def _modified_files(self, build, commit_link_links=None):
         modified_files = {}
-        for commit_link in commit_link_links or build.params_id.commit_link_ids:
+        if commit_link_links is None:
+            commit_link_links = build.params_id.commit_link_ids
+        for commit_link in commit_link_links:
             commit = commit_link.commit_id
             modified = commit.repo_id._git(['diff', '--name-only', '%s..%s' % (commit_link.merge_base_commit_id.name, commit.name)])
             if modified:
