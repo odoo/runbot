@@ -29,7 +29,7 @@ class ConfigStep(models.Model):
         for codeowner in codeowners:
             github_teams = codeowner._get_github_teams()
             if github_teams and codeowner.regex and (codeowner._match_version(version_id)):
-                team_set = regexes.setdefault(codeowner.regex.strip(), set()) 
+                team_set = regexes.setdefault(codeowner.regex.strip(), set())
                 team_set |= set(t.strip() for t in github_teams)
         return list(regexes.items())
 
@@ -73,7 +73,8 @@ class ConfigStep(models.Model):
         if not self._check_limits(build):
             return
 
-        prs = bundle.branch_ids.filtered(lambda branch: branch.is_pr and branch.alive)
+        build_repositories = build.params_id.commit_link_ids.commit_id.repo_id
+        prs = bundle.branch_ids.filtered(lambda branch: branch.is_pr and branch.alive and (branch.remote_id.repo_id in build_repositories))
 
         # skip draft pr
         draft_prs = prs.filtered(lambda pr: pr.draft)
