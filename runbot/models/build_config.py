@@ -405,7 +405,6 @@ class ConfigStep(models.Model):
         self.env['runbot.runbot']._reload_nginx()
         return dict(cmd=cmd, log_path=log_path, container_name=docker_name, exposed_ports=[build_port, build_port + 1], ro_volumes=exports, env_variables=env_variables)
 
-
     def _run_install_odoo(self, build, log_path):
         exports = build._checkout()
 
@@ -439,17 +438,19 @@ class ConfigStep(models.Model):
             else:
                 build._log('test_all', 'Installing modules without testing', level='WARNING')
         test_tags_in_extra = '--test-tags' in extra_params
+
+        disable_auto_tags = build.params_id.config_data.get('disable_auto_tags', False)
         if self.test_tags or test_tags_in_extra:
             if "--test-tags" in available_options:
                 if not test_tags_in_extra:
                     test_tags = self.test_tags.replace(' ', '')
-                    if self.enable_auto_tags:
+                    if self.enable_auto_tags and not disable_auto_tags:
                         auto_tags = self.env['runbot.build.error'].disabling_tags()
                         test_tags = ','.join(test_tags.split(',') + auto_tags)
                     cmd.extend(['--test-tags', test_tags])
             else:
                 build._log('test_all', 'Test tags given but not supported')
-        elif self.enable_auto_tags and self.test_enable:
+        elif self.enable_auto_tags and self.test_enable and not disable_auto_tags:
             if grep(config_path, "[/module][:class]"):
                 auto_tags = self.env['runbot.build.error'].disabling_tags()
                 if auto_tags:
