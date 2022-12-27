@@ -4,7 +4,7 @@
     'summary': "Runbot",
     'description': "Runbot for Odoo 15.0",
     'author': "Odoo SA",
-    'website': "http://runbot.odoo.com",
+    'website': "https://runbot.odoo.com",
     'category': 'Website',
     'version': '5.2',
     'application': True,

@@ -271,8 +271,7 @@ class ConfigStep(models.Model):
         build.write({'job_start': now(), 'job_end': False})  # state, ...
         log_link = ''
         if self._has_log():
-            log_url = f'http://{build.host}'
-            url = f"{log_url}/runbot/static/build/{build.dest}/logs/{self.name}.txt"
+            url = f"{build.http_log_url}{self.name}.txt"
             log_link = f'[@icon-file-text]({url})'
         build._log('run', 'Starting step **%s** from config **%s** %s' % (self.name, build.params_id.config_id.name, log_link), log_type='markdown', level='SEPARATOR')
         self._run_step(build, log_path)
@@ -742,8 +741,8 @@ class ConfigStep(models.Model):
             dump_build = params.dump_db.build_id or build.parent_id
             assert download_db_suffix and dump_build
             download_db_name = '%s-%s' % (dump_build.dest, download_db_suffix)
-            zip_name = '%s.zip' % download_db_name
-            dump_url = '%s%s' % (dump_build.http_log_url(), zip_name)
+            zip_name = f'{download_db_name}.zip'
+            dump_url = f'{dump_build.http_log_url()}{zip_name}'
             build._log('test-migration', 'Restoring dump [%s](%s) from build [%s](%s)' % (zip_name, dump_url, dump_build.id, dump_build.build_url), log_type='markdown')
         restore_suffix = self.restore_rename_db_suffix or params.dump_db.db_suffix or suffix
         assert restore_suffix
@@ -855,19 +854,19 @@ class ConfigStep(models.Model):
         if self.job_type == 'install_odoo':
             kwargs['message'] += ' $$fa-download$$'
             db_suffix = build.params_id.config_data.get('db_name') or self.db_name
-            kwargs['path'] = '%s%s-%s.zip' % (build.http_log_url(), build.dest, db_suffix)
+            kwargs['path'] = f'{build.http_log_url()}{build.dest}-{db_suffix}.zip'
             kwargs['log_type'] = 'link'
         build._log('', **kwargs)
 
         if self.coverage:
-            xml_url = '%scoverage.xml' % build.http_log_url()
-            html_url = 'http://%s/runbot/static/build/%s/coverage/index.html' % (build.host, build.dest)
+            xml_url = f'{build.http_log_url()}coverage.xml'
+            html_url = f'{build.http_log_url("coverage")}index.html'
             message = 'Coverage report: [xml @icon-download](%s), [html @icon-eye](%s)' % (xml_url, html_url)
             build._log('end_job', message, log_type='markdown')
 
         if self.flamegraph:
-            dat_url = '%sflame_%s.%s' % (build.http_log_url(), self.name, 'log.gz')
-            svg_url = '%sflame_%s.%s' % (build.http_log_url(), self.name, 'svg')
+            dat_url = f'{build.http_log_url()}flame_{self.name,}.log.gz'
+            svg_url = f'{build.http_log_url()}flame_{self.name,}.svg'
             message = 'Flamegraph report: [data @icon-download](%s), [svg @icon-eye](%s)' % (dat_url, svg_url)
             build._log('end_job', message, log_type='markdown')
 
