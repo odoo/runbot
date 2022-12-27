@@ -353,7 +353,7 @@ class Repo(models.Model):
         """
         self.ensure_one()
         get_ref_time = round(self._get_fetch_head_time(), 4)
-        commit_limit = time.time() - 60*60*24*max_age
+        commit_limit = time.time() - (60 * 60 * 24 * max_age)
         if not self.get_ref_time or get_ref_time > self.get_ref_time:
             try:
                 self.set_ref_time(get_ref_time)
@@ -367,6 +367,7 @@ class Repo(models.Model):
                 if not git_refs:
                     return []
                 refs = [tuple(field for field in line.split('\x00')) for line in git_refs.split('\n')]
+                refs = [r for r in refs if not re.match(r'^refs/[\w-]+/heads/\d+$', r[0])]  # remove branches with interger names to avoid confusion with pr names
                 refs = [r for r in refs if int(r[2]) > commit_limit or self.env['runbot.branch'].match_is_base(r[0].split('/')[-1])]
                 if ignore:
                     refs = [r for r in refs if r[0].split('/')[-1] not in ignore]
