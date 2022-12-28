@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import datetime
 import re
 from unittest import skip
 from unittest.mock import patch, Mock
@@ -7,7 +6,6 @@ from subprocess import CalledProcessError
 from odoo.tests import common, TransactionCase
 from odoo.tools import mute_logger
 import logging
-import odoo
 import time
 
 from .common import RunbotCase, RunbotCaseMinimalSetup
@@ -471,3 +469,56 @@ class TestRepoScheduler(RunbotCase):
         builds[0].write({'local_state': 'done'})
 
         self.Runbot._scheduler(host)
+
+
+class TestGetRefs(RunbotCase):
+    def setUp(self):
+        super().setUp()
+        self.test_refs = []
+
+    def mock_git_helper(self):
+        """Helper that returns a mock for repo._git()"""
+        def mock_git(repo, cmd):
+            self.assertIn('for-each-ref', cmd)
+            self.assertIn('refs/*/pull/*', cmd)
+            return '\n'.join(['\x00'.join(ref_data) for ref_data in self.test_refs])
+        return mock_git
+
+    def test_get_refs(self):
+        self.remote_server_dev.fetch_pull = True
+        to_ignore = { '242': 1672227770.0}
+        good_ref = (
+            'refs/bla-dev/heads/master-test-branch-rbt',
+            'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+            '1672139720',
+            'foobarman',
+            '<foobarman@somewhere.com>',
+            '[IMP] mail: better tests',
+            'foobarman',
+            '<foobarman@somewhere.com>',
+        )
+        bad_ref = (
+            'refs/bla-dev/heads/1703',
+            'e9b396d2dddffdb373bf2c6ad073696aa25b4f68',
+            '1672224639',
+            'foobarman',
+            '<foobarman@somewhere.com>',
+            '[FIX] foo: bar',
+            'foobarman',
+            '<foobarman@somewhere.com>',
+        )
+        to_ignore_ref = (
+            'refs/bla-dev/pull/242',
+            'ee89a48b76b58f4b3b0a7ee2c558dd8d936f6b12',
+            '1672224242',
+            'foobarman',
+            '<foobarman@somewhere.com>',
+            '[IMP] blah: blah',
+            'foobarman',
+            '<foobarman@somewhere.com>',
+        )
+        self.test_refs.extend([good_ref, bad_ref, to_ignore_ref])
+        refs = self.repo_server._get_refs(ignore=to_ignore)
+        self.assertIn(good_ref, refs, 'A valid branch should appear in refs')
+        self.assertNotIn(bad_ref, refs, 'A branch name that is an integer should be filtered out')
+        self.assertNotIn(to_ignore_ref, refs, 'An explicitely ignored branch should be filtered out')
