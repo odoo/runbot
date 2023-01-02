@@ -30,7 +30,7 @@ class BuildError(models.Model):
     fingerprint = fields.Char('Error fingerprint', index=True)
     random = fields.Boolean('underterministic error', tracking=True)
     responsible = fields.Many2one('res.users', 'Assigned fixer', tracking=True)
-    team_id = fields.Many2one('runbot.team', 'Assigned team')
+    team_id = fields.Many2one('runbot.team', 'Assigned team', tracking=True)
     fixing_commit = fields.Char('Fixing commit', tracking=True)
     fixing_pr_id = fields.Many2one('runbot.branch', 'Fixing PR', tracking=True, domain=[('is_pr', '=', True)])
     build_ids = fields.Many2many('runbot.build', 'runbot_build_error_ids_runbot_build_rel', string='Affected builds')
@@ -71,12 +71,12 @@ class BuildError(models.Model):
         return records
 
     def assign(self):
-        if not any((not record.responsible and not record.team_id and record.file_path) for record in self):
+        if not any((not record.responsible and not record.team_id and record.file_path and not record.parent_id) for record in self):
             return
         teams = self.env['runbot.team'].search(['|', ('path_glob', '!=', False), ('module_ownership_ids', '!=', False)])
         repos = self.env['runbot.repo'].search([])
         for record in self:
-            if not record.responsible and not record.team_id and record.file_path:
+            if not record.responsible and not record.team_id and record.file_path and not record.parent_id:
                 team = teams._get_team(record.file_path, repos)
                 if team:
                     record.team_id = team
@@ -85,16 +85,32 @@ class BuildError(models.Model):
         if 'active' in vals:
             for build_error in self:
                 (build_error.child_ids - self).write({'active': vals['active']})
-                if not self.user_has_groups('runbot.group_runbot_admin'):
+                if not (self.env.su or self.user_has_groups('runbot.group_runbot_admin')):
                     if build_error.test_tags:
-                        raise UserError(f"This error as a test-tag and can only be (de)activated by admin")
+                        raise UserError("This error as a test-tag and can only be (de)activated by admin")
                     if not vals['active'] and build_error.last_seen_date + relativedelta(days=1) > fields.Datetime.now():
-                        raise UserError(f"This error broke less than one day ago can only be deactivated by admin")
-        if vals.get('parent_id') and not self.env.su:
+                        raise UserError("This error broke less than one day ago can only be deactivated by admin")
+        result = super(BuildError, self).write(vals)
+        if vals.get('parent_id'):
             for build_error in self:
+                parent = build_error.parent_id
                 if build_error.test_tags:
-                    raise UserError(f"Cannot parent an error with test tags: {build_error.test_tags}")
-        return super(BuildError, self).write(vals)
+                    if parent.test_tags and not self.env.su:
+                        raise UserError(f"Cannot parent an error with test tags: {build_error.test_tags}")
+                    elif not parent.test_tags:
+                        parent.sudo().test_tags = build_error.test_tags
+                        build_error.sudo().test_tags = ''
+                if build_error.responsible:
+                    if parent.responsible and parent.responsible != build_error.responsible and not self.env.su:
+                        raise UserError(f"Error {parent.id} as already a responsible ({parent.responsible}) cannot assign {build_error.responsible}")
+                    else:
+                        parent.responsible = build_error.responsible
+                        build_error.responsible = False
+                if build_error.team_id:
+                    if not parent.team_id:
+                        parent.team_id = build_error.team_id
+                    build_error.team_id = False
+        return result
 
     @api.depends('build_ids', 'child_ids.build_ids')
     def _compute_build_counts(self):

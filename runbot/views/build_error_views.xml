@@ -17,12 +17,12 @@
               </group>
               <group col="2">
                 <group name="fixer_info" string="Fixing">
-                  <field name="responsible"/>
-                  <field name="team_id"/>
+                  <field name="responsible" attrs="{'readonly': [('parent_id','!=', False), ('responsible','=', False)]}"/>
+                  <field name="team_id" attrs="{'readonly': [('parent_id','!=', False), ('team_id','=', False)]}"/>
                   <field name="fixing_pr_id"/>
                   <field name="active"/>
                   <field name="test_tags" readonly="1" groups="!runbot.group_runbot_admin"/>
-                  <field name="test_tags" readonly="0" groups="runbot.group_runbot_admin"/>
+                  <field name="test_tags" groups="runbot.group_runbot_admin" attrs="{'readonly': [('parent_id','!=', False), ('test_tags','=', False)]}"/>
                 </group>
                   <group name="fixer_info" string="Fixing">
                   <field name="version_ids" widget="many2many_tags"/>
