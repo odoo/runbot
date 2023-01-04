@@ -12,6 +12,7 @@
                 <field name="github_team" widget="github_team"/>
                 <field name="github_logins"/>
                 <field name="skip_team_pr"/>
+                <field name="skip_fw_pr"/>
                 <field name="dashboard_id"/>
                 <field name="path_glob"/>
               </group>
