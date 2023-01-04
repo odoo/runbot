@@ -177,6 +177,12 @@
         <search string="Search config step">
           <field name="name"/>
           <field name="group_name"/>
+          <field name="python_code" filter_domain="[
+              '|',
+              ('python_code', 'ilike', self),
+              ('python_result_code', 'ilike', self),
+          ]">
+        </field>
           <filter string="Install job" name='install_job' domain="[(['job_type', '=', 'install_odoo'])]"/>
           <filter string="Run job" name='run_job' domain="[(['job_type', '=', 'run_odoo'])]"/>
           <filter string="Python job" name='python_job' domain="[(['job_type', '=', 'python'])]"/>
