@@ -112,6 +112,11 @@ class ConfigStep(models.Model):
         codeowners = build.env['runbot.codeowner'].search([('project_id', '=', bundle.project_id.id)])
         regexes = self._codeowners_regexes(codeowners, build.params_id.version_id)
         modified_files = self._modified_files(build, pr_by_commit.keys())
+
+        if not modified_files:
+            return
+
+        skippable_teams = self.env['runbot.team'].search(['|', ('skip_team_pr', '=', True), ('skip_fw_pr', '=', True)])
         for commit_link, files in modified_files.items():
             build._log('', 'Checking %s codeowner regexed on %s files' % (len(regexes), len(files)))
             reviewers = set()
@@ -128,12 +133,19 @@ class ConfigStep(models.Model):
                 pr = pr_by_commit[commit_link]
                 new_reviewers = reviewers - set((pr.reviewers or '').split(','))
                 if new_reviewers:
-                    skippable_teams = self.env['runbot.team'].search([('github_team', 'in', list(new_reviewers)), ('skip_team_pr', '=', True)])
-                    skippable_teams = skippable_teams.filtered(lambda team: pr.pr_author in team._get_members_logins())
-                    skipped_teams = set(skippable_teams.mapped('github_team'))
-                    if skipped_teams:
-                        new_reviewers = new_reviewers - skipped_teams
-                        build._log('', 'Skipping teams %s since author is part of the team members' % (sorted(skipped_teams),), log_type='markdown')
+                    # todo replace all team by a runbot team and simplify this logic to remove search
+                    author_skippable_teams = skippable_teams.filtered(lambda team: team.skip_team_pr and team.github_team in new_reviewers and pr.pr_author in team._get_members_logins())
+                    author_skipped_teams = set(author_skippable_teams.mapped('github_team'))
+                    if author_skipped_teams:
+                        new_reviewers = new_reviewers - author_skipped_teams
+                        build._log('', 'Skipping teams %s since author is part of the team members' % (sorted(author_skipped_teams),), log_type='markdown')
+
+                    fw_skippable_teams = skippable_teams.filtered(lambda team: team.skip_fw_pr and team.github_team in new_reviewers and pr.pr_author == fw_bot)
+                    fw_skipped_teams = set(fw_skippable_teams.mapped('github_team'))
+                    if fw_skipped_teams:
+                        new_reviewers = new_reviewers - fw_skipped_teams
+                        build._log('', 'Skipping teams %s (ignore forwardport)' % (sorted(fw_skipped_teams),), log_type='markdown')
+
                     new_reviewers = sorted(new_reviewers)
 
                     build._log('', 'Requesting review for pull request [%s](%s): %s' % (pr.dname, pr.branch_url, ', '.join(new_reviewers)), log_type='markdown')
