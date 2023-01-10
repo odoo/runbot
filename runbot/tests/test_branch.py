@@ -146,7 +146,7 @@ class TestBranchForbidden(RunbotCase):
     """Test that a branch matching the repo forbidden regex, goes to dummy bundle"""
 
     def test_forbidden(self):
-        dummy_bundle = self.env.ref('runbot.bundle_dummy')
+        dummy_bundle = self.remote_server_dev.repo_id.project_id.dummy_bundle_id
         self.remote_server_dev.repo_id.forbidden_regex = '^bad_name.+'
         with mute_logger("odoo.addons.runbot.models.branch"):
             branch = self.Branch.create({
@@ -199,7 +199,7 @@ class TestBranchIsBase(RunbotCaseMinimalSetup):
     @mute_logger("odoo.addons.runbot.models.branch")
     def test_is_base_regex_on_dev_remote(self):
         """Test that a branch matching the is_base regex on a secondary remote goes to the dummy bundles."""
-        dummy_bundle = self.env.ref('runbot.bundle_dummy')
+        dummy_bundle = self.repo_addons.project_id.dummy_bundle_id
 
         # master branch on dev remote
         initial_addons_dev_commit = self.Commit.create({

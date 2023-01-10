@@ -145,8 +145,8 @@ class Branch(models.Model):
 
     @api.depends('reference_name', 'remote_id.repo_id.project_id')
     def _compute_bundle_id(self):
-        dummy = self.env.ref('runbot.bundle_dummy')
         for branch in self:
+            dummy = branch.remote_id.repo_id.project_id.dummy_bundle_id
             if branch.bundle_id == dummy:
                 continue
             name = branch.reference_name
