@@ -14,15 +14,19 @@ class Runbot(models.AbstractModel):
     @patch('odoo.addons.runbot.models.repo.Repo._git')
     def _create_demo_data(self, mock_git, mock_github):
         mock_github.return_value = False
+        project = self.env.ref('runbot.main_project')
         bundles = self.env['runbot.bundle'].browse(
             self.env['ir.model.data'].search([
                 ('module', '=', 'runbot_populate'), ('model', '=', 'runbot.bundle')
             ]).mapped('res_id')
-        )
-        bundles |= self.env.ref('runbot.bundle_master')
+        ).filtered(lambda bundle: bundle.project_id == project)
+        bundles |= project.master_bundle_id
         bundles = bundles.sorted('is_base', reverse=True)
 
-        assert bundles|self.env.ref('runbot.bundle_dummy') == bundles.search([])
+        existing_bundle = bundles.search([('project_id', '=', project.id)])
+        expected_bundle = bundles | project.dummy_bundle_id
+
+        assert expected_bundle == existing_bundle
 
         if bundles.branch_ids:
             # only populate data if no branch are found
