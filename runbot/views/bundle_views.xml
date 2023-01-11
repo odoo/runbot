@@ -56,6 +56,7 @@
                     <field name="commit_limit"/>
                     <field name="file_limit"/>
                     <field name="disable_codeowner"/>
+                    <field name="for_next_freeze"/>
                     <field name="branch_ids">
                         <tree>
                             <field name="dname"/>

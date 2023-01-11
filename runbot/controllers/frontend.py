@@ -105,7 +105,7 @@ class Runbot(Controller):
             '/runbot',
             '/runbot/<model("runbot.project"):project>',
             '/runbot/<model("runbot.project"):project>/search/<search>'], website=True, auth='public', type='http')
-    def bundles(self, project=None, search='', projects=False, refresh=False, **kwargs):
+    def bundles(self, project=None, search='', projects=False, refresh=False, for_next_freeze=False, limit=40, **kwargs):
         search = search if len(search) < 60 else search[:60]
         env = request.env
         categories = env['runbot.category'].search([])
@@ -131,6 +131,9 @@ class Runbot(Controller):
             elif filter_mode == 'nosticky':
                 domain.append(('sticky', '=', False))
 
+            if for_next_freeze:
+                domain.append(('for_next_freeze', '=', True))
+
             if search:
                 search_domains = []
                 pr_numbers = []
@@ -152,7 +155,7 @@ class Runbot(Controller):
                     case when "runbot_bundle".sticky then "runbot_bundle".version_number end collate "C" desc,
                     "runbot_bundle".last_batch desc
             """
-            query.limit=40
+            query.limit = min(limit, 200)
             bundles = env['runbot.bundle'].browse(query)
 
             category_id = int(request.httprequest.cookies.get('category') or 0) or request.env['ir.model.data']._xmlid_to_res_id('runbot.default_category')
