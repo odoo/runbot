@@ -95,7 +95,7 @@ class RunbotTeam(models.Model):
         for team in self:
             if team.github_team:
                 url = f"https://api.github.com/orgs/{team.organisation}/teams/{team.github_team}"
-                session = _make_github_session(team.project_id.token)
+                session = _make_github_session(team.project_id.sudo().token)
                 response = session.get(url)
                 if response.status_code != 200:
                     raise UserError(f'Cannot find team {team.github_team}')
