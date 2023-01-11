@@ -45,12 +45,14 @@ RUN curl -sSL https://nightly.odoo.com/resources/phantomjs.tar.bz2  -o /tmp/phan
     </template>
 
     <template id="runbot.docker_install_wkhtml">
+      <t t-if="values['wkhtml_url']">
 # Install wkhtml
 RUN curl -sSL <t t-esc="values['wkhtml_url']"/> -o /tmp/wkhtml.deb \
     &amp;&amp; apt-get update \
     &amp;&amp; dpkg --force-depends -i /tmp/wkhtml.deb \
     &amp;&amp; apt-get install -y -f --no-install-recommends \
     &amp;&amp; rm /tmp/wkhtml.deb
+      </t>
     </template>
 
     <template id="runbot.docker_install_nodejs">
