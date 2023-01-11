@@ -156,8 +156,16 @@ def handle_pr(env, event):
     if not branch:
         return "Not set up to care about {}:{}".format(r, b)
 
-
-    _logger.info("%s: %s#%s (%s) (by %s)", event['action'], repo.name, pr['number'], pr['title'].strip(), event['sender']['login'])
+    headers = request.httprequest.headers if request.httprequest else {}
+    _logger.info(
+        "%s: %s#%s (%s) (by %s, delivery %s by %s)",
+        event['action'],
+        repo.name, pr['number'],
+        pr['title'].strip(),
+        event['sender']['login'],
+        headers.get('X-Github-Delivery'),
+        headers.get('User-Agent'),
+     )
     if event['action'] == 'opened':
         author_name = pr['user']['login']
         author = env['res.partner'].search([('github_login', '=', author_name)], limit=1)
@@ -172,19 +180,27 @@ def handle_pr(env, event):
         return "Unknown PR {}:{}, scheduling fetch".format(repo.name, pr['number'])
     if event['action'] == 'synchronize':
         if pr_obj.head == pr['head']['sha']:
+            _logger.warning(
+                "PR %s sync %s -> %s => same head",
+                pr_obj.display_name,
+                pr_obj.head,
+                pr['head']['sha'],
+            )
             return 'No update to pr head'
 
         if pr_obj.state in ('closed', 'merged'):
-            _logger.error("Tentative sync to closed PR %s", pr_obj.display_name)
+            _logger.error("PR %s sync %s -> %s => failure (closed)", pr_obj.display_name, pr_obj.head, pr['head']['sha'])
             return "It's my understanding that closed/merged PRs don't get sync'd"
 
         if pr_obj.state == 'ready':
             pr_obj.unstage("updated by %s", event['sender']['login'])
 
         _logger.info(
-            "PR %s updated to %s by %s, resetting to 'open' and squash=%s",
+            "PR %s sync %s -> %s by %s => reset to 'open' and squash=%s",
             pr_obj.display_name,
-            pr['head']['sha'], event['sender']['login'],
+            pr_obj.head,
+            pr['head']['sha'],
+            event['sender']['login'],
             pr['commits'] == 1
         )
 
