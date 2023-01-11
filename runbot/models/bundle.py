@@ -52,6 +52,10 @@ class Bundle(models.Model):
     file_limit = fields.Integer("File limit")
     disable_codeowner = fields.Boolean("Disable codeowners", tracking=True)
 
+    # extra_info
+    for_next_freeze = fields.Boolean('Should be in next freeze')
+
+
     @api.depends('name')
     def _compute_host_id(self):
         assigned_only = None
