@@ -234,7 +234,7 @@ class Branch(models.Model):
         if self.draft:
             self.reviewers = ''  # reset reviewers on draft
 
-        if self.was_alive and not self.alive and self.bundle_id.for_next_freeze:
+        if was_alive and not self.alive and self.bundle_id.for_next_freeze:
             if not any(branch.alive and branch.is_pr for branch in self.bundle_id.branch_ids):
                 self.bundle_id.for_next_freeze = False
 
