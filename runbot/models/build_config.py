@@ -706,9 +706,8 @@ class ConfigStep(models.Model):
         build = build.with_context(defined_commit_ids=target_commit_ids)
         exports = build._checkout()
 
-        dump_db = build.params_id.dump_db
-
-        migrate_db_name = '%s-%s' % (build.dest, dump_db.db_suffix)  # only ok if restore does not force db_suffix
+        db_suffix = build.params_id.config_data.get('db_name') or build.params_id.dump_db.db_suffix
+        migrate_db_name = '%s-%s' % (build.dest, db_suffix)  # only ok if restore does not force db_suffix
 
         migrate_cmd = build._cmd()
         migrate_cmd += ['-u all']
