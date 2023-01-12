@@ -598,7 +598,10 @@ class ConfigStep(models.Model):
                 end = True
             elif len(target_builds) > 1 and not self.upgrade_flat:
                 for target_build in target_builds:
-                    build._add_child({'upgrade_to_build_id': target_build.id})
+                    build._add_child(
+                        {'upgrade_to_build_id': target_build.id},
+                        description="Testing migration to %s" % target_build.params_id.version_id.name
+                    )
                 end = True
         if end:
             return  # replace this by a python job friendly solution
@@ -619,7 +622,10 @@ class ConfigStep(models.Model):
                     build._log('_run_configure_upgrade', 'No source version found for %s, skipping' % target_version.name, level='INFO')
                 elif not self.upgrade_flat:
                     for from_build in from_builds:
-                        build._add_child({'upgrade_to_build_id': target_build.id, 'upgrade_from_build_id': from_build.id})
+                        build._add_child(
+                            {'upgrade_to_build_id': target_build.id, 'upgrade_from_build_id': from_build.id},
+                            description="Testing migration from %s to %s" % (from_build.params_id.version_id.name, target_build.params_id.version_id.name)
+                        )
                     end = True
 
         if end:
