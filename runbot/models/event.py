@@ -53,7 +53,7 @@ class runbot_event(models.Model):
         fingerprints = defaultdict(list)
         for ir_logging in self:
             ir_logging.error_id = False
-            if ir_logging.level == 'ERROR' and ir_logging.type == 'server':
+            if ir_logging.level in ('ERROR', 'CRITICAL', 'WARNING') and ir_logging.type == 'server':
                 fingerprints[self.env['runbot.build.error']._digest(cleaning_regexes.r_sub('%', ir_logging.message))].append(ir_logging)
         for build_error in self.env['runbot.build.error'].search([('fingerprint', 'in', list(fingerprints.keys()))]):
             for ir_logging in fingerprints[build_error.fingerprint]:
