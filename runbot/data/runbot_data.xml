@@ -48,6 +48,11 @@ admin_passwd=running_master_password</field>
 
     </data>
 
+    <record model="ir.config_parameter" id="runbot.runbot_disable_host_on_fetch_failure">
+        <field name="key">runbot.runbot_disable_host_on_fetch_failure</field>
+        <field name="value"></field>
+    </record>
+
     <record model="ir.config_parameter" id="runbot.runbot_is_base_regex">
         <field name="key">runbot.runbot_is_base_regex</field>
         <field name="value">^((master)|(saas-)?\d+\.\d+)$</field>
