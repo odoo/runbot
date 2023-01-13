@@ -92,6 +92,8 @@ class RunbotTeam(models.Model):
         return team_loggins
 
     def _fetch_members(self):
+        self.check_access_rights('write')
+        self.check_access_rule('write')
         for team in self:
             if team.github_team:
                 url = f"https://api.github.com/orgs/{team.organisation}/teams/{team.github_team}"
