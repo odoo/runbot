@@ -930,7 +930,7 @@ class ConfigStep(models.Model):
     def _make_python_results(self, build):
         eval_ctx = self.make_python_ctx(build)
         safe_eval(self.python_result_code.strip(), eval_ctx, mode="exec", nocopy=True)
-        return_value = eval_ctx.get('return_value')
+        return_value = eval_ctx.get('return_value', {})
         # todo check return_value or write in try except. Example: local result setted to wrong value
         if not isinstance(return_value, dict):
             raise RunbotException('python_result_code must set return_value to a dict values on build')
