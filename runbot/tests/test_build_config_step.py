@@ -674,7 +674,7 @@ Initiating shutdown
         self.assertEqual(result, {'local_result': 'ok'})
 
         # invalid result code (no return_value set)
-        config_step.python_result_code = """a = 2*5\nr = {'a': 'ok'}"""
+        config_step.python_result_code = """a = 2*5\nr = {'a': 'ok'}\nreturn_value = 'ko'"""
         with self.assertRaises(RunbotException):
             result = config_step._make_results(build)
 
