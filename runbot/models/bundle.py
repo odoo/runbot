@@ -203,10 +203,11 @@ class Bundle(models.Model):
         return res
 
     def write(self, values):
-        super().write(values)
+        res = super().write(values)
         if 'is_base' in values:
             model = self.browse()
             model._get_base_ids.clear_cache(model)
+        return res
 
     def _force(self, category_id=None):
         self.ensure_one()
