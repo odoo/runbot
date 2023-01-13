@@ -27,6 +27,7 @@ class ResConfigSettings(models.TransientModel):
     runbot_is_base_regex = fields.Char('Regex is_base')
     runbot_forwardport_author = fields.Char('Forwardbot author')
     runbot_organisation = fields.Char('Organisation')
+    runbot_disable_host_on_fetch_failure = fields.Boolean('Disable host on fetch failure')
 
     runbot_db_gc_days = fields.Integer(
         'Days before gc',
@@ -70,8 +71,9 @@ class ResConfigSettings(models.TransientModel):
                    runbot_do_fetch=get_param('runbot.runbot_do_fetch', default=False),
                    runbot_do_schedule=get_param('runbot.runbot_do_schedule', default=False),
                    runbot_is_base_regex=get_param('runbot.runbot_is_base_regex', default=''),
-                   runbot_forwardport_author = get_param('runbot.runbot_forwardport_author', default=''),
-                   runbot_organisation = get_param('runbot.runbot_organisation', default=''),
+                   runbot_forwardport_author=get_param('runbot.runbot_forwardport_author', default=''),
+                   runbot_organisation=get_param('runbot.runbot_organisation', default=''),
+                   runbot_disable_host_on_fetch_failure=get_param('runbot.runbot_disable_host_on_fetch_failure', default=False),
                    )
         return res
 
@@ -94,6 +96,7 @@ class ResConfigSettings(models.TransientModel):
         set_param('runbot.runbot_is_base_regex', self.runbot_is_base_regex)
         set_param('runbot.runbot_forwardport_author', self.runbot_forwardport_author)
         set_param('runbot.runbot_organisation', self.runbot_organisation)
+        set_param('runbot.runbot_disable_host_on_fetch_failure', self.runbot_disable_host_on_fetch_failure)
 
     @api.onchange('runbot_is_base_regex')
     def _on_change_is_base_regex(self):
