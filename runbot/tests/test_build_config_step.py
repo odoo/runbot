@@ -108,7 +108,9 @@ class TestCodeowner(TestBuildConfigStepCommon):
         self.assertEqual(self.repo_server.addons_paths, 'addons,core/addons')
         self.assertEqual('module1', self.repo_server._get_module('server/core/addons/module1/some/file.py'))
         self.assertEqual('module1', self.repo_server._get_module('server/addons/module1/some/file.py'))
+        self.assertEqual('module_addons', self.repo_addons._get_module('addons/module_addons/some/file.py'))
         self.assertEqual(None, self.repo_server._get_module('server/core/module1/some/file.py'))
+        self.assertEqual(None, self.repo_server._get_module('server/core/module/some/file.py'))
 
     def test_codeowner_regex_multiple(self):
         self.diff = 'file.js\nfile.py\nfile.xml'

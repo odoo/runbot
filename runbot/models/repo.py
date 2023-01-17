@@ -561,7 +561,7 @@ class Repo(models.Model):
         for addons_path in (self.addons_paths or '').split(','):
             base_path = f'{self.name}/{addons_path}'
             if file.startswith(base_path):
-                return file.replace(base_path, '').strip('/').split('/')[0]
+                return file[len(base_path):].strip('/').split('/')[0]
 
 
 class RefTime(models.Model):
