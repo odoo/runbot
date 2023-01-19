@@ -34,7 +34,7 @@ import resource
 from odoo import _, models, fields, api
 from odoo.osv import expression
 from odoo.exceptions import UserError
-from odoo.tools import topological_sort, groupby
+from odoo.tools.misc import topological_sort, groupby
 from odoo.tools.sql import reverse_order
 from odoo.tools.appdirs import user_cache_dir
 from odoo.addons.runbot_merge import utils
@@ -187,13 +187,13 @@ class Project(models.Model):
             ])
             logger.debug("\nPRs spanning new: %s\nto port: %s", leaves, candidates)
             # enqueue the creation of a new forward-port based on our candidates
-            # but it should only create a single step and needs to stitch batch
+            # but it should only create a single step and needs to stitch back
             # the parents linked list, so it has a special type
-            for c in candidates:
+            for _, cs in groupby(candidates, key=lambda p: p.label):
                 self.env['forwardport.batches'].create({
                     'batch_id': self.env['runbot_merge.batch'].create({
                         'target': before[-1].id,
-                        'prs': [(4, c.id, 0)],
+                        'prs': [(4, c.id, 0) for c in cs],
                         'active': False,
                     }).id,
                     'source': 'insert',

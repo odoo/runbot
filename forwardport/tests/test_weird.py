@@ -425,30 +425,39 @@ def test_new_intermediate_branch(env, config, make_repo):
     1.0, 2.0 and master, if a branch 3.0 is forked off from master and inserted
     before it, we need to create a new *intermediate* forward port PR
     """
-    def validate(commit):
-        prod.post_status(commit, 'success', 'ci/runbot')
-        prod.post_status(commit, 'success', 'legal/cla')
+    def validate(repo, commit):
+        repo.post_status(commit, 'success', 'ci/runbot')
+        repo.post_status(commit, 'success', 'legal/cla')
     project, prod, _ = make_basic(env, config, make_repo, fp_token=True, fp_remote=True)
+    _, prod2, _ = make_basic(env, config, make_repo, fp_token=True, fp_remote=True)
+    assert len(project.repo_ids) == 2
+
     original_c_tree = prod.read_tree(prod.commit('c'))
     prs = []
-    with prod:
+    with prod, prod2:
         for i in ['0', '1']:
             prod.make_commits('a', Commit(i, tree={i:i}), ref='heads/branch%s' % i)
             pr = prod.make_pr(target='a', head='branch%s' % i)
             prs.append(pr)
-            validate(pr.head)
+            validate(prod, pr.head)
             pr.post_comment('hansen r+', config['role_reviewer']['token'])
 
         # also add a PR targeting b forward-ported to c, in order to check
-        # for an insertion right after the source
+        # for an insertion right after the source, as well as have linked PRs in
+        # two different repos
         prod.make_commits('b', Commit('x', tree={'x': 'x'}), ref='heads/branchx')
+        prod2.make_commits('b', Commit('x2', tree={'x': 'x2'}), ref='heads/branchx')
         prx = prod.make_pr(target='b', head='branchx')
-        validate(prx.head)
+        prx2 = prod2.make_pr(target='b', head='branchx')
+        validate(prod, prx.head)
+        validate(prod2, prx2.head)
         prx.post_comment('hansen r+', config['role_reviewer']['token'])
+        prx2.post_comment('hansen r+', config['role_reviewer']['token'])
     env.run_crons()
-    with prod:
-        validate('staging.a')
-        validate('staging.b')
+    with prod, prod2:
+        for r in [prod, prod2]:
+            validate(r, 'staging.a')
+            validate(r, 'staging.b')
     env.run_crons()
 
     # should have merged pr1, pr2 and prx and created their forward ports, now
@@ -461,7 +470,7 @@ def test_new_intermediate_branch(env, config, make_repo):
     assert pr0_fp_id
     assert pr0_fp_id.target.name == 'b'
     with prod:
-        validate(pr0_fp_id.head)
+        validate(prod, pr0_fp_id.head)
     env.run_crons()
     original0 = PRs.search([('parent_id', '=', pr0_fp_id.id)])
     assert original0, "Could not find FP of PR0 to C"
@@ -473,15 +482,26 @@ def test_new_intermediate_branch(env, config, make_repo):
 
     # also check prx's fp
     prx_id = to_pr(env, prx)
+    prx2_id = to_pr(env, prx2)
+    assert prx_id.label == prx2_id.label
+
     prx_fp_id = PRs.search([('source_id', '=', prx_id.id)])
     assert prx_fp_id
     assert prx_fp_id.target.name == 'c'
+    prx2_fp_id = PRs.search([('source_id', '=', prx2_id.id)])
+    assert prx2_fp_id
+    assert prx2_fp_id.target.name == 'c'
+    assert prx_fp_id.label == prx2_fp_id.label,\
+        "ensure labels of PRs of same batch are the same"
 
     # NOTE: the branch must be created on git(hub) first, probably
     # create new branch forked from the "current master" (c)
     c = prod.commit('c').id
     with prod:
         prod.make_ref('heads/new', c)
+    c2 = prod2.commit('c').id
+    with prod2:
+        prod2.make_ref('heads/new', c2)
     currents = {branch.name: branch.id for branch in project.branch_ids}
     # insert a branch between "b" and "c"
     project.write({
@@ -514,6 +534,15 @@ def test_new_intermediate_branch(env, config, make_repo):
     assert newx.target.name == 'new'
     assert prx_fp_id.parent_id == newx
 
+    descx2 = PRs.search([('source_id', '=', prx2_id.id)])
+    newx2 = descx2 - prx2_fp_id
+    assert len(newx2) == 1
+    assert newx2.parent_id == prx2_id
+    assert newx2.target.name == 'new'
+    assert prx2_fp_id.parent_id == newx2
+
+    assert newx.label == newx2.label
+
     # created followups for 1
     # earliest followup is followup from deactivating a branch, creates fp in
     # n+1 = c (from b), then inserting a new branch between b and c should
@@ -527,20 +556,24 @@ def test_new_intermediate_branch(env, config, make_repo):
     # ci on pr1/pr2 fp to b
     sources = [to_pr(env, pr).id for pr in prs]
     sources.append(prx_id.id)
+    sources.append(prx2_id.id)
+
+    def get_repo(pr):
+        if pr.repository.name == prod.name:
+            return prod
+        return prod2
     # CI all the forward port PRs (shouldn't hurt to re-ci the forward port of
     # prs[0] to b aka pr0_fp_id
-    for target in ['new', 'c']:
-        fps = PRs.search([('source_id', 'in', sources), ('target.name', '=', target)])
-        with prod:
-            for fp in fps:
-                validate(fp.head)
-        env.run_crons()
+    fps = PRs.search([('source_id', 'in', sources), ('target.name', '=', ['new', 'c'])])
+    with prod, prod2:
+        for fp in fps:
+            validate(get_repo(fp), fp.head)
+    env.run_crons()
     # now fps should be the last PR of each sequence, and thus r+-able (via
     # fwbot so preceding PR is also r+'d)
-    with prod:
-        for pr in fps:
-            assert pr.target.name == 'c'
-            prod.get_pr(pr.number).post_comment(
+    with prod, prod2:
+        for pr in fps.filtered(lambda p: p.target.name == 'c'):
+            get_repo(pr).get_pr(pr.number).post_comment(
                 '%s r+' % project.fp_github_name,
                 config['role_reviewer']['token'])
     assert all(p.state == 'merged' for p in PRs.browse(sources)),\
@@ -551,9 +584,10 @@ def test_new_intermediate_branch(env, config, make_repo):
 
     assert len(env['runbot_merge.stagings'].search([])) == 2,\
         "enabled branches should have been staged"
-    with prod:
+    with prod, prod2:
         for target in ['new', 'c']:
-            validate(f'staging.{target}')
+            validate(prod, f'staging.{target}')
+            validate(prod2, f'staging.{target}')
     env.run_crons()
     assert all(p.state == 'merged' for p in PRs.search([('target.name', '!=', 'b')])), \
         "All PRs except disabled branch should be merged now"
