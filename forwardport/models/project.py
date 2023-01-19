@@ -235,11 +235,19 @@ class PullRequests(models.Model):
     reminder_backoff_factor = fields.Integer(default=-4, group_operator=None)
     merge_date = fields.Datetime()
 
+    detach_reason = fields.Char()
+
     fw_policy = fields.Selection([
         ('ci', "Normal"),
         ('skipci', "Skip CI"),
         # ('skipmerge', "Skip merge"),
     ], required=True, default="ci")
+
+    _sql_constraints = [(
+        'fw_constraint',
+        'check(source_id is null or num_nonnulls(parent_id, detach_reason) = 1)',
+        "fw PRs must either be attached or have a reason for being detached",
+    )]
 
     refname = fields.Char(compute='_compute_refname')
     @api.depends('label')
@@ -280,6 +288,8 @@ class PullRequests(models.Model):
         closed_fp = self.filtered(lambda p: p.state == 'closed' and p.source_id)
         if newhead and not self.env.context.get('ignore_head_update') and newhead != self.head:
             vals.setdefault('parent_id', False)
+            if with_parents and vals['parent_id'] is False:
+                vals['detach_reason'] = f"Head updated from {self.head} to {newhead}"
             # if any children, this is an FP PR being updated, enqueue
             # updating children
             if self.search_count([('parent_id', '=', self.id)]):
@@ -333,8 +343,14 @@ class PullRequests(models.Model):
     def _try_closing(self, by):
         r = super()._try_closing(by)
         if r:
-            self.with_context(forwardport_detach_warn=False).parent_id = False
-            self.search([('parent_id', '=', self.id)]).parent_id = False
+            self.with_context(forwardport_detach_warn=False).write({
+                'parent_id': False,
+                'detach_reason': f"Closed by {by}",
+            })
+            self.search([('parent_id', '=', self.id)]).write({
+                'parent_id': False,
+                'detach_reason': f"{by} closed parent PR {self.display_name}",
+            })
         return r
 
     def _parse_commands(self, author, comment, login):
@@ -728,6 +744,9 @@ class PullRequests(models.Model):
                 'source_id': source.id,
                 # only link to previous PR of sequence if cherrypick passed
                 'parent_id': pr.id if not has_conflicts else False,
+                'detach_reason': "conflicts: {}".format(
+                    f'\n{conflicts[pr]}\n{conflicts[pr]}'.strip()
+                ) if has_conflicts else None,
                 # Copy author & delegates of source as well as delegates of
                 # previous so they can r+ the new forward ports.
                 'delegates': [(6, False, (source.delegates | pr.delegates).ids)]

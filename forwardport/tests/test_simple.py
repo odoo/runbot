@@ -547,7 +547,10 @@ def test_delegate_fw(env, config, make_repo, users):
     # ensure pr1 has to be approved to be forward-ported
     _, pr1_id = env['runbot_merge.pull_requests'].search([], order='number')
     # detatch from source
-    pr1_id.parent_id = False
+    pr1_id.write({
+        'parent_id': False,
+        'detach_reason': "Detached for testing.",
+    })
     with prod:
         prod.post_status(pr1_id.head, 'success', 'legal/cla')
         prod.post_status(pr1_id.head, 'success', 'ci/runbot')
