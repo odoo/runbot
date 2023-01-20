@@ -2389,26 +2389,23 @@ class TestPRUpdate(object):
         assert pr.head == c2
         assert pr.state == 'validated'
 
-    def test_update_missed(self, env, repo, config):
+    def test_update_missed(self, env, repo, config, users):
         """ Sometimes github's webhooks don't trigger properly, a branch's HEAD
         does not get updated and we might e.g. attempt to merge a PR despite it
         now being unreviewed or failing CI or somesuch.
 
-        This is not a super frequent occurrence, and possibly not the most
-        problematic issue ever (e.g. if the branch doesn't CI it's not going to
-        pass staging, though we might still be staging a branch which had been
-        unreviewed).
+        Therefore during the staging process we should check what we can, reject
+        the staging if cricical properties were found to mismatch, and notify
+        the pull request.
 
-        So during the staging process, the heads should be checked, and the PR
-        will not be staged if the heads don't match (though it'll be reset to
-        open, rather than put in an error state as technically there's no
-        failure, we just want to notify users that something went odd with the
-        mergebot).
-
-        TODO: other cases / situations where we want to update the head?
+        The PR should then be reset to open (and transition to validated on its
+        own if the existing or new head has valid statuses), we don't want to
+        put it in an error state as technically there's no error, just something
+        which went a bit weird.
         """
         with repo:
-            repo.make_commits(None, repo.Commit('m', tree={'a': '0'}), ref='heads/master')
+            [c] = repo.make_commits(None, repo.Commit('m', tree={'a': '0'}), ref='heads/master')
+            repo.make_ref('heads/somethingelse', c)
 
             [c] = repo.make_commits(
                 'heads/master', repo.Commit('c', tree={'a': '1'}), ref='heads/abranch')
@@ -2433,11 +2430,18 @@ class TestPRUpdate(object):
             repo.post_status(c2, 'success', 'ci/runbot')
             repo.update_ref(pr.ref, c2, force=True)
 
+        other = env['runbot_merge.branch'].create({
+            'name': 'somethingelse',
+            'project_id': env['runbot_merge.project'].search([]).id,
+        })
+
         # we missed the update notification so the db should still be at c and
         # in a "ready" state
         pr_id.write({
             'head': c,
             'state': 'ready',
+            'message': "Something else",
+            'target': other.id,
         })
 
         env.run_crons()
@@ -2445,13 +2449,33 @@ class TestPRUpdate(object):
         # the PR should not get merged, and should be updated
         assert pr_id.state == 'validated'
         assert pr_id.head == c2
+        assert pr_id.message == 'c'
+        assert pr_id.target.name == 'master'
+        assert pr.comments[-1] == (users['user'], """\
+@{} @{} we apparently missed updates to this PR and tried to stage it in a state 
+which might not have been approved.
 
-        pr_id.write({'head': c, 'state': 'ready'})
+The properties Head, Message, Target were not correctly synchronized and have been updated.
+
+Note that we are unable to check the properties Merge Method, Overrides, Draft.
+
+Please check and re-approve.
+""".format(users['user'], users['reviewer']))
+
+        pr_id.write({
+            'head': c,
+            'state': 'ready',
+            'message': "Something else",
+            'target': other.id,
+        })
         with repo:
             pr.post_comment('hansen check')
         env.run_crons()
         assert pr_id.state == 'validated'
         assert pr_id.head == c2
+        assert pr_id.message == 'c' # the commit's message was used for the PR
+        assert pr_id.target.name == 'master'
+        assert pr.comments[-1] == (users['user'], f"Updated target, squash, message. Updated to {c2}.")
 
     def test_update_closed(self, env, repo):
         with repo:

@@ -63,40 +63,6 @@ def test_name_search(env):
     assert PRs.name_search('repo') == [pr2, pr0, pr1]
     assert PRs.name_search('repo#1959') == [pr1]
 
-def test_message_desync(env, project, make_repo, users, setreviewers, config):
-    """If the PR message gets desync'd (github misses sending an update), the
-    merge message should still match what's on github rather than what's in the
-    db
-    """
-    repo = make_repo('repo')
-    env['runbot_merge.repository'].create({
-        'project_id': project.id,
-        'name': repo.name,
-        'status_ids': [(0, 0, {'context': 'status'})]
-    })
-    setreviewers(*project.repo_ids)
-
-    with repo:
-        [m] = repo.make_commits(None, Commit('root', tree={'a': '1'}), ref='heads/master')
-
-        [c] = repo.make_commits('master', Commit('whee', tree={'b': '2'}))
-        pr = repo.make_pr(title='title', body='body', target='master', head=c)
-        repo.post_status(c, 'success', 'status')
-    env.run_crons()
-
-    pr_id = to_pr(env, pr)
-    assert pr_id.message == 'title\n\nbody'
-    pr_id.message = "xxx"
-
-    with repo:
-        pr.post_comment('hansen merge r+', config['role_reviewer']['token'])
-    env.run_crons()
-
-    st = repo.commit('staging.master')
-    assert st.message.startswith('title\n\nbody'),\
-        "the stored PR message should have been ignored when staging"
-    assert st.parents == [m, c], "check the staging's ancestry is the right one"
-
 def test_unreviewer(env, project, port):
     repo = env['runbot_merge.repository'].create({
         'project_id': project.id,

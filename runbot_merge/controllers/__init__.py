@@ -137,11 +137,12 @@ def handle_pr(env, event):
         if message != pr_obj.message:
             updates['message'] = message
 
-        _logger.info("update: %s#%d = %s (by %s)", repo.name, pr['number'], updates, event['sender']['login'])
+        _logger.info("update: %s = %s (by %s)", pr_obj.display_name, updates, event['sender']['login'])
         if updates:
-            pr_obj.write(updates)
-            return 'Updated {}'.format(pr_obj.id)
-        return "Nothing to update ({})".format(event['changes'].keys())
+            # copy because it updates the `updates` dict internally
+            pr_obj.write(dict(updates))
+            return 'Updated {}'.format(', '.join(updates))
+        return "Nothing to update ({})".format(', '.join(event['changes'].keys()))
 
     message = None
     if not branch:
@@ -209,7 +210,7 @@ def handle_pr(env, event):
             'head': pr['head']['sha'],
             'squash': pr['commits'] == 1,
         })
-        return 'Updated {} to {}'.format(pr_obj.display_name, pr_obj.head)
+        return f'Updated to {pr_obj.head}'
 
     if event['action'] == 'ready_for_review':
         pr_obj.draft = False

@@ -761,7 +761,10 @@ def test_retarget_after_freeze(env, config, make_repo, users):
     assert job
 
     # fuck up yo life: retarget the existing FP PR to the new branch
-    port_id.target = new_branch.id
+    port_pr = prod.get_pr(port_id.number)
+    with prod:
+        port_pr.base = 'bprime'
+    assert port_id.target == new_branch
 
     env.run_crons('forwardport.port_forward')
     assert not job.exists(), "job should have succeeded and apoptosed"
@@ -771,7 +774,6 @@ def test_retarget_after_freeze(env, config, make_repo, users):
     assert env['runbot_merge.pull_requests'].search([('state', 'not in', ('merged', 'closed'))]) == port_id
 
     # merge the retargered PR
-    port_pr = prod.get_pr(port_id.number)
     with prod:
         prod.post_status(port_pr.head, 'success', 'ci/runbot')
         prod.post_status(port_pr.head, 'success', 'legal/cla')

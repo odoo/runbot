@@ -15,8 +15,12 @@ class FreezeWizard(models.Model):
         self.env.ref('forwardport.port_forward').active = False
         return r
 
+    def action_freeze(self):
+        return super(FreezeWizard, self.with_context(forwardport_keep_disabled=True))\
+            .action_freeze()
+
     def unlink(self):
         r = super().unlink()
-        if not self.search_count([]):
+        if not (self.env.context.get('forwardport_keep_disabled') or self.search_count([])):
             self.env.ref('forwardport.port_forward').active = True
         return r
