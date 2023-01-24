@@ -6,6 +6,8 @@ import logging
 import time
 from collections import Counter
 
+from markupsafe import Markup
+
 from odoo import models, fields, api, Command
 from odoo.exceptions import UserError
 from odoo.addons.runbot_merge.exceptions import FastForwardError
@@ -24,6 +26,17 @@ class FreezeWizard(models.Model):
         domain="[('state', 'not in', ('closed', 'merged'))]",
         help="Pull requests which must have been merged before the freeze is allowed",
     )
+
+    pr_state_key = fields.Html(string="Color Key", compute='_compute_state_key', readonly=True)
+    def _compute_state_key(self):
+        s = dict(self.env['runbot_merge.pull_requests']._fields['state'].selection)
+        self.pr_state_key = Markup("""
+            <p>%s</p>
+        """) % Markup(" ").join(
+            Markup('<span class="badge border-0 fucking_color_key_{}">{}</span>').format(v, s[k])
+            for k, v in STATE_COLORMAP.items()
+            if v
+        )
 
     release_label = fields.Char(
         string="Find by label",
@@ -411,7 +424,7 @@ STATE_COLORMAP = {
     'merged': Colors.Green,
     'error': Colors.Red,
 }
-class PullRequestColor(models.Model):
+class PullRequest(models.Model):
     _inherit = 'runbot_merge.pull_requests'
 
     state_color = fields.Integer(compute='_compute_state_color')

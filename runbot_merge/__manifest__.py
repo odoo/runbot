@@ -21,6 +21,7 @@
             'runbot_merge/static/scss/runbot_merge.scss',
         ],
         'web.assets_backend': [
+            'runbot_merge/static/scss/runbot_merge_backend.scss',
             'runbot_merge/static/project_freeze/index.js',
         ],
     },

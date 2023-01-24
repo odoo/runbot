@@ -1,0 +1,7 @@
+@for $item from 2 through length($o-colors) {
+    .fucking_color_key_#{$item - 1} {
+        $background-color: nth($o-colors, $item);
+        color: color-contrast($background-color);
+        background-color: $background-color;
+    }
+}

@@ -14,6 +14,7 @@
                             <field name="branch_name"/>
                             <field name="required_pr_ids" widget="many2many_tags"
                                 options="{'color_field': 'state_color', 'no_create': True}"/>
+                            <field name="pr_state_key" readonly="1"/>
                         </group>
                     </group>
                     <group string="Release">
