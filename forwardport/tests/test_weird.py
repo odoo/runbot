@@ -847,6 +847,11 @@ def test_freeze(env, config, make_repo, users):
 
     assert not w_id.errors
     w_id.action_freeze()
+
+    # re-enable forward-port cron after freeze
+    _, cron_id = env['ir.model.data'].check_object_reference('forwardport', 'port_forward', context={'active_test': False})
+    env['ir.cron'].browse([cron_id]).active = True
+
     # run crons to process the feedback, run a second time in case of e.g.
     # forward porting
     env.run_crons()
