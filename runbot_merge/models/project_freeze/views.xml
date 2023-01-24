@@ -28,7 +28,7 @@
                         </p>
                         <field name="release_label" colspan="2"/>
                         <field name="release_pr_ids" nolabel="1" colspan="2">
-                            <tree editable="bottom" create="false" delete="false">
+                            <tree editable="bottom">
                                 <field name="repository_id" readonly="1"/>
                                 <field name="pr_id" options="{'no_create': True}"/>
                                 <field name="label"/>
