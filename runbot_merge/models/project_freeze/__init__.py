@@ -329,6 +329,8 @@ class FreezeWizard(models.Model):
             })
         } for pr in all_prs])
 
+        if self.bump_pr_ids:
+            master.active_staging_id.cancel("freeze by %s", self.env.user.login)
         # delete wizard
         self.sudo().unlink()
         # managed to create all the things, show reminder text (or close)
