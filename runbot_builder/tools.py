@@ -113,6 +113,7 @@ def run(client_class):
     parser.add_argument('--db_user')
     parser.add_argument('--db_password')
     parser.add_argument('-d', '--database', default='runbot', help='name of runbot db')
+    parser.add_argument('--addons-path', type=str, dest="addons_path")
     parser.add_argument('--logfile', default=False)
     parser.add_argument('--forced-host-name', default=False)
 
@@ -136,9 +137,10 @@ def run(client_class):
     odoo.tools.config['db_user'] = args.db_user
     odoo.tools.config['db_password'] = args.db_password
     addon_path = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
-    config_addons_path = odoo.tools.config['addons_path']
-    odoo.tools.config['addons_path'] = ','.join([config_addons_path, addon_path])
-
+    config_addons_path = args.addons_path or odoo.tools.config['addons_path']
+    if addon_path not in config_addons_path:
+        config_addons_path = ','.join([config_addons_path, addon_path])
+    odoo.tools.config['addons_path'] = config_addons_path
     odoo.tools.config['forced_host_name'] = args.forced_host_name
 
     # create environment
