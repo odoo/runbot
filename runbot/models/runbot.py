@@ -272,7 +272,7 @@ class Runbot(models.AbstractModel):
             self._commit()
 
             # cleanup old pull_info_failures
-            for pr_number, t in pull_info_failures.items():
+            for pr_number, t in pull_info_failures.copy().items():
                 if t + 15*60 < time.time():
                     _logger.warning('Removing %s from pull_info_failures', pr_number)
                     del pull_info_failures[pr_number]
