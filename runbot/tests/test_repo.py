@@ -381,15 +381,21 @@ class TestFetch(RunbotCase):
         # Ensure that Host is not disabled if fetch succeeds after 3 tries
         with mute_logger("odoo.addons.runbot.models.repo"):
             self.repo_server._update_fetch_cmd()
+
         self.assertFalse(host.assigned_only, "Host should not be disabled when fetch succeeds")
         self.assertEqual(self.fetch_count, 3)
 
-        # Now ensure that host is disabled after 5 unsuccesful tries
         self.force_failure = True
-        self.fetch_count = 0
+
         with mute_logger("odoo.addons.runbot.models.repo"):
             self.repo_server._update_fetch_cmd()
-        self.assertTrue(host.assigned_only)
+        self.assertFalse(host.assigned_only, "Host should not be disabled when fetch fails by default")
+
+        self.fetch_count = 0
+        self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_disable_host_on_fetch_failure', True)
+        with mute_logger("odoo.addons.runbot.models.repo"):
+            self.repo_server._update_fetch_cmd()
+        self.assertTrue(host.assigned_only, "Host should be disabled when fetch fails and runbot_disable_host_on_fetch_failure is set")
         self.assertEqual(self.fetch_count, 5)
 
 
