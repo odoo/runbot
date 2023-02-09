@@ -19,6 +19,7 @@ from odoo.tools.safe_eval import safe_eval
 from collections import defaultdict
 from pathlib import Path
 from psycopg2 import sql
+from psycopg2.errors import InsufficientPrivilege
 import getpass
 
 _logger = logging.getLogger(__name__)
@@ -876,7 +877,11 @@ class BuildResult(models.Model):
     def _local_pg_dropdb(self, dbname):
         with local_pgadmin_cursor() as local_cr:
             pid_col = 'pid' if local_cr.connection.server_version >= 90200 else 'procpid'
-            query = 'SELECT pg_terminate_backend({}) FROM pg_stat_activity WHERE datname=%s'.format(pid_col)
+            try:
+                query = 'SELECT pg_terminate_backend({}) FROM pg_stat_activity WHERE datname=%s'.format(pid_col)
+            except InsufficientPrivilege:
+                _logger.warning('Cannot terminate backend process for %s (maybe a root psql console is accessing the database).', dbname)
+                return
             local_cr.execute(query, [dbname])
             local_cr.execute('DROP DATABASE IF EXISTS "%s"' % dbname)
         # cleanup filestore
