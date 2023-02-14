@@ -834,6 +834,8 @@ class Comment(tuple):
         self._c = c
         return self
     def __getitem__(self, item):
+        if isinstance(item, int):
+            return super().__getitem__(item)
         return self._c[item]
 
 

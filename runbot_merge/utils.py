@@ -30,3 +30,8 @@ def backoff(func=None, *, delays=BACKOFF_DELAYS, exc=Exception):
             if delay is None:
                 raise
             time.sleep(delay)
+
+def make_message(pr_dict):
+    title = pr_dict['title'].strip()
+    body = (pr_dict.get('body') or '').strip()
+    return f'{title}\n\n{body}' if body else title

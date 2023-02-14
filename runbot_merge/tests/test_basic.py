@@ -2408,7 +2408,7 @@ class TestPRUpdate(object):
             repo.make_ref('heads/somethingelse', c)
 
             [c] = repo.make_commits(
-                'heads/master', repo.Commit('c', tree={'a': '1'}), ref='heads/abranch')
+                'heads/master', repo.Commit('title \n\nbody', tree={'a': '1'}), ref='heads/abranch')
             pr = repo.make_pr(target='master', head='abranch')
             repo.post_status(pr.head, 'success', 'legal/cla')
             repo.post_status(pr.head, 'success', 'ci/runbot')
@@ -2418,6 +2418,7 @@ class TestPRUpdate(object):
             ('number', '=', pr.number),
         ])
         env.run_crons('runbot_merge.process_updated_commits')
+        assert pr_id.message == 'title\n\nbody'
         assert pr_id.state == 'ready'
 
         # TODO: find way to somehow skip / ignore the update_ref?
@@ -2449,18 +2450,70 @@ class TestPRUpdate(object):
         # the PR should not get merged, and should be updated
         assert pr_id.state == 'validated'
         assert pr_id.head == c2
-        assert pr_id.message == 'c'
+        assert pr_id.message == 'title\n\nbody'
         assert pr_id.target.name == 'master'
-        assert pr.comments[-1] == (users['user'], """\
-@{} @{} we apparently missed updates to this PR and tried to stage it in a state 
+        assert pr.comments[-1]['body'] == """\
+@{} @{} we apparently missed updates to this PR and tried to stage it in a state \
 which might not have been approved.
 
-The properties Head, Message, Target were not correctly synchronized and have been updated.
+The properties Head, Target, Message were not correctly synchronized and have been updated.
+
+<details><summary>differences</summary>
+
+```diff
+  Head:
+- {}
++ {}
+  
+  Target branch:
+- somethingelse
++ master
+  
+  Message:
+- Something else
++ title
+  
++ body
++ 
+```
+</details>
 
 Note that we are unable to check the properties Merge Method, Overrides, Draft.
 
 Please check and re-approve.
-""".format(users['user'], users['reviewer']))
+""".format(users['user'], users['reviewer'], c, c2)
+
+        # if the head commit doesn't change, that part should still be valid
+        with repo:
+            pr.post_comment('hansen r+', config['role_reviewer']['token'])
+        assert pr_id.state == 'ready'
+        pr_id.write({'message': 'wrong'})
+        env.run_crons()
+
+        assert pr_id.message == 'title\n\nbody'
+        assert pr_id.state == 'validated'
+        assert pr.comments[-1]['body'] == """\
+@{} @{} we apparently missed updates to this PR and tried to stage it in a state \
+which might not have been approved.
+
+The properties Message were not correctly synchronized and have been updated.
+
+<details><summary>differences</summary>
+
+```diff
+  Message:
+- wrong
++ title
+  
++ body
++ 
+```
+</details>
+
+Note that we are unable to check the properties Merge Method, Overrides, Draft.
+
+Please check and re-approve.
+""".format(users['user'], users['reviewer'])
 
         pr_id.write({
             'head': c,
@@ -2473,7 +2526,7 @@ Please check and re-approve.
         env.run_crons()
         assert pr_id.state == 'validated'
         assert pr_id.head == c2
-        assert pr_id.message == 'c' # the commit's message was used for the PR
+        assert pr_id.message == 'title\n\nbody' # the commit's message was used for the PR
         assert pr_id.target.name == 'master'
         assert pr.comments[-1] == (users['user'], f"Updated target, squash, message. Updated to {c2}.")
 

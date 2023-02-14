@@ -130,10 +130,7 @@ def handle_pr(env, event):
         # turns out github doesn't bother sending a change key if the body is
         # changing from empty (None), therefore ignore that entirely, just
         # generate the message and check if it changed
-        message = pr['title'].strip()
-        body = (pr['body'] or '').strip()
-        if body:
-            message += f"\n\n{body}"
+        message = utils.make_message(pr)
         if message != pr_obj.message:
             updates['message'] = message
 
