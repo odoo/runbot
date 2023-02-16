@@ -1,6 +1,6 @@
 import re
 from odoo import models, fields
-
+from odoo.addons.runbot.common import markdown_escape
 
 class ConfigStep(models.Model):
     _inherit = 'runbot.build.config.step'
@@ -124,10 +124,10 @@ class ConfigStep(models.Model):
             for file, file_reviewers in reviewer_per_file.items():
                 href = 'https://%s/blob/%s/%s' % (commit_link.branch_id.remote_id.base_url, commit_link.commit_id.name, file.split('/', 1)[-1])
                 if file_reviewers:
-                    build._log('', 'Adding %s to reviewers for file [%s](%s)' % (', '.join(sorted(file_reviewers)), file, href), log_type='markdown')
+                    build._log('', 'Adding %s to reviewers for file [%s](%s)' % (', '.join(sorted(file_reviewers)), markdown_escape(file), href), log_type='markdown')
                     reviewers |= file_reviewers
                 else:
-                    build._log('', 'No reviewer for file [%s](%s)' % (file, href), log_type='markdown')
+                    build._log('', 'No reviewer for file [%s](%s)' % (markdown_escape(file), href), log_type='markdown')
 
             if reviewers:
                 pr = pr_by_commit[commit_link]

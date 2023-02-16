@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from .common import RunbotCase
-
+from odoo.addons.runbot.common import markdown_escape
 
 class TestIrLogging(RunbotCase):
 
@@ -58,6 +58,19 @@ class TestIrLogging(RunbotCase):
         self.assertEqual(
             log._markdown(),
             'This <a href="https://wwww.somewhere.com">link</a> goes to somewhere and <a href="http://www.nowhere.com">this one</a> to nowhere.'
+        )
+
+        # test links with markdown like symbols
+        log.message = f'Adding validation to reviewers for file [{markdown_escape("foo/__init__.py")}](https://www.nowhere.com/)'
+        self.assertEqual(
+            log._markdown(),
+            'Adding validation to reviewers for file <a href="https://www.nowhere.com/">foo/__init__.py</a>'
+        )
+
+        log.message = f'~~{markdown_escape("foo/__init__.py")}~~'
+        self.assertEqual(
+            log._markdown(),
+            '<del>foo/__init__.py</del>'
         )
 
         # test link with icon

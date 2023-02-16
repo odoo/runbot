@@ -133,6 +133,27 @@ def list_local_dbs(additionnal_conditions=None):
         """ % additionnal_condition_str)
         return [d[0] for d in local_cr.fetchall()]
 
+def markdown_escape(text):
+    patterns = {
+        r'\*\*(.+?)\*\*': '\\*\\*\\g<1>\\*\\*',
+        r'~~(.+?)~~': '\\~\\~\\g<1>\\~\\~',
+        r'__(.+?)__': '\\_\\_\\g<1>\\_\\_',
+    }
+
+    for p, b in patterns.items():
+        text = re.sub(p, b, text, flags=re.DOTALL)
+    return text
+
+def markdown_unescape(text):
+    patterns = {
+        r'\\\*\\\*': '**',
+        r'\\\~\\\~': '~~',
+        r'\\\_\\\_': '__',
+    }
+
+    for p, b in patterns.items():
+        text = re.sub(p, b, text, flags=re.DOTALL)
+    return text
 
 def pseudo_markdown(text):
     text = html_escape(text)
@@ -166,7 +187,7 @@ def pseudo_markdown(text):
         return f'<code>{codes[int(match.group(1))]}</code>'
 
     text = Markup(re.sub(r'<code>(\d+)</code>', code_replace, text, flags=re.DOTALL))
-    return text
+    return markdown_unescape(text)
 
 
 def _make_github_session(token):
