@@ -74,9 +74,9 @@ class Command():
         cmd_chain += [' '.join(final) for final in self.finals if final]
         return ' ; '.join(cmd_chain)
 
-    def add_config_tuple(self, option, value):
+    def add_config_tuple(self, option, value, section=None):
         assert '-' not in option
-        self.config_tuples.append((option, value))
+        self.config_tuples.append((option, value, section or 'options'))
 
     def get_config(self, starting_config=''):
         """ returns a config file content based on config tuples and
@@ -84,10 +84,10 @@ class Command():
         """
         config = configparser.ConfigParser()
         config.read_string(starting_config)
-        if self.config_tuples and not config.has_section('options'):
-            config.add_section('options')
-        for option, value in self.config_tuples:
-            config.set('options', option, value)
+        for option, value, section in self.config_tuples:
+            if not config.has_section(section):
+                config.add_section(section)
+            config.set(section, option, value)
         res = io.StringIO()
         config.write(res)
         res.seek(0)

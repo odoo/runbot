@@ -27,12 +27,16 @@ class Test_Command(common.TransactionCase):
         self.assertIn('bar', cmd.cmd)
         cmd.add_config_tuple('x', 'y')
 
+        cmd.add_config_tuple('yy', 'zz', section='other')
+
         content = cmd.get_config(starting_config=CONFIG)
 
         self.assertIn('[options]', content)
         self.assertIn('foo = bar', content)
         self.assertIn('a = b', content)
         self.assertIn('x = y', content)
+        self.assertIn('[other]', content)
+        self.assertIn('yy = zz', content)
 
         with self.assertRaises(AssertionError):
             cmd.add_config_tuple('http-interface', '127.0.0.1')
