@@ -721,7 +721,7 @@ class Repo:
         s = self._get_session(token)
 
         r = s.post('https://api.github.com/repos/{}/forks'.format(self.name))
-        assert 200 <= r.status_code < 300, r.json()
+        assert 200 <= r.status_code < 300, r.text
 
         repo_name = r.json()['full_name']
         repo_url = 'https://api.github.com/repos/' + repo_name

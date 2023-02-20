@@ -1,3 +1,4 @@
+from . import ir_actions
 from . import res_partner
 from . import project
 from . import pull_requests
