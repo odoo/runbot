@@ -105,12 +105,8 @@ class GH(object):
         """
         :type check: bool | dict[int:Exception]
         """
-        r = self._session.request(
-            method,
-            '{}/repos/{}/{}'.format(self._url, self._repo, path),
-            params=params,
-            json=json
-        )
+        path = f'/repos/{self._repo}/{path}'
+        r = self._session.request(method, self._url + path, params=params, json=json)
         self._log_gh(_gh, method, path, params, json, r)
         if check:
             if isinstance(check, collections.abc.Mapping):
