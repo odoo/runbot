@@ -146,9 +146,6 @@ class TestBuildError(RunbotCase):
             'active': False
         })
 
-        # test that a test tag with a dash raise an Vamlidation error
-        with self.assertRaises(ValidationError):
-            error_a.test_tags = '-foo'
 
         error_a.test_tags = 'foo,bar'
         error_b.test_tags = 'blah'
@@ -160,6 +157,13 @@ class TestBuildError(RunbotCase):
         # test that test tags on fixed errors are not taken into account
         self.assertNotIn('blah', self.BuildError.test_tags_list())
         self.assertNotIn('-blah', self.BuildError.disabling_tags())
+
+        error_a.test_tags = False
+        error_b.active = True
+        error_b.parent_id = error_a.id
+        self.assertEqual(error_b.test_tags, False)
+        self.assertEqual(self.BuildError.disabling_tags(), ['-blah',])
+
 
     def test_build_error_team_wildcards(self):
         website_team = self.BuildErrorTeam.create({

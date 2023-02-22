@@ -99,7 +99,7 @@ class BuildError(models.Model):
                         raise UserError(f"Cannot parent an error with test tags: {build_error.test_tags}")
                     elif not parent.test_tags:
                         parent.sudo().test_tags = build_error.test_tags
-                        build_error.sudo().test_tags = ''
+                        build_error.sudo().test_tags = False
                 if build_error.responsible:
                     if parent.responsible and parent.responsible != build_error.responsible and not self.env.su:
                         raise UserError(f"Error {parent.id} as already a responsible ({parent.responsible}) cannot assign {build_error.responsible}")
