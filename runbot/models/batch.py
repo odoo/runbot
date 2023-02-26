@@ -332,7 +332,7 @@ class Batch(models.Model):
             build = self.env['runbot.build']
             link_type = 'created'
             force_trigger = trigger_custom and trigger_custom.start_mode == 'force'
-            skip_trigger = (trigger_custom and trigger_custom.start_mode == 'disable') or trigger.manual
+            skip_trigger = (trigger_custom and trigger_custom.start_mode == 'disabled') or trigger.manual
             should_start = ((trigger.repo_ids & bundle_repos) or bundle.build_all or bundle.sticky)
             if force_trigger or (should_start and not skip_trigger):  # only auto link build if bundle has a branch for this trigger
                 link_type, build = self._create_build(params)
