@@ -491,12 +491,14 @@ class TestGetRefs(RunbotCase):
         return mock_git
 
     def test_get_refs(self):
+        current = time.time()
+        commit_time = str(int(current) - 5000)
         self.remote_server_dev.fetch_pull = True
-        to_ignore = { '242': 1672227770.0}
+        to_ignore = {'242': current - 100}
         good_ref = (
             'refs/bla-dev/heads/master-test-branch-rbt',
             'da39a3ee5e6b4b0d3255bfef95601890afd80709',
-            '1672139720',
+            commit_time,
             'foobarman',
             '<foobarman@somewhere.com>',
             '[IMP] mail: better tests',
@@ -506,7 +508,7 @@ class TestGetRefs(RunbotCase):
         bad_ref = (
             'refs/bla-dev/heads/1703',
             'e9b396d2dddffdb373bf2c6ad073696aa25b4f68',
-            '1672224639',
+            commit_time,
             'foobarman',
             '<foobarman@somewhere.com>',
             '[FIX] foo: bar',
@@ -516,7 +518,7 @@ class TestGetRefs(RunbotCase):
         to_ignore_ref = (
             'refs/bla-dev/pull/242',
             'ee89a48b76b58f4b3b0a7ee2c558dd8d936f6b12',
-            '1672224242',
+            commit_time,
             'foobarman',
             '<foobarman@somewhere.com>',
             '[IMP] blah: blah',
