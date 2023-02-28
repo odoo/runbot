@@ -4,7 +4,7 @@ import getpass
 from collections import defaultdict
 
 from odoo import models, fields, api
-from odoo.tools import config
+from odoo.tools import config, ormcache
 from ..common import fqdn, local_pgadmin_cursor, os, list_local_dbs, local_pg_cursor
 from ..container import docker_build
 
@@ -36,6 +36,8 @@ class Host(models.Model):
     last_exception = fields.Char('Last exception')
     exception_count = fields.Integer('Exception count')
     psql_conn_count = fields.Integer('SQL connections count', default=0)
+    url = fields.Char('Host base url', compute="_compute_url")
+    https_enable = fields.Boolean('Use https', default=True)
 
     def _compute_nb(self):
         groups = self.env['runbot.build'].read_group(
@@ -141,9 +143,22 @@ class Host(models.Model):
     def _get_work_path(self):
         return os.path.abspath(os.path.join(os.path.dirname(__file__), '../static'))
 
+    @ormcache()
+    def _cache(self):
+        {host.name: host.id for host in self.search([])}
+
     @api.model
     def _get_current(self):
-        name = self._get_current_name()
+        return self._get_host(self._get_current_name())
+
+    @api.model
+    def _get_host(self, name):
+        if not name:
+            return self.browse()
+        host = self._cache().get(name)
+        if host:
+            return host
+        self.clear_caches()
         return self.search([('name', '=', name)]) or self.create({'name': name})
 
     @api.model
@@ -244,3 +259,9 @@ class Host(models.Model):
             logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
             with local_pg_cursor(logs_db_name) as local_cr:
                 local_cr.execute("DELETE FROM ir_logging WHERE id in %s", [tuple(local_log_ids)])
+
+    def url(self, subdomain=''):
+        if subdomain:
+            subdomain = f'{subdomain}.'
+        protocol = 'https' if self.https_enable else 'http'
+        return f'{protocol}://{subdomain}{self.name}'

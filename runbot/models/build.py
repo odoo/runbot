@@ -163,12 +163,12 @@ class BuildResult(models.Model):
 
     requested_action = fields.Selection([('wake_up', 'To wake up'), ('deathrow', 'To kill')], string='Action requested', index=True)
     # web infos
-    host = fields.Char('Host')
+    host = fields.Char('Host name')
     keep_host = fields.Boolean('Keep host on rebuild and for children')
+    host_id = fields.Many2one('runbot.host', 'Host', compute='_compute_host_id')
 
     port = fields.Integer('Port')
     dest = fields.Char(compute='_compute_dest', type='char', string='Dest', readonly=1, store=True)
-    domain = fields.Char(compute='_compute_domain', type='char', string='URL')
     # logs and stats
     log_ids = fields.One2many('ir.logging', 'build_id', string='Logs')
     error_log_ids = fields.One2many('ir.logging', 'build_id', domain=[('level', 'in', ['WARNING', 'ERROR', 'CRITICAL'])], string='Error Logs')
@@ -207,8 +207,8 @@ class BuildResult(models.Model):
 
     parent_id = fields.Many2one('runbot.build', 'Parent Build', index=True)
     parent_path = fields.Char('Parent path', index=True)
-    top_parent =  fields.Many2one('runbot.build', compute='_compute_top_parent')
-    ancestors =  fields.Many2many('runbot.build', compute='_compute_ancestors')
+    top_parent = fields.Many2one('runbot.build', compute='_compute_top_parent')
+    ancestors = fields.Many2many('runbot.build', compute='_compute_ancestors')
     # should we add a has children stored boolean?
     children_ids = fields.One2many('runbot.build', 'parent_id')
 
@@ -391,11 +391,6 @@ class BuildResult(models.Model):
                 nickname = re.sub(r'"|\'|~|\:', '', nickname)
                 nickname = re.sub(r'_|/|\.', '-', nickname)
                 build.dest = ("%05d-%s" % (build.id or 0, nickname[:32])).lower()
-
-    @api.depends('port', 'dest', 'host')
-    def _compute_domain(self):
-        for build in self:
-            build.domain = "%s.%s" % (build.dest, build.host)
 
     @api.depends_context('batch')
     def _compute_build_url(self):
@@ -738,7 +733,6 @@ class BuildResult(models.Model):
                 build._github_status()
             build._run_job()
 
-
     def _run_job(self):
         # run job
         for build in self:
@@ -794,8 +788,8 @@ class BuildResult(models.Model):
         root = self.env['runbot.runbot']._root()
         return os.path.join(root, 'build', build.dest, *l)
 
-    def http_log_url(self):
-        return 'http://%s/runbot/static/build/%s/logs/' % (self.host, self.dest)
+    def http_log_url(self, logs='logs'):
+        return f'{self.host_id.url()}/runbot/static/build/{self.dest}/{logs}/'
 
     def _server(self, *path):
         """Return the absolute path to the direcory containing the server file, adding optional *path"""

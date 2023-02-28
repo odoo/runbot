@@ -1,6 +1,6 @@
 # Odoo Runbot Repository
 
-This repository contains the source code of Odoo testing bot [runbot.odoo.com](http://runbot.odoo.com/runbot) and related addons.
+This repository contains the source code of Odoo testing bot [runbot.odoo.com](https://runbot.odoo.com/runbot) and related addons.
 
 ------------------
 
