@@ -43,7 +43,7 @@ class TestCodeowner(TestBuildConfigStepCommon):
 
     def test_codeowner_is_base(self):
         self.dev_bundle.is_base = True
-        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.config_step._run_codeowner(self.parent_build)
         self.assertEqual(self.parent_build.log_ids.mapped('message'), [
             'Skipping base bundle',
         ])
@@ -52,7 +52,7 @@ class TestCodeowner(TestBuildConfigStepCommon):
     def test_codeowner_check_limits(self):
         self.parent_build.params_id.commit_link_ids[0].file_changed = 451
         self.parent_build.params_id.commit_link_ids[0].base_ahead = 51
-        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.config_step._run_codeowner(self.parent_build)
         self.assertEqual(self.parent_build.log_ids.mapped('message'), [
             'Limit reached: dfdfcfcf has more than 50 commit (51) and will be skipped. Contact runbot team to increase your limit if it was intended',
             'Limit reached: dfdfcfcf has more than 450 modified files (451) and will be skipped. Contact runbot team to increase your limit if it was intended',
@@ -60,8 +60,8 @@ class TestCodeowner(TestBuildConfigStepCommon):
         self.assertEqual(self.parent_build.local_result, 'ko')
 
     def test_codeowner_draft(self):
-        self.dev_pr.draft = True
-        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.dev_pr.draft=True
+        self.config_step._run_codeowner(self.parent_build)
         self.assertEqual(self.parent_build.log_ids.mapped('message'), [
             'Some pr are draft, skipping: 1234'
         ])
@@ -74,7 +74,7 @@ class TestCodeowner(TestBuildConfigStepCommon):
 
     def test_codeowner_forwardpot(self):
         self.dev_pr.pr_author = 'fw-bot'
-        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.config_step._run_codeowner(self.parent_build)
         self.assertEqual(self.parent_build.log_ids.mapped('message'), [
             'Ignoring forward port pull request: 1234'
         ])
@@ -82,7 +82,7 @@ class TestCodeowner(TestBuildConfigStepCommon):
 
     def test_codeowner_invalid_target(self):
         self.dev_pr.target_branch_name = 'master-other-dev-branch'
-        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.config_step._run_codeowner(self.parent_build)
         self.assertEqual(self.parent_build.log_ids.mapped('message'), [
             'Some pr have an invalid target: 1234'
         ])
@@ -98,7 +98,7 @@ class TestCodeowner(TestBuildConfigStepCommon):
         })
         second_pr.pull_head_name = f'{self.remote_server.owner}:{self.dev_branch.name}'
         second_pr.bundle_id = self.dev_bundle.id
-        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.config_step._run_codeowner(self.parent_build)
         self.assertEqual(self.parent_build.log_ids.mapped('message'), [
             "More than one open pr in this bundle for server: ['1234', '1235']"
         ])
@@ -114,7 +114,7 @@ class TestCodeowner(TestBuildConfigStepCommon):
 
     def test_codeowner_regex_multiple(self):
         self.diff = 'file.js\nfile.py\nfile.xml'
-        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.config_step._run_codeowner(self.parent_build)
         messages = self.parent_build.log_ids.mapped('message')
         self.assertEqual(messages[1], 'Checking 2 codeowner regexed on 3 files')
         self.assertEqual(messages[2], 'Adding team_js to reviewers for file [server/file.js](https://False/blob/dfdfcfcf/file.js)')
@@ -126,14 +126,14 @@ class TestCodeowner(TestBuildConfigStepCommon):
     def test_codeowner_regex_some_already_on(self):
         self.diff = 'file.js\nfile.py\nfile.xml'
         self.dev_pr.reviewers = 'codeowner-team,team_js'
-        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.config_step._run_codeowner(self.parent_build)
         messages = self.parent_build.log_ids.mapped('message')        
         self.assertEqual(messages[5], 'Requesting review for pull request [base/server:1234](https://example.com/base/server/pull/1234): team_py')
 
     def test_codeowner_regex_all_already_on(self):
         self.diff = 'file.js\nfile.py\nfile.xml'
         self.dev_pr.reviewers = 'codeowner-team,team_js,team_py'
-        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.config_step._run_codeowner(self.parent_build)
         messages = self.parent_build.log_ids.mapped('message')        
         self.assertEqual(messages[5], 'All reviewers are already on pull request [base/server:1234](https://example.com/base/server/pull/1234)')
 
@@ -143,7 +143,7 @@ class TestCodeowner(TestBuildConfigStepCommon):
         self.team1.github_logins = 'some_member,another_member'
         self.team1.skip_team_pr = True
         self.dev_pr.pr_author = 'some_member'
-        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.config_step._run_codeowner(self.parent_build)
         messages = self.parent_build.log_ids.mapped('message')
         self.assertEqual(messages[5], "Skipping teams ['team_py'] since author is part of the team members")
         self.assertEqual(messages[6], 'Requesting review for pull request [base/server:1234](https://example.com/base/server/pull/1234): codeowner-team, team_js')
@@ -155,7 +155,7 @@ class TestCodeowner(TestBuildConfigStepCommon):
         self.diff = '\n'.join([
             'core/addons/module1/some/file.py',
         ])
-        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.config_step._run_codeowner(self.parent_build)
         messages = self.parent_build.log_ids.mapped('message')
         self.assertEqual(
             messages[2], 
@@ -168,7 +168,7 @@ class TestCodeowner(TestBuildConfigStepCommon):
         self.diff = '\n'.join([
             'core/addons/module1/some/file.py',
         ])
-        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.config_step._run_codeowner(self.parent_build)
         messages = self.parent_build.log_ids.mapped('message')
         self.assertEqual(
             messages[2], 
@@ -186,7 +186,7 @@ class TestCodeowner(TestBuildConfigStepCommon):
             'core/addons/module3/some/file.js',
             'core/addons/module4/some/file.txt',
         ])
-        self.config_step._run_codeowner(self.parent_build, '/tmp/essai')
+        self.config_step._run_codeowner(self.parent_build)
         messages = self.parent_build.log_ids.mapped('message')
         self.assertEqual(messages, [
             'PR [base/server:1234](https://example.com/base/server/pull/1234) found for repo **server**',
@@ -215,7 +215,7 @@ class TestBuildConfigStepCreate(TestBuildConfigStepCommon):
         """ Test child builds are taken into account"""
 
 
-        self.config_step._run_create_build(self.parent_build, '/tmp/essai')
+        self.config_step._run_create_build(self.parent_build)
         self.assertEqual(len(self.parent_build.children_ids), 2, 'Two sub-builds should have been generated')
 
         # check that the result will be ignored by parent build
@@ -229,7 +229,7 @@ class TestBuildConfigStepCreate(TestBuildConfigStepCommon):
     def test_config_step_create(self):
         """ Test the config step of type create """
         self.config_step.make_orphan = True
-        self.config_step._run_create_build(self.parent_build, '/tmp/essai')
+        self.config_step._run_create_build(self.parent_build)
         self.assertEqual(len(self.parent_build.children_ids), 2, 'Two sub-builds should have been generated')
 
         # check that the result will be ignored by parent build
@@ -252,7 +252,7 @@ class TestBuildConfigStepCreate(TestBuildConfigStepCommon):
             }).id,
         })
 
-        self.config_step._run_create_build(self.parent_build, '/tmp/essai')
+        self.config_step._run_create_build(self.parent_build)
         self.assertEqual(len(self.parent_build.children_ids), 10, '10 build should have been generated')
 
         # check that the result will be ignored by parent build
@@ -271,7 +271,7 @@ class TestBuildConfigStepCreate(TestBuildConfigStepCommon):
             }).id,
         })
 
-        self.config_step._run_create_build(self.parent_build, '/tmp/essai')
+        self.config_step._run_create_build(self.parent_build)
         self.assertEqual(len(self.parent_build.children_ids), 5, '5 build should have been generated')
 
         # check that the result will be ignored by parent build
@@ -295,7 +295,7 @@ class TestBuildConfigStepCreate(TestBuildConfigStepCommon):
             }).id,
         })
 
-        self.config_step._run_create_build(self.parent_build, '/tmp/essai')
+        self.config_step._run_create_build(self.parent_build)
         self.assertEqual(len(self.parent_build.children_ids), 10, '10 build should have been generated')
         self.assertEqual(len(self.parent_build.children_ids.filtered(lambda b: b.config_id == test_config_1)), 5)
         self.assertEqual(len(self.parent_build.children_ids.filtered(lambda b: b.config_id == test_config_2)), 5)
@@ -382,7 +382,7 @@ class TestBuildConfigStep(TestBuildConfigStepCommon):
             self.assertEqual(log_path, 'dev/null/logpath')
 
         self.patchers['docker_run'].side_effect = docker_run
-        config_step._run_install_odoo(self.parent_build, 'dev/null/logpath')
+        config_step._run_install_odoo(self.parent_build)
 
     @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
     def test_dump(self, mock_checkout):
@@ -401,7 +401,7 @@ class TestBuildConfigStep(TestBuildConfigStepCommon):
 
         self.patchers['docker_run'].side_effect = docker_run
 
-        config_step._run_install_odoo(self.parent_build, 'dev/null/logpath')
+        config_step._run_install_odoo(self.parent_build)
 
     @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
     def test_install_tags(self, mock_checkout):
@@ -424,7 +424,7 @@ class TestBuildConfigStep(TestBuildConfigStepCommon):
             self.assertEqual(tags, '/module,:class.method')
 
         self.patchers['docker_run'].side_effect = docker_run
-        config_step._run_install_odoo(self.parent_build, 'dev/null/logpath')
+        config_step._run_install_odoo(self.parent_build)
 
         config_step.enable_auto_tags = True
 
@@ -435,7 +435,7 @@ class TestBuildConfigStep(TestBuildConfigStepCommon):
             self.assertEqual(tags, '/module,:class.method,-:otherclass.othertest')
 
         self.patchers['docker_run'].side_effect = docker_run2
-        config_step._run_install_odoo(self.parent_build, 'dev/null/logpath')
+        config_step._run_install_odoo(self.parent_build)
 
     @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
     def test_db_name(self, mock_checkout):
@@ -455,19 +455,19 @@ class TestBuildConfigStep(TestBuildConfigStepCommon):
 
         self.patchers['docker_run'].side_effect = docker_run
 
-        config_step._run_step(self.parent_build, 'dev/null/logpath')
+        config_step._run_step(self.parent_build)
 
         assert_db_name = 'custom_build'
         parent_build_params = self.parent_build.params_id.copy({'config_data': {'db_name': 'custom_build'}})
         parent_build = self.parent_build.copy({'params_id': parent_build_params.id})
-        config_step._run_step(parent_build, 'dev/null/logpath')
+        config_step._run_step(parent_build)
 
         config_step = self.ConfigStep.create({
             'name': 'run_test',
             'job_type': 'run_odoo',
             'custom_db_name': 'custom',
         })
-        config_step._run_step(parent_build, 'dev/null/logpath')
+        config_step._run_step(parent_build)
 
         self.assertEqual(call_count, 3)
 
@@ -489,7 +489,7 @@ docker_params = dict(cmd=cmd)
             self.assertIn('-d test_database', run_cmd)
 
         self.patchers['docker_run'].side_effect = docker_run
-        config_step._run_step(self.parent_build, 'dev/null/logpath')
+        config_step._run_step(self.parent_build)
         self.patchers['docker_run'].assert_called_once()
         db = self.env['runbot.database'].search([('name', '=', 'test_database')])
         self.assertEqual(db.build_id, self.parent_build)
@@ -506,7 +506,7 @@ def run():
             'python_code': test_code,
         })
 
-        retult = config_step._run_python(self.parent_build, 'dev/null/logpath')
+        retult = config_step._run_python(self.parent_build)
         self.assertEqual(retult, {'a': 'b'})
 
     @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
@@ -525,7 +525,7 @@ def run():
             call_count += 1
 
         self.patchers['docker_run'].side_effect = docker_run
-        config_step._run_step(self.parent_build, 'dev/null/logpath')
+        config_step._run_step(self.parent_build)
 
         self.assertEqual(call_count, 1)
 

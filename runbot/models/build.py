@@ -641,8 +641,6 @@ class BuildResult(models.Model):
                     build._log('wake_up', 'Impossible to wake-up, **build dir does not exists anymore**', log_type='markdown', level='SEPARATOR')
                 else:
                     try:
-                        log_path = build._path('logs', 'wake_up.txt')
-
                         port = self._find_port()
                         build.write({
                             'job_start': now(),
@@ -658,7 +656,7 @@ class BuildResult(models.Model):
                             run_step = step_ids[-1]
                         else:
                             run_step = self.env.ref('runbot.runbot_build_config_step_run')
-                        run_step._run_step(build, log_path, force=True)
+                        run_step._run_step(build, force=True)
                         # reload_nginx will be triggered by _run_run_odoo
                     except Exception:
                         _logger.exception('Failed to wake up build %s', build.dest)
@@ -770,6 +768,7 @@ class BuildResult(models.Model):
         containers_memory_limit = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_containers_memory', 0)
         if containers_memory_limit and 'memory' not in kwargs:
             kwargs['memory'] = int(float(containers_memory_limit) * 1024 ** 3)
+
         self.docker_start = now()
         if self.job_start:
             start_step_time = int(dt2time(self.docker_start) - dt2time(self.job_start))

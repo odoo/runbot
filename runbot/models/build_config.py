@@ -3,6 +3,7 @@ import glob
 import json
 import logging
 import fnmatch
+import psutil
 import re
 import shlex
 import time
@@ -154,6 +155,7 @@ class ConfigStep(models.Model):
     install_modules = fields.Char('Modules to install', help="List of module patterns to install, use * to install all available modules, prefix the pattern with dash to remove the module.", default='')
     db_name = fields.Char('Db Name', compute='_compute_db_name', inverse='_inverse_db_name', tracking=True)
     cpu_limit = fields.Integer('Cpu limit', default=3600, tracking=True)
+    container_cpus = fields.Integer('Allowed CPUs', help='Allowed container CPUs. Fallback on config parameter if 0.', default=0, tracking=True)
     coverage = fields.Boolean('Coverage', default=False, tracking=True)
     paths_to_omit = fields.Char('Paths to omit from coverage', tracking=True)
     flamegraph = fields.Boolean('Allow Flamegraph', default=False, tracking=True)
@@ -267,7 +269,6 @@ class ConfigStep(models.Model):
                     raise UserError('Invalid extra_params on config step')
 
     def _run(self, build):
-        log_path = build._path('logs', '%s.txt' % self.name)
         build.write({'job_start': now(), 'job_end': False})  # state, ...
         log_link = ''
         if self._has_log():
@@ -275,16 +276,27 @@ class ConfigStep(models.Model):
             url = f"{log_url}/runbot/static/build/{build.dest}/logs/{self.name}.txt"
             log_link = f'[@icon-file-text]({url})'
         build._log('run', 'Starting step **%s** from config **%s** %s' % (self.name, build.params_id.config_id.name, log_link), log_type='markdown', level='SEPARATOR')
-        self._run_step(build, log_path)
+        self._run_step(build)
 
-    def _run_step(self, build, log_path, **kwargs):
+    def _run_step(self, build, **kwargs):
         build.log_counter = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_maxlogs', 100)
         run_method = getattr(self, '_run_%s' % self.job_type)
-        docker_params = run_method(build, log_path, **kwargs)
+        docker_params = run_method(build, **kwargs)
         if docker_params:
+            if 'log_path' not in docker_params:
+                docker_params['log_path'] = build._path('logs', f'{self.name}.txt')
+            if 'cpu_limit' not in docker_params:
+                max_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=10000))
+                docker_params['cpu_limit'] = min(self.cpu_limit, max_timeout)
+
+            container_cpus = float(self.container_cpus or self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_containers_cpus', 0))
+            if 'cpus' not in docker_params and container_cpus:
+                logical_cpu_count = psutil.cpu_count(logical=True)
+                physical_cpu_count = psutil.cpu_count(logical=False)
+                docker_params['cpus'] = float((logical_cpu_count / physical_cpu_count) * container_cpus)
             build._docker_run(**docker_params)
 
-    def _run_create_build(self, build, log_path):
+    def _run_create_build(self, build):
         count = 0
         config_data = build.params_id.config_data
         config_ids = config_data.get('create_config_ids', self.create_config_ids)
@@ -321,7 +333,7 @@ class ConfigStep(models.Model):
             'PatchSet': PatchSet,
         }
 
-    def _run_python(self, build, log_path):
+    def _run_python(self, build):
         eval_ctx = self.make_python_ctx(build)
         try:
             safe_eval(self.python_code.strip(), eval_ctx, mode="exec", nocopy=True)
@@ -345,7 +357,7 @@ class ConfigStep(models.Model):
         self.ensure_one()
         return self.job_type in ('install_odoo', 'run_odoo', 'restore', 'test_upgrade') or (self.job_type == 'python' and ('docker_params =' in self.python_code or '_run_' in self.python_code))
 
-    def _run_run_odoo(self, build, log_path, force=False):
+    def _run_run_odoo(self, build, force=False):
         if not force:
             if build.parent_id:
                 build._log('_run_run_odoo', 'build has a parent, skip run')
@@ -403,9 +415,10 @@ class ConfigStep(models.Model):
         self.env.cr.commit()  # commit before docker run to be 100% sure that db state is consistent with dockers
         self.invalidate_cache()
         self.env['runbot.runbot']._reload_nginx()
-        return dict(cmd=cmd, log_path=log_path, container_name=docker_name, exposed_ports=[build_port, build_port + 1], ro_volumes=exports, env_variables=env_variables)
+        return dict(cmd=cmd, container_name=docker_name, exposed_ports=[build_port, build_port + 1], ro_volumes=exports, env_variables=env_variables)
 
-    def _run_install_odoo(self, build, log_path):
+
+    def _run_install_odoo(self, build):
         exports = build._checkout()
 
         modules_to_install = self._modules_to_install(build)
@@ -486,10 +499,8 @@ class ConfigStep(models.Model):
         if self.flamegraph:
             cmd.finals.append(['flamegraph.pl', '--title', 'Flamegraph %s for build %s' % (self.name, build.id), self._perfs_data_path(), '>', self._perfs_data_path(ext='svg')])
             cmd.finals.append(['gzip', '-f', self._perfs_data_path()])  # keep data but gz them to save disc space
-        max_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=10000))
-        timeout = min(self.cpu_limit, max_timeout)
         env_variables = self.additionnal_env.split(';') if self.additionnal_env else []
-        return dict(cmd=cmd, log_path=log_path, container_name=build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports, env_variables=env_variables)
+        return dict(cmd=cmd, container_name=build._get_docker_name(), ro_volumes=exports, env_variables=env_variables)
 
     def _upgrade_create_childs(self):
         pass
@@ -537,7 +548,7 @@ class ConfigStep(models.Model):
                         )
                         child._log('', 'This build tests change of schema in stable version testing upgrade to %s' % target.params_id.version_id.name)
 
-    def _run_configure_upgrade(self, build, log_path):
+    def _run_configure_upgrade(self, build):
         """
         Source/target parameters:
             - upgrade_to_current | (upgrade_to_master + (upgrade_to_major_versions | upgrade_to_all_versions))
@@ -699,7 +710,7 @@ class ConfigStep(models.Model):
             if any(fnmatch.fnmatch(db.db_suffix, pat) for pat in pat_list):
                 yield db
 
-    def _run_test_upgrade(self, build, log_path):
+    def _run_test_upgrade(self, build):
         target = build.params_id.upgrade_to_build_id
         commit_ids = build.params_id.commit_ids
         target_commit_ids = target.params_id.commit_ids
@@ -723,7 +734,6 @@ class ConfigStep(models.Model):
         # migrate_cmd += ['--upgrades-paths', '/%s' % migration_scripts] upgrades-paths is broken, ln is created automatically in sources
 
         build._log('run', 'Start migration build %s' % build.dest)
-        timeout = self.cpu_limit
 
         migrate_cmd.finals.append(['psql', migrate_db_name, '-c', '"SELECT id, name, state FROM ir_module_module WHERE state NOT IN (\'installed\', \'uninstalled\', \'uninstallable\') AND name NOT LIKE \'test_%\' "', '>', '/data/build/logs/modules_states.txt'])
 
@@ -731,9 +741,9 @@ class ConfigStep(models.Model):
         exception_env = self.env['runbot.upgrade.exception']._generate()
         if exception_env:
             env_variables.append(exception_env)
-        return dict(cmd=migrate_cmd, log_path=log_path, container_name=build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports, env_variables=env_variables, image_tag=target.params_id.dockerfile_id.image_tag)
+        return dict(cmd=migrate_cmd, container_name=build._get_docker_name(), ro_volumes=exports, env_variables=env_variables, image_tag=target.params_id.dockerfile_id.image_tag)
 
-    def _run_restore(self, build, log_path):
+    def _run_restore(self, build):
         # exports = build._checkout()
         params = build.params_id
 
@@ -774,7 +784,7 @@ class ConfigStep(models.Model):
 
             ])
 
-        return dict(cmd=cmd, log_path=log_path, container_name=build._get_docker_name(), cpu_limit=self.cpu_limit)
+        return dict(cmd=cmd, container_name=build._get_docker_name())
 
     def _reference_builds(self, bundle, trigger):
         upgrade_dumps_trigger_id = trigger.upgrade_dumps_trigger_id
