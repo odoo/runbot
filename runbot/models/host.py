@@ -126,6 +126,7 @@ class Host(models.Model):
             && mkdir /home/{user} \\
             && chown -R {user}:{user} /home/{user}
             USER {user}
+            ENV PATH /home/{user}/.local/bin:$PATH
             ENV COVERAGE_FILE /data/build/.coverage
             """
 
