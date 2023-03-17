@@ -107,18 +107,25 @@ class BuildParameters(models.Model):
         for params in self:
             params.commit_ids = params.commit_link_ids.commit_id
 
-    def create(self, values):
-        params = self.new(values)
-        match = self._find_existing(params.fingerprint)
-        if match:
-            return match
-        values = self._convert_to_write(params._cache)
-        return super().create(values)
+    @api.model_create_multi
+    def create(self, values_list):
+        records = self.browse()
+        for values in values_list:
+            params = self.new(values)
+            record = self._find_existing(params.fingerprint)
+            if record:
+                records |= record
+            else:
+                values = self._convert_to_write(params._cache)
+                records |= super().create(values)
+        return records
 
     def _find_existing(self, fingerprint):
         return self.env['runbot.build.params'].search([('fingerprint', '=', fingerprint)], limit=1)
 
     def write(self, vals):
+        if not self.env.registry.loaded:
+            return
         raise UserError('Params cannot be modified')
 
 
