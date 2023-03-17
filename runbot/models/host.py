@@ -4,7 +4,7 @@ import getpass
 from collections import defaultdict
 
 from odoo import models, fields, api
-from odoo.tools import config
+from odoo.tools import config, ormcache
 from ..common import fqdn, local_pgadmin_cursor, os, list_local_dbs, local_pg_cursor
 from ..container import docker_build
 
@@ -36,6 +36,7 @@ class Host(models.Model):
     last_exception = fields.Char('Last exception')
     exception_count = fields.Integer('Exception count')
     psql_conn_count = fields.Integer('SQL connections count', default=0)
+    host_message_ids = fields.One2many('runbot.host.message', 'host_id')
 
     def _compute_nb(self):
         groups = self.env['runbot.build'].read_group(
@@ -140,11 +141,18 @@ class Host(models.Model):
 
     def _get_work_path(self):
         return os.path.abspath(os.path.join(os.path.dirname(__file__), '../static'))
+    
+    @ormcache()
+    def _host_list(self):
+        return {host.name: host.id for host in self.search([])}
+
+    def _get_host(self, name):
+        return self.browse(self._host_list().get(name)) or self.with_context(active_test=False).search([('name', '=', name)])
 
     @api.model
     def _get_current(self):
         name = self._get_current_name()
-        return self.search([('name', '=', name)]) or self.create({'name': name})
+        return self._get_host(name) or self.create({'name': name})
 
     @api.model
     def _get_current_name(self):
@@ -244,3 +252,26 @@ class Host(models.Model):
             logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
             with local_pg_cursor(logs_db_name) as local_cr:
                 local_cr.execute("DELETE FROM ir_logging WHERE id in %s", [tuple(local_log_ids)])
+
+    def _process_messages(self):
+        self.host_message_ids._process()
+
+
+class MessageQueue(models.Model):
+    _name = 'runbot.host.message'
+    _description = "Message queue"
+    _order = 'id'
+    _log_access = False
+
+    create_date = fields.Datetime('Create date', default=fields.Datetime.now)
+    host_id = fields.Many2one('runbot.host', required=True, ondelete='cascade')
+    build_id = fields.Many2one('runbot.build')
+    message = fields.Char('Message')
+
+    def _process(self):
+        records = self
+        # todo consume messages here
+        if records:
+            for record in records:
+                self.env['runbot.runbot'].warning(f'Host {record.host_id.name} got an unexpected message {record.message}')
+        self.unlink()

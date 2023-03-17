@@ -18,6 +18,7 @@
                         <field name="nb_worker"/>
                         <field name="last_exception" readonly='1'/>
                         <field name="exception_count" readonly='1'/>
+                        <field name="host_message_ids" readonly='1'/>
                     </group>
                 </sheet>
                 <div class="oe_chatter">
