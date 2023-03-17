@@ -55,6 +55,10 @@
         <field name="repo_id" ref="repo_runbot"/>
     </record>
 
+    <record id="version_16" model="runbot.version">
+        <field name="name">16.0</field>
+    </record>
+
     <!-- BUNDLES -->
     <record id="bundle_16_1" model="runbot.bundle">
         <field name="name">saas-16.1</field>
@@ -146,7 +150,6 @@
         <field name="ci_context"/>        
     </record>
 
-
     <record id="runbot_build_config_linting" model="runbot.build.config">
         <field name="name">Linting</field>
     </record>
@@ -154,6 +157,47 @@
         <field name="name">Security</field>
     </record>
 
+    <record id="runbot_build_config_split" model="runbot.build.config">
+        <field name="name">Split</field>
+    </record>
+
+    <record id="runbot_build_config_post_install" model="runbot.build.config">
+        <field name="name">Post install</field>
+    </record>
+
+    <record id="main_host" model="runbot.host">
+        <field name="name">main host</field>
+    </record>
+
+    <record id="build_base_params" model="runbot.build.params">
+        <field name="config_id" ref="runbot_build_config_split"/>
+        <field name="version_id" ref="version_16"/>
+        <field name="project_id" ref="project_runbot"/>
+    </record>
+
+    <record id="build_base" model="runbot.build">
+        <field name="params_id" ref="build_base_params"/>
+        <field name="host">main host</field>
+    </record>
+
+    <record id="build_child_params" model="runbot.build.params">
+        <field name="config_id" ref="runbot_build_config_post_install"/>
+        <field name="version_id" ref="version_16"/>
+        <field name="project_id" ref="project_runbot"/>
+    </record>
+
+    <record id="build_child1" model="runbot.build">
+        <field name="params_id" ref="build_child_params"/>
+        <field name="parent_id" ref="build_base"/>
+        <field name="host">main host</field>
+    </record>
+
+    <record id="build_child2" model="runbot.build">
+        <field name="params_id" ref="build_child_params"/>
+        <field name="parent_id" ref="build_base"/>
+        <field name="host">main host</field>
+    </record>
+    
     <function model="runbot.runbot" name="_create_demo_data">
     </function>
     
