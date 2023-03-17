@@ -275,7 +275,6 @@ class Runbot(models.AbstractModel):
                     _logger.warning('Removing %s from pull_info_failures', pr_number)
                     del pull_info_failures[pr_number]
 
-
         return manager.get('sleep', default_sleep)
 
     def _scheduler_loop_turn(self, host, sleep=5):
