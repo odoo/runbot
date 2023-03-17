@@ -45,6 +45,8 @@ class Runbot(models.AbstractModel):
             self._commit()
         host.process_logs()
         self._commit()
+        host._process_messages()
+        self._commit()
         for build in self._get_builds_to_schedule(host):
             build = build.browse(build.id)  # remove preftech ids, manage build one by one
             build._schedule()

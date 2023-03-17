@@ -163,7 +163,8 @@ class BuildResult(models.Model):
 
     requested_action = fields.Selection([('wake_up', 'To wake up'), ('deathrow', 'To kill')], string='Action requested', index=True)
     # web infos
-    host = fields.Char('Host')
+    host = fields.Char('Host name')
+    host_id = fields.Many2one('runbot.host', string="Host", compute='_compute_host_id')
     keep_host = fields.Boolean('Keep host on rebuild and for children')
 
     port = fields.Integer('Port')
@@ -232,6 +233,12 @@ class BuildResult(models.Model):
     def _compute_display_name(self):
         for build in self:
             build.display_name = build.description or build.config_id.name
+
+    @api.depends('host')
+    def _compute_host_id(self):
+        get_host = self.env['runbot.host']._get_host
+        for record in self:
+            record.host_id = get_host(record.host)
 
     @api.depends('params_id.config_id')
     def _compute_log_list(self):  # storing this field because it will be access trhoug repo viewn and keep track of the list at create
