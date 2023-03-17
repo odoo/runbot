@@ -14,6 +14,7 @@ import logging
 import os
 import re
 import subprocess
+import time
 import warnings
 
 # unsolved issue https://github.com/docker/docker-py/issues/2928
@@ -27,6 +28,7 @@ with warnings.catch_warnings():
 
 
 _logger = logging.getLogger(__name__)
+docker_stop_failures = {}
 
 
 class Command():
@@ -114,7 +116,6 @@ def _docker_build(build_dir, image_tag):
         _logger.error('Build of image %s failed with this BUILD error:', image_tag)
         msg = f"{e.msg}\n{''.join(l.get('stream') or '' for l in e.build_log)}"
         return (False, msg)
-    _logger.info('Dockerfile %s finished build', image_tag)
     return (True, None)
 
 
@@ -203,6 +204,13 @@ def _docker_stop(container_name, build_dir):
     """Stops the container named container_name"""
     container_name = sanitize_container_name(container_name)
     _logger.info('Stopping container %s', container_name)
+    if container_name in docker_stop_failures:
+        if docker_stop_failures[container_name] + 60 * 60 < time.time():
+            _logger.warning('Removing %s from docker_stop_failures', container_name)
+            del docker_stop_failures[container_name]
+        else:
+            _logger.warning('Skipping %s, is in failure', container_name)
+            return
     docker_client = docker.from_env()
     if build_dir:
         end_file = os.path.join(build_dir, 'end-%s' % container_name)
@@ -212,10 +220,13 @@ def _docker_stop(container_name, build_dir):
     try:
         container = docker_client.containers.get(container_name)
         container.stop(timeout=1)
+        return
     except docker.errors.NotFound:
         _logger.error('Cannnot stop container %s. Container not found', container_name)
     except docker.errors.APIError as e:
         _logger.error('Cannnot stop container %s. API Error "%s"', container_name, e)
+    docker_stop_failures[container_name] = time.time()
+
 
 def docker_state(container_name, build_dir):
     container_name = sanitize_container_name(container_name)
