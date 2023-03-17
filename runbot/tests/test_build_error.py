@@ -33,8 +33,10 @@ class TestBuildError(RunbotCase):
 
     def test_build_scan(self):
         IrLog = self.env['ir.logging']
-        ko_build = self.create_test_build({'local_result': 'ko'})
-        ok_build = self.create_test_build({'local_result': 'ok'})
+        ko_build = self.create_test_build({'local_result': 'ok', 'local_state': 'testing'})
+        ok_build = self.create_test_build({'local_result': 'ok', 'local_state': 'running'})
+
+
 
         error_team = self.BuildErrorTeam.create({
             'name': 'test-error-team',
@@ -56,6 +58,10 @@ class TestBuildError(RunbotCase):
         IrLog.create(log)
         log.update({'build_id': ok_build.id})
         IrLog.create(log)
+
+        self.assertEqual(ko_build.local_result, 'ko', 'Testing build should have gone ko after error log')
+        self.assertEqual(ok_build.local_result, 'ok', 'Running build should not have gone ko after error log')
+
         ko_build._parse_logs()
         ok_build._parse_logs()
         build_error = self.BuildError.search([('build_ids', 'in', [ko_build.id])])

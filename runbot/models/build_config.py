@@ -166,7 +166,6 @@ class ConfigStep(models.Model):
     # python
     python_code = fields.Text('Python code', tracking=True, default=PYTHON_DEFAULT)
     python_result_code = fields.Text('Python code for result', tracking=True, default=PYTHON_DEFAULT)
-    ignore_triggered_result = fields.Boolean('Ignore error triggered in logs', tracking=True, default=False)
     running_job = fields.Boolean('Job final state is running', default=False, help="Docker won't be killed if checked")
     # create_build
     create_config_ids = fields.Many2many('runbot.build.config', 'runbot_build_config_step_ids_create_config_ids_rel', string='New Build Configs', tracking=True, index=True)
@@ -275,14 +274,14 @@ class ConfigStep(models.Model):
             url = f"{log_url}/runbot/static/build/{build.dest}/logs/{self.name}.txt"
             log_link = f'[@icon-file-text]({url})'
         build._log('run', 'Starting step **%s** from config **%s** %s' % (self.name, build.params_id.config_id.name, log_link), log_type='markdown', level='SEPARATOR')
-        self._run_step(build, log_path)
+        return self._run_step(build, log_path)
 
     def _run_step(self, build, log_path, **kwargs):
         build.log_counter = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_maxlogs', 100)
         run_method = getattr(self, '_run_%s' % self.job_type)
         docker_params = run_method(build, log_path, **kwargs)
         if docker_params:
-            build._docker_run(**docker_params)
+            return build._docker_run(**docker_params)
 
     def _run_create_build(self, build, log_path):
         count = 0
@@ -906,23 +905,20 @@ class ConfigStep(models.Model):
         return ['--omit', ','.join(pattern_to_omit)]
 
     def _make_results(self, build):
-        build_values = {}
         log_time = self._get_log_last_write(build)
         if log_time:
-            build_values['job_end'] = log_time
+            build.job_end = log_time
         if self.job_type == 'python' and self.python_result_code and self.python_result_code != PYTHON_DEFAULT:
-            build_values.update(self._make_python_results(build))
+            build.write(self._make_python_results(build))
         elif self.job_type in ['install_odoo', 'python']:
             if self.coverage:
-                build_values.update(self._make_coverage_results(build))
+                build.write(self._make_coverage_results(build))
             if self.test_enable or self.test_tags:
-                build_values.update(self._make_tests_results(build))
+                build.write(self._make_tests_results(build))
         elif self.job_type == 'test_upgrade':
-            build_values.update(self._make_upgrade_results(build))
+            build.write(self._make_upgrade_results(build))
         elif self.job_type == 'restore':
-            build_values.update(self._make_restore_results(build))
-
-        return build_values
+            build.write(self._make_restore_results(build))
 
     def _make_python_results(self, build):
         eval_ctx = self.make_python_ctx(build)

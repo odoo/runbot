@@ -4,8 +4,10 @@ import datetime
 from unittest.mock import patch
 
 from odoo import fields
+from odoo.tests import tagged
 from odoo.exceptions import UserError, ValidationError
 from .common import RunbotCase, RunbotCaseMinimalSetup
+from unittest.mock import MagicMock
 
 
 def rev_parse(repo, branch_name):
@@ -18,6 +20,7 @@ def rev_parse(repo, branch_name):
     return head_hash
 
 
+@tagged('-at_install', 'post_istall')
 class TestBuildParams(RunbotCaseMinimalSetup):
 
     def setUp(self):
@@ -171,7 +174,10 @@ class TestBuildResult(RunbotCase):
         # test a bulk write, that one cannot change from 'ko' to 'ok'
         builds = self.Build.browse([build.id, other.id])
         with self.assertRaises(ValidationError):
-            builds.write({'local_result': 'ok'})
+            builds.write({'local_result': 'warn'})
+        # self.assertEqual(build.local_result, 'warn')
+        # self.assertEqual(other.local_result, 'ko')
+
 
     def test_markdown_description(self):
         build = self.Build.create({
@@ -331,6 +337,11 @@ class TestBuildResult(RunbotCase):
         build1 = self.Build.create({
             'params_id': self.server_params.id,
         })
+        self.assertEqual('pending', build1.global_state)
+
+        build1.local_state = 'testing'
+        self.assertEqual('testing', build1.global_state)
+
         build1_1 = self.Build.create({
             'params_id': self.server_params.id,
             'parent_id': build1.id,
@@ -339,6 +350,15 @@ class TestBuildResult(RunbotCase):
             'params_id': self.server_params.id,
             'parent_id': build1.id,
         })
+        self.assertEqual('testing', build1.global_state)
+        self.assertEqual('pending', build1_1.global_state)
+        self.assertEqual('pending', build1_2.global_state)
+
+        build1_1.local_state = 'testing'
+        self.assertEqual('testing', build1.global_state)
+        self.assertEqual('testing', build1_1.global_state)
+        self.assertEqual('pending', build1_2.global_state)
+
         build1_1_1 = self.Build.create({
             'params_id': self.server_params.id,
             'parent_id': build1_1.id,
@@ -348,60 +368,132 @@ class TestBuildResult(RunbotCase):
             'parent_id': build1_1.id,
         })
 
-        def assert_state(global_state, build):
-            self.assertEqual(build.global_state, global_state)
+        self.assertEqual('testing', build1.global_state)
+        self.assertEqual('testing', build1_1.global_state)
+        self.assertEqual('pending', build1_2.global_state)
+        self.assertEqual('pending', build1_1_1.global_state)
+        self.assertEqual('pending', build1_1_2.global_state)
 
-        assert_state('pending', build1)
-        assert_state('pending', build1_1)
-        assert_state('pending', build1_2)
-        assert_state('pending', build1_1_1)
-        assert_state('pending', build1_1_2)
+        build1_2.flush()
+        with self.assertQueries(['''UPDATE "runbot_build" SET "global_state"=%s,"local_state"=%s,"write_date"=%s,"write_uid"=%s WHERE id IN %s''']):
+            build1_2.local_state = "testing"
+            build1_2.flush()
 
-        build1.local_state = 'testing'
-        build1_1.local_state = 'testing'
+        self.assertEqual('testing', build1.global_state)
+        self.assertEqual('testing', build1_2.global_state)
+
+        with self.assertQueries([]):  # no change should be triggered
+            build1_2.local_state = "testing"
+
+        # with self.assertQueries(['''UPDATE "runbot_build" SET "global_state"=%s,"local_state"=%s,"write_date"=%s,"write_uid"=%s WHERE id IN %s''']):
         build1.local_state = 'done'
+        build1.flush()
+
+        self.assertEqual('waiting', build1.global_state)
+        self.assertEqual('testing', build1_1.global_state)
+
+        # with self.assertQueries([]): # write the same value, no update should be triggered
+        build1.local_state = 'done'
+        build1.flush()
+
         build1_1.local_state = 'done'
 
-        assert_state('waiting', build1)
-        assert_state('waiting', build1_1)
-        assert_state('pending', build1_2)
-        assert_state('pending', build1_1_1)
-        assert_state('pending', build1_1_2)
+        self.assertEqual('waiting', build1.global_state)
+        self.assertEqual('waiting', build1_1.global_state)
+        self.assertEqual('testing', build1_2.global_state)
+        self.assertEqual('pending', build1_1_1.global_state)
+        self.assertEqual('pending', build1_1_2.global_state)
 
         build1_1_1.local_state = 'testing'
 
-        assert_state('waiting', build1)
-        assert_state('waiting', build1_1)
-        assert_state('pending', build1_2)
-        assert_state('testing', build1_1_1)
-        assert_state('pending', build1_1_2)
+        self.assertEqual('waiting', build1.global_state)
+        self.assertEqual('waiting', build1_1.global_state)
+        self.assertEqual('testing', build1_2.global_state)
+        self.assertEqual('testing', build1_1_1.global_state)
+        self.assertEqual('pending', build1_1_2.global_state)
 
-        build1_2.local_state = 'testing'
+        with self.assertQueries([]):
+            build1_2.local_state = 'testing'
 
-        assert_state('waiting', build1)
-        assert_state('waiting', build1_1)
-        assert_state('testing', build1_2)
-        assert_state('testing', build1_1_1)
-        assert_state('pending', build1_1_2)
+        self.assertEqual('waiting', build1.global_state)
+        self.assertEqual('waiting', build1_1.global_state)
+        self.assertEqual('testing', build1_2.global_state)
+        self.assertEqual('testing', build1_1_1.global_state)
+        self.assertEqual('pending', build1_1_2.global_state)
 
-        build1_2.local_state = 'testing'  # writing same state a second time
+        build1_2.local_state = 'done'
+        build1_1_1.local_state = 'done'
+        build1_1_2.local_state = 'testing'
 
-        assert_state('waiting', build1)
-        assert_state('waiting', build1_1)
-        assert_state('testing', build1_2)
-        assert_state('testing', build1_1_1)
-        assert_state('pending', build1_1_2)
+        self.assertEqual('waiting', build1.global_state)
+        self.assertEqual('waiting', build1_1.global_state)
+        self.assertEqual('done', build1_2.global_state)
+        self.assertEqual('done', build1_1_1.global_state)
+        self.assertEqual('testing', build1_1_2.global_state)
 
         build1_1_2.local_state = 'done'
+
+        self.assertEqual('done', build1.global_state)
+        self.assertEqual('done', build1_1.global_state)
+        self.assertEqual('done', build1_2.global_state)
+        self.assertEqual('done', build1_1_1.global_state)
+        self.assertEqual('done', build1_1_2.global_state)
+
+    def test_rebuild_sub_sub_build(self):
+        build1 = self.Build.create({
+            'params_id': self.server_params.id,
+        })
+        build1.local_state = 'testing'
+        build1_1 = self.Build.create({
+            'params_id': self.server_params.id,
+            'parent_id': build1.id,
+        })
+        build1_1.local_state = 'testing'
+        build1.local_state = 'done'
+        build1_1_1 = self.Build.create({
+            'params_id': self.server_params.id,
+            'parent_id': build1_1.id,
+        })
+        build1_1_1.local_state = 'testing'
+        build1_1.local_state = 'done'
+        self.assertEqual('waiting', build1.global_state)
+        self.assertEqual('waiting', build1_1.global_state)
+        self.assertEqual('testing', build1_1_1.global_state)
+
+        build1_1_1.local_result = 'ko'
         build1_1_1.local_state = 'done'
-        build1_2.local_state = 'done'
+        self.assertEqual('done', build1.global_state)
+        self.assertEqual('done', build1_1.global_state)
+        self.assertEqual('done', build1_1_1.global_state)
+        self.assertEqual('ko', build1.global_result)
+        self.assertEqual('ko', build1_1.global_result)
+        self.assertEqual('ko', build1_1_1.global_result)
 
-        assert_state('done', build1)
-        assert_state('done', build1_1)
-        assert_state('done', build1_2)
-        assert_state('done', build1_1_1)
-        assert_state('done', build1_1_2)
+        rebuild1_1_1 = self.Build.create({  # this is a rebuild
+            'params_id': self.server_params.id,
+            'parent_id': build1_1.id,
+        })
+        build1_1_1.orphan_result = True
 
+        self.assertEqual('ok', build1.global_result)
+        self.assertEqual('ok', build1_1.global_result)
+        self.assertEqual('ko', build1_1_1.global_result)
+        self.assertEqual('waiting', build1.global_state)
+        self.assertEqual('waiting', build1_1.global_state)
+        self.assertEqual('done', build1_1_1.global_state)
+        self.assertEqual('pending', rebuild1_1_1.global_state)
+
+        rebuild1_1_1.local_result = 'ok'
+        rebuild1_1_1.local_state = 'done'
+
+        self.assertEqual('ok', build1.global_result)
+        self.assertEqual('ok', build1_1.global_result)
+        self.assertEqual('ko', build1_1_1.global_result)
+        self.assertEqual('ok', rebuild1_1_1.global_result)
+        self.assertEqual('done', build1.global_state)
+        self.assertEqual('done', build1_1.global_state)
+        self.assertEqual('done', build1_1_1.global_state)
+        self.assertEqual('done', rebuild1_1_1.global_state)
 
 class TestGc(RunbotCaseMinimalSetup):
 
@@ -446,6 +538,7 @@ class TestGc(RunbotCaseMinimalSetup):
         build_a.write({'local_state': 'testing', 'host': host.name})
         build_b.write({'local_state': 'testing', 'host': 'runbot_yyy'})
 
+
         # no room needed, verify that nobody got killed
         self.Runbot._gc_testing(host)
         self.assertFalse(build_a.requested_action)
@@ -487,3 +580,34 @@ class TestGc(RunbotCaseMinimalSetup):
         self.assertFalse(build_b.requested_action)
         self.assertFalse(build_a_last.requested_action)
         self.assertFalse(children_b.requested_action)
+
+
+class TestGithubStatus(RunbotCase):
+
+    def setUp(self):
+        super().setUp()
+        self.build = self.Build.create({
+            'params_id': self.base_params.id,
+            'description': 'A nice **description**'
+        })
+
+    def test_change_state(self):
+        self.callcount = 0
+
+        def github_status(build):
+            self.callcount += 1
+
+        with patch('odoo.addons.runbot.models.build.BuildResult._github_status', github_status):
+            self.callcount = 0
+            self.build.local_state = 'testing'
+
+            self.assertEqual(self.callcount, 0, "_github_status shouldn't have been called")
+
+            self.callcount = 0
+            self.build.local_state = 'running'
+
+            self.assertEqual(self.callcount, 1, "_github_status should have been called")
+
+            self.callcount = 0
+            self.build.local_state = 'done'
+            self.assertEqual(self.callcount, 0, "_github_status shouldn't have been called")

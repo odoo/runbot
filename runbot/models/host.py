@@ -209,7 +209,7 @@ class Host(models.Model):
                 res.append({name:value for name, value in zip(col_names, row)})
             return res
 
-    def process_logs(self, build_ids=None):
+    def _process_logs(self, build_ids=None):
         """move logs from host to the leader"""
         ir_logs = self._fetch_local_logs()
         logs_by_build_id = defaultdict(list)
@@ -252,6 +252,13 @@ class Host(models.Model):
             logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
             with local_pg_cursor(logs_db_name) as local_cr:
                 local_cr.execute("DELETE FROM ir_logging WHERE id in %s", [tuple(local_log_ids)])
+
+    def get_build_domain(self, domain=None):
+        domain = domain or []
+        return [('host', '=', self.name)] + domain
+
+    def get_builds(self, domain, order=None):
+        return self.env['runbot.build'].search(self.get_build_domain(domain), order=order)
 
     def _process_messages(self):
         self.host_message_ids._process()

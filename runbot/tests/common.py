@@ -181,7 +181,6 @@ class RunbotCase(TransactionCase):
         self.start_patcher('docker_stop', 'odoo.addons.runbot.container._docker_stop')
         self.start_patcher('docker_get_gateway_ip', 'odoo.addons.runbot.models.build_config.docker_get_gateway_ip', None)
 
-        self.start_patcher('cr_commit', 'odoo.sql_db.Cursor.commit', None)
         self.start_patcher('repo_commit', 'odoo.addons.runbot.models.runbot.Runbot._commit', None)
         self.start_patcher('_local_cleanup_patcher', 'odoo.addons.runbot.models.build.BuildResult._local_cleanup')
         self.start_patcher('_local_pg_dropdb_patcher', 'odoo.addons.runbot.models.build.BuildResult._local_pg_dropdb')
@@ -193,6 +192,11 @@ class RunbotCase(TransactionCase):
         self.start_patcher('getmtime', 'odoo.addons.runbot.common.os.path.getmtime', datetime.datetime.now().timestamp())
 
         self.start_patcher('_get_py_version', 'odoo.addons.runbot.models.build.BuildResult._get_py_version', 3)
+
+        def no_commit(*_args, **_kwargs):
+            _logger.info('Skipping commit')
+
+        self.patch(self.env.cr, 'commit', no_commit)
 
 
     def start_patcher(self, patcher_name, patcher_path, return_value=DEFAULT, side_effect=DEFAULT, new=DEFAULT):

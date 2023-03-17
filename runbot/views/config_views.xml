@@ -61,7 +61,6 @@
                         <field name="python_code" widget="ace" options="{'mode': 'python'}"/>
                         <field name="python_result_code" widget="ace" options="{'mode': 'python'}"/>
                         <field name="running_job"/>
-                        <field name="ignore_triggered_result"/>
                     </group>
                     <group string="Test settings" attrs="{'invisible': [('job_type', 'not in', ('python', 'install_odoo'))]}">
                         <field name="create_db" groups="base.group_no_one"/>

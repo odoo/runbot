@@ -65,7 +65,7 @@ class TestHost(RunbotCase):
         # check that local logs are inserted in leader ir.logging
         logs = fetch_local_logs_return_value(build_dest=build.dest)
         self.start_patcher('fetch_local_logs', 'odoo.addons.runbot.models.host.Host._fetch_local_logs', logs)
-        self.test_host.process_logs()
+        self.test_host._process_logs()
         self.patchers['host_local_pg_cursor'].assert_called()
         self.assertEqual(
             self.env['ir.logging'].search_count([
@@ -78,7 +78,7 @@ class TestHost(RunbotCase):
         # check that a warn log sets the build in warning
         logs = fetch_local_logs_return_value(nb_logs=1, build_dest=build.dest, level='WARNING')
         self.patchers['fetch_local_logs'].return_value = logs
-        self.test_host.process_logs()
+        self.test_host._process_logs()
         self.patchers['host_local_pg_cursor'].assert_called()
         self.assertEqual(
             self.env['ir.logging'].search_count([
@@ -88,12 +88,12 @@ class TestHost(RunbotCase):
             ]),
             1,
         )
-        self.assertEqual(build.triggered_result, 'warn', 'A warning log should sets the build in warn')
+        self.assertEqual(build.local_result, 'warn', 'A warning log should sets the build in warn')
 
         # now check that error logs sets the build in ko
         logs = fetch_local_logs_return_value(nb_logs=1, build_dest=build.dest, level='ERROR')
         self.patchers['fetch_local_logs'].return_value = logs
-        self.test_host.process_logs()
+        self.test_host._process_logs()
         self.patchers['host_local_pg_cursor'].assert_called()
         self.assertEqual(
             self.env['ir.logging'].search_count([
@@ -103,11 +103,11 @@ class TestHost(RunbotCase):
             ]),
             1,
         )
-        self.assertEqual(build.triggered_result, 'ko', 'An error log should sets the build in ko')
+        self.assertEqual(build.local_result, 'ko', 'An error log should sets the build in ko')
 
         build.log_counter = 10
         # Test log limit
         logs = fetch_local_logs_return_value(nb_logs=11, message='test log limit', build_dest=build.dest)
         self.patchers['fetch_local_logs'].return_value = logs
-        self.test_host.process_logs()
+        self.test_host._process_logs()
         self.patchers['host_local_pg_cursor'].assert_called()
