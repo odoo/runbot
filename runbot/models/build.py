@@ -1033,8 +1033,9 @@ class BuildResult(models.Model):
             elif grep(config_path, "--xmlrpc-interface"):
                 command.add_config_tuple("xmlrpc_interface", "127.0.0.1")
 
+        log_db = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
         if grep(config_path, "log-db"):
-            command.add_config_tuple("log_db", "runbot_logs")
+            command.add_config_tuple("log_db", log_db)
             if grep(config_path, 'log-db-level'):
                 command.add_config_tuple("log_db_level", '25')
 
