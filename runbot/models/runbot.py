@@ -39,80 +39,76 @@ class Runbot(models.AbstractModel):
     def _scheduler(self, host):
         self._gc_testing(host)
         self._commit()
-        for build in self._get_builds_with_requested_actions(host):
-            build = build.browse(build.id)  # remove preftech ids, manage build one by one
+        processed = 0
+        for build in host.get_builds([('requested_action', 'in', ['wake_up', 'deathrow'])]):
+            processed += 1
             build._process_requested_actions()
             self._commit()
-        host.process_logs()
+        host._process_logs()
         self._commit()
         host._process_messages()
         self._commit()
-        for build in self._get_builds_to_schedule(host):
+        for build in host.get_builds([('local_state', 'in', ['testing', 'running'])]) | self._get_builds_to_init(host):
             build = build.browse(build.id)  # remove preftech ids, manage build one by one
-            build._schedule()
+            result = build._schedule()
+            if result:
+                processed += 1
             self._commit()
-        self._assign_pending_builds(host, host.nb_worker, [('build_type', '!=', 'scheduled')])
+            if callable(result):
+                result()  # start docker
+        processed += self._assign_pending_builds(host, host.nb_worker, [('build_type', '!=', 'scheduled')])
         self._commit()
-        self._assign_pending_builds(host, host.nb_worker - 1 or host.nb_worker)
+        processed += self._assign_pending_builds(host, host.nb_worker - 1 or host.nb_worker)
         self._commit()
-        self._assign_pending_builds(host, host.nb_worker and host.nb_worker + 1, [('build_type', '=', 'priority')])
+        processed += self._assign_pending_builds(host, host.nb_worker and host.nb_worker + 1, [('build_type', '=', 'priority')])
         self._commit()
-        for build in self._get_builds_to_init(host):
-            build = build.browse(build.id)  # remove preftech ids, manage build one by one
-            build._init_pendings(host)
-            self._commit()
         self._gc_running(host)
         self._commit()
         self._reload_nginx()
-
-    def build_domain_host(self, host, domain=None):
-        domain = domain or []
-        return [('host', '=', host.name)] + domain
-
-    def _get_builds_with_requested_actions(self, host):
-        return self.env['runbot.build'].search(self.build_domain_host(host, [('requested_action', 'in', ['wake_up', 'deathrow'])]))
-
-    def _get_builds_to_schedule(self, host):
-        return self.env['runbot.build'].search(self.build_domain_host(host, [('local_state', 'in', ['testing', 'running'])]))
+        self._commit()
+        return processed
 
     def _assign_pending_builds(self, host, nb_worker, domain=None):
         if host.assigned_only or nb_worker <= 0:
-            return
-        domain_host = self.build_domain_host(host)
-        reserved_slots = self.env['runbot.build'].search_count(domain_host + [('local_state', 'in', ('testing', 'pending'))])
+            return 0
+        reserved_slots = len(host.get_builds([('local_state', 'in', ('testing', 'pending'))]))
         assignable_slots = (nb_worker - reserved_slots)
         if assignable_slots > 0:
             allocated = self._allocate_builds(host, assignable_slots, domain)
             if allocated:
                 _logger.info('Builds %s where allocated to runbot', allocated)
+            return len(allocated)
+        return 0
 
     def _get_builds_to_init(self, host):
-        domain_host = self.build_domain_host(host)
-        used_slots = self.env['runbot.build'].search_count(domain_host + [('local_state', '=', 'testing')])
+        domain_host = host.get_build_domain()
+        used_slots = len(host.get_builds([('local_state', '=', 'testing')]))
         available_slots = host.nb_worker - used_slots
-        if available_slots <= 0:
-            return self.env['runbot.build']
-        return self.env['runbot.build'].search(domain_host + [('local_state', '=', 'pending')], limit=available_slots)
+        build_to_init = self.env['runbot.build']
+        if available_slots > 0:
+            build_to_init |= self.env['runbot.build'].search(domain_host + [('local_state', '=', 'pending')], limit=available_slots)
+        if available_slots + 1 > 0:
+            build_to_init |= self.env['runbot.build'].search(domain_host + [('local_state', '=', 'pending'), ('build_type', '=', 'priority')], limit=1)
+        return build_to_init
 
     def _gc_running(self, host):
         running_max = host.get_running_max()
-        domain_host = self.build_domain_host(host)
         Build = self.env['runbot.build']
-        cannot_be_killed_ids = Build.search(domain_host + [('keep_running', '=', True)]).ids
+        cannot_be_killed_ids = host.get_builds([('keep_running', '=', True)]).ids
         sticky_bundles = self.env['runbot.bundle'].search([('sticky', '=', True), ('project_id.keep_sticky_running', '=', True)])
         cannot_be_killed_ids += [
             build.id
             for build in sticky_bundles.mapped('last_batchs.slot_ids.build_id')
             if build.host == host.name
         ][:running_max]
-        build_ids = Build.search(domain_host + [('local_state', '=', 'running'), ('id', 'not in', cannot_be_killed_ids)], order='job_start desc').ids
+        build_ids = host.get_builds([('local_state', '=', 'running'), ('id', 'not in', cannot_be_killed_ids)], order='job_start desc').ids
         Build.browse(build_ids)[running_max:]._kill()
 
     def _gc_testing(self, host):
         """garbage collect builds that could be killed"""
         # decide if we need room
         Build = self.env['runbot.build']
-        domain_host = self.build_domain_host(host)
+        domain_host = host.get_build_domain()
         testing_builds = Build.search(domain_host + [('local_state', 'in', ['testing', 'pending']), ('requested_action', '!=', 'deathrow')])
         used_slots = len(testing_builds)
         available_slots = host.nb_worker - used_slots
@@ -282,11 +278,11 @@ class Runbot(models.AbstractModel):
 
         return manager.get('sleep', default_sleep)
 
-    def _scheduler_loop_turn(self, host, default_sleep=5):
-        _logger.info('Scheduling...')
+    def _scheduler_loop_turn(self, host, sleep=5):
         with self.manage_host_exception(host) as manager:
-            self._scheduler(host)
-        return manager.get('sleep', default_sleep)
+            if self._scheduler(host):
+                sleep = 0.1
+        return manager.get('sleep', sleep)
 
     @contextmanager
     def manage_host_exception(self, host):

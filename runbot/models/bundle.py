@@ -55,7 +55,6 @@ class Bundle(models.Model):
     # extra_info
     for_next_freeze = fields.Boolean('Should be in next freeze')
 
-
     @api.depends('name')
     def _compute_host_id(self):
         assigned_only = None
