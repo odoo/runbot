@@ -233,6 +233,7 @@ class BuildResult(models.Model):
     killable = fields.Boolean('Killable')
 
     database_ids = fields.One2many('runbot.database', 'build_id')
+    commit_export_ids = fields.One2many('runbot.commit.export', 'build_id')
 
     static_run = fields.Char('Static run URL')
 
@@ -343,7 +344,8 @@ class BuildResult(models.Model):
         # some validation to ensure db consistency
         if 'local_state' in values:
             if values['local_state'] == 'done':
-                self.env['runbot.commit.export'].search([('build_id', 'in', self.ids)]).unlink()
+                self.filtered(lambda b: b.local_state != 'done').commit_export_ids.unlink()
+
         local_result = values.get('local_result')
         for build in self:
             if local_result and local_result != self._get_worst_result([build.local_result, local_result]):  # dont write ok on a warn/error build
@@ -367,9 +369,6 @@ class BuildResult(models.Model):
             for build in self:
                 if not build.parent_id and build.global_state not in ('done', 'running'):
                     build._github_status()
-
-
-
 
         return res
 
