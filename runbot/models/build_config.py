@@ -375,13 +375,10 @@ class ConfigStep(models.Model):
         if "--max-cron-threads" in available_options:
             cmd += ["--max-cron-threads", "1"]
 
-
-        install_steps = [step.db_name for step in build.params_id.config_id.step_ids() if step.job_type == 'install_odoo']
-        db_name = build.params_id.config_data.get('db_name') or 'all' in install_steps and 'all' or install_steps[0]
+        db_name = build.params_id.config_data.get('db_name') or (build.database_ids[0].db_suffix if build.database_ids else 'all')
         # we need to have at least one job of type install_odoo to run odoo, take the last one for db_name.
         cmd += ['-d', '%s-%s' % (build.dest, db_name)]
 
-        icp = self.env['ir.config_parameter'].sudo()
         if "--proxy-mode" in available_options:
             cmd += ["--proxy-mode"]
 
