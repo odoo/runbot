@@ -14,7 +14,7 @@
               <div>
                 <span t-attf-class="badge badge-{{pending_level}}">
                   Pending:
-                  <t t-esc="pending_total"/>
+                  <t t-esc="pending_count"/><span title="Assigned build (reserved host)" t-if="pending_assigned_count">(<t t-esc="pending_assigned_count"/>)</span>
                 </span>
               </div>
               <t t-set="project_id"/>
