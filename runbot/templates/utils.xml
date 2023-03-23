@@ -168,7 +168,7 @@
             <a href="/runbot/load_info" class="slots_infos">
                 <span t-attf-class="badge badge-{{pending_level}}">
                     Pending:
-                    <t t-esc="pending_total"/>
+                    <t t-esc="pending_count"/><span title="Assigned build (reserved host)" t-if="pending_assigned_count">(<t t-esc="pending_assigned_count"/>)</span>
                 </span>
                 <t t-set="testing" t-value="hosts_data._total_testing()"/>
                 <t t-set="workers" t-value="hosts_data._total_workers()"/>
