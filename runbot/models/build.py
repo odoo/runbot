@@ -362,13 +362,8 @@ class BuildResult(models.Model):
                 build._github_status()
 
         for init_global_state, build in zip(init_global_states, self):
-            if not build.parent_id and init_global_state not in ('done', 'running') and build.global_state in ('done', 'running'):
+            if init_global_state not in ('done', 'running') and build.global_state in ('done', 'running'):
                 build._github_status()
-
-        if values.get('global_state') in ('done', 'running'):
-            for build in self:
-                if not build.parent_id and build.global_state not in ('done', 'running'):
-                    build._github_status()
 
         return res
 
