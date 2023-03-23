@@ -282,6 +282,7 @@ class ConfigStep(models.Model):
         docker_params = run_method(build, log_path, **kwargs)
         if docker_params:
             return build._docker_run(**docker_params)
+        return True
 
     def _run_create_build(self, build, log_path):
         count = 0
