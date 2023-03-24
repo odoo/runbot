@@ -363,6 +363,7 @@ class BuildResult(models.Model):
 
         for init_global_state, build in zip(init_global_states, self):
             if init_global_state not in ('done', 'running') and build.global_state in ('done', 'running'):
+                build.build_end = now()
                 build._github_status()
 
         return res
