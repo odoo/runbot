@@ -353,17 +353,21 @@ class BuildResult(models.Model):
                     values.pop('local_result')
                 else:
                     raise ValidationError('Local result cannot be set to a less critical level')
-
         init_global_results = self.mapped('global_result')
         init_global_states = self.mapped('global_state')
+        init_local_states = self.mapped('local_state')
+
         res = super(BuildResult, self).write(values)
         for init_global_result, build in zip(init_global_results, self):
             if init_global_result != build.global_result:
                 build._github_status()
 
+        for init_local_state, build in zip(init_local_states, self):
+            if init_local_state not in ('done', 'running') and build.local_state in ('done', 'running'):
+                build.build_end = now()
+
         for init_global_state, build in zip(init_global_states, self):
             if init_global_state not in ('done', 'running') and build.global_state in ('done', 'running'):
-                build.build_end = now()
                 build._github_status()
 
         return res
