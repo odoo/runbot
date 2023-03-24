@@ -122,7 +122,8 @@ class Batch(models.Model):
             domain += [('host', '=', self.bundle_id.host_id.name), ('keep_host', '=', True)]
         build = self.env['runbot.build'].search(domain, limit=1, order='id desc')
         link_type = 'matched'
-        if build:
+        killed_states = ('skipped', 'killed', 'manually_killed')
+        if build and build.local_result not in killed_states and build.global_result not in killed_states:
             if build.killable:
                 build.killable = False
         else:
