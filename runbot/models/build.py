@@ -441,7 +441,7 @@ class BuildResult(models.Model):
     @api.depends('build_start', 'build_end', 'global_state')
     def _compute_build_time(self):
         for build in self:
-            if build.build_end and build.global_state != 'waiting':
+            if build.build_end and build.build_start:
                 build.build_time = int(dt2time(build.build_end) - dt2time(build.build_start))
             elif build.build_start:
                 build.build_time = int(time.time() - dt2time(build.build_start))
