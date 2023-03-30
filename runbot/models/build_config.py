@@ -321,8 +321,9 @@ class ConfigStep(models.Model):
             'PatchSet': PatchSet,
         }
 
-    def _run_python(self, build, log_path):
+    def _run_python(self, build, log_path, force=False):
         eval_ctx = self.make_python_ctx(build)
+        eval_ctx['force'] = force
         try:
             safe_eval(self.python_code.strip(), eval_ctx, mode="exec", nocopy=True)
             run = eval_ctx.get('run')
