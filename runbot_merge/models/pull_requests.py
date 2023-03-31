@@ -1722,7 +1722,7 @@ class Commit(models.Model):
 class Stagings(models.Model):
     _name = _description = 'runbot_merge.stagings'
 
-    target = fields.Many2one('runbot_merge.branch', required=True)
+    target = fields.Many2one('runbot_merge.branch', required=True, index=True)
 
     batch_ids = fields.One2many(
         'runbot_merge.batch', 'staging_id',
@@ -1737,7 +1737,7 @@ class Stagings(models.Model):
     ], default='pending')
     active = fields.Boolean(default=True)
 
-    staged_at = fields.Datetime(default=fields.Datetime.now)
+    staged_at = fields.Datetime(default=fields.Datetime.now, index=True)
     timeout_limit = fields.Datetime(store=True, compute='_compute_timeout_limit')
     reason = fields.Text("Reason for final state (if any)")
 
@@ -2127,9 +2127,9 @@ class Batch(models.Model):
     """
     _name = _description = 'runbot_merge.batch'
 
-    target = fields.Many2one('runbot_merge.branch', required=True)
-    staging_id = fields.Many2one('runbot_merge.stagings')
-    split_id = fields.Many2one('runbot_merge.split')
+    target = fields.Many2one('runbot_merge.branch', required=True, index=True)
+    staging_id = fields.Many2one('runbot_merge.stagings', index=True)
+    split_id = fields.Many2one('runbot_merge.split', index=True)
 
     prs = fields.Many2many('runbot_merge.pull_requests')
 

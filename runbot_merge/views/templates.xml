@@ -154,7 +154,7 @@
     <template id="stagings" name="mergebot branch stagings">
         <t t-set="repo_statuses" t-value="branch.project_id.repo_ids.having_branch(branch).status_ids"/>
         <ul class="list-unstyled stagings">
-            <t t-foreach="branch.staging_ids.sorted(lambda s: s.staged_at, reverse=True)[:6]" t-as="staging">
+            <t t-foreach="branch.env['runbot_merge.stagings'].search([('target', '=', branch.id)], order='staged_at desc', limit=6)" t-as="staging">
                 <t t-set="success" t-value="staging.state == 'success'"/>
                 <t t-set="failure" t-value="staging.state == 'failure'"/>
                 <t t-set="pending" t-value="staging.active and (not staging.state or staging.state == 'pending')"/>
