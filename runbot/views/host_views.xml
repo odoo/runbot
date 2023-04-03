@@ -17,19 +17,25 @@
                         <field name="assigned_only"/>
                         <field name="nb_worker"/>
                         <field name="nb_run_slot"/>
-                        <field name="build_ids" widget="many2many" options="{'not_delete': True, 'no_create_edit': True}" readonly="1">
-                            <tree>
-                                <field name="create_date"/>
-                                <field name="global_state"/>
-                                <field name="global_result"/>
-                                <field name="job"/>
-                                <field name="dest" widget="char_frontend_url"/>
-                            </tree>
-                        </field>
                         <field name="last_exception" readonly='1'/>
                         <field name="exception_count" readonly='1'/>
-                        <field name="host_message_ids" readonly='1'/>
                     </group>
+                    <notebook>
+                        <page string="Messages">
+                            <field name="host_message_ids" readonly='1'/>
+                        </page>
+                        <page string="Builds">
+                            <field name="build_ids" widget="many2many" options="{'not_delete': True, 'no_create_edit': True}" readonly='1'>
+                                <tree string="Builds">
+                                    <field name="create_date"/>
+                                    <field name="global_state"/>
+                                    <field name="global_result"/>
+                                    <field name="job"/>
+                                    <field name="dest" widget="char_frontend_url"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
                 </sheet>
                 <div class="oe_chatter">
                     <field name="message_follower_ids"/>
