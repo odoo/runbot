@@ -313,6 +313,15 @@
                       </t>
                     </t>
                   </td>
+                  <td t-attf-class="bg-{{message_class.strip() or logclass}}-light">
+                    <t t-if="l.level in ('CRITICAL', 'ERROR', 'WARNING') and not l.with_context(active_test=False).error_id">
+                      <small>
+                        <a groups="runbot.group_runbot_admin" t-attf-href="/runbot/parse_log/{{l.id}}" class="sm" title="Parse this log line to follow this error.">
+                          <i t-attf-class="fa fa-magic"/>
+                        </a>
+                      </small>
+                    </t>
+                  </td>
                 </tr>
                 <t t-if="l.with_context(active_test=False).error_id">
                   <t t-set="icon" t-value="'list'"/>
@@ -325,7 +334,7 @@
                   </t>
                   <tr>
                     <td/><td/><td/>
-                    <td t-attf-class="bg-{{'info' if error.active else 'success'}}-light {{size}}">
+                    <td t-attf-class="bg-{{'info' if error.active else 'success'}}-light {{size}}" colspan="2">
                       This error is already <t t-esc="'known' if error.active else 'fixed'"/>.
                       <a groups="runbot.group_user" t-attf-href="/web#id={{l.error_id.id}}&amp;view_type=form&amp;model=runbot.build.error&amp;menu_id={{env.ref('runbot.runbot_menu_root').id}}" title="View in Backend" target="new">
                         <i t-attf-class="fa fa-{{icon}}"/>

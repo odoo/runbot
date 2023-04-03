@@ -624,3 +624,8 @@ class Runbot(Controller):
         run_url = build._get_run_url(db_suffix)
         _logger.info('Redirecting to %s', run_url)
         return werkzeug.utils.redirect(run_url)
+
+    @route(['/runbot/parse_log/<model("ir.logging"):ir_log>'], type='http', auth='user', website=True, sitemap=False)
+    def parse_log(self, ir_log, **kwargs):
+        request.env['runbot.build.error']._parse_logs(ir_log)
+        return werkzeug.utils.redirect('/runbot/build/%s' % ir_log.build_id.id)
