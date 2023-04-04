@@ -404,8 +404,15 @@ class TestBuildConfigStep(TestBuildConfigStepCommon):
 
         config_step._run_install_odoo(self.parent_build, 'dev/null/logpath')
 
+    def get_test_tags(self, params):
+        cmds = params['cmd'].build().split(' && ')
+        self.assertEqual(cmds[1].split(' server/server.py')[0], 'python3')
+        return cmds[1].split('--test-tags ')[1].split(' ')[0]
+
+    @patch('odoo.addons.runbot.models.build.BuildResult.parse_config')
     @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
-    def test_install_tags(self, mock_checkout):
+    def test_install_tags(self, mock_checkout, parse_config):
+        parse_config.return_value = {'--test-enable', '--test-tags'}
         config_step = self.ConfigStep.create({
             'name': 'all',
             'job_type': 'install_odoo',
@@ -417,26 +424,36 @@ class TestBuildConfigStep(TestBuildConfigStepCommon):
             'random': True,
             'test_tags': ':otherclass.othertest'
         })
-
-        def docker_run(cmd, *args, **kwargs):
-            cmds = cmd.build().split(' && ')
-            self.assertEqual(cmds[1].split(' server/server.py')[0], 'python3')
-            tags = cmds[1].split('--test-tags ')[1].split(' ')[0]
-            self.assertEqual(tags, '/module,:class.method')
-
-        self.patchers['docker_run'].side_effect = docker_run
-        config_step._run_install_odoo(self.parent_build, 'dev/null/logpath')
+        params = config_step._run_install_odoo(self.parent_build, 'dev/null/logpath')
+        tags = self.get_test_tags(params)
+        self.assertEqual(tags, '/module,:class.method')
 
         config_step.enable_auto_tags = True
+        params = config_step._run_install_odoo(self.parent_build, 'dev/null/logpath')
+        tags = self.get_test_tags(params)
+        self.assertEqual(tags, '/module,:class.method,-:otherclass.othertest')
 
-        def docker_run2(cmd, *args, **kwargs):
-            cmds = cmd.build().split(' && ')
-            self.assertEqual(cmds[1].split(' server/server.py')[0], 'python3')
-            tags = cmds[1].split('--test-tags ')[1].split(' ')[0]
-            self.assertEqual(tags, '/module,:class.method,-:otherclass.othertest')
+    @patch('odoo.addons.runbot.models.build.BuildResult.parse_config')
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
+    def test_install_custom_tags(self, mock_checkout, parse_config):
+        parse_config.return_value = {'--test-enable', '--test-tags'}
+        config_step = self.ConfigStep.create({
+            'name': 'all',
+            'job_type': 'install_odoo',
+            'enable_auto_tags': True,
+        })
+        self.env['runbot.build.error'].create({
+            'content': 'foo',
+            'random': True,
+            'test_tags': ':otherclass.othertest'
+        })
 
-        self.patchers['docker_run'].side_effect = docker_run2
-        config_step._run_install_odoo(self.parent_build, 'dev/null/logpath')
+        child = self.parent_build._add_child({'config_data': {'test_tags': '-at_install,/module1,/module2'}})
+
+        params = config_step._run_install_odoo(child, 'dev/null/logpath')
+        tags = self.get_test_tags(params)
+        self.assertEqual(tags, '-at_install,/module1,/module2,-:otherclass.othertest')
+
 
     @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
     def test_db_name(self, mock_checkout):

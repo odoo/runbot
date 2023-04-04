@@ -435,25 +435,27 @@ class ConfigStep(models.Model):
                 cmd.extend(['--test-enable'])
             else:
                 build._log('test_all', 'Installing modules without testing', level='WARNING')
+
         test_tags_in_extra = '--test-tags' in extra_params
 
-        disable_auto_tags = build.params_id.config_data.get('disable_auto_tags', False)
-        if self.test_tags or test_tags_in_extra:
-            if "--test-tags" in available_options:
-                if not test_tags_in_extra:
-                    test_tags = self.test_tags.replace(' ', '')
-                    if self.enable_auto_tags and not disable_auto_tags:
-                        auto_tags = self.env['runbot.build.error'].disabling_tags()
-                        test_tags = ','.join(test_tags.split(',') + auto_tags)
-                    cmd.extend(['--test-tags', test_tags])
-            else:
-                build._log('test_all', 'Test tags given but not supported')
-        elif self.enable_auto_tags and self.test_enable and not disable_auto_tags:
-            if grep(config_path, "[/module][:class]"):
-                auto_tags = self.env['runbot.build.error'].disabling_tags()
-                if auto_tags:
-                    test_tags = ','.join(auto_tags)
-                    cmd.extend(['--test-tags', test_tags])
+        if (self.test_enable or self.test_tags) and "--test-tags" in available_options and not test_tags_in_extra:
+            test_tags = []
+            custom_tags = build.params_id.config_data.get('test_tags')
+            if custom_tags:
+                test_tags += custom_tags.replace(' ', '').split(',')
+            if self.test_tags:
+                test_tags += self.test_tags.replace(' ', '').split(',')
+            if self.enable_auto_tags and not build.params_id.config_data.get('disable_auto_tags', False):
+                if grep(config_path, "[/module][:class]"):
+                    auto_tags = self.env['runbot.build.error'].disabling_tags()
+                    if auto_tags:
+                        test_tags += auto_tags
+
+            test_tags = [test_tag for test_tag in test_tags if test_tag]
+            if test_tags:
+                cmd.extend(['--test-tags', ','.join(test_tags)])
+        elif test_tags_in_extra or self.test_tags and "--test-tags" not in available_options:
+            build._log('test_all', 'Test tags given but not supported')
 
         if "--screenshots" in available_options:
             cmd.add_config_tuple('screenshots', '/data/build/tests')
