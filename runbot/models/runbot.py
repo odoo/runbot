@@ -102,7 +102,9 @@ class Runbot(models.AbstractModel):
             if build.host == host.name
         ][:running_max]
         build_ids = host.get_builds([('local_state', '=', 'running'), ('id', 'not in', cannot_be_killed_ids)], order='job_start desc').ids
-        Build.browse(build_ids)[running_max:]._kill()
+        for build in Build.browse(build_ids)[running_max:]:
+            build._kill()
+
 
     def _gc_testing(self, host):
         """garbage collect builds that could be killed"""
