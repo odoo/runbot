@@ -32,7 +32,6 @@ class Hook(http.Controller):
                 if not remote_id:
                     _logger.error("Remote %s not found", repo_data['ssh_url'])
         remote = request.env['runbot.remote'].sudo().browse(remote_id)
-        _logger.info('Remote found %s', remote)
 
         # force update of dependencies too in case a hook is lost
         if not payload or event == 'push':
