@@ -287,7 +287,12 @@ class MessageQueue(models.Model):
 
     def _process(self):
         records = self
-        # todo consume messages here
+        global_updates = records.filtered(lambda r: r.message == 'global_updated')
+        global_updates.build_id._update_globals()
+        records -= global_updates
+        # ask_kills = records.filtered(lambda r: r.message == 'ask_kill')
+        # ask_kills.build_id._ask_kill()
+        # records -= ask_kills
         if records:
             for record in records:
                 self.env['runbot.runbot'].warning(f'Host {record.host_id.name} got an unexpected message {record.message}')

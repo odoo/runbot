@@ -173,10 +173,9 @@ class TestBuildResult(RunbotCase):
 
         # test a bulk write, that one cannot change from 'ko' to 'ok'
         builds = self.Build.browse([build.id, other.id])
-        with self.assertRaises(ValidationError):
-            builds.write({'local_result': 'warn'})
-        # self.assertEqual(build.local_result, 'warn')
-        # self.assertEqual(other.local_result, 'ko')
+        builds.write({'local_result': 'warn'})
+        self.assertEqual(build.local_result, 'warn')
+        self.assertEqual(other.local_result, 'ko')
 
 
     def test_markdown_description(self):
@@ -385,16 +384,16 @@ class TestBuildResult(RunbotCase):
         with self.assertQueries([]):  # no change should be triggered
             build1_2.local_state = "testing"
 
-        # with self.assertQueries(['''UPDATE "runbot_build" SET "global_state"=%s,"local_state"=%s,"write_date"=%s,"write_uid"=%s WHERE id IN %s''']):
-        build1.local_state = 'done'
-        build1.flush()
+        with self.assertQueries(['''UPDATE "runbot_build" SET "global_state"=%s,"local_state"=%s,"write_date"=%s,"write_uid"=%s WHERE id IN %s''']):
+            build1.local_state = 'done'
+            build1.flush()
 
         self.assertEqual('waiting', build1.global_state)
         self.assertEqual('testing', build1_1.global_state)
 
-        # with self.assertQueries([]): # write the same value, no update should be triggered
-        build1.local_state = 'done'
-        build1.flush()
+        with self.assertQueries([]): # write the same value, no update should be triggered
+            build1.local_state = 'done'
+            build1.flush()
 
         build1_1.local_state = 'done'
 
