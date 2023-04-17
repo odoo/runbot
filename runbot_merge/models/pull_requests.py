@@ -2197,8 +2197,8 @@ class Batch(models.Model):
                         yield from value.splitlines(keepends=True)
                         yield '\n'
 
-                old = list(format_items((n, v) for n, v, _ in e.args[1]))
-                new = list(format_items((n, v) for n, _, v in e.args[1]))
+                old = list(format_items((n, str(v)) for n, v, _ in e.args[1]))
+                new = list(format_items((n, str(v)) for n, _, v in e.args[1]))
                 diff = ''.join(Differ().compare(old, new))
                 _logger.warning(
                     "data mismatch on %s:\n%s",
