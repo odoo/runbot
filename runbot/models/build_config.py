@@ -859,7 +859,7 @@ class ConfigStep(models.Model):
         kwargs = dict(message='Step %s finished in %s' % (self.name, s2human(build.job_time)))
         if self.job_type == 'install_odoo':
             kwargs['message'] += ' $$fa-download$$'
-            db_suffix = build.params_id.config_data.get('db_name') or self.db_name
+            db_suffix = build.params_id.config_data.get('db_name') or (build.params_id.dump_db.db_suffix if not self.create_db else False) or self.db_name
             kwargs['path'] = '%s%s-%s.zip' % (build.http_log_url(), build.dest, db_suffix)
             kwargs['log_type'] = 'link'
         build._log('', **kwargs)

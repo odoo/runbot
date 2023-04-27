@@ -165,7 +165,7 @@ class Batch(models.Model):
         if not bundle.version_id:
             _logger.error('No version found on bundle %s in project %s', bundle.name, project.name)
 
-        dockerfile_id = bundle.dockerfile_id or bundle.base_id.dockerfile_id or bundle.version_id.dockerfile_id or bundle.project_id.dockerfile_id
+        dockerfile_id = bundle.dockerfile_id or bundle.base_id.dockerfile_id or bundle.project_id.dockerfile_id or bundle.version_id.dockerfile_id
         if not dockerfile_id:
             _logger.error('No dockerfile found !')
 
