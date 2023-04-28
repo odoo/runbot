@@ -1012,7 +1012,7 @@ class BuildResult(models.Model):
         _logger.error('None of %s found in commit, actual commit content:\n %s' % (commit.repo_id.server_files, os.listdir(commit._source_path())))
         raise RunbotException('No server found in %s' % commit.dname)
 
-    def _cmd(self, python_params=None, py_version=None, local_only=True, sub_command=None):
+    def _cmd(self, python_params=None, py_version=None, local_only=True, sub_command=None, enable_log_db=True):
         """Return a list describing the command to start the build
         """
         self.ensure_one()
@@ -1056,11 +1056,12 @@ class BuildResult(models.Model):
             elif grep(config_path, "--xmlrpc-interface"):
                 command.add_config_tuple("xmlrpc_interface", "127.0.0.1")
 
-        log_db = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
-        if grep(config_path, "log-db"):
-            command.add_config_tuple("log_db", log_db)
-            if grep(config_path, 'log-db-level'):
-                command.add_config_tuple("log_db_level", '25')
+        if enable_log_db:
+            log_db = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
+            if grep(config_path, "log-db"):
+                command.add_config_tuple("log_db", log_db)
+                if grep(config_path, 'log-db-level'):
+                    command.add_config_tuple("log_db_level", '25')
 
         if grep(config_path, "data-dir"):
             datadir = build._path('datadir')

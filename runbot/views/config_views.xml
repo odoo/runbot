@@ -77,6 +77,7 @@
                     <group string="Extra Parameters" attrs="{'invisible': [('job_type', 'not in', ('python', 'install_odoo', 'test_upgrade', 'run_odoo'))]}">
                         <field name="extra_params"/>
                         <field name="additionnal_env"/>
+                        <field name="enable_log_db"/>
                     </group>
                     <group string="Create settings" attrs="{'invisible': [('job_type', 'not in', ('python', 'create_build'))]}">
                         <field name="create_config_ids" widget="many2many_tags" options="{'no_create': True}" />

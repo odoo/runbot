@@ -163,6 +163,7 @@ class ConfigStep(models.Model):
     sub_command = fields.Char('Subcommand', tracking=True)
     extra_params = fields.Char('Extra cmd args', tracking=True)
     additionnal_env = fields.Char('Extra env', help='Example: foo="bar";bar="foo". Cannot contains \' ', tracking=True)
+    enable_log_db = fields.Boolean("Enable log db", default=True)
     # python
     python_code = fields.Text('Python code', tracking=True, default=PYTHON_DEFAULT)
     python_result_code = fields.Text('Python code for result', tracking=True, default=PYTHON_DEFAULT)
@@ -357,10 +358,9 @@ class ConfigStep(models.Model):
 
         exports = build._checkout()
 
-        # adjust job_end to record an accurate job_20 job_time
         build._log('run', 'Start running build %s' % build.dest)
         # run server
-        cmd = build._cmd(local_only=False)
+        cmd = build._cmd(local_only=False, enable_log_db=self.enable_log_db)
 
         available_options = build.parse_config()
 
@@ -416,7 +416,7 @@ class ConfigStep(models.Model):
             python_params = ['-m', 'coverage', 'run', '--branch', '--source', '/data/build'] + coverage_extra_params
         elif self.flamegraph:
             python_params = ['-m', 'flamegraph', '-o', self._perfs_data_path()]
-        cmd = build._cmd(python_params, py_version, sub_command=self.sub_command)
+        cmd = build._cmd(python_params, py_version, sub_command=self.sub_command, enable_log_db=self.enable_log_db)
         # create db if needed
         db_suffix = build.params_id.config_data.get('db_name') or (build.params_id.dump_db.db_suffix if not self.create_db else False) or self.db_name
         db_name = '%s-%s' % (build.dest, db_suffix)
@@ -715,7 +715,7 @@ class ConfigStep(models.Model):
         db_suffix = build.params_id.config_data.get('db_name') or build.params_id.dump_db.db_suffix
         migrate_db_name = '%s-%s' % (build.dest, db_suffix)  # only ok if restore does not force db_suffix
 
-        migrate_cmd = build._cmd()
+        migrate_cmd = build._cmd(enable_log_db=self.enable_log_db)
         migrate_cmd += ['-u all']
         migrate_cmd += ['-d', migrate_db_name]
         migrate_cmd += ['--stop-after-init']
