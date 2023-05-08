@@ -760,6 +760,13 @@ class BuildResult(models.Model):
                 next_index += 1
                 continue
             break
+
+        if new_step and self.active_step and self.active_step.break_on_ko and self.local_result == 'ko':
+            self._log('break_on_ko', 'Build is in failure, stopping')
+            self.local_state = 'done'
+            self.active_step = False
+            return
+
         build.active_step = new_step.id
         build.local_state = new_step._step_state()
 
