@@ -90,10 +90,10 @@ function process_chart_data(){
     var older_build_stats = config.result[builds[0]];
     var keys = Object.keys(newer_build_stats) ;
     if (aggregate != 'sum') {
-      keys.splice(keys.indexOf('Aggregate Sum'));
+      keys.splice(keys.indexOf('Aggregate Sum'), 1);
     }
     if (aggregate != 'average') {
-      keys.splice(keys.indexOf('Aggregate Average'));
+      keys.splice(keys.indexOf('Aggregate Average'), 1);
     }
     var mode = document.getElementById('mode_selector').value;
 
