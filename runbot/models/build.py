@@ -827,7 +827,8 @@ class BuildResult(models.Model):
         return os.path.join(root, 'build', build.dest, *l)
 
     def http_log_url(self):
-        return 'http://%s/runbot/static/build/%s/logs/' % (self.host, self.dest)
+        use_ssl = self.env['ir.config_parameter'].get_param('runbot.use_ssl', default=True)
+        return '%s://%s/runbot/static/build/%s/logs/' % ('https' if use_ssl else 'http', self.host, self.dest)
 
     def _server(self, *path):
         """Return the absolute path to the direcory containing the server file, adding optional *path"""
