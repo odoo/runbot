@@ -5,6 +5,7 @@
         <field name="model">runbot.build.error</field>
         <field name="arch" type="xml">
           <form>
+            <widget name="web_ribbon" title="Test-tags" bg_color="bg-warning" attrs="{'invisible': [('test_tags', '=', False)]}"/>
             <header>
             </header>
               <group>
@@ -20,6 +21,7 @@
                   <field name="responsible" attrs="{'readonly': [('parent_id','!=', False), ('responsible','=', False)]}"/>
                   <field name="team_id" attrs="{'readonly': [('parent_id','!=', False), ('team_id','=', False)]}"/>
                   <field name="fixing_pr_id"/>
+                  <field name="fixing_pr_url" widget="url"/>
                   <field name="active"/>
                   <field name="test_tags" readonly="1" groups="!runbot.group_runbot_admin"/>
                   <field name="test_tags" groups="runbot.group_runbot_admin" attrs="{'readonly': [('parent_id','!=', False), ('test_tags','=', False)]}"/>
@@ -110,7 +112,11 @@
         <field name="name">runbot.build.error.tree</field>
         <field name="model">runbot.build.error</field>
         <field name="arch" type="xml">
-            <tree string="Errors" decoration-danger="test_tags" multi_edit="1">
+            <tree string="Errors" 
+                  decoration-danger="test_tags and (fixing_pr_alive or not fixing_pr_id)" 
+                  decoration-success="fixing_pr_id and not test_tags and not fixing_pr_alive"
+                  decoration-warning="test_tags and fixing_pr_id and not fixing_pr_alive"
+                  multi_edit="1">
                 <field name="module_name" readonly="1"/>
                 <field name="summary" readonly="1"/>
                 <field name="random" string="Random"/>
@@ -119,6 +125,9 @@
                 <field name="responsible"/>
                 <field name="team_id"/>
                 <field name="test_tags"/>
+                <field name="fixing_pr_id"/>
+                <field name="fixing_pr_alive" invisible="1"/>
+                <field name="fixing_pr_url" widget="url" text="view PR" readonly="1"/>
             </tree>
         </field>
     </record>
@@ -135,6 +144,8 @@
           <field name="responsible"/>
           <field name="team_id"/>
           <field name="fixing_commit"/>
+          <filter string="Assigned to me" name="my_errors" domain="[('responsible', '=', uid)]"/>
+          <separator/>
           <filter string="No Parent" name="no_parent_error" domain="[('parent_id', '=', False)]"/>
           <separator/>
           <filter string="Undeterministic" name="random_error" domain="[('random', '=', True)]"/>
@@ -144,6 +155,10 @@
           <filter string="Not Fixed" name="not_fixed_errors" domain="[('active', '=', True)]"/>
           <separator/>
           <filter string="Not Assigned" name="not_assigned_errors" domain="[('responsible', '=', False)]"/>
+          <filter string="Assigned" name="assigned_errors" domain="[('responsible', '!=', False)]"/>
+          <filter string="Having a PR" name="pr_set_errors" domain="[('fixing_pr_id', '!=', False)]"/>
+          <filter string="Fixing PR is closed" name="pr_closed_errors" domain="[('fixing_pr_id', '!=', False), ('fixing_pr_id.alive', '=', False)]"/>
+          <filter string="Fixing PR is open" name="pr_open_errors" domain="[('fixing_pr_id', '!=', False), ('fixing_pr_id.alive', '=', True)]"/>
           <separator/>
           <filter string="Test Tags" name="test_tagged_errors" domain="[('test_tags', '!=', False)]"/>
         </search>

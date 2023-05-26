@@ -33,6 +33,8 @@ class BuildError(models.Model):
     team_id = fields.Many2one('runbot.team', 'Assigned team', tracking=True)
     fixing_commit = fields.Char('Fixing commit', tracking=True)
     fixing_pr_id = fields.Many2one('runbot.branch', 'Fixing PR', tracking=True, domain=[('is_pr', '=', True)])
+    fixing_pr_alive = fields.Boolean('Fixing PR alive', related='fixing_pr_id.alive')
+    fixing_pr_url = fields.Char('Fixing PR url', related='fixing_pr_id.branch_url')
     build_ids = fields.Many2many('runbot.build', 'runbot_build_error_ids_runbot_build_rel', string='Affected builds')
     bundle_ids = fields.One2many('runbot.bundle', compute='_compute_bundle_ids')
     version_ids = fields.One2many('runbot.version', compute='_compute_version_ids', string='Versions', search='_search_version')
