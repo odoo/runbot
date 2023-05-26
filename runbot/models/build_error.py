@@ -306,6 +306,8 @@ class ErrorReassignWizard(models.TransientModel):
 
     team_id = fields.Many2one('runbot.team', 'Assigned team')
     responsible_id = fields.Many2one('res.users', 'Assigned fixer')
+    fixing_pr_id = fields.Many2one('runbot.branch', 'Fixing PR', domain=[('is_pr', '=', True)])
+    fixing_commit = fields.Char('Fixing commit')
 
     def submit(self):
         error_ids = self.env['runbot.build.error'].browse(self.env.context.get('active_ids'))
@@ -314,3 +316,7 @@ class ErrorReassignWizard(models.TransientModel):
                 error_ids['team_id'] = self.team_id
             if self.responsible_id:
                 error_ids['responsible'] = self.responsible_id
+            if self.fixing_pr_id:
+                error_ids['fixing_pr_id'] = self.fixing_pr_id
+            if self.fixing_commit:
+                error_ids['fixing_commit'] = self.fixing_commit

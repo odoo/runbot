@@ -259,6 +259,10 @@
                 <field name="team_id"/>
                 <field name="responsible_id"/>
               </group>
+              <group name="Fix">
+                <field name="fixing_pr_id"/>
+                <field name="fixing_commit"/>
+              </group>
               <footer>
                 <button string="Submit" name="submit" type="object" class="btn-primary"/>
                 <button string="Cancel" class="btn-secondary" special="cancel"/>
@@ -269,7 +273,7 @@
     </record>
 
     <record id="runbot_open_reassign_wizard" model="ir.actions.act_window">
-        <field name="name">Reassign to another Team and/or User</field>
+        <field name="name">Assign Team/User/PR Wizard</field>
         <field name="res_model">runbot.error.reassign.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
