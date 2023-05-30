@@ -20,7 +20,7 @@ def rev_parse(repo, branch_name):
     return head_hash
 
 
-@tagged('-at_install', 'post_istall')
+@tagged('-at_install', 'post_install')
 class TestBuildParams(RunbotCaseMinimalSetup):
 
     def setUp(self):
