@@ -239,7 +239,7 @@ class RunbotCase(TransactionCase):
             'head': initial_addons_commit.id,
         })
         self.assertEqual(self.branch_addons.bundle_id, self.branch_server.bundle_id)
-        triggers = self.env['runbot.trigger'].search([])
+        triggers = self.env['runbot.trigger'].search([('repo_ids', 'in', [self.repo_addons.id, self.repo_server.id])])
 
         self.assertEqual(triggers.repo_ids + triggers.dependency_ids, self.remote_addons.repo_id + self.remote_server.repo_id)
 
