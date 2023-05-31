@@ -46,30 +46,20 @@
               </group>
               <notebook>
                 <page string="Builds">
-                  <field name="build_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}">
+                  <field name="children_build_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
                     <tree>
                       <field name="create_date"/>
                       <field name="host" groups="base.group_no_one"/>
                       <field name="dest"/>
+                      <field name="version_id"/>
                       <field name="trigger_id"/>
                       <field name="description"/>
                       <field name="build_url" widget="url" readonly="1" text="View build"/>
                     </tree>
                   </field>
                 </page>
-                <page string="All Errors Builds">
-                  <field name="children_build_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}">
-                    <tree>
-                      <field name="create_date"/>
-                      <field name="id"/>
-                      <field name="host" groups="base.group_no_one"/>
-                      <field name="dest"/>
-                      <field name="build_url" widget="url" readonly="1" text="View build"/>
-                    </tree>
-                  </field>
-                </page>
-                <page string="Linked Errors">
-                  <field name="child_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}">
+                <page string="Linked Errors" attrs="{'invisible': [('child_ids', '=', [])]}">
+                  <field name="child_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
                     <tree>
                       <field name="create_date"/>
                       <field name="module_name"/>
@@ -78,8 +68,8 @@
                     </tree>
                   </field>
                 </page>
-                <page string="Error history">
-                  <field name="error_history_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}">
+                <page string="Error history" attrs="{'invisible': [('error_history_ids', '=', [])]}">
+                  <field name="error_history_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
                     <tree>
                       <field name="create_date"/>
                       <field name="module_name"/>
@@ -88,13 +78,14 @@
                       <field name="build_count"/>
                       <field name="responsible"/>
                       <field name="fixing_commit"/>
+                      <field name="id"/>
                     </tree>
                   </field>
                 </page>
                 <page string="Debug" groups="base.group_no_one">
                   <group name="build_error_group">
                     <field name="fingerprint" readonly="1"/>
-                    <field name="cleaned_content"/>
+                    <field name="cleaned_content" readonly="1"/>
                     <field name="fixing_commit"/>
                     <field name="bundle_ids" widget="many2many_tags"/>
                   </group>
