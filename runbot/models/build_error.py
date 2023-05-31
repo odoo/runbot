@@ -39,7 +39,7 @@ class BuildError(models.Model):
     bundle_ids = fields.One2many('runbot.bundle', compute='_compute_bundle_ids')
     version_ids = fields.One2many('runbot.version', compute='_compute_version_ids', string='Versions', search='_search_version')
     trigger_ids = fields.Many2many('runbot.trigger', compute='_compute_trigger_ids', string='Triggers', search='_search_trigger_ids')
-    active = fields.Boolean('Error is not fixed', default=True, tracking=True)
+    active = fields.Boolean('Active (not fixed)', default=True, tracking=True)
     tag_ids = fields.Many2many('runbot.build.error.tag', string='Tags')
     build_count = fields.Integer(compute='_compute_build_counts', string='Nb seen', store=True)
     parent_id = fields.Many2one('runbot.build.error', 'Linked to', index=True)
