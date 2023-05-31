@@ -86,7 +86,7 @@
                   <group name="build_error_group">
                     <field name="fingerprint" readonly="1"/>
                     <field name="cleaned_content" readonly="1"/>
-                    <field name="fixing_commit"/>
+                    <field name="fixing_commit" widget="url"/>
                     <field name="bundle_ids" widget="many2many_tags"/>
                   </group>
                 </page>
