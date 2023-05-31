@@ -39,7 +39,7 @@
                 <div class="oe_button_box" name="button_box">
                 </div>
                 <group>
-                    <field name="name"/>
+                    <field name="name" widget="char_frontend_url"/>
                     <field name="project_id"/>
                     <field name="sticky" readonly="0"/>
                     <field name="to_upgrade" readonly="0"/>
@@ -124,7 +124,7 @@
         <field name="arch" type="xml">
             <tree string="Bundle">
                 <field name="project_id"/>
-                <field name="name"/>
+                <field name="name" widget="char_frontend_url"/>
                 <field name="version_number"/>
                 <field name="is_base"/>
                 <field name="sticky"/>

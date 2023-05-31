@@ -36,6 +36,29 @@ var FieldJson = basic_fields.FieldChar.extend({
 
 registry.add('jsonb', FieldJson)
 
+var FieldCharFrontendUrl = basic_fields.FieldChar.extend({
+    quickEditExclusion: [
+        '.fa-external-link',
+    ],
+    init() {
+        this._super.apply(this, arguments);
+        if (this.model.startsWith('runbot.')) {
+            this.route = '/runbot/' + this.model.split('.')[1] + '/' + this.res_id;
+        } else {
+            this.route = false;
+        }
+    },
+    _renderReadonly: function() {
+        this._super.apply(this, arguments);
+        var link= '';
+        if (this.route) {
+            link = ' <a href="'+this.route+'" target="_blank"><i class="external_link fa fa-fw o_button_icon fa-external-link "/></a>';
+            this.$el.html('<span>' + this.$el.html() + link + '<span>');
+        }
+    }
+});
+
+registry.add('char_frontend_url', FieldCharFrontendUrl)
 
 var FrontendUrl = relational_fields.FieldMany2One.extend({
     isQuickEditable: false,
