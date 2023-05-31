@@ -54,7 +54,7 @@ var FrontendUrl = relational_fields.FieldMany2One.extend({
         this._super.apply(this, arguments);
         var link = ''
         if (this.route) {
-            link = ' <a href="'+this.route+'" ><i class="external_link fa fa-fw o_button_icon fa-external-link "/></a>'
+            link = ' <a href="'+this.route+'" target="_blank"><i class="external_link fa fa-fw o_button_icon fa-external-link "/></a>'
         }
         this.$el.html('<span>' + this.$el.html() + link + '<span>')
     },
