@@ -18,7 +18,7 @@ class BuildError(models.Model):
     _name = "runbot.build.error"
     _description = "Build error"
 
-    _inherit = "mail.thread"
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     _rec_name = "id"
 
     content = fields.Text('Error message', required=True)
