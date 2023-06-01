@@ -39,29 +39,41 @@ proxy_set_header Host $host;
 
 server {
     listen 8080 default;
-    location / { proxy_pass http://127.0.0.1:<t t-esc="port"/>; }
-    location /longpolling/im/poll { return 404; }
-    location /longpolling/poll { return 404; }
     location /runbot/static/ {
-       alias <t t-esc="runbot_static"/>;
-       autoindex off;
-       location ~ /runbot/static/build/[^/]+/(logs|tests)/ {
+      alias <t t-esc="runbot_static"/>;
+      autoindex off;
+      return 404;
+      location /runbot/static/src { }
+      location ~ /runbot/static/build/[^/]+/(logs|tests|coverage)/ {
           autoindex on;
-          add_header 'Access-Control-Allow-Origin' 'https://<t t-esc="runbot_domain"/>';
-       }
+          add_header 'Access-Control-Allow-Origin' '<t t-esc="base_url"/>';
+      }
     }
 }
+
+
+<t id="root_anchor"/>
+
 <t t-foreach="builds" t-as="build">
 server {
     listen 8080;
-    server_name ~^<t t-raw="re_escape(build.dest)"/>(-[a-z0-9_]+)?\.<t t-raw="re_escape(fqdn)"/>$;
+    server_name ~^<t t-out="re_escape(build.dest)"/>(-[a-z0-9_]+)?\.<t t-esc="re_escape(build.host)"/>$;
     location / { proxy_pass http://127.0.0.1:<t t-esc="build.port"/>; }
     location /longpolling { proxy_pass http://127.0.0.1:<t t-esc="build.port + 1"/>; }
+    location /websocket {
+      proxy_pass http://127.0.0.1:<t t-esc="build.port + 1"/>;
+      proxy_set_header X-Forwarded-Host $host;
+      proxy_set_header X-Forwarded-Proto $real_scheme;
+      proxy_set_header Host $host;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "Upgrade";
+    }
+    <t id="build_anchor"/>
 }
 </t>
 server {
     listen 8080;
-    server_name ~.+\.<t t-raw="re_escape(fqdn)"/>$;
+    server_name ~.+\.<t t-out="re_escape(host_name)"/>$;
     location / { return 404; }
 }
 }

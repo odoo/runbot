@@ -1,0 +1,51 @@
+<odoo>
+    <record id="action_forward_port" model="ir.actions.act_window">
+        <field name="name">Forward port batches</field>
+        <field name="res_model">forwardport.batches</field>
+        <field name="context">{'active_test': False}</field>
+    </record>
+    <record id="tree_forward_port" model="ir.ui.view">
+        <field name="name">Forward port batches</field>
+        <field name="model">forwardport.batches</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="source"/>
+                <field name="batch_id"/>
+            </tree>
+        </field>
+    </record>
+    <record id="form_forward_port" model="ir.ui.view">
+        <field name="name">Forward port batch</field>
+        <field name="model">forwardport.batches</field>
+        <field name="arch" type="xml">
+            <form>
+                <group>
+                    <group><field name="source"/></group>
+                    <group><field name="batch_id"/></group>
+                </group>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_followup_updates" model="ir.actions.act_window">
+        <field name="name">Followup Updates</field>
+        <field name="res_model">forwardport.updates</field>
+    </record>
+    <record id="tree_followup_updates" model="ir.ui.view">
+        <field name="name">Followup Updates</field>
+        <field name="model">forwardport.updates</field>
+        <field name="arch" type="xml">
+            <tree editable="bottom">
+                <field name="original_root"/>
+                <field name="new_root"/>
+            </tree>
+        </field>
+    </record>
+
+    <menuitem name="Forward Port Batches" id="menu_forward_port"
+              parent="runbot_merge.menu_queues"
+              action="action_forward_port"/>
+    <menuitem name="Followup Updates" id="menu_followup"
+              parent="runbot_merge.menu_queues"
+              action="action_followup_updates"/>
+</odoo>

@@ -15,6 +15,7 @@ class TestCron(RunbotCase):
 
     def setUp(self):
         super(TestCron, self).setUp()
+        self.start_patcher('list_local_dbs_patcher', 'odoo.addons.runbot.models.host.list_local_dbs', ['runbot_logs'])
         self.start_patcher('_get_cron_period', 'odoo.addons.runbot.models.runbot.Runbot._get_cron_period', 2)
 
     @patch('time.sleep', side_effect=sleep)
@@ -37,7 +38,7 @@ class TestCron(RunbotCase):
     def test_cron_build(self, mock_scheduler, mock_host_bootstrap, mock_host_docker_build, *args):
         """ test that cron_fetch_and_build do its work """
         hostname = 'cronhost.runbot.com'
-        self.patchers['fqdn_patcher'].return_value = hostname
+        self.patchers['hostname_patcher'].return_value = hostname
         self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_update_frequency', 1)
         self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_do_schedule', True)
         self.env['runbot.repo'].search([('id', '!=', self.repo_server.id)]).write({'mode': 'disabled'})  # disable all other existing repo than repo_server

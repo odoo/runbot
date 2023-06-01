@@ -1,7 +1,7 @@
 
 import subprocess
 
-from ..common import os, RunbotException
+from ..common import os, RunbotException, _make_github_session
 import glob
 import shutil
 
@@ -52,11 +52,12 @@ class Commit(models.Model):
                     module = os.path.basename(os.path.dirname(manifest_path))
                     yield (addons_path, module, manifest_file_name)
 
-    def export(self):
+    def export(self, build):
         """Export a git repo into a sources"""
         #  TODO add automated tests
         self.ensure_one()
-
+        if not self.env['runbot.commit.export'].search([('build_id', '=', build.id), ('commit_id', '=', self.id)]):
+            self.env['runbot.commit.export'].create({'commit_id': self.id, 'build_id': build.id})
         export_path = self._source_path()
 
         if os.path.isdir(export_path):
@@ -74,13 +75,17 @@ class Commit(models.Model):
             self.rebase_on_id.repo_id._fetch(export_sha)
 
         p1 = subprocess.Popen(['git', '--git-dir=%s' % self.repo_id.path, 'archive', export_sha], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        p2 = subprocess.Popen(['tar', '-xmC', export_path], stdin=p1.stdout, stdout=subprocess.PIPE)
+        p2 = subprocess.Popen(['tar', '--mtime', self.date.strftime('%Y-%m-%d %H:%M:%S'), '-xC', export_path], stdin=p1.stdout, stdout=subprocess.PIPE)
         p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
         (_, err) = p2.communicate()
         p1.poll()  # fill the returncode
         if p1.returncode:
+            _logger.info("git export: removing corrupted export %r", export_path)
+            shutil.rmtree(export_path)
             raise RunbotException("Git archive failed for %s with error code %s. (%s)" % (self.name, p1.returncode, p1.stderr.read().decode()))
         if err:
+            _logger.info("git export: removing corrupted export %r", export_path)
+            shutil.rmtree(export_path)
             raise RunbotException("Export for %s failed. (%s)" % (self.name, err))
 
         if self.rebase_on_id:
@@ -131,7 +136,7 @@ class Commit(models.Model):
         for commit in self:
             commit.dname = '%s:%s' % (commit.repo_id.name, commit.name[:8])
 
-    def _github_status(self, build, context, state, target_url, description=None, post_commit=True):
+    def _github_status(self, build, context, state, target_url, description=None):
         self.ensure_one()
         Status = self.env['runbot.commit.status']
         last_status = Status.search([('commit_id', '=', self.id), ('context', '=', context)], order='id desc', limit=1)
@@ -145,8 +150,8 @@ class Commit(models.Model):
             'state': state,
             'target_url': target_url,
             'description': description or context,
+            'to_process': True,
         })
-        last_status._send(post_commit)
 
 
 class CommitLink(models.Model):
@@ -174,53 +179,60 @@ class CommitStatus(models.Model):
 
     commit_id = fields.Many2one('runbot.commit', string='Commit', required=True, index=True)
     context = fields.Char('Context', required=True)
-    state = fields.Char('State', required=True)
+    state = fields.Char('State', required=True, copy=True)
     build_id = fields.Many2one('runbot.build', string='Build', index=True)
     target_url = fields.Char('Url')
     description = fields.Char('Description')
     sent_date = fields.Datetime('Sent Date')
+    to_process = fields.Boolean('Status was not processed yet', index=True)
 
-    def _send(self, post_commit=True):
-        user_id = self.env.user.id
-        _dbname = self.env.cr.dbname
-        _context = self.env.context
+    def _send_to_process(self):
+        commits_status = self.search([('to_process', '=', True)], order='create_date DESC, id DESC')
+        if commits_status:
+            _logger.info('Sending %s commit status', len(commits_status))
+            commits_status._send()
 
-        status_id = self.id
-        commit = self.commit_id
-        all_remote = commit.repo_id.remote_ids
-        remotes = all_remote.filtered(lambda remote: remote.token)
-        no_token_remote = all_remote-remotes
-        if no_token_remote:
-            _logger.warning('No token on remote %s, skipping status', no_token_remote.mapped("name"))
-        remote_ids = remotes.ids
-        commit_name = commit.name
-
-        status = {
-            'context': self.context,
-            'state': self.state,
-            'target_url': self.target_url,
-            'description': self.description,
-        }
-        if remote_ids:
-
-            def send_github_status(env):
-                for remote in env['runbot.remote'].browse(remote_ids):
-                    _logger.info(
-                        "github updating %s status %s to %s in repo %s",
-                        status['context'], commit_name, status['state'], remote.name)
-                    remote._github('/repos/:owner/:repo/statuses/%s' % commit_name, status, ignore_errors=True)
-                    env['runbot.commit.status'].browse(status_id).sent_date = fields.Datetime.now()
-
-            def send_github_status_async():
-                try:
-                    db_registry = registry(_dbname)
-                    with api.Environment.manage(), db_registry.cursor() as cr:
-                        env = api.Environment(cr, user_id, _context)
-                        send_github_status(env)
-                except:
-                    _logger.exception('Something went wrong sending notification for %s', commit_name)
-
-            if post_commit:
-                self._cr.after('commit', send_github_status_async)
+    def _send(self):
+        session_cache = {}
+        processed = set()
+        for commit_status in self.sorted(lambda cs: (cs.create_date, cs.id), reverse=True): # ensure most recent are processed first
+            commit_status.to_process = False
+            # only send the last status for each commit+context
+            key = (commit_status.context, commit_status.commit_id.name)
+            if key not in processed:
+                processed.add(key)
+                status = {
+                    'context': commit_status.context,
+                    'state': commit_status.state,
+                    'target_url': commit_status.target_url,
+                    'description': commit_status.description,
+                }
+                for remote in commit_status.commit_id.repo_id.remote_ids.filtered('send_status'):
+                    if not remote.token:
+                        _logger.warning('No token on remote %s, skipping status', remote.mapped("name"))
+                    else:
+                        if remote.token not in session_cache:
+                            session_cache[remote.token] = _make_github_session(remote.token)
+                        session = session_cache[remote.token]
+                        _logger.info(
+                            "github updating %s status %s to %s in repo %s",
+                            status['context'], commit_status.commit_id.name, status['state'], remote.name)
+                        remote._github('/repos/:owner/:repo/statuses/%s' % commit_status.commit_id.name,
+                            status,
+                            ignore_errors=True,
+                            session=session
+                        )
+                commit_status.sent_date = fields.Datetime.now()
             else:
-                send_github_status(self.env)
+                _logger.info('Skipping outdated status for %s %s', commit_status.context, commit_status.commit_id.name)
+
+
+
+class CommitExport(models.Model):
+    _name = 'runbot.commit.export'
+    _description = 'Commit export'
+
+    build_id = fields.Many2one('runbot.build', index=True)
+    commit_id = fields.Many2one('runbot.commit')
+
+    host = fields.Char(related='build_id.host', store=True)

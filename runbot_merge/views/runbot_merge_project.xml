@@ -1,0 +1,78 @@
+<odoo>
+    <record id="runbot_merge_form_project" model="ir.ui.view">
+        <field name="name">Project Form</field>
+        <field name="model">runbot_merge.project</field>
+        <field name="arch" type="xml">
+            <form>
+                <field name="freeze_id" invisible="1"/>
+                <header>
+                    <button type="object" name="action_prepare_freeze"
+                            string="Freeze"
+                            attrs="{'invisible': [('freeze_id', '!=', False)]}"/>
+                    <button type="object" name="action_prepare_freeze"
+                            string="View Freeze" class="oe_highlight"
+                            attrs="{'invisible': [('freeze_id', '=', False)]}"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="github_prefix" string="bot name"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="github_token"/>
+                            <field name="secret"/>
+                        </group>
+                        <group>
+                            <field name="ci_timeout"/>
+                            <field name="batch_limit"/>
+                        </group>
+                    </group>
+
+                    <group class="oe_edit_only">
+                        <group colspan="4">
+                            <label for="freeze_reminder">
+                                Reminder to show after freeze
+                            </label>
+                            <field colspan="4" name="freeze_reminder" nolabel="1"/>
+                        </group>
+                    </group>
+
+                    <separator string="Repositories"/>
+                    <field name="repo_ids">
+                        <tree>
+                            <field name="sequence" widget="handle"/>
+                            <field name="name"/>
+                            <field name="branch_filter"/>
+                            <field name="status_ids" widget="many2many_tags"/>
+                        </tree>
+                    </field>
+                    <separator string="Branches"/>
+                    <field name="branch_ids">
+                        <tree editable="bottom" decoration-muted="not active">
+                            <field name="sequence" widget="handle" />
+                            <field name="name"/>
+                            <field name="active"/>
+                        </tree>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="project_freeze_reminder" model="ir.ui.view">
+        <field name="name">Project Form</field>
+        <field name="model">runbot_merge.project</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <field name="freeze_reminder" nolabel="1" readonly="1"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>

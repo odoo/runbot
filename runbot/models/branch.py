@@ -12,6 +12,8 @@ class Branch(models.Model):
     _name = 'runbot.branch'
     _description = "Branch"
     _order = 'name'
+    _rec_name = 'dname'
+
     _sql_constraints = [('branch_repo_uniq', 'unique (name,remote_id)', 'The branch must be unique per repository !')]
 
     name = fields.Char('Name', required=True)
@@ -24,6 +26,10 @@ class Branch(models.Model):
     bundle_id = fields.Many2one('runbot.bundle', 'Bundle', compute='_compute_bundle_id', store=True, ondelete='cascade', index=True)
 
     is_pr = fields.Boolean('IS a pr', required=True)
+    pr_title = fields.Char('Pr Title')
+    pr_body = fields.Char('Pr Body')
+    pr_author = fields.Char('Pr Author')
+    
     pull_head_name = fields.Char(compute='_compute_branch_infos', string='PR HEAD name', readonly=1, store=True)
     pull_head_remote_id = fields.Many2one('runbot.remote', 'Pull head repository', compute='_compute_branch_infos', store=True, index=True)
     target_branch_name = fields.Char(compute='_compute_branch_infos', string='PR target branch', store=True)
@@ -44,7 +50,7 @@ class Branch(models.Model):
 
     def _search_dname(self, operator, value):
         if ':' not in value:
-            return [('name', operator, 'value')]
+            return [('name', operator, value)]
         repo_short_name, branch_name = value.split(':')
         owner, repo_name = repo_short_name.split('/')
         return ['&', ('remote_id', '=', self.env['runbot.remote'].search([('owner', '=', owner), ('repo_name', '=', repo_name)]).id), ('name', operator, branch_name)]
@@ -61,13 +67,17 @@ class Branch(models.Model):
             if branch.is_pr:
                 _, name = branch.pull_head_name.split(':')
                 if branch.pull_head_remote_id:
-                    branch.reference_name = name
+                    reference_name = name
                 else:
-                    branch.reference_name = branch.pull_head_name  # repo is not known, not in repo list must be an external pr, so use complete label
+                    reference_name = branch.pull_head_name  # repo is not known, not in repo list must be an external pr, so use complete label
                     #if ':patch-' in branch.pull_head_name:
                     #    branch.reference_name = '%s~%s' % (branch.pull_head_name, branch.name)
             else:
-                branch.reference_name = branch.name
+                reference_name = branch.name
+            forced_version = branch.remote_id.repo_id.single_version  # we don't add a depend on repo.single_version to avoid mass recompute of existing branches
+            if forced_version and not reference_name.startswith(f'{forced_version.name}-'):
+                reference_name = f'{forced_version.name}---{reference_name}'
+            branch.reference_name = reference_name
 
     @api.depends('name')
     def _compute_branch_infos(self, pull_info=None):
@@ -96,17 +106,20 @@ class Branch(models.Model):
                         break
 
         for branch in self:
-            branch.target_branch_name = False
-            branch.pull_head_name = False
-            branch.pull_head_remote_id = False
+            #branch.target_branch_name = False
+            #branch.pull_head_name = False
+            #branch.pull_head_remote_id = False
             if branch.name:
                 pi = branch.is_pr and (pull_info or pull_info_dict.get((branch.remote_id, branch.name)) or branch._get_pull_info())
                 if pi:
                     try:
-                        branch.draft = pi.get('draft', False)
                         branch.alive = pi.get('state', False) != 'closed'
                         branch.target_branch_name = pi['base']['ref']
                         branch.pull_head_name = pi['head']['label']
+                        branch.pr_title = pi['title']
+                        branch.draft = pi.get('draft', False) or branch.pr_title and (branch.pr_title.startswith('[DRAFT]') or branch.pr_title.startswith('[WIP]'))
+                        branch.pr_body = pi['body']
+                        branch.pr_author = pi['user']['login']
                         pull_head_repo_name = False
                         if pi['head'].get('repo'):
                             pull_head_repo_name = pi['head']['repo'].get('full_name')
@@ -132,8 +145,8 @@ class Branch(models.Model):
 
     @api.depends('reference_name', 'remote_id.repo_id.project_id')
     def _compute_bundle_id(self):
-        dummy = self.env.ref('runbot.bundle_dummy')
         for branch in self:
+            dummy = branch.remote_id.repo_id.project_id.dummy_bundle_id
             if branch.bundle_id == dummy:
                 continue
             name = branch.reference_name
@@ -217,6 +230,13 @@ class Branch(models.Model):
                 _logger.info('Changing base of bundle %s to %s(%s)', self.bundle_id, base.name, base.id)
                 self.bundle_id.defined_base_id = base.id
                 self.bundle_id._force()
+
+        if self.draft:
+            self.reviewers = ''  # reset reviewers on draft
+
+        if was_alive and not self.alive and self.bundle_id.for_next_freeze:
+            if not any(branch.alive and branch.is_pr for branch in self.bundle_id.branch_ids):
+                self.bundle_id.for_next_freeze = False
 
         if (not self.draft and was_draft) or (self.alive and not was_alive) or (self.target_branch_name != init_target_branch_name and self.alive):
             self.bundle_id._force()

@@ -6,19 +6,18 @@ from .common import RunbotCase, RunbotCaseMinimalSetup
 class TestBranch(RunbotCase):
 
     def test_base_fields(self):
-        branch = self.Branch.create({
-            'remote_id': self.remote_server.id,
-            'name': 'master',
-            'is_pr': False,
-        })
-
-        self.assertEqual(branch.branch_url, 'https://example.com/base/server/tree/master')
+        self.assertEqual(self.branch_server.branch_url, 'https://example.com/base/server/tree/master')
 
     def test_pull_request(self):
         mock_github = self.patchers['github_patcher']
         mock_github.return_value = {
             'base': {'ref': 'master'},
             'head': {'label': 'foo-dev:bar_branch', 'repo': {'full_name': 'foo-dev/bar'}},
+            'title': '[IMP] Title',
+            'body': 'Body',
+            'user': {
+                'login': 'Pr author'
+            },
         }
         pr = self.Branch.create({
             'remote_id': self.remote_server.id,
@@ -43,7 +42,7 @@ class TestBranchRelations(RunbotCase):
             })
             branch.bundle_id.is_base = True
             return branch
-        self.master = create_base('master')
+        self.master = self.branch_server
         create_base('11.0')
         create_base('saas-11.1')
         create_base('12.0')
@@ -125,7 +124,12 @@ class TestBranchRelations(RunbotCase):
         self.patchers['github_patcher'].return_value = {
             'base': {'ref': 'master-test-tri'},
             'head': {'label': 'dev:master-test-tri-imp', 'repo': {'full_name': 'dev/server'}},
-            }
+            'title': '[IMP] Title',
+            'body': 'Body',
+            'user': {
+                'login': 'Pr author'
+            },
+        }
         b = self.Branch.create({
                 'remote_id': self.remote_server_dev.id,
                 'name': '100',
@@ -142,7 +146,7 @@ class TestBranchForbidden(RunbotCase):
     """Test that a branch matching the repo forbidden regex, goes to dummy bundle"""
 
     def test_forbidden(self):
-        dummy_bundle = self.env.ref('runbot.bundle_dummy')
+        dummy_bundle = self.remote_server_dev.repo_id.project_id.dummy_bundle_id
         self.remote_server_dev.repo_id.forbidden_regex = '^bad_name.+'
         with mute_logger("odoo.addons.runbot.models.branch"):
             branch = self.Branch.create({
@@ -195,7 +199,7 @@ class TestBranchIsBase(RunbotCaseMinimalSetup):
     @mute_logger("odoo.addons.runbot.models.branch")
     def test_is_base_regex_on_dev_remote(self):
         """Test that a branch matching the is_base regex on a secondary remote goes to the dummy bundles."""
-        dummy_bundle = self.env.ref('runbot.bundle_dummy')
+        dummy_bundle = self.repo_addons.project_id.dummy_bundle_id
 
         # master branch on dev remote
         initial_addons_dev_commit = self.Commit.create({

@@ -1,50 +1,4 @@
 <odoo>
-    <record id="runbot_merge_form_project" model="ir.ui.view">
-        <field name="name">Project Form</field>
-        <field name="model">runbot_merge.project</field>
-        <field name="arch" type="xml">
-            <form>
-                <sheet>
-                    <div class="oe_title">
-                        <h1><field name="name" placeholder="Name"/></h1>
-                    </div>
-                    <group>
-                        <group>
-                            <field name="github_prefix" string="bot name"/>
-                        </group>
-                    </group>
-                    <group>
-                        <group>
-                            <field name="github_token"/>
-                            <field name="secret"/>
-                        </group>
-                        <group>
-                            <field name="ci_timeout"/>
-                            <field name="batch_limit"/>
-                        </group>
-                    </group>
-
-                    <separator string="Repositories"/>
-                    <field name="repo_ids">
-                        <tree>
-                            <field name="sequence" widget="handle"/>
-                            <field name="name"/>
-                            <field name="branch_filter"/>
-                            <field name="status_ids" widget="many2many_tags"/>
-                        </tree>
-                    </field>
-                    <separator string="Branches"/>
-                    <field name="branch_ids">
-                        <tree editable="bottom" decoration-muted="not active">
-                            <field name="sequence" widget="handle" />
-                            <field name="name"/>
-                            <field name="active"/>
-                        </tree>
-                    </field>
-                </sheet>
-            </form>
-        </field>
-    </record>
 
     <record id="form_repository" model="ir.ui.view">
         <field name="name">Repository form</field>
@@ -123,6 +77,8 @@
                 <field name="number"/>
                 <field name="target"/>
                 <field name="state"/>
+                <field name="author"/>
+                <field name="reviewed_by"/>
             </tree>
         </field>
     </record>
@@ -143,10 +99,10 @@
                             <field name="target"/>
                             <field name="state"/>
                             <field name="author"/>
-                            <field name="priority"/>
                         </group>
                         <group>
                             <field name="label"/>
+                            <field name="priority"/>
                             <field name="squash"/>
                         </group>
                     </group>
@@ -154,6 +110,8 @@
                         <group colspan="4">
                             <field name="head"/>
                             <field name="statuses"/>
+                        </group>
+                        <group colspan="4">
                             <field name="overrides"/>
                         </group>
                     </group>
@@ -242,7 +200,8 @@
                     <group string="Batches">
                         <field name="batch_ids" colspan="4" nolabel="1">
                             <tree>
-                                <field name="prs"/>
+                                <field name="prs" widget="many2many_tags"
+                                       options="{'no_quick_create': True}"/>
                             </tree>
                         </field>
                     </group>
@@ -251,66 +210,33 @@
         </field>
     </record>
 
-    <record id="runbot_merge_action_fetches" model="ir.actions.act_window">
-        <field name="name">PRs to fetch</field>
-        <field name="res_model">runbot_merge.fetch_job</field>
-        <field name="view_mode">tree</field>
-        <field name="context">{'default_active': True}</field>
+    <record id="runbot_merge_action_commits" model="ir.actions.act_window">
+        <field name="name">Commit Statuses</field>
+        <field name="res_model">runbot_merge.commit</field>
+        <field name="view_mode">tree,form</field>
     </record>
-    <record id="runbot_merge_search_fetches" model="ir.ui.view">
-        <field name="name">Fetches Search</field>
-        <field name="model">runbot_merge.fetch_job</field>
-        <field name="arch" type="xml">
-            <search>
-                <filter string="Active" name="active"
-                        domain="[('active', '=', True)]"/>
-                <field name="repository"/>
-                <field name="number"/>
-            </search>
-        </field>
-    </record>
-    <record id="runbot_merge_tree_fetches" model="ir.ui.view">
-        <field name="name">Fetches Tree</field>
-        <field name="model">runbot_merge.fetch_job</field>
+    <record id="runbot_merge_commits_tree" model="ir.ui.view">
+        <field name="name">commits list</field>
+        <field name="model">runbot_merge.commit</field>
         <field name="arch" type="xml">
             <tree>
-                <field name="repository"/>
-                <field name="number"/>
-            </tree>
-        </field>
-    </record>
-
-    <record id="runbot_merge_action_overrides" model="ir.actions.act_window">
-        <field name="name">CI / statuses overrides</field>
-        <field name="res_model">res.partner.override</field>
-    </record>
-    <record id="runot_merge_tree_overrides" model="ir.ui.view">
-        <field name="name">Overrides List</field>
-        <field name="model">res.partner.override</field>
-        <field name="arch" type="xml">
-            <tree editable="bottom">
-                <field name="context"/>
-                <field name="repository_id"/>
-                <field name="partner_ids" widget="many2many_tags"/>
+                <field name="sha"/>
+                <field name="statuses"/>
             </tree>
         </field>
     </record>
 
     <menuitem name="Mergebot" id="runbot_merge_menu"/>
-    <menuitem name="Projects" id="runbot_merge_menu_project"
-              parent="runbot_merge_menu"
-              action="runbot_merge_action_projects"/>
-    <menuitem name="Pull Requests" id="runbot_merge_menu_prs"
-              parent="runbot_merge_menu"
-              action="runbot_merge_action_prs"/>
-    <menuitem name="Stagings" id="runbot_merge_menu_stagings"
-              parent="runbot_merge_menu"
-              action="runbot_merge_action_stagings"/>
-    <menuitem name="Fetches" id="runbot_merge_menu_fetches"
-              parent="runbot_merge_menu"
-              action="runbot_merge_action_fetches"/>
-    <menuitem name="Configuration" id="runbot_merge_menu_configuration" parent="runbot_merge_menu"/>
-    <menuitem name="CI Overrides" id="runbot_merge_menu_configuration_overrides"
-              parent="runbot_merge_menu"
-              action="runbot_merge_action_overrides"/>
+        <menuitem name="Projects" id="runbot_merge_menu_project"
+                  parent="runbot_merge_menu"
+                  action="runbot_merge_action_projects"/>
+        <menuitem name="Pull Requests" id="runbot_merge_menu_prs"
+                  parent="runbot_merge_menu"
+                  action="runbot_merge_action_prs"/>
+        <menuitem name="Stagings" id="runbot_merge_menu_stagings"
+                  parent="runbot_merge_menu"
+                  action="runbot_merge_action_stagings"/>
+        <menuitem name="Commits" id="runbot_merge_menu_commits"
+                  parent="runbot_merge_menu"
+                  action="runbot_merge_action_commits"/>
 </odoo>

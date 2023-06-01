@@ -1,4 +1,4 @@
-import collections
+import collections.abc
 import itertools
 import json as json_
 import logging
@@ -8,7 +8,6 @@ import pathlib
 import pprint
 import textwrap
 import unicodedata
-from datetime import datetime, timezone
 
 import requests
 import werkzeug.urls
@@ -106,15 +105,11 @@ class GH(object):
         """
         :type check: bool | dict[int:Exception]
         """
-        r = self._session.request(
-            method,
-            '{}/repos/{}/{}'.format(self._url, self._repo, path),
-            params=params,
-            json=json
-        )
+        path = f'/repos/{self._repo}/{path}'
+        r = self._session.request(method, self._url + path, params=params, json=json)
         self._log_gh(_gh, method, path, params, json, r)
         if check:
-            if isinstance(check, collections.Mapping):
+            if isinstance(check, collections.abc.Mapping):
                 exc = check.get(r.status_code)
                 if exc:
                     raise exc(r.text)
@@ -188,7 +183,7 @@ class GH(object):
             head = '<Response [%s]: %s)>' % (r.status_code, r.json() if _is_json(r) else r.text)
 
         if head == to:
-            _logger.info("Sanity check ref update of %s to %s: ok", branch, to)
+            _logger.debug("Sanity check ref update of %s to %s: ok", branch, to)
             return
 
         _logger.warning("Sanity check ref update of %s, expected %s got %s", branch, to, head)
@@ -202,10 +197,19 @@ class GH(object):
             def _wait_for_update():
                 if not self._check_updated(branch, sha):
                     return
-                raise exceptions.FastForwardError(self._repo)
-        except requests.HTTPError:
+                raise exceptions.FastForwardError(self._repo) \
+                    from Exception("timeout: never saw %s" % sha)
+        except requests.HTTPError as e:
             _logger.debug('fast_forward(%s, %s, %s) -> ERROR', self._repo, branch, sha, exc_info=True)
-            raise exceptions.FastForwardError(self._repo)
+            if e.response.status_code == 422:
+                try:
+                    r = e.response.json()
+                except Exception:
+                    pass
+                else:
+                    if isinstance(r, dict) and 'message' in r:
+                        e = Exception(r['message'].lower())
+            raise exceptions.FastForwardError(self._repo) from e
 
     def set_ref(self, branch, sha):
         # force-update ref
@@ -216,7 +220,7 @@ class GH(object):
 
         status0 = r.status_code
         _logger.debug(
-            'set_ref(update, %s, %s, %s -> %s (%s)',
+            'ref_set(%s, %s, %s -> %s (%s)',
             self._repo, branch, sha, status0,
             'OK' if status0 == 200 else r.text or r.reason
         )
@@ -231,29 +235,34 @@ class GH(object):
 
         # 422 makes no sense but that's what github returns, leaving 404 just
         # in case
-        status1 = None
         if status0 in (404, 422):
             # fallback: create ref
-            r = self('post', 'git/refs', json={
-                'ref': 'refs/heads/{}'.format(branch),
-                'sha': sha,
-            }, check=False)
-            status1 = r.status_code
-            _logger.debug(
-                'set_ref(create, %s, %s, %s) -> %s (%s)',
-                self._repo, branch, sha, status1,
-                'OK' if status1 == 201 else r.text or r.reason
-            )
+            status1 = self.create_ref(branch, sha)
             if status1 == 201:
-                @utils.backoff(exc=AssertionError)
-                def _wait_for_update():
-                    head = self._check_updated(branch, sha)
-                    assert not head, "Sanity check ref update of %s, expected %s got %s" % (
-                        branch, sha, head
-                    )
                 return
+        else:
+            status1 = None
 
         raise AssertionError("set_ref failed(%s, %s)" % (status0, status1))
+
+    def create_ref(self, branch, sha):
+        r = self('post', 'git/refs', json={
+            'ref': 'refs/heads/{}'.format(branch),
+            'sha': sha,
+        }, check=False)
+        status = r.status_code
+        _logger.debug(
+            'ref_create(%s, %s, %s) -> %s (%s)',
+            self._repo, branch, sha, status,
+            'OK' if status == 201 else r.text or r.reason
+        )
+        if status == 201:
+            @utils.backoff(exc=AssertionError)
+            def _wait_for_update():
+                head = self._check_updated(branch, sha)
+                assert not head, \
+                    f"Sanity check ref update of {branch}, expected {sha} got {head}"
+        return status
 
     def merge(self, sha, dest, message):
         r = self('post', 'merges', json={
@@ -308,15 +317,14 @@ class GH(object):
         prev = original_head
         mapping = {}
         for c in commits:
+            committer = c['commit']['committer']
+            committer.pop('date')
             copy = self('post', 'git/commits', json={
                 'message': c['commit']['message'],
                 'tree': c['new_tree'],
                 'parents': [prev],
                 'author': c['commit']['author'],
-                'committer': dict(
-                    c['commit']['committer'],
-                    date=datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-                ),
+                'committer': committer,
             }, check={409: MergeError}).json()
             logger.debug('copied %s to %s (parent: %s)', c['sha'], copy['sha'], prev)
             prev = mapping[c['sha']] = copy['sha']

@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data>
+    <!-- PROJECTS -->
+    <record model="runbot.project" id="project_runbot">
+        <field name="name">runbot</field>
+    </record>
+
+    <!-- REPOS -->
+    <record id="repo_odoo" model="runbot.repo">
+        <field name="name">odoo</field>
+        <field name="project_id" ref="runbot.main_project"/>
+        <field name="server_files">odoo-bin</field>
+        <field name="manifest_files">__manifest__.py</field>
+        <field name="mode">hook</field>
+        <field name="addons_paths">addons,odoo/addons</field>
+        <field name="mode">disabled</field>
+    </record>
+    <record id="remote_odoo_odoo" model="runbot.remote">
+        <field name="name">git@example.com:odoo/odoo</field>
+        <field name="repo_id" ref="repo_odoo"/>
+    </record>
+    <record id="remote_odoo_dev_odoo" model="runbot.remote">
+        <field name="name">git@example.com:odoo-dev/odoo</field>
+        <field name="repo_id" ref="repo_odoo"/>
+    </record>
+    <record id="repo_enterprise" model="runbot.repo">
+        <field name="name">enterprise</field>
+        <field name="project_id" ref="runbot.main_project"/>
+        <field name="server_files"></field>
+        <field name="manifest_files">__manifest__.py</field>
+        <field name="mode">hook</field>
+        <field name="addons_paths"></field>
+        <field name="mode">disabled</field>
+    </record>
+    <record id="remote_odoo_enterprise" model="runbot.remote">
+        <field name="name">git@example.com:odoo/enterprise</field>
+        <field name="repo_id" ref="repo_enterprise"/>
+    </record>
+    <record id="remote_odoo_dev_enterprise" model="runbot.remote">
+        <field name="name">git@example.com:odoo-dev/enterprise</field>
+        <field name="repo_id" ref="repo_enterprise"/>
+    </record>
+
+    <record id="repo_runbot" model="runbot.repo">
+        <field name="name">runbot</field>
+        <field name="project_id" ref="project_runbot"/>
+        <field name="server_files"></field>
+        <field name="manifest_files">__manifest__.py</field>
+        <field name="mode">hook</field>
+        <field name="addons_paths"></field>
+        <field name="mode">disabled</field>
+    </record>
+    <record id="remote_odoo_runbot" model="runbot.remote">
+        <field name="name">git@example.com:odoo/runbot</field>
+        <field name="repo_id" ref="repo_runbot"/>
+    </record>
+
+    <!-- BUNDLES -->
+    <record id="bundle_16_1" model="runbot.bundle">
+        <field name="name">saas-16.1</field>
+        <field name="is_base">True</field>
+        <field name="project_id" ref="runbot.main_project"/>
+    </record>
+    <record id="bundle_16" model="runbot.bundle">
+        <field name="name">16.0</field>
+        <field name="is_base">True</field>
+        <field name="project_id" ref="runbot.main_project"/>
+    </record>
+    <record id="bundle_15_4" model="runbot.bundle">
+        <field name="name">saas-15.4</field>
+        <field name="is_base">True</field>
+        <field name="project_id" ref="runbot.main_project"/>
+    </record>
+    <record id="bundle_15" model="runbot.bundle">
+        <field name="name">15.0</field>
+        <field name="is_base">True</field>
+        <field name="project_id" ref="runbot.main_project"/>
+    </record>
+    <record id="bundle_14" model="runbot.bundle">
+        <field name="name">14.0</field>
+        <field name="is_base">True</field>
+        <field name="project_id" ref="runbot.main_project"/>
+    </record>
+    <record id="bundle_13" model="runbot.bundle">
+        <field name="name">13.0</field>
+        <field name="is_base">True</field>
+        <field name="sticky">False</field>
+        <field name="project_id" ref="runbot.main_project"/>
+    </record>
+    <record id="bundle_master_dev_tri" model="runbot.bundle">
+        <field name="name">master-dev-tri</field>
+        <field name="project_id" ref="runbot.main_project"/>
+    </record>
+    <record id="bundle_15_0_dev_tri" model="runbot.bundle">
+        <field name="name">15.0-dev-tri</field>
+        <field name="project_id" ref="runbot.main_project"/>
+    </record>
+    <record id="bundle_master_dev_partial_tri" model="runbot.bundle">
+        <field name="name">master-dev-partial-tri</field>
+        <field name="project_id" ref="runbot.main_project"/>
+    </record>
+
+
+    <record id="bundle_runbot_15_0" model="runbot.bundle">
+        <field name="name">15.0</field>
+        <field name="is_base">True</field>
+        <field name="project_id" ref="project_runbot"/>
+    </record>
+    <record id="bundle_runbot_13_0" model="runbot.bundle">
+        <field name="name">13.0</field>
+        <field name="is_base">True</field>
+        <field name="project_id" ref="project_runbot"/>
+    </record>
+    <record id="bundle_runbot_13_dev_tri" model="runbot.bundle">
+        <field name="name">13.0-dev-tri</field>
+        <field name="project_id" ref="project_runbot"/>
+    </record>
+
+    <!-- Triggers-->
+
+    <record id="trigger_default_odoo" model="runbot.trigger">
+        <field name="name">odoo</field>
+        <field name="category_id" ref="runbot.default_category"/>
+        <field name="project_id" ref="runbot.main_project"/>
+        <field name="config_id" ref="runbot.runbot_build_config_default"/>
+        <field name="repo_ids" eval="[(4, ref('repo_odoo'))]"/>
+        <field name="repo_ids" eval="[(4, ref('repo_odoo'))]"/>
+        <field name="ci_context"/>        
+    </record>
+    <record id="trigger_default_enterprise" model="runbot.trigger">
+        <field name="name">enterprise</field>
+        <field name="category_id" ref="runbot.default_category"/>
+        <field name="project_id" ref="runbot.main_project"/>
+        <field name="config_id" ref="runbot.runbot_build_config_default"/>
+        <field name="repo_ids" eval="[(4, ref('repo_enterprise'))]"/>
+        <field name="dependency_ids" eval="[(4, ref('repo_odoo'))]"/>
+        <field name="ci_context"/>        
+    </record>
+        <record id="trigger_default_runbot" model="runbot.trigger">
+        <field name="name">enterprise</field>
+        <field name="category_id" ref="runbot.default_category"/>
+        <field name="project_id" ref="project_runbot"/>
+        <field name="config_id" ref="runbot.runbot_build_config_default"/>
+        <field name="repo_ids" eval="[(4, ref('repo_runbot'))]"/>
+        <field name="dependency_ids" eval="[(4, ref('repo_odoo'))]"/>
+        <field name="ci_context"/>        
+    </record>
+
+
+    <record id="runbot_build_config_linting" model="runbot.build.config">
+        <field name="name">Linting</field>
+    </record>
+    <record id="runbot_build_config_security" model="runbot.build.config">
+        <field name="name">Security</field>
+    </record>
+
+    <function model="runbot.runbot" name="_create_demo_data">
+    </function>
+    
+</data>

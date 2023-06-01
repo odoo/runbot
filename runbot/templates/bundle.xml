@@ -2,7 +2,7 @@
 <odoo>
     <data>
         <template id="runbot.bundle">
-            <t t-call='website.layout'>
+            <t t-call='runbot.layout'>
                 <div class="container-fluid">
                     <div class="row">
                         <div class='col-md-12'>
@@ -11,13 +11,13 @@
                                     <t t-esc="bundle.name"/>
                                     <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e" />
                                     <div class="btn-group" role="group">
-                                        <a groups="runbot.group_runbot_admin" t-attf-href="/web/#id={{bundle.id}}&amp;view_type=form&amp;model=runbot.bundle" class="btn btn-default btn-sm" target="new" title="View in Backend">
+                                        <a groups="runbot.group_runbot_advanced_user" t-attf-href="/web/#id={{bundle.id}}&amp;view_type=form&amp;model=runbot.bundle&amp;menu_id={{env.ref('runbot.runbot_menu_root').id}}" class="btn btn-default btn-sm" target="new" title="View in Backend">
                                           <i class="fa fa-list"/>
                                         </a>
-                                        <a class="btn btn-default" groups="base.group_user" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Force A New Batch">
+                                        <a groups="runbot.group_runbot_advanced_user" class="btn btn-default" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Force A New Batch">
                                             <i class="fa fa-refresh"/>
                                         </a>
-                                        <a class="btn btn-default" groups="base.group_user" t-attf-href="/runbot/bundle/{{bundle.id}}/force/1" title="Force A New Batch with automatic rebase">
+                                        <a groups="runbot.group_runbot_advanced_user" class="btn btn-default" t-attf-href="/runbot/bundle/{{bundle.id}}/force/1" title="Force A New Batch with automatic rebase">
                                             <i class="fa fa-fast-forward"/>
                                         </a>
                                         <t t-call="runbot.branch_copy_button"/>
@@ -47,7 +47,7 @@
                                                                 <a t-att-href="branch.branch_url" class="btn btn-default text-left" title="View Branch on Github"><i class="fa fa-github"/></a>
                                                                 <a groups="runbot.group_runbot_admin" class="btn btn-default fa fa-list text-left" t-attf-href="/web/#id={{branch.id}}&amp;view_type=form&amp;model=runbot.branch" target="new" title="View Branch in Backend"/>
                                                                 <a href="#" t-esc="branch.remote_id.short_name" class="btn btn-default disabled text-left"/>
-                                                                <a t-attf-href="/runbot/branch/{{branch.id}}" class="btn btn-default text-left" title="View Branch Details"><t t-esc="branch.name"/> <i t-if="not branch.alive" title="deleted/closed" class="fa fa-ban text-danger"/></a>
+                                                                <a t-attf-href="/runbot/branch/{{branch.id}}" class="btn btn-default text-left" title="View Branch Details"><span t-att-class="'' if branch.alive else 'line-through'" t-esc="branch.name"/> <i t-if="not branch.alive" title="deleted/closed" class="fa fa-ban text-danger"/></a>
                                                                 <t t-if="len(group[1]) == 1 and not branch.is_pr">
                                                                     <a t-attf-href="https://{{group[0].main_remote_id.base_url}}/compare/{{bundle.version_id.name}}...{{branch.remote_id.owner}}:{{branch.name}}?expand=1" class="btn btn-default text-left" title="Create pr"><i class="fa fa-code-fork"/> Create pr</a>
                                                                 </t>

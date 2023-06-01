@@ -8,7 +8,7 @@ MESSAGE_TEMPLATE = """{message}
 
 closes {repo}#{number}
 
-{headers}Signed-off-by: {name} <{login}@users.noreply.github.com>"""
+{headers}Signed-off-by: {name} <{email}>"""
 # target branch '-' source branch '-' base64 unique '-fw'
 REF_PATTERN = r'{target}-{source}-[a-zA-Z0-9_-]{{4}}-fw'
 
@@ -49,7 +49,7 @@ class re_matches:
         return self._r.match(text)
 
     def __repr__(self):
-        return '~' + self._r.pattern + '~'
+        return self._r.pattern + '...'
 
 def seen(env, pr, users):
     return users['user'], f'[Pull request status dashboard]({to_pr(env, pr).url}).'
@@ -74,9 +74,9 @@ def make_basic(env, config, make_repo, *, reponame='proj', project_name='myproje
             'github_prefix': 'hansen',
             'fp_github_token': config['github']['token'],
             'branch_ids': [
-                (0, 0, {'name': 'a', 'fp_sequence': 10, 'fp_target': True}),
-                (0, 0, {'name': 'b', 'fp_sequence': 8, 'fp_target': True}),
-                (0, 0, {'name': 'c', 'fp_sequence': 6, 'fp_target': True}),
+                (0, 0, {'name': 'a', 'sequence': 100, 'fp_target': True}),
+                (0, 0, {'name': 'b', 'sequence': 80, 'fp_target': True}),
+                (0, 0, {'name': 'c', 'sequence': 60, 'fp_target': True}),
             ],
         })
 
@@ -126,10 +126,12 @@ def pr_page(page, pr):
     return html.fromstring(page(f'/{pr.repo.name}/pull/{pr.number}'))
 
 def to_pr(env, pr):
-    return env['runbot_merge.pull_requests'].search([
+    pr = env['runbot_merge.pull_requests'].search([
         ('repository.name', '=', pr.repo.name),
         ('number', '=', pr.number),
     ])
+    assert len(pr) == 1, f"Expected to find {pr.repo.name}#{pr.number}, got {pr}."
+    return pr
 
 def part_of(label, pr_id, *, separator='\n\n'):
     """ Adds the "part-of" pseudo-header in the footer.

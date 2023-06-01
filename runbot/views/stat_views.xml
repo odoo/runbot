@@ -1,60 +1,22 @@
 <odoo>
   <data>
-
-    <record id="view_stat_sql_tree" model="ir.ui.view">
-        <field name="name">runbot.stat.sql.tree</field>
-        <field name="model">runbot.build.stat.sql</field>
+    <record id="build_stat_regex_form" model="ir.ui.view">
+        <field name="name">runbot.build.stat.regex.form</field>
+        <field name="model">runbot.build.stat.regex</field>
         <field name="arch" type="xml">
-            <tree string="Statistics">
-                <field name="key"/>
-                <field name="value"/>
-                <field name="config_step_id"/>
-                <field name="build_id"/>
-                <field name="bundle_id"/>
-                <field name="batch_id"/>
-                <field name="trigger_id"/>
-                <field name="stat_id"/>
-            </tree>
+          <form>
+            <sheet>
+              <group name="stat_regex_group">
+                <field name="name"/>
+                <field name="regex" placeholder="odoo.addons.(?P&lt;key&gt;.+) tested in .+, (?P&lt;value&gt;\d+) queries"/>
+                <field name="generic"/>
+                <field name="description"/>
+                <field name="sequence"/>
+              </group>
+            </sheet>
+          </form>
         </field>
     </record>
-
-    <record id="open_view_stat_sql_tree" model="ir.actions.act_window">
-        <field name="name">Statistics</field>
-        <field name="res_model">runbot.build.stat.sql</field>
-        <field name="view_mode">tree,graph,pivot</field>
-    </record>
-
-    <menuitem
-        name="Build Statistics"
-        id="runbot_menu_stat_root"
-        parent="runbot_menu_root"
-        sequence="100"
-        />
-
-    <menuitem
-        name="Build Statistics"
-        id="runbot_menu_stat_tree"
-        parent="runbot_menu_stat_root"
-        sequence="10"
-        action="open_view_stat_sql_tree"
-        />
-
-      <record id="build_stat_regex_form" model="ir.ui.view">
-          <field name="name">runbot.build.stat.regex.form</field>
-          <field name="model">runbot.build.stat.regex</field>
-          <field name="arch" type="xml">
-            <form>
-              <sheet>
-                <group name="stat_regex_group">
-                  <field name="name"/>
-                  <field name="regex" placeholder="odoo.addons.(?P&lt;key&gt;.+) tested in .+, (?P&lt;value&gt;\d+) queries"/>
-                  <field name="generic"/>
-                  <field name="description"/>
-                </group>
-              </sheet>
-            </form>
-          </field>
-      </record>
 
     <record id="build_stat_regex_tree" model="ir.ui.view">
         <field name="name">runbot.build.stat.regex.tree</field>
@@ -65,6 +27,7 @@
                 <field name="generic"/>
                 <field name="description"/>
                 <field name="regex"/>
+                <field name="sequence" widget="handle"/>
             </tree>
         </field>
     </record>
@@ -75,12 +38,5 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    <menuitem
-        name="Stats Regexes"
-        id="runbot_menu_manage_stat_regexes"
-        parent="runbot_menu_stat_root"
-        sequence="20"
-        action="open_view_stat_regex_tree"
-    />
   </data>
 </odoo>

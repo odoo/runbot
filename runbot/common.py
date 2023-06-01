@@ -5,17 +5,17 @@ import itertools
 import logging
 import psycopg2
 import re
+import requests
 import socket
 import time
 import os
 
 from collections import OrderedDict
 from datetime import timedelta
-
 from babel.dates import format_timedelta
-from werkzeug import utils
+from markupsafe import Markup
 
-from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT
+from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT, html_escape
 
 _logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class RunbotException(Exception):
 
 
 def fqdn():
-    return socket.getfqdn()
+    return socket.gethostname()
 
 
 def time2str(t):
@@ -41,6 +41,10 @@ def dt2time(datetime):
 
 def now():
     return time.strftime(DEFAULT_SERVER_DATETIME_FORMAT)
+
+
+def findall(filename, pattern):
+    return set(re.findall(pattern, open(filename).read()))
 
 
 def grep(filename, string):
@@ -105,6 +109,16 @@ def local_pgadmin_cursor():
         if cnx:
             cnx.close()
 
+@contextlib.contextmanager
+def local_pg_cursor(db_name):
+    cnx = None
+    try:
+        cnx = psycopg2.connect(f"dbname={db_name}")
+        yield cnx.cursor()
+    finally:
+        if cnx:
+            cnx.commit()
+            cnx.close()
 
 def list_local_dbs(additionnal_conditions=None):
     additionnal_condition_str = ''
@@ -121,7 +135,7 @@ def list_local_dbs(additionnal_conditions=None):
 
 
 def pseudo_markdown(text):
-    text = utils.escape(text)
+    text = html_escape(text)
 
     # first, extract code blocs:
     codes = []
@@ -151,5 +165,13 @@ def pseudo_markdown(text):
     def code_replace(match):
         return f'<code>{codes[int(match.group(1))]}</code>'
 
-    text = re.sub(r'<code>(\d+)</code>', code_replace, text, flags=re.DOTALL)
+    text = Markup(re.sub(r'<code>(\d+)</code>', code_replace, text, flags=re.DOTALL))
     return text
+
+
+def _make_github_session(token):
+    session = requests.Session()
+    if token:
+        session.auth = (token, 'x-oauth-basic')
+    session.headers.update({'Accept': 'application/vnd.github.she-hulk-preview+json'})
+    return session

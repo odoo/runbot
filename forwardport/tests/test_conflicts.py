@@ -16,7 +16,7 @@ def test_conflict(env, config, make_repo, users):
     project = env['runbot_merge.project'].search([])
     project.write({
         'branch_ids': [
-            (0, 0, {'name': 'd', 'fp_sequence': 4, 'fp_target': True})
+            (0, 0, {'name': 'd', 'sequence': 40, 'fp_target': True})
         ]
     })
 
@@ -60,9 +60,10 @@ def test_conflict(env, config, make_repo, users):
         'g': 'a',
         'h': re_matches(r'''<<<\x3c<<< HEAD
 a
+|||||||| parent of [\da-f]{7,}.*
 =======
 xxx
->>>\x3e>>> [0-9a-f]{7,}.*
+>>>\x3e>>> [\da-f]{7,}.*
 '''),
     }
     prb = prod.get_pr(prb_id.number)
@@ -73,8 +74,8 @@ This PR targets b and is part of the forward-port chain. Further PRs will be cre
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 '''),
-        (users['user'], """Ping @%s, @%s
-The next pull request (%s) is in conflict. You can merge the chain up to here by saying
+        (users['user'], """@%s @%s the next pull request (%s) is in conflict. \
+You can merge the chain up to here by saying
 > @%s r+
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
@@ -270,7 +271,7 @@ def test_multiple_commits_same_authorship(env, config, make_repo):
 
 def test_multiple_commits_different_authorship(env, config, make_repo, users, rolemap):
     """ When a PR has multiple commits by different authors, the resulting
-    (squashed) conflict commit should have
+    (squashed) conflict commit should have an empty email
     """
     author = {'name': 'George Pearce', 'email': 'gp@example.org'}
     committer = {'name': 'G. P. W. Meredith', 'email': 'gpwm@example.org'}
@@ -306,7 +307,7 @@ def test_multiple_commits_different_authorship(env, config, make_repo, users, ro
     for _ in range(20):
         pr_ids = env['runbot_merge.pull_requests'].search([], order='number')
         if len(pr_ids) == 2:
-            _   , pr2_id = pr_ids
+            _, pr2_id = pr_ids
             break
         time.sleep(0.5)
     else:
@@ -323,9 +324,10 @@ def test_multiple_commits_different_authorship(env, config, make_repo, users, ro
 
     assert re.match(r'''<<<\x3c<<< HEAD
 b
+|||||||| parent of [\da-f]{7,}.*
 =======
 2
->>>\x3e>>> [0-9a-f]{7,}.*
+>>>\x3e>>> [\da-f]{7,}.*
 ''', prod.read_tree(c)['g'])
 
     # I'd like to fix the conflict so everything is clean and proper *but*
@@ -343,11 +345,12 @@ b
 
     assert pr2.comments == [
         seen(env, pr2, users),
-        (users['user'], re_matches(r'Ping.*CONFLICT', re.DOTALL)),
+        (users['user'], re_matches(r'@%s @%s .*CONFLICT' % (users['user'], users['reviewer']), re.DOTALL)),
         (users['reviewer'], 'hansen r+'),
-        (users['user'], f"All commits must have author and committer email, "
+        (users['user'], f"@{users['user']} @{users['reviewer']} unable to stage: "
+                        "All commits must have author and committer email, "
                         f"missing email on {pr2_id.head} indicates the "
-                        f"authorship is most likely incorrect."),
+                        "authorship is most likely incorrect."),
     ]
     assert pr2_id.state == 'error'
     assert not pr2_id.staging_id, "staging should have been rejected"

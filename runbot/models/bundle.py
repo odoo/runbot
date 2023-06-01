@@ -13,6 +13,7 @@ _logger = logging.getLogger(__name__)
 class Bundle(models.Model):
     _name = 'runbot.bundle'
     _description = "Bundle"
+    _inherit = 'mail.thread'
 
     name = fields.Char('Bundle name', required=True, help="Name of the base branch")
     project_id = fields.Many2one('runbot.project', required=True, index=True)
@@ -35,13 +36,13 @@ class Bundle(models.Model):
     base_id = fields.Many2one('runbot.bundle', 'Base bundle', compute='_compute_base_id', store=True)
     to_upgrade = fields.Boolean('To upgrade', compute='_compute_to_upgrade', store=True, index=False)
 
-    version_id = fields.Many2one('runbot.version', 'Version', compute='_compute_version_id', store=True)
+    version_id = fields.Many2one('runbot.version', 'Version', compute='_compute_version_id', store=True, recursive=True)
     version_number = fields.Char(related='version_id.number', store=True, index=True)
 
     previous_major_version_base_id = fields.Many2one('runbot.bundle', 'Previous base bundle', compute='_compute_relations_base_id')
     intermediate_version_base_ids = fields.Many2many('runbot.bundle', 'Intermediate base bundles', compute='_compute_relations_base_id')
 
-    priority = fields.Boolean('Build priority', default=False)
+    priority = fields.Boolean('Build priority', default=False, groups="runbot.group_runbot_admin")
 
     # Custom parameters
     trigger_custom_ids = fields.One2many('runbot.bundle.trigger.custom', 'bundle_id')
@@ -49,13 +50,18 @@ class Bundle(models.Model):
     dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, help="Use a custom Dockerfile")
     commit_limit = fields.Integer("Commit limit")
     file_limit = fields.Integer("File limit")
+    disable_codeowner = fields.Boolean("Disable codeowners", tracking=True)
+
+    # extra_info
+    for_next_freeze = fields.Boolean('Should be in next freeze')
 
     @api.depends('name')
     def _compute_host_id(self):
         assigned_only = None
         runbots = {}
-        for bundle in self.filtered('name'):
-            elems = bundle.name.split('-')
+        for bundle in self:
+            bundle.host_id = False
+            elems = (bundle.name or '').split('-')
             for elem in elems:
                 if elem.startswith('runbot'):
                     if elem.replace('runbot', '') == '_x':
@@ -93,14 +99,17 @@ class Bundle(models.Model):
                 continue
             project_id = bundle.project_id.id
             master_base = False
+            fallback = False
             for bid, bname in self._get_base_ids(project_id):
                 if bundle.name.startswith('%s-' % bname):
                     bundle.base_id = self.browse(bid)
                     break
                 elif bname == 'master':
                     master_base = self.browse(bid)
+                elif not fallback or fallback.id < bid:
+                    fallback = self.browse(bid)
             else:
-                bundle.base_id = master_base
+                bundle.base_id = master_base or fallback
 
     @tools.ormcache('project_id')
     def _get_base_ids(self, project_id):
@@ -123,9 +132,9 @@ class Bundle(models.Model):
 
     @api.depends_context('category_id')
     def _compute_last_batchs(self):
-        if self:
-            batch_ids = defaultdict(list)
-            category_id = self.env.context.get('category_id', self.env['ir.model.data'].xmlid_to_res_id('runbot.default_category'))
+        batch_ids = defaultdict(list)
+        if self.ids:
+            category_id = self.env.context.get('category_id', self.env['ir.model.data']._xmlid_to_res_id('runbot.default_category'))
             self.env.cr.execute("""
                 SELECT
                     id
@@ -148,8 +157,8 @@ class Bundle(models.Model):
             for batch in batchs:
                 batch_ids[batch.bundle_id.id].append(batch.id)
 
-            for bundle in self:
-                bundle.last_batchs = [(6, 0, batch_ids[bundle.id])]
+        for bundle in self:
+            bundle.last_batchs = [(6, 0, batch_ids[bundle.id])] if bundle.id in batch_ids else False
 
     @api.depends_context('category_id')
     def _compute_last_done_batch(self):
@@ -157,7 +166,7 @@ class Bundle(models.Model):
             # self.env['runbot.batch'].flush()
             for bundle in self:
                 bundle.last_done_batch = False
-            category_id = self.env.context.get('category_id', self.env['ir.model.data'].xmlid_to_res_id('runbot.default_category'))
+            category_id = self.env.context.get('category_id', self.env['ir.model.data']._xmlid_to_res_id('runbot.default_category'))
             self.env.cr.execute("""
                 SELECT
                     id
@@ -181,6 +190,10 @@ class Bundle(models.Model):
             for batch in batchs:
                 batch.bundle_id.last_done_batch = batch
 
+    def _url(self):
+        self.ensure_one()
+        return "/runbot/bundle/%s" % self.id
+
     def create(self, values_list):
         res = super().create(values_list)
         if res.is_base:
@@ -189,10 +202,11 @@ class Bundle(models.Model):
         return res
 
     def write(self, values):
-        super().write(values)
+        res = super().write(values)
         if 'is_base' in values:
             model = self.browse()
             model._get_base_ids.clear_cache(model)
+        return res
 
     def _force(self, category_id=None):
         self.ensure_one()
@@ -213,14 +227,17 @@ class Bundle(models.Model):
         if self.defined_base_id:
             return [('info', 'This bundle has a forced base: %s' % self.defined_base_id.name)]
         warnings = []
-        for branch in self.branch_ids:
-            if branch.is_pr and branch.target_branch_name != self.base_id.name:
-                if branch.target_branch_name.startswith(self.base_id.name):
-                    warnings.append(('info', 'PR %s targeting a non base branch: %s' % (branch.dname, branch.target_branch_name)))
-                else:
-                    warnings.append(('warning' if branch.alive else 'info', 'PR %s targeting wrong version: %s (expecting %s)' % (branch.dname, branch.target_branch_name, self.base_id.name)))
-            elif not branch.is_pr and not branch.name.startswith(self.base_id.name) and not self.defined_base_id:
-                warnings.append(('warning', 'Branch %s not starting with version name (%s)' % (branch.dname, self.base_id.name)))
+        if not self.base_id:
+            warnings.append(('warning', 'No base defined on this bundle'))
+        else:
+            for branch in self.branch_ids:
+                if branch.is_pr and branch.target_branch_name != self.base_id.name:
+                    if branch.target_branch_name.startswith(self.base_id.name):
+                        warnings.append(('info', 'PR %s targeting a non base branch: %s' % (branch.dname, branch.target_branch_name)))
+                    else:
+                        warnings.append(('warning' if branch.alive else 'info', 'PR %s targeting wrong version: %s (expecting %s)' % (branch.dname, branch.target_branch_name, self.base_id.name)))
+                elif not branch.is_pr and not branch.name.startswith(self.base_id.name) and not self.defined_base_id:
+                    warnings.append(('warning', 'Branch %s not starting with version name (%s)' % (branch.dname, self.base_id.name)))
         return warnings
 
     def branch_groups(self):
@@ -229,21 +246,3 @@ class Bundle(models.Model):
         for branch in self.branch_ids.sorted(key=lambda b: (b.is_pr)):
             branch_groups[branch.remote_id.repo_id].append(branch)
         return branch_groups
-
-
-class BundleTriggerCustomisation(models.Model):
-    _name = 'runbot.bundle.trigger.custom'
-    _description = 'Custom trigger'
-
-    trigger_id = fields.Many2one('runbot.trigger', domain="[('project_id', '=', bundle_id.project_id)]")
-    bundle_id = fields.Many2one('runbot.bundle')
-    config_id = fields.Many2one('runbot.build.config')
-    extra_params = fields.Char("Custom parameters")
-
-    _sql_constraints = [
-        (
-            "bundle_custom_trigger_unique",
-            "unique (bundle_id, trigger_id)",
-            "Only one custom trigger per trigger per bundle is allowed",
-        )
-    ]

@@ -1,0 +1,83 @@
+<odoo>
+    <record id="runbot_merge_project_freeze_form" model="ir.ui.view">
+        <field name="name">Freeze Wizard Configuration Screen</field>
+        <field name="model">runbot_merge.project.freeze</field>
+        <field name="arch" type="xml">
+            <form js_class="freeze_wizard">
+                <sheet>
+                    <div class="alert alert-warning" role="alert"
+                         attrs="{'invisible': [('errors', '=', False)]}">
+                        <field name="errors" readonly="True"/>
+                    </div>
+                    <group>
+                        <group colspan="2">
+                            <field name="branch_name"/>
+                            <field name="required_pr_ids" widget="many2many_tags"
+                                options="{'color_field': 'state_color', 'no_create': True}"/>
+                            <field name="pr_state_key" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Release">
+                        <p colspan="2">
+                            Release (freeze) PRs, provide the first commit
+                            of the new branches. Each PR must have a single
+                            commit.
+                        </p>
+                        <p class="alert alert-warning" role="alert" colspan="2">
+                            These PRs will be merged directly, not staged.
+                        </p>
+                        <field name="release_label" colspan="2"/>
+                        <field name="release_pr_ids" nolabel="1" colspan="2">
+                            <tree editable="bottom">
+                                <field name="repository_id" options="{'no_create': True}"/>
+                                <field name="pr_id" options="{'no_create': True}"/>
+                                <field name="label"/>
+                            </tree>
+                        </field>
+                    </group>
+                    <group string="Bump">
+                        <p colspan="2">
+                            Bump PRs, provide the first commit of the source
+                            branches after the release has been cut.
+                        </p>
+                        <p class="alert alert-warning" role="alert" colspan="2">
+                            These PRs will be merged directly, not staged.
+                        </p>
+                        <field name="bump_label" colspan="2"/>
+                        <field name="bump_pr_ids" nolabel="1" colspan="2">
+                            <tree editable="bottom">
+                                <field name="repository_id" options="{'no_create': True}"/>
+                                <field name="pr_id" options="{'no_create': True}"/>
+                                <field name="label"/>
+                            </tree>
+                        </field>
+                    </group>
+                    <footer>
+                        <!--
+                        the operator should always be able to try freezing, in
+                        case the smart form blows up or whatever, but change
+                        the style of the button if the form has "no errors"
+                        -->
+                        <button string="Freeze" type="object" name="action_freeze"
+                                class="btn-success" attrs="{'invisible': [('errors', '!=', False)]}"/>
+                        <button string="Freeze" type="object" name="action_freeze"
+                                class="btn-primary" attrs="{'invisible': [('errors', '=', False)]}"/>
+                        <button string="Save &amp; Close" special="save"/>
+                        <button string="Cancel" type="object" name="action_cancel" class="btn-warning"/>
+                    </footer>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="runbot_merge_repository_freeze" model="ir.ui.view">
+        <field name="name">Add freeze field to repo form</field>
+        <field name="model">runbot_merge.repository</field>
+        <field name="inherit_id" ref="form_repository"/>
+        <field name="arch" type="xml">
+            <field name="branch_filter" position="after">
+                <field name="freeze"/>
+            </field>
+        </field>
+    </record>
+</odoo>

@@ -12,6 +12,7 @@
                   <div class="row mt16 o_settings_container">
                     <div class="col-12 col-lg-6 o_setting_box">
                       <div class="o_setting_right_pane">
+                        <span class="o_form_label">Builder settings</span>
                         <div class="content-group">
                           <label for="runbot_workers" class="col-xs-3 o_light_label" style="width: 60%;"/>
                           <field name="runbot_workers" style="width: 15%;"/>
@@ -24,37 +25,55 @@
                           <field name="runbot_timeout" style="width: 15%;"/>
                           <label for="runbot_starting_port" class="col-xs-3 o_light_label" style="width: 60%;"/>
                           <field name="runbot_starting_port" style="width: 15%;"/>
-                          <label for="runbot_max_age" class="col-xs-3 o_light_label" style="width: 60%;"/>
-                          <field name="runbot_max_age" style="width: 15%;"/>
-                          <label for="runbot_update_frequency" class="col-xs-3 o_light_label" style="width: 60%;"/>
-                          <field name="runbot_update_frequency" style="width: 15%;"/>
-                          <label for="runbot_db_gc_days" class="col-xs-3 o_light_label" style="width: 60%;"/>
-                          <field name="runbot_db_gc_days" style="width: 15%;"/>
-                          <label for="runbot_db_gc_days_child" class="col-xs-3 o_light_label" style="width: 60%;"/>
-                          <field name="runbot_db_gc_days_child" style="width: 15%;"/>
                         </div>
                       </div>
                     </div>
                     <div class="col-12 col-lg-6 o_setting_box">
                       <div class="o_setting_right_pane">
+                        <span class="o_form_label">Leader settings</span>
                         <div class="content-group">
-                          <label for="runbot_do_fetch" class="col-xs-3 o_light_label" style="width: 40%;"/>
-                          <field name="runbot_do_fetch"/>
-                          <label for="runbot_do_schedule" class="col-xs-3 o_light_label" style="width: 40%;"/>
-                          <field name="runbot_do_schedule"/>
-                          <label for="runbot_domain" class="col-xs-3 o_light_label" style="width: 40%;"/>
-                          <field name="runbot_domain" style="width: 55%;"/>
+                          <label for="runbot_max_age" class="col-xs-3 o_light_label" style="width: 60%;"/>
+                          <field name="runbot_max_age" style="width: 15%;"/>
+                          <label for="runbot_disable_host_on_fetch_failure" class="col-xs-3 o_light_label" style="width: 40%;"/>
+                          <field name="runbot_disable_host_on_fetch_failure" style="width: 15%;"/>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-12 col-lg-12 o_setting_box">
+                      <div class="o_setting_right_pane">
+                        <div class="content-group">
                           <label for="runbot_template" class="col-xs-3 o_light_label" style="width: 40%;"/>
                           <field name="runbot_template" style="width: 55%;"/>
                           <label for="runbot_is_base_regex" class="col-xs-3 o_light_label" style="width: 40%;"/>
                           <field name="runbot_is_base_regex" style="width: 55%;"/>
+                          <label for="runbot_forwardport_author" class="col-xs-3 o_light_label" style="width: 40%;"/>
+                          <field name="runbot_forwardport_author" style="width: 55%;"/>
+                          <label for="runbot_organisation" class="col-xs-3 o_light_label" style="width: 40%;"/>
+                          <field name="runbot_organisation" style="width: 55%;"/>
+                          <label for="runbot_logdb_name" class="col-xs-3 o_light_label" style="width: 40%;"/>
+                          <field name="runbot_logdb_name" style="width: 15%;"/>
                         </div>
                       </div>
                     </div>
-                    <label for="runbot_logdb_uri" class="col-xs-3 o_light_label" style="width: 60%;"/>
-                    <field name="runbot_logdb_uri" style="width: 100%;"/>
+                    <div class="col-12 col-lg-6 o_setting_box">
+                      <div class="o_setting_right_pane">
+                        <span class="o_form_label">Garbage Collecting Settings</span>
+                        <div class="content-group">
+                          <label for="runbot_db_gc_days" class="col-xs-3 o_light_label" style="width: 60%;"/>
+                          <field name="runbot_db_gc_days" style="width: 15%;"/>
+                          <label for="runbot_db_gc_days_child" class="col-xs-3 o_light_label" style="width: 60%;"/>
+                          <field name="runbot_db_gc_days_child" style="width: 15%;"/>
+                          <label for="runbot_full_gc_days" class="col-xs-3 o_light_label" style="width: 60%;"/>
+                          <field name="runbot_full_gc_days" style="width: 15%;"/>
+                        </div>
+                      </div>
+                    </div>
+                    <label for="runbot_default_odoorc" class="col-xs-3 o_light_label" style="width: 60%;"/>
+                    <field name="runbot_default_odoorc" style="width: 100%;"/>
                     <label for="runbot_message" class="col-xs-3 o_light_label" style="width: 60%;"/>
                     <field name="runbot_message" style="width: 100%;"/>
+                    <label for="runbot_upgrade_exception_message" class="col-xs-3 o_light_label" style="width: 60%;"/>
+                    <field name="runbot_upgrade_exception_message" style="width: 100%;"/>
                   </div>
                 </div>
               </xpath>
@@ -70,7 +89,6 @@
             <field name="context">{'module' : 'runbot'}</field>
         </record>
 
-        <menuitem id="menu_runbot_global_settings" name="Settings"
-            parent="runbot_menu_root" sequence="0" action="action_runbot_configuration" groups="base.group_system"/>
+
     </data>
 </odoo>

@@ -18,10 +18,14 @@ class TestSchedule(RunbotCase):
             'project_id': self.project,
             'config_id': self.env.ref('runbot.runbot_build_config_default').id,
         })
+
+        host = self.env['runbot.host'].create({'name': 'runbotxx'})  # the host needs to exists in _schedule()
+
         build = self.Build.create({
             'local_state': 'testing',
+            'global_state': 'testing',
             'port': '1234',
-            'host': 'runbotxx',
+            'host': host.name,
             'job_start': datetime.datetime.now(),
             'active_step': self.env.ref('runbot.runbot_build_config_step_run').id,
             'params_id': params.id
@@ -30,8 +34,10 @@ class TestSchedule(RunbotCase):
         self.assertEqual(build.local_state, 'testing')
         build._schedule()  # too fast, docker not started
         self.assertEqual(build.local_state, 'testing')
+        self.assertEqual(build.local_result, 'ok')
 
+        self.start_patcher('fetch_local_logs', 'odoo.addons.runbot.models.host.Host._fetch_local_logs', [])  # the local logs have to be empty
         build.write({'job_start': datetime.datetime.now() - datetime.timedelta(seconds=70)})  # docker never started
         build._schedule()
         self.assertEqual(build.local_state, 'done')
-        self.assertEqual(build.local_result, 'ok')
+        self.assertEqual(build.local_result, 'ko')

@@ -1,0 +1,55 @@
+<odoo>
+<data>
+    <record id="res_users_form_view_runbot" model="ir.ui.view">
+        <field name="name">res.users.form.view</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form_simple_modif" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='email']" position="after">
+                <field name="github_login"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record model="ir.ui.view" id="res_users_view_search">
+        <field name="name">res.users.view.search.inherit.runbot</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_search" />
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <separator/>
+                <field name="github_login"/>
+                <filter string="Has github login" name="has_github_login" domain="[('github_login', '!=', False)]"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record model="ir.ui.view" id="runbot_users_form">
+        <field name="name">Runbot Users Form</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Runbot">
+                    <group>
+                        <field name="github_login"/>
+                        <field name="runbot_team_ids"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_users_state_tree" model="ir.ui.view">
+        <field name="name">res.users.tree.inherit</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='login_date']" position="after">
+                <field name="github_login"/>
+            </xpath>
+        </field>
+    </record>
+
+</data>
+</odoo>

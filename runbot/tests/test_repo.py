@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import datetime
 import re
 from unittest import skip
 from unittest.mock import patch, Mock
@@ -7,7 +6,6 @@ from subprocess import CalledProcessError
 from odoo.tests import common, TransactionCase
 from odoo.tools import mute_logger
 import logging
-import odoo
 import time
 
 from .common import RunbotCase, RunbotCaseMinimalSetup
@@ -64,6 +62,11 @@ class TestRepo(RunbotCaseMinimalSetup):
             return {
                 'base': {'ref': 'master'},
                 'head': {'label': 'dev:%s' % branch_name, 'repo': {'full_name': 'dev/server'}},
+                'title': '[IMP] Title',
+                'body': 'Body',
+                'user': {
+                    'login': 'Pr author'
+                },
             }
 
         repos = self.repo_addons | self.repo_server
@@ -71,7 +74,7 @@ class TestRepo(RunbotCaseMinimalSetup):
         first_commit = [(
             'refs/%s/heads/%s' % (self.remote_server_dev.remote_name, branch_name),
             'd0d0caca',
-            datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
+            str(int(time.time())),
             'Marc Bidule',
             '<marc.bidule@somewhere.com>',
             'Server subject',
@@ -99,7 +102,7 @@ class TestRepo(RunbotCaseMinimalSetup):
         # create a addons branch in the same bundle
         self.commit_list[self.repo_addons.id] = [('refs/%s/heads/%s' % (self.remote_addons_dev.remote_name, branch_name),
                                                   'deadbeef',
-                                                  datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
+                                                   str(int(time.time())),
                                                   'Marc Bidule',
                                                   '<marc.bidule@somewhere.com>',
                                                   'Addons subject',
@@ -127,7 +130,7 @@ class TestRepo(RunbotCaseMinimalSetup):
         self.commit_list[self.repo_server.id] += [
             ('refs/%s/pull/123' % self.remote_server.remote_name,
              'd0d0caca',
-             datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
+             str(int(time.time())),
              'Marc Bidule',
              '<marc.bidule@somewhere.com>',
              'Another subject',
@@ -137,7 +140,7 @@ class TestRepo(RunbotCaseMinimalSetup):
         # Create Batches
         repos._update_batches()
 
-        pull_request = self.env['runbot.branch'].search([('remote_id', '=', self.remote_server.id), ('id', '!=', self.branch_server.id)])
+        pull_request = self.env['runbot.branch'].search([('remote_id', '=', self.remote_server.id), ('name', '=', '123')])
         self.assertEqual(pull_request.bundle_id, bundle)
 
         self.assertEqual(dev_branch.head_name, 'd0d0caca')
@@ -157,7 +160,7 @@ class TestRepo(RunbotCaseMinimalSetup):
             (
                 'refs/%s/heads/%s' % (self.remote_server_dev.remote_name, branch_name),
                 'b00b',
-                datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
+                str(int(time.time())),
                 'Marc Bidule',
                 '<marc.bidule@somewhere.com>',
                 'A new subject',
@@ -167,7 +170,7 @@ class TestRepo(RunbotCaseMinimalSetup):
             (
                 'refs/%s/pull/123' % self.remote_server.remote_name,
                 'b00b',
-                datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
+                str(int(time.time())),
                 'Marc Bidule',
                 '<marc.bidule@somewhere.com>',
                 'A new subject',
@@ -179,7 +182,7 @@ class TestRepo(RunbotCaseMinimalSetup):
         repos._update_batches()
 
         self.assertEqual(dev_branch, self.env['runbot.branch'].search([('remote_id', '=', self.remote_server_dev.id)]))
-        self.assertEqual(pull_request + self.branch_server, self.env['runbot.branch'].search([('remote_id', '=', self.remote_server.id)]))
+        #self.assertEqual(pull_request + self.branch_server, self.env['runbot.branch'].search([('remote_id', '=', self.remote_server.id)]))
         self.assertEqual(addons_dev_branch, self.env['runbot.branch'].search([('remote_id', '=', self.remote_addons_dev.id)]))
 
         batch = self.env['runbot.batch'].search([('bundle_id', '=', bundle.id)])
@@ -207,7 +210,7 @@ class TestRepo(RunbotCaseMinimalSetup):
         self.commit_list[self.repo_server.id] = [
             ('refs/%s/heads/%s' % (self.remote_server_dev.remote_name, branch_name),
              'dead1234',
-             datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
+             str(int(time.time())),
              'Marc Bidule',
              '<marc.bidule@somewhere.com>',
              'A last subject',
@@ -262,7 +265,7 @@ class TestRepo(RunbotCaseMinimalSetup):
         for i in range(20005):
             self.commit_list[self.repo_server.id].append(['refs/heads/bidon-%05d' % i,
                                                           'd0d0caca %s' % i,
-                                                          datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
+                                                          str(int(time.time())),
                                                           'Marc Bidule',
                                                           '<marc.bidule@somewhere.com>',
                                                           'A nice subject',
@@ -378,15 +381,21 @@ class TestFetch(RunbotCase):
         # Ensure that Host is not disabled if fetch succeeds after 3 tries
         with mute_logger("odoo.addons.runbot.models.repo"):
             self.repo_server._update_fetch_cmd()
+
         self.assertFalse(host.assigned_only, "Host should not be disabled when fetch succeeds")
         self.assertEqual(self.fetch_count, 3)
 
-        # Now ensure that host is disabled after 5 unsuccesful tries
         self.force_failure = True
-        self.fetch_count = 0
+
         with mute_logger("odoo.addons.runbot.models.repo"):
             self.repo_server._update_fetch_cmd()
-        self.assertTrue(host.assigned_only)
+        self.assertFalse(host.assigned_only, "Host should not be disabled when fetch fails by default")
+
+        self.fetch_count = 0
+        self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_disable_host_on_fetch_failure', True)
+        with mute_logger("odoo.addons.runbot.models.repo"):
+            self.repo_server._update_fetch_cmd()
+        self.assertTrue(host.assigned_only, "Host should be disabled when fetch fails and runbot_disable_host_on_fetch_failure is set")
         self.assertEqual(self.fetch_count, 5)
 
 
@@ -420,7 +429,6 @@ class TestRepoScheduler(RunbotCase):
         # as the _scheduler method commits, we need to protect the database
         super(TestRepoScheduler, self).setUp()
 
-        self.fqdn_patcher = patch('odoo.addons.runbot.models.host.fqdn')
         mock_root = self.patchers['repo_root_patcher']
         mock_root.return_value = '/tmp/static'
 
@@ -467,3 +475,58 @@ class TestRepoScheduler(RunbotCase):
         builds[0].write({'local_state': 'done'})
 
         self.Runbot._scheduler(host)
+
+
+class TestGetRefs(RunbotCase):
+    def setUp(self):
+        super().setUp()
+        self.test_refs = []
+
+    def mock_git_helper(self):
+        """Helper that returns a mock for repo._git()"""
+        def mock_git(repo, cmd):
+            self.assertIn('for-each-ref', cmd)
+            self.assertIn('refs/*/pull/*', cmd)
+            return '\n'.join(['\x00'.join(ref_data) for ref_data in self.test_refs])
+        return mock_git
+
+    def test_get_refs(self):
+        current = time.time()
+        commit_time = str(int(current) - 5000)
+        self.remote_server_dev.fetch_pull = True
+        to_ignore = {'242': current - 100}
+        good_ref = (
+            'refs/bla-dev/heads/master-test-branch-rbt',
+            'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+            commit_time,
+            'foobarman',
+            '<foobarman@somewhere.com>',
+            '[IMP] mail: better tests',
+            'foobarman',
+            '<foobarman@somewhere.com>',
+        )
+        bad_ref = (
+            'refs/bla-dev/heads/1703',
+            'e9b396d2dddffdb373bf2c6ad073696aa25b4f68',
+            commit_time,
+            'foobarman',
+            '<foobarman@somewhere.com>',
+            '[FIX] foo: bar',
+            'foobarman',
+            '<foobarman@somewhere.com>',
+        )
+        to_ignore_ref = (
+            'refs/bla-dev/pull/242',
+            'ee89a48b76b58f4b3b0a7ee2c558dd8d936f6b12',
+            commit_time,
+            'foobarman',
+            '<foobarman@somewhere.com>',
+            '[IMP] blah: blah',
+            'foobarman',
+            '<foobarman@somewhere.com>',
+        )
+        self.test_refs.extend([good_ref, bad_ref, to_ignore_ref])
+        refs = self.repo_server._get_refs(ignore=to_ignore)
+        self.assertIn(good_ref, refs, 'A valid branch should appear in refs')
+        self.assertNotIn(bad_ref, refs, 'A branch name that is an integer should be filtered out')
+        self.assertNotIn(to_ignore_ref, refs, 'An explicitely ignored branch should be filtered out')

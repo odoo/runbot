@@ -18,13 +18,5 @@
       <field name="view_mode">tree</field>
     </record>
 
-    <menuitem
-        name="Warnings"
-        id="runbot_menu_warning_root"
-        parent="runbot_menu_root"
-        sequence="110"
-        action="open_view_warning_tree"
-        />
-
   </data>
 </odoo>

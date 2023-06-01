@@ -16,8 +16,18 @@
                         <field name="last_success" readonly='1'/>
                         <field name="assigned_only"/>
                         <field name="nb_worker"/>
+                        <field name="build_ids" widget="many2many" options="{'not_delete': True, 'no_create_edit': True}" readonly="1">
+                            <tree>
+                                <field name="create_date"/>
+                                <field name="global_state"/>
+                                <field name="global_result"/>
+                                <field name="job"/>
+                                <field name="dest" widget="char_frontend_url"/>
+                            </tree>
+                        </field>
                         <field name="last_exception" readonly='1'/>
                         <field name="exception_count" readonly='1'/>
+                        <field name="host_message_ids" readonly='1'/>
                     </group>
                 </sheet>
                 <div class="oe_chatter">
@@ -35,7 +45,7 @@
             <tree string="Builds">
                 <field name="name"/>
                 <field name="disp_name"/>
-                <field name="assigned_only"/>
+                <field name="assigned_only" widget="boolean_toggle"/>
                 <field name="nb_worker"/>
             </tree>
         </field>
@@ -47,12 +57,5 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    <menuitem
-        name="Build Hosts"
-        id="runbot_menu_host_tree"
-        parent="runbot_menu_root"
-        sequence="32"
-        action="open_view_host_tree"
-        />
   </data>
 </odoo>

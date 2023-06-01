@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo> 
+    <menuitem name="Runbot" id="runbot_menu_root"/>
+
+    <menuitem name="Objects" id="menu_objects" parent="runbot_menu_root" sequence="200"/>
+    <menuitem action="action_build" id="menu_build_build" parent="menu_objects" sequence="10" />
+    <menuitem action="action_build_params" id="menu_build_params" parent="menu_objects" sequence="15" />
+    <menuitem id="menu_bundle" action="action_bundle" parent="menu_objects" sequence="20"/>
+    <menuitem id="menu_bundle_batch" action="action_bundle_batch" parent="menu_objects" sequence="25" />
+    <menuitem name="Branches" id="runbot_menu_branch_tree" parent="menu_objects" sequence="40" action="open_view_branch_tree"/>
+    <menuitem name="Commits" id="runbot_menu_commit_tree" parent="menu_objects" sequence="50" action="open_view_commit_tree"/>
+    <menuitem  id="runbot_menu_bundle_custom_trigger" parent="menu_objects" sequence="70" action="action_bundle_custom_trigger"/>
+
+    <menuitem name="Hosts" id="runbot_menu_host_tree" parent="runbot_menu_root" sequence="300" action="open_view_host_tree" groups="runbot.group_runbot_admin"/>
+
+    <menuitem id="runbot_menu_trigger" parent="runbot_menu_root" sequence="500" action="runbot_triggers_action" groups="runbot.group_runbot_admin"/>
+
+    <menuitem name="Configs" id="runbot_menu_configs" parent="runbot_menu_root" sequence="600" groups="runbot.group_build_config_user"/>
+    <menuitem id="runbot_menu_job_config_tree" parent="runbot_menu_configs" sequence="10" action="open_view_job_config_tree"/>
+    <menuitem id="runbot_menu_job_tree" parent="runbot_menu_configs" sequence="20" action="open_view_job_tree"/>
+
+    <menuitem id="runbot_menu_upgrade_exceptions_tree" parent="runbot_menu_root" sequence="700" action="open_view_upgrade_exception_tree"/>
+
+    <menuitem name="Docker" id="menu_dockerfile" parent="runbot_menu_root" action="open_view_dockerfile_tree" sequence="800"/>
+
+    <menuitem name="Manage errors" id="runbot_menu_manage_errors" parent="runbot_menu_root" sequence="900"/>
+    <menuitem name="Build errors" id="runbot_menu_build_error_tree" parent="runbot_menu_manage_errors" sequence="10" action="open_view_build_error_tree"/>
+    <menuitem name="Error Logs" id="runbot_menu_error_logs" parent="runbot_menu_manage_errors" sequence="20" action="open_view_error_log_tree"/>
+
+    <menuitem name="Teams" id="runbot_menu_teams" parent="runbot_menu_root" sequence="1000"/>
+    <menuitem name="Teams" id="runbot_menu_team_tree" parent="runbot_menu_teams" sequence="30" action="open_view_runbot_team"/>
+    <menuitem name="Dashboards" id="runbot_menu_runbot_dashboard_tree" parent="runbot_menu_teams" sequence="40" action="open_view_runbot_dashboard" groups="runbot.group_runbot_admin"/>
+    <menuitem name="Dashboard Tiles" id="runbot_menu_runbot_dashboard_tile_tree" parent="runbot_menu_teams" sequence="50" action="open_view_runbot_dashboard_tile" groups="runbot.group_runbot_admin"/>
+    <menuitem name="Modules" id="runbot_menu_module_tree" parent="runbot_menu_teams" sequence="70" action="open_view_runbot_module"/>
+    <menuitem name="Modules ownership" id="runbot_menu_module_ownership_tree" parent="runbot_menu_teams" sequence="80" action="open_view_runbot_module_ownership"/>
+    <menuitem name="CodeOwners" id="runbot_menu_codeowner_tree" parent="runbot_menu_teams" sequence="90" action="open_view_codeowner_tree"/>
+   
+    <menuitem name="Warnings" id="runbot_menu_warning_root" parent="runbot_menu_root" sequence="1200" action="open_view_warning_tree" groups="runbot.group_runbot_admin"/>
+
+    <menuitem name="Settings" id="menu_runbot_settings" parent="runbot_menu_root" sequence="9000" groups="runbot.group_runbot_admin"/>
+    <menuitem id="menu_runbot_global_settings" parent="menu_runbot_settings" action="action_runbot_configuration" groups="base.group_system"/>
+    <menuitem id="menu_bundle_project" action="action_bundle_project"  sequence="10" parent="menu_runbot_settings"/>
+    <menuitem id="menu_bundle_version" action="action_bundle_version"  sequence="20" parent="menu_runbot_settings"/>
+    <menuitem id="runbot_menu_repos" parent="menu_runbot_settings" sequence="30" action="runbot_repos_action"/>
+    <menuitem id="runbot_menu_remotes" parent="menu_runbot_settings" sequence="40" action="runbot_remotes_action"/>
+    <menuitem id="runbot_menu_trigger_category" parent="menu_runbot_settings" sequence="50" action="runbot_triggers_category_action"/>
+    <menuitem id="runbot_menu_upgrade_regex_tree" parent="menu_runbot_settings" sequence="60" action="open_view_upgrade_regex_tree"/>
+    <menuitem name="Stats Regexes" id="runbot_menu_stat" parent="menu_runbot_settings" sequence="70" action="open_view_stat_regex_tree"/>
+    <menuitem name="Stat Regex Wizard" id="runbot_menu_stat_wizard" parent="menu_runbot_settings" sequence="80" action="runbot_stat_regex_wizard_action"/>
+    <menuitem name="Error regex" id="runbot_menu_error_regex_tree" parent="menu_runbot_settings" sequence="20" action="open_view_error_regex"/>
+    
+    <menuitem name="Technical" id="runbot_menu_technical" parent="menu_runbot_settings" sequence="10000" groups="base.group_system"/>
+    <menuitem id="runbot_menu_ir_cron_act" action="base.ir_cron_act" parent="runbot_menu_technical"/>
+    <menuitem id="runbot_menu_base_automation_act" action="base_automation.base_automation_act" parent="runbot_menu_technical"/>
+    <menuitem id="runbot_menu_action_ui_view" action="base.action_ui_view" parent="runbot_menu_technical"/>
+    <menuitem id="runbot_menu_action_res_users" action="base.action_res_users" parent="runbot_menu_technical"/>
+
+    <menuitem name="▶" id="runbot_menu_website" parent="runbot_menu_root" sequence="20000" action="website.action_website"/>
+
+</odoo>

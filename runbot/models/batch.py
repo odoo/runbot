@@ -18,12 +18,20 @@ class Batch(models.Model):
     commit_link_ids = fields.Many2many('runbot.commit.link')
     commit_ids = fields.Many2many('runbot.commit', compute='_compute_commit_ids')
     slot_ids = fields.One2many('runbot.batch.slot', 'batch_id')
+    all_build_ids = fields.Many2many('runbot.build', compute='_compute_all_build_ids', help="Recursive builds")
     state = fields.Selection([('preparing', 'Preparing'), ('ready', 'Ready'), ('done', 'Done'), ('skipped', 'Skipped')])
     hidden = fields.Boolean('Hidden', default=False)
     age = fields.Integer(compute='_compute_age', string='Build age')
     category_id = fields.Many2one('runbot.category', default=lambda self: self.env.ref('runbot.default_category', raise_if_not_found=False))
     log_ids = fields.One2many('runbot.batch.log', 'batch_id')
     has_warning = fields.Boolean("Has warning")
+    base_reference_batch_id = fields.Many2one('runbot.batch')
+
+    @api.depends('slot_ids.build_id')
+    def _compute_all_build_ids(self):
+        all_builds = self.env['runbot.build'].search([('id', 'child_of', self.slot_ids.build_id.ids)])
+        for batch in self:
+            batch.all_build_ids = all_builds.filtered_domain([('id', 'child_of', batch.slot_ids.build_id.ids)])
 
     @api.depends('commit_link_ids')
     def _compute_commit_ids(self):
@@ -44,8 +52,7 @@ class Batch(models.Model):
 
     def _url(self):
         self.ensure_one()
-        runbot_domain = self.env['runbot.runbot']._domain()
-        return "http://%s/runbot/batch/%s" % (runbot_domain, self.id)
+        return "/runbot/batch/%s" % self.id
 
     def _new_commit(self, branch, match_type='new'):
         # if not the same hash for repo:
@@ -76,12 +83,15 @@ class Batch(models.Model):
             for slot in batch.slot_ids:
                 slot.skipped = True
                 build = slot.build_id
+                if build.global_state in ('running', 'done'):
+                    continue
                 testing_slots = build.slot_ids.filtered(lambda s: not s.skipped)
                 if not testing_slots:
                     if build.global_state == 'pending':
                         build._skip('Newer build found')
                     elif build.global_state in ('waiting', 'testing'):
-                        build.killable = True
+                        if not build.killable:
+                            build.killable = True
                 elif slot.link_type == 'created':
                     batches = testing_slots.mapped('batch_id')
                     _logger.info('Cannot skip build %s build is still in use in batches %s', build.id, batches.ids)
@@ -90,52 +100,72 @@ class Batch(models.Model):
                         batch._log('Cannot kill or skip build %s, build is used in another bundle: %s', build.id, bundles.mapped('name'))
 
     def _process(self):
+        processed = self.browse()
         for batch in self:
             if batch.state == 'preparing' and batch.last_update < fields.Datetime.now() - datetime.timedelta(seconds=60):
                 batch._prepare()
+                processed |= batch
             elif batch.state == 'ready' and all(slot.build_id.global_state in (False, 'running', 'done') for slot in batch.slot_ids):
+                _logger.info('Batch %s is done', self.id)
                 batch._log('Batch done')
                 batch.state = 'done'
+                processed |= batch
+        return processed
 
     def _create_build(self, params):
         """
         Create a build with given params_id if it does not already exists.
         In the case that a very same build already exists that build is returned
         """
-        build = self.env['runbot.build'].search([('params_id', '=', params.id), ('parent_id', '=', False)], limit=1, order='id desc')
+        domain = [('params_id', '=', params.id), ('parent_id', '=', False)]
+        if self.bundle_id.host_id:
+            domain += [('host', '=', self.bundle_id.host_id.name), ('keep_host', '=', True)]
+        build = self.env['runbot.build'].search(domain, limit=1, order='id desc')
         link_type = 'matched'
-        if build:
-            build.killable = False
+        killed_states = ('skipped', 'killed', 'manually_killed')
+        if build and build.local_result not in killed_states and build.global_result not in killed_states:
+            if build.killable:
+                build.killable = False
         else:
             description = params.trigger_id.description if params.trigger_id.description else False
             link_type = 'created'
+
+            build_type = 'normal'
+            if self.category_id != self.env.ref('runbot.default_category'):
+                build_type = 'scheduled'
+            elif self.bundle_id.priority:
+                build_type = 'priority'
+
             build = self.env['runbot.build'].create({
                 'params_id': params.id,
                 'description': description,
-                'build_type': 'normal' if self.category_id == self.env.ref('runbot.default_category') else 'scheduled',
+                'build_type': build_type,
                 'no_auto_run': self.bundle_id.no_auto_run,
             })
             if self.bundle_id.host_id:
                 build.host = self.bundle_id.host_id.name
                 build.keep_host = True
 
-            build._github_status(post_commit=False)
+            build._github_status()
         return link_type, build
 
     def _prepare(self, auto_rebase=False):
+        _logger.info('Preparing batch %s', self.id)
+        if not self.bundle_id.base_id:
+            # in some case the base can be detected lately. If a bundle has no base, recompute the base before preparing
+            self.bundle_id._compute_base_id()
         for level, message in self.bundle_id.consistency_warning():
             if level == "warning":
                 self.warning("Bundle warning: %s" % message)
 
         self.state = 'ready'
-        _logger.info('Preparing batch %s', self.id)
 
         bundle = self.bundle_id
         project = bundle.project_id
         if not bundle.version_id:
             _logger.error('No version found on bundle %s in project %s', bundle.name, project.name)
 
-        dockerfile_id = bundle.dockerfile_id or bundle.base_id.dockerfile_id or bundle.version_id.dockerfile_id or bundle.project_id.dockerfile_id
+        dockerfile_id = bundle.dockerfile_id or bundle.base_id.dockerfile_id or bundle.project_id.dockerfile_id or bundle.version_id.dockerfile_id
         if not dockerfile_id:
             _logger.error('No dockerfile found !')
 
@@ -198,13 +228,12 @@ class Batch(models.Model):
         self._update_commits_infos(base_head_per_repo)  # set base_commit, diff infos, ...
 
         # 2. FIND missing commit in a compatible base bundle
-        if missing_repos and not bundle.is_base:
+        if not bundle.is_base:
             merge_base_commits = self.commit_link_ids.mapped('merge_base_commit_id')
             if auto_rebase:
-                batch = last_base_batch
-                self._log('Using last done batch %s to define missing commits (automatic rebase)', batch.id)
+                self.base_reference_batch_id = last_base_batch
             else:
-                batch = False
+                self.base_reference_batch_id = False
                 link_commit = self.env['runbot.commit.link'].search([
                     ('commit_id', 'in', merge_base_commits.ids),
                     ('match_type', 'in', ('new', 'head'))
@@ -216,16 +245,22 @@ class Batch(models.Model):
                     ('category_id', '=', self.category_id.id)
                 ]).sorted(lambda b: (len(b.commit_ids & merge_base_commits), b.id), reverse=True)
                 if batches:
-                    batch = batches[0]
-                    self._log('Using batch %s to define missing commits', batch.id)
-                    batch_exiting_commit = batch.commit_ids.filtered(lambda c: c.repo_id in merge_base_commits.repo_id)
-                    not_matching = (batch_exiting_commit - merge_base_commits)
-                    if not_matching:
-                        message = 'Only %s out of %s merge base matched. You may want to rebase your branches to ensure compatibility' % (len(merge_base_commits)-len(not_matching), len(merge_base_commits))
-                        suggestions = [('Tip: rebase %s to %s' % (commit.repo_id.name, commit.name)) for commit in not_matching]
-                        self.warning('%s\n%s' % (message, '\n'.join(suggestions)))
+                    self.base_reference_batch_id = batches[0]
+
+            batch = self.base_reference_batch_id
             if batch:
-                fill_missing({link.branch_id: link.commit_id for link in batch.commit_link_ids}, 'base_match')
+                if missing_repos:
+                    self._log('Using batch [%s](%s) to define missing commits', batch.id, batch._url())
+                    fill_missing({link.branch_id: link.commit_id for link in batch.commit_link_ids}, 'base_match')
+                # check if all mergebase match reference batch
+                batch_exiting_commit = batch.commit_ids.filtered(lambda c: c.repo_id in merge_base_commits.repo_id)
+                not_matching = (batch_exiting_commit - merge_base_commits)
+                if not_matching and not auto_rebase:
+                    message = 'Only %s out of %s merge base matched. You may want to rebase your branches to ensure compatibility' % (len(merge_base_commits)-len(not_matching), len(merge_base_commits))
+                    suggestions = [('Tip: rebase %s to %s' % (commit.repo_id.name, commit.name)) for commit in not_matching]
+                    self.warning('%s\n%s' % (message, '\n'.join(suggestions)))
+            else:
+                self._log('No reference batch found to fill missing commits')
 
         # 3.1 FIND missing commit in base heads
         if missing_repos:
@@ -265,32 +300,31 @@ class Batch(models.Model):
         bundle_repos = bundle.branch_ids.mapped('remote_id.repo_id')
         version_id = self.bundle_id.version_id.id
         project_id = self.bundle_id.project_id.id
-        config_by_trigger = {}
-        params_by_trigger = {}
+        trigger_customs = {}
         for trigger_custom in self.bundle_id.trigger_custom_ids:
-            config_by_trigger[trigger_custom.trigger_id.id] = trigger_custom.config_id
-            params_by_trigger[trigger_custom.trigger_id.id] = trigger_custom.extra_params
+            trigger_customs[trigger_custom.trigger_id] = trigger_custom
         for trigger in triggers:
+            trigger_custom = trigger_customs.get(trigger, self.env['runbot.bundle.trigger.custom'])
             trigger_repos = trigger.repo_ids | trigger.dependency_ids
             if trigger_repos & missing_repos:
                 self.warning('Missing commit for repo %s for trigger %s', (trigger_repos & missing_repos).mapped('name'), trigger.name)
                 continue
             # in any case, search for an existing build
-            config = config_by_trigger.get(trigger.id, trigger.config_id)
-            if not config:
-                continue
-            extra_params = params_by_trigger.get(trigger.id, '')
+            config = trigger_custom.config_id or trigger.config_id
+            extra_params = trigger_custom.extra_params or ''
+            config_data = trigger_custom.config_data or {}
             params_value = {
                 'version_id':  version_id,
                 'extra_params': extra_params,
                 'config_id': config.id,
                 'project_id': project_id,
                 'trigger_id': trigger.id,  # for future reference and access rights
-                'config_data': {},
+                'config_data': config_data,
                 'commit_link_ids': [(6, 0, [commit_link_by_repos[repo.id].id for repo in trigger_repos])],
                 'modules': bundle.modules,
                 'dockerfile_id': dockerfile_id,
                 'create_batch_id': self.id,
+                'used_custom_trigger': bool(trigger_custom),
             }
             params_value['builds_reference_ids'] = trigger._reference_builds(bundle)
 
@@ -298,7 +332,10 @@ class Batch(models.Model):
 
             build = self.env['runbot.build']
             link_type = 'created'
-            if ((trigger.repo_ids & bundle_repos) or bundle.build_all or bundle.sticky) and not trigger.manual:  # only auto link build if bundle has a branch for this trigger
+            force_trigger = trigger_custom and trigger_custom.start_mode == 'force'
+            skip_trigger = (trigger_custom and trigger_custom.start_mode == 'disabled') or trigger.manual
+            should_start = ((trigger.repo_ids & bundle_repos) or bundle.build_all or bundle.sticky)
+            if force_trigger or (should_start and not skip_trigger):  # only auto link build if bundle has a branch for this trigger
                 link_type, build = self._create_build(params)
             self.env['runbot.batch.slot'].create({
                 'batch_id': self.id,
@@ -315,7 +352,7 @@ class Batch(models.Model):
         if not bundle.sticky and self.category_id == default_category:
             skippable = self.env['runbot.batch'].search([
                 ('bundle_id', '=', bundle.id),
-                ('state', '!=', 'done'),
+                ('state', 'not in', ('done', 'skipped')),
                 ('id', '<', self.id),
                 ('category_id', '=', default_category.id)
             ])
@@ -403,6 +440,7 @@ class BatchSlot(models.Model):
     batch_id = fields.Many2one('runbot.batch', index=True)
     trigger_id = fields.Many2one('runbot.trigger', index=True)
     build_id = fields.Many2one('runbot.build', index=True)
+    all_build_ids = fields.Many2many('runbot.build', compute='_compute_all_build_ids')
     params_id = fields.Many2one('runbot.build.params', index=True, required=True)
     link_type = fields.Selection([('created', 'Build created'), ('matched', 'Existing build matched'), ('rebuild', 'Rebuild')], required=True)  # rebuild type?
     active = fields.Boolean('Attached', default=True)
@@ -412,6 +450,12 @@ class BatchSlot(models.Model):
     # - only available on batch and replace for batch only?
     # - create a new bundle batch will new linked build?
 
+    @api.depends('build_id')
+    def _compute_all_build_ids(self):
+        all_builds = self.env['runbot.build'].search([('id', 'child_of', self.build_id.ids)])
+        for slot in self:
+            slot.all_build_ids = all_builds.filtered_domain([('id', 'child_of', slot.build_id.ids)])
+
     def fa_link_type(self):
         return self._fa_link_type.get(self.link_type, 'exclamation-triangle')
 
@@ -420,5 +464,6 @@ class BatchSlot(models.Model):
         self.ensure_one()
         if self.build_id:
             return self.build_id
+        self.batch_id._log(f'Trigger {self.trigger_id.name} was started by {self.env.user.name}')
         self.link_type, self.build_id = self.batch_id._create_build(self.params_id)
         return self.build_id

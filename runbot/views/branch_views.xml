@@ -13,12 +13,14 @@
                 <field name="bundle_id" readonly='0'/>
                 <field name="remote_id"/>
                 <field name="name"/>
-                <field name="branch_url"/>
+                <field name="branch_url" widget="url"/>
                 <field name="is_pr"/>
                 <field name="pull_head_name"/>
                 <field name="target_branch_name"/>
                 <field name="head"/>
                 <field name="alive"/>
+                <field name="pr_title"/>
+                <field name="pr_body"/>
               </group>
             </sheet>
           </form>
@@ -31,6 +33,7 @@
         <field name="model">runbot.branch</field>
         <field name="arch" type="xml">
             <tree string="Branches">
+                <field name="create_date"/>
                 <field name="remote_id"/>
                 <field name="name"/>
             </tree>
@@ -43,14 +46,5 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    <menuitem name="Runbot" id="runbot_menu_root"/>
-
-    <menuitem
-        name="Branches"
-        id="runbot_menu_branch_tree"
-        parent="runbot_menu_root"
-        sequence="20"
-        action="open_view_branch_tree"
-        />
   </data>
 </odoo>

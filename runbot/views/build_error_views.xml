@@ -5,54 +5,61 @@
         <field name="model">runbot.build.error</field>
         <field name="arch" type="xml">
           <form>
+            <widget name="web_ribbon" title="Test-tags" bg_color="bg-warning" attrs="{'invisible': [('test_tags', '=', False)]}"/>
             <header>
             </header>
-            <sheet>
-              <group name="build_error_group">
-                <field name="fingerprint" readonly="1"/>
-                <field name="content"/>
-                <field name="cleaned_content" groups="base.group_no_one"/>
-                <field name="module_name"/>
-                <field name="function"/>
-                <field name="random"/>
-                <field name="responsible"/>
-                <field name="fixing_commit"/>
-                <field name="active"/>
-                <field name="parent_id" />
-                <field name="bundle_ids" widget="many2many_tags"/>
-                <field name="trigger_ids" widget="many2many_tags"/>
-                <field name="tag_ids" widget="many2many_tags"/>
-                <field name="first_seen_date"/>
-                <field name="first_seen_build_id"/>
-                <field name="last_seen_date"/>
-                <field name="last_seen_build_id"/>
-                <field name="test_tags"/>
+              <group>
+                <group name="build_error_group" string="Base info">
+                  <field name="content" readonly="1"/>
+                  <field name="module_name" readonly="1"/>
+                  <field name="function" readonly="1"/>
+                  <field name="file_path" readonly="1"/>
+                </group>
+              </group>
+              <group col="2">
+                <group name="fixer_info" string="Fixing">
+                  <field name="responsible" attrs="{'readonly': [('parent_id','!=', False), ('responsible','=', False)]}"/>
+                  <field name="team_id" attrs="{'readonly': [('parent_id','!=', False), ('team_id','=', False)]}"/>
+                  <field name="fixing_pr_id"/>
+                  <field name="fixing_pr_url" widget="url"/>
+                  <field name="active"/>
+                  <field name="test_tags" readonly="1" groups="!runbot.group_runbot_admin"/>
+                  <field name="test_tags" groups="runbot.group_runbot_admin" attrs="{'readonly': [('parent_id','!=', False), ('test_tags','=', False)]}"/>
+                </group>
+                  <group name="fixer_info" string="Fixing">
+                  <field name="version_ids" widget="many2many_tags"/>
+                  <field name="trigger_ids" widget="many2many_tags"/>
+                  <field name="tag_ids" widget="many2many_tags" readonly="1"/>
+                </group>
+              </group>
+              <group name="fixer_info" string="More info" col="2">
+                <group>
+                  <field name="random"/>
+                  <field name="first_seen_date"/>
+                  <field name="first_seen_build_id" widget="frontend_url"/>
+                </group>
+                <group>
+                  <field name="parent_id"/>
+                  <field name="last_seen_date"/>
+                  <field name="last_seen_build_id" widget="frontend_url"/>
+                </group>
               </group>
               <notebook>
                 <page string="Builds">
-                  <field name="build_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}">
+                  <field name="children_build_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
                     <tree>
                       <field name="create_date"/>
-                      <field name="id"/>
                       <field name="host" groups="base.group_no_one"/>
                       <field name="dest"/>
+                      <field name="version_id"/>
+                      <field name="trigger_id"/>
+                      <field name="description"/>
                       <field name="build_url" widget="url" readonly="1" text="View build"/>
                     </tree>
                   </field>
                 </page>
-                <page string="All Errors Builds">
-                  <field name="children_build_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}">
-                    <tree>
-                      <field name="create_date"/>
-                      <field name="id"/>
-                      <field name="host" groups="base.group_no_one"/>
-                      <field name="dest"/>
-                      <field name="build_url" widget="url" readonly="1" text="View build"/>
-                    </tree>
-                  </field>
-                </page>
-                <page string="Linked Errors">
-                  <field name="child_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}">
+                <page string="Linked Errors" attrs="{'invisible': [('child_ids', '=', [])]}">
+                  <field name="child_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
                     <tree>
                       <field name="create_date"/>
                       <field name="module_name"/>
@@ -61,8 +68,8 @@
                     </tree>
                   </field>
                 </page>
-                <page string="Error history">
-                  <field name="error_history_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}">
+                <page string="Error history" attrs="{'invisible': [('error_history_ids', '=', [])]}">
+                  <field name="error_history_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
                     <tree>
                       <field name="create_date"/>
                       <field name="module_name"/>
@@ -71,14 +78,23 @@
                       <field name="build_count"/>
                       <field name="responsible"/>
                       <field name="fixing_commit"/>
+                      <field name="id"/>
                     </tree>
                   </field>
                 </page>
+                <page string="Debug" groups="base.group_no_one">
+                  <group name="build_error_group">
+                    <field name="fingerprint" readonly="1"/>
+                    <field name="cleaned_content" readonly="1"/>
+                    <field name="fixing_commit" widget="url"/>
+                    <field name="bundle_ids" widget="many2many_tags"/>
+                  </group>
+                </page>
               </notebook>
-            </sheet>
             <div class="oe_chatter">
                 <field name="message_follower_ids" widget="mail_followers"/>
                 <field name="message_ids" widget="mail_thread"/>
+                <field name="activity_ids" widget="mail_activity"/>
             </div>
           </form>
         </field>
@@ -88,14 +104,22 @@
         <field name="name">runbot.build.error.tree</field>
         <field name="model">runbot.build.error</field>
         <field name="arch" type="xml">
-            <tree string="Errors">
-                <field name="module_name"/>
-                <field name="summary"/>
+            <tree string="Errors" 
+                  decoration-danger="test_tags and (fixing_pr_alive or not fixing_pr_id)" 
+                  decoration-success="fixing_pr_id and not test_tags and not fixing_pr_alive"
+                  decoration-warning="test_tags and fixing_pr_id and not fixing_pr_alive"
+                  multi_edit="1">
+                <field name="module_name" readonly="1"/>
+                <field name="summary" readonly="1"/>
                 <field name="random" string="Random"/>
-                <field name="last_seen_date" string="Last Seen"/>
-                <field name="build_count"/>
+                <field name="last_seen_date" string="Last Seen" readonly="1"/>
+                <field name="build_count" readonly="1"/>
                 <field name="responsible"/>
+                <field name="team_id"/>
                 <field name="test_tags"/>
+                <field name="fixing_pr_id"/>
+                <field name="fixing_pr_alive" invisible="1"/>
+                <field name="fixing_pr_url" widget="url" text="view PR" readonly="1"/>
             </tree>
         </field>
     </record>
@@ -108,16 +132,25 @@
           <field name="content"/>
           <field name="module_name"/>
           <field name="function"/>
+          <field name="version_ids"/>
           <field name="responsible"/>
+          <field name="team_id"/>
           <field name="fixing_commit"/>
+          <filter string="Assigned to me" name="my_errors" domain="[('responsible', '=', uid)]"/>
+          <separator/>
           <filter string="No Parent" name="no_parent_error" domain="[('parent_id', '=', False)]"/>
           <separator/>
           <filter string="Undeterministic" name="random_error" domain="[('random', '=', True)]"/>
+          <filter string="Deterministic" name="random_error" domain="[('random', '=', False)]"/>
           <separator/>
           <filter string="Fixed" name="fixed_errors" domain="[('active', '=', False)]"/>
           <filter string="Not Fixed" name="not_fixed_errors" domain="[('active', '=', True)]"/>
           <separator/>
           <filter string="Not Assigned" name="not_assigned_errors" domain="[('responsible', '=', False)]"/>
+          <filter string="Assigned" name="assigned_errors" domain="[('responsible', '!=', False)]"/>
+          <filter string="Having a PR" name="pr_set_errors" domain="[('fixing_pr_id', '!=', False)]"/>
+          <filter string="Fixing PR is closed" name="pr_closed_errors" domain="[('fixing_pr_id', '!=', False), ('fixing_pr_id.alive', '=', False)]"/>
+          <filter string="Fixing PR is open" name="pr_open_errors" domain="[('fixing_pr_id', '!=', False), ('fixing_pr_id.alive', '=', True)]"/>
           <separator/>
           <filter string="Test Tags" name="test_tagged_errors" domain="[('test_tags', '!=', False)]"/>
         </search>
@@ -180,27 +213,66 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    <menuitem
-        name="Manage errors"
-        id="runbot_menu_manage_errors"
-        parent="runbot_menu_root"
-        sequence="40"
-        />
+    <record model="ir.ui.view" id="runbot_error_closing_wizard_form">
+        <field name="name">runbot_error_closing_wizard</field>
+        <field name="model">runbot.error.closing.wizard</field>
+        <field name="arch" type="xml">
+          <form>
+            <sheet>
+              <group name="closing_group">
+                <field name="reason"/>
+              </group>
+              <footer>
+                <button string="Submit" name="submit" type="object" class="btn-primary"/>
+                <button string="Cancel" class="btn-secondary" special="cancel"/>
+              </footer>
+            </sheet>
+          </form>
+        </field>
+    </record>
 
-    <menuitem
-        name="Build errors"
-        id="runbot_menu_build_error_tree"
-        parent="runbot_menu_manage_errors"
-        sequence="10"
-        action="open_view_build_error_tree"
-        />
+    <record id="runbot_open_error_closing_wizard" model="ir.actions.act_window">
+        <field name="name">Close Errors With A Reason</field>
+        <field name="res_model">runbot.error.closing.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="view_id" ref="runbot_error_closing_wizard_form"/>
+        <field name="binding_model_id" ref="runbot.model_runbot_build_error"/>
+        <field name="binding_view_types">form,list</field>
+    </record>
 
-    <menuitem
-        name="Error regex"
-        id="runbot_menu_error_regex_tree"
-        parent="runbot_menu_manage_errors"
-        sequence="20"
-        action="open_view_error_regex"
-        />
+  <record model="ir.ui.view" id="runbot_error_reassign_wizard_form">
+        <field name="name">runbot_error_reassign_wizard</field>
+        <field name="model">runbot.error.reassign.wizard</field>
+        <field name="arch" type="xml">
+          <form>
+            <sheet>
+              <group name="team_group">
+                <field name="team_id"/>
+                <field name="responsible_id"/>
+              </group>
+              <group name="Fix">
+                <field name="fixing_pr_id"/>
+                <field name="fixing_commit"/>
+              </group>
+              <footer>
+                <button string="Submit" name="submit" type="object" class="btn-primary"/>
+                <button string="Cancel" class="btn-secondary" special="cancel"/>
+              </footer>
+            </sheet>
+          </form>
+        </field>
+    </record>
+
+    <record id="runbot_open_reassign_wizard" model="ir.actions.act_window">
+        <field name="name">Assign Team/User/PR Wizard</field>
+        <field name="res_model">runbot.error.reassign.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="view_id" ref="runbot_error_reassign_wizard_form"/>
+        <field name="binding_model_id" ref="runbot.model_runbot_build_error"/>
+        <field name="binding_view_types">list</field>
+    </record>
+
   </data>
 </odoo>

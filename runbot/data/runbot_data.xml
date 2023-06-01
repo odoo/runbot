@@ -16,20 +16,45 @@
         <field name="name">R&amp;D</field>
     </record>
 
-    <record model="runbot.bundle" id="runbot.bundle_master">
-        <field name="name">master</field>
-        <field name="is_base">True</field>
-        <field name="project_id" ref="runbot.main_project"/>
-    </record>
-    <record model="runbot.bundle" id="runbot.bundle_dummy">
-        <field name="name">Dummy</field>
-        <field name="no_build">True</field>
-        <field name="project_id" ref="runbot.main_project"/>
+    <data noupdate="1">
+        <record model="ir.config_parameter" id="runbot.runbot_upgrade_exception_message">
+            <field name="key">runbot.runbot_upgrade_exception_message</field>
+            <field name="value">Upgrade exception [#{exception.id}]({base_url}/web/#id={exception.id}&amp;view_type=form&amp;model=runbot.upgrade.exception) added\
+    {exception.elements}
+            </field>
+        </record>
+
+        <record model="ir.config_parameter" id="runbot.runbot_default_odoorc">
+            <field name="key">runbot.runbot_default_odoorc</field>
+            <field name="value">[options]
+admin_passwd=running_master_password</field>
+        </record>
+
+        <record model="ir.config_parameter" id="runbot.runbot_default_logdb_name">
+            <field name="key">runbot.logdb_name</field>
+            <field name="value">runbot_logs</field>
+        </record>
+
+    </data>
+
+    <record model="ir.config_parameter" id="runbot.runbot_disable_host_on_fetch_failure">
+        <field name="key">runbot.runbot_disable_host_on_fetch_failure</field>
+        <field name="value"></field>
     </record>
 
     <record model="ir.config_parameter" id="runbot.runbot_is_base_regex">
         <field name="key">runbot.runbot_is_base_regex</field>
         <field name="value">^((master)|(saas-)?\d+\.\d+)$</field>
+    </record>
+
+    <record model="ir.config_parameter" id="runbot.runbot_forwardport_author">
+        <field name="key">runbot.runbot_forwardport_author</field>
+        <field name="value">fw-bot</field>
+    </record>
+
+    <record model="ir.config_parameter" id="runbot.runbot_organisation">
+        <field name="key">runbot.runbot_organisation</field>
+        <field name="value">odoo</field>
     </record>
 
     <record model="ir.actions.server" id="action_toggle_is_base">
@@ -65,6 +90,7 @@
 
     <record id="ir_cron_runbot" model="ir.cron">
         <field name="name">Runbot</field>
+        <field name="active" eval="False"/>
         <field name="interval_number">10</field>
         <field name="interval_type">seconds</field>
         <field name="numbercall">-1</field>

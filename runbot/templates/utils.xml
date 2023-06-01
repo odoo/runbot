@@ -2,153 +2,190 @@
 <odoo>
     <data>
         <!-- base layout -->
-        <template id="runbot.layout" inherit_id="website.layout" name="Custom website layout">
-            <xpath expr="//head/meta[last()]" position="after">
-                <t t-if="refresh">
-                    <meta http-equiv="refresh" t-att-content="refresh"/>
-                </t>
-            </xpath>
-            <xpath expr="//footer" position="replace">
-            </xpath>
-            <xpath expr="//nav[hasclass('navbar')]" position="replace">
-                <nav class="navbar navbar-expand-md navbar-light bg-light">
-                    <a t-if="project" t-att-href="qu(search=search)">
-                        <b style="color:#777;">
-                            <t t-esc="project.name"/>
-                        </b>
-                    </a>
-                    <button type="button" class="navbar-toggler" data-toggle="collapse" data-target="#top_menu_collapse">
-                        <span class="navbar-toggler-icon"/>
-                    </button>
-                    <div class="collapse navbar-collapse" id="top_menu_collapse">
-                        <ul class="nav navbar-nav ml-auto text-right" id="top_menu">
-                            <t t-if="projects">
-                                <t t-foreach="projects" t-as="l_project">
-                                    <li class="nav-item">
-                                        <a class="nav-link" t-att-href="qu('/runbot/%s' % slug(l_project), search=search)">
-                                            <t t-esc="l_project.name"/>
-                                        </a>
-                                    </li>
-                                </t>
-                            </t>
-                            <li class="nav-item divider"/>
-                            <li class="nav-item dropdown">
-                                <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown">
-                                    <i class="fa fa-gear"/>
-                                </a>
-                                <div class="dropdown-menu" role="menu">
-                                    <form class="px-4 py-3" method="post" action="/runbot/submit">
-                                        <input type="hidden" name="save" value="1"/>
-                                        <input type="hidden" name="redirect" t-att-value="current_path"/>
-                                        <div class="text-nowrap">
-                                            <input type="checkbox" name="more" id="more" t-att-checked="more"/>
-                                            <label for="more">More info</label>
-                                        </div>
-                                        <div class="text-nowrap">
-                                            <input type="checkbox" name="keep_search" id="keep_search" t-att-checked="keep_search"/>
-                                            <label for="keep_search">Persistent search</label>
-                                        </div>
-                                        <hr class="separator"/>
-                                        <div class="text-nowrap">
-                                            <label for="filter_mode">Filter</label>
-                                            <select class="form-control" name="filter_mode" id="filter_mode">
-                                                <option value="all" t-att-selected="filter_mode=='all'">All</option>
-                                                <option value="sticky" t-att-selected="filter_mode=='sticky'">Sticky only</option>
-                                                <option value="nosticky" t-att-selected="filter_mode=='nosticky'">Dev only</option>
-                                            </select>
-                                        </div>
-                                        <div t-if="categories" class="text-nowrap">
-                                            <label for="category">Category</label>
-                                            <select class="form-control" name="category" id="category">
-                                                <option t-foreach="categories" t-as="category" t-att-value="category.id" t-esc="category.name" t-att-selected="category.id==active_category_id"/>
-                                            </select>
-                                        </div>
-                                        <hr class="separator"/>
-                                        <t t-if="triggers">
-                                            <input type="hidden" name="update_triggers" t-att-value="project.id"/>
-                                            <t t-foreach="triggers" t-as="trigger">
-                                                <div t-if="not trigger.manual" class="text-nowrap">
-                                                    <input type="checkbox" t-attf-name="trigger_{{trigger.id}}" t-attf-id="trigger_{{trigger.id}}" t-att-checked="trigger_display is None or trigger.id in trigger_display"/>
-                                                    <label t-attf-for="trigger_{{trigger.id}}" t-esc="trigger.name"/>
-                                                </div>
-                                            </t>
-                                        </t>
+        <template id="runbot.base_page">
+            <html>
+                <head>
+                    <title t-esc="title or 'Runbot'"/>
+                    <link rel="stylesheet" type="text/css" href="/web/static/lib/bootstrap/css/bootstrap.css"/>
+                    <link rel="stylesheet" type="text/css" href="/web/static/lib/fontawesome/css/font-awesome.css"/>
+                    <link rel="stylesheet" type="text/css" href="/runbot/static/src/css/runbot.css"/>
 
-                                        <button type="submit" class="btn btn-primary">Save</button>
-                                    </form>
-                                </div>
-                            </li>
-                            <li class="nav-item divider" t-ignore="true"/>
-                            <t t-if="not user_id._is_public()">
-                                <t t-if="nb_assigned_errors and nb_assigned_errors > 0">
+                    <script src="/web/static/lib/jquery/jquery.js" type="text/javascript"/>
+                    <script type="text/javascript" src="/web/static/lib/popper/popper.js"/>
+                    <script type="text/javascript" src="/web/static/lib/bootstrap/js/util.js"/>
+                    <script type="text/javascript" src="/web/static/lib/bootstrap/js/dropdown.js"/>
+                    <script type="text/javascript" src="/web/static/lib/bootstrap/js/collapse.js"/>
+                    <script type="text/javascript" src="/runbot/static/src/js/runbot.js"/>
+
+                    <t t-if="refresh">
+                        <meta http-equiv="refresh" t-att-content="refresh"/>
+                    </t>
+
+                </head>
+                <body>
+                    <t t-out="0"/>
+                </body>
+            </html>
+        </template>
+
+        <template id="runbot.layout" inherit_id="runbot.base_page" primary="True">
+            <xpath expr="//body" position="replace">
+                <body>
+                    <header>
+                        <nav class="navbar navbar-expand-md navbar-light bg-light">
+                            <a t-if="project" t-att-href="qu(search=search)">
+                                <b style="color:#777;">
+                                    <t t-esc="project.name"/>
+                                </b>
+                            </a>
+                            <button type="button" class="navbar-toggler" data-toggle="collapse" data-target="#top_menu_collapse">
+                                <span class="navbar-toggler-icon"/>
+                            </button>
+                            <div class="collapse navbar-collapse" id="top_menu_collapse">
+                                <ul class="nav navbar-nav ml-auto text-right" id="top_menu">
+                                    <t t-if="projects">
+                                        <t t-foreach="projects" t-as="l_project">
+                                            <li class="nav-item">
+                                                <a class="nav-link" t-att-href="qu('/runbot/%s' % slug(l_project), search=search)">
+                                                    <t t-esc="l_project.name"/>
+                                                </a>
+                                            </li>
+                                        </t>
+                                    </t>
                                     <li class="nav-item divider"/>
-                                    <li class="nav-item">
-                                        <a href="/runbot/errors" class="nav-link text-danger" t-attf-title="You have {{nb_assigned_errors}} random bug assigned"><i class="fa fa-bug"/><t t-esc="nb_assigned_errors"/></a>
+                                    <li class="nav-item dropdown">
+                                        <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown">
+                                            <i class="fa fa-gear"/>
+                                        </a>
+                                        <div class="dropdown-menu" role="menu">
+                                            <form class="px-4 py-3" method="post" action="/runbot/submit">
+                                                <input type="hidden" name="save" value="1"/>
+                                                <input type="hidden" name="redirect" t-att-value="current_path"/>
+                                                <div class="text-nowrap">
+                                                    <input type="checkbox" name="more" id="more" t-att-checked="more"/>
+                                                    <label for="more">More info</label>
+                                                </div>
+                                                <div class="text-nowrap">
+                                                    <input type="checkbox" name="keep_search" id="keep_search" t-att-checked="keep_search"/>
+                                                    <label for="keep_search">Persistent search</label>
+                                                </div>
+                                                <hr class="separator"/>
+                                                <div class="text-nowrap">
+                                                    <label for="filter_mode">Filter</label>
+                                                    <select class="form-control" name="filter_mode" id="filter_mode">
+                                                        <option value="all" t-att-selected="filter_mode=='all'">All</option>
+                                                        <option value="sticky" t-att-selected="filter_mode=='sticky'">Sticky only</option>
+                                                        <option value="nosticky" t-att-selected="filter_mode=='nosticky'">Dev only</option>
+                                                    </select>
+                                                </div>
+                                                <div t-if="categories" class="text-nowrap">
+                                                    <label for="category">Category</label>
+                                                    <select class="form-control" name="category" id="category">
+                                                        <option t-foreach="categories" t-as="category" t-att-value="category.id" t-esc="category.name" t-att-selected="category.id==active_category_id"/>
+                                                    </select>
+                                                </div>
+                                                <hr class="separator"/>
+                                                <t t-if="triggers">
+                                                    <input type="hidden" name="update_triggers" t-att-value="project.id"/>
+                                                    <t t-foreach="triggers" t-as="trigger">
+                                                        <div class="text-nowrap">
+                                                            <input type="checkbox" t-attf-name="trigger_{{trigger.id}}" t-attf-id="trigger_{{trigger.id}}" t-att-checked="trigger_display is None or trigger.id in trigger_display"/>
+                                                            <label t-attf-for="trigger_{{trigger.id}}" t-esc="trigger.name"/>
+                                                        </div>
+                                                    </t>
+                                                </t>
+                                                <button type="submit" class="btn btn-primary">Save</button>
+                                            </form>
+                                        </div>
                                     </li>
+                                    <li class="nav-item divider" t-ignore="true"/>
+                                    <t t-if="not user_id._is_public()">
+                                        <t t-call="runbot.build_errors_link"/>
+                                        <li class="nav-item dropdown" t-ignore="true">
+                                            <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown">
+                                                <b>
+                                                    <span t-esc="user_id.name[:23] + '...' if user_id.name and len(user_id.name) &gt; 25 else user_id.name"/>
+                                                </b>
+                                            </a>
+                                            <div class="dropdown-menu js_usermenu" role="menu">
+                                                <a class="dropdown-item" id="o_logout" role="menuitem" t-attf-href="/web/session/logout?redirect=/">Logout</a>
+                                                <a class="dropdown-item" role="menuitem" t-attf-href="/web">Web</a>
+                                                <div t-if="user_id.runbot_team_ids" class="dropdown-divider"/>
+                                                <div t-if="user_id.runbot_team_ids" class="dropdown-header">Teams</div>
+                                                <a t-foreach="user_id.runbot_team_ids" t-as="team" class="dropdown-item" role="menuitem" t-attf-href="/runbot/teams/{{team.id}}">
+                                                    <t t-esc="team.name.capitalize()"/>
+                                                </a>
+                                            </div>
+                                        </li>
+                                    </t>
+                                    <t t-else="">
+                                        <li class="nav-item dropdown" t-ignore="true">
+                                            <b>
+                                                <a class="nav-link" t-attf-href="/web/login?redirect={{request.httprequest.path}}">Login</a>
+                                            </b>
+                                        </li>
+                                    </t>
+                                </ul>
+                                <t t-out="nav_form or ''">
                                 </t>
-                                <t t-elif="nb_build_errors and nb_build_errors > 0">
-                                    <li class="nav-item divider"/>
-                                    <li class="nav-item">
-                                        <a href="/runbot/errors" class="nav-link" title="Random Bugs"><i class="fa fa-bug"/></a>
-                                    </li>
-                                </t>
-                                <li class="nav-item dropdown" t-ignore="true">
-                                    <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown">
-                                        <b>
-                                            <span t-esc="user_id.name[:23] + '...' if user_id.name and len(user_id.name) &gt; 25 else user_id.name"/>
-                                        </b>
-                                    </a>
-                                    <div class="dropdown-menu js_usermenu" role="menu">
-                                        <a class="dropdown-item" id="o_logout" role="menuitem" t-attf-href="/web/session/logout?redirect=/">Logout</a>
-                                        <a class="dropdown-item" role="menuitem" t-attf-href="/web">Web</a>
-                                    </div>
-                                </li>
-                            </t>
-                            <t t-else="">
-                                <li class="nav-item dropdown" t-ignore="true">
-                                    <b>
-                                        <a class="nav-link" t-attf-href="/web/login?redirect=/">Login</a>
-                                    </b>
-                                </li>
-                            </t>
-                        </ul>
-                        <t t-raw="nav_form or ''">
-                        </t>
-                    </div>
-                </nav>
+                            </div>
+                        </nav>
+                    </header>
+                    <t t-out="0"/>
+                </body>
             </xpath>
         </template>
 
-        <!-- remove black bar with app switcher -->
-        <template id="inherits_no_black_bar" inherit_id="website.user_navbar" name="Inherits No black user_navbar">
-            <xpath expr="//nav[@id='oe_main_menu_navbar']" position="attributes">
-                <attribute name="groups">base.group_website_publisher</attribute>
-            </xpath>
-            <xpath expr="//t[@t-set='body_classname']" position="attributes">
-                <attribute name="t-value">'o_connected_user' if env['ir.ui.view'].user_has_groups('base.group_website_publisher') else None</attribute>
-            </xpath>
+        <template id="runbot.build_errors_link">
+            <t t-if="nb_assigned_errors">
+                <li class="nav-item divider"/>
+                <li class="nav-item">
+                    <a href="/runbot/errors" class="nav-link text-danger" t-attf-title="You have {{nb_assigned_errors}} random bug assigned">
+                        <i class="fa fa-bug"/>
+                        <t t-esc="nb_assigned_errors"/>
+                        <span class="text-warning" t-if="nb_team_errors">+<t t-esc="nb_team_errors"/></span>
+                    </a>
+                </li>
+            </t>
+            <t t-elif="nb_team_errors">
+                <li class="nav-item divider"/>
+                <li class="nav-item">
+                    <a href="/runbot/errors" class="nav-link text-warning" t-attf-title="Your team has {{nb_team_errors}} random bug assigned">
+                        <i class="fa fa-bug"/>
+                        <t t-esc="nb_team_errors"/>
+                    </a>
+                </li>
+            </t>
+            <t t-elif="nb_build_errors">
+                <li class="nav-item divider"/>
+                <li class="nav-item">
+                    <a href="/runbot/errors" class="nav-link" title="Random Bugs"><i class="fa fa-bug"/></a>
+                </li>
+            </t>
         </template>
 
         <template id="runbot.slots_infos" name="Hosts slot nb pending/testing/slots">
-            <span t-attf-class="badge badge-{{pending_level}}">
-                Pending:
-                <t t-esc="pending_total"/>
-            </span>
-            <t t-set="testing" t-value="hosts_data._total_testing()"/>
-            <t t-set="workers" t-value="hosts_data._total_workers()"/>
-            <t t-set="klass">success</t>
-            <t t-if="not workers" t-set="klass">danger</t>
-            <t t-else="">
-                <t t-if="int(testing)/workers > 0" t-set="klass">info</t>
-                <t t-if="int(testing)/workers > 0.75" t-set="klass">warning</t>
-                <t t-if="int(testing)/workers >= 1" t-set="klass">danger</t>
-            </t>
-            <span t-attf-class="badge badge-{{klass}}">
-                Testing:
-                <t t-esc="testing"/>
-                /
-                <t t-esc="workers"/>
-            </span>
+            <a href="/runbot/load_info" class="slots_infos">
+                <span t-attf-class="badge badge-{{pending_level}}">
+                    Pending:
+                    <t t-esc="pending_count"/><span title="Assigned build (reserved host)" t-if="pending_assigned_count">(<t t-esc="pending_assigned_count"/>)</span>
+                </span>
+                <t t-set="testing" t-value="hosts_data._total_testing()"/>
+                <t t-set="workers" t-value="hosts_data._total_workers()"/>
+                <t t-set="klass">success</t>
+                <t t-if="not workers" t-set="klass">danger</t>
+                <t t-else="">
+                    <t t-if="int(testing)/workers > 0" t-set="klass">info</t>
+                    <t t-if="int(testing)/workers > 0.75" t-set="klass">warning</t>
+                    <t t-if="int(testing)/workers >= 1" t-set="klass">danger</t>
+                </t>
+                <span t-attf-class="badge badge-{{klass}}">
+                    Testing:
+                    <t t-esc="testing"/>
+                    /
+                    <t t-esc="workers"/>
+                </span>
+            </a>
         </template>
 
         <template id="runbot.slot_button">
@@ -158,7 +195,7 @@
                 <span t-attf-class="btn btn-{{color}} disabled" t-att-title="slot.link_type">
                     <i t-attf-class="fa fa-{{slot.fa_link_type()}}"/>
                 </span>
-                <a t-if="bu" t-attf-href="/runbot/build/#{bu.id}" t-attf-class="btn btn-default slot_name">
+                <a t-if="bu" t-attf-href="/runbot/batch/{{slot.batch_id.id}}/build/#{bu.id}" t-attf-class="btn btn-default slot_name">
                     <span t-esc="slot.trigger_id.name"/>
                 </a>
                 <span t-else="" t-attf-class="btn btn-default disabled slot_name">
@@ -176,13 +213,13 @@
         <template id="runbot.build_button">
             <div t-attf-class="pull-right">
                 <div t-attf-class="btn-group {{klass}}">
-                    <a t-if="bu.local_state == 'running' and bu.database_ids" t-attf-href="http://{{sorted(bu.mapped('database_ids.name'))[0]}}.{{bu.host}}" class="btn btn-primary" title="Sign in on this build" aria-label="Sign in on this build">
+                    <a t-if="bu.local_state == 'running' and bu.database_ids" t-attf-href="http://{{sorted(bu.mapped('database_ids.name'))[0]}}.{{bu.host}}" class="btn btn-info" title="Sign in on this build" aria-label="Sign in on this build">
                         <i class="fa fa-sign-in"/>
                     </a>
-                    <a t-if="bu.static_run" t-att-href="bu.static_run" class="btn btn-primary" title="View result" aria-label="View result">
+                    <a t-if="bu.static_run" t-att-href="bu.static_run" class="btn btn-info" title="View result" aria-label="View result">
                         <i class="fa fa-sign-in"/>
                     </a>
-                    <a t-if="bu.local_state=='done' and bu.requested_action != 'wake_up' and bu.database_ids" href="#" data-runbot="wakeup" t-att-data-runbot-build="bu.id" class="btn btn-default" title="Wake up this build" aria-label="Wake up this build">
+                    <a groups="base.group_user" t-if="bu.local_state=='done' and bu.requested_action != 'wake_up' and bu.database_ids" href="#" data-runbot="wakeup" t-att-data-runbot-build="bu.id" class="btn btn-default" title="Wake up this build" aria-label="Wake up this build">
                         <i class="fa fa-coffee"/>
                     </a>
                     <a t-attf-href="/runbot/build/{{bu['id']}}" class="btn btn-default" title="Build details" aria-label="Build details">
@@ -250,7 +287,7 @@
                         </a>
                     </t>
                     <t t-else="">
-                        <a groups="base.group_user" data-runbot="kill" class="dropdown-item disabled">
+                        <a groups="base.group_user" class="dropdown-item disabled">
                             <i class="fa fa-spinner fa-spin"/>
                             Killing
                             <i class="fa fa-crosshairs"/>
@@ -265,7 +302,7 @@
                         </a>
                     </t>
                     <t t-else="">
-                        <a groups="base.group_user" class="dropdown-item disabled" data-runbot="wakeup">
+                        <a groups="base.group_user" class="dropdown-item disabled">
                             <i class="fa fa-spinner fa-spin"/>
                             Waking up
                             <i class="fa fa-crosshairs"/>
@@ -284,7 +321,11 @@
                 </t>
                 <t groups="runbot.group_runbot_admin">
                     <div class="dropdown-divider"/>
-                    <a class="dropdown-item" t-attf-href="/web/#id={{bu['id']}}&amp;view_type=form&amp;model=runbot.build" target="new">
+                    <a class="dropdown-item" t-attf-href="/runbot/build/search?config_id={{bu.params_id.config_id.id}}&amp;trigger_id={{bu.params_id.trigger_id.id}}&amp;version_id={{bu.params_id.version_id.id}}&amp;create_batch_id.bundle_id={{bu.params_id.create_batch_id.bundle_id.id}}&amp;description={{bu.description or ''}}">
+                        <i class="fa fa-search"/>
+                        Find similar builds
+                    </a>
+                    <a class="dropdown-item" t-attf-href="/web/#id={{bu['id']}}&amp;view_type=form&amp;model=runbot.build&amp;menu_id={{env.ref('runbot.runbot_menu_root').id}}" target="new">
                         <i class="fa fa-list"/>
                         View in backend
                     </a>
@@ -298,9 +339,11 @@
             <span class="caret"/>
           </button>
           <div  class="dropdown-menu" role="menu">
-            <t t-foreach="bundle.branch_ids.sorted(key=lambda b: (b.remote_id.repo_id.sequence, b.remote_id.repo_id.id, b.is_pr))" t-as="branch">
+            <t t-foreach="bundle.branch_ids.sorted(key=lambda b: (not b.alive, b.remote_id.repo_id.sequence, b.remote_id.repo_id.id, b.is_pr, b.id))" t-as="branch">
               <t t-set="link_title" t-value="'View %s %s on Github' % ('PR' if branch.is_pr else 'Branch', branch.name)"/>
-              <a t-att-href="branch.branch_url" class="dropdown-item" t-att-title="link_title"><span class="font-italic text-muted"><t t-esc="branch.remote_id.short_name"/></span> <t t-esc="branch.name"/></a>
+              <a t-att-href="branch.branch_url" class="dropdown-item" t-att-title="link_title">
+                <span class="font-italic text-muted" t-esc="branch.remote_id.short_name"/> <span t-att-class="'' if branch.alive else 'line-through'" t-esc="branch.name"/> <i t-if="not branch.alive" title="deleted/closed" class="fa fa-ban text-danger"/>
+              </a>
             </t>
           </div>
         </template>

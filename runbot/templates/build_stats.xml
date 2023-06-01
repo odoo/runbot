@@ -2,7 +2,7 @@
 <odoo>
   <data>
     <template id="runbot.build_stats">
-      <t t-call='website.layout'>
+      <t t-call='runbot.layout'>
           <t t-set="bundles" t-value="build.slot_ids.mapped('batch_id.bundle_id')"/>
           <div>
             <div class="row">
@@ -11,7 +11,7 @@
                   <b>Build: </b><a t-attf-href="/runbot/build/{{build.id}}"><t t-esc="build.id"/></a><br/>
                   <t t-if="build.description">
                     <b>Description:</b>
-                    <t t-raw="build.md_description"/>
+                    <t t-out="build.md_description"/>
                     <br/>
                   </t>
                   <b>Date: </b><t t-esc="build.create_date" /><br/>
@@ -63,7 +63,7 @@
     </template>
 
     <template id="runbot.modules_stats">
-      <t t-call='website.layout'>
+      <t t-call='runbot.layout'>
         <input type="hidden" id="bundle_id" t-att-value="bundle.id"/>
         <input type="hidden" id="trigger_id" t-att-value="trigger.id"/>
         <div class="container-fluid">
@@ -104,7 +104,7 @@
                   <option title="Real Values ordered by name" selected="selected" value="alpha">Alphabetical</option>
                   <option title="Delta With Reference Build Values" value="difference">Difference</option>
                   <option title="Bigger # of datapoint varying from previous one" value="change_count">Noisy</option>
-                </select>
+                </select><br/>
 
                 <b>Display:</b>
                 <select id="nb_dataset_selector" class="form-select" aria-label="Number Of Builds">
@@ -113,7 +113,14 @@
                   <option value="10">Top 10</option>
                   <option value="20">Top 20</option>
                   <option value="50">Top 50</option>
-                </select>
+                </select><br/>
+
+                <b>Display aggregate:</b>
+                <select id="display_aggregate_selector" class="form-select" aria-label="Display sum">
+                  <option selected="selected" value="none">No</option>
+                  <option value="sum">Sum</option>
+                  <option value="average">Average</option>
+                </select><br/>
                 <div id="js-legend" class="chart-legend">
                 
                 </div>
@@ -122,6 +129,7 @@
           </div>
         </div>
       </t>
+      <script type="text/javascript" src="/web/static/lib/Chart/Chart.js"></script>
       <script type="text/javascript" src="/runbot/static/src/js/stats.js"></script>
     </template>
   </data>

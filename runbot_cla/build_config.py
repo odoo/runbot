@@ -13,7 +13,7 @@ _logger = logging.getLogger(__name__)
 class Step(models.Model):
     _inherit = "runbot.build.config.step"
 
-    job_type = fields.Selection(selection_add=[('cla_check', 'Check cla')])
+    job_type = fields.Selection(selection_add=[('cla_check', 'Check cla')], ondelete={'cla_check': 'cascade'})
 
     def _run_cla_check(self, build, log_path):
         build._checkout()

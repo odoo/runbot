@@ -7,12 +7,13 @@ are staged concurrently in all repos
 """
 import json
 import time
+import xmlrpc.client
 
 import pytest
 import requests
-from lxml.etree import XPath, tostring
+from lxml.etree import XPath
 
-from utils import seen, re_matches, get_partner, pr_page, to_pr, Commit
+from utils import seen, get_partner, pr_page, to_pr, Commit
 
 
 @pytest.fixture
@@ -429,7 +430,7 @@ def test_merge_fail(env, project, repo_a, repo_b, users, config):
     assert pr1b.comments == [
         (users['reviewer'], 'hansen r+'),
         seen(env, pr1b, users),
-        (users['user'], re_matches('^Unable to stage PR')),
+        (users['user'], '@%(user)s @%(reviewer)s unable to stage: merge conflict' % users),
     ]
     other = to_pr(env, pr1a)
     reviewer = get_partner(env, users["reviewer"]).formatted_email
@@ -527,14 +528,22 @@ class TestCompanionsNotReady:
         assert p_a.comments == [
             (users['reviewer'], 'hansen r+'),
             seen(env, p_a, users),
-            (users['user'], "Linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (repo_b.name, p_b.number)),
+            (users['user'], "@%s @%s linked pull request(s) %s not ready. Linked PRs are not staged until all of them are ready." % (
+                users['user'],
+                users['reviewer'],
+                pr_b.display_name,
+            )),
         ]
         # ensure the message is only sent once per PR
         env.run_crons('runbot_merge.check_linked_prs_status')
         assert p_a.comments == [
             (users['reviewer'], 'hansen r+'),
             seen(env, p_a, users),
-            (users['user'], "Linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (repo_b.name, p_b.number)),
+            (users['user'], "@%s @%s linked pull request(s) %s not ready. Linked PRs are not staged until all of them are ready." % (
+                users['user'],
+                users['reviewer'],
+                pr_b.display_name,
+            )),
         ]
         assert p_b.comments == [seen(env, p_b, users)]
 
@@ -570,7 +579,8 @@ class TestCompanionsNotReady:
         assert pr_b.comments == [
             (users['reviewer'], 'hansen r+'),
             seen(env, pr_b, users),
-            (users['user'], "Linked pull request(s) %s#%d, %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
+            (users['user'], "@%s @%s linked pull request(s) %s#%d, %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
+                users['user'], users['reviewer'],
                 repo_a.name, pr_a.number,
                 repo_c.name, pr_c.number
             ))
@@ -609,7 +619,8 @@ class TestCompanionsNotReady:
         assert pr_b.comments == [
             (users['reviewer'], 'hansen r+'),
             seen(env, pr_b, users),
-            (users['user'], "Linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
+            (users['user'], "@%s @%s linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
+                users['user'], users['reviewer'],
                 repo_a.name, pr_a.number
             ))
         ]
@@ -617,7 +628,8 @@ class TestCompanionsNotReady:
             (users['reviewer'], 'hansen r+'),
             seen(env, pr_c, users),
             (users['user'],
-             "Linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
+             "@%s @%s linked pull request(s) %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
+                 users['user'], users['reviewer'],
                  repo_a.name, pr_a.number
              ))
         ]
@@ -655,7 +667,10 @@ def test_other_failed(env, project, repo_a, repo_b, users, config):
     assert pr_a.comments == [
         (users['reviewer'], 'hansen r+'),
         seen(env, pr_a, users),
-        (users['user'], 'Staging failed: ci/runbot on %s (view more at http://example.org/b)' % sth)
+        (users['user'], '@%s @%s staging failed: ci/runbot on %s (view more at http://example.org/b)' % (
+            users['user'], users['reviewer'],
+            sth
+        ))
     ]
 
 class TestMultiBatches:
@@ -670,12 +685,16 @@ class TestMultiBatches:
             make_branch(repo_b, 'master', 'initial', {'b': 'b0'})
 
             prs = [(
-                a and to_pr(env, make_pr(repo_a, 'batch{}'.format(i), [{'a{}'.format(i): 'a{}'.format(i)}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token'],)),
-                b and to_pr(env, make_pr(repo_b, 'batch{}'.format(i), [{'b{}'.format(i): 'b{}'.format(i)}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token'],))
+                a and make_pr(repo_a, 'batch{}'.format(i), [{'a{}'.format(i): 'a{}'.format(i)}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token']),
+                b and make_pr(repo_b, 'batch{}'.format(i), [{'b{}'.format(i): 'b{}'.format(i)}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token']),
             )
                 for i, (a, b) in enumerate([(1, 1), (0, 1), (1, 1), (1, 1), (1, 0)])
             ]
         env.run_crons()
+        prs = [
+            (a and to_pr(env, a), b and to_pr(env, b))
+            for (a, b) in prs
+        ]
 
         st = env['runbot_merge.stagings'].search([])
         assert st
@@ -699,12 +718,16 @@ class TestMultiBatches:
             make_branch(repo_b, 'master', 'initial', {'b': 'b0'})
 
             prs = [(
-                a and to_pr(env, make_pr(repo_a, 'batch{}'.format(i), [{'a{}'.format(i): 'a{}'.format(i)}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token'],)),
-                b and to_pr(env, make_pr(repo_b, 'batch{}'.format(i), [{'b{}'.format(i): 'b{}'.format(i)}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token'],))
+                a and make_pr(repo_a, 'batch{}'.format(i), [{'a{}'.format(i): 'a{}'.format(i)}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token']),
+                b and make_pr(repo_b, 'batch{}'.format(i), [{'b{}'.format(i): 'b{}'.format(i)}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token']),
             )
                 for i, (a, b) in enumerate([(1, 1), (0, 1), (1, 1), (1, 1), (1, 0)])
             ]
         env.run_crons()
+        prs = [
+            (a and to_pr(env, a), b and to_pr(env, b))
+            for (a, b) in prs
+        ]
 
         st0 = env['runbot_merge.stagings'].search([])
         assert len(st0.batch_ids) == 5
@@ -916,7 +939,8 @@ class TestSubstitutions:
                             'label': original,
                             'sha': format(pr_number, 'x')*40,
                         }
-                    }
+                    },
+                    'sender': {'login': 'pytest'}
                 }
             )
             pr = env['runbot_merge.pull_requests'].search([
@@ -1074,3 +1098,341 @@ def test_multi_project(env, make_repo, setreviewers, users, config,
     assert pr2.comments == [
         (users['user'], f'[Pull request status dashboard]({pr2_id.url}).'),
     ]
+
+def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
+    """ Tests the freeze wizard feature (aside from the UI):
+
+    * have a project with 3 repos, and two branches (1.0 and master) each
+    * have 2 PRs required for the freeze
+    * prep 3 freeze PRs
+    * prep 1 bump PR
+    * trigger the freeze wizard
+    * trigger it again (check that the same object is returned, there should
+      only be one freeze per project at a time)
+    * configure the freeze
+    * check that it doesn't go through
+    * merge required PRs
+    * check that freeze goes through
+    * check that reminder is shown
+    * check that new branches are created w/ correct parent & commit info
+    """
+    project.freeze_reminder = "Don't forget to like and subscribe"
+
+    # have a project with 3 repos, and two branches (1.0 and master)
+    project.branch_ids = [
+        (1, project.branch_ids.id, {'sequence': 1}),
+        (0, 0, {'name': '1.0', 'sequence': 2}),
+    ]
+
+    [
+        (master_head_a, master_head_b, master_head_c),
+        (pr_required_a, _, pr_required_c),
+        (pr_rel_a, pr_rel_b, pr_rel_c),
+        pr_bump_a,
+        pr_other
+    ] = setup_mess(repo_a, repo_b, repo_c)
+    env.run_crons() # process the PRs
+
+    release_prs = {
+        repo_a.name: to_pr(env, pr_rel_a),
+        repo_b.name: to_pr(env, pr_rel_b),
+        repo_c.name: to_pr(env, pr_rel_c),
+    }
+    pr_bump_id = to_pr(env, pr_bump_a)
+    # trigger the ~~tree~~ freeze wizard
+    w = project.action_prepare_freeze()
+    w2 = project.action_prepare_freeze()
+    assert w == w2, "each project should only have one freeze wizard active at a time"
+    assert w['res_model'] == 'runbot_merge.project.freeze'
+
+    w_id = env[w['res_model']].browse([w['res_id']])
+    assert w_id.branch_name == '1.1', "check that the forking incremented the minor by 1"
+    assert len(w_id.release_pr_ids) == len(project.repo_ids), \
+        "should ask for a many release PRs as we have repositories"
+
+    # configure required PRs
+    w_id.required_pr_ids = (to_pr(env, pr_required_a) | to_pr(env, pr_required_c)).ids
+    # configure releases
+    for r in w_id.release_pr_ids:
+        r.pr_id = release_prs[r.repository_id.name].id
+    w_id.release_pr_ids[-1].pr_id = to_pr(env, pr_other).id
+    # configure bump
+    assert not w_id.bump_pr_ids, "there is no bump pr by default"
+    w_id.write({'bump_pr_ids': [
+        (0, 0, {'repository_id': pr_bump_id.repository.id, 'pr_id': pr_bump_id.id})
+    ]})
+    r = w_id.action_freeze()
+    assert r == w, "the freeze is not ready so the wizard should redirect to itself"
+    owner = repo_c.owner
+    assert w_id.errors == f"""\
+* All release PRs must have the same label, found '{owner}:release-1.1, {owner}:whocares'.
+* 2 required PRs not ready."""
+    w_id.release_pr_ids[-1].pr_id = release_prs[repo_c.name].id
+
+    with repo_a:
+        pr_required_a.post_comment('hansen r+', config['role_reviewer']['token'])
+        repo_a.post_status('apr', 'success', 'ci/runbot')
+        repo_a.post_status('apr', 'success', 'legal/cla')
+    with repo_c:
+        pr_required_c.post_comment('hansen r+', config['role_reviewer']['token'])
+        repo_c.post_status('cpr', 'success', 'ci/runbot')
+        repo_c.post_status('cpr', 'success', 'legal/cla')
+    env.run_crons()
+
+    for repo in [repo_a, repo_b, repo_c]:
+        with repo:
+            repo.post_status('staging.master', 'success', 'ci/runbot')
+            repo.post_status('staging.master', 'success', 'legal/cla')
+    env.run_crons()
+
+    assert to_pr(env, pr_required_a).state == 'merged'
+    assert to_pr(env, pr_required_c).state == 'merged'
+
+    assert not w_id.errors
+
+    # assume the wizard is closed, re-open it
+    w = project.action_prepare_freeze()
+    assert w['res_model'] == 'runbot_merge.project.freeze'
+    assert w['res_id'] == w_id.id, "check that we're still getting the old wizard"
+    w_id = env[w['res_model']].browse([w['res_id']])
+    assert w_id.exists()
+
+    # actually perform the freeze
+    r = w_id.action_freeze()
+    # check that the wizard was deleted
+    assert not w_id.exists()
+    # check that the wizard pops out a reminder dialog (kinda)
+    assert r['res_model'] == 'runbot_merge.project'
+    assert r['res_id'] == project.id
+
+    # stuff that's done directly
+    for pr_id in release_prs.values():
+        assert pr_id.state == 'merged'
+    assert pr_bump_id.state == 'merged'
+
+    # stuff that's behind a cron
+    env.run_crons()
+
+    assert pr_rel_a.state == "closed"
+    assert pr_rel_a.base['ref'] == '1.1'
+    assert pr_rel_b.state == "closed"
+    assert pr_rel_b.base['ref'] == '1.1'
+    assert pr_rel_c.state == "closed"
+    assert pr_rel_c.base['ref'] == '1.1'
+    for pr_id in release_prs.values():
+        assert pr_id.target.name == '1.1'
+
+    assert pr_bump_a.state == 'closed'
+    assert pr_bump_a.base['ref'] == 'master'
+    assert pr_bump_id.target.name == 'master'
+
+    m_a = repo_a.commit('master')
+    assert m_a.message.startswith('Bump A')
+    assert repo_a.read_tree(m_a) == {
+        'f': '1', # from master
+        'g': 'x', # from required PR (merged into master before forking)
+        'version': '1.2-alpha', # from bump PR
+    }
+
+    c_a = repo_a.commit('1.1')
+    assert c_a.message.startswith('Release 1.1 (A)')
+    assert repo_a.read_tree(c_a) == {
+        'f': '1', # from master
+        'g': 'x', # from required pr
+        'version': '1.1', # from release commit
+    }
+    c_a_parent = repo_a.commit(c_a.parents[0])
+    assert c_a_parent.message.startswith('super important file')
+    assert c_a_parent.parents[0] == master_head_a
+
+    c_b = repo_b.commit('1.1')
+    assert c_b.message.startswith('Release 1.1 (B)')
+    assert repo_b.read_tree(c_b) == {'f': '1', 'version': ''}
+    assert c_b.parents[0] == master_head_b
+
+    c_c = repo_c.commit('1.1')
+    assert c_c.message.startswith('Release 1.1 (C)')
+    assert repo_c.read_tree(c_c) == {'f': '2', 'version': ''}
+    assert repo_c.commit(c_c.parents[0]).parents[0] == master_head_c
+
+
+def setup_mess(repo_a, repo_b, repo_c):
+    master_heads = []
+    for r in [repo_a, repo_b, repo_c]:
+        with r:
+            [root, _] = r.make_commits(
+                None,
+                Commit('base', tree={'version': '', 'f': '0'}),
+                Commit('release 1.0', tree={'version': '1.0'} if r is repo_a else None),
+                ref='heads/1.0'
+            )
+            master_heads.extend(r.make_commits(root, Commit('other', tree={'f': '1'}), ref='heads/master'))
+    # have 2 PRs required for the freeze
+    with repo_a:
+        repo_a.make_commits(master_heads[0], Commit('super important file', tree={'g': 'x'}), ref='heads/apr')
+        pr_required_a = repo_a.make_pr(target='master', head='apr')
+    with repo_c:
+        repo_c.make_commits(master_heads[2], Commit('update thing', tree={'f': '2'}), ref='heads/cpr')
+        pr_required_c = repo_c.make_pr(target='master', head='cpr')
+    # have 3 release PRs, only the first one updates the tree (version file)
+    with repo_a:
+        repo_a.make_commits(
+            master_heads[0],
+            Commit('Release 1.1 (A)', tree={'version': '1.1'}),
+            ref='heads/release-1.1'
+        )
+        pr_rel_a = repo_a.make_pr(target='master', head='release-1.1')
+    with repo_b:
+        repo_b.make_commits(
+            master_heads[1],
+            Commit('Release 1.1 (B)', tree=None),
+            ref='heads/release-1.1'
+        )
+        pr_rel_b = repo_b.make_pr(target='master', head='release-1.1')
+    with repo_c:
+        repo_c.make_commits(master_heads[2], Commit("Some change", tree={'a': '1'}), ref='heads/whocares')
+        pr_other = repo_c.make_pr(target='master', head='whocares')
+        repo_c.make_commits(
+            master_heads[2],
+            Commit('Release 1.1 (C)', tree=None),
+            ref='heads/release-1.1'
+        )
+        pr_rel_c = repo_c.make_pr(target='master', head='release-1.1')
+    # have one bump PR on repo A
+    with repo_a:
+        repo_a.make_commits(
+            master_heads[0],
+            Commit("Bump A", tree={'version': '1.2-alpha'}),
+            ref='heads/bump-1.1',
+        )
+        pr_bump_a = repo_a.make_pr(target='master', head='bump-1.1')
+    return master_heads, (pr_required_a, None, pr_required_c), (pr_rel_a, pr_rel_b, pr_rel_c), pr_bump_a, pr_other
+
+def test_freeze_subset(env, project, repo_a, repo_b, repo_c, users, config):
+    """It should be possible to only freeze a subset of a project when e.g. one
+    of the repository is managed differently than the rest and has
+    non-synchronous releases.
+
+    - it should be possible to mark repositories as non-freezed (just opted out
+      of the entire thing), in which case no freeze PRs should be asked of them
+    - it should be possible to remove repositories from the freeze wizard
+    - repositories which are not in the freeze wizard should just not be frozen
+
+    To do things correctly that should probably match with the branch filters
+    and stuff, but that's a configuration concern.
+    """
+    # have a project with 3 repos, and two branches (1.0 and master)
+    project.branch_ids = [
+        (1, project.branch_ids.id, {'sequence': 1}),
+        (0, 0, {'name': '1.0', 'sequence': 2}),
+    ]
+
+    masters = []
+    for r in [repo_a, repo_b, repo_c]:
+        with r:
+            [root, _] = r.make_commits(
+                None,
+                Commit('base', tree={'version': '', 'f': '0'}),
+                Commit('release 1.0', tree={'version': '1.0'} if r is repo_a else None),
+                ref='heads/1.0'
+            )
+            masters.extend(r.make_commits(root, Commit('other', tree={'f': '1'}), ref='heads/master'))
+
+    with repo_a:
+        repo_a.make_commits(
+            masters[0],
+            Commit('Release 1.1', tree={'version': '1.1'}),
+            ref='heads/release-1.1'
+        )
+        pr_rel_a = repo_a.make_pr(target='master', head='release-1.1')
+
+    # the third repository we opt out of freezing
+    project.repo_ids.filtered(lambda r: r.name == repo_c.name).freeze = False
+    env.run_crons() # process the PRs
+
+    # open the freeze wizard
+    w = project.action_prepare_freeze()
+    w_id = env[w['res_model']].browse([w['res_id']])
+    # check that there are only rels for repos A and B
+    assert w_id.mapped('release_pr_ids.repository_id.name') == [repo_a.name, repo_b.name]
+    # remove B from the set
+    b_id = w_id.release_pr_ids.filtered(lambda r: r.repository_id.name == repo_b.name)
+    w_id.write({'release_pr_ids': [(3, b_id.id, 0)]})
+    assert len(w_id.release_pr_ids) == 1
+    # set lone release PR
+    w_id.release_pr_ids.pr_id = to_pr(env, pr_rel_a).id
+    assert not w_id.errors
+
+    w_id.action_freeze()
+    assert not w_id.exists()
+
+    assert repo_a.commit('1.1'), "should have created branch in repo A"
+    try:
+        repo_b.commit('1.1')
+        pytest.fail("should *not* have created branch in repo B")
+    except AssertionError:
+        ...
+    try:
+        repo_c.commit('1.1')
+        pytest.fail("should *not* have created branch in repo C")
+    except AssertionError:
+        ...
+    # can't stage because we (wilfully) don't have branches 1.1 in repos B and C
+
+@pytest.mark.skip("env's session is not thread-safe sadface")
+def test_race_conditions():
+    """need the ability to dup the env in order to send concurrent requests to
+    the inner odoo
+
+    - try to run the action_freeze during a cron (merge or staging), should
+      error (recover and return nice message?)
+    - somehow get ahead of the action and update master's commit between moment
+      where it is fetched and moment where the bump pr is fast-forwarded,
+      there's actually a bit of time thanks to the rate limiting (fetch of base,
+      update of tmp to base, rebase of commits on tmp, wait 1s, for each release
+      and bump PR, then the release branches are created, and finally the bump
+      prs)
+    """
+    ...
+
+def test_freeze_conflict(env, project, repo_a, repo_b, repo_c, users, config):
+    """If one of the branches we're trying to create already exists, the wizard
+    fails.
+    """
+    project.branch_ids = [
+        (1, project.branch_ids.id, {'sequence': 1}),
+        (0, 0, {'name': '1.0', 'sequence': 2}),
+    ]
+    heads, _, (pr_rel_a, pr_rel_b, pr_rel_c), bump, other = \
+        setup_mess(repo_a, repo_b, repo_c)
+    env.run_crons()
+
+    release_prs = {
+        repo_a.name: to_pr(env, pr_rel_a),
+        repo_b.name: to_pr(env, pr_rel_b),
+        repo_c.name: to_pr(env, pr_rel_c),
+    }
+
+    w = project.action_prepare_freeze()
+    w_id = env[w['res_model']].browse([w['res_id']])
+    for repo, release_pr in release_prs.items():
+        w_id.release_pr_ids\
+            .filtered(lambda r: r.repository_id.name == repo)\
+            .pr_id = release_pr.id
+
+    # create conflicting branch
+    with repo_c:
+        repo_c.make_ref('heads/1.1', heads[2])
+
+    # actually perform the freeze
+    with pytest.raises(xmlrpc.client.Fault) as e:
+        w_id.action_freeze()
+    assert f"Unable to create branch {repo_c.name}:1.1" in e.value.faultString
+
+    # branches a and b should have been deleted
+    with pytest.raises(AssertionError) as e:
+        repo_a.get_ref('heads/1.1')
+    assert e.value.args[0].startswith("Not Found")
+    with pytest.raises(AssertionError) as e:
+        repo_b.get_ref('heads/1.1')
+    assert e.value.args[0].startswith("Not Found")

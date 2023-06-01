@@ -2,11 +2,12 @@
 {
     'name': "runbot",
     'summary': "Runbot",
-    'description': "Runbot for Odoo 13.0",
+    'description': "Runbot for Odoo 15.0",
     'author': "Odoo SA",
     'website': "http://runbot.odoo.com",
     'category': 'Website',
-    'version': '5.1',
+    'version': '5.3',
+    'application': True,
     'depends': ['base', 'base_automation', 'website'],
     'data': [
         'templates/dockerfile.xml',
@@ -22,7 +23,7 @@
         'security/ir.model.access.csv',
         'security/ir.rule.csv',
 
-        'templates/assets.xml',
+        'templates/utils.xml',
         'templates/badge.xml',
         'templates/batch.xml',
         'templates/branch.xml',
@@ -34,15 +35,16 @@
         'templates/frontend.xml',
         'templates/git.xml',
         'templates/nginx.xml',
-        'templates/utils.xml',
         'templates/build_error.xml',
 
         'views/branch_views.xml',
         'views/build_error_views.xml',
         'views/build_views.xml',
         'views/bundle_views.xml',
+        'views/codeowner_views.xml',
         'views/commit_views.xml',
         'views/config_views.xml',
+        'views/dashboard_views.xml',
         'views/dockerfile_views.xml',
         'views/error_log_views.xml',
         'views/host_views.xml',
@@ -51,9 +53,17 @@
         'views/stat_views.xml',
         'views/upgrade.xml',
         'views/warning_views.xml',
-
-        'wizards/mutli_build_wizard_views.xml',
+        'views/custom_trigger_wizard_views.xml',
         'wizards/stat_regex_wizard_views.xml',
+        'views/menus.xml',
+        'views/user.xml',
     ],
     'license': 'LGPL-3',
+
+    'assets': {
+        'web.assets_backend': [
+            'runbot/static/src/js/fields.js',
+        ],
+    }
+
 }

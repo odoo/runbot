@@ -6,19 +6,37 @@
             <form string="Build Params">
                 <sheet>
                     <group>
-                        <field name="config_id"/>
-                        <field name="config_data"/>
-                        <field name="version_id"/>
-                        <field name="extra_params"/>
-                        <field name="commit_link_ids">
-                            <tree>
-                                <field name="commit_id"/>
-                                <field name="match_type"/>
-                            </tree>
-                        </field>
-                        <field name="trigger_id"/>
-                        <field name="create_batch_id"/>
-                        <field name="dockerfile_id"/>
+                        <group colspan="2">
+                            <field name="config_id"/>
+                            <field name="config_data"/>
+                            <field name="extra_params"/>
+                            <field name="dockerfile_id"/>
+                            <field name="dump_db"/>
+                        </group>
+                        <group colspan="2">
+                            <field name="trigger_id"/>
+                            <field name="create_batch_id"/>
+                            <field name="version_id"/>
+                            <field name="used_custom_trigger"/>
+                        </group>
+                    </group>
+                    <group>
+                        <notebook>
+                            <page string="Commits">
+                                <field name="commit_link_ids">
+                                    <tree>
+                                        <field name="commit_id"/>
+                                        <field name="match_type"/>
+                                    </tree>
+                                </field>
+                            </page>
+                            <page string="Builds">
+                                <field name="build_ids"/>
+                            </page>
+                            <page string="Reference Builds">
+                                <field name="builds_reference_ids"/>
+                            </page>
+                        </notebook>
                     </group>
                 </sheet>
             </form>
@@ -42,6 +60,7 @@
                     <group>
                         <field name="description"/>
                         <field name="params_id"/>
+                        <field name="config_id"/>
                         <field name="port" groups="base.group_no_one"/>
                         <field name="dest"/>
                         <field name="local_state"/>
@@ -49,8 +68,8 @@
                         <field name="requested_action" groups="base.group_no_one"/>
                         <field name="local_result"/>
                         <field name="global_result"/>
-                        <field name="triggered_result" groups="base.group_no_one"/>
                         <field name="host"/>
+                        <field name="host_id"/>
                         <field name="job_start" groups="base.group_no_one"/>
                         <field name="job_end" groups="base.group_no_one"/>
                         <field name="job_time" groups="base.group_no_one"/>
@@ -67,17 +86,6 @@
                         <field name="gc_delay"/>
                     </group>
                 </sheet>
-                <sheet>
-                  <group>
-                    <field name="stat_ids">
-                        <tree>
-                            <field name="config_step_id"/>
-                            <field name="key"/>
-                            <field name="value"/>
-                        </tree>
-                    </field>
-                  </group>
-                </sheet>
             </form>
         </field>
     </record>
@@ -88,9 +96,7 @@
                 <field name="dest"/>
                 <field name="global_state"/>
                 <field name="global_result"/>
-                <field name="port"/>
                 <field name="job"/>
-                <field name="coverage_result"/>
                 <field name="host"/>
                 <field name="build_time"/>
                 <field name="build_age"/>
@@ -141,8 +147,5 @@
         <field name="res_model">runbot.build.params</field>
         <field name="view_mode">tree,form</field>
     </record>
-    <menuitem id="menu_build" name="Build" parent="runbot_menu_root"/>
-    <menuitem id="menu_build_build" action="action_build" parent="menu_build"/>
-    <menuitem id="menu_build_params" action="action_build_params" parent="menu_build"/>
   </data>
 </odoo>

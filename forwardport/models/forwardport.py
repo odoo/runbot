@@ -1,13 +1,17 @@
 # -*- coding: utf-8 -*-
 import logging
+import pathlib
+import resource
+import subprocess
 import uuid
 from contextlib import ExitStack
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from dateutil import relativedelta
 
 from odoo import fields, models
 from odoo.addons.runbot_merge.github import GH
+from odoo.tools.appdirs import user_cache_dir
 
 # how long a merged PR survives
 MERGE_AGE = relativedelta.relativedelta(weeks=2)
@@ -15,6 +19,7 @@ MERGE_AGE = relativedelta.relativedelta(weeks=2)
 _logger = logging.getLogger(__name__)
 
 class Queue:
+    __slots__ = ()
     limit = 100
 
     def _process_item(self):
@@ -29,12 +34,16 @@ class Queue:
             except Exception:
                 _logger.exception("Error while processing %s, skipping", b)
                 self.env.cr.rollback()
-            self.clear_caches()
+                b._on_failure()
+                self.env.cr.commit()
+
+    def _on_failure(self):
+        pass
 
     def _search_domain(self):
         return []
 
-class BatchQueue(models.Model, Queue):
+class ForwardPortTasks(models.Model, Queue):
     _name = 'forwardport.batches'
     _description = 'batches which got merged and are candidates for forward-porting'
 
@@ -46,22 +55,20 @@ class BatchQueue(models.Model, Queue):
         ('fp', 'Forward Port Followup'),
         ('insert', 'New branch port')
     ], required=True)
+    retry_after = fields.Datetime(required=True, default='1900-01-01 01:01:01')
+
+    def _search_domain(self):
+        return super()._search_domain() + [
+            ('retry_after', '<=', fields.Datetime.to_string(fields.Datetime.now())),
+        ]
+
+    def _on_failure(self):
+        super()._on_failure()
+        self.retry_after = fields.Datetime.to_string(fields.Datetime.now() + timedelta(minutes=30))
 
     def _process_item(self):
         batch = self.batch_id
-
         newbatch = batch.prs._port_forward()
-        # insert new barch in ancestry sequence unless conflict (= no parent)
-        if self.source == 'insert':
-            for pr in newbatch.prs:
-                if not pr.parent_id:
-                    break
-                newchild = pr.search([
-                    ('parent_id', '=', pr.parent_id.id),
-                    ('id', '!=', pr.id),
-                ])
-                if newchild:
-                    newchild.parent_id = pr.id
 
         if newbatch:
             _logger.info(
@@ -70,6 +77,17 @@ class BatchQueue(models.Model, Queue):
                 batch, batch.prs,
                 newbatch, newbatch.prs,
             )
+            # insert new batch in ancestry sequence unless conflict (= no parent)
+            if self.source == 'insert':
+                for pr in newbatch.prs:
+                    if not pr.parent_id:
+                        break
+                    newchild = pr.search([
+                        ('parent_id', '=', pr.parent_id.id),
+                        ('id', '!=', pr.id),
+                    ])
+                    if newchild:
+                        newchild.parent_id = pr.id
         else: # reached end of seq (or batch is empty)
             # FIXME: or configuration is fucky so doesn't want to FP (maybe should error and retry?)
             _logger.info(
@@ -80,12 +98,12 @@ class BatchQueue(models.Model, Queue):
         batch.active = False
 
 
-CONFLICT_TEMPLATE = "WARNING: the latest change ({previous.head}) triggered " \
+CONFLICT_TEMPLATE = "{ping}WARNING: the latest change ({previous.head}) triggered " \
                     "a conflict when updating the next forward-port " \
                     "({next.display_name}), and has been ignored.\n\n" \
                     "You will need to update this pull request differently, " \
                     "or fix the issue by hand on {next.display_name}."
-CHILD_CONFLICT = "WARNING: the update of {previous.display_name} to " \
+CHILD_CONFLICT = "{ping}WARNING: the update of {previous.display_name} to " \
                  "{previous.head} has caused a conflict in this pull request, " \
                  "data may have been lost."
 class UpdateQueue(models.Model, Queue):
@@ -102,6 +120,12 @@ class UpdateQueue(models.Model, Queue):
         previous = self.new_root
         with ExitStack() as s:
             for child in self.new_root._iter_descendants():
+                self.env.cr.execute("""
+                    SELECT id
+                    FROM runbot_merge_pull_requests
+                    WHERE id = %s
+                    FOR UPDATE NOWAIT
+                """, [child.id])
                 _logger.info(
                     "Re-port %s from %s (changed root %s -> %s)",
                     child.display_name,
@@ -113,14 +137,15 @@ class UpdateQueue(models.Model, Queue):
                     Feedback.create({
                         'repository': child.repository.id,
                         'pull_request': child.number,
-                        'message': "Ancestor PR %s has been updated but this PR"
+                        'message': "%sancestor PR %s has been updated but this PR"
                                    " is %s and can't be updated to match."
                                    "\n\n"
                                    "You may want or need to manually update any"
                                    " followup PR." % (
-                                       self.new_root.display_name,
-                                       child.state,
-                                   )
+                            child.ping(),
+                            self.new_root.display_name,
+                            child.state,
+                        )
                     })
                     return
 
@@ -132,6 +157,7 @@ class UpdateQueue(models.Model, Queue):
                         'repository': previous.repository.id,
                         'pull_request': previous.number,
                         'message': CONFLICT_TEMPLATE.format(
+                            ping=previous.ping(),
                             previous=previous,
                             next=child
                         )
@@ -139,7 +165,7 @@ class UpdateQueue(models.Model, Queue):
                     Feedback.create({
                         'repository': child.repository.id,
                         'pull_request': child.number,
-                        'message': CHILD_CONFLICT.format(previous=previous, next=child)\
+                        'message': CHILD_CONFLICT.format(ping=child.ping(), previous=previous, next=child)\
                             + (f'\n\nstdout:\n```\n{out.strip()}\n```' if out.strip() else '')
                             + (f'\n\nstderr:\n```\n{err.strip()}\n```' if err.strip() else '')
                     })
@@ -149,22 +175,23 @@ class UpdateQueue(models.Model, Queue):
                     f'{child.target.name}..{child.refname}',
                     count=True
                 ).stdout.decode().strip())
+                old_head = child.head
                 # update child's head to the head we're going to push
                 child.with_context(ignore_head_update=True).write({
                     'head': new_head,
                     # 'state': 'opened',
                     'squash': commits_count == 1,
                 })
-                working_copy.push('-f', 'target', child.refname)
-
-                # also push to local cache: looks like in some cases github
-                # doesn't propagate revisions (?) or at least does so too slowly
-                # so on the next loop we try to fetch the revision we just
-                # pushed through PR and... we can't find it
+                # push the new head to the local cache: in some cases github
+                # doesn't propagate revisions fast enough so on the next loop we
+                # can't find the revision we just pushed
                 dummy_branch = str(uuid.uuid4())
                 ref = previous._get_local_directory()
                 working_copy.push(ref._directory, f'{new_head}:refs/heads/{dummy_branch}')
                 ref.branch('--delete', '--force', dummy_branch)
+                # then update the child's branch to the new head
+                working_copy.push(f'--force-with-lease={child.refname}:{old_head}',
+                                  'target', child.refname)
 
                 # committing here means github could technically trigger its
                 # webhook before sending a response, but committing before
@@ -243,3 +270,46 @@ class DeleteBranches(models.Model, Queue):
                 r.json()
             )
         _deleter.info('✔ deleted branch %s of PR %s', self.pr_id.label, self.pr_id.display_name)
+
+_gc = _logger.getChild('maintenance')
+def _bypass_limits():
+    """Allow git to go beyond the limits set for Odoo.
+
+    On large repositories, git gc can take a *lot* of memory (especially with
+    `--aggressive`), if the Odoo limits are too low this can prevent the gc
+    from running, leading to a lack of packing and a massive amount of cruft
+    accumulating in the working copy.
+    """
+    resource.setrlimit(resource.RLIMIT_AS, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
+
+class GC(models.TransientModel):
+    _name = 'forwardport.maintenance'
+    _description = "Weekly maintenance of... cache repos?"
+
+    def _run(self):
+        # lock out the forward port cron to avoid concurrency issues while we're
+        # GC-ing it: wait until it's available, then SELECT FOR UPDATE it,
+        # which should prevent cron workers from running it
+        fp_cron = self.env.ref('forwardport.port_forward')
+        self.env.cr.execute("""
+            SELECT 1 FROM ir_cron
+            WHERE id = %s
+            FOR UPDATE
+        """, [fp_cron.id])
+
+        repos_dir = pathlib.Path(user_cache_dir('forwardport'))
+        # run on all repos with a forwardport target (~ forwardport enabled)
+        for repo in self.env['runbot_merge.repository'].search([('fp_remote_target', '!=', False)]):
+            repo_dir = repos_dir / repo.name
+            if not repo_dir.is_dir():
+                continue
+
+            _gc.info('Running maintenance on %s', repo.name)
+            r = subprocess.run(
+                ['git', '--git-dir', repo_dir, 'gc', '--aggressive', '--prune=now'],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                encoding='utf-8',
+                preexec_fn = _bypass_limits,
+            )
+            if r.returncode:
+                _gc.warning("Maintenance failure (status=%d):\n%s", r.returncode, r.stdout)

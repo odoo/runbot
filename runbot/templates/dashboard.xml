@@ -2,7 +2,7 @@
 <odoo>
   <data>
     <template id="runbot.glances">
-      <t t-call='portal.frontend_layout'>
+      <t t-call="runbot.layout">
         <t t-set="head">
           <t t-if="refresh">
             <meta http-equiv="refresh" t-att-content="refresh"/>
@@ -14,7 +14,7 @@
               <div>
                 <span t-attf-class="badge badge-{{pending_level}}">
                   Pending:
-                  <t t-esc="pending_total"/>
+                  <t t-esc="pending_count"/><span title="Assigned build (reserved host)" t-if="pending_assigned_count">(<t t-esc="pending_assigned_count"/>)</span>
                 </span>
               </div>
               <t t-set="project_id"/>
@@ -37,7 +37,7 @@
       </t>
     </template>
 
-    <template id="frontend_no_nav" inherit_id="portal.frontend_layout" primary="True">
+    <template id="frontend_no_nav" inherit_id="runbot.layout" primary="True">
       <xpath expr="//header" position="replace">
       </xpath>
     </template>
@@ -179,6 +179,102 @@
                 </tr>
               </table>
             </div>
+          </div>
+        </div>
+      </t>
+    </template>
+
+    <template id="runbot.default_dashboard_tile_view">
+      <div class="col-md-3 col-lg-2 p-2">
+        <div class="card">
+          <div class="card-header limited-height-toggle" t-attf-onclick="$('#tile_{{tile.id}}').toggleClass('limited-height')">
+            <t t-esc="tile.display_name"/> <t t-if="tile.build_ids"> (<t t-esc="len(tile.build_ids)"/>)</t>
+          </div>
+          <div class="card-body limited-height" t-attf-id="tile_{{tile.id}}">
+            <p t-if="not tile.build_ids" class="text-success my-0">No build found 👍</p>
+            <t t-foreach="tile.sticky_bundle_ids.sorted(lambda b: b.version_id.number, reverse=True)" t-as="bundle">
+              <t t-set="failed_builds" t-value="tile.build_ids.filtered(lambda b: b.top_parent.slot_ids.batch_id.bundle_id == bundle)"/>
+              <h4 class="card-title" t-if="failed_builds" t-esc="bundle.name"/>
+              <p t-foreach="failed_builds" t-as="build" class="my-0">
+                  <a class="text-danger" t-attf-href="/runbot/build/{{build.id}}" target="new">
+                    <t t-esc="build.description or build.id"/>
+                  </a>
+              </p>
+            </t>
+            <hr/>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template id="runbot.dashboard">
+      <div class="row">
+        <t t-foreach="dashboard.dashboard_tile_ids" t-as="tile">
+          <t t-if="tile.build_ids or not hide_empty" t-call="{{ tile.custom_template_id.id }}"/>
+        </t>
+      </div>
+    </template>
+
+    <template id="runbot.dashboard_page">
+      <t t-call="runbot.frontend_no_nav">
+        <t t-set="head">
+          <t t-if="refresh">
+            <meta http-equiv="refresh" t-att-content="refresh"/>
+          </t>
+        </t>
+        <t t-call="runbot.dashboard"/>
+      </t>
+    </template>
+
+    <template id="runbot.load_info">
+      <t t-call='runbot.layout'>
+        <div class="container-fluid frontend">
+          <div class="row">
+            <div class="col-md-12">
+                <t t-call="runbot.slots_infos"/>
+            </div>
+          </div>
+
+          <div t-foreach="build_by_bundle" t-as="bundle_builds" class="row bundle_row">
+            <t t-set="bundle" t-value="bundle_builds[0]"/>
+            <t t-set="builds" t-value="bundle_builds[1]"/>
+
+            <div class="col-md-3 col-lg-2 cell">
+              <div class="one_line">
+                <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e" />
+                <a t-attf-href="/runbot/bundle/#{bundle.id}" title="View Bundle">
+                  <b t-esc="bundle.name"/>
+                </a>
+              </div>
+              <div class="badge badge-info" t-out="len(builds)"/>
+            </div>
+            <div class="col-md-9 col-lg-10">
+              <div class="table-responsive">
+                <table class="table table-condensed">
+                  <t t-foreach="builds" t-as="build">
+                    <t t-set="rowclass">
+                      <t t-call="runbot.build_class">
+                        <t t-set="build" t-value="build"/>
+                      </t>
+                    </t>
+                    <tr t-attf-class="bg-{{rowclass.strip()}}-light{{'line-through' if build.orphan_result else ''}}">
+                      <td> Batch: <a t-attf-href="/runbot/batch/{{build.params_id.create_batch_id.id}}"><t t-out="build.params_id.create_batch_id.id"/></a></td>
+                      <td><a t-attf-href="/runbot/build/{{build.id}}"><t t-out="build.parent_path"/></a></td>
+                      <td t-out="build.local_state"/>
+                      <td t-out="build.host"/>
+                      <td t-out="build.config_id.name"/>
+                      <td>
+                        <t t-call="runbot.build_button">
+                          <t t-set="bu" t-value="build"/>
+                          <t t-set="klass" t-value="'btn-group-ssm'"/>
+                        </t>
+                      </td>
+                    </tr>
+                  </t>
+                </table>
+              </div>
+            </div>
+
           </div>
         </div>
       </t>

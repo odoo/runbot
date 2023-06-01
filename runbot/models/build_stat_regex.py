@@ -24,12 +24,14 @@ class BuildStatRegex(models.Model):
 
     _name = "runbot.build.stat.regex"
     _description = "Statistics regex"
+    _order = 'sequence,id'
 
     name = fields.Char("Key Name")
     regex = fields.Char("Regular Expression")
     description = fields.Char("Description")
     generic = fields.Boolean('Generic', help='Executed when no regex on the step', default=True)
     config_step_ids = fields.Many2many('runbot.build.config.step', string='Config Steps')
+    sequence = fields.Integer('Sequence')
 
     @api.constrains("name", "regex")
     def _check_regex(self):
@@ -50,10 +52,11 @@ class BuildStatRegex(models.Model):
         """
         if not os.path.exists(file_path):
             return {}
-        key_values = {}
+        stats_matches = {}
         with open(file_path, "r") as log_file:
             data = log_file.read()
             for build_stat_regex in self:
+                current_stat_matches = {}
                 for match in re.finditer(build_stat_regex.regex, data):
                     group_dict = match.groupdict()
                     try:
@@ -64,10 +67,6 @@ class BuildStatRegex(models.Model):
                             group_dict.get("value"), build_stat_regex.regex
                         )
                         continue
-                    key = (
-                        "%s.%s" % (build_stat_regex.name, group_dict["key"])
-                        if "key" in group_dict
-                        else build_stat_regex.name
-                    )
-                    key_values[key] = value
-        return key_values
+                    current_stat_matches[group_dict.get('key', 'value')] = value
+                stats_matches[build_stat_regex.name] = current_stat_matches
+        return stats_matches

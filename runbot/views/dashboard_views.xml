@@ -1,0 +1,244 @@
+<odoo>
+  <data>
+    <record id="team_form" model="ir.ui.view">
+        <field name="name">runbot.team.form</field>
+        <field name="model">runbot.team</field>
+        <field name="arch" type="xml">
+          <form>
+            <sheet>
+              <group name="team_group">
+                <field name="name"/>
+                <field name="organisation" invisible="1"/>
+                <field name="github_team" widget="github_team"/>
+                <field name="github_logins"/>
+                <field name="skip_team_pr"/>
+                <field name="skip_fw_pr"/>
+                <field name="dashboard_id"/>
+                <field name="path_glob"/>
+              </group>
+              <notebook>
+                <page string="Team Members">
+                  <field name="user_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}">
+                    <tree editable="bottom">
+                      <field name="name" readonly="1"></field>
+                      <field name="github_login"></field>
+                    </tree>
+                  </field>
+                </page>
+                <page string="Errors" attrs="{'invisible': [('build_error_ids', '=', [])]}">
+                  <field name="build_error_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}"/>
+                </page>
+                <page string="Modules">
+                  <field name="module_ownership_ids">
+                    <tree create="0" delete="0">
+                      <field name="module_id" readonly="1"/>
+                      <field name="is_fallback" widget="boolean_toggle"/>
+                    </tree>
+                  </field>
+                </page>
+                <page string="Codeowners">
+                  <field name="codeowner_ids">
+                  </field>
+                </page>
+                <page string="Followed triggers" attrs="{'invisible': [('trigger_ids', '=', [])]}">
+                  <field name="trigger_ids">
+                  </field>
+                </page>
+                <page string="Exceptions" attrs="{'invisible': [('upgrade_exception_ids', '=', [])]}">
+                  <field name="upgrade_exception_ids" readonly="1"/>
+                </page>
+              </notebook>
+            </sheet>
+            <div class="oe_chatter">
+              <field name="message_follower_ids" widget="mail_followers"/>
+              <field name="message_ids" widget="mail_thread"/>
+          </div>
+          </form>
+        </field>
+    </record>
+
+    <record id="team_tree" model="ir.ui.view">
+      <field name="name">runbot.team.tree</field>
+        <field name="model">runbot.team</field>
+        <field name="arch" type="xml">
+            <tree string="Runbot Teams">
+                <field name="name"/>
+                <field name="path_glob"/>
+                <field name="github_team"/>
+                <field name="module_ownership_ids"/>
+                <field name="build_error_ids"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="module_form" model="ir.ui.view">
+      <field name="name">runbot.module.form</field>
+      <field name="model">runbot.module</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <group>
+              <field name="name"/>
+              <field name="ownership_ids">
+                <tree editable="bottom">
+                  <field name="team_id"/>
+                  <field name="is_fallback" widget="boolean_toggle"/>
+                </tree>
+              </field>
+            </group>
+          </sheet>
+        </form>
+      </field>
+    </record>
+
+    <record id="module_tree" model="ir.ui.view">
+      <field name="name">runbot.module.tree</field>
+        <field name="model">runbot.module</field>
+        <field name="arch" type="xml">
+            <tree string="Runbot modules">
+              <field name="name"/>
+              <field name="ownership_ids" widget="many2many_tags"/>
+              <field name="team_ids" widget="many2many_tags"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="module_ownership_search_view" model="ir.ui.view">
+      <field name="name">runbot.module.ownership.search</field>
+      <field name="model">runbot.module.ownership</field>
+      <field name="arch" type="xml">
+        <search string="Search ownership">
+          <field name="team_id"/>
+          <field name="module_id"/>
+          <filter string="Is Fallback" name='fallback' domain="[(['is_fallback', '=', True])]"/>
+          <filter string="Not Fallback" name='not_fallback' domain="[(['is_fallback', '=', False])]"/>
+        </search>
+      </field>
+    </record>
+
+    <record id="module_ownership_tree" model="ir.ui.view">
+      <field name="name">runbot.module.ownership.tree</field>
+        <field name="model">runbot.module.ownership</field>
+        <field name="arch" type="xml">
+            <tree string="Runbot modules ownership" editable="bottom" multi_edit="1">
+              <field name="team_id"/>
+              <field name="module_id"/>
+              <field name="is_fallback" widget="boolean_toggle"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="dashboard_form" model="ir.ui.view">
+        <field name="name">runbot.dashboard.form</field>
+        <field name="model">runbot.dashboard</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                <group name="dashboard_group">
+                    <field name="name"/>
+                    <field name="team_ids"/>
+                    <field name="dashboard_tile_ids"/>
+                </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="dashboard_tree" model="ir.ui.view">
+      <field name="name">runbot.dashboard.tree</field>
+        <field name="model">runbot.dashboard</field>
+        <field name="arch" type="xml">
+            <tree string="Runbot Dashboards">
+                <field name="name"/>
+                <field name="team_ids"/>
+                <field name="dashboard_tile_ids"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="dashboard_tile_form" model="ir.ui.view">
+        <field name="name">runbot.dashboard.tile.form</field>
+        <field name="model">runbot.dashboard.tile</field>
+        <field name="arch" type="xml">
+          <form>
+            <sheet>
+              <group name="dashboard_tile_group">
+                <field name="name"/>
+                <field name="project_id"/>
+                <field name="category_id"/>
+                <field name="trigger_id"/>
+                <field name="config_id"/>
+                <field name="domain_filter" widget="domain" options="{'model': 'runbot.build', 'in_dialog': True}"/>
+                <field name="custom_template_id" groups="runbot.group_runbot_admin"/>
+              </group>
+              <notebook>
+                <page string="Builds Found">
+                  <field name="build_ids" nolabel="1" widget="many2many" options="{'not_delete': True, 'no_create': True}"/>
+                </page>
+                <page string="Dashboards">
+                  <field name="dashboard_ids" nolabel="1" widget="many2many" options="{'not_delete': True}"/>
+                </page>
+              </notebook>
+            </sheet>
+          </form>
+        </field>
+    </record>
+
+    <record id="dashboard_tile_tree" model="ir.ui.view">
+      <field name="name">runbot.dashboard.tile.tree</field>
+        <field name="model">runbot.dashboard.tile</field>
+        <field name="arch" type="xml">
+            <tree string="Runbot Dashboards Tiles">
+                <field name="sequence" widget="handle"/>
+                <field name="project_id"/>
+                <field name="category_id"/>
+                <field name="trigger_id"/>
+                <field name="config_id"/>
+                <field name="name"/>
+            </tree>
+        </field>
+    </record>
+
+    <record model="ir.actions.server" id="action_fetch_team_members">
+      <field name="name">Fetch members</field>
+      <field name="model_id" ref="runbot.model_runbot_team" />
+      <field name="binding_model_id" ref="runbot.model_runbot_team" />
+      <field name="type">ir.actions.server</field>
+      <field name="state">code</field>
+      <field name="code">
+          action = records._fetch_members()
+      </field>
+   </record>
+
+    <record id="open_view_runbot_dashboard_tile" model="ir.actions.act_window">
+      <field name="name">Runbot Dashboards Tiles</field>
+      <field name="res_model">runbot.dashboard.tile</field>
+      <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="open_view_runbot_team" model="ir.actions.act_window">
+      <field name="name">Runbot teams</field>
+      <field name="res_model">runbot.team</field>
+      <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="open_view_runbot_dashboard" model="ir.actions.act_window">
+        <field name="name">Runbot Dashboards</field>
+        <field name="res_model">runbot.dashboard</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="open_view_runbot_module" model="ir.actions.act_window">
+      <field name="name">Runbot modules</field>
+      <field name="res_model">runbot.module</field>
+      <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="open_view_runbot_module_ownership" model="ir.actions.act_window">
+      <field name="name">Runbot modules ownership</field>
+      <field name="res_model">runbot.module.ownership</field>
+      <field name="view_mode">tree,form</field>
+    </record>
+
+  </data>
+</odoo>

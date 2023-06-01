@@ -7,14 +7,30 @@
             <form string="Projects">
                 <group>
                     <field name="name"/>
+                    <field name="keep_sticky_running"/>
                     <field name="dockerfile_id"/>
                     <field name="group_ids"/>
                     <field name="trigger_ids"/>
+                    <field name="sequence"/>
+                    <field name="token" password="True"/>
                 </group>
             </form>
         </field>
     </record>
 
+    <record id="view_runbot_project_tree" model="ir.ui.view">
+        <field name="model">runbot.project</field>
+        <field name="arch" type="xml">
+            <tree string="Projects">
+                <field name="name"/>
+                <field name="keep_sticky_running"/>
+                <field name="dockerfile_id"/>
+                <field name="group_ids"/>
+                <field name="trigger_ids"/>
+                <field name="sequence"/>
+            </tree>
+        </field>
+    </record>
 
     <record id="view_runbot_bundle" model="ir.ui.view">
         <field name="model">runbot.bundle</field>
@@ -23,7 +39,7 @@
                 <div class="oe_button_box" name="button_box">
                 </div>
                 <group>
-                    <field name="name"/>
+                    <field name="name" widget="char_frontend_url"/>
                     <field name="project_id"/>
                     <field name="sticky" readonly="0"/>
                     <field name="to_upgrade" readonly="0"/>
@@ -37,6 +53,10 @@
                     <field name="build_all"/>
                     <field name="dockerfile_id"/>
                     <field name="host_id" readonly="0"/>
+                    <field name="commit_limit"/>
+                    <field name="file_limit"/>
+                    <field name="disable_codeowner"/>
+                    <field name="for_next_freeze"/>
                     <field name="branch_ids">
                         <tree>
                             <field name="dname"/>
@@ -47,9 +67,11 @@
                     </field>
                     <field string="Trigger customisations" name="trigger_custom_ids">
                         <tree editable="bottom">
+                            <field name="start_mode"/>
                             <field name="trigger_id" domain="[('project_id', '=', parent.project_id)]"/>
                             <field name="config_id"/>
                             <field name="extra_params"/>
+                            <field name="config_data"/>
                         </tree>
                     </field>
                     <field string="Last batches" name="last_batchs">
@@ -59,17 +81,50 @@
                             <field name="slot_ids"/>
                         </tree>
                     </field>
+                </group>
 
+                <div class="oe_chatter">
+                    <field name="message_follower_ids" widget="mail_followers"/>
+                    <field name="message_ids" widget="mail_thread"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_runbot_custom_trigger_tree" model="ir.ui.view">
+        <field name="model">runbot.bundle.trigger.custom</field>
+        <field name="arch" type="xml">
+            <tree string="Bundle">
+                <field name="bundle_id"/>
+                <field name="trigger_id"/>
+                <field name="config_id"/>
+                <field name="extra_params"/>
+                <field name="config_data"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_runbot_custom_trigger_form" model="ir.ui.view">
+        <field name="model">runbot.bundle.trigger.custom</field>
+        <field name="arch" type="xml">
+            <form string="Bundle">
+                <group>
+                    <field name="bundle_id"/>
+                    <field name="trigger_id"/>
+                    <field name="config_id"/>
+                    <field name="extra_params"/>
+                    <field name="config_data"/>
                 </group>
             </form>
         </field>
     </record>
+
     <record id="view_runbot_bundle_tree" model="ir.ui.view">
         <field name="model">runbot.bundle</field>
         <field name="arch" type="xml">
             <tree string="Bundle">
                 <field name="project_id"/>
-                <field name="name"/>
+                <field name="name" widget="char_frontend_url"/>
                 <field name="version_number"/>
                 <field name="is_base"/>
                 <field name="sticky"/>
@@ -106,6 +161,7 @@
             </form>
         </field>
     </record>
+
     <record id="view_runbot_batch_tree" model="ir.ui.view">
         <field name="model">runbot.batch</field>
         <field name="arch" type="xml">
@@ -127,7 +183,12 @@
             </tree>
         </field>
     </record>
-
+    <record id="action_bundle_custom_trigger" model="ir.actions.act_window">
+        <field name="name">Custom triggers</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">runbot.bundle.trigger.custom</field>
+        <field name="view_mode">tree,form</field>
+    </record>
     <record id="action_bundle" model="ir.actions.act_window">
         <field name="name">Bundles</field>
         <field name="type">ir.actions.act_window</field>
@@ -152,11 +213,5 @@
         <field name="res_model">runbot.batch</field>
         <field name="view_mode">tree,form</field>
     </record>
-
-    <menuitem id="menu_bundle" name="Bundle" parent="runbot_menu_root"/>
-    <menuitem id="menu_bundle_bundle" action="action_bundle" parent="menu_bundle"/>
-    <menuitem id="menu_bundle_project" action="action_bundle_project" parent="menu_bundle"/>
-    <menuitem id="menu_bundle_version" action="action_bundle_version" parent="menu_bundle"/>
-    <menuitem id="menu_bundle_batch" action="action_bundle_batch" parent="menu_bundle"/>
   </data>
 </odoo>

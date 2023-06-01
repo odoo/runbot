@@ -1,7 +1,12 @@
 // FIX: bs4 shit-heap colors and styles
-body {
+html {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   color: #666666;
+  font-size: 14px;
+}
+body {
+  color: inherit;
+  font-family: inherit;
 }
 h1, h2, h3, h4, h5, h6{
   color: inherit;
@@ -36,27 +41,44 @@ h5 { font-size: 1em; }
 .list-inline > li {
   padding: 0 5px;
   margin-right: 0;
+  // TODO: find better way to do this
+  display: inline-block;
+}
+
+.btn {
+  user-select: text;
 }
 
 // mergebot layouting
 .stagings {
-    display: flex;
-    align-items: stretch;
-}
-.stagings > li {
-    flex: 1;
+  display: flex;
+  align-items: stretch;
 
-    padding: 0.1em;
-    padding-left: 0.5em;
-}
-.stagings > li:not(:last-child) {
-    border-right: 1px solid lightgray;
-}
-.batch:not(:last-child) {
-    border-bottom: 1px solid lightgray;
-}
-.batch a:not(:last-of-type) a:after {
+  > li {
+    flex: 1;
+    // prevent content-based autosizing otherwise that's flex' starting point
+    width: 0;
+
+    padding: 0.1em 0.1em 0.1em 0.5em;
+
+    &:not(:last-child) {
+      border-right: 1px solid lightgray;
+    }
+  }
+  .batch {
+    // cut off branch names if they can't be line-wrapped and would break the
+    // layout, works with flex to force all columns to be at the same size
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    &:not(:last-child) {
+      border-bottom: 1px solid lightgray;
+    }
+  }
+
+  .batch a:not(:last-of-type) a:after {
     content: ",";
+  }
 }
 .pr-listing > * { display: inline-block; }
 .pr-awaiting { opacity: 0.8; }
@@ -83,4 +105,8 @@ dl.runbot-merge-fields {
   > dd {
     @extend .col-sm-10;
   }
+}
+
+.staging-statuses {
+  cursor: wait;
 }

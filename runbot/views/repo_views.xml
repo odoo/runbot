@@ -8,7 +8,9 @@
             <header>
             </header>
             <sheet>
+              <widget name="web_ribbon" title="Archived" bg_color="bg-danger" attrs="{'invisible': [('active', '=', True)]}"/>
               <group name="repo_group">
+                <field name="active" invisible="1"/>
                 <field name="name"/>
                 <field name="sequence"/>
                 <field name="description"/>
@@ -27,6 +29,7 @@
                 <field name="ci_url"/>
                 <field name="ci_description"/>
                 <field name="has_stats"/>
+                <field name="team_ids"/>
               </group>
             </sheet>
           </form>
@@ -44,6 +47,8 @@
                 <field name="config_id"/>
                 <field name="ci_context"/>
                 <field name="repo_ids" widget="many2many_tags"/>
+                <field name="dependency_ids" widget="many2many_tags"/>
+                <field name="manual"/>
             </tree>
         </field>
       </record>
@@ -85,13 +90,15 @@
                 <field name="mode"/>
                 <field name="forbidden_regex"/>
                 <field name="invalid_branch_message"/>
+                <field name="single_version"/>
                 <field name="remote_ids">
                   <tree string="Remotes" editable="bottom">
                     <field name="name"/>
                     <field name="sequence"/>
                     <field name="fetch_heads" string="Branch"/>
                     <field name="fetch_pull" string="PR"/>
-                    <field name="token"/>
+                    <field name="send_status"/>
+                    <field name="token" password="True"/>
                   </tree>
                 </field>
               </group>
@@ -115,6 +122,7 @@
                 <field name="token"/>
                 <field name="fetch_pull"/>
                 <field name="fetch_heads"/>
+                <field name="send_status"/>
               </group>
             </sheet>
           </form>
@@ -130,6 +138,7 @@
                 <field name="repo_id"/>
                 <field name="fetch_pull"/>
                 <field name="fetch_heads"/>
+                <field name="send_status"/>
             </tree>
         </field>
     </record>
@@ -168,49 +177,5 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    <menuitem id="runbot_menu_repos_main" name="Repos" parent="runbot_menu_root"/>
-    <menuitem
-       id="runbot_menu_repos"
-        parent="runbot_menu_repos_main"
-        sequence="10"
-        action="runbot_repos_action"
-        />
-      <menuitem
-        id="runbot_menu_remotes"
-        parent="runbot_menu_repos_main"
-        sequence="20"
-        action="runbot_remotes_action"
-      />
-      <menuitem
-        id="runbot_menu_trigger"
-        parent="runbot_menu_repos_main"
-        sequence="30"
-        action="runbot_triggers_action"
-      />
-      <menuitem
-        id="runbot_menu_trigger_category"
-        parent="runbot_menu_repos_main"
-        sequence="40"
-        action="runbot_triggers_category_action"
-      />
-
-      <menuitem
-        name="Technical"
-        id="runbot_menu_technical"
-        parent="runbot_menu_root"
-        sequence="1000"
-        />
-
-        <menuitem id="runbot_menu_ir_cron_act" action="base.ir_cron_act" parent="runbot_menu_technical"/>
-        <menuitem id="runbot_menu_base_automation_act" action="base_automation.base_automation_act" parent="runbot_menu_technical"/>
-        <menuitem id="runbot_menu_action_ui_view" action="base.action_ui_view" parent="runbot_menu_technical"/>
-
-      <menuitem
-        name="▶"
-        id="runbot_menu_website"
-        parent="runbot_menu_root"
-        sequence="1001"
-        action="website.action_website"
-        />
   </data>
 </odoo>

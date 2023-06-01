@@ -47,6 +47,7 @@ class TestBuildStatRegex(RunbotCase):
 
     def test_build_stat_regex_find_in_file(self):
 
+        max_id = self.BuildStat.search([], order="id desc", limit=1).id or 0
         file_content = """foo bar
 2020-03-02 22:06:58,391 17 INFO xxx odoo.modules.module: odoo.addons.website_blog.tests.test_ui tested in 10.35s, 2501 queries
 some garbage
@@ -58,24 +59,30 @@ nothing to see here
         )
         with patch("builtins.open", mock_open(read_data=file_content)):
             self.config_step._make_stats(self.build)
-
-        self.assertEqual(self.BuildStat.search_count([('key', '=', 'query_count.website_blog.tests.test_ui'), ('value', '=', 2501.0)]), 1)
-        self.assertEqual(self.BuildStat.search_count([('key', '=', 'query_count.website_event.tests.test_ui'), ('value', '=', 2435.0)]), 1)
+        self.assertEqual(
+            dict(self.BuildStat.search([('category', '=', 'query_count'), ('id', '>', max_id)]).values), 
+            {
+                'website_event.tests.test_ui': 2435.0,
+                'website_blog.tests.test_ui': 2501.0
+            }
+        )
 
         # Check unicity
         with self.assertRaises(IntegrityError):
             with mute_logger("odoo.sql_db"):
                 with self.cr.savepoint():  # needed to continue tests
-                    self.env["runbot.build.stat"]._write_key_values(
-                        self.build, self.config_step, {'query_count.website_event.tests.test_ui': 2435}
-                    )
+                    self.env["runbot.build.stat"].create({
+                        'build_id': self.build.id, 
+                        'config_step_id': self.config_step.id,
+                        'category': 'query_count',
+                        'values': {'website_event.tests.test_ui': 2435},
+                        }
 
-        # minimal test for RunbotBuildStatSql model
-        # self.assertEqual(self.env['runbot.build.stat.sql'].search_count([('build_id', '=', self.build.id)]), 2)
-        # TODO FIXME
+                    )
 
     def test_build_stat_regex_generic(self):
         """ test that regex are not used when generic is False and that _make_stats use all genreic regex if there are no regex on step """
+        max_id = self.BuildStat.search([], order="id desc", limit=1).id or 0
         file_content = """foo bar
 odoo.addons.foobar tested in 2s, 25 queries
 useless 10
@@ -96,12 +103,12 @@ chocolate 15
         with patch("builtins.open", mock_open(read_data=file_content)):
             self.config_step._make_stats(self.build)
 
-        self.assertEqual(self.BuildStat.search_count([('key', '=', 'query_count.foobar'), ('value', '=', 25.0)]), 0)
-        self.assertEqual(self.BuildStat.search_count([('key', '=', 'useless_count.useless'), ('value', '=', 10.0)]), 0)
-        self.assertEqual(self.BuildStat.search_count([('key', '=', 'chocolate_count.chocolate'), ('value', '=', 15.0)]), 1)
+        self.assertEqual(self.BuildStat.search_count([('category', '=', 'query_count'), ('id', '>', max_id)]), 0)
+        self.assertEqual(self.BuildStat.search_count([('category', '=', 'useless_count'), ('id', '>', max_id)]), 0)
+        self.assertEqual(dict(self.BuildStat.search([('category', '=', 'chocolate_count'), ('id', '>', max_id)]).values), {'chocolate': 15.0})
 
     def test_build_stat_regex_find_in_file_perf(self):
-
+        max_id = self.BuildStat.search([], order="id desc", limit=1).id or 0
         noise_lines = """2020-03-17 13:26:15,472 2376 INFO runbottest odoo.modules.loading: loading runbot/views/build_views.xml
 2020-03-10 22:58:34,472 17 INFO 1709329-master-9938b2-all_no_autotag werkzeug: 127.0.0.1 - - [10/Mar/2020 22:58:34] "POST /mail/read_followers HTTP/1.1" 200 - 13 0.004 0.009
 2020-03-10 22:58:30,137 17 INFO ? werkzeug: 127.0.0.1 - - [10/Mar/2020 22:58:30] "GET /website/static/src/xml/website.editor.xml HTTP/1.1" 200 - - - -
@@ -125,5 +132,10 @@ chocolate 15
         with patch("builtins.open", mock_open(read_data=log_data)):
             self.config_step._make_stats(self.build)
 
-        self.assertEqual(self.BuildStat.search_count([('key', '=', 'query_count.website_blog.tests.test_ui'), ('value', '=', 2501.0)]), 1)
-        self.assertEqual(self.BuildStat.search_count([('key', '=', 'query_count.website_event.tests.test_ui'), ('value', '=', 2435.0)]), 1)
+        self.assertEqual(
+            dict(self.BuildStat.search([('category', '=', 'query_count'), ('id', '>', max_id)]).values), 
+            {
+                'website_event.tests.test_ui': 2435.0,
+                'website_blog.tests.test_ui': 2501.0
+            }
+        )

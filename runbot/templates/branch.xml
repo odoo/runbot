@@ -2,7 +2,7 @@
 <odoo>
   <data>
     <template id="runbot.branch">
-      <t t-call='website.layout'>
+      <t t-call='runbot.layout'>
         <div class="container-fluid">
           <div class="row">
             <div class='col-md-12'>
@@ -44,6 +44,10 @@
                   <tr>
                     <td>Target Branch</td>
                     <td t-esc="branch.target_branch_name"></td>
+                  </tr>
+                  <tr>
+                    <td>Pr title</td>
+                    <td t-esc="branch.pr_title"/>
                   </tr>
                 </t>
                 <t t-elif="branch_pr">

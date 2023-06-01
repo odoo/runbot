@@ -1,5 +1,5 @@
 from odoo.fields import Field
-from collections import MutableMapping
+from collections.abc import MutableMapping
 from psycopg2.extras import Json
 
 

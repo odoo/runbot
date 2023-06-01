@@ -154,6 +154,7 @@ def test_pseudo_version_tag(env, project, make_repo, setreviewers, config):
     with repo:
         repo.post_status('staging.master', 'success', 'ci')
     env.run_crons() # should merge staging
+    env.run_crons('runbot_merge.labels_cron') # update labels
     assert pr_id.state == 'merged'
     assert pr.labels >= {'2.1'}
 
@@ -174,5 +175,6 @@ def test_pseudo_version_tag(env, project, make_repo, setreviewers, config):
     with repo:
         repo.post_status('staging.master', 'success', 'ci')
     env.run_crons() # should merge staging
+    env.run_crons('runbot_merge.labels_cron') # update labels
     assert pr_id.state == 'merged'
     assert pr.labels >= {'post-bonk'}

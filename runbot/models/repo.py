@@ -6,13 +6,12 @@ import re
 import subprocess
 import time
 
-import dateutil
 import requests
 
 from pathlib import Path
 
 from odoo import models, fields, api
-from ..common import os, RunbotException
+from ..common import os, RunbotException, _make_github_session
 from odoo.exceptions import UserError
 from odoo.tools.safe_eval import safe_eval
 
@@ -39,7 +38,7 @@ class Trigger(models.Model):
     sequence = fields.Integer('Sequence')
     name = fields.Char("Name")
     description = fields.Char("Description", help="Informative description")
-    project_id = fields.Many2one('runbot.project', string="Project id", required=True)  # main/security/runbot
+    project_id = fields.Many2one('runbot.project', string="Project id", required=True, default=lambda self: self.env.ref('runbot.main_project', raise_if_not_found=False))
     repo_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_triggers', string="Triggers", domain="[('project_id', '=', project_id)]")
     dependency_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_dependencies', string="Dependencies")
     config_id = fields.Many2one('runbot.build.config', string="Config", required=True)
@@ -56,6 +55,9 @@ class Trigger(models.Model):
     ci_url = fields.Char("ci url")
     ci_description = fields.Char("ci description")
     has_stats = fields.Boolean('Has a make_stats config step', compute="_compute_has_stats", store=True)
+
+    team_ids = fields.Many2many('runbot.team', string="Runbot Teams", help="Teams responsible of this trigger, mainly usefull for nightly")
+    active = fields.Boolean("Active", default=True)
 
     @api.depends('config_id.step_order_ids.step_id.make_stats')
     def _compute_has_stats(self):
@@ -114,6 +116,7 @@ class Remote(models.Model):
     sequence = fields.Integer('Sequence', tracking=True)
     fetch_heads = fields.Boolean('Fetch branches', default=True, tracking=True)
     fetch_pull = fields.Boolean('Fetch PR', default=False, tracking=True)
+    send_status = fields.Boolean('Send status', default=False, tracking=True)
 
     token = fields.Char("Github token", groups="runbot.group_runbot_admin")
 
@@ -147,32 +150,29 @@ class Remote(models.Model):
         remote = super().create(values_list)
         if not remote.repo_id.main_remote_id:
             remote.repo_id.main_remote_id = remote
-        remote._cr.after('commit', remote.repo_id._update_git_config)
+        remote._cr.postcommit.add(remote.repo_id._update_git_config)
         return remote
 
     def write(self, values):
         res = super().write(values)
-        self._cr.after('commit', self.repo_id._update_git_config)
+        self._cr.postcommit.add(self.repo_id._update_git_config)
         return res
 
-    def _github(self, url, payload=None, ignore_errors=False, nb_tries=2, recursive=False):
-        generator = self.sudo()._github_generator(url, payload=payload, ignore_errors=ignore_errors, nb_tries=nb_tries, recursive=recursive)
+    def _github(self, url, payload=None, ignore_errors=False, nb_tries=2, recursive=False, session=None):
+        generator = self.sudo()._github_generator(url, payload=payload, ignore_errors=ignore_errors, nb_tries=nb_tries, recursive=recursive, session=session)
         if recursive:
             return generator
         result = list(generator)
         return result[0] if result else False
 
-    def _github_generator(self, url, payload=None, ignore_errors=False, nb_tries=2, recursive=False):
+    def _github_generator(self, url, payload=None, ignore_errors=False, nb_tries=2, recursive=False, session=None):
         """Return a http request to be sent to github"""
         for remote in self:
             if remote.owner and remote.repo_name and remote.repo_domain:
                 url = url.replace(':owner', remote.owner)
                 url = url.replace(':repo', remote.repo_name)
                 url = 'https://api.%s%s' % (remote.repo_domain, url)
-                session = requests.Session()
-                if remote.token:
-                    session.auth = (remote.token, 'x-oauth-basic')
-                session.headers.update({'Accept': 'application/vnd.github.she-hulk-preview+json'})
+                session = session or _make_github_session(remote.token)
                 while url:
                     if recursive:
                         _logger.info('Getting page %s', url)
@@ -217,7 +217,7 @@ class Repo(models.Model):
     _order = 'sequence, id'
     _inherit = 'mail.thread'
 
-    name = fields.Char("Name", unique=True, tracking=True)  # odoo/enterprise/upgrade/security/runbot/design_theme
+    name = fields.Char("Name", tracking=True)  # odoo/enterprise/upgrade/security/runbot/design_theme
     identity_file = fields.Char("Identity File", help="Identity file to use with git/ssh", groups="runbot.group_runbot_admin")
     main_remote_id = fields.Many2one('runbot.remote', "Main remote", tracking=True)
     remote_ids = fields.One2many('runbot.remote', 'repo_id', "Remotes")
@@ -242,6 +242,7 @@ class Repo(models.Model):
     last_processed_hook_time = fields.Float('Last processed hook time')
     get_ref_time = fields.Float('Last refs db update', compute='_compute_get_ref_time')
     trigger_ids = fields.Many2many('runbot.trigger', relation='runbot_trigger_triggers', readonly=True)
+    single_version = fields.Many2one('runbot.version', "Single version", help="Limit the repo to a single version for non versionned repo")
     forbidden_regex = fields.Char('Forbidden regex', help="Regex that forid bundle creation if branch name is matching", tracking=True)
     invalid_branch_message = fields.Char('Forbidden branch message', tracking=True)
 
@@ -352,10 +353,11 @@ class Repo(models.Model):
         """
         self.ensure_one()
         get_ref_time = round(self._get_fetch_head_time(), 4)
+        commit_limit = time.time() - (60 * 60 * 24 * max_age)
         if not self.get_ref_time or get_ref_time > self.get_ref_time:
             try:
                 self.set_ref_time(get_ref_time)
-                fields = ['refname', 'objectname', 'committerdate:iso8601', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail']
+                fields = ['refname', 'objectname', 'committerdate:unix', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail']
                 fmt = "%00".join(["%(" + field + ")" for field in fields])
                 cmd = ['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/*/heads/*']
                 if any(remote.fetch_pull for remote in self.remote_ids):
@@ -365,7 +367,8 @@ class Repo(models.Model):
                 if not git_refs:
                     return []
                 refs = [tuple(field for field in line.split('\x00')) for line in git_refs.split('\n')]
-                refs = [r for r in refs if dateutil.parser.parse(r[2][:19]) + datetime.timedelta(days=max_age) > datetime.datetime.now()]
+                refs = [r for r in refs if not re.match(r'^refs/[\w-]+/heads/\d+$', r[0])]  # remove branches with interger names to avoid confusion with pr names
+                refs = [r for r in refs if int(r[2]) > commit_limit or self.env['runbot.branch'].match_is_base(r[0].split('/')[-1])]
                 if ignore:
                     refs = [r for r in refs if r[0].split('/')[-1] not in ignore]
                 return refs
@@ -426,7 +429,7 @@ class Repo(models.Model):
                         'committer': committer,
                         'committer_email': committer_email,
                         'subject': subject,
-                        'date': dateutil.parser.parse(date[:19]),
+                        'date': datetime.datetime.fromtimestamp(int(date)),
                     })
                 branch.head = commit
                 if not branch.alive:
@@ -440,9 +443,6 @@ class Repo(models.Model):
                     message = "This branch name is incorrect. Branch name should be prefixed with a valid version"
                     message = branch.remote_id.repo_id.invalid_branch_message or message
                     branch.head._github_status(False, "Branch naming", 'failure', False, message)
-
-                if not self.trigger_ids:
-                    continue
 
                 bundle = branch.bundle_id
                 if bundle.no_build:
@@ -474,12 +474,15 @@ class Repo(models.Model):
     def _update_git_config(self):
         """ Update repo git config file """
         for repo in self:
+            if repo.mode == 'disabled':
+                _logger.info(f'skipping disabled repo {repo.name}')
+                continue
             if os.path.isdir(os.path.join(repo.path, 'refs')):
                 git_config_path = os.path.join(repo.path, 'config')
                 template_params = {'repo': repo}
-                git_config = self.env['ir.ui.view'].render_template("runbot.git_config", template_params)
-                with open(git_config_path, 'wb') as config_file:
-                    config_file.write(git_config)
+                git_config = self.env['ir.ui.view']._render_template("runbot.git_config", template_params)
+                with open(git_config_path, 'w') as config_file:
+                    config_file.write(str(git_config))
                 _logger.info('Config updated for repo %s' % repo.name)
             else:
                 _logger.info('Repo not cloned, skiping config update for %s' % repo.name)
@@ -539,18 +542,27 @@ class Repo(models.Model):
                     message = 'Failed to fetch repo %s: %s' % (self.name, e.output.decode())
                     host = self.env['runbot.host']._get_current()
                     host.message_post(body=message)
-                    self.env['runbot.runbot'].warning('Host %s got reserved because of fetch failure' % host.name)
-                    _logger.exception(message)
-                    host.disable()
+                    icp = self.env['ir.config_parameter'].sudo()
+                    if icp.get_param('runbot.runbot_disable_host_on_fetch_failure'):
+                        self.env['runbot.runbot'].warning('Host %s got reserved because of fetch failure' % host.name)
+                        _logger.exception(message)
+                        host.disable()
         return success
 
     def _update(self, force=False, poll_delay=5*60):
         """ Update the physical git reposotories on FS"""
-        for repo in self:
-            try:
-                return repo._update_git(force, poll_delay)
-            except Exception:
-                _logger.exception('Fail to update repo %s', repo.name)
+        self.ensure_one()
+        try:
+            return self._update_git(force, poll_delay)
+        except Exception:
+            _logger.exception('Fail to update repo %s', self.name)
+
+    def _get_module(self, file):
+        for addons_path in (self.addons_paths or '').split(','):
+            base_path = f'{self.name}/{addons_path}'
+            if file.startswith(base_path):
+                return file[len(base_path):].strip('/').split('/')[0]
+
 
 class RefTime(models.Model):
     _name = 'runbot.repo.reftime'

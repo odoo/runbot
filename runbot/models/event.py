@@ -2,8 +2,10 @@
 
 import logging
 
+from collections import defaultdict
+
 from ..common import pseudo_markdown
-from odoo import models, fields, tools
+from odoo import models, fields, tools, api
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
@@ -18,66 +20,45 @@ class runbot_event(models.Model):
 
     build_id = fields.Many2one('runbot.build', 'Build', index=True, ondelete='cascade')
     active_step_id = fields.Many2one('runbot.build.config.step', 'Active step', index=True)
-    type = fields.Selection(selection_add=TYPES, string='Type', required=True, index=True)
+    type = fields.Selection(selection_add=TYPES, string='Type', required=True, index=True, ondelete={t[0]: 'cascade' for t in TYPES})
+    error_id = fields.Many2one('runbot.build.error', compute='_compute_known_error')  # remember to never store this field
+    dbname = fields.Char(string='Database Name', index=False)
 
-    def init(self):
-        parent_class = super(runbot_event, self)
-        if hasattr(parent_class, 'init'):
-            parent_class.init()
+    @api.model_create_multi
+    def create(self, vals_list):
+        logs_by_build_id = defaultdict(list)
+        for log in vals_list:
+            if 'build_id' in log:
+                logs_by_build_id[log['build_id']].append(log)
 
-        self._cr.execute("""
-CREATE OR REPLACE FUNCTION runbot_set_logging_build() RETURNS TRIGGER AS $runbot_set_logging_build$
-BEGIN
-  IF (NEW.build_id IS NULL AND NEW.dbname IS NOT NULL AND NEW.dbname != current_database()) THEN
-    NEW.build_id := split_part(NEW.dbname, '-', 1)::integer;
-    SELECT active_step INTO NEW.active_step_id FROM runbot_build WHERE runbot_build.id = NEW.build_id;
-  END IF;
-  IF (NEW.build_id IS NOT NULL) AND (NEW.type = 'server') THEN
-    DECLARE
-        counter INTEGER;
-    BEGIN
-        UPDATE runbot_build b
-            SET log_counter = log_counter - 1
-        WHERE b.id = NEW.build_id;
-        SELECT log_counter
-        INTO counter
-        FROM runbot_build
-        WHERE runbot_build.id = NEW.build_id;
-        IF (counter = 0) THEN
-            NEW.message = 'Log limit reached (full logs are still available in the log file)';
-            NEW.level = 'SEPARATOR';
-            NEW.func = '';
-            NEW.type = 'runbot';
-            RETURN NEW;
-        ELSIF (counter < 0) THEN
-                RETURN NULL;
-        END IF;
-    END;
-  END IF;
-  IF (NEW.build_id IS NOT NULL AND UPPER(NEW.level) NOT IN ('INFO', 'SEPARATOR')) THEN
-    BEGIN
-        UPDATE runbot_build b
-            SET triggered_result = CASE WHEN UPPER(NEW.level) = 'WARNING' THEN 'warn'
-                                        ELSE 'ko'
-                                   END
-        WHERE b.id = NEW.build_id;
-    END;
-  END IF;
-RETURN NEW;
-END;
-$runbot_set_logging_build$ language plpgsql;
-
-DROP TRIGGER IF EXISTS runbot_new_logging ON ir_logging;
-CREATE TRIGGER runbot_new_logging BEFORE INSERT ON ir_logging
-FOR EACH ROW EXECUTE PROCEDURE runbot_set_logging_build();
-
-        """)
+        builds = self.env['runbot.build'].browse(logs_by_build_id.keys())
+        for build in builds:
+            build_logs = logs_by_build_id[build.id]
+            for ir_log in build_logs:
+                ir_log['active_step_id'] = build.active_step.id
+                if build.local_state != 'running':
+                    if ir_log['level'].upper() == 'WARNING':
+                        build.local_result = 'warn'
+                    elif ir_log['level'].upper() == 'ERROR':
+                        build.local_result = 'ko'
+        return super().create(vals_list)
 
     def _markdown(self):
         """ Apply pseudo markdown parser for message.
         """
         self.ensure_one()
         return pseudo_markdown(self.message)
+
+    def _compute_known_error(self):
+        cleaning_regexes = self.env['runbot.error.regex'].search([('re_type', '=', 'cleaning')])
+        fingerprints = defaultdict(list)
+        for ir_logging in self:
+            ir_logging.error_id = False
+            if ir_logging.level in ('ERROR', 'CRITICAL', 'WARNING') and ir_logging.type == 'server':
+                fingerprints[self.env['runbot.build.error']._digest(cleaning_regexes.r_sub('%', ir_logging.message))].append(ir_logging)
+        for build_error in self.env['runbot.build.error'].search([('fingerprint', 'in', list(fingerprints.keys()))]):
+            for ir_logging in fingerprints[build_error.fingerprint]:
+                ir_logging.error_id = build_error.id
 
 
 class RunbotErrorLog(models.Model):
@@ -96,7 +77,7 @@ class RunbotErrorLog(models.Model):
     path = fields.Char(string='Path', readonly=True)
     line = fields.Char(string='Line', readonly=True)
     build_id = fields.Many2one('runbot.build', string='Build', readonly=True)
-    dest = fields.Char(String='Build dest', readonly=True)
+    dest = fields.Char(string='Build dest', readonly=True)
     local_state = fields.Char(string='Local state', readonly=True)
     local_result = fields.Char(string='Local result', readonly=True)
     global_state = fields.Char(string='Global state', readonly=True)

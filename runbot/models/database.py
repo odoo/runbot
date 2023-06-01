@@ -7,7 +7,7 @@ class Database(models.Model):
     _name = 'runbot.database'
     _description = "Database"
 
-    name = fields.Char('Host name', required=True, unique=True)
+    name = fields.Char('Host name', required=True)
     build_id = fields.Many2one('runbot.build', index=True, required=True)
     db_suffix = fields.Char(compute='_compute_db_suffix')
 

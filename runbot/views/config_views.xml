@@ -14,7 +14,7 @@
                         <field name="description"/>
                         <field name="step_order_ids">
                             <tree string="Step list" editable="bottom">
-                                <field name="step_id"/>
+                                <field name="step_id" widget="Many2one" options="{'no_edit': 1}"/>
                                 <field name="sequence" widget="handle"/>
                             </tree>
                         </field>
@@ -40,6 +40,7 @@
                     </div>
                     <group string="General settings">
                         <field name="name"/>
+                        <field name="description"/>
                         <field name="domain_filter"/>
                         <field name="job_type"/>
                         <field name="make_stats"/>
@@ -60,7 +61,6 @@
                         <field name="python_code" widget="ace" options="{'mode': 'python'}"/>
                         <field name="python_result_code" widget="ace" options="{'mode': 'python'}"/>
                         <field name="running_job"/>
-                        <field name="ignore_triggered_result"/>
                     </group>
                     <group string="Test settings" attrs="{'invisible': [('job_type', 'not in', ('python', 'install_odoo'))]}">
                         <field name="create_db" groups="base.group_no_one"/>
@@ -77,6 +77,7 @@
                     <group string="Extra Parameters" attrs="{'invisible': [('job_type', 'not in', ('python', 'install_odoo', 'test_upgrade', 'run_odoo'))]}">
                         <field name="extra_params"/>
                         <field name="additionnal_env"/>
+                        <field name="enable_log_db"/>
                     </group>
                     <group string="Create settings" attrs="{'invisible': [('job_type', 'not in', ('python', 'create_build'))]}">
                         <field name="create_config_ids" widget="many2many_tags" options="{'no_create': True}" />
@@ -112,6 +113,17 @@
                     <group string="Restore settings" attrs="{'invisible': [('job_type', '!=', 'restore')]}">
                         <field name="restore_download_db_suffix"/>
                         <field name="restore_rename_db_suffix"/>
+                    </group>
+
+                    <group string="Codeowner settings" attrs="{'invisible': [('job_type', 'not in', ('codeowner', 'python'))]}">
+                        <field name="fallback_reviewer"/>
+                    </group>
+                    <group>
+                      <field name="step_order_ids" groups="base.group_no_one" readonly="1">
+                        <tree>
+                            <field name="config_id" widget="Many2one" options="{'no_edit': 1}"/>
+                        </tree>
+                      </field>
                     </group>
                 </sheet>
                 <div class="oe_chatter">
@@ -165,6 +177,12 @@
         <search string="Search config step">
           <field name="name"/>
           <field name="group_name"/>
+          <field name="python_code" filter_domain="[
+              '|',
+              ('python_code', 'ilike', self),
+              ('python_result_code', 'ilike', self),
+          ]">
+        </field>
           <filter string="Install job" name='install_job' domain="[(['job_type', '=', 'install_odoo'])]"/>
           <filter string="Run job" name='run_job' domain="[(['job_type', '=', 'run_odoo'])]"/>
           <filter string="Python job" name='python_job' domain="[(['job_type', '=', 'python'])]"/>
@@ -189,28 +207,7 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    <menuitem
-        name="Configs"
-        id="runbot_menu_configs"
-        parent="runbot_menu_root"
-        sequence="30"
-        />
 
-    <menuitem
-        name="Build Configs"
-        id="runbot_menu_job_config_tree"
-        parent="runbot_menu_configs"
-        sequence="10"
-        action="open_view_job_config_tree"
-        />
-
-    <menuitem
-        name="Build Config Step"
-        id="runbot_menu_job_tree"
-        parent="runbot_menu_configs"
-        sequence="20"
-        action="open_view_job_tree"
-        />
 
   </data>
 </odoo>

@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
+import collections
 import json
+import pathlib
 
+import markdown
+import markupsafe
 import werkzeug.exceptions
 
 from odoo.http import Controller, route, request
@@ -15,15 +19,42 @@ class MergebotDashboard(Controller):
 
     @route('/runbot_merge/<int:branch_id>', auth='public', type='http', website=True)
     def stagings(self, branch_id, until=None):
+        branch = request.env['runbot_merge.branch'].browse(branch_id).sudo().exists()
+        if not branch:
+            raise werkzeug.exceptions.NotFound()
+
         stagings = request.env['runbot_merge.stagings'].with_context(active_test=False).sudo().search([
-            ('target', '=', branch_id),
+            ('target', '=', branch.id),
             ('staged_at', '<=', until) if until else (True, '=', True),
         ], order='staged_at desc', limit=LIMIT+1)
 
         return request.render('runbot_merge.branch_stagings', {
-            'branch': request.env['runbot_merge.branch'].browse(branch_id).sudo(),
+            'branch': branch,
             'stagings': stagings[:LIMIT],
             'next': stagings[-1].staged_at if len(stagings) > LIMIT else None,
+        })
+
+    def _entries(self):
+        changelog = pathlib.Path(__file__).parent.parent / 'changelog'
+        if changelog.is_dir():
+            return [
+                (d.name, [f.read_text(encoding='utf-8') for f in d.iterdir() if f.is_file()])
+                for d in changelog.iterdir()
+            ]
+        return []
+
+    def entries(self, item_converter):
+        entries = collections.OrderedDict()
+        for key, items in sorted(self._entries(), reverse=True):
+            entries.setdefault(key, []).extend(map(item_converter, items))
+        return entries
+
+    @route('/runbot_merge/changelog', auth='public', type='http', website=True)
+    def changelog(self):
+        md = markdown.Markdown(extensions=['nl2br'], output_format='html5')
+        entries = self.entries(lambda t: markupsafe.Markup(md.convert(t)))
+        return request.render('runbot_merge.changelog', {
+            'entries': entries,
         })
 
     @route('/<org>/<repo>/pull/<int(min=1):pr>', auth='public', type='http', website=True)

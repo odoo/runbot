@@ -22,6 +22,8 @@ Configuration:
   ``role_reviewer``, ``role_self_reviewer`` and ``role_other``
     - name (optional, used as partner name when creating that, otherwise github
       login gets used)
+    - email (optional, used as partner email when creating that, otherwise
+      github email gets used, reviewer and self-reviewer must have an email)
     - token, a personal access token with the ``public_repo`` scope (otherwise
       the API can't leave comments), maybe eventually delete_repo (for personal
       forks)
@@ -42,16 +44,20 @@ logic errors.
 import base64
 import collections
 import configparser
+import contextlib
 import copy
+import functools
 import http.client
 import itertools
-import logging
 import os
+import pathlib
+import pprint
 import random
 import re
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 import warnings
@@ -70,9 +76,10 @@ def pytest_addoption(parser):
     parser.addoption('--addons-path')
     parser.addoption("--no-delete", action="store_true", help="Don't delete repo after a failed run")
     parser.addoption('--log-github', action='store_true')
+    parser.addoption('--coverage', action='store_true')
 
     parser.addoption(
-        '--tunnel', action="store", type="choice", choices=['ngrok', 'localtunnel'], default='ngrok',
+        '--tunnel', action="store", type="choice", choices=['', 'ngrok', 'localtunnel'], default='',
         help="Which tunneling method to use to expose the local Odoo server "
              "to hook up github's webhook. ngrok is more reliable, but "
              "creating a free account is necessary to avoid rate-limiting "
@@ -85,7 +92,7 @@ def pytest_addoption(parser):
 # noinspection PyUnusedLocal
 def pytest_configure(config):
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'mergebot_test_utils'))
-    print(sys.path)
+
 
 @pytest.fixture(scope='session', autouse=True)
 def _set_socket_timeout():
@@ -136,14 +143,16 @@ def rolemap(request, config):
 
 @pytest.fixture
 def partners(env, config, rolemap):
-    m = dict.fromkeys(rolemap.keys(), env['res.partner'])
+    m = {}
     for role, u in rolemap.items():
         if role in ('user', 'other'):
             continue
 
         login = u['login']
+        conf = config['role_' + role]
         m[role] = env['res.partner'].create({
-            'name': config['role_' + role].get('name', login),
+            'name': conf.get('name', login),
+            'email': conf.get('email') or u['email'] or False,
             'github_login': login,
         })
     return m
@@ -174,32 +183,42 @@ def tunnel(pytestconfig, port):
     """ Creates a tunnel to localhost:<port> using ngrok or localtunnel, should yield the
     publicly routable address & terminate the process at the end of the session
     """
-
     tunnel = pytestconfig.getoption('--tunnel')
-    if tunnel == 'ngrok':
+    if tunnel == '':
+        yield f'http://localhost:{port}'
+    elif tunnel == 'ngrok':
+        web_addr = 'http://localhost:4040/api'
         addr = 'localhost:%d' % port
-        # if ngrok is not running, start it
+        # try to find out if ngrok is running, and if it's not attempt
+        # to start it
         try:
-            # FIXME: use lockfile instead
-            time.sleep(random.randint(1, 10))
+            # FIXME: this is for xdist to avoid workers running ngrok at the
+            #        exact same time, use lockfile instead
+            time.sleep(random.SystemRandom().randint(1, 10))
             # FIXME: use config file so we can set web_addr to something else
             #        than localhost:4040 (otherwise we can't disambiguate
             #        between the ngrok we started and an ngrok started by
             #        some other user)
-            requests.get('http://localhost:4040/api')
+            requests.get(web_addr)
         except requests.exceptions.ConnectionError:
             subprocess.Popen(NGROK_CLI, stdout=subprocess.DEVNULL)
-            time.sleep(2)
+            for _ in range(5):
+                time.sleep(1)
+                with contextlib.suppress(requests.exceptions.ConnectionError):
+                    requests.get(web_addr)
+                    break
+            else:
+                raise Exception("Unable to connect to ngrok")
 
-        requests.post('http://localhost:4040/api/tunnels', json={
+        requests.post(f'{web_addr}/tunnels', json={
             'name': str(port),
             'proto': 'http',
             'bind_tls': True, # only https
             'addr': addr,
             'inspect': True,
         }).raise_for_status()
-        tunnel = 'http://localhost:4040/api/tunnels/%s' % port
 
+        tunnel = f'{web_addr}/tunnels/{port}'
         for _ in range(10):
             time.sleep(2)
             r = requests.get(tunnel)
@@ -211,7 +230,7 @@ def tunnel(pytestconfig, port):
             try:
                 yield r.json()['public_url']
             finally:
-                requests.delete('http://localhost:4040/api/tunnels/%s' % port)
+                requests.delete(tunnel)
                 for _ in range(10):
                     time.sleep(1)
                     r = requests.get(tunnel)
@@ -222,7 +241,7 @@ def tunnel(pytestconfig, port):
                 else:
                     raise TimeoutError("ngrok tunnel deletion failed")
 
-                r = requests.get('http://localhost:4040/api/tunnels')
+                r = requests.get(f'{web_addr}/tunnels')
                 # there are still tunnels in the list -> bail
                 if r.ok and r.json()['tunnels']:
                     return
@@ -254,15 +273,19 @@ class DbDict(dict):
         super().__init__()
         self._adpath = adpath
     def __missing__(self, module):
-        db = 'template_%s' % uuid.uuid4()
-        subprocess.run([
-            'odoo', '--no-http',
-            '--addons-path', self._adpath,
-            '-d', db, '-i', module,
-            '--max-cron-threads', '0',
-            '--stop-after-init'
-        ], check=True)
-        self[module] = db
+        self[module] = db = 'template_%s' % uuid.uuid4()
+        with tempfile.TemporaryDirectory() as d:
+            subprocess.run([
+                'odoo', '--no-http',
+                '--addons-path', self._adpath,
+                '-d', db, '-i', module + ',auth_oauth',
+                '--max-cron-threads', '0',
+                '--stop-after-init',
+                '--log-level', 'warn'
+            ],
+                check=True,
+                env={**os.environ, 'XDG_DATA_HOME': d}
+            )
         return db
 
 @pytest.fixture(scope='session')
@@ -321,18 +344,54 @@ def port():
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         return s.getsockname()[1]
 
+@pytest.fixture(scope='session')
+def dummy_addons_path():
+    with tempfile.TemporaryDirectory() as dummy_addons_path:
+        mod = pathlib.Path(dummy_addons_path, 'saas_worker')
+        mod.mkdir(0o700)
+        (mod / '__init__.py').write_bytes(b'')
+        (mod / '__manifest__.py').write_text(pprint.pformat({
+            'name': 'dummy saas_worker',
+            'version': '1.0',
+        }), encoding='utf-8')
+        (mod / 'util.py').write_text("""\
+def from_role(_):
+    return lambda fn: fn
+""", encoding='utf-8')
+
+        yield dummy_addons_path
+
 @pytest.fixture
-def server(request, db, port, module):
-    opts = ['--log-handler', 'github_requests:WARNING']
-    if request.config.getoption('--log-github'):
-        opts = []
+def server(request, db, port, module, dummy_addons_path, tmpdir):
+    log_handlers = [
+        'odoo.modules.loading:WARNING',
+    ]
+    if not request.config.getoption('--log-github'):
+        log_handlers.append('github_requests:WARNING')
+
+    addons_path = ','.join(map(str, [
+        request.config.getoption('--addons-path'),
+        dummy_addons_path,
+    ]))
+
+    cov = []
+    if request.config.getoption('--coverage'):
+        cov = ['coverage', 'run', '-p', '--source=odoo.addons.runbot_merge,odoo.addons.forwardport', '--branch']
 
     p = subprocess.Popen([
+        *cov,
         'odoo', '--http-port', str(port),
-        '--addons-path', request.config.getoption('--addons-path'),
-        '-d', db, *opts,
+        '--addons-path', addons_path,
+        '-d', db,
         '--max-cron-threads', '0', # disable cron threads (we're running crons by hand)
-    ])
+        *itertools.chain.from_iterable(('--log-handler', h) for h in log_handlers),
+    ], env={
+        **os.environ,
+        # stop putting garbage in the user dirs, and potentially creating conflicts
+        # TODO: way to override this with macOS?
+        'XDG_DATA_HOME': str(tmpdir.mkdir('share')),
+        'XDG_CACHE_HOME': str(tmpdir.mkdir('cache')),
+    })
 
     try:
         wait_for_server(db, port, p, module)
@@ -346,6 +405,9 @@ def server(request, db, port, module):
 def env(port, server, db, default_crons):
     yield Environment(port, db, default_crons)
 
+def check(response):
+    assert response.ok, response.text or response.reason
+    return response
 # users is just so I can avoid autouse on toplevel users fixture b/c it (seems
 # to) break the existing local tests
 @pytest.fixture
@@ -363,8 +425,7 @@ def make_repo(capsys, request, config, tunnel, users):
         endpoint = 'https://api.github.com/orgs/{}/repos'.format(owner)
     else:
         endpoint = 'https://api.github.com/user/repos'
-        r = github.get('https://api.github.com/user')
-        r.raise_for_status()
+        r = check(github.get('https://api.github.com/user'))
         assert r.json()['login'] == owner
 
     repos = []
@@ -374,7 +435,7 @@ def make_repo(capsys, request, config, tunnel, users):
         repo_url = 'https://api.github.com/repos/{}'.format(fullname)
 
         # create repo
-        r = github.post(endpoint, json={
+        r = check(github.post(endpoint, json={
             'name': name,
             'has_issues': False,
             'has_projects': False,
@@ -384,12 +445,18 @@ def make_repo(capsys, request, config, tunnel, users):
             'allow_squash_merge': False,
             # 'allow_merge_commit': False,
             'allow_rebase_merge': False,
-        })
-        r.raise_for_status()
+        }))
+        r = r.json()
+        # wait for repository visibility
+        while True:
+            time.sleep(1)
+            if github.head(r['url']).ok:
+                break
+
         repo = Repo(github, fullname, repos)
 
         # create webhook
-        github.post('{}/hooks'.format(repo_url), json={
+        check(github.post('{}/hooks'.format(repo_url), json={
             'name': 'web',
             'config': {
                 'url': '{}/runbot_merge/hooks'.format(tunnel),
@@ -397,16 +464,16 @@ def make_repo(capsys, request, config, tunnel, users):
                 'insecure_ssl': '1',
             },
             'events': ['pull_request', 'issue_comment', 'status', 'pull_request_review']
-        })
+        }))
+        time.sleep(1)
 
-        github.put('{}/contents/{}'.format(repo_url, 'a'), json={
+        check(github.put('{}/contents/{}'.format(repo_url, 'a'), json={
             'path': 'a',
             'message': 'github returns a 409 (Git Repository is Empty) if trying to create a tree in a repo with no objects',
             'content': base64.b64encode(b'whee').decode('ascii'),
             'branch': 'garbage_%s' % uuid.uuid4()
-        }).raise_for_status()
-        # try to unwatch repo, doesn't actually work
-        repo.unsubscribe()
+        }))
+        time.sleep(1)
         return repo
 
     yield repomaker
@@ -450,16 +517,13 @@ class Repo:
 
     def add_collaborator(self, login, token):
         # send invitation to user
-        r = self._session.put('https://api.github.com/repos/{}/collaborators/{}'.format(self.name, login))
-        assert r.ok, r.json()
+        r = check(self._session.put('https://api.github.com/repos/{}/collaborators/{}'.format(self.name, login)))
         # accept invitation on behalf of user
-        r = requests.patch('https://api.github.com/user/repository_invitations/{}'.format(r.json()['id']), headers={
+        check(requests.patch('https://api.github.com/user/repository_invitations/{}'.format(r.json()['id']), headers={
             'Authorization': 'token ' + token
-        })
-        assert r.ok, r.json()
+        }))
         # sanity check that user is part of collaborators
-        r = self._session.get('https://api.github.com/repos/{}/collaborators'.format(self.name))
-        assert r.ok, r.json()
+        r = check(self._session.get('https://api.github.com/repos/{}/collaborators'.format(self.name)))
         assert any(login == c['login'] for c in r.json())
 
     def _get_session(self, token):
@@ -536,17 +600,6 @@ class Repo:
             committer=c['committer'],
             parents=[p['sha'] for p in gh_commit['parents']],
         )
-
-    def log(self, ref_or_sha):
-        for page in itertools.count(1):
-            r = self._session.get(
-                'https://api.github.com/repos/{}/commits'.format(self.name),
-                params={'sha': ref_or_sha, 'page': page}
-            )
-            assert 200 <= r.status_code < 300, r.json()
-            yield from map(self._commit_from_gh, r.json())
-            if not r.links.get('next'):
-                return
 
     def read_tree(self, commit):
         """ read tree object from commit
@@ -629,17 +682,18 @@ class Repo:
 
         hashes = []
         for commit in commits:
-            if commit.reset:
-                tree = None
-            r = self._session.post('https://api.github.com/repos/{}/git/trees'.format(self.name), json={
-                'tree': [
-                    {'path': k, 'mode': '100644', 'type': 'blob', 'content': v}
-                    for k, v in commit.tree.items()
-                ],
-                'base_tree': tree
-            })
-            assert r.ok, r.text
-            tree = r.json()['sha']
+            if commit.tree:
+                if commit.reset:
+                    tree = None
+                r = self._session.post('https://api.github.com/repos/{}/git/trees'.format(self.name), json={
+                    'tree': [
+                        {'path': k, 'mode': '100644', 'type': 'blob', 'content': v}
+                        for k, v in commit.tree.items()
+                    ],
+                    'base_tree': tree
+                })
+                assert r.ok, r.text
+                tree = r.json()['sha']
 
             data = {
                 'parents': parents,
@@ -667,13 +721,19 @@ class Repo:
         s = self._get_session(token)
 
         r = s.post('https://api.github.com/repos/{}/forks'.format(self.name))
-        assert 200 <= r.status_code < 300, r.json()
+        assert 200 <= r.status_code < 300, r.text
 
         repo_name = r.json()['full_name']
         repo_url = 'https://api.github.com/repos/' + repo_name
         # poll for end of fork
         limit = time.time() + 60
         while s.head(repo_url, timeout=5).status_code != 200:
+            if time.time() > limit:
+                raise TimeoutError("No response for repo %s over 60s" % repo_name)
+            time.sleep(1)
+
+        # wait for the branches (which should have been copied over) to be visible
+        while not s.get(f'{repo_url}/branches').json():
             if time.time() > limit:
                 raise TimeoutError("No response for repo %s over 60s" % repo_name)
             time.sleep(1)
@@ -729,7 +789,8 @@ class Repo:
     def post_status(self, ref, status, context='default', **kw):
         assert self.hook
         assert status in ('error', 'failure', 'pending', 'success')
-        r = self._session.post('https://api.github.com/repos/{}/statuses/{}'.format(self.name, self.commit(ref).id), json={
+        commit = ref if isinstance(ref, Commit) else self.commit(ref)
+        r = self._session.post('https://api.github.com/repos/{}/statuses/{}'.format(self.name, commit.id), json={
             'state': status,
             'context': context,
             **kw
@@ -773,6 +834,8 @@ class Comment(tuple):
         self._c = c
         return self
     def __getitem__(self, item):
+        if isinstance(item, int):
+            return super().__getitem__(item)
         return self._c[item]
 
 
@@ -791,27 +854,39 @@ mutation setDraft($pid: ID!) {
     }
 }
 '''
+def state_prop(name: str) -> property:
+    @property
+    def _prop(self):
+        return self._pr[name]
+    return _prop.setter(lambda self, v: self._set_prop(name, v))
+
 class PR:
     def __init__(self, repo, number):
         self.repo = repo
         self.number = number
         self.labels = LabelsProxy(self)
+        self._cache = None, {}
 
     @property
     def _pr(self):
-        r = self.repo._session.get('https://api.github.com/repos/{}/pulls/{}'.format(self.repo.name, self.number))
-        assert 200 <= r.status_code < 300, r.json()
-        return r.json()
+        previous, caching = self._cache
+        r = self.repo._session.get(
+            'https://api.github.com/repos/{}/pulls/{}'.format(self.repo.name, self.number),
+            headers=caching
+        )
+        assert r.ok, r.json()
+        if r.status_code == 304:
+            return previous
+        contents, caching = self._cache = r.json(), {}
+        if r.headers.get('etag'):
+            caching['If-None-Match'] = r.headers['etag']
+        if r.headers.get('last-modified'):
+            caching['If-Modified-Since']= r.headers['Last-Modified']
+        return contents
 
-    @property
-    def title(self):
-        raise NotImplementedError()
-    title = title.setter(lambda self, v: self._set_prop('title', v))
-
-    @property
-    def base(self):
-        raise NotImplementedError()
-    base = base.setter(lambda self, v: self._set_prop('base', v))
+    title = state_prop('title')
+    body = state_prop('body')
+    base = state_prop('base')
 
     @property
     def draft(self):
@@ -1009,7 +1084,7 @@ class Environment:
         for xid in crons:
             t0 = time.time()
             print('\trunning cron', xid, '...', file=sys.stderr)
-            _, model, cron_id = self('ir.model.data', 'xmlid_lookup', xid)
+            model, cron_id = self('ir.model.data', 'check_object_reference', *xid.split('.', 1))
             assert model == 'ir.cron', "Expected {} to be a cron, got {}".format(xid, model)
             self('ir.cron', 'method_direct_trigger', [cron_id], **kw)
             print('\tdone %.3fs' % (time.time() - t0), file=sys.stderr)
@@ -1050,37 +1125,27 @@ class Model:
     def __repr__(self):
         return "{}({})".format(self._model, ', '.join(str(id_) for id_ in self._ids))
 
+    # method: (model, rebrowse)
+    _conf = {
+        'check_object_reference': (True, False),
+        'create': (True, True),
+        'exists': (False, True),
+        'fields_get': (True, False),
+        'name_create': (False, True),
+        'name_search': (True, False),
+        'search': (True, True),
+        'search_count': (True, False),
+        'search_read': (True, False),
+        'filtered': (False, True),
+    }
+
     def browse(self, ids):
         return Model(self._env, self._model, ids)
 
-    def exists(self):
-        ids = self._env(self._model, 'exists', self._ids)
-        return Model(self._env, self._model, ids)
-
-    def search(self, *args, **kwargs):
-        ids = self._env(self._model, 'search', *args, **kwargs)
-        return Model(self._env, self._model, ids)
-
-    def name_search(self, *args, **kwargs):
-        return self._env(self._model, 'name_search', *args, **kwargs)
-
-    def create(self, values):
-        return Model(self._env, self._model, [self._env(self._model, 'create', values)])
-
-    def write(self, values):
-        return self._env(self._model, 'write', self._ids, values)
-
-    def read(self, fields):
-        return self._env(self._model, 'read', self._ids, fields)
-
-    def name_get(self):
-        return self._env(self._model, 'name_get', self._ids)
-
-    def unlink(self):
-        return self._env(self._model, 'unlink', self._ids)
-
+    # because sorted is not xmlrpc-compatible (it doesn't downgrade properly)
     def sorted(self, field):
-        rs = sorted(self.read([field]), key=lambda r: r[field])
+        rs = self.read([field])
+        rs.sort(key=lambda r: r[field])
         return Model(self._env, self._model, [r['id'] for r in rs])
 
     def __getitem__(self, index):
@@ -1095,17 +1160,18 @@ class Model:
     def __getattr__(self, fieldname):
         if fieldname in ['__dataclass_fields__', '__attrs_attrs__']:
             raise AttributeError('%r is invalid on %s' % (fieldname, self._model))
+
+        field_description = self._fields.get(fieldname)
+        if field_description is None:
+            return functools.partial(self._call, fieldname)
+
         if not self._ids:
             return False
 
-        assert len(self._ids) == 1
         if fieldname == 'id':
             return self._ids[0]
 
-        try:
-            val = self.read([fieldname])[0][fieldname]
-        except Exception:
-            raise AttributeError('%r is invalid on %s' % (fieldname, self._model))
+        val = self.read([fieldname])[0][fieldname]
         field_description = self._fields[fieldname]
         if field_description['type'] in ('many2one', 'one2many', 'many2many'):
             val = val or []
@@ -1117,7 +1183,18 @@ class Model:
 
     # because it's difficult to discriminate between methods and fields
     def _call(self, name, *args, **kwargs):
-        return self._env(self._model, name, self._ids, *args, **kwargs)
+        model, rebrowse = self._conf.get(name, (False, False))
+
+        if model:
+            res = self._env(self._model, name, *args, **kwargs)
+        else:
+            res = self._env(self._model, name, self._ids, *args, **kwargs)
+
+        if not rebrowse:
+            return res
+        if isinstance(res, int):
+            return self.browse([res])
+        return self.browse(res)
 
     def __setattr__(self, fieldname, value):
         self._env(self._model, 'write', self._ids, {fieldname: value})
