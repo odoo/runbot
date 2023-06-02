@@ -28,6 +28,7 @@ class ResConfigSettings(models.TransientModel):
     runbot_forwardport_author = fields.Char('Forwardbot author')
     runbot_organisation = fields.Char('Organisation')
     runbot_disable_host_on_fetch_failure = fields.Boolean('Disable host on fetch failure')
+    runbot_use_ssl = fields.Boolean('Use ssl for workers', help="select if worker ressources (log, dump, ...) uses ssl or not.", config_parameter="runbot.use_ssl")
 
     runbot_db_gc_days = fields.Integer(
         'Days before gc',

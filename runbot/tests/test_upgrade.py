@@ -421,7 +421,7 @@ class TestUpgradeFlow(RunbotCase):
             source_dest = current_build.params_id.dump_db.build_id.dest
 
             def docker_run_restore(cmd, *args, **kwargs):
-                dump_url = f'http://host.runbot.com/runbot/static/build/{source_dest}/logs/{source_dest}-{suffix}.zip'
+                dump_url = f'https://host.runbot.com/runbot/static/build/{source_dest}/logs/{source_dest}-{suffix}.zip'
                 zip_name = f'{source_dest}-{suffix}.zip'
                 db_name = f'{current_build.dest}-{suffix}'
                 self.assertEqual(

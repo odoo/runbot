@@ -47,6 +47,11 @@ admin_passwd=running_master_password</field>
         <field name="value">^((master)|(saas-)?\d+\.\d+)$</field>
     </record>
 
+    <record model="ir.config_parameter" id="runbot.use_ssl">
+        <field name="key">runbot.use_ssl</field>
+        <field name="value">True</field>
+    </record>
+
     <record model="ir.config_parameter" id="runbot.runbot_forwardport_author">
         <field name="key">runbot.runbot_forwardport_author</field>
         <field name="value">fw-bot</field>
