@@ -454,7 +454,7 @@ class ConfigStep(models.Model):
             test_tags = [test_tag for test_tag in test_tags if test_tag]
             if test_tags:
                 cmd.extend(['--test-tags', ','.join(test_tags)])
-        elif test_tags_in_extra or self.test_tags and "--test-tags" not in available_options:
+        elif (test_tags_in_extra or self.test_tags) and "--test-tags" not in available_options:
             build._log('test_all', 'Test tags given but not supported')
 
         if "--screenshots" in available_options:
