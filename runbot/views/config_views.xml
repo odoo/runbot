@@ -93,6 +93,7 @@
                         <field string="Explicit list" name="upgrade_to_version_ids" widget="many2many_tags"/>
                       </group>
                       <group class="col" string="Source version settings">
+                        <field string="Base" name="upgrade_from_base"/>
                         <field string="Major" name="upgrade_from_previous_major_version"/>
                         <field string="Last saas" name="upgrade_from_last_intermediate_version"/>
                         <field string="All saas" name="upgrade_from_all_intermediate_version"/>

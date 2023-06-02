@@ -184,6 +184,7 @@ class ConfigStep(models.Model):
     upgrade_to_version_ids = fields.Many2many('runbot.version', relation='runbot_upgrade_to_version_ids', string='Forced version to use as target')
     # 2. define source from target
     upgrade_from_current = fields.Boolean(help="If checked, only upgrade from current will be used, other options will be ignored Template should be installed in the same build")
+    upgrade_from_base = fields.Boolean()
     upgrade_from_previous_major_version = fields.Boolean() # 13.0
     upgrade_from_last_intermediate_version = fields.Boolean() # 13.3
     upgrade_from_all_intermediate_version = fields.Boolean() # 13.2 # 13.1
@@ -677,6 +678,8 @@ class ConfigStep(models.Model):
             return self.upgrade_from_version_ids
         else:
             versions = self.env['runbot.version'].browse()
+            if self.upgrade_from_base:
+                versions |= target_version
             if self.upgrade_from_previous_major_version:
                 versions |= target_version.previous_major_version_id
             if self.upgrade_from_all_intermediate_version:
@@ -857,7 +860,7 @@ class ConfigStep(models.Model):
             return
 
         kwargs = dict(message='Step %s finished in %s' % (self.name, s2human(build.job_time)))
-        if self.job_type == 'install_odoo':
+        if self.job_type == 'install_odoo' or (self.job_type == 'python' and '_run_install_odoo' in self.python_code):
             kwargs['message'] += ' $$fa-download$$'
             db_suffix = build.params_id.config_data.get('db_name') or (build.params_id.dump_db.db_suffix if not self.create_db else False) or self.db_name
             kwargs['path'] = '%s%s-%s.zip' % (build.http_log_url(), build.dest, db_suffix)

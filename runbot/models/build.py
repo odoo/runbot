@@ -940,7 +940,7 @@ class BuildResult(models.Model):
         self.env['runbot.database'].create({'name': dbname, 'build_id': self.id})
 
     def _log(self, func, message, level='INFO', log_type='runbot', path='runbot'):
-
+        message = str(message)
         if len(message) > 300000:
             message = message[:300000] + '[Truncate, message too long]'
 
