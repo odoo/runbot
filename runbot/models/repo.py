@@ -74,6 +74,8 @@ class Trigger(models.Model):
     def _upgrade_step_from_config(self, config):
         upgrade_step = next((step_order.step_id for step_order in config.step_order_ids if step_order.step_id._is_upgrade_step()), False)
         if not upgrade_step:
+            upgrade_step = next((step_order.step_id for step_order in config.step_order_ids if step_order.step_id.job_type == 'python'), False)
+        if not upgrade_step:
             raise UserError('Upgrade trigger should have a config with step of type Configure Upgrade')
         return upgrade_step
 
