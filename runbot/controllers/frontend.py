@@ -142,7 +142,7 @@ class Runbot(Controller):
                 for search_elem in search.split("|"):
                     if search_elem.isnumeric():
                         pr_numbers.append(int(search_elem))
-                    operator = '=like' if '%' in search_elem else 'like'
+                    operator = '=ilike' if '%' in search_elem else 'ilike'
                     search_domains.append([('name', operator, search_elem)])
                 if pr_numbers:
                     res = request.env['runbot.branch'].search([('name', 'in', pr_numbers)])
