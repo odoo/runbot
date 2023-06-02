@@ -25,6 +25,10 @@
                           <field name="runbot_timeout" style="width: 15%;"/>
                           <label for="runbot_starting_port" class="col-xs-3 o_light_label" style="width: 60%;"/>
                           <field name="runbot_starting_port" style="width: 15%;"/>
+                          <label for="runbot_disable_host_on_fetch_failure" class="col-xs-3 o_light_label" style="width: 60%;"/>
+                          <field name="runbot_disable_host_on_fetch_failure" style="width: 15%;"/>
+                          <label for="runbot_use_ssl" class="col-xs-3 o_light_label" style="width: 60%;"/>
+                          <field name="runbot_use_ssl" style="width: 15%;"/>
                         </div>
                       </div>
                     </div>
@@ -34,8 +38,6 @@
                         <div class="content-group">
                           <label for="runbot_max_age" class="col-xs-3 o_light_label" style="width: 60%;"/>
                           <field name="runbot_max_age" style="width: 15%;"/>
-                          <label for="runbot_disable_host_on_fetch_failure" class="col-xs-3 o_light_label" style="width: 40%;"/>
-                          <field name="runbot_disable_host_on_fetch_failure" style="width: 15%;"/>
                         </div>
                       </div>
                     </div>
