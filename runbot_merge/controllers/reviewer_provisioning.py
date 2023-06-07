@@ -6,12 +6,12 @@ from odoo.http import Controller, request, route
 try:
     from odoo.addons.saas_worker.util import from_role
 except ImportError:
-    def from_role(_):
+    def from_role(*_, **__):
         return lambda _: None
 
 _logger = logging.getLogger(__name__)
 class MergebotReviewerProvisioning(Controller):
-    @from_role('accounts')
+    @from_role('accounts', signed=True)
     @route('/runbot_merge/users', type='json', auth='public')
     def list_users(self):
         env = request.env(su=True)
@@ -23,7 +23,7 @@ class MergebotReviewerProvisioning(Controller):
             if u.github_login
         ]
 
-    @from_role('accounts')
+    @from_role('accounts', signed=True)
     @route('/runbot_merge/provision', type='json', auth='public')
     def provision_user(self, users):
         _logger.info('Provisioning %s users: %s.', len(users), ', '.join(map(
@@ -107,7 +107,7 @@ class MergebotReviewerProvisioning(Controller):
         _logger.info("Provisioning: created %d updated %d.", created, updated)
         return [created, updated]
 
-    @from_role('accounts')
+    @from_role('accounts', signed=True)
     @route(['/runbot_merge/get_reviewers'], type='json', auth='public')
     def fetch_reviewers(self, **kwargs):
         reviewers = request.env['res.partner.review'].sudo().search([
@@ -115,7 +115,7 @@ class MergebotReviewerProvisioning(Controller):
         ]).mapped('partner_id.github_login')
         return reviewers
 
-    @from_role('accounts')
+    @from_role('accounts', signed=True)
     @route(['/runbot_merge/remove_reviewers'], type='json', auth='public', methods=['POST'])
     def update_reviewers(self, github_logins, **kwargs):
         partners = request.env['res.partner'].sudo().search([('github_login', 'in', github_logins)])

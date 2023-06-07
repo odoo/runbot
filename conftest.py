@@ -355,7 +355,7 @@ def dummy_addons_path():
             'version': '1.0',
         }), encoding='utf-8')
         (mod / 'util.py').write_text("""\
-def from_role(_):
+def from_role(*_, **__):
     return lambda fn: fn
 """, encoding='utf-8')
 
