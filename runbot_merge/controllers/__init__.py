@@ -154,7 +154,7 @@ def handle_pr(env, event):
     if not branch:
         return "Not set up to care about {}:{}".format(r, b)
 
-    headers = request.httprequest.headers if request.httprequest else {}
+    headers = request.httprequest.headers if request else {}
     _logger.info(
         "%s: %s#%s (%s) (by %s, delivery %s by %s)",
         event['action'],
