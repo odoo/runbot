@@ -11,13 +11,13 @@ from odoo.http import Controller, route, request
 
 LIMIT = 20
 class MergebotDashboard(Controller):
-    @route('/runbot_merge', auth="public", type="http", website=True)
+    @route('/runbot_merge', auth="public", type="http", website=True, sitemap=True)
     def dashboard(self):
         return request.render('runbot_merge.dashboard', {
             'projects': request.env['runbot_merge.project'].with_context(active_test=False).sudo().search([]),
         })
 
-    @route('/runbot_merge/<int:branch_id>', auth='public', type='http', website=True)
+    @route('/runbot_merge/<int:branch_id>', auth='public', type='http', website=True, sitemap=False)
     def stagings(self, branch_id, until=None):
         branch = request.env['runbot_merge.branch'].browse(branch_id).sudo().exists()
         if not branch:
@@ -49,7 +49,7 @@ class MergebotDashboard(Controller):
             entries.setdefault(key, []).extend(map(item_converter, items))
         return entries
 
-    @route('/runbot_merge/changelog', auth='public', type='http', website=True)
+    @route('/runbot_merge/changelog', auth='public', type='http', website=True, sitemap=True)
     def changelog(self):
         md = markdown.Markdown(extensions=['nl2br'], output_format='html5')
         entries = self.entries(lambda t: markupsafe.Markup(md.convert(t)))
@@ -57,7 +57,7 @@ class MergebotDashboard(Controller):
             'entries': entries,
         })
 
-    @route('/<org>/<repo>/pull/<int(min=1):pr>', auth='public', type='http', website=True)
+    @route('/<org>/<repo>/pull/<int(min=1):pr>', auth='public', type='http', website=True, sitemap=False)
     def pr(self, org, repo, pr):
         pr_id = request.env['runbot_merge.pull_requests'].sudo().search([
             ('repository.name', '=', f'{org}/{repo}'),
