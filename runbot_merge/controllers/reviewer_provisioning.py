@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 
+from odoo import Command
 from odoo.http import Controller, request, route
 
 try:
@@ -34,7 +35,7 @@ class MergebotReviewerProvisioning(Controller):
         Partners = env['res.partner']
         Users = env['res.users']
 
-        existing_partners = Partners.search([
+        existing_partners = Partners.with_context(active_test=False).search([
             '|', ('email', 'in', [u['email'] for u in users]),
                  ('github_login', 'in', [u['github_login'] for u in users])
         ])
@@ -55,20 +56,24 @@ class MergebotReviewerProvisioning(Controller):
             if p.github_login:
                 # assume there can't be an existing one because github_login is
                 # unique, and should not be able to collide with emails
-                partners[p.github_login] = p
+                partners[p.github_login.casefold()] = p
 
+        portal = env.ref('base.group_portal')
         internal = env.ref('base.group_user')
         odoo_provider = env.ref('auth_oauth.provider_openerp')
 
         to_create = []
-        created = updated = 0
+        updated = 0
+        to_activate = Partners
         for new in users:
             if 'sub' in new:
                 new['oauth_provider_id'] = odoo_provider.id
                 new['oauth_uid'] = new.pop('sub')
 
             # prioritise by github_login as that's the unique-est point of information
-            current = partners.get(new['github_login']) or partners.get(new['email']) or Partners
+            current = partners.get(new['github_login'].casefold()) or partners.get(new['email']) or Partners
+            if not current.active:
+                to_activate |= current
             # entry doesn't have user -> create user
             if not current.user_ids:
                 # skip users without an email (= login) as that
@@ -77,7 +82,7 @@ class MergebotReviewerProvisioning(Controller):
                     continue
 
                 new['login'] = new['email']
-                new['groups_id'] = [(4, internal.id)]
+                new['groups_id'] = [Command.link(internal.id)]
                 # entry has partner -> create user linked to existing partner
                 # (and update partner implicitly)
                 if current:
@@ -90,19 +95,29 @@ class MergebotReviewerProvisioning(Controller):
             if len(user) != 1:
                 _logger.warning("Got %d users for partner %s.", len(user), current.display_name)
                 user = user[:1]
+            new.setdefault("active", True)
             update_vals = {
                 k: v
                 for k, v in new.items()
-                if v not in ('login', 'email')
                 if v != (user[k] if k != 'oauth_provider_id' else user[k].id)
             }
+            if user.has_group('base.group_portal'):
+                update_vals['groups_id'] = [
+                    Command.unlink(portal.id),
+                    Command.link(internal.id),
+                ]
+
             if update_vals:
                 user.write(update_vals)
                 updated += 1
+
+        created = len(to_create)
         if to_create:
             # only create 100 users at a time to avoid request timeout
-            Users.create(to_create[:100])
-            created = len(to_create[:100])
+            Users.create(to_create)
+
+        if to_activate:
+            to_activate.active = True
 
         _logger.info("Provisioning: created %d updated %d.", created, updated)
         return [created, updated]
@@ -120,12 +135,13 @@ class MergebotReviewerProvisioning(Controller):
     def update_reviewers(self, github_logins, **kwargs):
         partners = request.env['res.partner'].sudo().search([('github_login', 'in', github_logins)])
         partners.write({
-            'review_rights': [(5, 0, 0)],
-            'delegate_reviewer': [(5, 0, 0)],
+            'email': False,
+            'review_rights': [Command.clear()],
+            'delegate_reviewer': [Command.clear()],
         })
 
         # Assign the linked users as portal users
         partners.mapped('user_ids').write({
-            'groups_id': [(6, 0, [request.env.ref('base.group_portal').id])]
+            'groups_id': [Command.set([request.env.ref('base.group_portal').id])]
         })
         return True

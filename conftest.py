@@ -1078,6 +1078,15 @@ class Environment:
     def __getitem__(self, name):
         return Model(self, name)
 
+    def ref(self, xid, raise_if_not_found=True):
+        model, obj_id = self(
+            'ir.model.data', 'check_object_reference',
+            *xid.split('.', 1),
+            raise_on_access_error=raise_if_not_found
+        )
+        return Model(self, model, [obj_id]) if obj_id else None
+
+
     def run_crons(self, *xids, **kw):
         crons = xids or self._default_crons
         print('running crons', crons, file=sys.stderr)
