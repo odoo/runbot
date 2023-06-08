@@ -143,10 +143,17 @@ All substitutions are tentatively applied sequentially to the input.
                 },
                 'sender': {'login': self.project_id.github_prefix},
             })
+            edit2 = ''
+            if pr_id.draft != pr['draft']:
+                edit2 = controllers.handle_pr(self.env, {
+                    'action': 'converted_to_draft' if pr['draft'] else 'ready_for_review',
+                    'pull_request': pr,
+                    'sender': {'login': self.project_id.github_prefix}
+                }) + '. '
             feedback({
                 'repository': pr_id.repository.id,
                 'pull_request': number,
-                'message': f"{edit}. {sync}.",
+                'message': f"{edit}. {edit2}{sync}.",
             })
             return
 

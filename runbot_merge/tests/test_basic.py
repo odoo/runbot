@@ -2520,6 +2520,7 @@ Please check and re-approve.
             'state': 'ready',
             'message': "Something else",
             'target': other.id,
+            'draft': True,
         })
         with repo:
             pr.post_comment('hansen check')
@@ -2528,7 +2529,11 @@ Please check and re-approve.
         assert pr_id.head == c2
         assert pr_id.message == 'title\n\nbody' # the commit's message was used for the PR
         assert pr_id.target.name == 'master'
-        assert pr.comments[-1] == (users['user'], f"Updated target, squash, message. Updated to {c2}.")
+        assert not pr_id.draft
+        assert pr.comments[-1] == (
+            users['user'],
+            f"Updated target, squash, message. Updated {pr_id.display_name} to ready. Updated to {c2}."
+        )
 
     def test_update_closed(self, env, repo):
         with repo:
