@@ -213,6 +213,8 @@ class Repository(models.Model):
 class PullRequests(models.Model):
     _inherit = 'runbot_merge.pull_requests'
 
+    statuses = fields.Text(recursive=True)
+
     limit_id = fields.Many2one('runbot_merge.branch', help="Up to which branch should this PR be forward-ported")
 
     parent_id = fields.Many2one(
