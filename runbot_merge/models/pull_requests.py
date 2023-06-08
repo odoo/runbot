@@ -67,7 +67,7 @@ class Repository(models.Model):
 
     sequence = fields.Integer(default=50, group_operator=None)
     name = fields.Char(required=True)
-    project_id = fields.Many2one('runbot_merge.project', required=True)
+    project_id = fields.Many2one('runbot_merge.project', required=True, index=True)
     status_ids = fields.One2many('runbot_merge.repository.status', 'repo_id', string="Required Statuses")
 
     group_id = fields.Many2one('res.groups', default=lambda self: self.env.ref('base.group_user'))
@@ -235,10 +235,10 @@ class Branch(models.Model):
     _order = 'sequence, name'
 
     name = fields.Char(required=True)
-    project_id = fields.Many2one('runbot_merge.project', required=True)
+    project_id = fields.Many2one('runbot_merge.project', required=True, index=True)
 
     active_staging_id = fields.Many2one(
-        'runbot_merge.stagings', compute='_compute_active_staging', store=True,
+        'runbot_merge.stagings', compute='_compute_active_staging', store=True, index=True,
         help="Currently running staging for the branch."
     )
     staging_ids = fields.One2many('runbot_merge.stagings', 'target')
@@ -251,6 +251,8 @@ class Branch(models.Model):
 
     active = fields.Boolean(default=True)
     sequence = fields.Integer(group_operator=None)
+
+    staging_enabled = fields.Boolean(default=True)
 
     def _auto_init(self):
         res = super(Branch, self)._auto_init()

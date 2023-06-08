@@ -56,7 +56,8 @@
                         <tree editable="bottom" decoration-muted="not active">
                             <field name="sequence" widget="handle" />
                             <field name="name"/>
-                            <field name="active"/>
+                            <field name="active" widget="boolean_toggle"/>
+                            <field name="staging_enabled" widget="boolean_toggle"/>
                         </tree>
                     </field>
                 </sheet>

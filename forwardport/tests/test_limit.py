@@ -50,31 +50,6 @@ def test_configure(env, config, make_repo):
     assert prs[2].number == originals[2]
 
 
-def test_self_disabled(env, config, make_repo):
-    """ Allow setting target as limit even if it's disabled
-    """
-    prod, other = make_basic(env, config, make_repo)
-    bot_name = env['runbot_merge.project'].search([]).fp_github_name
-    branch_a = env['runbot_merge.branch'].search([('name', '=', 'a')])
-    branch_a.fp_target = False
-    with prod:
-        [c] = prod.make_commits('a', Commit('c', tree={'0': '0'}), ref='heads/mybranch')
-        pr = prod.make_pr(target='a', head='mybranch')
-        prod.post_status(c, 'success', 'legal/cla')
-        prod.post_status(c, 'success', 'ci/runbot')
-        pr.post_comment('hansen r+\n%s up to a' % bot_name, config['role_reviewer']['token'])
-    env.run_crons()
-    pr_id = env['runbot_merge.pull_requests'].search([('number', '=', pr.number)])
-    assert pr_id.limit_id == branch_a
-
-    with prod:
-        prod.post_status('staging.a', 'success', 'legal/cla')
-        prod.post_status('staging.a', 'success', 'ci/runbot')
-
-    assert env['runbot_merge.pull_requests'].search([]) == pr_id,\
-        "should not have created a forward port"
-
-
 def test_ignore(env, config, make_repo):
     """ Provide an "ignore" command which is equivalent to setting the limit
     to target
@@ -100,17 +75,12 @@ def test_ignore(env, config, make_repo):
         "should not have created a forward port"
 
 
-@pytest.mark.parametrize('enabled', ['active', 'fp_target'])
-def test_disable(env, config, make_repo, users, enabled):
+def test_disable(env, config, make_repo, users):
     """ Checks behaviour if the limit target is disabled:
 
     * disable target while FP is ongoing -> skip over (and stop there so no FP)
     * forward-port over a disabled branch
     * request a disabled target as limit
-
-    Disabling (with respect to forward ports) can be performed by marking the
-    branch as !active (which also affects mergebot operations), or as
-    !fp_target (won't be forward-ported to).
     """
     prod, other = make_basic(env, config, make_repo)
     project = env['runbot_merge.project'].search([])
@@ -133,7 +103,7 @@ def test_disable(env, config, make_repo, users, enabled):
         prod.post_status('staging.a', 'success', 'legal/cla')
         prod.post_status('staging.a', 'success', 'ci/runbot')
     # disable branch b
-    env['runbot_merge.branch'].search([('name', '=', 'b')]).write({enabled: False})
+    env['runbot_merge.branch'].search([('name', '=', 'b')]).active = False
     env.run_crons()
 
     # should have created a single PR (to branch c, for pr 1)
@@ -167,49 +137,6 @@ def test_disable(env, config, make_repo, users, enabled):
         (users['other'], "Forward-porting to 'c'."),
         seen(env, pr, users),
     }
-
-
-def test_default_disabled(env, config, make_repo, users):
-    """ If the default limit is disabled, it should still be the default
-    limit but the ping message should be set on the actual last FP (to the
-    last non-deactivated target)
-    """
-    prod, other = make_basic(env, config, make_repo)
-    branch_c = env['runbot_merge.branch'].search([('name', '=', 'c')])
-    branch_c.fp_target = False
-
-    with prod:
-        [c] = prod.make_commits('a', Commit('c', tree={'0': '0'}), ref='heads/branch0')
-        pr = prod.make_pr(target='a', head='branch0')
-        prod.post_status(c, 'success', 'legal/cla')
-        prod.post_status(c, 'success', 'ci/runbot')
-        pr.post_comment('hansen r+', config['role_reviewer']['token'])
-    env.run_crons()
-
-    assert env['runbot_merge.pull_requests'].search([]).limit_id == branch_c
-
-    with prod:
-        prod.post_status('staging.a', 'success', 'legal/cla')
-        prod.post_status('staging.a', 'success', 'ci/runbot')
-    env.run_crons()
-
-    p1, p2 = env['runbot_merge.pull_requests'].search([], order='number')
-    assert p1.number == pr.number
-    pr2 = prod.get_pr(p2.number)
-
-    cs = pr2.comments
-    assert len(cs) == 2
-    assert pr2.comments == [
-        seen(env, pr2, users),
-        (users['user'], """\
-@%(user)s @%(reviewer)s this PR targets b and is the last of the forward-port chain.
-
-To merge the full chain, say
-> @%(user)s r+
-
-More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
-""" % users)
-    ]
 
 def test_limit_after_merge(env, config, make_repo, users):
     """ If attempting to set a limit (<up to>) on a PR which is merged

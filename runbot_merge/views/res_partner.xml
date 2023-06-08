@@ -25,6 +25,7 @@
                     <field name="display_name" string="Name"/>
                     <field name="github_login"/>
                     <field name="review_rights" widget="many2many_tags"/>
+                    <field name="user_id" invisible="1"/>
                 </tree>
             </xpath>
         </field>

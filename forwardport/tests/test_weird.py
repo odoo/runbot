@@ -26,9 +26,9 @@ def make_basic(env, config, make_repo, *, fp_token, fp_remote):
             'github_prefix': 'hansen',
             'fp_github_token': fp_token and config['github']['token'],
             'branch_ids': [
-                (0, 0, {'name': 'a', 'sequence': 2, 'fp_target': True}),
-                (0, 0, {'name': 'b', 'sequence': 1, 'fp_target': True}),
-                (0, 0, {'name': 'c', 'sequence': 0, 'fp_target': True}),
+                (0, 0, {'name': 'a', 'sequence': 2}),
+                (0, 0, {'name': 'b', 'sequence': 1}),
+                (0, 0, {'name': 'c', 'sequence': 0}),
             ],
         })
 
@@ -263,9 +263,9 @@ class TestNotAllBranches:
             'github_prefix': 'hansen',
             'fp_github_token': config['github']['token'],
             'branch_ids': [
-                (0, 0, {'name': 'a', 'sequence': 2, 'fp_target': True}),
-                (0, 0, {'name': 'b', 'sequence': 1, 'fp_target': True}),
-                (0, 0, {'name': 'c', 'sequence': 0, 'fp_target': True}),
+                (0, 0, {'name': 'a', 'sequence': 2}),
+                (0, 0, {'name': 'b', 'sequence': 1}),
+                (0, 0, {'name': 'c', 'sequence': 0}),
             ]
         })
         repo_a = env['runbot_merge.repository'].create({
@@ -514,7 +514,7 @@ def test_new_intermediate_branch(env, config, make_repo):
     env.run_crons()
     project.write({
         'branch_ids': [
-            (0, False, {'name': 'new', 'sequence': 1, 'fp_target': True}),
+            (0, False, {'name': 'new', 'sequence': 1}),
         ]
     })
     env.run_crons()
@@ -748,7 +748,7 @@ def test_retarget_after_freeze(env, config, make_repo, users):
     project.write({
         'branch_ids': [
             (1, branch_c.id, {'sequence': 1}),
-            (0, 0, {'name': 'bprime', 'sequence': 2, 'fp_target': True}),
+            (0, 0, {'name': 'bprime', 'sequence': 2}),
             (1, branch_b.id, {'sequence': 3}),
             (1, branch_a.id, {'sequence': 4}),
         ]

@@ -210,17 +210,6 @@ class Repository(models.Model):
     _inherit = 'runbot_merge.repository'
     fp_remote_target = fields.Char(help="where FP branches get pushed")
 
-class Branch(models.Model):
-    _inherit = 'runbot_merge.branch'
-
-    fp_target = fields.Boolean(default=True)
-    fp_enabled = fields.Boolean(compute='_compute_fp_enabled')
-
-    @api.depends('active', 'fp_target')
-    def _compute_fp_enabled(self):
-        for b in self:
-            b.fp_enabled = b.active and b.fp_target
-
 class PullRequests(models.Model):
     _inherit = 'runbot_merge.pull_requests'
 
@@ -438,7 +427,7 @@ class PullRequests(models.Model):
                         ping = False
                         msg = "Forward-port disabled."
                         self.limit_id = limit_id
-                    elif not limit_id.fp_enabled:
+                    elif not limit_id.active:
                         msg = "branch %r is disabled, it can't be used as a forward port target." % limit_id.name
                     else:
                         ping = False
@@ -550,7 +539,7 @@ class PullRequests(models.Model):
         return next((
             branch
             for branch in branches[from_+1:to_+1]
-            if branch.fp_enabled
+            if branch.active
         ), None)
 
     def _commits_lazy(self):

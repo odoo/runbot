@@ -151,9 +151,7 @@ def test_update_merged(env, make_repo, config, users):
     with prod:
         prod.make_ref('heads/d', prod.commit('c').id)
     env['runbot_merge.project'].search([]).write({
-        'branch_ids': [(0, 0, {
-            'name': 'd', 'sequence': 40, 'fp_target': True,
-        })]
+        'branch_ids': [(0, 0, {'name': 'd', 'sequence': 40})]
     })
 
     with prod:
@@ -251,10 +249,10 @@ def test_duplicate_fw(env, make_repo, setreviewers, config, users):
         'github_prefix': 'hansen',
         'fp_github_token': config['github']['token'],
         'branch_ids': [
-            (0, 0, {'name': 'master', 'sequence': 0, 'fp_target': True}),
-            (0, 0, {'name': 'v3', 'sequence': 1, 'fp_target': True}),
-            (0, 0, {'name': 'v2', 'sequence': 2, 'fp_target': True}),
-            (0, 0, {'name': 'v1', 'sequence': 3, 'fp_target': True}),
+            (0, 0, {'name': 'master', 'sequence': 0}),
+            (0, 0, {'name': 'v3', 'sequence': 1}),
+            (0, 0, {'name': 'v2', 'sequence': 2}),
+            (0, 0, {'name': 'v1', 'sequence': 3}),
         ],
         'repo_ids': [
             (0, 0, {

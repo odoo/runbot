@@ -152,12 +152,6 @@
                        help="Repository where forward port branches will be created"
                 />
             </xpath>
-
-            <xpath expr="//field[@name='branch_ids']/tree" position="inside">
-                <field name="fp_target" string="FP to"
-                       help="This branch will be forward-ported to (from lower ones)"
-                />
-            </xpath>
         </field>
     </record>
 
