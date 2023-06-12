@@ -174,7 +174,7 @@ def test_limit_after_merge(env, config, make_repo, users):
         (users['reviewer'], "hansen r+"),
         seen(env, pr1, users),
         (users['reviewer'], bot_name + ' up to b'),
-        (bot_name, "@%s forward-port limit can only be set before the PR is merged." % users['reviewer']),
+        (users['user'], "@%s forward-port limit can only be set before the PR is merged." % users['reviewer']),
     ]
     assert pr2.comments == [
         seen(env, pr2, users),
@@ -184,7 +184,7 @@ This PR targets b and is part of the forward-port chain. Further PRs will be cre
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """),
         (users['reviewer'], bot_name + ' up to b'),
-        (bot_name, "@%s forward-port limit can only be set on an origin PR"
+        (users['user'], "@%s forward-port limit can only be set on an origin PR"
                    " (%s here) before it's merged and forward-ported." % (
             users['reviewer'],
             p1.display_name,
@@ -208,13 +208,14 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     env.run_crons()
 
     assert pr2.comments[4:] == [
-        (bot_name, "@%s @%s this PR was modified / updated and has become a normal PR. "
+        (users['user'], "@%s @%s this PR was modified / updated and has become a normal PR. "
                    "It should be merged the normal way (via @%s)" % (
             users['user'], users['reviewer'],
             p2.repository.project_id.github_prefix
         )),
         (users['reviewer'], bot_name + ' up to b'),
-        (bot_name, f"@{users['reviewer']} forward-port limit can only be set on an origin PR "
-                   f"({p1.display_name} here) before it's merged and forward-ported."
-         ),
+        (users['user'], f"@{users['reviewer']} forward-port limit can only be "
+                        f"set on an origin PR ({p1.display_name} here) before "
+                        f"it's merged and forward-ported."
+        ),
     ]

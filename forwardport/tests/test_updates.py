@@ -3,9 +3,6 @@ Test cases for updating PRs during after the forward-porting process after the
 initial merge has succeeded (and forward-porting has started)
 """
 import re
-import sys
-
-import pytest
 
 from utils import seen, re_matches, Commit, make_basic, to_pr
 
@@ -248,6 +245,8 @@ def test_duplicate_fw(env, make_repo, setreviewers, config, users):
         'github_token': config['github']['token'],
         'github_prefix': 'hansen',
         'fp_github_token': config['github']['token'],
+        'fp_github_name': 'herbert',
+        'fp_github_email': 'hb@example.com',
         'branch_ids': [
             (0, 0, {'name': 'master', 'sequence': 0}),
             (0, 0, {'name': 'v3', 'sequence': 1}),

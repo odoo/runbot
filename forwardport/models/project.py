@@ -67,8 +67,9 @@ class Project(models.Model):
     def _compute_git_identity(self):
         s = requests.Session()
         for project in self:
-            if not project.fp_github_token:
+            if not project.fp_github_token or (self.fp_github_name and self.fp_github_email):
                 continue
+
             r0 = s.get('https://api.github.com/user', headers={
                 'Authorization': 'token %s' % project.fp_github_token
             })
@@ -246,6 +247,25 @@ class PullRequests(models.Model):
         for pr in self:
             pr.refname = pr.label.split(':', 1)[-1]
 
+    ping = fields.Char(recursive=True)
+
+    @api.depends('source_id.author.github_login', 'source_id.reviewed_by.github_login')
+    def _compute_ping(self):
+        """For forward-port PRs (PRs with a source) the author is the PR bot, so
+        we want to ignore that and use the author & reviewer of the original PR
+        """
+        source = self.source_id
+        if not source:
+            return super()._compute_ping()
+
+        for pr in self:
+            s = ' '.join(
+                f'@{p.github_login}'
+                for p in source.author | source.reviewed_by | self.reviewed_by
+            )
+            pr.ping = s and (s + ' ')
+
+
     @api.model_create_single
     def create(self, vals):
         # PR opened event always creates a new PR, override so we can precreate PRs
@@ -297,32 +317,24 @@ class PullRequests(models.Model):
         if self.env.context.get('forwardport_detach_warn', True):
             for p in with_parents:
                 if not p.parent_id:
-                    self.env['runbot_merge.pull_requests.feedback'].create({
-                        'repository': p.repository.id,
-                        'pull_request': p.number,
-                        'message': "%sthis PR was modified / updated and has become a normal PR. "
-                                   "It should be merged the normal way (via @%s)" % (
-                            p.source_id.ping(),
-                            p.repository.project_id.github_prefix,
-                        ),
-                        'token_field': 'fp_github_token',
-                    })
+                    self.env.ref('runbot_merge.forwardport.update.detached')._send(
+                        repository=p.repository,
+                        pull_request=p.number,
+                        token_field='fp_github_token',
+                        format_args={'pr': p},
+                    )
         for p in closed_fp.filtered(lambda p: p.state != 'closed'):
-            self.env['runbot_merge.pull_requests.feedback'].create({
-                'repository': p.repository.id,
-                'pull_request': p.number,
-                'message': "%sthis PR was closed then reopened. "
-                           "It should be merged the normal way (via @%s)" % (
-                    p.source_id.ping(),
-                    p.repository.project_id.github_prefix,
-                ),
-                'token_field': 'fp_github_token',
-            })
+            self.env.ref('runbot_merge.forwardport.reopen.detached')._send(
+                repository=p.repository,
+                pull_request=p.number,
+                token_field='fp_github_token',
+                format_args={'pr': p},
+            )
         if vals.get('state') == 'merged':
-            for p in self:
-                self.env['forwardport.branch_remover'].create({
-                    'pr_id': p.id,
-                })
+            self.env['forwardport.branch_remover'].create([
+                {'pr_id': p.id}
+                for p in self
+            ])
         # if we change the policy to skip CI, schedule followups on existing FPs
         if vals.get('fw_policy') == 'skipci' and self.state == 'merged':
             self.env['runbot_merge.pull_requests'].search([
@@ -455,15 +467,12 @@ class PullRequests(models.Model):
         if not (self.state == 'opened' and self.parent_id):
             return
 
-        self.env['runbot_merge.pull_requests.feedback'].create({
-            'repository': self.repository.id,
-            'pull_request': self.number,
-            'token_field': 'fp_github_token',
-            'message': '%s%s failed on this forward-port PR' % (
-                self.source_id.ping(),
-                ci,
-            )
-        })
+        self.env.ref('runbot_merge.forwardport.ci.failed')._send(
+            repository=self.repository,
+            pull_request=self.number,
+            token_field='fp_github_token',
+            format_args={'pr': self, 'ci': ci},
+        )
 
     def _validate(self, statuses):
         failed = super()._validate(statuses)
@@ -636,16 +645,12 @@ class PullRequests(models.Model):
                 linked, other = different_pr, different_target
                 if t != target:
                     linked, other = ref, target
-                self.env['runbot_merge.pull_requests.feedback'].create({
-                    'repository': pr.repository.id,
-                    'pull_request': pr.number,
-                    'token_field': 'fp_github_token',
-                    'message': "%sthis pull request can not be forward ported: "
-                               "next branch is %r but linked pull request %s "
-                               "has a next branch %r." % (
-                        pr.ping(), t.name, linked.display_name, other.name
-                    )
-                })
+                self.env.ref('runbot_merge.forwardport.failure.discrepancy')._send(
+                    repository=pr.repository,
+                    pull_request=pr.number,
+                    token_field='fp_github_token',
+                    format_args={'pr': pr, 'linked': linked, 'next': t.name, 'other': other.name},
+                )
             _logger.warning(
                 "Cancelling forward-port of %s: found different next branches (%s)",
                 self, all_targets
@@ -743,23 +748,18 @@ class PullRequests(models.Model):
                 'delegates': [(6, False, (source.delegates | pr.delegates).ids)]
             })
             if has_conflicts and pr.parent_id and pr.state not in ('merged', 'closed'):
-                message = source.ping() + """\
-the next pull request (%s) is in conflict. You can merge the chain up to here by saying
-> @%s r+
-%s""" % (new_pr.display_name, pr.repository.project_id.fp_github_name, footer)
-                self.env['runbot_merge.pull_requests.feedback'].create({
-                    'repository': pr.repository.id,
-                    'pull_request': pr.number,
-                    'message': message,
-                    'token_field': 'fp_github_token',
-                })
+                self.env.ref('runbot_merge.forwardport.failure.conflict')._send(
+                    repository=pr.repository,
+                    pull_request=pr.number,
+                    token_field='fp_github_token',
+                    format_args={'source': source, 'pr': pr, 'new': new_pr, 'footer': footer},
+                )
             # not great but we probably want to avoid the risk of the webhook
             # creating the PR from under us. There's still a "hole" between
             # the POST being executed on gh and the commit but...
             self.env.cr.commit()
 
         for pr, new_pr in zip(self, new_batch):
-            source = pr.source_id or pr
             (h, out, err, hh) = conflicts.get(pr) or (None, None, None, None)
 
             if h:
@@ -775,47 +775,47 @@ the next pull request (%s) is in conflict. You can merge the chain up to here by
                         '* %s%s\n' % (sha, ' <- on this commit' if sha == h else '')
                         for sha in hh
                     )
-                message = f"""{source.ping()}cherrypicking of pull request {source.display_name} failed.
-{lines}{sout}{serr}
-Either perform the forward-port manually (and push to this branch, proceeding as usual) or close this PR (maybe?).
-
-In the former case, you may want to edit this PR message as well.
-"""
+                template = 'runbot_merge.forwardport.failure'
+                format_args = {
+                    'pr': new_pr,
+                    'commits': lines,
+                    'stdout': sout,
+                    'stderr': serr,
+                    'footer': footer,
+                }
             elif has_conflicts:
-                message = """%s\
-while this was properly forward-ported, at least one co-dependent PR (%s) did \
-not succeed. You will need to fix it before this can be merged.
-
-Both this PR and the others will need to be approved via `@%s r+` as they are \
-all considered "in conflict".
-%s""" % (
-                    source.ping(),
-                    ', '.join(p.display_name for p in (new_batch - new_pr)),
-                    proj.github_prefix,
-                    footer
-                )
+                template = 'runbot_merge.forwardport.linked'
+                format_args = {
+                    'pr': new_pr,
+                    'siblings': ', '.join(p.display_name for p in (new_batch - new_pr)),
+                    'footer': footer,
+                }
             elif base._find_next_target(new_pr) is None:
                 ancestors = "".join(
                     "* %s\n" % p.display_name
                     for p in pr._iter_ancestors()
                     if p.parent_id
                 )
-                message = source.ping() + """\
-this PR targets %s and is the last of the forward-port chain%s
-%s
-To merge the full chain, say
-> @%s r+
-%s""" % (target.name, ' containing:' if ancestors else '.', ancestors, pr.repository.project_id.fp_github_name, footer)
+                template = 'runbot_merge.forwardport.final'
+                format_args = {
+                    'pr': new_pr,
+                    'containing': ' containing:' if ancestors else '.',
+                    'ancestors': ancestors,
+                    'footer': footer,
+                }
             else:
-                message = """\
-This PR targets %s and is part of the forward-port chain. Further PRs will be created up to %s.
-%s""" % (target.name, base.limit_id.name, footer)
-            self.env['runbot_merge.pull_requests.feedback'].create({
-                'repository': new_pr.repository.id,
-                'pull_request': new_pr.number,
-                'message': message,
-                'token_field': 'fp_github_token',
-            })
+                template = 'runbot_merge.forwardport.intermediate'
+                format_args = {
+                    'pr': new_pr,
+                    'footer': footer,
+                }
+            self.env.ref(template)._send(
+                repository=new_pr.repository,
+                pull_request=new_pr.number,
+                token_field='fp_github_token',
+                format_args=format_args,
+            )
+
             labels = ['forwardport']
             if has_conflicts:
                 labels.append('conflict')
@@ -1150,31 +1150,18 @@ stderr:
             if source.merge_date > (cutoff_dt - backoff):
                 continue
             source.reminder_backoff_factor += 1
-            self.env['runbot_merge.pull_requests.feedback'].create({
-                'repository': source.repository.id,
-                'pull_request': source.number,
-                'message': "%sthis pull request has forward-port PRs awaiting action (not merged or closed):\n%s" % (
-                    source.ping(),
-                    '\n- '.join(pr.display_name for pr in sorted(prs, key=lambda p: p.number))
-                ),
-                'token_field': 'fp_github_token',
-            })
-
-    def ping(self, author=True, reviewer=True):
-        source = self.source_id
-        if not source:
-            return super().ping(author=author, reviewer=reviewer)
-
-        # use a dict literal to maintain ordering (3.6+)
-        pingline = ' '.join(
-            f'@{p.github_login}'
-            for p in filter(None, {
-                author and source.author: None,
-                reviewer and source.reviewed_by: None,
-                reviewer and self.reviewed_by: None,
-            })
-        )
-        return pingline and (pingline + ' ')
+            self.env.ref('runbot_merge.forwardport.reminder')._send(
+                repository=source.repository,
+                pull_request=source.number,
+                token_field='fp_github_token',
+                format_args={
+                    'pr': source,
+                    'outstanding': ''.join(
+                        f'\n- {pr.display_name}'
+                        for pr in sorted(prs, key=lambda p: p.number)
+                    ),
+                }
+            )
 
 class Stagings(models.Model):
     _inherit = 'runbot_merge.stagings'

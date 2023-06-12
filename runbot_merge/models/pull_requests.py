@@ -16,6 +16,7 @@ import time
 
 from difflib import Differ
 from itertools import takewhile
+from typing import Optional
 
 import requests
 import werkzeug
@@ -111,15 +112,17 @@ All substitutions are tentatively applied sequentially to the input.
         # fetch PR object and handle as *opened*
         issue, pr = gh.pr(number)
 
-        feedback = self.env['runbot_merge.pull_requests.feedback'].create
         if not self.project_id._has_branch(pr['base']['ref']):
             _logger.info("Tasked with loading PR %d for un-managed branch %s:%s, ignoring",
                          number, self.name, pr['base']['ref'])
-            feedback({
-                'repository': self.id,
-                'pull_request': number,
-                'message': "Branch `{}` is not within my remit, imma just ignore it.".format(pr['base']['ref']),
-            })
+            self.env.ref('runbot_merge.pr.load.unmanaged')._send(
+                repository=self,
+                pull_request=number,
+                format_args = {
+                    'pr': pr,
+                    'repository': self,
+                },
+            )
             return
 
         # if the PR is already loaded, force sync a few attributes
@@ -150,20 +153,13 @@ All substitutions are tentatively applied sequentially to the input.
                     'pull_request': pr,
                     'sender': {'login': self.project_id.github_prefix}
                 }) + '. '
-            feedback({
+            self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': pr_id.repository.id,
                 'pull_request': number,
                 'message': f"{edit}. {edit2}{sync}.",
             })
             return
 
-        feedback({
-            'repository': self.id,
-            'pull_request': number,
-            'message': "%sI didn't know about this PR and had to retrieve "
-                       "its information, you may have to re-approve it as "
-                       "I didn't see previous commands." % pr_id.ping()
-        })
         sender = {'login': self.project_id.github_prefix}
         # init the PR to the null commit so we can later synchronise it back
         # back to the "proper" head while resetting reviews
@@ -212,14 +208,21 @@ All substitutions are tentatively applied sequentially to the input.
             'pull_request': pr,
             'sender': sender,
         })
+        pr_id = self.env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', pr['base']['repo']['full_name']),
+            ('number', '=', number),
+        ])
         if pr['state'] == 'closed':
             # don't go through controller because try_closing does weird things
             # for safety / race condition reasons which ends up committing
             # and breaks everything
-            self.env['runbot_merge.pull_requests'].search([
-                ('repository.name', '=', pr['base']['repo']['full_name']),
-                ('number', '=', number),
-            ]).state = 'closed'
+            pr_id.state = 'closed'
+
+        self.env.ref('runbot_merge.pr.load.fetched')._send(
+            repository=self,
+            pull_request=number,
+            format_args={'pr': pr_id},
+        )
 
     def having_branch(self, branch):
         branches = self.env['runbot_merge.branch'].search
@@ -281,10 +284,11 @@ class Branch(models.Model):
                 "Target branch deactivated by %r.",
                 self.env.user.login,
             )
+            tmpl = self.env.ref('runbot_merge.pr.branch.disabled')
             self.env['runbot_merge.pull_requests.feedback'].create([{
                 'repository': pr.repository.id,
                 'pull_request': pr.number,
-                'message': f'Hey {pr.ping()}the target branch {pr.target.name!r} has been disabled, you may want to close this PR.',
+                'message': tmpl._format(pr=pr),
             } for pr in self.prs])
         return True
 
@@ -392,11 +396,11 @@ class Branch(models.Model):
                         reason = json.loads(str(reason))['message'].lower()
 
                     pr.state = 'error'
-                    self.env['runbot_merge.pull_requests.feedback'].create({
-                        'repository': pr.repository.id,
-                        'pull_request': pr.number,
-                        'message': f'{pr.ping()}unable to stage: {reason}',
-                    })
+                    self.env.ref('runbot_merge.pr.merge.failed')._send(
+                        repository=pr.repository,
+                        pull_request=pr.number,
+                        format_args= {'pr': pr, 'reason': reason, 'exc': e},
+                    )
             else:
                 first = False
 
@@ -584,16 +588,16 @@ class PullRequests(models.Model):
     repo_name = fields.Char(related='repository.name')
     message_title = fields.Char(compute='_compute_message_title')
 
-    def ping(self, author=True, reviewer=True):
-        P = self.env['res.partner']
-        s = ' '.join(
-            f'@{p.github_login}'
-            for p in (self.author if author else P) | (self.reviewed_by if reviewer else P)
-            if p
-        )
-        if s:
-            s += ' '
-        return s
+    ping = fields.Char(compute='_compute_ping')
+
+    @api.depends('author.github_login', 'reviewed_by.github_login')
+    def _compute_ping(self):
+        for pr in self:
+            s = ' '.join(
+                f'@{p.github_login}'
+                for p in (pr.author | pr.reviewed_by )
+            )
+            pr.ping = s and (s + ' ')
 
     @api.depends('repository.name', 'number')
     def _compute_url(self):
@@ -739,11 +743,11 @@ class PullRequests(models.Model):
             return
 
         if target and not repo.project_id._has_branch(target):
-            self.env['runbot_merge.pull_requests.feedback'].create({
-                'repository': repo.id,
-                'pull_request': number,
-                'message': "I'm sorry. Branch `{}` is not within my remit.".format(target),
-            })
+            self.env.ref('runbot_merge.pr.fetch.unmanaged')._send(
+                repository=repo,
+                pull_request=number,
+                format_args={'repository': repo, 'branch': target, 'number': number}
+            )
             return
 
         pr = self.search([
@@ -825,16 +829,15 @@ class PullRequests(models.Model):
             )
             return 'ok'
 
-        Feedback = self.env['runbot_merge.pull_requests.feedback']
         if not (is_author or any(cmd == 'override' for cmd, _ in commands)):
             # no point even parsing commands
             _logger.info("ignoring comment of %s (%s): no ACL to %s",
                           login, name, self.display_name)
-            Feedback.create({
-                'repository': self.repository.id,
-                'pull_request': self.number,
-                'message': "I'm sorry, @{}. I'm afraid I can't do that.".format(login)
-            })
+            self.env.ref('runbot_merge.command.access.no')._send(
+                repository=self.repository,
+                pull_request=self.number,
+                format_args={'user': login, 'pr': self}
+            )
             return 'ignored'
 
         applied, ignored = [], []
@@ -890,11 +893,11 @@ class PullRequests(models.Model):
                     if self.status == 'failure':
                         # the normal infrastructure is for failure and
                         # prefixes messages with "I'm sorry"
-                        Feedback.create({
-                            'repository': self.repository.id,
-                            'pull_request': self.number,
-                            'message': "@{} you may want to rebuild or fix this PR as it has failed CI.".format(login),
-                        })
+                        self.env.ref("runbot_merge.command.approve.failure")._send(
+                            repository=self.repository,
+                            pull_request=self.number,
+                            format_args={'user': login, 'pr': self},
+                        )
                 elif not param and is_author:
                     newstate = RMINUS.get(self.state)
                     if self.priority == 0 or newstate:
@@ -902,11 +905,11 @@ class PullRequests(models.Model):
                             self.state = newstate
                         if self.priority == 0:
                             self.priority = 1
-                            Feedback.create({
-                                'repository': self.repository.id,
-                                'pull_request': self.number,
-                                'message': "PR priority reset to 1, as pull requests with priority 0 ignore review state.",
-                            })
+                            self.env.ref("runbot_merge.command.unapprove.p0")._send(
+                                repository=self.repository,
+                                pull_request=self.number,
+                                format_args={'user': login, 'pr': self},
+                            )
                         self.unstage("unreviewed (r-) by %s", login)
                         ok = True
                     else:
@@ -938,11 +941,11 @@ class PullRequests(models.Model):
                     self.merge_method = param
                     ok = True
                     explanation = next(label for value, label in type(self).merge_method.selection if value == param)
-                    Feedback.create({
-                        'repository': self.repository.id,
-                        'pull_request': self.number,
-                        'message':"Merge method set to %s." % explanation
-                    })
+                    self.env.ref("runbot_merge.command.method")._send(
+                        repository=self.repository,
+                        pull_request=self.number,
+                        format_args={'new_method': explanation, 'pr': self, 'user': login},
+                    )
             elif command == 'override':
                 overridable = author.override_rights\
                     .filtered(lambda r: not r.repository_id or (r.repository_id == self.repository))\
@@ -983,7 +986,7 @@ class PullRequests(models.Model):
         if msgs:
             joiner = ' ' if len(msgs) == 1 else '\n- '
             msgs.insert(0, "I'm sorry, @{}:".format(login))
-            Feedback.create({
+            self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': self.repository.id,
                 'pull_request': self.number,
                 'message': joiner.join(msgs),
@@ -1078,11 +1081,11 @@ class PullRequests(models.Model):
     def _notify_ci_failed(self, ci):
         # only report an issue of the PR is already approved (r+'d)
         if self.state == 'approved':
-            self.env['runbot_merge.pull_requests.feedback'].create({
-                'repository': self.repository.id,
-                'pull_request': self.number,
-                'message': "%s%r failed on this reviewed PR." % (self.ping(), ci),
-            })
+            self.env.ref("runbot_merge.failure.approved")._send(
+                repository=self.repository,
+                pull_request=self.number,
+                format_args={'pr': self, 'status': ci}
+            )
 
     def _auto_init(self):
         super(PullRequests, self)._auto_init()
@@ -1108,11 +1111,11 @@ class PullRequests(models.Model):
         pr._validate(json.loads(c.statuses or '{}'))
 
         if pr.state not in ('closed', 'merged'):
-            self.env['runbot_merge.pull_requests.feedback'].create({
-                'repository': pr.repository.id,
-                'pull_request': pr.number,
-                'message': f"[Pull request status dashboard]({pr.url}).",
-            })
+            self.env.ref('runbot_merge.pr.created')._send(
+                repository=pr.repository,
+                pull_request=pr.number,
+                format_args={'pr': pr},
+            )
         return pr
 
     def _from_gh(self, description, author=None, branch=None, repo=None):
@@ -1211,14 +1214,14 @@ class PullRequests(models.Model):
             unready = (prs - ready).sorted(key=lambda p: (p.repository.name, p.number))
 
             for r in ready:
-                self.env['runbot_merge.pull_requests.feedback'].create({
-                    'repository': r.repository.id,
-                    'pull_request': r.number,
-                    'message': "{}linked pull request(s) {} not ready. Linked PRs are not staged until all of them are ready.".format(
-                        r.ping(),
-                        ', '.join(map('{0.display_name}'.format, unready))
-                    )
-                })
+                self.env.ref('runbot_merge.pr.linked.not_ready')._send(
+                    repository=r.repository,
+                    pull_request=r.number,
+                    format_args={
+                        'pr': r,
+                        'siblings': ', '.join(map('{0.display_name}'.format, unready))
+                    },
+                )
                 r.link_warned = True
                 if commit:
                     self.env.cr.commit()
@@ -1236,14 +1239,11 @@ class PullRequests(models.Model):
             ('merge_method', '=', False),
             ('method_warned', '=', False),
         ]):
-            self.env['runbot_merge.pull_requests.feedback'].create({
-                'repository': r.repository.id,
-                'pull_request': r.number,
-                'message': "%sbecause this PR has multiple commits, I need to know how to merge it:\n\n%s" % (
-                    r.ping(),
-                    methods,
-                )
-            })
+            self.env.ref('runbot_merge.pr.merge_method')._send(
+                repository=r.repository,
+                pull_request=r.number,
+                format_args={'pr': r, 'methods':methods},
+            )
             r.method_warned = True
             if commit:
                 self.env.cr.commit()
@@ -1663,6 +1663,33 @@ class Feedback(models.Model):
                 to_remove.append(f.id)
         self.browse(to_remove).unlink()
 
+class FeedbackTemplate(models.Model):
+    _name = 'runbot_merge.pull_requests.feedback.template'
+    _description = "str.format templates for feedback messages, no integration," \
+                   "but that's their purpose"
+    _inherit = ['mail.thread']
+
+    template = fields.Text(tracking=True)
+    help = fields.Text(readonly=True)
+
+    def _format(self, **args):
+        return self.template.format_map(args)
+
+    def _send(self, *, repository: Repository, pull_request: int, format_args: dict, token_field: Optional[str] = None) -> Optional[Feedback]:
+        try:
+            feedback = {
+                'repository': repository.id,
+                'pull_request': pull_request,
+                'message': self.template.format_map(format_args),
+            }
+            if token_field:
+                feedback['token_field'] = token_field
+            return self.env['runbot_merge.pull_requests.feedback'].create(feedback)
+        except Exception:
+            _logger.exception("Failed to render template %s", self.get_external_id())
+            raise
+            return None
+
 class Commit(models.Model):
     """Represents a commit onto which statuses might be posted,
     independent of everything else as commits can be created by
@@ -1900,11 +1927,11 @@ class Stagings(models.Model):
         prs = prs or self.batch_ids.prs
         prs.write({'state': 'error'})
         for pr in prs:
-            self.env['runbot_merge.pull_requests.feedback'].create({
-                'repository': pr.repository.id,
-                'pull_request': pr.number,
-                'message': "%sstaging failed: %s" % (pr.ping(), message),
-            })
+           self.env.ref('runbot_merge.pr.staging.fail')._send(
+               repository=pr.repository,
+               pull_request=pr.number,
+               format_args={'pr': pr, 'message': message},
+           )
 
         self.batch_ids.write({'active': False})
         self.write({
@@ -2213,31 +2240,16 @@ class Batch(models.Model):
                     "data mismatch on %s:\n%s",
                     pr.display_name, diff
                 )
-                self.env['runbot_merge.pull_requests.feedback'].create({
-                    'repository': pr.repository.id,
-                    'pull_request': pr.number,
-                    'message': """\
-{ping}we apparently missed updates to this PR and tried to stage it in a state \
-which might not have been approved.
-
-The properties {mismatch} were not correctly synchronized and have been updated.
-
-<details><summary>differences</summary>
-
-```diff
-{diff}```
-</details>
-
-Note that we are unable to check the properties {unchecked}.
-
-Please check and re-approve.
-""".format(
-    ping=pr.ping(),
-    mismatch=', '.join(pr_fields[f].string for f in e.args[0]),
-    diff=diff,
-    unchecked=', '.join(pr_fields[f].string for f in UNCHECKABLE),
-)
-                })
+                self.env.ref('runbot_merge.pr.staging.mismatch')._send(
+                    repository=pr.repository,
+                    pull_request=pr.number,
+                    format_args={
+                        'pr': pr,
+                        'mismatch': ', '.join(pr_fields[f].string for f in e.args[0]),
+                        'diff': diff,
+                        'unchecked': ', '.join(pr_fields[f].string for f in UNCHECKABLE)
+                    }
+                )
                 return self.env['runbot_merge.batch']
 
         # update meta to new heads

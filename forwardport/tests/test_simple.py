@@ -109,7 +109,7 @@ def test_straightforward_flow(env, config, make_repo, users):
     assert c.author['name'] == other_user['user'], "author should still be original's probably"
     assert c.committer['name'] == other_user['user'], "committer should also still be the original's, really"
 
-    assert pr1.ping() == "@%s @%s " % (
+    assert pr1.ping == "@%s @%s " % (
         config['role_other']['user'],
         config['role_reviewer']['user'],
     ), "ping of forward-port PR should include author and reviewer of source"
@@ -132,7 +132,7 @@ def test_straightforward_flow(env, config, make_repo, users):
         (users['reviewer'], 'hansen r+ rebase-ff'),
         seen(env, pr, users),
         (users['user'], 'Merge method set to rebase and fast-forward.'),
-        (users['user'], '@%s @%s this pull request has forward-port PRs awaiting action (not merged or closed):\n%s' % (
+        (users['user'], '@%s @%s this pull request has forward-port PRs awaiting action (not merged or closed):\n- %s' % (
             users['other'], users['reviewer'],
             '\n- '.join((pr1 | pr2).mapped('display_name'))
         )),
@@ -160,7 +160,7 @@ def test_straightforward_flow(env, config, make_repo, users):
 @%s @%s this PR targets c and is the last of the forward-port chain containing:
 * %s
 
-To merge the full chain, say
+To merge the full chain, use
 > @%s r+
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
@@ -315,7 +315,11 @@ def test_empty(env, config, make_repo, users):
     assert env['runbot_merge.pull_requests'].search([], order='number') == prs
     # change FP token to see if the feedback comes from the proper user
     project = env['runbot_merge.project'].search([])
-    project.fp_github_token = config['role_other']['token']
+    project.write({
+        'fp_github_name': False,
+        'fp_github_email': False,
+        'fp_github_token': config['role_other']['token'],
+    })
     assert project.fp_github_name == users['other']
 
     # check reminder
@@ -324,7 +328,7 @@ def test_empty(env, config, make_repo, users):
 
     awaiting = (
         users['other'],
-        '@%s @%s this pull request has forward-port PRs awaiting action (not merged or closed):\n%s' % (
+        '@%s @%s this pull request has forward-port PRs awaiting action (not merged or closed):\n- %s' % (
             users['user'], users['reviewer'],
             fail_id.display_name
         )
@@ -582,11 +586,11 @@ def test_delegate_fw(env, config, make_repo, users):
         seen(env, pr2, users),
         (users['user'], '''@{self_reviewer} @{reviewer} this PR targets c and is the last of the forward-port chain.
 
-To merge the full chain, say
-> @{user} r+
+To merge the full chain, use
+> @{bot} r+
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
-'''.format_map(users)),
+'''.format(bot=pr1_id.repository.project_id.fp_github_name, **users)),
         (users['other'], 'hansen r+')
     ]
 

@@ -3212,10 +3212,10 @@ class TestUnknownPR:
             seen(env, prx, users),
             (users['reviewer'], 'hansen r+'),
             (users['reviewer'], 'hansen r+'),
-            (users['user'], "I didn't know about this PR and had to "
+            seen(env, prx, users),
+            (users['user'], f"@{users['user']} @{users['reviewer']} I didn't know about this PR and had to "
                             "retrieve its information, you may have to "
                             "re-approve it as I didn't see previous commands."),
-            seen(env, prx, users),
         ]
 
         pr = env['runbot_merge.pull_requests'].search([
@@ -3265,10 +3265,13 @@ class TestUnknownPR:
         assert pr.comments == [
             seen(env, pr, users),
             (users['reviewer'], 'hansen r+'),
-            (users['user'], "I didn't know about this PR and had to retrieve "
+            seen(env, pr, users),
+            # reviewer is set because fetch replays all the comments (thus
+            # setting r+ and reviewer) but then syncs the head commit thus
+            # unsetting r+ but leaving the reviewer
+            (users['user'], f"@{users['user']} @{users['reviewer']} I didn't know about this PR and had to retrieve "
                             "its information, you may have to re-approve it "
                             "as I didn't see previous commands."),
-            seen(env, pr, users),
         ]
 
     def test_rplus_unmanaged(self, env, repo, users, config):

@@ -1,0 +1,171 @@
+id,template,help
+runbot_merge.handle.branch.unmanaged,"This PR targets the un-managed branch {repository}:{branch}, it needs to be retargeted before it can be merged.","Notifies of event on PR whose branch is not managed  by the mergebot.
+
+repository: repository name
+branch: branch (ref) name
+event: complete pr event"
+runbot_merge.handle.branch.inactive,"This PR targets the disabled branch {repository}:{branch}, it needs to be retargeted before it can be merged.","Notifies of event on PR whose branch is deactivated.
+
+repository: repository name
+branch: branch (ref) name
+event: complete pr event"
+runbot_merge.handle.pr.merged,@{event[sender][login]} ya silly goose you can't reopen a merged PR.,"Notifies that a user tried to reopen a merged PR.
+
+Event: complete PR event"
+runbot_merge.pr.load.unmanaged,"Branch `{pr[base][ref]}` is not within my remit, imma just ignore it.","Notifies that a user tried to load a PR targeting a non-handled branch.
+
+pr: pull request (github object)
+Repository: repository object (???)"
+runbot_merge.pr.load.fetched,"{pr.ping}I didn't know about this PR and had to retrieve its information, you may have to re-approve it as I didn't see previous commands.","Notifies that we did retrieve an unknown PR (either by request or as side effect of an interaction).
+
+Pr: pr object we just created"
+runbot_merge.pr.branch.disabled,"{pr.ping}the target branch {pr.target.name!r} has been disabled, you may want to close this PR.","Notifies that the target branch for this PR was deactivated.
+
+pr: pull request in question"
+runbot_merge.pr.merge.failed,{pr.ping}unable to stage: {reason},"Notifies that the PR could not be merged into the staging branch.
+
+pr: pr object we tried to merge
+reason: error message
+exc: exception object"
+runbot_merge.pr.fetch.unmanaged,I'm sorry. Branch `{branch}` is not within my remit.,"Responds to a request to fetch a PR to an unmanaged branch.
+
+repository: pr repository
+branch: target branch
+number: pr number"
+runbot_merge.command.access.no,"I'm sorry, @{user}. I'm afraid I can't do that.","Responds to command by a user who has no rights at all.
+
+user: github login of comment sender
+pr: pr object to which the command was sent"
+runbot_merge.command.approve.failure,@{user} you may want to rebuild or fix this PR as it has failed CI.,"Responds to r+ of PR with failed CI.
+
+user: github login of comment sender
+pr: pr object to which the command was sent"
+runbot_merge.command.unapprove.p0,"PR priority reset to 1, as pull requests with priority 0 ignore review state.","Responds to r- of pr in p=0.
+
+user: github login of comment sender
+pr: pr object to which the command was sent"
+runbot_merge.command.method,Merge method set to {new_method}.,"Responds to the setting of the merge method.
+
+new_method: ...
+pr: pr object to which the command was sent
+user: github login of the comment sender"
+runbot_merge.failure.approved,{pr.ping}{status!r} failed on this reviewed PR.,"Notification of failed status on a reviewed PR.
+
+pr: pull request in question
+status: failed status"
+runbot_merge.pr.created,[Pull request status dashboard]({pr.url}).,"Initial comment on PR creation.
+
+pr: created pr"
+runbot_merge.pr.linked.not_ready,{pr.ping}linked pull request(s) {siblings} not ready. Linked PRs are not staged until all of them are ready.,"Comment when a PR is ready (approved & validated) but it is linked to other PRs which are not.
+
+pr: pr we're looking at
+siblings: its siblings, as a single comma-separated list of PR links"
+runbot_merge.pr.merge_method,"{pr.ping}because this PR has multiple commits, I need to know how to merge it:
+
+{methods}","Comment when a PR is ready but doesn't have a merge method set
+
+pr: the pr we can't stage
+methods: a markdown-formatted list of valid merge methods"
+runbot_merge.pr.staging.mismatch,"{pr.ping}we apparently missed updates to this PR and tried to stage it in a state which might not have been approved.
+
+The properties {mismatch} were not correctly synchronized and have been updated.
+
+<details><summary>differences</summary>
+
+```diff
+{diff}```
+</details>
+
+Note that we are unable to check the properties {unchecked}.
+
+Please check and re-approve.
+","Comment when staging was attempted but a sanity check revealed the github state and the mergebot state differ.
+
+pr: the pr we tried to stage
+mismatch: comma separated list of mismatched property names
+diff: patch-style view of the differing properties
+unchecked: comma-separated list of properties which can't be checked"
+runbot_merge.pr.staging.fail,{pr.ping}staging failed: {message},"Comment when a PR caused a staging to fail (normally only sent if  the staging has a single batch, may be sent on multiple PRs depending whether the heuristic to guess the problematic PR of a batch succeeded)
+
+pr: the pr
+message: staging failure information (error message, build link, etc...)"
+runbot_merge.forwardport.updates.closed,"{pr.ping}ancestor PR {parent.display_name} has been updated but this PR is {pr.state} and can't be updated to match.
+
+You may want or need to manually update any followup PR.","Comment when a PR is updated and on of its followups is already merged or closed. Sent to the followup.
+
+pr: the closed or merged PR
+parent: the modified ancestor PR"
+runbot_merge.forwardport.updates.conflict.parent,"{pr.ping}WARNING: the latest change ({pr.head}) triggered a conflict when updating the next forward-port ({next.display_name}), and has been ignored.
+
+You will need to update this pull request differently, or fix the issue by hand on {next.display_name}.","Comment when a PR update triggers a conflict in a child.
+
+pr: updated parent PR
+next: child PR in conflict"
+runbot_merge.forwardport.updates.conflict.child,"{pr.ping}WARNING: the update of {previous.display_name} to {previous.head} has caused a conflict in this pull request, data may have been lost.{stdout}{stderr}","Comment when a PR update followup is in conflict.
+
+pr: PR where update followup conflict happened
+previous: parent PR which triggered the followup
+stdout: markdown-formatted stdout of git, if any
+stderr: markdown-formatted stderr of git, if any"
+runbot_merge.forwardport.update.detached,{pr.ping}this PR was modified / updated and has become a normal PR. It should be merged the normal way (via @{pr.repository.project_id.github_prefix}),"Comment when a forwardport PR gets updated, documents that the PR now needs to be merged the “normal” way.
+
+pr: the pr in question "
+runbot_merge.forwardport.reopen.detached,{pr.ping}this PR was closed then reopened. It should be merged the normal way (via @{pr.repository.project_id.github_prefix}),"Comment when a forwardport PR gets closed then reopened, documents that the PR is now in a detached state.
+
+pr: the pr in question"
+runbot_merge.forwardport.ci.failed,{pr.ping}{ci} failed on this forward-port PR,"Comment when CI fails on a forward-port PR (which thus won't port any further, for now).
+
+pr: the pr in question
+ci: the failed status"
+runbot_merge.forwardport.failure.discrepancy,{pr.ping}this pull request can not be forward-ported: next branch is {next!r} but linked pull request {linked.display_name} has a next branch {other!r}.,"Comment when we tried to forward port a PR batch, but the PRs have different next targets (unlikely to happen really).
+
+pr: the pr we tried to forward port
+linked: the linked PR with a different next target
+next: next target for the current pr
+other: next target for the other pr"
+runbot_merge.forwardport.failure.conflict,"{pr.ping}the next pull request ({new.display_name}) is in conflict. You can merge the chain up to here by saying
+> @{pr.repository.project_id.fp_github_name} r+
+{footer}","Comment when a forward port was created but is in conflict, warns of that & gives instructions for current PR.
+
+pr: the pr which was just forward ported
+new: the new forward-port
+footer: some footer text"
+runbot_merge.forwardport.reminder,{pr.ping}this pull request has forward-port PRs awaiting action (not merged or closed):{outstanding},"Comment when a forward port has outstanding (not merged or closed) descendants
+
+pr: the original (source) PR
+outstanding: markdown-formatted list of outstanding PRs"
+runbot_merge.forwardport.failure,"{pr.ping}cherrypicking of pull request {pr.source_id.display_name} failed.
+{commits}{stdout}{stderr}
+Either perform the forward-port manually (and push to this branch, proceeding as usual) or close this PR (maybe?).
+
+In the former case, you may want to edit this PR message as well.
+{footer}","Comment when a forward-port failed.
+
+pr: the new pr (in failure)
+commits: markdown-formatted list of source commits, indicating which failed
+stdout: git's stdout
+stderr: git's stderr
+footer: some footer text"
+runbot_merge.forwardport.linked,"{pr.ping}while this was properly forward-ported, at least one co-dependent PR ({siblings}) did not succeed. You will need to fix it before this can be merged.
+
+Both this PR and the others will need to be approved via `@{pr.repository.project_id.github_prefix} r+` as they are all considered “in conflict”.
+{footer} ","Comment when a forward port succeeded but at least one sibling failed.
+
+pr: the current pr (new)
+siblings: comma-separated list of sibling links
+footer: some footer text"
+runbot_merge.forwardport.final,"{pr.ping}this PR targets {pr.target.name} and is the last of the forward-port chain{containing}
+{ancestors}
+To merge the full chain, use
+> @{pr.repository.project_id.fp_github_name} r+
+{footer}","Comment when a forward port was created and is the last of a sequence (target the limit branch).
+
+pr: the new forward port
+containing: label changing depending whether there are ancestors to merge
+ancestors: markdown formatted list of parent PRs which can be approved as part of the chain
+footer: a footer"
+runbot_merge.forwardport.intermediate,"This PR targets {pr.target.name} and is part of the forward-port chain. Further PRs will be created up to {pr.limit_id.name}.
+{footer}","Comment when a forward port was succcessfully created but is not the last of the line.
+
+pr: the new forward port
+footer: a footer"

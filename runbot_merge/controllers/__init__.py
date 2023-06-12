@@ -143,11 +143,19 @@ def handle_pr(env, event):
 
     message = None
     if not branch:
-        message = f"This PR targets the un-managed branch {r}:{b}, it needs to be retargeted before it can be merged."
+        message = env.ref('runbot_merge.handle.branch.unmanaged')._format(
+            repository=r,
+            branch=b,
+            event=event,
+        )
         _logger.info("Ignoring event %s on PR %s#%d for un-managed branch %s",
                      event['action'], r, pr['number'], b)
     elif not branch.active:
-        message = f"This PR targets the disabled branch {r}:{b}, it needs to be retargeted before it can be merged."
+        message = env.ref('runbot_merge.handle.branch.inactive')._format(
+            repository=r,
+            branch=b,
+            event=event,
+        )
     if message and event['action'] not in ('synchronize', 'closed'):
         feedback(message=message)
 
@@ -240,7 +248,7 @@ def handle_pr(env, event):
         if pr_obj.state == 'merged':
             feedback(
                 close=True,
-                message="@%s ya silly goose you can't reopen a merged PR." % event['sender']['login']
+                message=env.ref('runbot_merge.handle.pr.merged')._format(event=event),
             )
 
         if pr_obj.state == 'closed':

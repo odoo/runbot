@@ -25,3 +25,4 @@ access_runbot_merge_pull_requests,User access to PR,model_runbot_merge_pull_requ
 access_runbot_merge_pull_requests_feedback,Users have no reason to access feedback,model_runbot_merge_pull_requests_feedback,,0,0,0,0
 access_runbot_merge_review_rights_2,Users can see partners,model_res_partner_review,base.group_user,1,0,0,0
 access_runbot_merge_review_override_2,Users can see partners,model_res_partner_override,base.group_user,1,0,0,0
+runbot_merge.access_runbot_merge_pull_requests_feedback_template,access_runbot_merge_pull_requests_feedback_template,runbot_merge.model_runbot_merge_pull_requests_feedback_template,base.group_system,1,1,0,0

@@ -33,11 +33,42 @@
         </field>
     </record>
 
-    <menuitem name="Configuration" id="menu_configuration" parent="runbot_merge_menu"/>
+    <record id="action_feedback" model="ir.actions.act_window">
+        <field name="name">Feedback Templates tree</field>
+        <field name="res_model">runbot_merge.pull_requests.feedback.template</field>
+    </record>
+    <record id="tree_feedback" model="ir.ui.view">
+        <field name="name">Feedback Templates</field>
+        <field name="model">runbot_merge.pull_requests.feedback.template</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="template"/>
+                <field name="help"/>
+            </tree>
+        </field>
+    </record>
+    <record id="form_feedback" model="ir.ui.view">
+        <field name="name">Feedback Templates form</field>
+        <field name="model">runbot_merge.pull_requests.feedback.template</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <field name="help"/>
+                    <field name="template"/>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <menuitem name="Configuration" id="menu_configuration" parent="runbot_merge_menu">
         <menuitem name="CI Overrides" id="menu_configuration_overrides"
-                  parent="menu_configuration"
                   action="action_overrides"/>
         <menuitem name="Review Rights" id="menu_configuration_review"
-                  parent="menu_configuration"
                   action="action_review"/>
+        <menuitem name="Feedback Templates" id="menu_configuration_feedback"
+                  action="action_feedback"/>
+    </menuitem>
 </odoo>

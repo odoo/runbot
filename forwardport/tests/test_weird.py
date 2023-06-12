@@ -25,6 +25,8 @@ def make_basic(env, config, make_repo, *, fp_token, fp_remote):
             'github_token': config['github']['token'],
             'github_prefix': 'hansen',
             'fp_github_token': fp_token and config['github']['token'],
+            'fp_github_name': 'herbert',
+            'fp_github_email': 'hb@example.com',
             'branch_ids': [
                 (0, 0, {'name': 'a', 'sequence': 2}),
                 (0, 0, {'name': 'b', 'sequence': 1}),
@@ -262,6 +264,8 @@ class TestNotAllBranches:
             'github_token': config['github']['token'],
             'github_prefix': 'hansen',
             'fp_github_token': config['github']['token'],
+            'fp_github_name': 'herbert',
+            'fp_github_email': 'hb@example.com',
             'branch_ids': [
                 (0, 0, {'name': 'a', 'sequence': 2}),
                 (0, 0, {'name': 'b', 'sequence': 1}),
@@ -401,7 +405,7 @@ class TestNotAllBranches:
         assert pr_a.comments == [
             (users['reviewer'], 'hansen r+'),
             seen(env, pr_a, users),
-            (users['user'], "@%s @%s this pull request can not be forward ported:"
+            (users['user'], "@%s @%s this pull request can not be forward-ported:"
                             " next branch is 'b' but linked pull request %s "
                             "has a next branch 'c'." % (
                 users['user'], users['reviewer'], pr_b_id.display_name,
@@ -410,7 +414,7 @@ class TestNotAllBranches:
         assert pr_b.comments == [
             (users['reviewer'], 'hansen r+'),
             seen(env, pr_b, users),
-            (users['user'], "@%s @%s this pull request can not be forward ported:"
+            (users['user'], "@%s @%s this pull request can not be forward-ported:"
                             " next branch is 'c' but linked pull request %s "
                             "has a next branch 'b'." % (
                 users['user'], users['reviewer'], pr_a_id.display_name,
@@ -472,6 +476,7 @@ def test_new_intermediate_branch(env, config, make_repo):
     with prod:
         validate(prod, pr0_fp_id.head)
     env.run_crons()
+    assert pr0_fp_id.state == 'validated'
     original0 = PRs.search([('parent_id', '=', pr0_fp_id.id)])
     assert original0, "Could not find FP of PR0 to C"
     assert original0.target.name == 'c'
@@ -519,6 +524,7 @@ def test_new_intermediate_branch(env, config, make_repo):
     })
     env.run_crons()
 
+    assert pr0_fp_id.state == 'validated'
     # created an intermediate PR for 0 and x
     desc0 = PRs.search([('source_id', '=', pr0_id.id)])
     new0 = desc0 - pr0_fp_id - original0
