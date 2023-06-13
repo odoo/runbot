@@ -463,13 +463,6 @@ For-Commit-Id: %s
             )
             refname = 'staging.{}'.format(self.name)
             it['gh'].set_ref(refname, staging_head)
-            # asserts that the new head is visible through the api
-            head = it['gh'].head(refname)
-            assert head == staging_head,\
-                "[api] updated %s:%s to %s but found %s" % (
-                    r.name, refname,
-                    staging_head, head,
-                )
 
             i = itertools.count()
             @utils.backoff(delays=WAIT_FOR_VISIBILITY, exc=TimeoutError)
