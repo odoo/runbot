@@ -119,7 +119,7 @@ class Runbot(models.AbstractModel):
             return
 
         for build in testing_builds:
-            if build.killable:
+            if build.top_parent.killable:
                 build.top_parent._ask_kill(message='Build automatically killed, new build found.')
 
     def _allocate_builds(self, host, nb_slots, domain=None):
