@@ -275,7 +275,7 @@ class GH(object):
         try:
             r = r.json()
         except Exception:
-            raise MergeError("Got non-JSON reponse from github: %s %s (%s)" % (r.status_code, r.reason, r.text))
+            raise MergeError("got non-JSON reponse from github: %s %s (%s)" % (r.status_code, r.reason, r.text))
         _logger.debug(
             "merge(%s, %s (%s), %s) -> %s",
             self._repo, dest, r['parents'][0]['sha'],
@@ -297,10 +297,17 @@ class GH(object):
         logger.debug("rebasing %s, %s on %s (reset=%s, commits=%s)",
                      self._repo, pr, dest, reset, len(commits))
 
-        assert commits, "can't rebase a PR with no commits"
+        if not commits:
+            raise MergeError("PR has no commits")
         prev = original_head
         for original in commits:
-            assert len(original['parents']) == 1, "can't rebase commits with more than one parent"
+            if len(original['parents']) != 1:
+                raise MergeError(
+                    "commits with multiple parents ({sha}) can not be rebased, "
+                    "either fix the branch to remove merges or merge without "
+                    "rebasing".format_map(
+                    original
+                ))
             tmp_msg = 'temp rebasing PR %s (%s)' % (pr, original['sha'])
             merged = self.merge(original['sha'], dest, tmp_msg)
 
@@ -309,9 +316,12 @@ class GH(object):
             # expect (either original_head or the previously merged commit)
             [base_commit] = (parent['sha'] for parent in merged['parents']
                              if parent['sha'] != original['sha'])
-            assert prev == base_commit,\
-                "Inconsistent view of %s between head (%s) and merge (%s)" % (
-                    dest, prev, base_commit,
+            if prev != base_commit:
+                raise MergeError(
+                    f"Inconsistent view of branch {dest} while rebasing "
+                    f"PR {pr} expected commit {prev} but the other parent of "
+                    f"merge commit {merged['sha']} is {base_commit}.\n\n"
+                    f"The branch may be getting concurrently modified."
                 )
             prev = merged['sha']
             original['new_tree'] = merged['tree']['sha']

@@ -388,7 +388,7 @@ class Branch(models.Model):
                     if len(e.args) > 1 and e.args[1]:
                         reason = e.args[1]
                     else:
-                        reason = e.__context__
+                        reason = e.__cause__ or e.__context__
                     # if the reason is a json document, assume it's a github
                     # error and try to extract the error message to give it to
                     # the user
@@ -1588,7 +1588,7 @@ class Tagging(models.Model):
             try:
                 gh.change_tags(pr, tags_remove, tags_add)
             except Exception:
-                _logger.exception(
+                _logger.info(
                     "Error while trying to change the tags of %s#%s from %s to %s",
                     repo.name, pr, remove, add,
                 )
@@ -2211,8 +2211,8 @@ class Batch(models.Model):
                         it = meta[to_revert.repository]
                         it['gh'].set_ref('tmp.{}'.format(to_revert.target.name), it['head'])
                     raise
-            except github.MergeError:
-                raise exceptions.MergeError(pr)
+            except github.MergeError as e:
+                raise exceptions.MergeError(pr) from e
             except exceptions.Mismatch as e:
                 def format_items(items):
                     """ Bit of a pain in the ass because difflib really wants
@@ -2229,10 +2229,7 @@ class Batch(models.Model):
                 old = list(format_items((n, str(v)) for n, v, _ in e.args[1]))
                 new = list(format_items((n, str(v)) for n, _, v in e.args[1]))
                 diff = ''.join(Differ().compare(old, new))
-                _logger.warning(
-                    "data mismatch on %s:\n%s",
-                    pr.display_name, diff
-                )
+                _logger.info("data mismatch on %s:\n%s", pr.display_name, diff)
                 self.env.ref('runbot_merge.pr.staging.mismatch')._send(
                     repository=pr.repository,
                     pull_request=pr.number,

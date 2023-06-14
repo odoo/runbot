@@ -235,14 +235,14 @@ def handle_pr(env, event):
                 oldstate,
             )
             return 'Closed {}'.format(pr_obj.display_name)
-        else:
-            _logger.warning(
-                '%s tried to close %s (state=%s)',
-                event['sender']['login'],
-                pr_obj.display_name,
-                oldstate,
-            )
-            return 'Ignored: could not lock rows (probably being merged)'
+
+        _logger.info(
+            '%s tried to close %s (state=%s) but locking failed',
+            event['sender']['login'],
+            pr_obj.display_name,
+            oldstate,
+        )
+        return 'Ignored: could not lock rows (probably being merged)'
 
     if event['action'] == 'reopened' :
         if pr_obj.state == 'merged':
