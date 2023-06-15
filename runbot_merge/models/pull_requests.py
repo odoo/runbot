@@ -19,6 +19,7 @@ from itertools import takewhile
 from typing import Optional
 
 import requests
+import sentry_sdk
 import werkzeug
 from werkzeug.datastructures import Headers
 
@@ -2031,7 +2032,10 @@ class Stagings(models.Model):
             FOR UPDATE
             ''', [tuple(self.mapped('batch_ids.prs.id'))])
             try:
-                self._safety_dance(gh, staging_heads)
+                with sentry_sdk.start_span(description="merge staging") as span:
+                    span.set_tag("staging", self.id)
+                    span.set_tag("branch", self.target.name)
+                    self._safety_dance(gh, staging_heads)
             except exceptions.FastForwardError as e:
                 logger.warning(
                     "Could not fast-forward successful staging on %s:%s",

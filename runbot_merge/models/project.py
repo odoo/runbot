@@ -1,6 +1,8 @@
 import logging
 import re
 
+import sentry_sdk
+
 from odoo import models, fields
 
 _logger = logging.getLogger(__name__)
@@ -69,7 +71,9 @@ class Project(models.Model):
             ('staging_enabled', '=', True),
         ]):
             try:
-                with self.env.cr.savepoint():
+                with self.env.cr.savepoint(), \
+                    sentry_sdk.start_span(description=f'create staging {branch.name}') as span:
+                    span.set_tag('branch', branch.name)
                     branch.try_staging()
             except Exception:
                 _logger.exception("Failed to create staging for branch %r", branch.name)

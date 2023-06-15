@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 import logging
 import pathlib
+
+import sentry_sdk
+
 import resource
 import subprocess
 import uuid
@@ -28,7 +31,8 @@ class Queue:
     def _process(self):
         for b in self.search(self._search_domain(), order='create_date, id', limit=self.limit):
             try:
-                b._process_item()
+                with sentry_sdk.start_span(description=self._name):
+                    b._process_item()
                 b.unlink()
                 self.env.cr.commit()
             except Exception:
@@ -68,6 +72,7 @@ class ForwardPortTasks(models.Model, Queue):
 
     def _process_item(self):
         batch = self.batch_id
+        sentry_sdk.set_tag('forward-porting', batch.prs.mapped('display_name'))
         newbatch = batch.prs._port_forward()
 
         if newbatch:
@@ -109,6 +114,7 @@ class UpdateQueue(models.Model, Queue):
 
     def _process_item(self):
         previous = self.new_root
+        sentry_sdk.set_tag("update-root", self.new_root.display_name)
         with ExitStack() as s:
             for child in self.new_root._iter_descendants():
                 self.env.cr.execute("""

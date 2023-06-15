@@ -6,7 +6,10 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 
 from odoo import http
-from runbot_merge.exceptions import FastForwardError, Mismatch, MergeError, Unmergeable
+from odoo.addons.base.models.ir_cron import ir_cron
+from odoo.http import WebRequest
+
+from .exceptions import FastForwardError, Mismatch, MergeError, Unmergeable
 
 
 def delegate(self, attr):
@@ -41,8 +44,41 @@ def setup_sentry(dsn):
             LoggingIntegration(level=logging.INFO, event_level=logging.WARNING),
         ],
         before_send=event_filter,
+        # apparently not in my version of the sdk
+        # functions_to_trace = []
     )
     http.root = SentryWsgiMiddleware(http.root)
+    instrument_odoo()
+
+def instrument_odoo():
+    """Monkeypatches odoo core to copy odoo metadata into sentry for more
+    informative events
+    """
+    # add user to wsgi request context
+    old_call_function = WebRequest._call_function
+    def _call_function(self, *args, **kwargs):
+        if self.uid:
+            sentry_sdk.set_user({
+                'id': self.uid,
+                'email': self.env.user.email,
+                'username': self.env.user.login,
+            })
+        else:
+            sentry_sdk.set_user({'username': '<public>'})
+        return old_call_function(self, *args, **kwargs)
+    WebRequest._call_function = _call_function
+
+    # create transaction for tracking crons, add user to that
+    old_callback = ir_cron._callback
+    def _callback(self, cron_name, server_action_id, job_id):
+        sentry_sdk.start_transaction(name=f"cron {cron_name}")
+        sentry_sdk.set_user({
+            'id': self.env.user.id,
+            'email': self.env.user.email,
+            'username': self.env.user.login,
+        })
+        return old_callback(self, cron_name, server_action_id, job_id)
+    ir_cron._callback = _callback
 
 dummy_record = logging.LogRecord(name="", level=logging.NOTSET, pathname='', lineno=0, msg='', args=(), exc_info=None)
 # mapping of exception types to predicates, if the predicate returns `True` the

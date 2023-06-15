@@ -3,6 +3,7 @@ import hmac
 import logging
 import json
 
+import sentry_sdk
 import werkzeug.exceptions
 
 from odoo.http import Controller, request, route
@@ -18,6 +19,13 @@ class MergebotController(Controller):
     def index(self):
         req = request.httprequest
         event = req.headers['X-Github-Event']
+        with sentry_sdk.configure_scope() as scope:
+            if scope.transaction:
+                # only in 1.8.0 (or at least 1.7.2
+                if hasattr(scope, 'set_transaction_name'):
+                    scope.set_transaction_name(f"webhook {event}")
+                else: # but our servers use 1.4.3
+                    scope.transaction = f"webhook {event}"
 
         github._gh.info(self._format(req))
 
@@ -39,6 +47,7 @@ class MergebotController(Controller):
                              req.headers.get('X-Hub-Signature'))
                 return werkzeug.exceptions.Forbidden()
 
+        sentry_sdk.set_context('webhook', request.jsonrequest)
         return c(env, request.jsonrequest)
 
     def _format(self, request):
