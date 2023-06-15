@@ -177,7 +177,9 @@ class FreezeWizard(models.Model):
         if self.errors:
             return self.action_open()
 
-        conflict_crons = self.env.ref('runbot_merge.merge_cron') | self.env.ref('runbot_merge.staging_cron')
+        conflict_crons = self.env.ref('runbot_merge.merge_cron')\
+                       | self.env.ref('runbot_merge.staging_cron')\
+                       | self.env.ref('runbot_merge.process_updated_commits')
         # we don't want to run concurrently to the crons above, though we
         # don't need to prevent read access to them
         self.env.cr.execute(
@@ -190,6 +192,12 @@ class FreezeWizard(models.Model):
         # everything so the new branch is the second one, just after the branch
         # it "forks"
         master, rest = project_id.branch_ids[0], project_id.branch_ids[1:]
+        if self.bump_pr_ids and master.active_staging_id:
+            self.env.cr.execute(
+                'SELECT * FROM runbot_merge_stagings WHERE id = %s FOR UPDATE NOWAIT',
+                [master.active_staging_id]
+            )
+
         seq = itertools.count(start=1) # start reseq at 1
         commands = [
             (1, master.id, {'sequence': next(seq)}),
