@@ -6,15 +6,15 @@
             <html>
                 <head>
                     <title t-esc="title or 'Runbot'"/>
-                    <link rel="stylesheet" type="text/css" href="/web/static/lib/bootstrap/css/bootstrap.css"/>
-                    <link rel="stylesheet" type="text/css" href="/web/static/lib/fontawesome/css/font-awesome.css"/>
+                    <link rel="stylesheet" type="text/css" href="/runbot/static/src/libs/bootstrap/css/bootstrap.css"/>
+                    <link rel="stylesheet" type="text/css" href="/runbot/static/src/libs/fontawesome/css/font-awesome.css"/>
                     <link rel="stylesheet" type="text/css" href="/runbot/static/src/css/runbot.css"/>
 
-                    <script src="/web/static/lib/jquery/jquery.js" type="text/javascript"/>
-                    <script type="text/javascript" src="/web/static/lib/popper/popper.js"/>
-                    <script type="text/javascript" src="/web/static/lib/bootstrap/js/util.js"/>
-                    <script type="text/javascript" src="/web/static/lib/bootstrap/js/dropdown.js"/>
-                    <script type="text/javascript" src="/web/static/lib/bootstrap/js/collapse.js"/>
+                    <script src="/runbot/static/src/libs/jquery/jquery.js" type="text/javascript"/>
+                    <script type="text/javascript" src="/runbot/static/src/libs/popper/popper.js"/>
+                    <script type="text/javascript" src="/runbot/static/src/libs/bootstrap/js/util.js"/>
+                    <script type="text/javascript" src="/runbot/static/src/libs/bootstrap/js/dropdown.js"/>
+                    <script type="text/javascript" src="/runbot/static/src/libs/bootstrap/js/collapse.js"/>
                     <script type="text/javascript" src="/runbot/static/src/js/runbot.js"/>
 
                     <t t-if="refresh">
