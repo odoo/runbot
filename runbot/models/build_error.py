@@ -47,9 +47,9 @@ class BuildError(models.Model):
     children_build_ids = fields.Many2many('runbot.build', compute='_compute_children_build_ids', string='Children builds')
     error_history_ids = fields.Many2many('runbot.build.error', compute='_compute_error_history_ids', string='Old errors', context={'active_test': False})
     first_seen_build_id = fields.Many2one('runbot.build', compute='_compute_first_seen_build_id', string='First Seen build')
-    first_seen_date = fields.Datetime(string='First Seen Date', related='first_seen_build_id.create_date')
+    first_seen_date = fields.Datetime(string='First Seen Date', related='first_seen_build_id.create_date', depends=['first_seen_build_id'])
     last_seen_build_id = fields.Many2one('runbot.build', compute='_compute_last_seen_build_id', string='Last Seen build', store=True)
-    last_seen_date = fields.Datetime(string='Last Seen Date', related='last_seen_build_id.create_date', store=True)
+    last_seen_date = fields.Datetime(string='Last Seen Date', related='last_seen_build_id.create_date', store=True, depends=['last_seen_build_id'])
     test_tags = fields.Char(string='Test tags', help="Comma separated list of test_tags to use to reproduce/remove this error", tracking=True)
 
     @api.constrains('test_tags')

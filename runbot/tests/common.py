@@ -201,13 +201,14 @@ class RunbotCase(TransactionCase):
 
     def start_patcher(self, patcher_name, patcher_path, return_value=DEFAULT, side_effect=DEFAULT, new=DEFAULT):
 
-        def stop_patcher_wrapper():
-            self.stop_patcher(patcher_name)
+        if patcher_name in self.patcher_objects:
+            raise Exception(f'Patcher {patcher_name} already started')
 
         patcher = patch(patcher_path, new=new)
+        self.patcher_objects[patcher_name] = patcher
         if not hasattr(patcher, 'is_local'):
             res = patcher.start()
-            self.addCleanup(stop_patcher_wrapper)
+            self.addCleanup(patcher.stop)
             self.patchers[patcher_name] = res
             self.patcher_objects[patcher_name] = patcher
             if side_effect != DEFAULT:

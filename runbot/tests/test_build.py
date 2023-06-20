@@ -300,7 +300,7 @@ class TestBuildResult(RunbotCase):
         self.assertEqual(child_delta.days, 24)
 
         # test the real _local_cleanup method
-        self.stop_patcher('_local_cleanup_patcher')
+        self.patcher_objects['_local_cleanup_patcher'].stop()
         self.start_patcher('build_local_pgadmin_cursor_patcher', 'odoo.addons.runbot.models.build.local_pgadmin_cursor')
         self.start_patcher('build_path_patcher', 'odoo.addons.runbot.models.build.Path')
         dbname = '%s-foobar' % build.dest
@@ -374,10 +374,10 @@ class TestBuildResult(RunbotCase):
         self.assertEqual('pending', build1_1_1.global_state)
         self.assertEqual('pending', build1_1_2.global_state)
 
-        build1_2.flush()
+        build1_2.flush_recordset()
         with self.assertQueries(['''UPDATE "runbot_build" SET "global_state"=%s,"local_state"=%s,"write_date"=%s,"write_uid"=%s WHERE id IN %s''']):
             build1_2.local_state = "testing"
-            build1_2.flush()
+            build1_2.flush_recordset()
 
         self.assertEqual('testing', build1.global_state)
         self.assertEqual('testing', build1_2.global_state)
@@ -387,14 +387,14 @@ class TestBuildResult(RunbotCase):
 
         # with self.assertQueries(['''UPDATE "runbot_build" SET "global_state"=%s,"local_state"=%s,"write_date"=%s,"write_uid"=%s WHERE id IN %s''']):
         build1.local_state = 'done'
-        build1.flush()
+        build1.flush_recordset()
 
         self.assertEqual('waiting', build1.global_state)
         self.assertEqual('testing', build1_1.global_state)
 
         # with self.assertQueries([]): # write the same value, no update should be triggered
         build1.local_state = 'done'
-        build1.flush()
+        build1.flush_recordset()
 
         build1_1.local_state = 'done'
 

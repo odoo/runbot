@@ -265,7 +265,7 @@ class TestUpgradeFlow(RunbotCase):
 
         with self.assertRaises(UserError):
             self.step_upgrade_server.job_type = 'install_odoo'
-            self.trigger_upgrade_server.flush(['upgrade_step_id'])
+            self.trigger_upgrade_server.flush_recordset(['upgrade_step_id'])
 
         batch = self.master_bundle._force()
         batch._prepare()
@@ -414,9 +414,9 @@ class TestUpgradeFlow(RunbotCase):
             ['account', 'l10n_be', 'l10n_ch', 'mail', 'stock']  # is this order ok?
         )
         current_build = db_builds[0]
-        for current_build in db_builds:
-            self.start_patcher('docker_state', 'odoo.addons.runbot.models.build.docker_state', 'END')
 
+        self.start_patcher('docker_state', 'odoo.addons.runbot.models.build.docker_state', 'END')
+        for current_build in db_builds:
             suffix = current_build.params_id.dump_db.db_suffix
             source_dest = current_build.params_id.dump_db.build_id.dest
 

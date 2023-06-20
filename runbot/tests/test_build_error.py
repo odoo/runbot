@@ -214,13 +214,12 @@ class TestBuildError(RunbotCase):
         self.additionnal_setup()
         bundle = self.env['runbot.bundle'].search([('project_id', '=', self.project.id)])
         bundle.last_batch.state = 'done'
-        bundle.flush()
         bundle._compute_last_done_batch()  # force the recompute
         self.assertTrue(bool(bundle.last_done_batch.exists()))
         # simulate a failed build that we want to monitor
         failed_build = bundle.last_done_batch.slot_ids[0].build_id
         failed_build.global_result = 'ko'
-        failed_build.flush()
+        failed_build.flush_recordset()
 
         team = self.env['runbot.team'].create({'name': 'Test team'})
         dashboard = self.env['runbot.dashboard.tile'].create({

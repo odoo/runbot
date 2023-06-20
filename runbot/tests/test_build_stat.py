@@ -55,7 +55,7 @@ some garbage
 nothing to see here
 """
         self.start_patcher(
-            "isdir", "odoo.addons.runbot.models.build_stat_regex.os.path.exists", True
+            "stats_file_exists", "odoo.addons.runbot.models.build_stat_regex.os.path.exists", True
         )
         with patch("builtins.open", mock_open(read_data=file_content)):
             self.config_step._make_stats(self.build)
@@ -98,7 +98,7 @@ chocolate 15
         self.StatRegex.create({"name": "chocolate_count", "regex":  r"(?P<key>chocolate) (?P<value>\d+)"})
 
         self.start_patcher(
-            "isdir", "odoo.addons.runbot.models.build_stat_regex.os.path.exists", True
+            "stats_file_exists", "odoo.addons.runbot.models.build_stat_regex.os.path.exists", True
         )
         with patch("builtins.open", mock_open(read_data=file_content)):
             self.config_step._make_stats(self.build)
@@ -127,7 +127,7 @@ chocolate 15
         log_data += noise_lines * 10000
 
         self.start_patcher(
-            "isdir", "odoo.addons.runbot.models.build_stat_regex.os.path.exists", True
+            "stats_file_exists", "odoo.addons.runbot.models.build_stat_regex.os.path.exists", True
         )
         with patch("builtins.open", mock_open(read_data=log_data)):
             self.config_step._make_stats(self.build)

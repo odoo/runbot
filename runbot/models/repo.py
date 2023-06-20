@@ -276,12 +276,12 @@ class Repo(models.Model):
     def set_hook_time(self, value):
         for repo in self:
             self.env['runbot.repo.hooktime'].create({'time': value, 'repo_id': repo.id})
-        self.invalidate_cache()
+        self.invalidate_recordset(['hook_time'])
 
     def set_ref_time(self, value):
         for repo in self:
             self.env['runbot.repo.reftime'].create({'time': value, 'repo_id': repo.id})
-        self.invalidate_cache()
+        self.invalidate_recordset(['get_ref_time'])
 
     def _gc_times(self):
         self.env.cr.execute("""

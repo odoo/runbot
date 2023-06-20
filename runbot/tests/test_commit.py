@@ -54,12 +54,15 @@ class TestCommitStatus(HttpCase):
 
             # 3. test that a non-existsing commit_status returns a 404
             # 3.1 find a non existing commit status id
-            non_existing_id = self.env['runbot.commit.status'].browse(50000).exists() or 50000
-            while self.env['runbot.commit.status'].browse(non_existing_id).exists():
-                non_existing_id += 1
+            non_existing_commit_status = self.env['runbot.commit.status'].create({
+                'commit_id': self.server_commit.id,
+                'context': 'ci/test',
+                'state': 'failure',
+            })
+            non_existing_commit_status.unlink()
 
             self.authenticate('runbot_admin', 'admin')
-            response = self.url_open('/runbot/commit/resend/%s' % non_existing_id)
+            response = self.url_open('/runbot/commit/resend/%s' % non_existing_commit_status.id)
             self.assertEqual(response.status_code, 404)
 
             #4.1 Test that a status not sent (with not sent_date) can be manually resend

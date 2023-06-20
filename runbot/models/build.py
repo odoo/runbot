@@ -108,16 +108,15 @@ class BuildParameters(models.Model):
             params.commit_ids = params.commit_link_ids.commit_id
 
     @api.model_create_multi
-    def create(self, values_list):
+    def create(self, vals_list):
         records = self.browse()
-        for values in values_list:
-            params = self.new(values)
+        for vals in vals_list:
+            params = self.new(vals)
             record = self._find_existing(params.fingerprint)
             if record:
                 records |= record
             else:
-                values = self._convert_to_write(params._cache)
-                records |= super().create(values)
+                records |= super().create(self._convert_to_write(params._cache))
         return records
 
     def _find_existing(self, fingerprint):
@@ -214,7 +213,7 @@ class BuildResult(models.Model):
     # -> build_link ?
 
     parent_id = fields.Many2one('runbot.build', 'Parent Build', index=True)
-    parent_path = fields.Char('Parent path', index=True)
+    parent_path = fields.Char('Parent path', index=True, unaccent=False)
     top_parent =  fields.Many2one('runbot.build', compute='_compute_top_parent')
     ancestors =  fields.Many2many('runbot.build', compute='_compute_ancestors')
     # should we add a has children stored boolean?
@@ -815,6 +814,7 @@ class BuildResult(models.Model):
         ro_volumes[f'/home/{user}/.odoorc'] = self._path('.odoorc')
         kwargs.pop('build_dir', False)  # todo check python steps
         build_dir = self._path()
+        self.env.flush_all()
         def start_docker():
             docker_run(cmd=cmd, build_dir=build_dir, ro_volumes=ro_volumes, **kwargs)
         return start_docker

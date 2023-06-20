@@ -21,7 +21,7 @@ from odoo.modules.module import get_module_resource
 
 _logger = logging.getLogger(__name__)
 
-# after this point, not realy a repo buisness
+
 class Runbot(models.AbstractModel):
     _name = 'runbot.runbot'
     _description = 'Base runbot model'
@@ -41,6 +41,7 @@ class Runbot(models.AbstractModel):
         self._commit()
         processed = 0
         for build in host.get_builds([('requested_action', 'in', ['wake_up', 'deathrow'])]):
+            build = build.browse(build.id)
             processed += 1
             build._process_requested_actions()
             self._commit()
@@ -56,6 +57,7 @@ class Runbot(models.AbstractModel):
             self._commit()
             if callable(result):
                 result()  # start docker
+                self._commit()
         processed += self._assign_pending_builds(host, host.nb_worker, [('build_type', '!=', 'scheduled')])
         self._commit()
         processed += self._assign_pending_builds(host, host.nb_worker - 1 or host.nb_worker)

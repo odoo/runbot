@@ -5,7 +5,7 @@ from odoo.tools import mute_logger
 import logging
 _logger = logging.getLogger(__name__)
 
-# after this point, not realy a repo buisness
+
 class Runbot(models.AbstractModel):
     _inherit = 'runbot.runbot'
 
@@ -64,7 +64,7 @@ class Runbot(models.AbstractModel):
                             'is_pr': True,
                         })
                         count += 1
-                        branch.flush()
+                        branch.flush_recordset()
 
                     if 'partial' in bundle.name:
                         break

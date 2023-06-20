@@ -43,7 +43,7 @@
       <field name="model">runbot.error.log</field>
       <field name="arch" type="xml">
         <tree string="Build Errors">
-          <button name="action_goto_build" type="object" icon="fa-external-link "/>
+          <button name="action_goto_build" type="object" icon="fa-external-link" title="View build"/>
           <field name="build_id"/>
           <field name="bundle_ids" widget="many2many_tags"/>
           <field name="log_create_date"/>

@@ -297,7 +297,7 @@ class TestRepo(RunbotCaseMinimalSetup):
             self.assertEqual(repo1[field_name], 1.3)
             self.assertEqual(repo2[field_name], 1.4)
 
-            self.Repo.invalidate_cache()
+            self.Repo.invalidate_model()
             self.assertEqual(repo1[field_name], 1.3)
             self.assertEqual(repo2[field_name], 1.4)
 
@@ -414,7 +414,7 @@ class TestIdentityFile(RunbotCase):
         def test_identity_file(self):
             """test that the identity file is used in git command"""
 
-            self.stop_patcher('git_patcher')
+            self.patcher_objects['git_patcher'].stop()
             self.start_patcher('check_output_patcher', 'odoo.addons.runbot.models.repo.subprocess.check_output', new=self.check_output_helper())
 
             self.repo_server.identity_file = 'fake_identity'
@@ -466,8 +466,8 @@ class TestRepoScheduler(RunbotCase):
         host = self.env['runbot.host']._get_current()
         self.Runbot._scheduler(host)
 
-        build.invalidate_cache()
-        scheduled_build.invalidate_cache()
+        build.invalidate_recordset()
+        scheduled_build.invalidate_recordset()
         self.assertFalse(build.host)
         self.assertFalse(scheduled_build.host)
 

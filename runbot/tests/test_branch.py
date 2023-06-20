@@ -50,8 +50,8 @@ class TestBranchRelations(RunbotCase):
         create_base('13.0')
         create_base('saas-13.1')
         self.last = create_base('saas-13.2')
-        self.env['runbot.bundle'].flush()
-        self.env['runbot.version'].flush()
+        self.env['runbot.bundle'].flush_model()
+        self.env['runbot.version'].flush_model()
 
     def test_relations_master_dev(self):
         b = self.Branch.create({

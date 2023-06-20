@@ -56,11 +56,12 @@ class Host(models.Model):
         for host in self:
             host.build_ids = self.env['runbot.build'].search([('host', '=', host.name), ('local_state', '!=', 'done')])
 
-    @api.model_create_single
-    def create(self, values):
-        if 'disp_name' not in values:
-            values['disp_name'] = values['name']
-        return super().create(values)
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if 'disp_name' not in vals:
+                vals['disp_name'] = vals['name']
+        return super().create(vals_list)
 
     def _bootstrap_local_logs_db(self):
         """ bootstrap a local database that will collect logs from builds """

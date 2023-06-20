@@ -18,7 +18,7 @@
                                 <field name="sequence" widget="handle"/>
                             </tree>
                         </field>
-                        <field name="protected" groups="base.group_no_one"/>
+                        <field name="protected"/>
                         <field name="group" groups="base.group_no_one"/>
                     </group>
                 </sheet>
@@ -44,7 +44,7 @@
                         <field name="domain_filter"/>
                         <field name="job_type"/>
                         <field name="make_stats"/>
-                        <field name="protected" groups="base.group_no_one"/>
+                        <field name="protected"/>
                         <field name="default_sequence" groups="base.group_no_one"/>
                         <field name="group" groups="base.group_no_one"/>
                     </group>

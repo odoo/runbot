@@ -19,8 +19,8 @@ class Project(models.Model):
     dummy_bundle_id = fields.Many2one('runbot.bundle', string='Dummy bundle')
 
     @api.model_create_multi
-    def create(self, create_values):
-        projects = super().create(create_values)
+    def create(self, vals_list):
+        projects = super().create(vals_list)
         base_bundle_values = []
         dummy_bundle_values = []
         for project in projects:

@@ -1,7 +1,7 @@
 import logging
 import re
 from odoo import models, fields, api
-from odoo.addons.base.models.qweb import QWebException
+from odoo.addons.base.models.ir_qweb import QWebException
 
 _logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ class Dockerfile(models.Model):
     def _compute_dockerfile(self):
         for rec in self:
             try:
-                res = rec.template_id.sudo()._render() if rec.template_id else ''
+                res = rec.template_id._render_template(rec.template_id.id) if rec.template_id else ''
                 rec.dockerfile = re.sub(r'^\s*$', '', res, flags=re.M).strip()
             except QWebException:
                 rec.dockerfile = ''

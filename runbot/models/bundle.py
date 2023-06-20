@@ -163,6 +163,8 @@ class Bundle(models.Model):
     @api.depends_context('category_id')
     def _compute_last_done_batch(self):
         if self:
+            self.env['runbot.batch'].flush_model()
+            self.env['runbot.bundle'].flush_model()
             # self.env['runbot.batch'].flush()
             for bundle in self:
                 bundle.last_done_batch = False
