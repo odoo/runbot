@@ -35,6 +35,11 @@ class MergebotReviewerProvisioning(Controller):
         Partners = env['res.partner']
         Users = env['res.users']
 
+        existing_logins = set()
+        existing_oauth = set()
+        for u in Users.with_context(active_test=False).search([]):
+            existing_logins.add(u.login)
+            existing_oauth .add((u.oauth_provider_id.id, u.oauth_uid))
         existing_partners = Partners.with_context(active_test=False).search([
             '|', ('email', 'in', [u['email'] for u in users]),
                  ('github_login', 'in', [u['github_login'] for u in users])
@@ -76,9 +81,30 @@ class MergebotReviewerProvisioning(Controller):
                 to_activate |= current
             # entry doesn't have user -> create user
             if not current.user_ids:
-                # skip users without an email (= login) as that
-                # fails
                 if not new['email']:
+                    _logger.info(
+                        "Unable to create user for %s: no email in provisioning data",
+                        current.display_name
+                    )
+                    continue
+                if 'oauth_uid' in new:
+                    if (new['oauth_provider_id'], new['oauth_uid']) in existing_oauth:
+                        _logger.warning(
+                            "Attempted to create user with duplicate oauth uid "
+                            "%s with provider %r for provisioning entry %r. "
+                            "There is likely a duplicate partner (one version "
+                            "with email, one with github login)",
+                            new['oauth_uid'], odoo_provider.display_name, new,
+                        )
+                        continue
+                if new['email'] in existing_logins:
+                    _logger.warning(
+                        "Attempted to create user with duplicate login %s for "
+                        "provisioning entry %r. There is likely a duplicate "
+                        "partner (one version with email, one with github "
+                        "login)",
+                        new['email'], new,
+                    )
                     continue
 
                 new['login'] = new['email']
@@ -93,7 +119,7 @@ class MergebotReviewerProvisioning(Controller):
             # otherwise update user (if there is anything to update)
             user = current.user_ids
             if len(user) != 1:
-                _logger.warning("Got %d users for partner %s.", len(user), current.display_name)
+                _logger.warning("Got %d users for partner %s, updating first.", len(user), current.display_name)
                 user = user[:1]
             new.setdefault("active", True)
             update_vals = {

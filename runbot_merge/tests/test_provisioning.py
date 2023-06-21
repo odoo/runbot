@@ -1,4 +1,3 @@
-import pytest
 import requests
 
 GEORGE = {
@@ -30,24 +29,13 @@ def test_basic_provisioning(env, port):
     r = provision_user(port, [dict(GEORGE, name="x", github_login="y", sub="42")])
     assert r == [0, 1]
 
-    # can't fail anymore because github_login now used to look up the existing
-    # user
-    # with pytest.raises(Exception):
-    #     provision_user(port, [{
-    #         'name': "other@example.org",
-    #         'email': "x",
-    #         'github_login': "y",
-    #         'sub': "42"
-    #     }])
-
     r = provision_user(port, [dict(GEORGE, active=False)])
     assert r == [0, 1]
     assert not env['res.users'].search([('login', '=', GEORGE['email'])])
     assert env['res.partner'].search([('email', '=', GEORGE['email'])])
 
 def test_upgrade_partner(env, port):
-    # If a partner exists for a github login (and / or email?) it can be
-    # upgraded by creating a user for it
+    # matching partner with an email but no github login
     p = env['res.partner'].create({
         'name': GEORGE['name'],
         'email': GEORGE['email'],
@@ -64,6 +52,7 @@ def test_upgrade_partner(env, port):
     p.user_ids.unlink()
     p.unlink()
 
+    # matching partner with a github login but no email
     p = env['res.partner'].create({
         'name': GEORGE['name'],
         'github_login': GEORGE['github_login'],
@@ -77,20 +66,47 @@ def test_upgrade_partner(env, port):
         'email': GEORGE['email'],
     }]
 
-    # deactivate user to see if provisioning re-enables them
+    # matching partner with a deactivated user
     p.user_ids.active = False
     r = provision_user(port, [GEORGE])
     assert r == [0, 1]
     assert len(p.user_ids) == 1, "provisioning should re-enable user"
     assert p.user_ids.active
 
-    # re-enable both user and partner to see if both get re-enabled
+    # matching deactivated partner (with a deactivated user)
     p.user_ids.active = False
     p.active = False
     r = provision_user(port, [GEORGE])
     assert r == [0, 1]
     assert p.active, "provisioning should re-enable partner"
     assert p.user_ids.active
+
+def test_duplicates(env, port):
+    """In case of duplicate data, the handler should probably not blow up, but
+    instead log a warning (so the data gets fixed eventually) and skip
+    """
+    # dupe 1: old oauth signup account & github interaction account, provisioning
+    # prioritises the github account & tries to create a user for it, which
+    # fails because the signup account has the same oauth uid (probably)
+    env['res.partner'].create({'name': 'foo', 'github_login': 'foo'})
+    env['res.users'].create({'login': 'foo@example.com', 'name': 'foo', 'email': 'foo@example.com', 'oauth_provider_id': 1, 'oauth_uid': '42'})
+    assert provision_user(port, [{
+        'name': "foo",
+        'email': 'foo@example.com',
+        'github_login': 'foo',
+        'sub': '42'
+    }]) == [0, 0]
+
+    # dupe 2: old non-oauth signup account & github interaction account, same
+    # as previous except it breaks on the login instead of the oauth_uid
+    env['res.partner'].create({'name': 'bar', 'github_login': 'bar'})
+    env['res.users'].create({'login': 'bar@example.com', 'name': 'bar', 'email': 'bar@example.com'})
+    assert provision_user(port, [{
+        'name': "bar",
+        'email': 'bar@example.com',
+        'github_login': 'bar',
+        'sub': '43'
+    }]) == [0, 0]
 
 def test_no_email(env, port):
     """ Provisioning system should ignore email-less entries
@@ -182,6 +198,6 @@ def provision_user(port, users):
     })
     r.raise_for_status()
     json = r.json()
-    assert 'error' not in json
+    assert 'error' not in json, json['error']['data']['debug']
 
     return json['result']
