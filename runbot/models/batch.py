@@ -22,7 +22,7 @@ class Batch(models.Model):
     state = fields.Selection([('preparing', 'Preparing'), ('ready', 'Ready'), ('done', 'Done'), ('skipped', 'Skipped')])
     hidden = fields.Boolean('Hidden', default=False)
     age = fields.Integer(compute='_compute_age', string='Build age')
-    category_id = fields.Many2one('runbot.category', default=lambda self: self.env.ref('runbot.default_category', raise_if_not_found=False))
+    category_id = fields.Many2one('runbot.category', index=True, default=lambda self: self.env.ref('runbot.default_category', raise_if_not_found=False))
     log_ids = fields.One2many('runbot.batch.log', 'batch_id')
     has_warning = fields.Boolean("Has warning")
     base_reference_batch_id = fields.Many2one('runbot.batch')

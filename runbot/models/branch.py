@@ -17,7 +17,7 @@ class Branch(models.Model):
     _sql_constraints = [('branch_repo_uniq', 'unique (name,remote_id)', 'The branch must be unique per repository !')]
 
     name = fields.Char('Name', required=True)
-    remote_id = fields.Many2one('runbot.remote', 'Remote', required=True, ondelete='cascade')
+    remote_id = fields.Many2one('runbot.remote', 'Remote', required=True, ondelete='cascade', index=True)
 
     head = fields.Many2one('runbot.commit', 'Head Commit', index=True)
     head_name = fields.Char('Head name', related='head.name', store=True)
@@ -29,7 +29,7 @@ class Branch(models.Model):
     pr_title = fields.Char('Pr Title')
     pr_body = fields.Char('Pr Body')
     pr_author = fields.Char('Pr Author')
-    
+
     pull_head_name = fields.Char(compute='_compute_branch_infos', string='PR HEAD name', readonly=1, store=True)
     pull_head_remote_id = fields.Many2one('runbot.remote', 'Pull head repository', compute='_compute_branch_infos', store=True, index=True)
     target_branch_name = fields.Char(compute='_compute_branch_infos', string='PR target branch', store=True)
