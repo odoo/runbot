@@ -51,7 +51,7 @@ class BuildParameters(models.Model):
     version_id = fields.Many2one('runbot.version', required=True, index=True)
     project_id = fields.Many2one('runbot.project', required=True, index=True)  # for access rights
     trigger_id = fields.Many2one('runbot.trigger', index=True)  # for access rights
-    create_batch_id = fields.Many2one('runbot.batch')
+    create_batch_id = fields.Many2one('runbot.batch', index=True)
     category = fields.Char('Category', index=True)  # normal vs nightly vs weekly, ...
     dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, default=lambda self: self.env.ref('runbot.docker_default', raise_if_not_found=False))
     skip_requirements = fields.Boolean('Skip requirements.txt auto install')
