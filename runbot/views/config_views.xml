@@ -35,7 +35,7 @@
         <field name="arch" type="xml">
             <form string="Build config step">
                 <sheet>
-                    <div t-att-class="label label-warning" attrs="{'invisible': [('protected', '=', False)]}">
+                    <div class="label label-warning" attrs="{'invisible': [('protected', '=', False)]}">
                         This record is protected and can only be edited by config administrator.
                     </div>
                     <group string="General settings">
