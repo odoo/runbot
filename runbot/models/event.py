@@ -145,9 +145,6 @@ class RunbotErrorLog(models.Model):
 
         raise UserError('Operator `%s` not implemented for bundle search' % operator)
 
-    def search_count(self, args):
-       return 4242  # hack to speed up the view
-
     def _search_sticky(self, operator, value):
         if operator == '=':
             self.env.cr.execute("""
