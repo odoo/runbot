@@ -991,6 +991,9 @@ class BuildResult(models.Model):
             child._ask_kill(lock=False)
 
     def _wake_up(self):
+
+        user = request.env.user if request else self.env.user
+        self._log('wake_up', f'Wake up initiated by {user.name}')
         if self.local_state != 'done':
             self._log('wake_up', 'Impossibe to wake up, state is not done')
         else:
