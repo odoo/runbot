@@ -5,92 +5,94 @@
         <field name="model">runbot.build.error</field>
         <field name="arch" type="xml">
           <form>
-            <widget name="web_ribbon" title="Test-tags" bg_color="bg-warning" attrs="{'invisible': [('test_tags', '=', False)]}"/>
-            <header>
-            </header>
-              <group>
-                <group name="build_error_group" string="Base info">
-                  <field name="content" readonly="1"/>
-                  <field name="module_name" readonly="1"/>
-                  <field name="function" readonly="1"/>
-                  <field name="file_path" readonly="1"/>
-                </group>
-              </group>
-              <group col="2">
-                <group name="fixer_info" string="Fixing">
-                  <field name="responsible" attrs="{'readonly': [('parent_id','!=', False), ('responsible','=', False)]}"/>
-                  <field name="team_id" attrs="{'readonly': [('parent_id','!=', False), ('team_id','=', False)]}"/>
-                  <field name="fixing_pr_id"/>
-                  <field name="fixing_pr_url" widget="url"/>
-                  <field name="active"/>
-                  <field name="test_tags" readonly="1" groups="!runbot.group_runbot_admin"/>
-                  <field name="test_tags" groups="runbot.group_runbot_admin" attrs="{'readonly': [('parent_id','!=', False), ('test_tags','=', False)]}"/>
-                </group>
-                  <group name="fixer_info" string="Fixing">
-                  <field name="version_ids" widget="many2many_tags"/>
-                  <field name="trigger_ids" widget="many2many_tags"/>
-                  <field name="tag_ids" widget="many2many_tags" readonly="1"/>
-                </group>
-              </group>
-              <group name="fixer_info" string="More info" col="2">
+            <sheet>
+              <widget name="web_ribbon" title="Test-tags" bg_color="bg-warning" attrs="{'invisible': [('test_tags', '=', False)]}"/>
+              <header>
+              </header>
                 <group>
-                  <field name="random"/>
-                  <field name="first_seen_date"/>
-                  <field name="first_seen_build_id" widget="frontend_url"/>
-                </group>
-                <group>
-                  <field name="parent_id"/>
-                  <field name="last_seen_date"/>
-                  <field name="last_seen_build_id" widget="frontend_url"/>
-                </group>
-              </group>
-              <notebook>
-                <page string="Builds">
-                  <field name="children_build_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
-                    <tree>
-                      <field name="create_date"/>
-                      <field name="host" groups="base.group_no_one"/>
-                      <field name="dest"/>
-                      <field name="version_id"/>
-                      <field name="trigger_id"/>
-                      <field name="description"/>
-                      <field name="build_url" widget="url" readonly="1" text="View build"/>
-                    </tree>
-                  </field>
-                </page>
-                <page string="Linked Errors" attrs="{'invisible': [('child_ids', '=', [])]}">
-                  <field name="child_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
-                    <tree>
-                      <field name="create_date"/>
-                      <field name="module_name"/>
-                      <field name="summary"/>
-                      <field name="build_count"/>
-                    </tree>
-                  </field>
-                </page>
-                <page string="Error history" attrs="{'invisible': [('error_history_ids', '=', [])]}">
-                  <field name="error_history_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
-                    <tree>
-                      <field name="create_date"/>
-                      <field name="module_name"/>
-                      <field name="summary"/>
-                      <field name="random"/>
-                      <field name="build_count"/>
-                      <field name="responsible"/>
-                      <field name="fixing_commit"/>
-                      <field name="id"/>
-                    </tree>
-                  </field>
-                </page>
-                <page string="Debug" groups="base.group_no_one">
-                  <group name="build_error_group">
-                    <field name="fingerprint" readonly="1"/>
-                    <field name="cleaned_content" readonly="1"/>
-                    <field name="fixing_commit" widget="url"/>
-                    <field name="bundle_ids" widget="many2many_tags"/>
+                  <group name="build_error_group" string="Base info">
+                    <field name="content" readonly="1"/>
+                    <field name="module_name" readonly="1"/>
+                    <field name="function" readonly="1"/>
+                    <field name="file_path" readonly="1"/>
                   </group>
-                </page>
-              </notebook>
+                </group>
+                <group col="2">
+                  <group name="fixer_info" string="Fixing">
+                    <field name="responsible" attrs="{'readonly': [('parent_id','!=', False), ('responsible','=', False)]}"/>
+                    <field name="team_id" attrs="{'readonly': [('parent_id','!=', False), ('team_id','=', False)]}"/>
+                    <field name="fixing_pr_id"/>
+                    <field name="fixing_pr_url" widget="url"/>
+                    <field name="active"/>
+                    <field name="test_tags" readonly="1" groups="!runbot.group_runbot_admin"/>
+                    <field name="test_tags" groups="runbot.group_runbot_admin" attrs="{'readonly': [('parent_id','!=', False), ('test_tags','=', False)]}"/>
+                  </group>
+                    <group name="fixer_info" string="Fixing">
+                    <field name="version_ids" widget="many2many_tags"/>
+                    <field name="trigger_ids" widget="many2many_tags"/>
+                    <field name="tag_ids" widget="many2many_tags" readonly="1"/>
+                  </group>
+                </group>
+                <group name="fixer_info" string="More info" col="2">
+                  <group>
+                    <field name="random"/>
+                    <field name="first_seen_date"/>
+                    <field name="first_seen_build_id" widget="frontend_url"/>
+                  </group>
+                  <group>
+                    <field name="parent_id"/>
+                    <field name="last_seen_date"/>
+                    <field name="last_seen_build_id" widget="frontend_url"/>
+                  </group>
+                </group>
+                <notebook>
+                  <page string="Builds">
+                    <field name="children_build_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
+                      <tree>
+                        <field name="create_date"/>
+                        <field name="host" groups="base.group_no_one"/>
+                        <field name="dest"/>
+                        <field name="version_id"/>
+                        <field name="trigger_id"/>
+                        <field name="description"/>
+                        <field name="build_url" widget="url" readonly="1" text="View build"/>
+                      </tree>
+                    </field>
+                  </page>
+                  <page string="Linked Errors" attrs="{'invisible': [('child_ids', '=', [])]}">
+                    <field name="child_ids" widget="many2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
+                      <tree>
+                        <field name="create_date"/>
+                        <field name="module_name"/>
+                        <field name="summary"/>
+                        <field name="build_count"/>
+                      </tree>
+                    </field>
+                  </page>
+                  <page string="Error history" attrs="{'invisible': [('error_history_ids', '=', [])]}">
+                    <field name="error_history_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
+                      <tree>
+                        <field name="create_date"/>
+                        <field name="module_name"/>
+                        <field name="summary"/>
+                        <field name="random"/>
+                        <field name="build_count"/>
+                        <field name="responsible"/>
+                        <field name="fixing_commit"/>
+                        <field name="id"/>
+                      </tree>
+                    </field>
+                  </page>
+                  <page string="Debug" groups="base.group_no_one">
+                    <group name="build_error_group">
+                      <field name="fingerprint" readonly="1"/>
+                      <field name="cleaned_content" readonly="1"/>
+                      <field name="fixing_commit" widget="url"/>
+                      <field name="bundle_ids" widget="many2many_tags"/>
+                    </group>
+                  </page>
+                </notebook>
+            </sheet>
             <div class="oe_chatter">
                 <field name="message_follower_ids" widget="mail_followers"/>
                 <field name="message_ids" widget="mail_thread"/>
