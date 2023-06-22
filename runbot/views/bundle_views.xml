@@ -71,7 +71,7 @@
                             <field name="trigger_id" domain="[('project_id', '=', parent.project_id)]"/>
                             <field name="config_id"/>
                             <field name="extra_params"/>
-                            <field name="config_data"/>
+                            <field name="config_data" widget="jsonb"/>
                         </tree>
                     </field>
                     <field string="Last batches" name="last_batchs">

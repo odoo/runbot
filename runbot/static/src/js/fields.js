@@ -1,128 +1,120 @@
-odoo.define('runbot.json_field', function (require) {
-"use strict";
-    
-var basic_fields = require('web.basic_fields');
-var relational_fields = require('web.relational_fields');
-var registry = require('web.field_registry');
-var field_utils = require('web.field_utils');
-var dom = require('web.dom');
+/** @odoo-module **/
 
+import { TextField } from "@web/views/fields/text/text_field";
+import { CharField } from "@web/views/fields/char/char_field";
+import { Many2OneField } from "@web/views/fields/many2one/many2one_field";
 
-var FieldJson = basic_fields.FieldChar.extend({
-    init: function () {
-        this._super.apply(this, arguments);
+import { _lt } from "@web/core/l10n/translation";
+import { registry } from "@web/core/registry";
+import { useDynamicPlaceholder } from "@web/views/fields/dynamicplaceholder_hook";
+import { useInputField } from "@web/views/fields/input_field_hook";
 
-        if (this.mode === 'edit') {
-            this.tagName = 'textarea';
-        }
-        this.autoResizeOptions = {parent: this};
-    },
+import { onMounted, onWillUnmount, useEffect, useRef, xml, Component } from "@odoo/owl";
 
-    start: function () {
-        if (this.mode === 'edit') {
-            dom.autoresize(this.$el, this.autoResizeOptions);
-        }
-        return this._super();
-    },
-    _onKeydown: function (ev) {
-        if (ev.which === $.ui.keyCode.ENTER) {
-            ev.stopPropagation();
-            return;
-        }
-        this._super.apply(this, arguments);
-    },
-
-});
-
-registry.add('jsonb', FieldJson)
-
-var FieldCharFrontendUrl = basic_fields.FieldChar.extend({
-    quickEditExclusion: [
-        '.fa-external-link',
-    ],
-    init() {
-        this._super.apply(this, arguments);
-        if (this.model.startsWith('runbot.')) {
-            this.route = '/runbot/' + this.model.split('.')[1] + '/' + this.res_id;
-        } else {
-            this.route = false;
-        }
-    },
-    _renderReadonly: function() {
-        this._super.apply(this, arguments);
-        var link= '';
-        if (this.route) {
-            link = ' <a href="'+this.route+'" target="_blank"><i class="external_link fa fa-fw o_button_icon fa-external-link "/></a>';
-            this.$el.html('<span>' + this.$el.html() + link + '<span>');
-        }
-    }
-});
-
-registry.add('char_frontend_url', FieldCharFrontendUrl)
-
-var FrontendUrl = relational_fields.FieldMany2One.extend({
-    isQuickEditable: false,
-    events: _.extend({'click .external_link': '_stopPropagation'}, relational_fields.FieldMany2One.prototype.events),
-    init() {
-        this._super.apply(this, arguments);
-        if (this.value) {
-            const model = this.value.model.split('.').slice(1).join('_');
-            const res_id = this.value.res_id;
-            this.route = '/runbot/' + model+ '/' + res_id;
-        } else {
-            this.route = false;
-        }
-    },
-    _renderReadonly: function () {
-        this._super.apply(this, arguments);
-        var link = ''
-        if (this.route) {
-            link = ' <a href="'+this.route+'" target="_blank"><i class="external_link fa fa-fw o_button_icon fa-external-link "/></a>'
-        }
-        this.$el.html('<span>' + this.$el.html() + link + '<span>')
-    },
-    _stopPropagation: function(event) {
-        event.stopPropagation()
-    }
-});
-registry.add('frontend_url', FrontendUrl)
 
 function stringify(obj) {
     return JSON.stringify(obj, null, '\t')
 }
 
-field_utils.format.jsonb = stringify;
-field_utils.parse.jsonb = JSON.parse;
 
-var GithubTeamWidget = basic_fields.InputField.extend({
-    events: _.extend({'click': '_onClick'}, basic_fields.InputField.prototype.events),
-    _renderReadonly: function () {
-        if (!this.value) {
-            return;
+export class JsonField extends TextField {
+    static template = xml`
+    <t t-if="props.readonly">
+            <span t-esc="value" />
+        </t>
+        <t t-else="">
+            <div t-ref="div">
+                <textarea
+                    class="o_input"
+                    t-att-class="{'o_field_translate': props.isTranslatable}"
+                    t-att-id="props.id"
+                    t-att-placeholder="props.placeholder"
+                    t-att-rows="rowCount"
+                    t-on-input="onInput"
+                    t-ref="textarea"
+                />
+            </div>
+        </t>
+    `;
+    setup() {
+        this.props.value.toString = () => stringify(this.props.value);
+        if (this.props.dynamicPlaceholder) {
+            this.dynamicPlaceholder = useDynamicPlaceholder();
         }
-        this.el.textContent = '';
-        const organisation = this.record.data.organisation;
-        this.value.split(',').forEach((value) => {
-            const href = 'https://github.com/orgs/' + organisation + '/teams/' + value.trim() + '/members';
-            const anchorEl = Object.assign(document.createElement('a'), {
-                text: value + " ",
-                href: href,
-                target: '_blank',
-            });
-            this.el.appendChild(anchorEl);
+        this.divRef = useRef("div");
+        this.textareaRef = useRef("textarea");
+
+        useInputField({
+            getValue: () => this.value,
+            refName: "textarea",
+            parse: JSON.parse,
         });
-      
-    },
 
-    /**
-     * Prevent the URL click from opening the record (when used on a list).
-     * @private
-     * @param {MouseEvent} ev
-     */
-    _onClick: function (ev) {
-        ev.stopPropagation();
-    },
-});
-registry.add('github_team', GithubTeamWidget)
+        useEffect(() => {
+            if (!this.props.readonly) {
+                this.resize();
+            }
+        });
+        onMounted(this.onMounted);
+        onWillUnmount(this.onWillUnmount);
+    }
+    get value() {
+        return stringify(this.props.value || "");
+    }
+}
 
-});
+registry.category("fields").add("jsonb", JsonField);
+
+export class FrontendUrl extends Component {
+    static template = xml`
+    <div class="o_field_many2one_selection">
+        <div class="o_field_widget"><Many2OneField t-props="props"/></div>
+        <div><a t-att-href="route"><span class="fa fa-play ms-2"/></a></div>
+    </div>`;
+
+    static components = { Many2OneField }
+
+    get route() {
+        const model = this.props.relation || this.props.record.fields[this.props.name].relation;
+        const id = this.props.value[0];
+        if (model.startsWith('runbot.') ) {
+            return '/runbot/' + model.split('.')[1] + '/' + this.props.record.resId;
+        } else {
+            return false;
+        }
+    }
+}
+
+registry.category("fields").add("frontend_url", FrontendUrl);
+
+
+export class FieldCharFrontendUrl extends Component {
+
+    static template = xml`
+    <div class="o_field_many2one_selection">
+        <div class="o_field_widget"><CharField t-props="props" /></div>
+        <div><a t-att-href="route"><span class="fa fa-play ms-2"/></a></div>
+    </div>`;
+
+    static components = { CharField }
+
+    get route() {
+        const model = this.props.record.resModel;
+        const id = this.props.record.resId;
+        if (model.startsWith('runbot.') ) {
+            return '/runbot/' + model.split('.')[1] + '/' + id;
+        } else {
+            return false;
+        }
+    }
+}
+
+registry.category("fields").add("char_frontend_url", FieldCharFrontendUrl);
+
+//export class GithubTeamWidget extends CharField {
+
+//this.value.split(',').forEach((value) => {
+//    const href = 'https://github.com/orgs/' + organisation + '/teams/' + value.trim() + '/members';
+//}
+//
+//registry.category("fields").add("github_team", GithubTeamWidget);
