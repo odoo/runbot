@@ -277,7 +277,7 @@ class DbDict(dict):
         with tempfile.TemporaryDirectory() as d:
             subprocess.run([
                 'odoo', '--no-http',
-                '--addons-path', self._adpath,
+                *(['--addons-path', self._adpath] if self._adpath else []),
                 '-d', db, '-i', module + ',auth_oauth',
                 '--max-cron-threads', '0',
                 '--stop-after-init',
@@ -296,7 +296,7 @@ def dbcache(request):
     dbs = DbDict(request.config.getoption('--addons-path'))
     yield dbs
     for db in dbs.values():
-        subprocess.run(['dropdb', db], check=True)
+        subprocess.run(['dropdb', '--if-exists', db], check=True)
 
 @pytest.fixture
 def db(request, module, dbcache):
@@ -369,10 +369,10 @@ def server(request, db, port, module, dummy_addons_path, tmpdir):
     if not request.config.getoption('--log-github'):
         log_handlers.append('github_requests:WARNING')
 
-    addons_path = ','.join(map(str, [
+    addons_path = ','.join(map(str, filter(None, [
         request.config.getoption('--addons-path'),
         dummy_addons_path,
-    ]))
+    ])))
 
     cov = []
     if request.config.getoption('--coverage'):
