@@ -103,6 +103,10 @@
                 </field>
               </group>
             </sheet>
+            <div class="oe_chatter">
+                <field name="message_follower_ids"/>
+                <field name="message_ids"/>
+            </div>
           </form>
         </field>
     </record>
@@ -113,6 +117,7 @@
         <field name="arch" type="xml">
           <form>
             <header>
+              <button name="check_token" string="Check token" type="object" class="oe_highlight" groups="runbot.group_runbot_admin"/>
             </header>
             <sheet>
               <group name="repo_group">
@@ -125,6 +130,11 @@
                 <field name="send_status"/>
               </group>
             </sheet>
+
+            <div class="oe_chatter">
+                <field name="message_follower_ids"/>
+                <field name="message_ids"/>
+            </div>
           </form>
         </field>
     </record>

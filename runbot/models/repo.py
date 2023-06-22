@@ -211,6 +211,58 @@ class Remote(models.Model):
                                 else:
                                     raise
 
+    def check_token(self):
+        if not self.user_has_groups('runbot.group_runbot_admin'):
+            raise UserError('This action is restricted to admin users')
+        token_results = {}
+        for repo in self:
+            session = _make_github_session(repo.token)
+            if repo.token not in token_results:
+                token_results[repo.token] = session.get("https://api.github.com/user")
+            response = token_results[repo.token]
+            try:
+                limit_total = response.headers['X-RateLimit-Limit']
+                limit_used = response.headers['X-RateLimit-Used']
+                limit_remaining = response.headers['X-RateLimit-Remaining']
+                limit_reset = datetime.datetime.fromtimestamp(int(response.headers['X-RateLimit-Reset']))
+                json = response.json()
+                login = json['login']
+                user_id = json['id']
+                html_url = json['html_url']
+                avatar_url = json['avatar_url']
+                repo_access_response = session.get(f'https://api.github.com/repos/{repo.owner}/{self.repo_name}/collaborators/{login}/permission')
+                if repo_access_response.status_code == 200:
+                    repo_access = repo_access_response.json()
+                    permission = repo_access['permission']
+                    permissions = repo_access['user']['permissions']
+                    response
+                    access_info = f'''
+<b>Permissions:</b> {permission}<br/>
+<ul>
+<li><b>admin:</b> <span class="fa fa-{'check' if permissions['admin'] else 'times'}"></li>
+<li><b>maintain:</b> <span class="fa fa-{'check' if permissions['maintain'] else 'times'}"/></li>
+<li><b>push:</b> <span class="fa fa-{'check' if permissions['push'] else 'times'}"/></li>
+<li><b>triage:</b> <span class="fa fa-{'check' if permissions['triage'] else 'times'}"/></li>
+<li><b>pull:</b> <span class="fa fa-{'check' if permissions['pull'] else 'times'}"/></li>
+<ul>
+'''
+                else:
+                    access_info = 'Look like this repo does not exist or given token does not have access to it'
+                message = f'''
+<b>User:</b> <a href="{html_url}">{login}</a> <img src={avatar_url} height="20px" width="20px"><br/>
+<b>User id:</b> {user_id}<br/>
+<b>Limit total:</b> {limit_total}<br/>
+<b>Limit used:</b> {limit_used}<br/>
+<b>Limit remaining:</b> {limit_remaining}<br/>
+<b>Limit reset:</b> {limit_reset}<br/>
+<br/>
+{access_info}'''
+            except Exception as e:
+                _logger.exception('An error occured')
+                message = f"An error occured: \n{str(e)}"
+
+        self.message_post(body=message)
+
 
 class Repo(models.Model):
 
