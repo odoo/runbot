@@ -1,0 +1,29 @@
+.code_diff {
+    white-space: nowrap;
+    overflow-x: auto;
+    font: 12px/normal 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+
+    .col_number {
+        background-color: #EEE;
+    }
+
+    .added {
+        background:#a1f1a1;
+    }
+    
+    .removed {
+        background:#f3a3a3;
+    }
+    
+    .code {
+        white-space: pre-wrap;
+    }
+    .diff_line {
+        background-color: #FFF;
+    }
+
+    .diff_line:hover {
+        filter: brightness(92%);
+    }
+    
+}
