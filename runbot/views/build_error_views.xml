@@ -121,7 +121,7 @@
                 <field name="test_tags"/>
                 <field name="fixing_pr_id"/>
                 <field name="fixing_pr_alive" invisible="1"/>
-                <field name="fixing_pr_url" widget="url" text="view PR" readonly="1"/>
+                <field name="fixing_pr_url" widget="url" text="view PR" readonly="1" attrs="{'invisible': [('fixing_pr_url', '=', False)]}"/>
             </tree>
         </field>
     </record>
