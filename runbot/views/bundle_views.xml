@@ -106,7 +106,7 @@
                 <field name="trigger_id"/>
                 <field name="config_id"/>
                 <field name="extra_params"/>
-                <field name="config_data"/>
+                <field name="config_data" widget="jsonb"/>
             </tree>
         </field>
     </record>

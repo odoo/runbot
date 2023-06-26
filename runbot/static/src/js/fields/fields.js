@@ -20,7 +20,7 @@ function stringify(obj) {
 export class JsonField extends TextField {
     static template = xml`
     <t t-if="props.readonly">
-            <span t-esc="value" />
+            <span t-esc="value"/>
         </t>
         <t t-else="">
             <div t-ref="div">
@@ -37,7 +37,6 @@ export class JsonField extends TextField {
         </t>
     `;
     setup() {
-        this.props.value.toString = () => stringify(this.props.value);
         if (this.props.dynamicPlaceholder) {
             this.dynamicPlaceholder = useDynamicPlaceholder();
         }
