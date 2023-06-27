@@ -248,3 +248,35 @@ class Bundle(models.Model):
         for branch in self.branch_ids.sorted(key=lambda b: (b.is_pr)):
             branch_groups[branch.remote_id.repo_id].append(branch)
         return branch_groups
+
+    def generate_custom_trigger_multi_action(self):
+        context = {
+            'default_bundle_id': self.id,
+            'default_config_id': self.env.ref('runbot.runbot_build_config_custom_multi').id,
+            'default_child_config_id': self.env.ref('runbot.runbot_build_config_restore_and_test').id,
+            'default_extra_params': False,
+            'default_child_extra_params': '--test-tags /module.test_method',
+            'default_number_build': 10,
+        }
+        return self._generate_custom_trigger_action(context)
+
+    def generate_custom_trigger_restore_action(self):
+        context = {
+            'default_bundle_id': self.id,
+            'default_config_id': self.env.ref('runbot.runbot_build_config_restore_and_test').id,
+            'default_child_config_id': False,
+            'default_extra_params': '--test-tags /module.test_method',
+            'default_child_extra_params': False,
+            'default_number_build': 0,
+        }
+        return self._generate_custom_trigger_action(context)
+
+    def _generate_custom_trigger_action(self, context):
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Generate custom trigger',
+            'view_mode': 'form',
+            'res_model': 'runbot.trigger.custom.wizard',
+            'target': 'new',
+            'context': context,
+        }

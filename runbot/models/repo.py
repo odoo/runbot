@@ -38,22 +38,23 @@ class Trigger(models.Model):
     sequence = fields.Integer('Sequence')
     name = fields.Char("Name")
     description = fields.Char("Description", help="Informative description")
-    project_id = fields.Many2one('runbot.project', string="Project id", required=True, default=lambda self: self.env.ref('runbot.main_project', raise_if_not_found=False))
+    project_id = fields.Many2one('runbot.project', string="Project id", required=True)
     repo_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_triggers', string="Triggers", domain="[('project_id', '=', project_id)]")
     dependency_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_dependencies', string="Dependencies")
     config_id = fields.Many2one('runbot.build.config', string="Config", required=True)
     batch_dependent = fields.Boolean('Batch Dependent', help="Force adding batch in build parameters to make it unique and give access to bundle")
 
-    ci_context = fields.Char("Ci context", default='ci/runbot', tracking=True)
+    ci_context = fields.Char("CI context", tracking=True)
     category_id = fields.Many2one('runbot.category', default=lambda self: self.env.ref('runbot.default_category', raise_if_not_found=False))
     version_domain = fields.Char(string="Version domain")
     hide = fields.Boolean('Hide trigger on main page')
     manual = fields.Boolean('Only start trigger manually', default=False)
+    restore_trigger_id = fields.Many2one('runbot.trigger', string='Restore Trigger ID for custom triggers', help="Mainly usefull to automatically define where to find a reference database when creating a custom trigger", tracking=True)
 
     upgrade_dumps_trigger_id = fields.Many2one('runbot.trigger', string='Template/complement trigger', tracking=True)
     upgrade_step_id = fields.Many2one('runbot.build.config.step', compute="_compute_upgrade_step_id", store=True)
-    ci_url = fields.Char("ci url")
-    ci_description = fields.Char("ci description")
+    ci_url = fields.Char("CI url")
+    ci_description = fields.Char("CI description")
     has_stats = fields.Boolean('Has a make_stats config step', compute="_compute_has_stats", store=True)
 
     team_ids = fields.Many2many('runbot.team', string="Runbot Teams", help="Teams responsible of this trigger, mainly usefull for nightly")
@@ -276,8 +277,7 @@ class Repo(models.Model):
     main_remote_id = fields.Many2one('runbot.remote', "Main remote", tracking=True)
     remote_ids = fields.One2many('runbot.remote', 'repo_id', "Remotes")
     project_id = fields.Many2one('runbot.project', required=True, tracking=True,
-                                 help="Default bundle project to use when pushing on this repos",
-                                 default=lambda self: self.env.ref('runbot.main_project', raise_if_not_found=False))
+                                 help="Default bundle project to use when pushing on this repos")
     # -> not verry usefull, remove it? (iterate on projects or contraints triggers:
     # all trigger where a repo is used must be in the same project.
     modules = fields.Char("Modules to install", help="Comma-separated list of modules to install and test.", tracking=True)

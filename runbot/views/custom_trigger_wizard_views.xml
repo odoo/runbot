@@ -5,17 +5,29 @@
         <field name="model">runbot.trigger.custom.wizard</field>
         <field name="arch" type="xml">
             <form string="Custom trigger wizard">
+                <field name="bundle_id" invisible="1"/>
+                <field name="project_id" invisible="1"/>
                 <group>
-                    <field name="bundle_id" invisible="1"/>
-                    <field name="project_id" invisible="1"/>
-                    <field name="warnings" decoration-warning="warnings"/>
-                    <field name="trigger_id"/>
-                    <field name="config_id"/>
-                    <field name="number_build"/>
-                    <field name="child_extra_params"/>
-                    <field name="child_dump_url"/>
-                    <field name="child_config_id"/>
-                    <field name="config_data"/>
+                    <group colspan="4">
+                        <field name="warnings" decoration-warning="warnings"/>
+                    </group>
+                    <group string="Base options">
+                        <field name="trigger_id"/>
+                        <field name="config_id"/>
+                        <field name="number_build"/>
+                        <field name="extra_params"/>
+                        <field name="child_extra_params"/>
+                        <field name="child_config_id"/>
+                    </group>
+                    <group string="Restore options">
+                        <field name="restore_mode"/>
+                        <field name="restore_dump_url" attrs="{'invisible': [('restore_mode', '!=', 'url')]}"/>
+                        <field name="restore_trigger_id" attrs="{'invisible': [('restore_mode', '!=', 'auto')]}"/>
+                        <field name="restore_database_suffix" attrs="{'invisible': [('restore_mode', '!=', 'auto')]}"/>
+                    </group>
+                    <group colspan="4">
+                        <field name="config_data"/>
+                    </group>
                 </group>
                 <footer>
                     <button name="submit" string="Submit" type="object" class="btn-primary"/>

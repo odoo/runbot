@@ -36,6 +36,10 @@
         <field name="model">runbot.bundle</field>
         <field name="arch" type="xml">
             <form string="Bundles">
+                <header>
+                    <button name="generate_custom_trigger_multi_action" string="New custom multi" type="object" class="oe_highlight"/>
+                    <button name="generate_custom_trigger_restore_action" string="New custom restore" type="object" class="oe_highlight"/>
+                </header>
                 <sheet>
                     <group>
                         <group string="Base options">

@@ -741,17 +741,36 @@ class ConfigStep(models.Model):
         if 'dump_url' in params.config_data:
             dump_url = params.config_data['dump_url']
             zip_name = dump_url.split('/')[-1]
-            build._log('test-migration', 'Restoring db [%s](%s)' % (zip_name, dump_url), log_type='markdown')
+            build._log('_run_restore', f'Restoring db [{zip_name}]({dump_url})', log_type='markdown')
             suffix = 'all'
         else:
-            download_db_suffix = params.dump_db.db_suffix or self.restore_download_db_suffix
-            dump_build = params.dump_db.build_id or build.parent_id
+            if 'dump_trigger_id' in params.config_data:
+                dump_trigger = self.env['runbot.trigger'].browse(params.config_data['dump_trigger_id'])
+                dump_suffix = params.config_data.get('dump_suffix', 'all')
+                base_batch = build.params_id.create_batch_id.base_reference_batch_id
+                reference_build = base_batch.slot_ids.filtered(lambda s: s.trigger_id == dump_trigger).mapped('build_id')
+                if not reference_build:
+                    build._log('_run_restore', f'No reference build found in batch {base_batch.id} for trigger {dump_trigger.name}', log_type='markdown', level='ERROR')
+                    build._kill(result='ko')
+                    return
+                if reference_build.local_state not in ('done', 'running'):
+                    build._log('_run_restore', f'Reference build [{reference_build.id}]({reference_build.build_url} is not yet finished, database may not exist', log_type='markdown', level='WARNING')
+                dump_db = reference_build.database_ids.filtered(lambda d: d.db_suffix == dump_suffix)
+                if not dump_db:
+                    build._log('_run_restore', f'No dump with suffix {dump_suffix} found in build [{reference_build.id}]({reference_build.build_url})', log_type='markdown', level='ERROR')
+                    build._kill(result='ko')
+                    return
+            else:
+                dump_db = params.dump_db
+
+            download_db_suffix = dump_db.db_suffix or self.restore_download_db_suffix
+            dump_build = dump_db.build_id or build.parent_id
             assert download_db_suffix and dump_build
             download_db_name = '%s-%s' % (dump_build.dest, download_db_suffix)
             zip_name = '%s.zip' % download_db_name
             dump_url = '%s%s' % (dump_build.http_log_url(), zip_name)
             build._log('test-migration', 'Restoring dump [%s](%s) from build [%s](%s)' % (zip_name, dump_url, dump_build.id, dump_build.build_url), log_type='markdown')
-        restore_suffix = self.restore_rename_db_suffix or params.dump_db.db_suffix or suffix
+        restore_suffix = self.restore_rename_db_suffix or dump_db.db_suffix or suffix
         assert restore_suffix
         restore_db_name = '%s-%s' % (build.dest, restore_suffix)
 

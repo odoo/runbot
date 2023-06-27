@@ -114,7 +114,7 @@ class RunbotCase(TransactionCase):
             'is_pr': False,
             'head': self.initial_server_commit.id,
         })
-        self.branch_server.bundle_id # compute
+        self.master_bundle = self.branch_server.bundle_id # compute
         self.dev_bundle = self.Bundle.create({
             'name': 'master-dev-tri',
             'project_id': self.project.id
