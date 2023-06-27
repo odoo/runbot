@@ -46,6 +46,7 @@ import collections
 import configparser
 import contextlib
 import copy
+import fcntl
 import functools
 import http.client
 import itertools
@@ -88,11 +89,20 @@ def pytest_addoption(parser):
              "blow through the former); localtunnel has no rate-limiting but "
              "the servers are way less reliable")
 
+def is_manager(config):
+    return not hasattr(config, 'workerinput')
 
 # noinspection PyUnusedLocal
 def pytest_configure(config):
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'mergebot_test_utils'))
 
+def pytest_unconfigure(config):
+    if not is_manager(config):
+        return
+
+    for c in config._tmp_path_factory.getbasetemp().iterdir():
+        if c.is_file() and c.name.startswith('template-'):
+            subprocess.run(['dropdb', '--if-exists', c.read_text(encoding='utf-8')])
 
 @pytest.fixture(scope='session', autouse=True)
 def _set_socket_timeout():
@@ -269,12 +279,26 @@ def tunnel(pytestconfig, port):
         raise ValueError("Unsupported %s tunnel method" % tunnel)
 
 class DbDict(dict):
-    def __init__(self, adpath):
+    def __init__(self, adpath, shared_dir):
         super().__init__()
         self._adpath = adpath
+        self._shared_dir = shared_dir
     def __missing__(self, module):
-        self[module] = db = 'template_%s' % uuid.uuid4()
-        with tempfile.TemporaryDirectory() as d:
+        with contextlib.ExitStack() as atexit:
+            f = atexit.enter_context(os.fdopen(os.open(
+                self._shared_dir / f'template-{module}',
+                os.O_CREAT | os.O_RDWR
+            ), mode="r+", encoding='utf-8'))
+            fcntl.lockf(f, fcntl.LOCK_EX)
+            atexit.callback(fcntl.lockf, f, fcntl.LOCK_UN)
+
+            db = f.read()
+            if db:
+                self[module] = db
+                return db
+
+            d = atexit.enter_context(tempfile.TemporaryDirectory())
+            self[module] = db = 'template_%s' % uuid.uuid4()
             subprocess.run([
                 'odoo', '--no-http',
                 *(['--addons-path', self._adpath] if self._adpath else []),
@@ -286,17 +310,25 @@ class DbDict(dict):
                 check=True,
                 env={**os.environ, 'XDG_DATA_HOME': d}
             )
+            f.write(db)
+            f.flush()
+            os.fsync(f.fileno())
+
         return db
 
 @pytest.fixture(scope='session')
-def dbcache(request):
+def dbcache(request, tmp_path_factory):
     """ Creates template DB once per run, then just duplicates it before
     starting odoo and running the testcase
     """
-    dbs = DbDict(request.config.getoption('--addons-path'))
+    shared_dir = tmp_path_factory.getbasetemp()
+    if not is_manager(request.config):
+        # xdist workers get a subdir as their basetemp, so we need to go one
+        # level up to deref it
+        shared_dir = shared_dir.parent
+
+    dbs = DbDict(request.config.getoption('--addons-path'), shared_dir)
     yield dbs
-    for db in dbs.values():
-        subprocess.run(['dropdb', '--if-exists', db], check=True)
 
 @pytest.fixture
 def db(request, module, dbcache):
