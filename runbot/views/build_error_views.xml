@@ -102,6 +102,45 @@
         </field>
     </record>
 
+  <record model="ir.ui.view" id="runbot_error_bulk_wizard_form">
+        <field name="name">runbot_error_bulk_wizard</field>
+        <field name="model">runbot.error.bulk.wizard</field>
+        <field name="arch" type="xml">
+          <form>
+            <sheet>
+              <group name="team_group">
+                <field name="team_id"/>
+                <field name="responsible_id"/>
+              </group>
+              <group name="Fix">
+                <field name="fixing_pr_id"/>
+                <field name="fixing_commit"/>
+              </group>
+              <group>
+                <field name="chatter_comment"/>
+              </group>
+              <group name="Close">
+                <field name="archive"/> 
+              </group>
+              <footer>
+                <button string="Submit" name="submit" type="object" class="btn-primary"/>
+                <button string="Cancel" class="btn-secondary" special="cancel"/>
+              </footer>
+            </sheet>
+          </form>
+        </field>
+    </record>
+
+    <record id="runbot_open_bulk_wizard" model="ir.actions.act_window">
+        <field name="name">Bulk Update Wizard</field>
+        <field name="res_model">runbot.error.bulk.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="view_id" ref="runbot_error_bulk_wizard_form"/>
+        <field name="binding_model_id" ref="runbot.model_runbot_build_error"/>
+        <field name="binding_view_types">list</field>
+    </record>
+
     <record id="build_error_view_tree" model="ir.ui.view">
         <field name="name">runbot.build.error.tree</field>
         <field name="model">runbot.build.error</field>
@@ -110,7 +149,12 @@
                   decoration-danger="test_tags and (fixing_pr_alive or not fixing_pr_id)" 
                   decoration-success="fixing_pr_id and not test_tags and not fixing_pr_alive"
                   decoration-warning="test_tags and fixing_pr_id and not fixing_pr_alive"
-                  multi_edit="1">
+                  multi_edit="1"
+                  create="False"
+                  >
+                <header>
+                  <button name="%(runbot.runbot_open_bulk_wizard)d" string="Bulk Update" type="action" groups="runbot.group_runbot_admin,runbot.group_runbot_error_manager"/>
+                </header>
                 <field name="module_name" readonly="1"/>
                 <field name="summary" readonly="1"/>
                 <field name="random" string="Random"/>
@@ -217,66 +261,7 @@
         <field name="view_mode">tree,form</field>
     </record>
 
-    <record model="ir.ui.view" id="runbot_error_closing_wizard_form">
-        <field name="name">runbot_error_closing_wizard</field>
-        <field name="model">runbot.error.closing.wizard</field>
-        <field name="arch" type="xml">
-          <form>
-            <sheet>
-              <group name="closing_group">
-                <field name="reason"/>
-              </group>
-              <footer>
-                <button string="Submit" name="submit" type="object" class="btn-primary"/>
-                <button string="Cancel" class="btn-secondary" special="cancel"/>
-              </footer>
-            </sheet>
-          </form>
-        </field>
-    </record>
 
-    <record id="runbot_open_error_closing_wizard" model="ir.actions.act_window">
-        <field name="name">Close Errors With A Reason</field>
-        <field name="res_model">runbot.error.closing.wizard</field>
-        <field name="view_mode">form</field>
-        <field name="target">new</field>
-        <field name="view_id" ref="runbot_error_closing_wizard_form"/>
-        <field name="binding_model_id" ref="runbot.model_runbot_build_error"/>
-        <field name="binding_view_types">form,list</field>
-    </record>
-
-  <record model="ir.ui.view" id="runbot_error_reassign_wizard_form">
-        <field name="name">runbot_error_reassign_wizard</field>
-        <field name="model">runbot.error.reassign.wizard</field>
-        <field name="arch" type="xml">
-          <form>
-            <sheet>
-              <group name="team_group">
-                <field name="team_id"/>
-                <field name="responsible_id"/>
-              </group>
-              <group name="Fix">
-                <field name="fixing_pr_id"/>
-                <field name="fixing_commit"/>
-              </group>
-              <footer>
-                <button string="Submit" name="submit" type="object" class="btn-primary"/>
-                <button string="Cancel" class="btn-secondary" special="cancel"/>
-              </footer>
-            </sheet>
-          </form>
-        </field>
-    </record>
-
-    <record id="runbot_open_reassign_wizard" model="ir.actions.act_window">
-        <field name="name">Assign Team/User/PR Wizard</field>
-        <field name="res_model">runbot.error.reassign.wizard</field>
-        <field name="view_mode">form</field>
-        <field name="target">new</field>
-        <field name="view_id" ref="runbot_error_reassign_wizard_form"/>
-        <field name="binding_model_id" ref="runbot.model_runbot_build_error"/>
-        <field name="binding_view_types">list</field>
-    </record>
 
   </data>
 </odoo>
