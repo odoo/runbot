@@ -737,7 +737,7 @@ class ConfigStep(models.Model):
     def _run_restore(self, build, log_path):
         # exports = build._checkout()
         params = build.params_id
-
+        dump_db = params.dump_db
         if 'dump_url' in params.config_data:
             dump_url = params.config_data['dump_url']
             zip_name = dump_url.split('/')[-1]
@@ -760,8 +760,6 @@ class ConfigStep(models.Model):
                     build._log('_run_restore', f'No dump with suffix {dump_suffix} found in build [{reference_build.id}]({reference_build.build_url})', log_type='markdown', level='ERROR')
                     build._kill(result='ko')
                     return
-            else:
-                dump_db = params.dump_db
 
             download_db_suffix = dump_db.db_suffix or self.restore_download_db_suffix
             dump_build = dump_db.build_id or build.parent_id
