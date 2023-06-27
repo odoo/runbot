@@ -9,29 +9,56 @@
             </header>
             <sheet>
               <widget name="web_ribbon" title="Archived" bg_color="bg-danger" attrs="{'invisible': [('active', '=', True)]}"/>
-              <group name="repo_group">
-                <field name="active" invisible="1"/>
-                <field name="name"/>
-                <field name="sequence"/>
-                <field name="description"/>
-                <field name="category_id" required='1'/>
-                <field name="project_id"/>
-                <field name="repo_ids"/>
-                <field name="dependency_ids"/>
-                <field name="config_id"/>
-                <field name="batch_dependent"/>
-                <field name="version_domain" widget="domain" options="{'model': 'runbot.version', 'in_dialog': True}"/>
-                <field name="hide"/>
-                <field name="manual"/>
-                <field name="upgrade_dumps_trigger_id"/>
-                <field name="upgrade_step_id"/>
-                <field name="ci_context"/>
-                <field name="ci_url"/>
-                <field name="ci_description"/>
-                <field name="has_stats"/>
-                <field name="team_ids"/>
+              <field name="active" invisible="1"/>
+              <group name="Base config">
+                <group>
+                  <field name="name"/>
+                  <field name="sequence"/>
+                  <field name="category_id" required='1'/>
+                  <field name="project_id" default=""/>
+                  <field name="config_id"/>
+                </group>
+                <group>
+                  <field name="description"/>
+                  <field name="batch_dependent"/>
+                  <field name="upgrade_dumps_trigger_id"/>
+                  <field name="upgrade_step_id"/>
+                  <field name="version_domain" widget="domain" options="{'model': 'runbot.version', 'in_dialog': True}"/>
+                </group>
               </group>
+              <group>
+                <group string="Repositories">
+                  <field name="repo_ids" nolabel="1" colspan="2"/>
+                </group>
+                <group string="Dependencies">
+                  <field name="dependency_ids" nolabel="1" colspan="2"/>
+                </group>
+              </group>
+              <group>
+                <group>
+                  <field name="hide"/>
+                  <field name="manual"/>
+                  <field name="restore_trigger_id"/>
+                </group>
+                <group>
+                  <field name="ci_context"/>
+                  <field name="ci_url"/>
+                  <field name="ci_description"/>
+                </group>
+              </group>
+              <group string="Managing Team (nightly failure, manual start, ...)"></group>
+              <field name="team_ids">
+                <tree>
+                  <field name="name"/>
+                  <field name="github_team"/>
+                  <field name="user_ids" widget="many2many_tags"/>
+                </tree>
+              </field>
             </sheet>
+            <div class="oe_chatter">
+                <field name="message_follower_ids"/>
+                <field name="message_ids"/>
+            </div>
           </form>
         </field>
       </record>
@@ -77,30 +104,45 @@
             <header>
             </header>
             <sheet>
-              <group name="repo">
-                <field name="name"/>
-                <field name="identity_file"/>
-                <field name="sequence"/>
-                <field name="project_id"/>
-                <field name="modules"/>
-                <field name="server_files"/>
-                <field name="manifest_files"/>
-                <field name="addons_paths"/>
-                <field name="hook_time" groups="base.group_no_one"/>
-                <field name="mode"/>
-                <field name="forbidden_regex"/>
-                <field name="invalid_branch_message"/>
-                <field name="single_version"/>
-                <field name="remote_ids">
-                  <tree string="Remotes" editable="bottom">
-                    <field name="name"/>
-                    <field name="sequence"/>
-                    <field name="fetch_heads" string="Branch"/>
-                    <field name="fetch_pull" string="PR"/>
-                    <field name="send_status"/>
-                    <field name="token" password="True"/>
-                  </tree>
-                </field>
+              <group string="Base values">
+                <group>
+                  <field name="name"/>
+                  <field name="project_id"/>
+                  <field name="sequence"/>
+                  <field name="mode"/>
+                </group>
+                <group>
+                  <field name="modules"/>
+                  <field name="server_files"/>
+                  <field name="manifest_files"/>
+                  <field name="addons_paths"/>
+                </group>
+                <group colspan="4">
+                  <field name="remote_ids">
+                    <tree string="Remotes" editable="bottom">
+                      <field name="name"/>
+                      <field name="sequence"/>
+                      <field name="fetch_heads" string="Branch"/>
+                      <field name="fetch_pull" string="PR"/>
+                      <field name="send_status"/>
+                      <field name="token" password="True"/>
+                    </tree>
+                  </field>
+                </group>
+              </group>
+              <group string="Advanced options">
+                <group>
+                  <field name="forbidden_regex"/>
+                  <field name="invalid_branch_message"/>
+                </group>
+                <group>
+                  <field name="identity_file"/>
+                  <field name="single_version"/>
+                </group>
+
+                <group string="debug">
+                  <field name="hook_time" groups="base.group_no_one"/>
+                </group>
               </group>
             </sheet>
             <div class="oe_chatter">

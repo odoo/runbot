@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from unittest.mock import patch, mock_open
 from odoo import Command
+from odoo.tools import mute_logger
 from odoo.exceptions import UserError
 from odoo.addons.runbot.common import RunbotException
 from .common import RunbotCase
@@ -197,6 +198,65 @@ class TestCodeowner(TestBuildConfigStepCommon):
             'Adding codeowner-team to reviewers for file [server/core/addons/module4/some/file.txt](https://False/blob/dfdfcfcf/core/addons/module4/some/file.txt)',
             'Requesting review for pull request [base/server:1234](https://example.com/base/server/pull/1234): codeowner-team, team_01, team_02, team_js, team_py'
         ])
+
+class TestBuildConfigStepRestore(TestBuildConfigStepCommon):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.restore_config_step = cls.env['runbot.build.config.step'].create({
+            'name': 'restore',
+            'job_type': 'restore',
+        })
+        cls.restore_config = cls.env['runbot.build.config'].create({
+            'name': 'Restore',
+            'step_order_ids': [
+                (0, 0, {'sequence': 10, 'step_id': cls.restore_config_step.id}),
+            ],
+        })
+
+    def test_restore(self):
+        # setup master branch
+        master_batch = self.master_bundle._force()
+        with mute_logger('odoo.addons.runbot.models.batch'):
+            master_batch._prepare()
+        reference_slot = master_batch.slot_ids
+        trigger = reference_slot.trigger_id
+        self.assertEqual(trigger.name, 'Server trigger', 'Just checking that we have a single slot')
+        reference_build = reference_slot.build_id
+        self.env['runbot.database'].create({
+            'build_id': reference_build.id,
+            'name': f'{reference_build.dest}-suffix',
+        })
+        reference_build.local_state = 'done'
+        reference_build.local_result = 'ok'
+
+        # custom trigger
+        config_data = {
+                'dump_trigger_id': trigger.id,
+                'dump_suffix': 'suffix',
+            }
+        self.env['runbot.bundle.trigger.custom'].create({
+            'bundle_id': self.dev_bundle.id,
+            'config_id': self.restore_config.id,
+            'trigger_id': trigger.id,
+            'config_data': config_data,
+        })
+
+        # create dev build
+        dev_batch = self.dev_bundle._force()
+        with mute_logger('odoo.addons.runbot.models.batch'):
+            dev_batch._prepare()
+        dev_batch.base_reference_batch_id = master_batch  # not tested, this is not the purpose of this test
+        dev_build = dev_batch.slot_ids.build_id
+        self.assertEqual(dev_build.params_id.config_data, config_data)
+
+        docker_params = self.restore_config_step._run_restore(dev_build, '/tmp/logs')
+        cmds = docker_params['cmd'].split(' && ')
+        self.assertEqual(f'wget https://False/runbot/static/build/{reference_build.dest}/logs/{reference_build.dest}-suffix.zip', cmds[2])
+        self.assertEqual(f'psql -q {dev_build.dest}-suffix < dump.sql', cmds[8])
+        self.called=True
+
 
 
 class TestBuildConfigStepCreate(TestBuildConfigStepCommon):
