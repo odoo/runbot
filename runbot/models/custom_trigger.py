@@ -68,7 +68,7 @@ class CustomTriggerWizard(models.TransientModel):
         for record in self:
             record.has_child_with_restore_step = record.child_config_id and any(step.job_type == 'restore' for step in self.child_config_id.step_ids())
 
-    @api.onchange('child_extra_params', 'restore_dump_url', 'config_id', 'child_config_id', 'number_build', 'config_id', 'restore_mode', 'restore_database_suffix', 'restore_trigger_id')
+    @api.onchange('extra_params', 'child_extra_params', 'restore_dump_url', 'config_id', 'child_config_id', 'number_build', 'config_id', 'restore_mode', 'restore_database_suffix', 'restore_trigger_id')
     def _onchange_warnings(self):
         for wizard in self:
             _warnings = []
@@ -126,7 +126,7 @@ class CustomTriggerWizard(models.TransientModel):
         self._onchange_config_data()
         self._onchange_warnings()
 
-    @api.onchange('number_build', 'child_extra_params', 'restore_dump_url', 'child_config_id', 'restore_trigger_id', 'restore_database_suffix', 'restore_mode')
+    @api.onchange('number_build', 'extra_params', 'child_extra_params', 'restore_dump_url', 'child_config_id', 'restore_trigger_id', 'restore_database_suffix', 'restore_mode')
     def _onchange_config_data(self):
        for wizard in self:
            wizard.config_data = self._get_config_data()
