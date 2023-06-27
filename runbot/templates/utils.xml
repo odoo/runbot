@@ -219,7 +219,7 @@
                     <a t-if="bu.static_run" t-att-href="bu.static_run" class="btn btn-info" title="View result" aria-label="View result">
                         <i class="fa fa-sign-in"/>
                     </a>
-                    <a groups="base.group_user" t-if="bu.local_state=='done' and bu.requested_action != 'wake_up' and bu.database_ids" href="#" data-runbot="wakeup" t-att-data-runbot-build="bu.id" class="btn btn-default" title="Wake up this build" aria-label="Wake up this build">
+                    <a groups="base.group_user" t-if="bu.local_state=='done' and (not bu.parent_id or user_id.has_group('runbot.group_runbot_advanced_user')) and bu.requested_action != 'wake_up' and bu.database_ids" href="#" data-runbot="wakeup" t-att-data-runbot-build="bu.id" class="btn btn-default" title="Wake up this build" aria-label="Wake up this build">
                         <i class="fa fa-coffee"/>
                     </a>
                     <a t-attf-href="/runbot/build/{{bu['id']}}" class="btn btn-default" title="Build details" aria-label="Build details">
