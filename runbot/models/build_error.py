@@ -286,28 +286,16 @@ class ErrorRegex(models.Model):
         return False
 
 
-class ErrorClosingWizard(models.TransientModel):
-    _name = 'runbot.error.closing.wizard'
-    _description = "Errors Closing Wizard"
-
-    reason = fields.Char("Closing Reason", help="Reason that will appear in the chatter")
-
-    def submit(self):
-        error_ids = self.env['runbot.build.error'].browse(self.env.context.get('active_ids'))
-        if error_ids:
-            for build_error in error_ids:
-                build_error.message_post(body=self.reason, subject="Closing Error")
-            error_ids['active'] = False
-
-
-class ErrorReassignWizard(models.TransientModel):
-    _name = 'runbot.error.reassign.wizard'
-    _description = "Errors reassign Wizard"
+class ErrorBulkWizard(models.TransientModel):
+    _name = 'runbot.error.bulk.wizard'
+    _description = "Errors Bulk Wizard"
 
     team_id = fields.Many2one('runbot.team', 'Assigned team')
     responsible_id = fields.Many2one('res.users', 'Assigned fixer')
     fixing_pr_id = fields.Many2one('runbot.branch', 'Fixing PR', domain=[('is_pr', '=', True)])
     fixing_commit = fields.Char('Fixing commit')
+    archive = fields.Boolean('Close error (archive)', default=False)
+    chatter_comment = fields.Text('Chatter Comment')
 
     def submit(self):
         error_ids = self.env['runbot.build.error'].browse(self.env.context.get('active_ids'))
@@ -320,3 +308,14 @@ class ErrorReassignWizard(models.TransientModel):
                 error_ids['fixing_pr_id'] = self.fixing_pr_id
             if self.fixing_commit:
                 error_ids['fixing_commit'] = self.fixing_commit
+            if self.archive:
+                error_ids['active'] = False
+            if self.chatter_comment:
+                for build_error in error_ids:
+                    build_error.message_post(body=self.chatter_comment, subject="Bullk Wizard Comment")
+
+    @api.onchange('fixing_commit', 'chatter_comment')
+    def _onchange_commit_comment(self):
+        for record in self:
+            if record.fixing_commit or record.chatter_comment:
+                record.archive = True
