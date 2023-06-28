@@ -10,6 +10,7 @@ import threading
 import time
 import signal
 
+from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from logging.handlers import WatchedFileHandler
@@ -37,6 +38,7 @@ class RunbotClient():
 
     def main_loop(self):
         from odoo import fields
+        from odoo.tools.profiler import Profiler
         self.on_start()
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
@@ -52,23 +54,28 @@ class RunbotClient():
             ' (assigned only)' if self.host.assigned_only else ''
         )
         while True:
-            try:
-                self.host.last_start_loop = fields.Datetime.now()
-                self.env.cr.commit()
-                self.count = self.count % self.max_count
-                sleep_time = self.loop_turn()
-                self.count += 1
-                self.host.last_end_loop = fields.Datetime.now()
-                self.env.cr.commit()
-                self.env.clear()
-                self.sleep(sleep_time)
-            except Exception as e:
-                _logger.exception('Builder main loop failed with: %s', e)
-                self.env.cr.rollback()
-                self.env.clear()
-                self.sleep(10)
-            if self.ask_interrupt.is_set():
-                return
+            context_manager = Profiler(db=self.env.cr.dbname) if self.host.profile else nullcontext()
+            with context_manager:
+                try:
+                    self.host.last_start_loop = fields.Datetime.now()
+                    self.env.cr.commit()
+                    self.count = self.count % self.max_count
+                    if self.host.paused:
+                        sleep_time = 5
+                    else:
+                        sleep_time = self.loop_turn()
+                    self.count += 1
+                    self.host.last_end_loop = fields.Datetime.now()
+                    self.env.cr.commit()
+                    self.env.clear()
+                    self.sleep(sleep_time)
+                except Exception as e:
+                    _logger.exception('Builder main loop failed with: %s', e)
+                    self.env.cr.rollback()
+                    self.env.clear()
+                    self.sleep(10)
+                if self.ask_interrupt.is_set():
+                    return
 
     def loop_turn(self):
         raise NotImplementedError()
