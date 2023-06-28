@@ -38,6 +38,9 @@ class Host(models.Model):
     host_message_ids = fields.One2many('runbot.host.message', 'host_id')
     build_ids = fields.One2many('runbot.build', compute='_compute_build_ids')
 
+    paused = fields.Boolean('Paused', help='Host will stop scheduling while paused')
+    profile = fields.Boolean('Profile', help='Enable profiling on this host')
+
     def _compute_nb(self):
         groups = self.env['runbot.build'].read_group(
             [('host', 'in', self.mapped('name')), ('local_state', 'in', ('testing', 'running'))],
