@@ -9,16 +9,14 @@
               <widget name="web_ribbon" title="Test-tags" bg_color="bg-warning" attrs="{'invisible': [('test_tags', '=', False)]}"/>
               <header>
               </header>
-                <group>
-                  <group name="build_error_group" string="Base info">
-                    <field name="content" readonly="1"/>
-                    <field name="module_name" readonly="1"/>
-                    <field name="function" readonly="1"/>
-                    <field name="file_path" readonly="1"/>
-                  </group>
+                <group name="build_error_group" string="Base info" col="2">
+                  <field name="content" readonly="1"/>
+                  <field name="module_name" readonly="1"/>
+                  <field name="function" readonly="1"/>
+                  <field name="file_path" readonly="1"/>
                 </group>
-                <group col="2">
-                  <group name="fixer_info" string="Fixing">
+                <group name="fixer_info" string="Fixing" col="2">
+                  <group>
                     <field name="responsible" attrs="{'readonly': [('parent_id','!=', False), ('responsible','=', False)]}"/>
                     <field name="team_id" attrs="{'readonly': [('parent_id','!=', False), ('team_id','=', False)]}"/>
                     <field name="fixing_pr_id"/>
@@ -27,7 +25,7 @@
                     <field name="test_tags" readonly="1" groups="!runbot.group_runbot_admin"/>
                     <field name="test_tags" groups="runbot.group_runbot_admin" attrs="{'readonly': [('parent_id','!=', False), ('test_tags','=', False)]}"/>
                   </group>
-                    <group name="fixer_info" string="Fixing">
+                  <group>
                     <field name="version_ids" widget="many2many_tags"/>
                     <field name="trigger_ids" widget="many2many_tags"/>
                     <field name="tag_ids" widget="many2many_tags" readonly="1"/>
