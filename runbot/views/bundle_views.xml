@@ -65,34 +65,39 @@
                             <field name="disable_codeowner"/>
                         </group>
                     </group>
-                    <group string="branches"/>
-                    <field name="branch_ids" nolabel="1">
-                        <tree>
-                            <field name="dname"/>
-                            <field name="remote_id"/>
-                            <field name="pull_head_name"/>
-                            <field name="target_branch_name"/>
-                        </tree>
-                    </field>
-                    <group string="Trigger customisation"/>
-                    <field name="trigger_custom_ids" nolabel="1">
-                        <tree editable="bottom">
-                            <field name="start_mode"/>
-                            <field name="trigger_id" domain="[('project_id', '=', parent.project_id)]"/>
-                            <field name="config_id"/>
-                            <field name="extra_params"/>
-                            <field name="config_data" widget="jsonb"/>
-                        </tree>
-                    </field>
-                    <group string="Last batchs"/>
-                    <field name="last_batchs" nolabel="1">
-                        <tree>
-                            <field name="id" widget="char_frontend_url"/>
-                            <field name="state"/>
-                            <field name="commit_link_ids"/>
-                            <field name="slot_ids"/>
-                        </tree>
-                    </field>
+                    <notebook>
+                        <page string="Trigger customisation">
+                            <field name="trigger_custom_ids" nolabel="1">
+                                <tree editable="bottom">
+                                    <field name="start_mode"/>
+                                    <field name="trigger_id" domain="[('project_id', '=', parent.project_id)]"/>
+                                    <field name="config_id"/>
+                                    <field name="extra_params"/>
+                                    <field name="config_data" widget="jsonb"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="branches">
+                            <field name="branch_ids" nolabel="1">
+                                <tree>
+                                    <field name="dname"/>
+                                    <field name="remote_id"/>
+                                    <field name="pull_head_name"/>
+                                    <field name="target_branch_name"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Last batchs">
+                            <field name="last_batchs" nolabel="1">
+                                <tree>
+                                    <field name="id" widget="char_frontend_url"/>
+                                    <field name="state"/>
+                                    <field name="commit_link_ids"/>
+                                    <field name="slot_ids"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
                 </sheet>
                 <div class="oe_chatter">
                     <field name="message_follower_ids"/>
