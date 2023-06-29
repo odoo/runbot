@@ -68,7 +68,7 @@ export class FrontendUrl extends Component {
     static template = xml`
     <div class="o_field_many2one_selection">
         <div class="o_field_widget"><Many2OneField t-props="props"/></div>
-        <div><a t-att-href="route"><span class="fa fa-play ms-2"/></a></div>
+        <div><a t-att-href="route" target="_blank"><span class="fa fa-play ms-2"/></a></div>
     </div>`;
 
     static components = { Many2OneField }
@@ -92,7 +92,7 @@ export class FieldCharFrontendUrl extends Component {
     static template = xml`
     <div class="o_field_many2one_selection">
         <div class="o_field_widget"><CharField t-props="props" /></div>
-        <div><a t-att-href="route"><span class="fa fa-play ms-2"/></a></div>
+        <div><a t-att-href="route" target="_blank"><span class="fa fa-play ms-2"/></a></div>
     </div>`;
 
     static components = { CharField }
