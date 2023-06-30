@@ -925,23 +925,12 @@ class BuildResult(models.Model):
         msg = ''
         try:
             with local_pgadmin_cursor() as local_cr:
-                pid_col = 'pid' if local_cr.connection.server_version >= 90200 else 'procpid'
-                query = 'SELECT pg_terminate_backend({}) FROM pg_stat_activity WHERE datname=%s'.format(pid_col)
+                query = 'SELECT pg_terminate_backend({}) FROM pg_stat_activity WHERE datname=pid'
                 local_cr.execute(query, [dbname])
                 local_cr.execute('DROP DATABASE IF EXISTS "%s"' % dbname)
-            # cleanup filestore
-            datadir = appdirs.user_data_dir()
-            paths = [os.path.join(datadir, pn, 'filestore', dbname) for pn in 'OpenERP Odoo'.split()]
-            cmd = ['rm', '-rf'] + paths
-            _logger.info(' '.join(cmd))
-            subprocess.call(cmd)
-        except psycopg2.errors.InsufficientPrivilege:
-            msg = f"Insuficient priveleges to drop local database '{dbname}'"
-            _logger.warning(msg)
         except Exception as e:
             msg = f"Failed to drop local logs database : {dbname} with exception: {e}"
             _logger.exception(msg)
-        if msg:
             host_name = self.env['runbot.host']._get_current_name()
             self.env['runbot.runbot'].warning(f'Host {host_name}: {msg}')
 
