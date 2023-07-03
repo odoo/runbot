@@ -77,7 +77,7 @@ export class FrontendUrl extends Component {
         const model = this.props.relation || this.props.record.fields[this.props.name].relation;
         const id = this.props.value[0];
         if (model.startsWith('runbot.') ) {
-            return '/runbot/' + model.split('.')[1] + '/' + this.props.record.resId;
+            return '/runbot/' + model.split('.')[1] + '/' + id;
         } else {
             return false;
         }
