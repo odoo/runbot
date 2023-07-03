@@ -15,6 +15,7 @@ from . import dockerfile
 from . import event
 from . import host
 from . import ir_cron
+from . import ir_http
 from . import ir_qweb
 from . import project
 from . import repo
