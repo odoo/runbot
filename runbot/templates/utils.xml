@@ -201,7 +201,7 @@
                 <span t-else="" t-attf-class="btn btn-default disabled slot_name">
                     <span t-esc="slot.trigger_id.name"/>
                 </span>
-                <a t-if="bu.local_state == 'running' and bu.database_ids" t-attf-href="http://{{sorted(bu.mapped('database_ids.name'))[0]}}.{{bu.host}}" class="fa fa-sign-in btn btn-info"/>
+                <a t-if="bu.local_state == 'running' and bu.database_ids" t-attf-href="/runbot/run/{{bu.id}}" class="fa fa-sign-in btn btn-info"/>
                 <a t-if="bu.static_run" t-att-href="bu.static_run" class="fa fa-sign-in btn btn-info"/>
                 <t t-if="bu" t-call="runbot.build_menu"/>
                 <a t-if="not bu" groups="base.group_user" class="btn btn-default" title="Create build" t-attf-href="/runbot/batch/slot/{{slot.id}}/build">
@@ -213,7 +213,7 @@
         <template id="runbot.build_button">
             <div t-attf-class="pull-right">
                 <div t-attf-class="btn-group {{klass}}">
-                    <a t-if="bu.local_state == 'running' and bu.database_ids" t-attf-href="http://{{sorted(bu.mapped('database_ids.name'))[0]}}.{{bu.host}}" class="btn btn-info" title="Sign in on this build" aria-label="Sign in on this build">
+                    <a t-if="bu.local_state == 'running' and bu.database_ids" t-attf-href="/runbot/run/{{bu.id}}" class="btn btn-info" title="Sign in on this build" aria-label="Sign in on this build">
                         <i class="fa fa-sign-in"/>
                     </a>
                     <a t-if="bu.static_run" t-att-href="bu.static_run" class="btn btn-info" title="View result" aria-label="View result">
@@ -265,7 +265,7 @@
                 </a>
                 <t t-if="bu.local_state=='running'">
                     <t t-foreach="bu.database_ids.sorted('name')[1:]" t-as="db">
-                        <a class="dropdown-item" t-attf-href="http://{{db.name}}.{{bu.host}}/">
+                        <a class="dropdown-item" t-attf-href="/runbot/run/{{bu.id}}/{{db.db_suffix}}">
                             <i class="fa fa-sign-in"/>
                             Connect <t t-esc="db.db_suffix"></t>
                         </a>
