@@ -77,6 +77,6 @@
             '/web/static/lib/bootstrap/js/dist/collapse.js',
             '/runbot/static/src/js/runbot.js',
         ],
-    }
-
+    },
+    'post_load': 'runbot_post_load',
 }
