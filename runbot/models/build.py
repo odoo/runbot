@@ -21,6 +21,7 @@ from pathlib import Path
 from psycopg2 import sql
 from psycopg2.extensions import TransactionRollbackError
 import getpass
+import uuid
 
 _logger = logging.getLogger(__name__)
 
@@ -236,6 +237,8 @@ class BuildResult(models.Model):
 
     static_run = fields.Char('Static run URL')
 
+    token = fields.Char('Token', default=lambda self: uuid.uuid4().hex)
+
     @api.depends('description', 'params_id.config_id')
     def _compute_display_name(self):
         for build in self:
@@ -323,6 +326,11 @@ class BuildResult(models.Model):
 
     def _get_result_score(self, result):
         return result_order.index(result)
+
+    def _get_run_token(self):
+        token = self.token or self.params_id.fingerprint
+        token_info = hex(hash(token or '' + str(self.env.user.id)))[-4:]
+        return (token[:6], token_info[:4])
 
     @api.depends('active_step')
     def _compute_job(self):
