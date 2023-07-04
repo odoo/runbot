@@ -192,7 +192,7 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
     if container.status not in ('running', 'created') :
         _logger.error('Container %s started but status is not running or created:  %s', container_name, container.status)  # TODO cleanup
     else:
-        _logger.info('Started Docker container %s', container_name)
+        _logger.info('Started Docker container %s (%s)', container_name, container.short_id)
     return
 
 
