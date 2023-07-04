@@ -1185,9 +1185,13 @@ class Model:
 
     # because sorted is not xmlrpc-compatible (it doesn't downgrade properly)
     def sorted(self, field):
-        rs = self.read([field])
-        rs.sort(key=lambda r: r[field])
-        return Model(self._env, self._model, [r['id'] for r in rs])
+        fn = field if callable(field) else lambda r: r[field]
+
+        return Model(self._env, self._model, (
+            id
+            for record in sorted(self, key=fn)
+            for id in record.ids
+        ))
 
     def __getitem__(self, index):
         if isinstance(index, str):
