@@ -605,9 +605,4 @@ class Runbot(Controller):
         build = request.env['runbot.build'].browse(int(build_id)).exists()
         if db_suffix is None:
             db_suffix = build.mapped('database_ids')[0].db_suffix
-        if request.env.user._is_internal():
-            token, token_info = build._get_run_token()
-            db_suffix = f'{db_suffix}-{token}-{token_info}'
-        redirect = f'http://{build.dest}-{db_suffix}.{build.host}'
-        _logger.info('Redirecting to %s', redirect)
-        return werkzeug.utils.redirect(redirect)
+        return werkzeug.utils.redirect(f'http://{build.dest}-{db_suffix}.{build.host}')
