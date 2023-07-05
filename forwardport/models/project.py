@@ -1114,31 +1114,6 @@ stderr:
             ('source_id.merge_date', '<', cutoff),
         ], order='source_id, id'), lambda p: p.source_id)
 
-    def _hall_of_shame(self):
-        """Provides data for the HOS view
-
-        * outstanding forward ports per reviewer
-        * pull requests with outstanding forward ports, oldest-merged first
-        """
-        cutoff_dt = datetime.datetime.now() - DEFAULT_DELTA
-        outstanding = self.env['runbot_merge.pull_requests'].search([
-            ('source_id', '!=', False),
-            ('state', 'not in', ['merged', 'closed']),
-            ('source_id.merge_date', '<', cutoff_dt),
-        ], order=None)
-        # only keep merged because apparently some PRs are in a weird spot
-        # where they're sources but closed?
-        sources = outstanding.mapped('source_id').filtered('merge_date').sorted('merge_date')
-        outstandings = []
-        reviewers = collections.Counter()
-        for source in sources:
-            outstandings.append(Outstanding(source=source, prs=source.forwardport_ids & outstanding))
-            reviewers[source.reviewed_by] += 1
-        return HallOfShame(
-            reviewers=reviewers.most_common(),
-            outstanding=outstandings,
-        )
-
     def _reminder(self):
         cutoff = self.env.context.get('forwardport_updated_before') \
               or fields.Datetime.to_string(datetime.datetime.now() - DEFAULT_DELTA)

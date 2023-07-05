@@ -527,7 +527,7 @@ class PullRequests(models.Model):
     ], default='opened', index=True)
 
     number = fields.Integer(required=True, index=True, group_operator=None)
-    author = fields.Many2one('res.partner')
+    author = fields.Many2one('res.partner', index=True)
     head = fields.Char(required=True)
     label = fields.Char(
         required=True, index=True,
@@ -545,7 +545,7 @@ class PullRequests(models.Model):
     ], default=False)
     method_warned = fields.Boolean(default=False)
 
-    reviewed_by = fields.Many2one('res.partner')
+    reviewed_by = fields.Many2one('res.partner', index=True)
     delegates = fields.Many2many('res.partner', help="Delegate reviewers, not intrinsically reviewers but can review this PR")
     priority = fields.Integer(default=2, index=True, group_operator=None)
 

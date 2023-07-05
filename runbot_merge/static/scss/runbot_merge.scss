@@ -110,3 +110,14 @@ dl.runbot-merge-fields {
 .staging-statuses {
   cursor: wait;
 }
+
+/* forwardport */
+.outstanding-partners > * {
+  @extend .pt-1;
+  // because there's a trailing space which is annoying to remove, which plays
+  // the role of padding-right
+  @extend .pl-1;
+  @extend .text-nowrap;
+  // works better for the left edge of the *box*
+  @extend .border-left;
+}
