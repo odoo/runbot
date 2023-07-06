@@ -1764,7 +1764,7 @@ class Stagings(models.Model):
         ('pending', 'Pending'),
         ('cancelled', "Cancelled"),
         ('ff_failed', "Fast forward failed")
-    ], default='pending')
+    ], default='pending', index=True)
     active = fields.Boolean(default=True)
 
     staged_at = fields.Datetime(default=fields.Datetime.now, index=True)

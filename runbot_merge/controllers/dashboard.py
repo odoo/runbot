@@ -35,19 +35,24 @@ class MergebotDashboard(Controller):
         })
 
     @route('/runbot_merge/<int:branch_id>', auth='public', type='http', website=True, sitemap=False)
-    def stagings(self, branch_id, until=None):
+    def stagings(self, branch_id, until=None, state=''):
         branch = request.env['runbot_merge.branch'].browse(branch_id).sudo().exists()
         if not branch:
             raise werkzeug.exceptions.NotFound()
 
-        stagings = request.env['runbot_merge.stagings'].with_context(active_test=False).sudo().search([
-            ('target', '=', branch.id),
-            ('staged_at', '<=', until) if until else (True, '=', True),
-        ], order='staged_at desc', limit=LIMIT+1)
+        staging_domain = [('target', '=', branch.id)]
+        if until:
+            staging_domain.append(('staged_at', '<=', until))
+        if state:
+            staging_domain.append(('state', '=', state))
+
+        stagings = request.env['runbot_merge.stagings'].with_context(active_test=False).sudo().search(staging_domain, order='staged_at desc', limit=LIMIT + 1)
 
         return request.render('runbot_merge.branch_stagings', {
             'branch': branch,
             'stagings': stagings[:LIMIT],
+            'until': until,
+            'state': state,
             'next': stagings[-1].staged_at if len(stagings) > LIMIT else None,
         })
 

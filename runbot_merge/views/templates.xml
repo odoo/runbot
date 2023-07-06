@@ -199,6 +199,18 @@
                 <section class="row">
                     <h1 class="col-md-12"><t t-esc="branch.project_id.name"/>: <t t-esc="branch.name"/></h1>
                 </section>
+                <form method="get">
+                    <label for="until">Staged before:</label>
+                    <input type="datetime-local" name="until" t-att-value="until"/>
+                    (UTC)
+                    <label for="state">State:</label>
+                    <select name="state">
+                        <option t-att-selected="'selected' if not state else None"/>
+                        <option t-att-selected="'selected' if state == 'success' else None" value="success">Success</option>
+                        <option t-att-selected="'selected' if state == 'failure' else None" value="failure">Failure</option>
+                    </select>
+                    <button type="submit">Apply</button>
+                </form>
                 <table>
                     <t t-foreach="stagings" t-as="staging">
                         <t t-set="success"
@@ -270,7 +282,7 @@
                     </t>
                 </table>
                 <t t-if="next">
-                    <a t-attf-href="/runbot_merge/{{branch.id}}?until={{next}}">
+                    <a t-attf-href="/runbot_merge/{{branch.id}}?until={{next}}&amp;state={{state}}">
                         Next >
                     </a>
                 </t>
