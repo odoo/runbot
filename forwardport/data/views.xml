@@ -10,8 +10,7 @@
         <xpath expr="//div[@id='alerts']" position="inside">
             <t t-if="env['runbot_merge.pull_requests'].check_access_rights('read', False)">
                 <t t-set="outstanding" t-value="env['runbot_merge.pull_requests'].search_count([
-                    ('source_id', '!=', False),
-                    ('state', 'not in', ['merged', 'closed']),
+                    ('state', 'in', ['opened', 'validated', 'approved', 'ready', 'error']),
                     ('source_id.merge_date', '&lt;', datetime.datetime.now() - relativedelta(days=3)),
                 ])"/>
                 <div t-if="outstanding != 0" class="alert col-md-12 alert-warning mb-0">

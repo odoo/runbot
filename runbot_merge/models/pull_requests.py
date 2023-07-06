@@ -1813,12 +1813,25 @@ class Stagings(models.Model):
         (repo, context, state, url)
         """
         Commits = self.env['runbot_merge.commit']
+        heads = {
+            head: repo
+            for st in self
+            for repo, head in json.loads(st.heads).items()
+            if not repo.endswith('^')
+        }
+        all_heads = Commits.search([('sha', 'in', list(heads))])
+        commits_map = {commit.sha: commit.id for commit in all_heads}
+
         for st in self:
-            heads = {
-                head: repo for repo, head in json.loads(st.heads).items()
-                if not repo.endswith('^')
-            }
-            commits = st.head_ids = Commits.search([('sha', 'in', list(heads.keys()))])
+            commits = st.head_ids = Commits._browse(
+                self.env,
+                tuple(
+                    commits_map[h]
+                    for repo, h in json.loads(st.heads).items()
+                    if not repo.endswith('^')
+                ),
+                all_heads._prefetch_ids
+            )
             if st.statuses_cache:
                 st.statuses = json.loads(st.statuses_cache)
                 continue
