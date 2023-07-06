@@ -197,11 +197,19 @@
                             </tree>
                         </field>
                     </group>
-                    <group string="Batches">
-                        <field name="batch_ids" colspan="4" nolabel="1">
+                    <group string="PRs">
+                        <field name="pr_ids" colspan="4" nolabel="1" readonly="1">
                             <tree>
-                                <field name="prs" widget="many2many_tags"
-                                       options="{'no_quick_create': True}"/>
+                                <field name="display_name"/>
+                                <field name="github_url" widget="url"/>
+                                <field name="url" widget="url"/>
+                            </tree>
+                        </field>
+                    </group>
+                    <group string="Batches">
+                        <field name="batch_ids" colspan="4" nolabel="1" readonly="1">
+                            <tree>
+                                <field name="prs" widget="many2many_tags"/>
                             </tree>
                         </field>
                     </group>

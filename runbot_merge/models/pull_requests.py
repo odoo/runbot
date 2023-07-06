@@ -1758,6 +1758,7 @@ class Stagings(models.Model):
         'runbot_merge.batch', 'staging_id',
         context={'active_test': False},
     )
+    pr_ids = fields.One2many('runbot_merge.pull_requests', compute='_compute_prs')
     state = fields.Selection([
         ('success', 'Success'),
         ('failure', 'Failure'),
@@ -1858,6 +1859,11 @@ class Stagings(models.Model):
                   fields.Datetime.from_string(st.staged_at)
                 + datetime.timedelta(minutes=st.target.project_id.ci_timeout)
             )
+
+    @api.depends('batch_ids.prs')
+    def _compute_prs(self):
+        for staging in self:
+            staging.pr_ids = staging.batch_ids.prs
 
     def _validate(self):
         Commits = self.env['runbot_merge.commit']
