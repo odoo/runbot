@@ -10,10 +10,10 @@ class ResConfigSettings(models.TransientModel):
     _inherit = 'res.config.settings'
 
     runbot_workers = fields.Integer('Default number of workers')
-    runbot_containers_memory = fields.Float('Memory limit for containers (in GiB)')
+    runbot_containers_memory = fields.Float('Containers Mem limit (in GiB)')
     runbot_memory_bytes = fields.Float('Bytes', compute='_compute_memory_bytes')
-    runbot_running_max = fields.Integer('Maximum number of running builds')
-    runbot_timeout = fields.Integer('Max allowed step timeout (in seconds)')
+    runbot_running_max = fields.Integer('Max running builds')
+    runbot_timeout = fields.Integer('Max step timeout (in seconds)')
     runbot_starting_port = fields.Integer('Starting port for running builds')
     runbot_max_age = fields.Integer('Max commit age (in days)')
     runbot_logdb_name = fields.Char('Local Logs DB name', default='runbot_logs', config_parameter='runbot.logdb_name')
