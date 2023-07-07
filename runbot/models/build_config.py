@@ -46,6 +46,7 @@ class ReProxy():
     VERBOSE = re.VERBOSE
     MULTILINE = re.MULTILINE
 
+
 class Config(models.Model):
     _name = 'runbot.build.config'
     _description = "Build config"
@@ -122,6 +123,7 @@ class ConfigStepUpgradeDb(models.Model):
     db_pattern = fields.Char('Db suffix pattern')
     min_target_version_id = fields.Many2one('runbot.version', "Minimal target version_id")
 
+
 TYPES = [
         ('install_odoo', 'Test odoo'),
         ('run_odoo', 'Run odoo'),
@@ -132,6 +134,8 @@ TYPES = [
         ('test_upgrade', 'Test Upgrade'),
         ('restore', 'Restore'),
     ]
+
+
 class ConfigStep(models.Model):
     _name = 'runbot.build.config.step'
     _description = "Config step"
@@ -201,6 +205,7 @@ class ConfigStep(models.Model):
 
     commit_limit = fields.Integer('Commit limit', default=50)
     file_limit = fields.Integer('File limit', default=450)
+    break_on_ko = fields.Boolean('Break after this step if build is ko')
 
     @api.constrains('python_code')
     def _check_python_code(self):
@@ -284,6 +289,7 @@ class ConfigStep(models.Model):
         build.log_counter = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_maxlogs', 100)
         run_method = getattr(self, '_run_%s' % self.job_type)
         docker_params = run_method(build, log_path, **kwargs)
+
         if docker_params:
             return build._docker_run(**docker_params)
         return True
