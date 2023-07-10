@@ -16,7 +16,6 @@
                         <field name="config_id"/>
                         <field name="number_build"/>
                         <field name="extra_params"/>
-                        <field name="child_extra_params"/>
                         <field name="child_config_id"/>
                     </group>
                     <group string="Restore options">
@@ -26,6 +25,7 @@
                         <field name="restore_database_suffix" attrs="{'invisible': [('restore_mode', '!=', 'auto')]}"/>
                     </group>
                     <group colspan="4">
+                        <field name="child_extra_params"/>
                         <field name="config_data"/>
                     </group>
                 </group>
