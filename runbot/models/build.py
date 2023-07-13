@@ -917,7 +917,7 @@ class BuildResult(models.Model):
         msg = ''
         try:
             with local_pgadmin_cursor() as local_cr:
-                query = 'SELECT pg_terminate_backend({}) FROM pg_stat_activity WHERE datname=pid'
+                query = 'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=%s'
                 local_cr.execute(query, [dbname])
                 local_cr.execute('DROP DATABASE IF EXISTS "%s"' % dbname)
         except Exception as e:
