@@ -11,6 +11,7 @@
                         <field name="name" readonly='1'/>
                         <field name="disp_name"/>
                         <field name="active"/>
+                        <field name="use_docker_registry"/>
                         <field name="last_start_loop" readonly='1'/>
                         <field name="last_end_loop" readonly='1'/>
                         <field name="last_success" readonly='1'/>
@@ -46,6 +47,7 @@
                 <field name="name"/>
                 <field name="disp_name"/>
                 <field name="assigned_only" widget="boolean_toggle"/>
+                <field name="use_docker_registry" widget="boolean_toggle"/>
                 <field name="nb_worker"/>
             </tree>
         </field>
