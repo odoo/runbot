@@ -118,6 +118,35 @@ def _docker_build(build_dir, image_tag):
         return (False, msg)
     return (True, None)
 
+def docker_push(image_tag):
+    return _docker_push(image_tag)
+
+
+def _docker_push(image_tag):
+    """Push a Docker image to the localy hosted docker registry
+    :param image_tag: the image tag (or id) to push
+    :return: tuple(success, msg) where success is a boolean and msg is the error message or None
+    """
+    docker_client = docker.from_env()
+    try:
+        image = docker_client.images.get(image_tag)
+    except docker.errors.ImageNotFound:
+        return (False, f"Docker image '{image_tag}' not found.")
+
+    push_tag = f'127.0.0.1:5001/{image_tag}'
+    image.tag(push_tag)
+    error = None
+    try:
+        for push_progress in docker_client.images.push(push_tag, stream=True, decode=True):
+            # the push method is supposed to raise in cases of API errors but doesn't in other cases
+            # e.g. connection errors or the image tag does not exists locally ...
+            if 'error' in push_progress:
+                error = str(push_progress)  # just stringify the whole as it might contains other keys like errorDetail ...
+    except docker.errors.APIError as e:
+        error = e
+    if error:
+        return (False, error)
+    return (True, None)
 
 def docker_run(*args, **kwargs):
     return _docker_run(*args, **kwargs)
