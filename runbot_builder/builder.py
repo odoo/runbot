@@ -20,6 +20,7 @@ class BuilderClient(RunbotClient):
             repo._update(force=True)
 
     def loop_turn(self):
+        self.env['runbot.runbot']._start_docker_registry(self.host)
         if self.count == 1: # cleanup at second iteration
             self.env['runbot.runbot']._source_cleanup()
             self.env['runbot.build']._local_cleanup()

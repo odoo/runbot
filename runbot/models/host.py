@@ -7,7 +7,7 @@ from collections import defaultdict
 from odoo import models, fields, api
 from odoo.tools import config, ormcache
 from ..common import fqdn, local_pgadmin_cursor, os, list_local_dbs, local_pg_cursor
-from ..container import docker_build
+from ..container import docker_build, docker_push
 
 _logger = logging.getLogger(__name__)
 
@@ -40,6 +40,8 @@ class Host(models.Model):
 
     paused = fields.Boolean('Paused', help='Host will stop scheduling while paused')
     profile = fields.Boolean('Profile', help='Enable profiling on this host')
+
+    use_docker_registry = fields.Boolean('Use Docker Registry', default=False, help="Use docker registry for pulling images")
 
     def _compute_nb(self):
         groups = self.env['runbot.build'].read_group(
@@ -124,34 +126,40 @@ class Host(models.Model):
         _logger.info('Done...')
 
     def _docker_build_dockerfile(self, dockerfile, workdir):
-        start = time.time()
-        # _logger.info('Building %s, %s', dockerfile.name, hash(str(dockerfile.dockerfile)))
-        docker_build_path = os.path.join(workdir, 'docker', dockerfile.image_tag)
-        os.makedirs(docker_build_path, exist_ok=True)
+        icp = self.env['ir.config_parameter']
+        docker_registry_host_id = icp.get_param('runbot.docker_registry_host_id', default=False)
+        if not self.use_docker_registry or docker_registry_host_id == self.id:
+            start = time.time()
+            # _logger.info('Building %s, %s', dockerfile.name, hash(str(dockerfile.dockerfile)))
+            docker_build_path = os.path.join(workdir, 'docker', dockerfile.image_tag)
+            os.makedirs(docker_build_path, exist_ok=True)
 
-        user = getpass.getuser()
+            user = getpass.getuser()
 
-        docker_append = f"""
-            RUN groupadd -g {os.getgid()} {user} \\
-            && useradd -u {os.getuid()} -g {user} -G audio,video {user} \\
-            && mkdir /home/{user} \\
-            && chown -R {user}:{user} /home/{user}
-            USER {user}
-            ENV COVERAGE_FILE /data/build/.coverage
-            """
+            docker_append = f"""
+                RUN groupadd -g {os.getgid()} {user} \\
+                && useradd -u {os.getuid()} -g {user} -G audio,video {user} \\
+                && mkdir /home/{user} \\
+                && chown -R {user}:{user} /home/{user}
+                USER {user}
+                ENV COVERAGE_FILE /data/build/.coverage
+                """
 
-        with open(os.path.join(docker_build_path, 'Dockerfile'), 'w') as Dockerfile:
-            Dockerfile.write(dockerfile.dockerfile + docker_append)
+            with open(os.path.join(docker_build_path, 'Dockerfile'), 'w') as Dockerfile:
+                Dockerfile.write(dockerfile.dockerfile + docker_append)
 
-        docker_build_success, msg = docker_build(docker_build_path, dockerfile.image_tag)
-        if not docker_build_success:
-            dockerfile.to_build = False
-            dockerfile.message_post(body=f'Build failure:\n{msg}')
-            # self.env['runbot.runbot'].warning(f'Dockerfile build "{dockerfile.image_tag}" failed on host {self.name}')
-        else:
-            duration = time.time() - start
-            if duration > 1:
-                _logger.info('Dockerfile %s finished build in %s', dockerfile.image_tag, duration)
+            docker_build_success, msg = docker_build(docker_build_path, dockerfile.image_tag)
+            if not docker_build_success:
+                dockerfile.to_build = False
+                dockerfile.message_post(body=f'Build failure:\n{msg}')
+                # self.env['runbot.runbot'].warning(f'Dockerfile build "{dockerfile.image_tag}" failed on host {self.name}')
+            else:
+                duration = time.time() - start
+                if duration > 1:
+                    _logger.info('Dockerfile %s finished build in %s', dockerfile.image_tag, duration)
+
+        # In all cases we want to push image on the local registry as every runbot builder is running a registry
+        docker_push(dockerfile.image_tag)  
 
     def _get_work_path(self):
         return os.path.abspath(os.path.join(os.path.dirname(__file__), '../static'))
