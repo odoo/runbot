@@ -401,7 +401,11 @@ class ConfigStep(models.Model):
 
         docker_name = build._get_docker_name()
         build_port = build.port
-        self.env['runbot.runbot']._reload_nginx()
+        try:
+            self.env['runbot.runbot']._reload_nginx()
+        except Exception:
+            _logger.exception('An error occured while reloading nginx')
+            build._log('', "An error occured while reloading nginx, skipping")
         return dict(cmd=cmd, log_path=log_path, container_name=docker_name, exposed_ports=[build_port, build_port + 1], ro_volumes=exports, env_variables=env_variables)
 
     def _run_install_odoo(self, build, log_path):

@@ -603,6 +603,6 @@ class Runbot(Controller):
     ], type='http', auth="public", website=True, sitemap=False)
     def access_running(self, build_id, db_suffix=None, **kwargs):
         build = request.env['runbot.build'].browse(int(build_id)).exists()
-        if db_suffix is None:
-            db_suffix = build.mapped('database_ids')[0].db_suffix
-        return werkzeug.utils.redirect(f'http://{build.dest}-{db_suffix}.{build.host}')
+        run_url = build._get_run_url(db_suffix)
+        _logger.info('Redirecting to %s', run_url)
+        return werkzeug.utils.redirect(run_url)

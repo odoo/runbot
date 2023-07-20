@@ -21,6 +21,7 @@ from pathlib import Path
 from psycopg2 import sql
 from psycopg2.extensions import TransactionRollbackError
 import getpass
+import uuid
 
 _logger = logging.getLogger(__name__)
 
@@ -236,6 +237,8 @@ class BuildResult(models.Model):
 
     static_run = fields.Char('Static run URL')
 
+    access_token = fields.Char('Token', default=lambda self: uuid.uuid4().hex)
+
     @api.depends('description', 'params_id.config_id')
     def _compute_display_name(self):
         for build in self:
@@ -323,6 +326,21 @@ class BuildResult(models.Model):
 
     def _get_result_score(self, result):
         return result_order.index(result)
+
+    def _get_run_token(self):
+        token = self.access_token or self.params_id.fingerprint
+        token_info = hex(hash(token or '' + str(self.env.user.id)))[-4:]
+        return (token[:8], token_info[:4])
+
+    def _get_run_url(self, db_suffix=None):
+        if db_suffix is None:
+            db_suffix = self.mapped('database_ids')[0].db_suffix
+        if request.env.user._is_internal():
+            token, token_info = self._get_run_token()
+            db_suffix = f'{db_suffix}-{token}-{token_info}'
+        use_ssl = self.env['ir.config_parameter'].sudo().get_param('runbot.use_ssl', default=True)
+        scheme = 'https' if use_ssl else 'http'
+        return f'{scheme}://{self.dest}-{db_suffix}.{self.host}'
 
     @api.depends('active_step')
     def _compute_job(self):
@@ -987,7 +1005,6 @@ class BuildResult(models.Model):
             child._ask_kill(lock=False)
 
     def _wake_up(self):
-
         user = request.env.user if request else self.env.user
         self._log('wake_up', f'Wake up initiated by {user.name}')
         if self.local_state != 'done':
