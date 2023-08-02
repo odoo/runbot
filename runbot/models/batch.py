@@ -230,7 +230,9 @@ class Batch(models.Model):
         # 2. FIND missing commit in a compatible base bundle
         if not bundle.is_base:
             merge_base_commits = self.commit_link_ids.mapped('merge_base_commit_id')
-            if auto_rebase:
+            if self.base_reference_batch_id:
+                self._log('Using a defined reference batch [%s](%s)', self.base_reference_batch_id.id, self.base_reference_batch_id._url())
+            elif auto_rebase or not bundle.branch_ids:
                 self.base_reference_batch_id = last_base_batch
             else:
                 self.base_reference_batch_id = False
