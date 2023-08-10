@@ -46,7 +46,7 @@ def _init_gh_logger():
 if odoo.netsvc._logger_init:
     _init_gh_logger()
 
-GH_LOG_PATTERN = """=> {method} /{path}{qs}{body}
+GH_LOG_PATTERN = """=> {method} {path}{qs}{body}
 
 <= {r.status_code} {r.reason}
 {headers}
@@ -222,7 +222,7 @@ class GH(object):
 
         status0 = r.status_code
         _logger.debug(
-            'ref_set(%s, %s, %s -> %s (%s)',
+            'set_ref(%s, %s, %s -> %s (%s)',
             self._repo, branch, sha, status0,
             'OK' if status0 == 200 else r.text or r.reason
         )
