@@ -373,14 +373,29 @@ def test_sub_match(env, project, repo_a, repo_b, repo_c, config):
     a_staging = repo_a.commit('staging.master')
     b_staging = repo_b.commit('staging.master')
     c_staging = repo_c.commit('staging.master')
-    assert json.loads(st.heads) == {
-        repo_a.name: a_staging.id,
-        repo_a.name + '^': a_staging.parents[0],
-        repo_b.name: b_staging.id,
-        repo_b.name + '^': b_staging.id,
-        repo_c.name: c_staging.id,
-        repo_c.name + '^': c_staging.id,
-    }
+    assert sorted(st.head_ids.mapped('sha')) == sorted([
+        a_staging.id,
+        b_staging.id,
+        c_staging.id,
+    ])
+    s = env['runbot_merge.stagings'].for_heads(
+        a_staging.id,
+        b_staging.id,
+        c_staging.id,
+    )
+    assert s == list(st.ids)
+
+    assert sorted(st.commit_ids.mapped('sha')) == sorted([
+        a_staging.parents[0],
+        b_staging.id,
+        c_staging.id,
+    ])
+    s = env['runbot_merge.stagings'].for_commits(
+        a_staging.parents[0],
+        b_staging.id,
+        c_staging.id,
+    )
+    assert s == list(st.ids)
 
 def test_merge_fail(env, project, repo_a, repo_b, users, config):
     """ In a matched-branch scenario, if merging in one of the linked repos

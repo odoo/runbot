@@ -11,6 +11,8 @@ access_runbot_merge_pull_requests_admin,Admin access to PR,model_runbot_merge_pu
 access_runbot_merge_pull_requests_tagging_admin,Admin access to tagging,model_runbot_merge_pull_requests_tagging,runbot_merge.group_admin,1,1,1,1
 access_runbot_merge_commit_admin,Admin access to commits,model_runbot_merge_commit,runbot_merge.group_admin,1,1,1,1
 access_runbot_merge_stagings_admin,Admin access to stagings,model_runbot_merge_stagings,runbot_merge.group_admin,1,1,1,1
+access_runbot_merge_stagings_heads_admin,Admin access to staging heads,model_runbot_merge_stagings_heads,runbot_merge.group_admin,1,1,1,1
+access_runbot_merge_stagings_commits_admin,Admin access to staging commits,model_runbot_merge_stagings_commits,runbot_merge.group_admin,1,1,1,1
 access_runbot_merge_stagings_cancel_admin,Admin access to cancelling stagings,model_runbot_merge_stagings_cancel,runbot_merge.group_admin,1,1,1,1
 access_runbot_merge_split_admin,Admin access to splits,model_runbot_merge_split,runbot_merge.group_admin,1,1,1,1
 access_runbot_merge_batch_admin,Admin access to batches,model_runbot_merge_batch,runbot_merge.group_admin,1,1,1,1
