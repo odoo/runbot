@@ -1682,7 +1682,6 @@ class FeedbackTemplate(models.Model):
         except Exception:
             _logger.exception("Failed to render template %s", self.get_external_id())
             raise
-            return None
 
 class Commit(models.Model):
     """Represents a commit onto which statuses might be posted,

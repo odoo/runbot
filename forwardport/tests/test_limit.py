@@ -1,8 +1,4 @@
-# -*- coding: utf-8 -*-
 import collections
-import time
-
-import pytest
 
 from utils import seen, Commit, make_basic
 

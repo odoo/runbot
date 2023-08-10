@@ -179,7 +179,7 @@ def test_bulk_ops(env, port):
         'email': "coc@example.org",
         'active': False,
     }])
-    assert a.active == b.active == False
+    assert a.active is b.active is False
 
     assert provision_user(port, [
         {'email': 'bob@example.org', 'github_login': 'xyz'},
@@ -187,7 +187,7 @@ def test_bulk_ops(env, port):
     ]) == [2, 0]
     assert a.users_id
     assert b.users_id
-    assert a.active == b.active == True
+    assert a.active is b.active is True
 
 def provision_user(port, users):
     r = requests.post(f'http://localhost:{port}/runbot_merge/provision', json={

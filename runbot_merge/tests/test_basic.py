@@ -7,7 +7,7 @@ from unittest import mock
 
 import pytest
 import requests
-from lxml import html, etree
+from lxml import html
 
 import odoo
 from utils import _simple_init, seen, re_matches, get_partner, Commit, pr_page, to_pr, part_of
@@ -1776,9 +1776,9 @@ commits, I need to know how to merge it:
         with repo:
             root = repo.make_commits(None, Commit("root", tree={'a': 'a'}), ref='heads/master')
 
-            repo.make_commits(root, Commit('C', tree={'a': 'b'}), ref=f'heads/change')
+            repo.make_commits(root, Commit('C', tree={'a': 'b'}), ref='heads/change')
             pr = repo.make_pr(title="title", body=f'first\n{separator}\nsecond',
-                              target='master', head=f'change')
+                              target='master', head='change')
             repo.post_status(pr.head, 'success', 'legal/cla')
             repo.post_status(pr.head, 'success', 'ci/runbot')
             pr.post_comment('hansen r+ merge', config['role_reviewer']['token'])
@@ -1806,7 +1806,7 @@ commits, I need to know how to merge it:
         with repo:
             root = repo.make_commits(None, Commit("root", tree={'a': 'a'}), ref='heads/master')
 
-            repo.make_commits(root, Commit('C', tree={'a': 'b'}), ref=f'heads/change')
+            repo.make_commits(root, Commit('C', tree={'a': 'b'}), ref='heads/change')
             pr = repo.make_pr(title="title", body="""\
 Title
 ---
@@ -1818,7 +1818,7 @@ This is more text
 ***
 removed
 """,
-                              target='master', head=f'change')
+                              target='master', head='change')
             repo.post_status(pr.head, 'success', 'legal/cla')
             repo.post_status(pr.head, 'success', 'ci/runbot')
             pr.post_comment('hansen r+ merge', config['role_reviewer']['token'])
@@ -1853,8 +1853,8 @@ removed
         with repo:
             root = repo.make_commits(None, Commit("root", tree={'a': 'a'}), ref='heads/master')
 
-            repo.make_commits(root, Commit('Commit\n\nfirst\n***\nsecond', tree={'a': 'b'}), ref=f'heads/change')
-            pr = repo.make_pr(title="PR", body=f'first\n***\nsecond',
+            repo.make_commits(root, Commit('Commit\n\nfirst\n***\nsecond', tree={'a': 'b'}), ref='heads/change')
+            pr = repo.make_pr(title="PR", body='first\n***\nsecond',
                               target='master', head='change')
             repo.post_status(pr.head, 'success', 'legal/cla')
             repo.post_status(pr.head, 'success', 'ci/runbot')
@@ -2007,7 +2007,7 @@ Part-of: {pr_id.display_name}"""
         assert log_to_node(repo.log('heads/master')), expected
 
     def test_squash_merge(self, repo, env, config, users):
-        other_user = requests.get(f'https://api.github.com/user', headers={
+        other_user = requests.get('https://api.github.com/user', headers={
             'Authorization': 'token %s' % config['role_other']['token'],
         }).json()
         other_user = {
@@ -2089,7 +2089,7 @@ Signed-off-by: {get_partner(env, users["reviewer"]).formatted_email}\
 
         # FIXME: should probably get the token from the project to be sure it's
         #        the bot user
-        current_user = repo._session.get(f'https://api.github.com/user').json()
+        current_user = repo._session.get('https://api.github.com/user').json()
         current_user = {
             'name': current_user['name'] or current_user['login'],
             # FIXME: not guaranteed

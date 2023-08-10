@@ -1,6 +1,6 @@
 import requests
 
-from utils import Commit, to_pr, seen
+from utils import Commit, to_pr
 
 
 def test_partner_merge(env):

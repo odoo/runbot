@@ -50,7 +50,7 @@ def test_existing_pr_disabled_branch(env, project, make_repo, setreviewers, conf
     assert not branch_id.active_staging_id
     assert staging_id.state == 'cancelled', \
         "closing the PRs should have canceled the staging"
-    assert staging_id.reason == f"Target branch deactivated by 'admin'."
+    assert staging_id.reason == "Target branch deactivated by 'admin'."
 
     p = pr_page(page, pr)
     target = dict(zip(

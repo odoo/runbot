@@ -9,7 +9,7 @@ from odoo import http
 from odoo.addons.base.models.ir_cron import ir_cron
 from odoo.http import WebRequest
 
-from .exceptions import FastForwardError, Mismatch, MergeError, Unmergeable
+from .exceptions import FastForwardError, MergeError, Unmergeable
 
 
 def delegate(self, attr):

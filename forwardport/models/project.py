@@ -13,7 +13,6 @@ it up), ...
 """
 import ast
 import base64
-import collections
 import contextlib
 import datetime
 import itertools
@@ -421,7 +420,7 @@ class PullRequests(models.Model):
                 limit = next(tokens, None)
                 ping = True
                 if not self._pr_acl(author).is_author:
-                    msg = "you can't set a forward-port limit.".format(login)
+                    msg = "you can't set a forward-port limit."
                 elif not limit:
                     msg = "please provide a branch to forward-port to."
                 else:

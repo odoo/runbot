@@ -71,7 +71,7 @@ class GH(object):
         """
         req = response.request
         url = werkzeug.urls.url_parse(req.url)
-        if url.netloc is not 'api.github.com':
+        if url.netloc != 'api.github.com':
             return
 
         body = '' if not req.body else ('\n' + pprint.pformat(json.loads(req.body.decode()), indent=4))

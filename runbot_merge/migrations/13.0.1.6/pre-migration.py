@@ -1,6 +1,3 @@
-import collections
-
-
 def migrate(cr, version):
     """ Status overrides: o2m -> m2m
     """
