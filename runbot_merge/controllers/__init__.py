@@ -15,6 +15,63 @@ from .. import utils, github
 _logger = logging.getLogger(__name__)
 
 class MergebotController(Controller):
+    @route('/runbot_merge/stagings', auth='none', type='json')
+    def stagings_for_commits(self, commits=None, heads=None):
+        Stagings = request.env(user=1)['runbot_merge.stagings'].sudo()
+        if commits:
+            stagings = Stagings.for_commits(*commits)
+        elif heads:
+            stagings = Stagings.for_heads(*heads)
+        else:
+            raise ValueError('Must receive one of "commits" or "heads" kwarg')
+
+        return stagings.ids
+
+    @route('/runbot_merge/stagings/<int:staging>', auth='none', type='json')
+    def prs_for_staging(self, staging):
+        staging = request.env(user=1)['runbot_merge.stagings'].browse(staging)
+        return [
+            batch.prs.mapped(lambda p: {
+                'name': p.display_name,
+                'repository': p.repository.name,
+                'number': p.number,
+            })
+            for batch in staging.sudo().batch_ids
+        ]
+
+    @route('/runbot_merge/stagings/<int:from_staging>/<int:to_staging>', auth='none', type='json')
+    def prs_for_staging(self, from_staging, to_staging, include_from=True, include_to=True):
+        Stagings = request.env(user=1, context={"active_test": False})['runbot_merge.stagings']
+        from_staging = Stagings.browse(from_staging)
+        to_staging = Stagings.browse(to_staging)
+        if from_staging.target != to_staging.target:
+            raise ValueError(f"Stagings must have the same target branch, found {from_staging.target.name} and {to_staging.target.name}")
+        if from_staging.id >= to_staging.id:
+            raise ValueError("first staging must be older than second staging")
+
+        stagings = Stagings.search([
+            ('target', '=', to_staging.target.id),
+            ('state', '=', 'success'),
+            ('id', '>=' if include_from else '>', from_staging.id),
+            ('id', '<=' if include_to else '<', to_staging.id),
+        ], order="id asc")
+
+        return [
+            {
+                'staging': staging.id,
+                'prs': [
+                    batch.prs.mapped(lambda p: {
+                        'name': p.display_name,
+                        'repository': p.repository.name,
+                        'number': p.number,
+                    })
+                    for batch in staging.batch_ids
+                ]
+            }
+            for staging in stagings
+        ]
+
+
     @route('/runbot_merge/hooks', auth='none', type='json', csrf=False, methods=['POST'])
     def index(self):
         req = request.httprequest
