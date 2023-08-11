@@ -6,6 +6,7 @@ import logging.handlers
 import os
 import pathlib
 import pprint
+import time
 import unicodedata
 
 import requests
@@ -57,6 +58,7 @@ class GH(object):
     def __init__(self, token, repo):
         self._url = 'https://api.github.com'
         self._repo = repo
+        self._last_update = 0
         session = self._session = requests.Session()
         session.headers['Authorization'] = 'token {}'.format(token)
         session.headers['Accept'] = 'application/vnd.github.symmetra-preview+json'
@@ -103,8 +105,16 @@ class GH(object):
         """
         :type check: bool | dict[int:Exception]
         """
+        if method.casefold() != 'get':
+            to_sleep = 1. - (time.time() - self._last_update)
+            if to_sleep > 0:
+                time.sleep(to_sleep)
+
         path = f'/repos/{self._repo}/{path}'
         r = self._session.request(method, self._url + path, params=params, json=json)
+        if method.casefold() != 'get':
+            self._last_update = time.time() + int(r.headers.get('Retry-After', 0))
+
         self._log_gh(_gh, r)
         if check:
             try:
