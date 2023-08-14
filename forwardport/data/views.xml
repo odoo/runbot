@@ -11,11 +11,11 @@
             <t t-if="env['runbot_merge.pull_requests'].check_access_rights('read', False)">
                 <t t-set="outstanding" t-value="env['runbot_merge.pull_requests'].search_count([
                     ('state', 'in', ['opened', 'validated', 'approved', 'ready', 'error']),
-                    ('source_id.merge_date', '&lt;', datetime.datetime.now() - relativedelta(days=3)),
+                    ('source_id.merge_date', '&lt;', datetime.datetime.now() - relativedelta(days=7)),
                 ])"/>
                 <div t-if="outstanding != 0" class="alert col-md-12 alert-warning mb-0">
                     <a href="/forwardport/outstanding">
-                        <t t-esc="outstanding"/> outstanding forward-ports
+                        <t t-esc="outstanding"/> outstanding forward-ports (>1 week)
                     </a>
                 </div>
             </t>
