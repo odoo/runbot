@@ -4,3 +4,4 @@ from . import project
 from . import pull_requests
 from . import project_freeze
 from . import staging_cancel
+from . import crons
