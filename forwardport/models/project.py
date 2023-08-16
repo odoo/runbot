@@ -20,23 +20,22 @@ import json
 import logging
 import operator
 import os
-import pathlib
 import re
 import subprocess
 import tempfile
 import typing
+from pathlib import Path
 
 import dateutil.relativedelta
 import requests
 
-import resource
 from odoo import _, models, fields, api
 from odoo.osv import expression
 from odoo.exceptions import UserError
 from odoo.tools.misc import topological_sort, groupby
 from odoo.tools.sql import reverse_order
 from odoo.tools.appdirs import user_cache_dir
-from odoo.addons.runbot_merge import utils
+from odoo.addons.runbot_merge import git, utils
 from odoo.addons.runbot_merge.models.pull_requests import RPLUS
 
 footer = '\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'
@@ -838,14 +837,6 @@ class PullRequests(models.Model):
             b.prs[0]._schedule_fp_followup()
         return b
 
-    @property
-    def _source_url(self):
-        return 'https://{}:{}@github.com/{}'.format(
-            self.repository.project_id.fp_github_name or '',
-            self.repository.project_id.fp_github_token,
-            self.repository.name,
-        )
-
     def _create_fp_branch(self, target_branch, fp_branch_name, cleanup):
         """ Creates a forward-port for the current PR to ``target_branch`` under
         ``fp_branch_name``.
@@ -865,25 +856,26 @@ class PullRequests(models.Model):
             "Forward-porting %s (%s) to %s",
             self.display_name, root.display_name, target_branch.name
         )
-        source = self._get_local_directory()
+        source = git.get_local(self.repository, 'fp_github')
         r = source.with_config(stdout=subprocess.PIPE, stderr=subprocess.STDOUT).fetch()
         logger.info("Updated cache repo %s:\n%s", source._directory, r.stdout.decode())
 
         logger.info("Create working copy...")
+        cache_dir = user_cache_dir('forwardport')
+        # PullRequest.display_name is `owner/repo#number`, so `owner` becomes a
+        # directory, `TemporaryDirectory` only creates the leaf, so we need to
+        # make sure `owner` exists in `cache_dir`.
+        Path(cache_dir, root.repository.name).parent.mkdir(parents=True, exist_ok=True)
         working_copy = source.clone(
             cleanup.enter_context(
                 tempfile.TemporaryDirectory(
-                    prefix='%s-to-%s-' % (
-                        root.display_name,
-                        target_branch.name
-                    ),
-                    dir=user_cache_dir('forwardport')
-                )),
+                    prefix=f'{root.display_name}-to-{target_branch.name}',
+                    dir=cache_dir)),
             branch=target_branch.name
         )
 
         r = working_copy.with_config(stdout=subprocess.PIPE, stderr=subprocess.STDOUT) \
-            .fetch(self._source_url, root.head)
+            .fetch(git.source_url(self.repository, 'fp_github'), root.head)
         logger.info(
             "Fetched head of %s into %s:\n%s",
             root.display_name,
@@ -1078,26 +1070,6 @@ stderr:
         # don't stringify so caller can still perform alterations
         return msg
 
-    def _get_local_directory(self):
-        repos_dir = pathlib.Path(user_cache_dir('forwardport'))
-        repos_dir.mkdir(parents=True, exist_ok=True)
-        repo_dir = repos_dir / self.repository.name
-
-        if repo_dir.is_dir():
-            return git(repo_dir)
-        else:
-            _logger.info("Cloning out %s to %s", self.repository.name, repo_dir)
-            subprocess.run(['git', 'clone', '--bare', self._source_url, str(repo_dir)], check=True)
-            # bare repos don't have fetch specs by default, and fetching *into*
-            # them is a pain in the ass, configure fetch specs so `git fetch`
-            # works properly
-            repo = git(repo_dir)
-            repo.config('--add', 'remote.origin.fetch', '+refs/heads/*:refs/heads/*')
-            # negative refspecs require git 2.29
-            repo.config('--add', 'remote.origin.fetch', '^refs/heads/tmp.*')
-            repo.config('--add', 'remote.origin.fetch', '^refs/heads/staging.*')
-            return repo
-
     def _outstanding(self, cutoff):
         """ Returns "outstanding" (unmerged and unclosed) forward-ports whose
         source was merged before ``cutoff`` (all of them if not provided).
@@ -1161,89 +1133,6 @@ class Feedback(models.Model):
 
     token_field = fields.Selection(selection_add=[('fp_github_token', 'Forwardport Bot')])
 
-ALWAYS = ('gc.auto=0', 'maintenance.auto=0')
-
-def _bypass_limits():
-    resource.setrlimit(resource.RLIMIT_AS, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
-
-def git(directory): return Repo(directory, check=True)
-class Repo:
-    def __init__(self, directory, **config):
-        self._directory = str(directory)
-        config.setdefault('stderr', subprocess.PIPE)
-        self._config = config
-        self._params = ()
-        self._opener = subprocess.run
-
-    def __getattr__(self, name):
-        return GitCommand(self, name.replace('_', '-'))
-
-    def _run(self, *args, **kwargs):
-        opts = {**self._config, **kwargs}
-        args = ('git', '-C', self._directory)\
-            + tuple(itertools.chain.from_iterable(('-c', p) for p in self._params + ALWAYS))\
-            + args
-        try:
-            return self._opener(args, preexec_fn=_bypass_limits, **opts)
-        except subprocess.CalledProcessError as e:
-            stream = e.stderr if e.stderr else e.stdout
-            if stream:
-                _logger.error("git call error: %s", stream)
-            raise
-
-    def stdout(self, flag=True):
-        if flag is True:
-            return self.with_config(stdout=subprocess.PIPE)
-        elif flag is False:
-            return self.with_config(stdout=None)
-        return self.with_config(stdout=flag)
-
-    def lazy(self):
-        r = self.with_config()
-        r._config.pop('check', None)
-        r._opener = subprocess.Popen
-        return r
-
-    def check(self, flag):
-        return self.with_config(check=flag)
-
-    def with_config(self, **kw):
-        opts = {**self._config, **kw}
-        r = Repo(self._directory, **opts)
-        r._opener = self._opener
-        r._params = self._params
-        return r
-
-    def with_params(self, *args):
-        r = self.with_config()
-        r._params = args
-        return r
-
-    def clone(self, to, branch=None):
-        self._run(
-            'clone',
-            *([] if branch is None else ['-b', branch]),
-            self._directory, to,
-        )
-        return Repo(to)
-
-class GitCommand:
-    def __init__(self, repo, name):
-        self._name = name
-        self._repo = repo
-
-    def __call__(self, *args, **kwargs):
-        return self._repo._run(self._name, *args, *self._to_options(kwargs))
-
-    def _to_options(self, d):
-        for k, v in d.items():
-            if len(k) == 1:
-                yield '-' + k
-            else:
-                yield '--' + k.replace('_', '-')
-            if v not in (None, True):
-                assert v is not False
-                yield str(v)
 
 class CherrypickError(Exception):
     ...
