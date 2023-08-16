@@ -182,7 +182,6 @@ def test_stage_match(env, project, repo_a, repo_b, config, page):
     assert 'Related: {}'.format(pr_b.display_name) in repo_a.commit('master').message
     assert 'Related: {}'.format(pr_a.display_name) in repo_b.commit('master').message
 
-    print(pr_a.batch_ids.read(['staging_id', 'prs']))
     # check that related PRs *still* link to one another after merge
     assert get_related_pr_labels(pr_page(page, prx_a)) == [pr_b.display_name]
     assert get_related_pr_labels(pr_page(page, prx_b)) == [pr_a.display_name]
@@ -1092,13 +1091,6 @@ def test_multi_project(env, make_repo, setreviewers, users, config,
 
     pr1_id = to_pr(env, pr1)
     pr2_id = to_pr(env, pr2)
-
-    print(
-        pr1.repo.name, pr1.number, pr1_id.display_name, pr1_id.label,
-        '\n',
-        pr2.repo.name, pr2.number, pr2_id.display_name, pr2_id.label,
-        flush=True,
-    )
 
     assert pr1_id.state == 'ready' and not pr1_id.blocked
     assert pr2_id.state == 'validated'
