@@ -8,6 +8,7 @@ import pathlib
 import pprint
 import time
 import unicodedata
+from typing import Iterable, List, TypedDict, Literal
 
 import requests
 import werkzeug.urls
@@ -46,6 +47,42 @@ def _init_gh_logger():
 
 if odoo.netsvc._logger_init:
     _init_gh_logger()
+
+SimpleUser = TypedDict('SimpleUser', {
+    'login': str,
+    'url': str,
+    'type': Literal['User', 'Organization'],
+})
+Authorship = TypedDict('Authorship', {
+    'name': str,
+    'email': str,
+})
+Commit = TypedDict('Commit', {
+    'tree': str,
+    'url': str,
+    'message': str,
+    # optional when creating a commit
+    'author': Authorship,
+    'committer': Authorship,
+    'comments_count': int,
+})
+CommitLink = TypedDict('CommitLink', {
+    'html_url': str,
+    'sha': str,
+    'url': str,
+})
+PrCommit = TypedDict('PrCommit', {
+    'url': str,
+    'sha': str,
+    'commit': Commit,
+    # optional when creating a commit (in which case it uses the current user)
+    'author': SimpleUser,
+    'committer': SimpleUser,
+    'parents': List[CommitLink],
+    # not actually true but we're smuggling stuff via that key
+    'new_tree': str,
+})
+
 
 GH_LOG_PATTERN = """=> {method} {path}{qs}{body}
 
@@ -137,7 +174,7 @@ class GH(object):
         r.raise_for_status()
         return r.json()
 
-    def head(self, branch):
+    def head(self, branch: str) -> str:
         d = utils.backoff(
             lambda: self('get', 'git/refs/heads/{}'.format(branch)).json(),
             exc=requests.HTTPError
@@ -383,14 +420,14 @@ class GH(object):
             if not r.links.get('next'):
                 return
 
-    def commits_lazy(self, pr):
+    def commits_lazy(self, pr: int) -> Iterable[PrCommit]:
         for page in itertools.count(1):
-            r = self('get', 'pulls/{}/commits'.format(pr), params={'page': page})
+            r = self('get', f'pulls/{pr}/commits', params={'page': page})
             yield from r.json()
             if not r.links.get('next'):
                 return
 
-    def commits(self, pr):
+    def commits(self, pr: int) -> List[PrCommit]:
         """ Returns a PR's commits oldest first (that's what GH does &
         is what we want)
         """

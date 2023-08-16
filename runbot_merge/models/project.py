@@ -32,8 +32,9 @@ class Project(models.Model):
         required=True,
         default="hanson", # mergebot du bot du bot du~
         help="Prefix (~bot name) used when sending commands from PR "
-             "comments e.g. [hanson retry] or [hanson r+ p=1]"
+             "comments e.g. [hanson retry] or [hanson r+ p=1]",
     )
+    github_name = fields.Char(related='github_prefix')
 
     batch_limit = fields.Integer(
         default=8, group_operator=None, help="Maximum number of PRs staged together")
@@ -64,6 +65,8 @@ class Project(models.Model):
                     self.env.cr.commit()
 
     def _create_stagings(self, commit=False):
+        from .stagings_create import try_staging
+
         # look up branches which can be staged on and have no active staging
         for branch in self.env['runbot_merge.branch'].search([
             ('active_staging_id', '=', False),
@@ -74,7 +77,7 @@ class Project(models.Model):
                 with self.env.cr.savepoint(), \
                     sentry_sdk.start_span(description=f'create staging {branch.name}') as span:
                     span.set_tag('branch', branch.name)
-                    branch.try_staging()
+                    try_staging(branch)
             except Exception:
                 _logger.exception("Failed to create staging for branch %r", branch.name)
             else:

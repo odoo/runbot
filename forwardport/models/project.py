@@ -37,6 +37,7 @@ from odoo.tools.sql import reverse_order
 from odoo.tools.appdirs import user_cache_dir
 from odoo.addons.runbot_merge import git, utils
 from odoo.addons.runbot_merge.models.pull_requests import RPLUS
+from odoo.addons.runbot_merge.models.stagings_create import Message
 
 footer = '\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'
 
@@ -1064,7 +1065,7 @@ stderr:
 
     def _make_fp_message(self, commit):
         cmap = json.loads(self.commits_map)
-        msg = self._parse_commit_message(commit['commit']['message'])
+        msg = Message.from_message(commit['commit']['message'])
         # write the *merged* commit as "original", not the PR's
         msg.headers['x-original-commit'] = cmap.get(commit['sha'], commit['sha'])
         # don't stringify so caller can still perform alterations
