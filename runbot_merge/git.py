@@ -1,12 +1,14 @@
 import dataclasses
 import itertools
 import logging
+import os
 import pathlib
 import resource
 import subprocess
-from typing import Optional, TypeVar
+from typing import Optional, TypeVar, Union, Sequence, Tuple, Dict
 
 from odoo.tools.appdirs import user_cache_dir
+from .github import MergeError, PrCommit
 
 _logger = logging.getLogger(__name__)
 
@@ -17,6 +19,7 @@ def source_url(repository, prefix: str) -> str:
         repository.name,
     )
 
+Authorship = Union[Tuple[str, str], Tuple[str, str, str]]
 
 def get_local(repository, prefix: Optional[str]) -> 'Optional[Repo]':
     repos_dir = pathlib.Path(user_cache_dir('mergebot'))
@@ -103,6 +106,119 @@ class Repo:
             self._directory, to,
         )
         return Repo(to)
+
+    def rebase(self, dest: str, commits: Sequence[PrCommit]) -> Tuple[str, Dict[str, str]]:
+        """Implements rebase by hand atop plumbing so:
+
+        - we can work without a working copy
+        - we can track individual commits (and store the mapping)
+
+        It looks like `--merge-base` is not sufficient for `merge-tree` to
+        correctly keep track of history, so it loses contents. Therefore
+        implement in two passes as in the github version.
+        """
+        repo = self.stdout().with_config(text=True, check=False)
+
+        logger = _logger.getChild('rebase')
+        logger.debug("rebasing %s on %s (reset=%s, commits=%s)",
+                     self._repo, dest, len(commits))
+        if not commits:
+            raise MergeError("PR has no commits")
+
+        new_trees = []
+        parent = dest
+        for original in commits:
+            if len(original['parents']) != 1:
+                raise MergeError(
+                    f"commits with multiple parents ({original['sha']}) can not be rebased, "
+                    "either fix the branch to remove merges or merge without "
+                    "rebasing")
+
+            new_trees.append(check(repo.merge_tree(parent, original['sha'])).stdout.strip())
+            parent = check(repo.commit_tree(
+                tree=new_trees[-1],
+                parents=[parent, original['sha']],
+                message=f'temp rebase {original["sha"]}',
+            )).stdout.strip()
+
+        mapping = {}
+        for original, tree in zip(commits, new_trees):
+            authorship = check(repo.show('--no-patch', '--pretty="%an%n%ae%n%ai%n%cn%n%ce"', original['sha']))
+            author_name, author_email, author_date, committer_name, committer_email =\
+                authorship.stdout.splitlines()
+
+            c = check(repo.commit_tree(
+                tree=tree,
+                parents=[dest],
+                message=original['commit']['message'],
+                author=(author_name, author_email, author_date),
+                committer=(committer_name, committer_email),
+            )).stdout.strip()
+
+            logger.debug('copied %s to %s (parent: %s)', original['sha'], c, dest)
+            dest = mapping[original['sha']] = c
+
+        return dest, mapping
+
+    def merge(self, c1: str, c2: str, msg: str, *, author: Tuple[str, str]) -> str:
+        repo = self.stdout().with_config(text=True, check=False)
+
+        t = repo.merge_tree(c1, c2)
+        if t.returncode:
+            raise MergeError(t.stderr)
+
+        c = self.commit_tree(
+            tree=t.stdout.strip(),
+            message=msg,
+            parents=[c1, c2],
+            author=author,
+        )
+        if c.returncode:
+            raise MergeError(c.stderr)
+        return c.stdout.strip()
+
+    def commit_tree(
+        self, *, tree: str, message: str,
+        parents: Sequence[str] = (),
+        author: Optional[Authorship] = None,
+        committer: Optional[Authorship] = None,
+    ) -> subprocess.CompletedProcess:
+        authorship = {}
+        if author:
+            authorship['GIT_AUTHOR_NAME'] = author[0]
+            authorship['GIT_AUTHOR_EMAIL'] = author[1]
+            if len(author) > 2:
+                authorship['GIT_AUTHOR_DATE'] = author[2]
+        if committer:
+            authorship['GIT_COMMITTER_NAME'] = committer[0]
+            authorship['GIT_COMMITTER_EMAIL'] = committer[1]
+            if len(committer) > 2:
+                authorship['GIT_COMMITTER_DATE'] = committer[2]
+
+        return self.with_config(
+            stdout=subprocess.PIPE,
+            text=True,
+            env={
+                **os.environ,
+                **authorship,
+                # we don't want git to use the timezone of the machine it's
+                # running on: previously it used the timezone configured in
+                # github (?), which I think / assume defaults to a generic UTC
+                'TZ': 'UTC',
+            }
+        )._run(
+            'commit-tree',
+            tree,
+            '-m', message,
+            *itertools.chain.from_iterable(('-p', p) for p in parents),
+        )
+
+def check(p: subprocess.CompletedProcess) -> subprocess.CompletedProcess:
+    if not p.returncode:
+        return p
+
+    _logger.info("rebase failed at %s\nstdout:\n%s\nstderr:\n%s", p.args, p.stdout, p.stderr)
+    raise MergeError(p.stderr or 'merge conflict')
 
 
 @dataclasses.dataclass

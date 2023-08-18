@@ -6,10 +6,9 @@ import json
 import logging
 import os
 import re
-import tempfile
 from difflib import Differ
-from itertools import count, takewhile
-from pathlib import Path
+from itertools import takewhile
+from operator import itemgetter
 from typing import Dict, Union, Optional, Literal, Callable, Iterator, Tuple, List, TypeAlias
 
 import requests
@@ -17,7 +16,6 @@ from werkzeug.datastructures import Headers
 
 from odoo import api, models, fields
 from odoo.tools import OrderedSet
-from odoo.tools.appdirs import user_cache_dir
 from .pull_requests import Branch, Stagings, PullRequests, Repository, Batch
 from .. import exceptions, utils, github, git
 
@@ -40,7 +38,7 @@ class StagingSlice:
     """
     gh: github.GH
     head: str
-    working_copy: git.Repo
+    repo: git.Repo
 
 
 StagingState: TypeAlias = Dict[Repository, StagingSlice]
@@ -82,43 +80,7 @@ def try_staging(branch: Branch) -> Optional[Stagings]:
     else: # p=2
         batched_prs = [pr_ids for _, pr_ids in takewhile(lambda r: r[0] == priority, rows)]
 
-    with contextlib.ExitStack() as cleanup:
-        return stage_into(branch, batched_prs, cleanup)
-
-
-def ready_prs(for_branch: Branch) -> List[Tuple[int, PullRequests]]:
-    env = for_branch.env
-    env.cr.execute("""
-    SELECT
-      min(pr.priority) as priority,
-      array_agg(pr.id) AS match
-    FROM runbot_merge_pull_requests pr
-    WHERE pr.target = any(%s)
-      -- exclude terminal states (so there's no issue when
-      -- deleting branches & reusing labels)
-      AND pr.state != 'merged'
-      AND pr.state != 'closed'
-    GROUP BY
-        pr.target,
-        CASE
-            WHEN pr.label SIMILAR TO '%%:patch-[[:digit:]]+'
-                THEN pr.id::text
-            ELSE pr.label
-        END
-    HAVING
-        bool_or(pr.state = 'ready') or bool_or(pr.priority = 0)
-    ORDER BY min(pr.priority), min(pr.id)
-    """, [for_branch.ids])
-    browse = env['runbot_merge.pull_requests'].browse
-    return [(p, browse(ids)) for p, ids in env.cr.fetchall()]
-
-
-def stage_into(
-        branch: Branch,
-        batched_prs: List[PullRequests],
-        cleanup: contextlib.ExitStack,
-) -> Optional[Stagings]:
-    original_heads, staging_state = staging_setup(branch, batched_prs, cleanup)
+    original_heads, staging_state = staging_setup(branch, batched_prs)
 
     staged = stage_batches(branch, batched_prs, staging_state)
 
@@ -146,18 +108,22 @@ def stage_into(
             # (with a uniquifier to ensure we don't hit a previous version of
             # the same) to ensure the staging head is new and we're building
             # everything
-            tree = it.gh.commit(it.head)['tree']
+            project = branch.project_id
             uniquifier = base64.b64encode(os.urandom(12)).decode('ascii')
-            dummy_head = it.gh('post', 'git/commits', json={
-                'tree': tree['sha'],
-                'parents': [it.head],
-                'message': f'''\
+            dummy_head = it.repo.with_config(check=True).commit_tree(
+                # somewhat exceptionally, `commit-tree` wants an actual tree
+                # not a tree-ish
+                tree=f'{it.head}^{{tree}}',
+                parents=[it.head],
+                author=(project.github_name, project.github_email),
+                message=f'''\
 force rebuild
 
 uniquifier: {uniquifier}
 For-Commit-Id: {it.head}
 ''',
-            }).json()['sha']
+            ).stdout.strip()
+
             # see above, ideally we don't need to mark the real head as
             # `to_check` because it's an old commit but `DO UPDATE` is necessary
             # for `RETURNING` to work, and it doesn't really hurt (maybe)
@@ -187,34 +153,17 @@ For-Commit-Id: {it.head}
         'heads': heads,
         'commits': commits,
     })
-    # create staging branch from tmp
-    token = branch.project_id.github_token
-    for repo in branch.project_id.repo_ids.having_branch(branch):
-        it = staging_state[repo]
+    for repo, it in staging_state.items():
         _logger.info(
             "%s: create staging for %s:%s at %s",
             branch.project_id.name, repo.name, branch.name,
             it.head
         )
-        refname = 'staging.{}'.format(branch.name)
-        it.gh.set_ref(refname, it.head)
-
-        i = count()
-        @utils.backoff(delays=WAIT_FOR_VISIBILITY, exc=TimeoutError)
-        def wait_for_visibility():
-            if check_visibility(repo, refname, it.head, token):
-                _logger.info(
-                    "[repo] updated %s:%s to %s: ok (at %d/%d)",
-                    repo.name, refname, it.head,
-                    next(i), len(WAIT_FOR_VISIBILITY)
-                )
-                return
-            _logger.warning(
-                "[repo] updated %s:%s to %s: failed (at %d/%d)",
-                repo.name, refname, it.head,
-                next(i), len(WAIT_FOR_VISIBILITY)
-            )
-            raise TimeoutError("Staged head not updated after %d seconds" % sum(WAIT_FOR_VISIBILITY))
+        it.repo.stdout(False).check(True).push(
+            '-f',
+            git.source_url(repo, 'github'),
+            f'{it.head}:refs/heads/staging.{branch.name}',
+        )
 
     _logger.info("Created staging %s (%s) to %s", st, ', '.join(
         '%s[%s]' % (batch, batch.prs)
@@ -223,10 +172,36 @@ For-Commit-Id: {it.head}
     return st
 
 
+def ready_prs(for_branch: Branch) -> List[Tuple[int, PullRequests]]:
+    env = for_branch.env
+    env.cr.execute("""
+    SELECT
+      min(pr.priority) as priority,
+      array_agg(pr.id) AS match
+    FROM runbot_merge_pull_requests pr
+    WHERE pr.target = any(%s)
+      -- exclude terminal states (so there's no issue when
+      -- deleting branches & reusing labels)
+      AND pr.state != 'merged'
+      AND pr.state != 'closed'
+    GROUP BY
+        pr.target,
+        CASE
+            WHEN pr.label SIMILAR TO '%%:patch-[[:digit:]]+'
+                THEN pr.id::text
+            ELSE pr.label
+        END
+    HAVING
+        bool_or(pr.state = 'ready') or bool_or(pr.priority = 0)
+    ORDER BY min(pr.priority), min(pr.id)
+    """, [for_branch.ids])
+    browse = env['runbot_merge.pull_requests'].browse
+    return [(p, browse(ids)) for p, ids in env.cr.fetchall()]
+
+
 def staging_setup(
         target: Branch,
         batched_prs: List[PullRequests],
-        cleanup: contextlib.ExitStack
 ) -> Tuple[Dict[Repository, str], StagingState]:
     """Sets up the staging:
 
@@ -235,14 +210,11 @@ def staging_setup(
     - generates working copy for each repository with the target branch
     """
     all_prs: PullRequests = target.env['runbot_merge.pull_requests'].concat(*batched_prs)
-    cache_dir = user_cache_dir('mergebot')
     staging_state = {}
     original_heads = {}
     for repo in target.project_id.repo_ids.having_branch(target):
         gh = repo.github()
         head = gh.head(target.name)
-        # create tmp staging branch
-        gh.set_ref('tmp.{}'.format(target.name), head)
 
         source = git.get_local(repo, 'github')
         source.fetch(
@@ -255,14 +227,8 @@ def staging_setup(
             f'+refs/heads/{target.name}:refs/heads/{target.name}',
             *(pr.head for pr in all_prs if pr.repository == repo)
         )
-        Path(cache_dir, repo.name).parent.mkdir(parents=True, exist_ok=True)
-        d = cleanup.enter_context(tempfile.TemporaryDirectory(
-            prefix=f'{repo.name}-{target.name}-staging',
-            dir=cache_dir,
-        ))
-        working_copy = source.clone(d, branch=target.name)
         original_heads[repo] = head
-        staging_state[repo] = StagingSlice(gh=gh, head=head, working_copy=working_copy)
+        staging_state[repo] = StagingSlice(gh=gh, head=head, repo=source.stdout().with_config(text=True, check=False))
 
     return original_heads, staging_state
 
@@ -343,39 +309,29 @@ UNCHECKABLE = ['merge_method', 'overrides', 'draft']
 
 
 def stage_batch(env: api.Environment, prs: PullRequests, staging: StagingState) -> Batch:
-    """
-    Updates meta[*][head] on success
+    """Stages the batch represented by the ``prs`` recordset, onto the
+    current corresponding staging heads.
+
+    Alongside returning the newly created batch, updates ``staging[*].head``
+    in-place on success. On failure, the heads should not be touched.
     """
     new_heads: Dict[PullRequests, str] = {}
     pr_fields = env['runbot_merge.pull_requests']._fields
     for pr in prs:
-        gh = staging[pr.repository].gh
-
+        info = staging[pr.repository]
         _logger.info(
             "Staging pr %s for target %s; method=%s",
             pr.display_name, pr.target.name,
             pr.merge_method or (pr.squash and 'single') or None
         )
 
-        target = 'tmp.{}'.format(pr.target.name)
-        original_head = gh.head(target)
         try:
-            try:
-                method, new_heads[pr] = stage(pr, gh, target, related_prs=(prs - pr))
-                _logger.info(
-                    "Staged pr %s to %s by %s: %s -> %s",
-                    pr.display_name, pr.target.name, method,
-                    original_head, new_heads[pr]
-                )
-            except Exception:
-                # reset the head which failed, as rebase() may have partially
-                # updated it (despite later steps failing)
-                gh.set_ref(target, original_head)
-                # then reset every previous update
-                for to_revert in new_heads.keys():
-                    it = staging[to_revert.repository]
-                    it.gh.set_ref('tmp.{}'.format(to_revert.target.name), it.head)
-                raise
+            method, new_heads[pr] = stage(pr, info, related_prs=(prs - pr))
+            _logger.info(
+                "Staged pr %s to %s by %s: %s -> %s",
+                pr.display_name, pr.target.name, method,
+                info.head, new_heads[pr]
+            )
         except github.MergeError as e:
             raise exceptions.MergeError(pr) from e
         except exceptions.Mismatch as e:
@@ -419,9 +375,9 @@ def format_for_difflib(items: Iterator[Tuple[str, object]]) -> Iterator[str]:
 
 
 Method = Literal['merge', 'rebase-merge', 'rebase-ff', 'squash']
-def stage(pr: PullRequests, gh: github.GH, target: str, related_prs: PullRequests) -> Tuple[Method, str]:
+def stage(pr: PullRequests, info: StagingSlice, related_prs: PullRequests) -> Tuple[Method, str]:
     # nb: pr_commits is oldest to newest so pr.head is pr_commits[-1]
-    _, prdict = gh.pr(pr.number)
+    _, prdict = info.gh.pr(pr.number)
     commits = prdict['commits']
     method: Method = pr.merge_method or ('rebase-ff' if commits == 1 else None)
     if commits > 50 and method.startswith('rebase'):
@@ -431,7 +387,7 @@ def stage(pr: PullRequests, gh: github.GH, target: str, related_prs: PullRequest
             pr, "Merging PRs of 250 or more commits is not supported "
                 "(https://developer.github.com/v3/pulls/#list-commits-on-a-pull-request)"
         )
-    pr_commits = gh.commits(pr.number)
+    pr_commits = info.gh.commits(pr.number)
     for c in pr_commits:
         if not (c['commit']['author']['email'] and c['commit']['committer']['email']):
             raise exceptions.Unmergeable(
@@ -475,7 +431,7 @@ def stage(pr: PullRequests, gh: github.GH, target: str, related_prs: PullRequest
 
     if pr.reviewed_by and pr.reviewed_by.name == pr.reviewed_by.github_login:
         # XXX: find other trigger(s) to sync github name?
-        gh_name = gh.user(pr.reviewed_by.github_login)['name']
+        gh_name = info.gh.user(pr.reviewed_by.github_login)['name']
         if gh_name:
             pr.reviewed_by.name = gh_name
 
@@ -488,43 +444,46 @@ def stage(pr: PullRequests, gh: github.GH, target: str, related_prs: PullRequest
             fn = stage_rebase_ff
         case 'squash':
             fn = stage_squash
-    return method, fn(pr, gh, target, pr_commits, related_prs=related_prs)
+    return method, fn(pr, info, pr_commits, related_prs=related_prs)
 
-def stage_squash(pr: PullRequests, gh: github.GH, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
+def stage_squash(pr: PullRequests, info: StagingSlice, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
     msg = pr._build_merge_message(pr, related_prs=related_prs)
-    authorship = {}
 
     authors = {
         (c['commit']['author']['name'], c['commit']['author']['email'])
         for c in commits
     }
     if len(authors) == 1:
-        name, email = authors.pop()
-        authorship['author']  = {'name': name, 'email': email}
+        author = authors.pop()
     else:
         msg.headers.extend(sorted(
             ('Co-Authored-By', "%s <%s>" % author)
             for author in authors
         ))
+        author = (pr.repository.project_id.github_name, pr.repository.project_id.github_email)
 
     committers = {
         (c['commit']['committer']['name'], c['commit']['committer']['email'])
         for c in commits
     }
-    if len(committers) == 1:
-        name, email = committers.pop()
-        authorship['committer'] = {'name': name, 'email': email}
     # should committers also be added to co-authors?
+    committer = committers.pop() if len(committers) == 1 else None
 
-    original_head = gh.head(target)
-    merge_tree = gh.merge(pr.head, target, 'temp merge')['tree']['sha']
-    head = gh('post', 'git/commits', json={
-        **authorship,
-        'message': str(msg),
-        'tree': merge_tree,
-        'parents': [original_head],
-    }).json()['sha']
-    gh.set_ref(target, head)
+    r = info.repo.merge_tree(info.head, pr.head)
+    if r.returncode:
+        raise exceptions.MergeError(pr, r.stderr)
+    merge_tree = r.stdout.strip()
+
+    r = info.repo.commit_tree(
+        tree=merge_tree,
+        parents=[info.head],
+        message=str(msg),
+        author=author,
+        committer=committer or author,
+    )
+    if r.returncode:
+        raise exceptions.MergeError(pr, r.stderr)
+    head = r.stdout.strip()
 
     commits_map = {c['sha']: head for c in commits}
     commits_map[''] = head
@@ -532,25 +491,30 @@ def stage_squash(pr: PullRequests, gh: github.GH, target: str, commits: List[git
 
     return head
 
-def stage_rebase_ff(pr: PullRequests, gh: github.GH, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
+def stage_rebase_ff(pr: PullRequests, info: StagingSlice, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
     # updates head commit with PR number (if necessary) then rebases
     # on top of target
     msg = pr._build_merge_message(commits[-1]['commit']['message'], related_prs=related_prs)
     commits[-1]['commit']['message'] = str(msg)
     add_self_references(pr, commits[:-1])
-    head, mapping = gh.rebase(pr.number, target, commits=commits)
+    head, mapping = info.repo.rebase(info.head, commits=commits)
     pr.commits_map = json.dumps({**mapping, '': head})
     return head
 
-def stage_rebase_merge(pr: PullRequests, gh: github.GH, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str :
+def stage_rebase_merge(pr: PullRequests, info: StagingSlice, commits: List[github.PrCommit], related_prs: PullRequests) -> str :
     add_self_references(pr, commits)
-    h, mapping = gh.rebase(pr.number, target, reset=True, commits=commits)
+    h, mapping = info.repo.rebase(info.head, commits=commits)
     msg = pr._build_merge_message(pr, related_prs=related_prs)
-    merge_head = gh.merge(h, target, str(msg))['sha']
+
+    project = pr.repository.project_id
+    merge_head= info.repo.merge(
+        info.head, h, str(msg),
+        author=(project.github_name, project.github_email),
+    )
     pr.commits_map = json.dumps({**mapping, '': merge_head})
     return merge_head
 
-def stage_merge(pr: PullRequests, gh: github.GH, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
+def stage_merge(pr: PullRequests, info: StagingSlice, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
     pr_head = commits[-1] # oldest to newest
     base_commit = None
     head_parents = {p['sha'] for p in pr_head['parents']}
@@ -573,26 +537,37 @@ def stage_merge(pr: PullRequests, gh: github.GH, target: str, commits: List[gith
     if base_commit:
         # replicate pr_head with base_commit replaced by
         # the current head
-        original_head = gh.head(target)
-        merge_tree = gh.merge(pr_head['sha'], target, 'temp merge')['tree']['sha']
-        new_parents = [original_head] + list(head_parents - {base_commit})
+        t = info.repo.merge_tree(info.head, pr_head['sha'])
+        if t.returncode:
+            raise exceptions.MergeError(pr, t.stderr)
+        merge_tree = t.stdout.strip()
+        new_parents = [info.head] + list(head_parents - {base_commit})
         msg = pr._build_merge_message(pr_head['commit']['message'], related_prs=related_prs)
-        copy = gh('post', 'git/commits', json={
-            'message': str(msg),
-            'tree': merge_tree,
-            'author': pr_head['commit']['author'],
-            'committer': pr_head['commit']['committer'],
-            'parents': new_parents,
-        }).json()
-        gh.set_ref(target, copy['sha'])
+
+        d2t = itemgetter('name', 'email', 'date')
+        c = info.repo.commit_tree(
+            tree=merge_tree,
+            parents=new_parents,
+            message=str(msg),
+            author=d2t(pr_head['commit']['author']),
+            committer=d2t(pr_head['commit']['committer']),
+        )
+        if c.returncode:
+            raise exceptions.MergeError(pr, c.stderr)
+        copy = c.stdout.strip()
+
         # merge commit *and old PR head* map to the pr head replica
-        commits_map[''] = commits_map[pr_head['sha']] = copy['sha']
+        commits_map[''] = commits_map[pr_head['sha']] = copy
         pr.commits_map = json.dumps(commits_map)
-        return copy['sha']
+        return copy
     else:
         # otherwise do a regular merge
         msg = pr._build_merge_message(pr)
-        merge_head = gh.merge(pr.head, target, str(msg))['sha']
+        project = pr.repository.project_id
+        merge_head = info.repo.merge(
+            info.head, pr.head, str(msg),
+            author=(project.github_name, project.github_email),
+        )
         # and the merge commit is the normal merge head
         commits_map[''] = merge_head
         pr.commits_map = json.dumps(commits_map)
@@ -707,10 +682,10 @@ class Message:
 
     def __str__(self):
         if not self.headers:
-            return self.body + '\n'
+            return self.body.rstrip() + '\n'
 
-        with io.StringIO(self.body) as msg:
-            msg.write(self.body)
+        with io.StringIO() as msg:
+            msg.write(self.body.rstrip())
             msg.write('\n\n')
             # https://git.wiki.kernel.org/index.php/CommitMessageConventions
             # seems to mostly use capitalised names (rather than title-cased)
