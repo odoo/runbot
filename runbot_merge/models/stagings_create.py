@@ -349,8 +349,7 @@ def stage_batch(env: api.Environment, prs: PullRequests, staging: StagingState) 
     new_heads: Dict[PullRequests, str] = {}
     pr_fields = env['runbot_merge.pull_requests']._fields
     for pr in prs:
-        gh = staging[pr.repository].gh
-
+        info = staging[pr.repository]
         _logger.info(
             "Staging pr %s for target %s; method=%s",
             pr.display_name, pr.target.name,
@@ -358,10 +357,10 @@ def stage_batch(env: api.Environment, prs: PullRequests, staging: StagingState) 
         )
 
         target = 'tmp.{}'.format(pr.target.name)
-        original_head = gh.head(target)
+        original_head = info.gh.head(target)
         try:
             try:
-                method, new_heads[pr] = stage(pr, gh, target, related_prs=(prs - pr))
+                method, new_heads[pr] = stage(pr, info, target, related_prs=(prs - pr))
                 _logger.info(
                     "Staged pr %s to %s by %s: %s -> %s",
                     pr.display_name, pr.target.name, method,
@@ -370,7 +369,7 @@ def stage_batch(env: api.Environment, prs: PullRequests, staging: StagingState) 
             except Exception:
                 # reset the head which failed, as rebase() may have partially
                 # updated it (despite later steps failing)
-                gh.set_ref(target, original_head)
+                info.gh.set_ref(target, original_head)
                 # then reset every previous update
                 for to_revert in new_heads.keys():
                     it = staging[to_revert.repository]
@@ -419,9 +418,9 @@ def format_for_difflib(items: Iterator[Tuple[str, object]]) -> Iterator[str]:
 
 
 Method = Literal['merge', 'rebase-merge', 'rebase-ff', 'squash']
-def stage(pr: PullRequests, gh: github.GH, target: str, related_prs: PullRequests) -> Tuple[Method, str]:
+def stage(pr: PullRequests, info: StagingSlice, target: str, related_prs: PullRequests) -> Tuple[Method, str]:
     # nb: pr_commits is oldest to newest so pr.head is pr_commits[-1]
-    _, prdict = gh.pr(pr.number)
+    _, prdict = info.gh.pr(pr.number)
     commits = prdict['commits']
     method: Method = pr.merge_method or ('rebase-ff' if commits == 1 else None)
     if commits > 50 and method.startswith('rebase'):
@@ -431,7 +430,7 @@ def stage(pr: PullRequests, gh: github.GH, target: str, related_prs: PullRequest
             pr, "Merging PRs of 250 or more commits is not supported "
                 "(https://developer.github.com/v3/pulls/#list-commits-on-a-pull-request)"
         )
-    pr_commits = gh.commits(pr.number)
+    pr_commits = info.gh.commits(pr.number)
     for c in pr_commits:
         if not (c['commit']['author']['email'] and c['commit']['committer']['email']):
             raise exceptions.Unmergeable(
@@ -475,7 +474,7 @@ def stage(pr: PullRequests, gh: github.GH, target: str, related_prs: PullRequest
 
     if pr.reviewed_by and pr.reviewed_by.name == pr.reviewed_by.github_login:
         # XXX: find other trigger(s) to sync github name?
-        gh_name = gh.user(pr.reviewed_by.github_login)['name']
+        gh_name = info.gh.user(pr.reviewed_by.github_login)['name']
         if gh_name:
             pr.reviewed_by.name = gh_name
 
@@ -488,9 +487,9 @@ def stage(pr: PullRequests, gh: github.GH, target: str, related_prs: PullRequest
             fn = stage_rebase_ff
         case 'squash':
             fn = stage_squash
-    return method, fn(pr, gh, target, pr_commits, related_prs=related_prs)
+    return method, fn(pr, info, target, pr_commits, related_prs=related_prs)
 
-def stage_squash(pr: PullRequests, gh: github.GH, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
+def stage_squash(pr: PullRequests, info: StagingSlice, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
     msg = pr._build_merge_message(pr, related_prs=related_prs)
     authorship = {}
 
@@ -516,15 +515,15 @@ def stage_squash(pr: PullRequests, gh: github.GH, target: str, commits: List[git
         authorship['committer'] = {'name': name, 'email': email}
     # should committers also be added to co-authors?
 
-    original_head = gh.head(target)
-    merge_tree = gh.merge(pr.head, target, 'temp merge')['tree']['sha']
-    head = gh('post', 'git/commits', json={
+    original_head = info.gh.head(target)
+    merge_tree = info.gh.merge(pr.head, target, 'temp merge')['tree']['sha']
+    head = info.gh('post', 'git/commits', json={
         **authorship,
         'message': str(msg),
         'tree': merge_tree,
         'parents': [original_head],
     }).json()['sha']
-    gh.set_ref(target, head)
+    info.gh.set_ref(target, head)
 
     commits_map = {c['sha']: head for c in commits}
     commits_map[''] = head
@@ -532,25 +531,25 @@ def stage_squash(pr: PullRequests, gh: github.GH, target: str, commits: List[git
 
     return head
 
-def stage_rebase_ff(pr: PullRequests, gh: github.GH, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
+def stage_rebase_ff(pr: PullRequests, info: StagingSlice, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
     # updates head commit with PR number (if necessary) then rebases
     # on top of target
     msg = pr._build_merge_message(commits[-1]['commit']['message'], related_prs=related_prs)
     commits[-1]['commit']['message'] = str(msg)
     add_self_references(pr, commits[:-1])
-    head, mapping = gh.rebase(pr.number, target, commits=commits)
+    head, mapping = info.gh.rebase(pr.number, target, commits=commits)
     pr.commits_map = json.dumps({**mapping, '': head})
     return head
 
-def stage_rebase_merge(pr: PullRequests, gh: github.GH, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str :
+def stage_rebase_merge(pr: PullRequests, info: StagingSlice, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str :
     add_self_references(pr, commits)
-    h, mapping = gh.rebase(pr.number, target, reset=True, commits=commits)
+    h, mapping = info.gh.rebase(pr.number, target, reset=True, commits=commits)
     msg = pr._build_merge_message(pr, related_prs=related_prs)
-    merge_head = gh.merge(h, target, str(msg))['sha']
+    merge_head = info.gh.merge(h, target, str(msg))['sha']
     pr.commits_map = json.dumps({**mapping, '': merge_head})
     return merge_head
 
-def stage_merge(pr: PullRequests, gh: github.GH, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
+def stage_merge(pr: PullRequests, info: StagingSlice, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
     pr_head = commits[-1] # oldest to newest
     base_commit = None
     head_parents = {p['sha'] for p in pr_head['parents']}
@@ -573,18 +572,18 @@ def stage_merge(pr: PullRequests, gh: github.GH, target: str, commits: List[gith
     if base_commit:
         # replicate pr_head with base_commit replaced by
         # the current head
-        original_head = gh.head(target)
-        merge_tree = gh.merge(pr_head['sha'], target, 'temp merge')['tree']['sha']
+        original_head = info.gh.head(target)
+        merge_tree = info.gh.merge(pr_head['sha'], target, 'temp merge')['tree']['sha']
         new_parents = [original_head] + list(head_parents - {base_commit})
         msg = pr._build_merge_message(pr_head['commit']['message'], related_prs=related_prs)
-        copy = gh('post', 'git/commits', json={
+        copy = info.gh('post', 'git/commits', json={
             'message': str(msg),
             'tree': merge_tree,
             'author': pr_head['commit']['author'],
             'committer': pr_head['commit']['committer'],
             'parents': new_parents,
         }).json()
-        gh.set_ref(target, copy['sha'])
+        info.gh.set_ref(target, copy['sha'])
         # merge commit *and old PR head* map to the pr head replica
         commits_map[''] = commits_map[pr_head['sha']] = copy['sha']
         pr.commits_map = json.dumps(commits_map)
@@ -592,7 +591,7 @@ def stage_merge(pr: PullRequests, gh: github.GH, target: str, commits: List[gith
     else:
         # otherwise do a regular merge
         msg = pr._build_merge_message(pr)
-        merge_head = gh.merge(pr.head, target, str(msg))['sha']
+        merge_head = info.gh.merge(pr.head, target, str(msg))['sha']
         # and the merge commit is the normal merge head
         commits_map[''] = merge_head
         pr.commits_map = json.dumps(commits_map)
