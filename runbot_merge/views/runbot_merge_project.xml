@@ -25,6 +25,10 @@
                     <group>
                         <group>
                             <field name="github_token"/>
+                            <field name="github_name" readonly="0"
+                                   help="Identity when creating new commits, defaults to github name, falls back to login."/>
+                            <field name="github_email" readonly="0"
+                                   help="Identity when creating new commits, defaults to public email, falls back to primary email."/>
                             <field name="secret"/>
                         </group>
                         <group>
