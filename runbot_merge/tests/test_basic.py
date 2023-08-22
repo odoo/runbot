@@ -2076,7 +2076,7 @@ Part-of: {pr_id.display_name}"""
 
 closes {pr1_id.display_name}
 
-Signed-off-by: {get_partner(env, users["reviewer"]).formatted_email}\
+Signed-off-by: {get_partner(env, users["reviewer"]).formatted_email}
 """
         assert one['commit']['committer']['name'] == a_user['name']
         assert one['commit']['committer']['email'] == a_user['email']
@@ -2107,7 +2107,7 @@ closes {pr2_id.display_name}
 
 Signed-off-by: {get_partner(env, users["reviewer"]).formatted_email}
 Co-authored-by: {a_user['name']} <{a_user['email']}>
-Co-authored-by: {other_user['name']} <{other_user['email']}>\
+Co-authored-by: {other_user['name']} <{other_user['email']}>
 """
         assert repo.read_tree(repo.commit(two['sha'])) == {
             'a': '0',

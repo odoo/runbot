@@ -10,6 +10,7 @@ import tempfile
 from difflib import Differ
 from itertools import count, takewhile
 from pathlib import Path
+from subprocess import CompletedProcess
 from typing import Dict, Union, Optional, Literal, Callable, Iterator, Tuple, List, TypeAlias
 
 import requests
@@ -40,7 +41,8 @@ class StagingSlice:
     """
     gh: github.GH
     head: str
-    working_copy: git.Repo
+    working_copy: git.Repo[CompletedProcess]
+    repo: git.Repo[CompletedProcess]
 
 
 StagingState: TypeAlias = Dict[Repository, StagingSlice]
@@ -262,7 +264,7 @@ def staging_setup(
         ))
         working_copy = source.clone(d, branch=target.name)
         original_heads[repo] = head
-        staging_state[repo] = StagingSlice(gh=gh, head=head, working_copy=working_copy)
+        staging_state[repo] = StagingSlice(gh=gh, head=head, working_copy=working_copy, repo=source)
 
     return original_heads, staging_state
 
@@ -490,40 +492,68 @@ def stage(pr: PullRequests, info: StagingSlice, target: str, related_prs: PullRe
     return method, fn(pr, info, target, pr_commits, related_prs=related_prs)
 
 def stage_squash(pr: PullRequests, info: StagingSlice, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
+    url = git.source_url(pr.repository, 'github')
+
     msg = pr._build_merge_message(pr, related_prs=related_prs)
-    authorship = {}
 
     authors = {
         (c['commit']['author']['name'], c['commit']['author']['email'])
         for c in commits
     }
     if len(authors) == 1:
-        name, email = authors.pop()
-        authorship['author']  = {'name': name, 'email': email}
+        author_name, author_email = authors.pop()
     else:
         msg.headers.extend(sorted(
             ('Co-Authored-By', "%s <%s>" % author)
             for author in authors
         ))
+        author_name = pr.repository.project_id.github_name
+        author_email = pr.repository.project_id.github_email
 
     committers = {
         (c['commit']['committer']['name'], c['commit']['committer']['email'])
         for c in commits
     }
+    committer_name = committer_email = None
     if len(committers) == 1:
-        name, email = committers.pop()
-        authorship['committer'] = {'name': name, 'email': email}
+        committer_name, committer_email = committers.pop()
     # should committers also be added to co-authors?
 
-    original_head = info.gh.head(target)
-    merge_tree = info.gh.merge(pr.head, target, 'temp merge')['tree']['sha']
-    head = info.gh('post', 'git/commits', json={
-        **authorship,
-        'message': str(msg),
-        'tree': merge_tree,
-        'parents': [original_head],
-    }).json()['sha']
-    info.gh.set_ref(target, head)
+    r = info.repo.stdout().with_config(check=False, text=True).merge_tree(info.head, pr.head)
+    if r.returncode:
+        raise exceptions.MergeError(pr, r.stderr)
+    merge_tree = r.stdout.strip()
+
+    r = info.repo.stdout().with_config(
+        check=False,
+        text=True,
+        env={
+            **os.environ,
+            'GIT_AUTHOR_NAME': author_name,
+            'GIT_AUTHOR_EMAIL': author_email,
+            'GIT_COMMITTER_NAME': committer_name or author_name,
+            'GIT_COMMITTER_EMAIL': committer_email or author_email,
+            # we don't want git to use the timezone of the machine it's running
+            # on: previously it used the timezone configured in github (?),
+            # which I think / assume defaults to a generic UTC
+            'TZ': 'UTC',
+        },
+    ).commit_tree(
+        merge_tree,
+        p=info.head,
+        m=str(msg),
+    )
+    if r.returncode:
+        raise exceptions.MergeError(pr, r.stderr)
+    head = r.stdout.strip()
+
+    # TODO: remove when we stop using tmp.
+    r = info.repo.with_config(text=True).check(False).push(
+        url,
+        f'{head}:{target}'
+    )
+    if r.returncode:
+        raise exceptions.MergeError(pr, r.stderr)
 
     commits_map = {c['sha']: head for c in commits}
     commits_map[''] = head
@@ -572,9 +602,8 @@ def stage_merge(pr: PullRequests, info: StagingSlice, target: str, commits: List
     if base_commit:
         # replicate pr_head with base_commit replaced by
         # the current head
-        original_head = info.gh.head(target)
         merge_tree = info.gh.merge(pr_head['sha'], target, 'temp merge')['tree']['sha']
-        new_parents = [original_head] + list(head_parents - {base_commit})
+        new_parents = [info.head] + list(head_parents - {base_commit})
         msg = pr._build_merge_message(pr_head['commit']['message'], related_prs=related_prs)
         copy = info.gh('post', 'git/commits', json={
             'message': str(msg),
@@ -706,10 +735,10 @@ class Message:
 
     def __str__(self):
         if not self.headers:
-            return self.body + '\n'
+            return self.body.rstrip() + '\n'
 
-        with io.StringIO(self.body) as msg:
-            msg.write(self.body)
+        with io.StringIO() as msg:
+            msg.write(self.body.rstrip())
             msg.write('\n\n')
             # https://git.wiki.kernel.org/index.php/CommitMessageConventions
             # seems to mostly use capitalised names (rather than title-cased)
