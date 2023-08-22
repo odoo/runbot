@@ -12,8 +12,7 @@ _logger = logging.getLogger(__name__)
 
 
 def source_url(repository, prefix: str) -> str:
-    return 'https://{}:{}@github.com/{}'.format(
-        repository.project_id[f'{prefix}_name'] or '',
+    return 'https://{}@github.com/{}'.format(
         repository.project_id[f'{prefix}_token'],
         repository.name,
     )
