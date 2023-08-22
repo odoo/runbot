@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from utils import seen, Commit, make_basic, REF_PATTERN, MESSAGE_TEMPLATE, validate_all, part_of
+from utils import seen, Commit, make_basic, REF_PATTERN, MESSAGE_TEMPLATE, validate_all, part_of, part_of2
 
 FMT = '%Y-%m-%d %H:%M:%S'
 FAKE_PREV_WEEK = (datetime.now() + timedelta(days=1)).strftime(FMT)
@@ -206,7 +206,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     old_b = prod.read_tree(b_head)
     head_b = prod.commit('b')
     assert head_b.message == message_template % pr1.number
-    assert prod.commit(head_b.parents[0]).message == part_of(f'p_0\n\nX-original-commit: {p_0_merged}', pr1, separator='\n')
+    assert prod.commit(head_b.parents[0]).message == part_of2(f'p_0\n\nX-original-commit: {p_0_merged}', pr1, separator='\n')
     b_tree = prod.read_tree(head_b)
     assert b_tree == {
         **old_b,
@@ -215,7 +215,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     old_c = prod.read_tree(c_head)
     head_c = prod.commit('c')
     assert head_c.message == message_template % pr2.number
-    assert prod.commit(head_c.parents[0]).message == part_of(f'p_0\n\nX-original-commit: {p_0_merged}', pr2, separator='\n')
+    assert prod.commit(head_c.parents[0]).message == part_of2(f'p_0\n\nX-original-commit: {p_0_merged}', pr2, separator='\n')
     c_tree = prod.read_tree(head_c)
     assert c_tree == {
         **old_c,

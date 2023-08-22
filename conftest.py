@@ -537,6 +537,9 @@ class Repo:
         self.hook = False
         repos.append(self)
 
+    def __repr__(self):
+        return f'<conftest.Repo {self.name}>'
+
     @property
     def owner(self):
         return self.name.split('/')[0]

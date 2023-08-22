@@ -567,7 +567,16 @@ def stage_rebase_ff(pr: PullRequests, info: StagingSlice, target: str, commits: 
     msg = pr._build_merge_message(commits[-1]['commit']['message'], related_prs=related_prs)
     commits[-1]['commit']['message'] = str(msg)
     add_self_references(pr, commits[:-1])
-    head, mapping = info.gh.rebase(pr.number, target, commits=commits)
+    head, mapping = info.repo.rebase(info.head, commits=commits)
+
+    # TODO: remove when we stop using tmp.
+    r = info.repo.with_config(text=True).check(False).push(
+        git.source_url(pr.repository, 'github'),
+        f'{head}:{target}'
+    )
+    if r.returncode:
+        raise exceptions.MergeError(pr, r.stderr)
+
     pr.commits_map = json.dumps({**mapping, '': head})
     return head
 

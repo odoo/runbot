@@ -10,7 +10,7 @@ import requests
 from lxml import html
 
 import odoo
-from utils import _simple_init, seen, re_matches, get_partner, Commit, pr_page, to_pr, part_of
+from utils import _simple_init, seen, re_matches, get_partner, Commit, pr_page, to_pr, part_of, part_of2
 
 
 @pytest.fixture
@@ -149,7 +149,7 @@ class TestCommitMessage:
 
         master = repo.commit('heads/master')
         assert master.message == "simple commit message\n\ncloses {repo.name}#1"\
-                                 "\n\nSigned-off-by: {reviewer.formatted_email}"\
+                                 "\n\nSigned-off-by: {reviewer.formatted_email}\n"\
                                  .format(repo=repo, reviewer=get_partner(env, users['reviewer']))
 
     def test_commit_existing(self, env, repo, users, config):
@@ -174,7 +174,7 @@ class TestCommitMessage:
         master = repo.commit('heads/master')
         # closes #1 is already present, should not modify message
         assert master.message == "simple commit message that closes #1"\
-                                 "\n\nSigned-off-by: {reviewer.formatted_email}"\
+                                 "\n\nSigned-off-by: {reviewer.formatted_email}\n"\
                                  .format(reviewer=get_partner(env, users['reviewer']))
 
     def test_commit_other(self, env, repo, users, config):
@@ -199,7 +199,7 @@ class TestCommitMessage:
         master = repo.commit('heads/master')
         # closes on another repositoy, should modify the commit message
         assert master.message == "simple commit message that closes odoo/enterprise#1\n\ncloses {repo.name}#1"\
-                                 "\n\nSigned-off-by: {reviewer.formatted_email}"\
+                                 "\n\nSigned-off-by: {reviewer.formatted_email}\n"\
                                  .format(repo=repo, reviewer=get_partner(env, users['reviewer']))
 
     def test_commit_wrong_number(self, env, repo, users, config):
@@ -224,7 +224,7 @@ class TestCommitMessage:
         master = repo.commit('heads/master')
         # closes on another repositoy, should modify the commit message
         assert master.message == "simple commit message that closes #11\n\ncloses {repo.name}#1"\
-                                 "\n\nSigned-off-by: {reviewer.formatted_email}"\
+                                 "\n\nSigned-off-by: {reviewer.formatted_email}\n"\
                                  .format(repo=repo, reviewer=get_partner(env, users['reviewer']))
 
     def test_commit_delegate(self, env, repo, users, config):
@@ -254,7 +254,7 @@ class TestCommitMessage:
 
         master = repo.commit('heads/master')
         assert master.message == "simple commit message\n\ncloses {repo.name}#1"\
-                                 "\n\nSigned-off-by: {reviewer.formatted_email}"\
+                                 "\n\nSigned-off-by: {reviewer.formatted_email}\n"\
                                  .format(repo=repo, reviewer=get_partner(env, users['other']))
 
     def test_commit_coauthored(self, env, repo, users, config):
@@ -292,7 +292,8 @@ Fixes a thing
 closes {repo.name}#1
 
 Signed-off-by: {reviewer.formatted_email}
-Co-authored-by: Bob <bob@example.com>""".format(
+Co-authored-by: Bob <bob@example.com>
+""".format(
             repo=repo,
             reviewer=get_partner(env, users['reviewer'])
         )
@@ -1628,8 +1629,8 @@ commits, I need to know how to merge it:
         # then compare to the dag version of the right graph
         nm2 = node('M2', node('M1', node('M0')))
         reviewer = get_partner(env, users["reviewer"]).formatted_email
-        nb1 = node(f'B1\n\ncloses {pr_id.display_name}\n\nSigned-off-by: {reviewer}',
-                   node(part_of('B0', pr_id), nm2))
+        nb1 = node(f'B1\n\ncloses {pr_id.display_name}\n\nSigned-off-by: {reviewer}\n',
+                   node(part_of2('B0', pr_id), nm2))
         assert staging == nb1
 
         with repo:
@@ -1718,7 +1719,7 @@ commits, I need to know how to merge it:
         c0 = node('C0', m)
         reviewer = get_partner(env, users["reviewer"]).formatted_email
         expected = node('gibberish\n\nblahblah\n\ncloses {}#{}'
-                        '\n\nSigned-off-by: {}'.format(repo.name, prx.number, reviewer), m, c0)
+                        '\n\nSigned-off-by: {}\n'.format(repo.name, prx.number, reviewer), m, c0)
         assert log_to_node(repo.log('heads/master')), expected
         pr = env['runbot_merge.pull_requests'].search([
             ('repository.name', '=', repo.name),
@@ -1760,7 +1761,7 @@ commits, I need to know how to merge it:
         c0 = node('C0', m)
         reviewer = get_partner(env, users["reviewer"]).formatted_email
         expected = node('gibberish\n\ncloses {}#{}'
-                        '\n\nSigned-off-by: {}'.format(repo.name, prx.number, reviewer), m, c0)
+                        '\n\nSigned-off-by: {}\n'.format(repo.name, prx.number, reviewer), m, c0)
         assert log_to_node(repo.log('heads/master')), expected
 
     @pytest.mark.parametrize('separator', [
@@ -1790,15 +1791,14 @@ commits, I need to know how to merge it:
         env.run_crons()
 
         head = repo.commit('heads/master')
-        assert head.message == textwrap.dedent(f"""\
-        title
+        assert head.message == f"""\
+title
 
-        first
+first
 
-        closes {repo.name}#{pr.number}
+closes {repo.name}#{pr.number}
 
-        Signed-off-by: {reviewer}
-        """).strip(), "should not contain the content which follows the thematic break"
+Signed-off-by: {reviewer}""", "should not contain the content which follows the thematic break"
 
     def test_pr_message_setex_title(self, repo, env, users, config):
         """ should not break on a proper SETEX-style title """
@@ -1830,21 +1830,20 @@ removed
         env.run_crons()
 
         head = repo.commit('heads/master')
-        assert head.message == textwrap.dedent(f"""\
-        title
+        assert head.message == f"""\
+title
 
-        Title
-        ---
-        This is some text
+Title
+---
+This is some text
 
-        Title 2
-        -------
-        This is more text
+Title 2
+-------
+This is more text
 
-        closes {repo.name}#{pr.number}
+closes {repo.name}#{pr.number}
 
-        Signed-off-by: {reviewer}
-        """).strip(), "should not break the SETEX titles"
+Signed-off-by: {reviewer}""", "should not break the SETEX titles"
 
     def test_rebase_no_edit(self, repo, env, users, config):
         """ Only the merge messages should be de-breaked
@@ -1867,17 +1866,17 @@ removed
         env.run_crons()
 
         head = repo.commit('heads/master')
-        assert head.message == textwrap.dedent(f"""\
-        Commit
+        assert head.message == f"""\
+Commit
 
-        first
-        ***
-        second
+first
+***
+second
 
-        closes {repo.name}#{pr.number}
+closes {repo.name}#{pr.number}
 
-        Signed-off-by: {reviewer}
-        """).strip(), "squashed / rebased messages should not be stripped"
+Signed-off-by: {reviewer}
+""", "squashed / rebased messages should not be stripped"
 
     def test_title_no_edit(self, repo, env, users, config):
         """The first line of a commit message should not be taken in account for
@@ -1909,13 +1908,15 @@ thing: thong
 
 closes {pr_id.display_name}
 
-Signed-off-by: {reviewer}"""
+Signed-off-by: {reviewer}
+"""
         assert repo.commit(staging_head.parents[0]).message == f"""\
 Some: thing
 
 is odd
 
-Part-of: {pr_id.display_name}"""
+Part-of: {pr_id.display_name}
+"""
 
     def test_pr_mergehead(self, repo, env, config):
         """ if the head of the PR is a merge commit and one of the parents is
@@ -2741,8 +2742,8 @@ class TestBatching(object):
 
         staging = log_to_node(log)
         reviewer = get_partner(env, users["reviewer"]).formatted_email
-        expected = node('commit_PR2_00\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, pr2.number, reviewer),
-             node('commit_PR1_00\n\ncloses {}#{}\n\nSigned-off-by: {}'.format(repo.name, pr1.number, reviewer),
+        expected = node('commit_PR2_00\n\ncloses {}#{}\n\nSigned-off-by: {}\n'.format(repo.name, pr2.number, reviewer),
+             node('commit_PR1_00\n\ncloses {}#{}\n\nSigned-off-by: {}\n'.format(repo.name, pr1.number, reviewer),
                   node('initial')))
         assert staging == expected
 
