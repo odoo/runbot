@@ -175,8 +175,8 @@
                         <field string="Token" name="fp_github_token"/>
                     </group>
                     <group>
-                        <field string="Bot Name" name="fp_github_name"/>
-                        <field string="Bot Email" name="fp_github_email"/>
+                        <field string="Bot Name" name="fp_github_name" readonly="0"/>
+                        <field string="Bot Email" name="fp_github_email" readonly="0"/>
                     </group>
                 </group>
             </xpath>

@@ -66,28 +66,37 @@ class Project(models.Model):
     def _compute_git_identity(self):
         s = requests.Session()
         for project in self:
-            if not project.fp_github_token or (self.fp_github_name and self.fp_github_email):
+            if not project.fp_github_token or (project.fp_github_name and project.fp_github_email):
                 continue
 
             r0 = s.get('https://api.github.com/user', headers={
                 'Authorization': 'token %s' % project.fp_github_token
             })
+            if not r0.ok:
+                _logger.error("Failed to fetch forward bot information for project %s: %s", project.name, r0.text or r0.content)
+                continue
+
+            user = r0.json()
+            project.fp_github_name = user['name'] or user['login']
+            if email := user['email']:
+                project.fp_github_email = email
+                continue
+
             if 'user:email' not in set(re.split(r',\s*', r0.headers['x-oauth-scopes'])):
-                raise UserError(_("The forward-port github token needs the user:email scope to fetch the bot's identity."))
+                raise UserError("The forward-port github token needs the user:email scope to fetch the bot's identity.")
             r1 = s.get('https://api.github.com/user/emails', headers={
                 'Authorization': 'token %s' % project.fp_github_token
             })
-            if not (r0.ok and r1.ok):
-                _logger.error("Failed to fetch bot information for project %s: %s", project.name, (r0.text or r0.content) if not r0.ok else (r1.text or r1.content))
+            if not r1.ok:
+                _logger.error("Failed to fetch forward bot emails for project %s: %s", project.name, r1.text or r1.content)
                 continue
-            project.fp_github_name = r0.json()['login']
             project.fp_github_email = next((
                 entry['email']
                 for entry in r1.json()
                 if entry['primary']
             ), None)
             if not project.fp_github_email:
-                raise UserError(_("The forward-port bot needs a primary email set up."))
+                raise UserError("The forward-port bot needs a public or primary email set up.")
 
     def write(self, vals):
         # check on branches both active and inactive so disabling branches doesn't
