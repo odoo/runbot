@@ -41,7 +41,6 @@ class StagingSlice:
     """
     gh: github.GH
     head: str
-    working_copy: git.Repo[CompletedProcess]
     repo: git.Repo[CompletedProcess]
 
 
@@ -84,43 +83,7 @@ def try_staging(branch: Branch) -> Optional[Stagings]:
     else: # p=2
         batched_prs = [pr_ids for _, pr_ids in takewhile(lambda r: r[0] == priority, rows)]
 
-    with contextlib.ExitStack() as cleanup:
-        return stage_into(branch, batched_prs, cleanup)
-
-
-def ready_prs(for_branch: Branch) -> List[Tuple[int, PullRequests]]:
-    env = for_branch.env
-    env.cr.execute("""
-    SELECT
-      min(pr.priority) as priority,
-      array_agg(pr.id) AS match
-    FROM runbot_merge_pull_requests pr
-    WHERE pr.target = any(%s)
-      -- exclude terminal states (so there's no issue when
-      -- deleting branches & reusing labels)
-      AND pr.state != 'merged'
-      AND pr.state != 'closed'
-    GROUP BY
-        pr.target,
-        CASE
-            WHEN pr.label SIMILAR TO '%%:patch-[[:digit:]]+'
-                THEN pr.id::text
-            ELSE pr.label
-        END
-    HAVING
-        bool_or(pr.state = 'ready') or bool_or(pr.priority = 0)
-    ORDER BY min(pr.priority), min(pr.id)
-    """, [for_branch.ids])
-    browse = env['runbot_merge.pull_requests'].browse
-    return [(p, browse(ids)) for p, ids in env.cr.fetchall()]
-
-
-def stage_into(
-        branch: Branch,
-        batched_prs: List[PullRequests],
-        cleanup: contextlib.ExitStack,
-) -> Optional[Stagings]:
-    original_heads, staging_state = staging_setup(branch, batched_prs, cleanup)
+    original_heads, staging_state = staging_setup(branch, batched_prs)
 
     staged = stage_batches(branch, batched_prs, staging_state)
 
@@ -225,10 +188,36 @@ For-Commit-Id: {it.head}
     return st
 
 
+def ready_prs(for_branch: Branch) -> List[Tuple[int, PullRequests]]:
+    env = for_branch.env
+    env.cr.execute("""
+    SELECT
+      min(pr.priority) as priority,
+      array_agg(pr.id) AS match
+    FROM runbot_merge_pull_requests pr
+    WHERE pr.target = any(%s)
+      -- exclude terminal states (so there's no issue when
+      -- deleting branches & reusing labels)
+      AND pr.state != 'merged'
+      AND pr.state != 'closed'
+    GROUP BY
+        pr.target,
+        CASE
+            WHEN pr.label SIMILAR TO '%%:patch-[[:digit:]]+'
+                THEN pr.id::text
+            ELSE pr.label
+        END
+    HAVING
+        bool_or(pr.state = 'ready') or bool_or(pr.priority = 0)
+    ORDER BY min(pr.priority), min(pr.id)
+    """, [for_branch.ids])
+    browse = env['runbot_merge.pull_requests'].browse
+    return [(p, browse(ids)) for p, ids in env.cr.fetchall()]
+
+
 def staging_setup(
         target: Branch,
         batched_prs: List[PullRequests],
-        cleanup: contextlib.ExitStack
 ) -> Tuple[Dict[Repository, str], StagingState]:
     """Sets up the staging:
 
@@ -237,7 +226,6 @@ def staging_setup(
     - generates working copy for each repository with the target branch
     """
     all_prs: PullRequests = target.env['runbot_merge.pull_requests'].concat(*batched_prs)
-    cache_dir = user_cache_dir('mergebot')
     staging_state = {}
     original_heads = {}
     for repo in target.project_id.repo_ids.having_branch(target):
@@ -257,14 +245,8 @@ def staging_setup(
             f'+refs/heads/{target.name}:refs/heads/{target.name}',
             *(pr.head for pr in all_prs if pr.repository == repo)
         )
-        Path(cache_dir, repo.name).parent.mkdir(parents=True, exist_ok=True)
-        d = cleanup.enter_context(tempfile.TemporaryDirectory(
-            prefix=f'{repo.name}-{target.name}-staging',
-            dir=cache_dir,
-        ))
-        working_copy = source.clone(d, branch=target.name)
         original_heads[repo] = head
-        staging_state[repo] = StagingSlice(gh=gh, head=head, working_copy=working_copy, repo=source)
+        staging_state[repo] = StagingSlice(gh=gh, head=head, repo=source)
 
     return original_heads, staging_state
 
