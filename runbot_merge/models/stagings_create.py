@@ -8,7 +8,7 @@ import os
 import re
 import tempfile
 from difflib import Differ
-from itertools import count, takewhile
+from itertools import count, takewhile, chain, repeat
 from pathlib import Path
 from subprocess import CompletedProcess
 from typing import Dict, Union, Optional, Literal, Callable, Iterator, Tuple, List, TypeAlias
@@ -246,7 +246,7 @@ def staging_setup(
             *(pr.head for pr in all_prs if pr.repository == repo)
         )
         original_heads[repo] = head
-        staging_state[repo] = StagingSlice(gh=gh, head=head, repo=source)
+        staging_state[repo] = StagingSlice(gh=gh, head=head, repo=source.stdout().with_config(text=True, check=False))
 
     return original_heads, staging_state
 
@@ -501,14 +501,12 @@ def stage_squash(pr: PullRequests, info: StagingSlice, target: str, commits: Lis
         committer_name, committer_email = committers.pop()
     # should committers also be added to co-authors?
 
-    r = info.repo.stdout().with_config(check=False, text=True).merge_tree(info.head, pr.head)
+    r = info.repo.merge_tree(info.head, pr.head)
     if r.returncode:
         raise exceptions.MergeError(pr, r.stderr)
     merge_tree = r.stdout.strip()
 
-    r = info.repo.stdout().with_config(
-        check=False,
-        text=True,
+    r = info.repo.with_config(
         env={
             **os.environ,
             'GIT_AUTHOR_NAME': author_name,
@@ -530,10 +528,7 @@ def stage_squash(pr: PullRequests, info: StagingSlice, target: str, commits: Lis
     head = r.stdout.strip()
 
     # TODO: remove when we stop using tmp.
-    r = info.repo.with_config(text=True).check(False).push(
-        url,
-        f'{head}:{target}'
-    )
+    r = info.repo.push(url, f'{head}:{target}')
     if r.returncode:
         raise exceptions.MergeError(pr, r.stderr)
 
@@ -552,10 +547,7 @@ def stage_rebase_ff(pr: PullRequests, info: StagingSlice, target: str, commits: 
     head, mapping = info.repo.rebase(info.head, commits=commits)
 
     # TODO: remove when we stop using tmp.
-    r = info.repo.with_config(text=True).check(False).push(
-        git.source_url(pr.repository, 'github'),
-        f'{head}:{target}'
-    )
+    r = info.repo.push(git.source_url(pr.repository, 'github'), f'{head}:{target}')
     if r.returncode:
         raise exceptions.MergeError(pr, r.stderr)
 
@@ -564,9 +556,20 @@ def stage_rebase_ff(pr: PullRequests, info: StagingSlice, target: str, commits: 
 
 def stage_rebase_merge(pr: PullRequests, info: StagingSlice, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str :
     add_self_references(pr, commits)
-    h, mapping = info.gh.rebase(pr.number, target, reset=True, commits=commits)
+    h, mapping = info.repo.rebase(info.head, commits=commits)
     msg = pr._build_merge_message(pr, related_prs=related_prs)
-    merge_head = info.gh.merge(h, target, str(msg))['sha']
+
+    project = pr.repository.project_id
+    merge_head= info.repo.merge(
+        info.head, h, str(msg),
+        author=(project.github_name, project.github_email),
+    )
+
+    # TODO: remove when we stop using tmp.
+    r = info.repo.push(git.source_url(pr.repository, 'github'), f'{merge_head}:{target}')
+    if r.returncode:
+        raise exceptions.MergeError(pr, r.stderr)
+
     pr.commits_map = json.dumps({**mapping, '': merge_head})
     return merge_head
 
@@ -593,25 +596,57 @@ def stage_merge(pr: PullRequests, info: StagingSlice, target: str, commits: List
     if base_commit:
         # replicate pr_head with base_commit replaced by
         # the current head
-        merge_tree = info.gh.merge(pr_head['sha'], target, 'temp merge')['tree']['sha']
+        t = info.repo.merge_tree(info.head, pr_head['sha'])
+        if t.returncode:
+            raise exceptions.MergeError(pr, t.stderr)
+        merge_tree = t.stdout.strip()
         new_parents = [info.head] + list(head_parents - {base_commit})
         msg = pr._build_merge_message(pr_head['commit']['message'], related_prs=related_prs)
-        copy = info.gh('post', 'git/commits', json={
-            'message': str(msg),
-            'tree': merge_tree,
-            'author': pr_head['commit']['author'],
-            'committer': pr_head['commit']['committer'],
-            'parents': new_parents,
-        }).json()
-        info.gh.set_ref(target, copy['sha'])
+
+        author = pr_head['commit']['author']
+        committer = pr_head['commit']['committer']
+        c = info.repo.with_config(env={
+            **os.environ,
+            'GIT_AUTHOR_NAME': author['name'],
+            'GIT_AUTHOR_EMAIL': author['email'],
+            'GIT_AUTHOR_DATE': author['date'],
+            'GIT_COMMITTER_NAME': committer['name'],
+            'GIT_COMMITTER_EMAIL': committer['email'],
+            'GIT_COMMITTER_DATE': committer['date'],
+        }).commit_tree(
+            *(chain.from_iterable(zip(
+                repeat('-p'),
+                new_parents,
+            ))),
+            '-m', str(msg),
+            merge_tree,
+        )
+        if c.returncode:
+            raise exceptions.MergeError(pr, c.stderr)
+        copy = c.stdout.strip()
+
+        # TODO: remove when we stop using tmp.
+        r = info.repo.push(git.source_url(pr.repository, 'github'), f'{copy}:{target}')
+        if r.returncode:
+            raise exceptions.MergeError(pr, r.stderr)
+
         # merge commit *and old PR head* map to the pr head replica
-        commits_map[''] = commits_map[pr_head['sha']] = copy['sha']
+        commits_map[''] = commits_map[pr_head['sha']] = copy
         pr.commits_map = json.dumps(commits_map)
-        return copy['sha']
+        return copy
     else:
         # otherwise do a regular merge
         msg = pr._build_merge_message(pr)
-        merge_head = info.gh.merge(pr.head, target, str(msg))['sha']
+        project = pr.repository.project_id
+        merge_head = info.repo.merge(
+            info.head, pr.head, str(msg),
+            author=(project.github_name, project.github_email),
+        )
+        # TODO: remove when we stop using tmp.
+        r = info.repo.push(git.source_url(pr.repository, 'github'), f'{merge_head}:{target}')
+        if r.returncode:
+            raise exceptions.MergeError(pr, r.stderr)
+
         # and the merge commit is the normal merge head
         commits_map[''] = merge_head
         pr.commits_map = json.dumps(commits_map)

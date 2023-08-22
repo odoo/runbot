@@ -137,9 +137,4 @@ def to_pr(env, pr):
     return pr
 
 def part_of(label, pr_id, *, separator='\n\n'):
-    """ Adds the "part-of" pseudo-header in the footer.
-    """
-    return f'{label}{separator}Part-of: {pr_id.display_name}'
-
-def part_of2(label, pr_id, *, separator='\n\n'):
-    return part_of(label, pr_id, separator=separator) + '\n'
+    return f'{label}{separator}Part-of: {pr_id.display_name}\n'

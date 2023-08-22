@@ -172,6 +172,28 @@ class Repo(Generic[T]):
 
         return dest, mapping
 
+    def merge(self, c1: str, c2: str, msg: str, *, author: Tuple[str, str]) -> str:
+        repo = self.stdout().with_config(text=True, check=False)
+
+        t = repo.merge_tree(c1, c2)
+        if t.returncode:
+            raise MergeError(t.stderr)
+
+        c = repo.with_config(env={
+            **os.environ,
+            'GIT_AUTHOR_NAME': author[0],
+            'GIT_AUTHOR_EMAIL': author[1],
+            'TZ': 'UTC',
+        }).commit_tree(
+            '-p', c1,
+            '-p', c2,
+            '-m', msg,
+            t.stdout.strip()
+        )
+        if c.returncode:
+            raise MergeError(c.stderr)
+        return c.stdout.strip()
+
 def check(p: subprocess.CompletedProcess) -> subprocess.CompletedProcess:
     if not p.returncode:
         return p
