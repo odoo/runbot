@@ -5,7 +5,6 @@ source branches).
 When preparing a staging, we simply want to ensure branch-matched PRs
 are staged concurrently in all repos
 """
-import json
 import time
 import xmlrpc.client
 
@@ -1256,12 +1255,12 @@ def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
 
     c_b = repo_b.commit('1.1')
     assert c_b.message.startswith('Release 1.1 (B)')
-    assert repo_b.read_tree(c_b) == {'f': '1', 'version': ''}
+    assert repo_b.read_tree(c_b) == {'f': '1', 'version': '1.1'}
     assert c_b.parents[0] == master_head_b
 
     c_c = repo_c.commit('1.1')
     assert c_c.message.startswith('Release 1.1 (C)')
-    assert repo_c.read_tree(c_c) == {'f': '2', 'version': ''}
+    assert repo_c.read_tree(c_c) == {'f': '2', 'version': '1.1'}
     assert repo_c.commit(c_c.parents[0]).parents[0] == master_head_c
 
 
@@ -1272,7 +1271,7 @@ def setup_mess(repo_a, repo_b, repo_c):
             [root, _] = r.make_commits(
                 None,
                 Commit('base', tree={'version': '', 'f': '0'}),
-                Commit('release 1.0', tree={'version': '1.0'} if r is repo_a else None),
+                Commit('release 1.0', tree={'version': '1.0'}),
                 ref='heads/1.0'
             )
             master_heads.extend(r.make_commits(root, Commit('other', tree={'f': '1'}), ref='heads/master'))
@@ -1294,7 +1293,7 @@ def setup_mess(repo_a, repo_b, repo_c):
     with repo_b:
         repo_b.make_commits(
             master_heads[1],
-            Commit('Release 1.1 (B)', tree=None),
+            Commit('Release 1.1 (B)', tree={'version': '1.1'}),
             ref='heads/release-1.1'
         )
         pr_rel_b = repo_b.make_pr(target='master', head='release-1.1')
@@ -1303,7 +1302,7 @@ def setup_mess(repo_a, repo_b, repo_c):
         pr_other = repo_c.make_pr(target='master', head='whocares')
         repo_c.make_commits(
             master_heads[2],
-            Commit('Release 1.1 (C)', tree=None),
+            Commit('Release 1.1 (C)', tree={'version': '1.1'}),
             ref='heads/release-1.1'
         )
         pr_rel_c = repo_c.make_pr(target='master', head='release-1.1')
@@ -1431,7 +1430,8 @@ def test_freeze_conflict(env, project, repo_a, repo_b, repo_c, users, config):
 
     # create conflicting branch
     with repo_c:
-        repo_c.make_ref('heads/1.1', heads[2])
+        [c] = repo_c.make_commits(heads[2], Commit("exists", tree={'version': ''}))
+        repo_c.make_ref('heads/1.1', c)
 
     # actually perform the freeze
     with pytest.raises(xmlrpc.client.Fault) as e:
