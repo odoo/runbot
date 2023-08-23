@@ -6,10 +6,8 @@ import json
 import logging
 import os
 import re
-import tempfile
 from difflib import Differ
-from itertools import count, takewhile, chain, repeat
-from pathlib import Path
+from itertools import takewhile, chain, repeat
 from subprocess import CompletedProcess
 from typing import Dict, Union, Optional, Literal, Callable, Iterator, Tuple, List, TypeAlias
 
@@ -18,7 +16,6 @@ from werkzeug.datastructures import Headers
 
 from odoo import api, models, fields
 from odoo.tools import OrderedSet
-from odoo.tools.appdirs import user_cache_dir
 from .pull_requests import Branch, Stagings, PullRequests, Repository, Batch
 from .. import exceptions, utils, github, git
 
@@ -111,18 +108,26 @@ def try_staging(branch: Branch) -> Optional[Stagings]:
             # (with a uniquifier to ensure we don't hit a previous version of
             # the same) to ensure the staging head is new and we're building
             # everything
-            tree = it.gh.commit(it.head)['tree']
+            project = branch.project_id
             uniquifier = base64.b64encode(os.urandom(12)).decode('ascii')
-            dummy_head = it.gh('post', 'git/commits', json={
-                'tree': tree['sha'],
-                'parents': [it.head],
-                'message': f'''\
+            dummy_head = it.repo.with_config(check=True, env={
+                **os.environ,
+                'GIT_AUTHOR_NAME': project.github_name,
+                'GIT_AUTHOR_EMAIL': project.github_email,
+                'TZ': 'UTC',
+            }).commit_tree(
+                # somewhat exceptionally, `commit-tree` wants an actual tree
+                # not a tree-ish
+                f'{it.head}^{{tree}}',
+                p=it.head,
+                m=f'''\
 force rebuild
 
 uniquifier: {uniquifier}
 For-Commit-Id: {it.head}
 ''',
-            }).json()['sha']
+            ).stdout.strip()
+
             # see above, ideally we don't need to mark the real head as
             # `to_check` because it's an old commit but `DO UPDATE` is necessary
             # for `RETURNING` to work, and it doesn't really hurt (maybe)
@@ -152,34 +157,17 @@ For-Commit-Id: {it.head}
         'heads': heads,
         'commits': commits,
     })
-    # create staging branch from tmp
-    token = branch.project_id.github_token
-    for repo in branch.project_id.repo_ids.having_branch(branch):
-        it = staging_state[repo]
+    for repo, it in staging_state.items():
         _logger.info(
             "%s: create staging for %s:%s at %s",
             branch.project_id.name, repo.name, branch.name,
             it.head
         )
-        refname = 'staging.{}'.format(branch.name)
-        it.gh.set_ref(refname, it.head)
-
-        i = count()
-        @utils.backoff(delays=WAIT_FOR_VISIBILITY, exc=TimeoutError)
-        def wait_for_visibility():
-            if check_visibility(repo, refname, it.head, token):
-                _logger.info(
-                    "[repo] updated %s:%s to %s: ok (at %d/%d)",
-                    repo.name, refname, it.head,
-                    next(i), len(WAIT_FOR_VISIBILITY)
-                )
-                return
-            _logger.warning(
-                "[repo] updated %s:%s to %s: failed (at %d/%d)",
-                repo.name, refname, it.head,
-                next(i), len(WAIT_FOR_VISIBILITY)
-            )
-            raise TimeoutError("Staged head not updated after %d seconds" % sum(WAIT_FOR_VISIBILITY))
+        it.repo.stdout(False).check(True).push(
+            '-f',
+            git.source_url(repo, 'github'),
+            f'{it.head}:refs/heads/staging.{branch.name}',
+        )
 
     _logger.info("Created staging %s (%s) to %s", st, ', '.join(
         '%s[%s]' % (batch, batch.prs)
@@ -231,8 +219,6 @@ def staging_setup(
     for repo in target.project_id.repo_ids.having_branch(target):
         gh = repo.github()
         head = gh.head(target.name)
-        # create tmp staging branch
-        gh.set_ref('tmp.{}'.format(target.name), head)
 
         source = git.get_local(repo, 'github')
         source.fetch(
@@ -340,25 +326,14 @@ def stage_batch(env: api.Environment, prs: PullRequests, staging: StagingState) 
             pr.merge_method or (pr.squash and 'single') or None
         )
 
-        target = 'tmp.{}'.format(pr.target.name)
-        original_head = info.gh.head(target)
+        original_head = info.head
         try:
-            try:
-                method, new_heads[pr] = stage(pr, info, target, related_prs=(prs - pr))
-                _logger.info(
-                    "Staged pr %s to %s by %s: %s -> %s",
-                    pr.display_name, pr.target.name, method,
-                    original_head, new_heads[pr]
-                )
-            except Exception:
-                # reset the head which failed, as rebase() may have partially
-                # updated it (despite later steps failing)
-                info.gh.set_ref(target, original_head)
-                # then reset every previous update
-                for to_revert in new_heads.keys():
-                    it = staging[to_revert.repository]
-                    it.gh.set_ref('tmp.{}'.format(to_revert.target.name), it.head)
-                raise
+            method, new_heads[pr] = stage(pr, info, related_prs=(prs - pr))
+            _logger.info(
+                "Staged pr %s to %s by %s: %s -> %s",
+                pr.display_name, pr.target.name, method,
+                original_head, new_heads[pr]
+            )
         except github.MergeError as e:
             raise exceptions.MergeError(pr) from e
         except exceptions.Mismatch as e:
@@ -402,7 +377,7 @@ def format_for_difflib(items: Iterator[Tuple[str, object]]) -> Iterator[str]:
 
 
 Method = Literal['merge', 'rebase-merge', 'rebase-ff', 'squash']
-def stage(pr: PullRequests, info: StagingSlice, target: str, related_prs: PullRequests) -> Tuple[Method, str]:
+def stage(pr: PullRequests, info: StagingSlice, related_prs: PullRequests) -> Tuple[Method, str]:
     # nb: pr_commits is oldest to newest so pr.head is pr_commits[-1]
     _, prdict = info.gh.pr(pr.number)
     commits = prdict['commits']
@@ -471,9 +446,9 @@ def stage(pr: PullRequests, info: StagingSlice, target: str, related_prs: PullRe
             fn = stage_rebase_ff
         case 'squash':
             fn = stage_squash
-    return method, fn(pr, info, target, pr_commits, related_prs=related_prs)
+    return method, fn(pr, info, pr_commits, related_prs=related_prs)
 
-def stage_squash(pr: PullRequests, info: StagingSlice, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
+def stage_squash(pr: PullRequests, info: StagingSlice, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
     url = git.source_url(pr.repository, 'github')
 
     msg = pr._build_merge_message(pr, related_prs=related_prs)
@@ -527,34 +502,23 @@ def stage_squash(pr: PullRequests, info: StagingSlice, target: str, commits: Lis
         raise exceptions.MergeError(pr, r.stderr)
     head = r.stdout.strip()
 
-    # TODO: remove when we stop using tmp.
-    r = info.repo.push(url, f'{head}:{target}')
-    if r.returncode:
-        raise exceptions.MergeError(pr, r.stderr)
-
     commits_map = {c['sha']: head for c in commits}
     commits_map[''] = head
     pr.commits_map = json.dumps(commits_map)
 
     return head
 
-def stage_rebase_ff(pr: PullRequests, info: StagingSlice, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
+def stage_rebase_ff(pr: PullRequests, info: StagingSlice, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
     # updates head commit with PR number (if necessary) then rebases
     # on top of target
     msg = pr._build_merge_message(commits[-1]['commit']['message'], related_prs=related_prs)
     commits[-1]['commit']['message'] = str(msg)
     add_self_references(pr, commits[:-1])
     head, mapping = info.repo.rebase(info.head, commits=commits)
-
-    # TODO: remove when we stop using tmp.
-    r = info.repo.push(git.source_url(pr.repository, 'github'), f'{head}:{target}')
-    if r.returncode:
-        raise exceptions.MergeError(pr, r.stderr)
-
     pr.commits_map = json.dumps({**mapping, '': head})
     return head
 
-def stage_rebase_merge(pr: PullRequests, info: StagingSlice, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str :
+def stage_rebase_merge(pr: PullRequests, info: StagingSlice, commits: List[github.PrCommit], related_prs: PullRequests) -> str :
     add_self_references(pr, commits)
     h, mapping = info.repo.rebase(info.head, commits=commits)
     msg = pr._build_merge_message(pr, related_prs=related_prs)
@@ -564,16 +528,10 @@ def stage_rebase_merge(pr: PullRequests, info: StagingSlice, target: str, commit
         info.head, h, str(msg),
         author=(project.github_name, project.github_email),
     )
-
-    # TODO: remove when we stop using tmp.
-    r = info.repo.push(git.source_url(pr.repository, 'github'), f'{merge_head}:{target}')
-    if r.returncode:
-        raise exceptions.MergeError(pr, r.stderr)
-
     pr.commits_map = json.dumps({**mapping, '': merge_head})
     return merge_head
 
-def stage_merge(pr: PullRequests, info: StagingSlice, target: str, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
+def stage_merge(pr: PullRequests, info: StagingSlice, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
     pr_head = commits[-1] # oldest to newest
     base_commit = None
     head_parents = {p['sha'] for p in pr_head['parents']}
@@ -614,21 +572,16 @@ def stage_merge(pr: PullRequests, info: StagingSlice, target: str, commits: List
             'GIT_COMMITTER_EMAIL': committer['email'],
             'GIT_COMMITTER_DATE': committer['date'],
         }).commit_tree(
+            merge_tree,
             *(chain.from_iterable(zip(
                 repeat('-p'),
                 new_parents,
             ))),
             '-m', str(msg),
-            merge_tree,
         )
         if c.returncode:
             raise exceptions.MergeError(pr, c.stderr)
         copy = c.stdout.strip()
-
-        # TODO: remove when we stop using tmp.
-        r = info.repo.push(git.source_url(pr.repository, 'github'), f'{copy}:{target}')
-        if r.returncode:
-            raise exceptions.MergeError(pr, r.stderr)
 
         # merge commit *and old PR head* map to the pr head replica
         commits_map[''] = commits_map[pr_head['sha']] = copy
@@ -642,11 +595,6 @@ def stage_merge(pr: PullRequests, info: StagingSlice, target: str, commits: List
             info.head, pr.head, str(msg),
             author=(project.github_name, project.github_email),
         )
-        # TODO: remove when we stop using tmp.
-        r = info.repo.push(git.source_url(pr.repository, 'github'), f'{merge_head}:{target}')
-        if r.returncode:
-            raise exceptions.MergeError(pr, r.stderr)
-
         # and the merge commit is the normal merge head
         commits_map[''] = merge_head
         pr.commits_map = json.dumps(commits_map)

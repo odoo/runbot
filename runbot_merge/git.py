@@ -185,10 +185,10 @@ class Repo(Generic[T]):
             'GIT_AUTHOR_EMAIL': author[1],
             'TZ': 'UTC',
         }).commit_tree(
+            t.stdout.strip(),
             '-p', c1,
             '-p', c2,
             '-m', msg,
-            t.stdout.strip()
         )
         if c.returncode:
             raise MergeError(c.stderr)
