@@ -58,13 +58,7 @@ def test_trivial_flow(env, repo, page, users, config):
 
     with repo:
         repo.post_status(c1, 'success', 'legal/cla')
-    # rewrite status payload in old-style to ensure it does not break
-    c = env['runbot_merge.commit'].search([('sha', '=', c1)])
-    c.statuses = json.dumps({k: v['state'] for k, v in json.loads(c.statuses).items()})
-
-    with repo:
         repo.post_status(c1, 'success', 'ci/runbot')
-
     env.run_crons()
     assert pr_id.state == 'validated'
 

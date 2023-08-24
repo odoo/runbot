@@ -741,7 +741,7 @@ class PullRequests(models.Model):
 
             st = 'success'
             for ci in pr.repository.status_ids._for_pr(pr):
-                v = state_(statuses, ci.context) or 'pending'
+                v = (statuses.get(ci.context) or {'state': 'pending'})['state']
                 if v in ('error', 'failure'):
                     st = 'failure'
                     break
@@ -1042,14 +1042,15 @@ class PullRequests(models.Model):
 
             success = True
             for ci in required:
-                st = state_(sts, ci) or 'pending'
-                if st == 'success':
+                status = sts.get(ci) or {'state': 'pending'}
+                result = status['state']
+                if result == 'success':
                     continue
 
                 success = False
-                if st in ('error', 'failure'):
+                if result in ('error', 'failure'):
                     failed |= pr
-                    pr._notify_ci_new_failure(ci, to_status(sts.get(ci.strip(), 'pending')))
+                    pr._notify_ci_new_failure(ci, status)
             if success:
                 oldstate = pr.state
                 if oldstate == 'opened':
@@ -1060,8 +1061,6 @@ class PullRequests(models.Model):
 
     def _notify_ci_new_failure(self, ci, st):
         prev = json.loads(self.previous_failure)
-        if prev.get('state'): # old-style previous-failure
-            prev = {ci: prev}
         if not any(self._statuses_equivalent(st, v) for v in prev.values()):
             prev[ci] = st
             self.previous_failure = json.dumps(prev)
@@ -1893,8 +1892,7 @@ class Stagings(models.Model):
                     status.get('target_url') or ''
                 )
                 for commit in commits
-                for context, st in json.loads(commit.statuses).items()
-                for status in [to_status(st)]
+                for context, status in json.loads(commit.statuses).items()
             ]
 
     # only depend on staged_at as it should not get modified, but we might
@@ -1930,7 +1928,7 @@ class Stagings(models.Model):
             st = 'success'
             for head, reqs in required_statuses:
                 statuses = cmap.get(head) or {}
-                for v in map(lambda n: state_(statuses, n), reqs):
+                for v in map(lambda n: statuses.get(n, {}).get('state'), reqs):
                     if st == 'failure' or v in ('error', 'failure'):
                         st = 'failure'
                     elif v is None:
@@ -2029,14 +2027,14 @@ class Stagings(models.Model):
             reason = next((
                 ctx for ctx, result in statuses.items()
                 if ctx in required_statuses
-                if to_status(result).get('state') in ('error', 'failure')
+                if result.get('state') in ('error', 'failure')
             ), None)
             if not reason:
                 continue
 
             pr = next((pr for pr in self.batch_ids.prs if pr.repository == head.repository_id), None)
 
-            status = to_status(statuses[reason])
+            status = statuses[reason]
             viewmore = ''
             if status.get('target_url'):
                 viewmore = ' (view more at %(target_url)s)' % status
@@ -2347,30 +2345,6 @@ class FetchJob(models.Model):
             if commit:
                 self.env.cr.commit()
 
-# The commit (and PR) statuses was originally a map of ``{context:state}``
-# however it turns out to clarify error messages it'd be useful to have
-# a bit more information e.g. a link to the CI's build info on failure and
-# all that. So the db-stored statuses are now becoming a map of
-# ``{ context: {state, target_url, description } }``. The issue here is
-# there's already statuses stored in the db so we need to handle both
-# formats, hence these utility functions)
-def state_(statuses, name):
-    """ Fetches the status state """
-    name = name.strip()
-    v = statuses.get(name)
-    if isinstance(v, dict):
-        return v.get('state')
-    return v
-def to_status(v):
-    """ Converts old-style status values (just a state string) to new-style
-    (``{state, target_url, description}``)
-
-    :type v: str | dict
-    :rtype: dict
-    """
-    if isinstance(v, dict):
-        return v
-    return {'state': v, 'target_url': None, 'description': None}
 
 refline = re.compile(rb'([\da-f]{40}) ([^\0\n]+)(\0.*)?\n?$')
 ZERO_REF = b'0'*40
