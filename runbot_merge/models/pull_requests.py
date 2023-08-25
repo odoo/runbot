@@ -1711,6 +1711,7 @@ class Commit(models.Model):
     statuses only, by PR pushes, by branch updates, ...
     """
     _name = _description = 'runbot_merge.commit'
+    _rec_name = 'sha'
 
     sha = fields.Char(required=True)
     statuses = fields.Char(help="json-encoded mapping of status contexts to states", default="{}")
