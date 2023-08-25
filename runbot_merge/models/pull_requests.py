@@ -1,36 +1,23 @@
-# coding: utf-8
-
 import ast
-import base64
 import collections
 import contextlib
 import datetime
-import io
 import itertools
 import json
 import logging
-import os
 import pprint
 import re
 import time
+from typing import Optional, Union
 
-from difflib import Differ
-from itertools import takewhile
-from typing import Optional
-
-import requests
 import sentry_sdk
 import werkzeug
-from werkzeug.datastructures import Headers
 
 from odoo import api, fields, models, tools
 from odoo.exceptions import ValidationError
 from odoo.osv import expression
-from odoo.tools import OrderedSet
 
 from .. import github, exceptions, controllers, utils
-
-WAIT_FOR_VISIBILITY = [10, 10, 10, 10]
 
 _logger = logging.getLogger(__name__)
 
@@ -67,6 +54,8 @@ class Repository(models.Model):
     _name = _description = 'runbot_merge.repository'
     _order = 'sequence, id'
 
+    id: int
+
     sequence = fields.Integer(default=50, group_operator=None)
     name = fields.Char(required=True)
     project_id = fields.Many2one('runbot_merge.project', required=True, index=True)
@@ -98,7 +87,7 @@ All substitutions are tentatively applied sequentially to the input.
             vals['status_ids'] = [(5, 0, {})] + [(0, 0, {'context': c}) for c in st.split(',')]
         return super().write(vals)
 
-    def github(self, token_field='github_token'):
+    def github(self, token_field='github_token') -> github.GH:
         return github.GH(self.project_id[token_field], self.name)
 
     def _auto_init(self):
@@ -245,6 +234,8 @@ class Branch(models.Model):
     _name = _description = 'runbot_merge.branch'
     _order = 'sequence, name'
 
+    id: int
+
     name = fields.Char(required=True)
     project_id = fields.Many2one('runbot_merge.project', required=True, index=True)
 
@@ -298,241 +289,15 @@ class Branch(models.Model):
         for b in self:
             b.active_staging_id = b.with_context(active_test=True).staging_ids
 
-    def _ready(self):
-        self.env.cr.execute("""
-        SELECT
-          min(pr.priority) as priority,
-          array_agg(pr.id) AS match
-        FROM runbot_merge_pull_requests pr
-        WHERE pr.target = any(%s)
-          -- exclude terminal states (so there's no issue when
-          -- deleting branches & reusing labels)
-          AND pr.state != 'merged'
-          AND pr.state != 'closed'
-        GROUP BY
-            pr.target,
-            CASE
-                WHEN pr.label SIMILAR TO '%%:patch-[[:digit:]]+'
-                    THEN pr.id::text
-                ELSE pr.label
-            END
-        HAVING
-            bool_or(pr.state = 'ready') or bool_or(pr.priority = 0)
-        ORDER BY min(pr.priority), min(pr.id)
-        """, [self.ids])
-        browse = self.env['runbot_merge.pull_requests'].browse
-        return [(p, browse(ids)) for p, ids in self.env.cr.fetchall()]
-
-    def _stageable(self):
-        return [
-            (p, prs)
-            for p, prs in self._ready()
-            if not any(prs.mapped('blocked'))
-        ]
-
-    def try_staging(self):
-        """ Tries to create a staging if the current branch does not already
-        have one. Returns None if the branch already has a staging or there
-        is nothing to stage, the newly created staging otherwise.
-        """
-        logger = _logger.getChild('cron')
-
-        logger.info(
-            "Checking %s (%s) for staging: %s, skip? %s",
-            self, self.name,
-            self.active_staging_id,
-            bool(self.active_staging_id)
-        )
-        if self.active_staging_id:
-            return
-
-        rows = self._stageable()
-        priority = rows[0][0] if rows else -1
-        if priority == 0 or priority == 1:
-            # p=0 take precedence over all else
-            # p=1 allows merging a fix inside / ahead of a split (e.g. branch
-            # is broken or widespread false positive) without having to cancel
-            # the existing staging
-            batched_prs = [pr_ids for _, pr_ids in takewhile(lambda r: r[0] == priority, rows)]
-        elif self.split_ids:
-            split_ids = self.split_ids[0]
-            logger.info("Found split of PRs %s, re-staging", split_ids.mapped('batch_ids.prs'))
-            batched_prs = [batch.prs for batch in split_ids.batch_ids]
-            split_ids.unlink()
-        else: # p=2
-            batched_prs = [pr_ids for _, pr_ids in takewhile(lambda r: r[0] == priority, rows)]
-
-        if not batched_prs:
-            return
-
-        Batch = self.env['runbot_merge.batch']
-        staged = Batch
-        original_heads = {}
-        meta = {repo: {} for repo in self.project_id.repo_ids.having_branch(self)}
-        for repo, it in meta.items():
-            gh = it['gh'] = repo.github()
-            it['head'] = original_heads[repo] = gh.head(self.name)
-            # create tmp staging branch
-            gh.set_ref('tmp.{}'.format(self.name), it['head'])
-
-        batch_limit = self.project_id.batch_limit
-        first = True
-        for batch in batched_prs:
-            if len(staged) >= batch_limit:
-                break
-            try:
-                staged |= Batch.stage(meta, batch)
-            except exceptions.MergeError as e:
-                pr = e.args[0]
-                _logger.exception("Failed to merge %s into staging branch", pr.display_name)
-                if first or isinstance(e, exceptions.Unmergeable):
-                    if len(e.args) > 1 and e.args[1]:
-                        reason = e.args[1]
-                    else:
-                        reason = e.__cause__ or e.__context__
-                    # if the reason is a json document, assume it's a github
-                    # error and try to extract the error message to give it to
-                    # the user
-                    with contextlib.suppress(Exception):
-                        reason = json.loads(str(reason))['message'].lower()
-
-                    pr.state = 'error'
-                    self.env.ref('runbot_merge.pr.merge.failed')._send(
-                        repository=pr.repository,
-                        pull_request=pr.number,
-                        format_args= {'pr': pr, 'reason': reason, 'exc': e},
-                    )
-            else:
-                first = False
-
-        if not staged:
-            return
-
-        heads = []
-        heads_map = {}
-        commits = []
-        for repo, it in meta.items():
-            tree = it['gh'].commit(it['head'])['tree']
-            # ensures staging branches are unique and always
-            # rebuilt
-            r = base64.b64encode(os.urandom(12)).decode('ascii')
-            trailer = ''
-            if heads_map:
-                trailer = '\n'.join(
-                    'Runbot-dependency: %s:%s' % (repo, h)
-                    for repo, h in heads_map.items()
-                )
-            dummy_head = {'sha': it['head']}
-            if it['head'] == original_heads[repo]:
-                # if the repo has not been updated by the staging, create a
-                # dummy commit to force rebuild
-                dummy_head = it['gh']('post', 'git/commits', json={
-                    'message': '''force rebuild
-
-uniquifier: %s
-For-Commit-Id: %s
-%s''' % (r, it['head'], trailer),
-                    'tree': tree['sha'],
-                    'parents': [it['head']],
-                }).json()
-
-            # special case if the two commits are identical because otherwise
-            # postgres raises error "ensure that no rows proposed for insertion
-            # within the same command have duplicate constained values"
-            if it['head'] == dummy_head['sha']:
-                self.env.cr.execute(
-                    "INSERT INTO runbot_merge_commit (sha, to_check, statuses) "
-                    "VALUES (%s, true, '{}') "
-                    "ON CONFLICT (sha) DO UPDATE SET to_check=true "
-                    "RETURNING id",
-                    [it['head']]
-                )
-                [commit] = [head] = self.env.cr.fetchone()
-            else:
-                self.env.cr.execute(
-                    "INSERT INTO runbot_merge_commit (sha, to_check, statuses) "
-                    "VALUES (%s, false, '{}'), (%s, true, '{}') "
-                    "ON CONFLICT (sha) DO UPDATE SET to_check=true "
-                    "RETURNING id",
-                    [it['head'], dummy_head['sha']]
-                )
-                ([commit], [head]) = self.env.cr.fetchall()
-
-            heads_map[repo.name] = dummy_head['sha']
-            heads.append(fields.Command.create({
-                'repository_id': repo.id,
-                'commit_id': head,
-            }))
-            commits.append(fields.Command.create({
-                'repository_id': repo.id,
-                'commit_id': commit,
-            }))
-
-        # create actual staging object
-        st = self.env['runbot_merge.stagings'].create({
-            'target': self.id,
-            'batch_ids': [(4, batch.id, 0) for batch in staged],
-            'heads': heads,
-            'commits': commits,
-        })
-        # create staging branch from tmp
-        token = self.project_id.github_token
-        for r in self.project_id.repo_ids.having_branch(self):
-            it = meta[r]
-            staging_head = heads_map[r.name]
-            _logger.info(
-                "%s: create staging for %s:%s at %s",
-                self.project_id.name, r.name, self.name,
-                staging_head
-            )
-            refname = 'staging.{}'.format(self.name)
-            it['gh'].set_ref(refname, staging_head)
-
-            i = itertools.count()
-            @utils.backoff(delays=WAIT_FOR_VISIBILITY, exc=TimeoutError)
-            def wait_for_visibility():
-                if self._check_visibility(r, refname, staging_head, token):
-                    _logger.info(
-                        "[repo] updated %s:%s to %s: ok (at %d/%d)",
-                        r.name, refname, staging_head,
-                        next(i), len(WAIT_FOR_VISIBILITY)
-                    )
-                    return
-                _logger.warning(
-                    "[repo] updated %s:%s to %s: failed (at %d/%d)",
-                    r.name, refname, staging_head,
-                    next(i), len(WAIT_FOR_VISIBILITY)
-                )
-                raise TimeoutError("Staged head not updated after %d seconds" % sum(WAIT_FOR_VISIBILITY))
-
-        logger.info("Created staging %s (%s) to %s", st, ', '.join(
-            '%s[%s]' % (batch, batch.prs)
-            for batch in staged
-        ), st.target.name)
-        return st
-
-    def _check_visibility(self, repo, branch_name, expected_head, token):
-        """ Checks the repository actual to see if the new / expected head is
-        now visible
-        """
-        # v1 protocol provides URL for ref discovery: https://github.com/git/git/blob/6e0cc6776106079ed4efa0cc9abace4107657abf/Documentation/technical/http-protocol.txt#L187
-        # for more complete client this is also the capabilities discovery and
-        # the "entry point" for the service
-        url = 'https://github.com/{}.git/info/refs?service=git-upload-pack'.format(repo.name)
-        with requests.get(url, stream=True, auth=(token, '')) as resp:
-            if not resp.ok:
-                return False
-            for head, ref in parse_refs_smart(resp.raw.read):
-                if ref != ('refs/heads/' + branch_name):
-                    continue
-                return head == expected_head
-            return False
 
 ACL = collections.namedtuple('ACL', 'is_admin is_reviewer is_author')
 class PullRequests(models.Model):
     _name = _description = 'runbot_merge.pull_requests'
     _order = 'number desc'
     _rec_name = 'number'
+
+    id: int
+    display_name: str
 
     target = fields.Many2one('runbot_merge.branch', required=True, index=True)
     repository = fields.Many2one('runbot_merge.repository', required=True)
@@ -1264,225 +1029,20 @@ class PullRequests(models.Model):
             if commit:
                 self.env.cr.commit()
 
-    def _parse_commit_message(self, message):
-        """ Parses a commit message to split out the pseudo-headers (which
-        should be at the end) from the body, and serialises back with a
-        predefined pseudo-headers ordering.
-        """
-        return Message.from_message(message)
-
-    def _is_mentioned(self, message, *, full_reference=False):
-        """Returns whether ``self`` is mentioned in ``message```
-
-        :param str | PullRequest message:
-        :param bool full_reference: whether the repository name must be present
-        :rtype: bool
-        """
-        if full_reference:
-            pattern = fr'\b{re.escape(self.display_name)}\b'
-        else:
-            repository = self.repository.name # .replace('/', '\\/')
-            pattern = fr'( |\b{repository})#{self.number}\b'
-        return bool(re.search(pattern, message if isinstance(message, str) else message.message))
-
-    def _build_merge_message(self, message, related_prs=()):
+    def _build_merge_message(self, message: Union['PullRequests', str], related_prs=()) -> 'Message':
         # handle co-authored commits (https://help.github.com/articles/creating-a-commit-with-multiple-authors/)
-        m = self._parse_commit_message(message)
-        if not self._is_mentioned(message):
-            m.body += '\n\ncloses {pr.display_name}'.format(pr=self)
+        m = Message.from_message(message)
+        if not is_mentioned(message, self):
+            m.body += f'\n\ncloses {self.display_name}'
 
         for r in related_prs:
-            if not r._is_mentioned(message, full_reference=True):
+            if not is_mentioned(message, r, full_reference=True):
                 m.headers.add('Related', r.display_name)
 
         if self.reviewed_by:
             m.headers.add('signed-off-by', self.reviewed_by.formatted_email)
 
         return m
-
-    def _add_self_references(self, commits):
-        """Adds a footer reference to ``self`` to all ``commits`` if they don't
-        already refer to the PR.
-        """
-        for c in (c['commit'] for c in commits):
-            if not self._is_mentioned(c['message']):
-                m = self._parse_commit_message(c['message'])
-                m.headers.pop('Part-Of', None)
-                m.headers.add('Part-Of', self.display_name)
-                c['message'] = str(m)
-
-    def _stage(self, gh, target, related_prs=()):
-        # nb: pr_commits is oldest to newest so pr.head is pr_commits[-1]
-        _, prdict = gh.pr(self.number)
-        commits = prdict['commits']
-        method = self.merge_method or ('rebase-ff' if commits == 1 else None)
-        if commits > 50 and method.startswith('rebase'):
-            raise exceptions.Unmergeable(self, "Rebasing 50 commits is too much.")
-        if commits > 250:
-            raise exceptions.Unmergeable(
-                self, "Merging PRs of 250 or more commits is not supported "
-                "(https://developer.github.com/v3/pulls/#list-commits-on-a-pull-request)"
-            )
-        pr_commits = gh.commits(self.number)
-        for c in pr_commits:
-            if not (c['commit']['author']['email'] and c['commit']['committer']['email']):
-                raise exceptions.Unmergeable(
-                    self,
-                    f"All commits must have author and committer email, "
-                    f"missing email on {c['sha']} indicates the authorship is "
-                    f"most likely incorrect."
-                )
-
-        # sync and signal possibly missed updates
-        invalid = {}
-        diff = []
-        pr_head = pr_commits[-1]['sha']
-        if self.head != pr_head:
-            invalid['head'] = pr_head
-            diff.append(('Head', self.head, pr_head))
-
-        if self.target.name != prdict['base']['ref']:
-            branch = self.env['runbot_merge.branch'].with_context(active_test=False).search([
-                ('name', '=', prdict['base']['ref']),
-                ('project_id', '=', self.repository.project_id.id),
-            ])
-            if not branch:
-                self.unlink()
-                raise exceptions.Unmergeable(self, "While staging, found this PR had been retargeted to an un-managed branch.")
-            invalid['target'] = branch.id
-            diff.append(('Target branch', self.target.name, branch.name))
-
-        if self.squash != commits == 1:
-            invalid['squash'] = commits == 1
-            diff.append(('Single commit', self.squash, commits == 1))
-
-        msg = utils.make_message(prdict)
-        if self.message != msg:
-            invalid['message'] = msg
-            diff.append(('Message', self.message, msg))
-
-        if invalid:
-            self.write({**invalid, 'state': 'opened', 'head': pr_head})
-            raise exceptions.Mismatch(invalid, diff)
-
-        if self.reviewed_by and self.reviewed_by.name == self.reviewed_by.github_login:
-            # XXX: find other trigger(s) to sync github name?
-            gh_name = gh.user(self.reviewed_by.github_login)['name']
-            if gh_name:
-                self.reviewed_by.name = gh_name
-
-        # NOTE: lost merge v merge/copy distinction (head being
-        #       a merge commit reused instead of being re-merged)
-        return method, getattr(self, '_stage_' + method.replace('-', '_'))(
-            gh, target, pr_commits, related_prs=related_prs)
-
-    def _stage_squash(self, gh, target, commits, related_prs=()):
-        msg = self._build_merge_message(self, related_prs=related_prs)
-        authorship = {}
-
-        authors = {
-            (c['commit']['author']['name'], c['commit']['author']['email'])
-            for c in commits
-        }
-        if len(authors) == 1:
-            name, email = authors.pop()
-            authorship['author']  = {'name': name, 'email': email}
-        else:
-            msg.headers.extend(sorted(
-                ('Co-Authored-By', "%s <%s>" % author)
-                for author in authors
-            ))
-
-        committers = {
-            (c['commit']['committer']['name'], c['commit']['committer']['email'])
-            for c in commits
-        }
-        if len(committers) == 1:
-            name, email = committers.pop()
-            authorship['committer'] = {'name': name, 'email': email}
-        # should committers also be added to co-authors?
-
-        original_head = gh.head(target)
-        merge_tree = gh.merge(self.head, target, 'temp merge')['tree']['sha']
-        head = gh('post', 'git/commits', json={
-            **authorship,
-            'message': str(msg),
-            'tree': merge_tree,
-            'parents': [original_head],
-        }).json()['sha']
-        gh.set_ref(target, head)
-
-        commits_map = {c['sha']: head for c in commits}
-        commits_map[''] = head
-        self.commits_map = json.dumps(commits_map)
-
-        return head
-
-    def _stage_rebase_ff(self, gh, target, commits, related_prs=()):
-        # updates head commit with PR number (if necessary) then rebases
-        # on top of target
-        msg = self._build_merge_message(commits[-1]['commit']['message'], related_prs=related_prs)
-        commits[-1]['commit']['message'] = str(msg)
-        self._add_self_references(commits[:-1])
-        head, mapping = gh.rebase(self.number, target, commits=commits)
-        self.commits_map = json.dumps({**mapping, '': head})
-        return head
-
-    def _stage_rebase_merge(self, gh, target, commits, related_prs=()):
-        self._add_self_references(commits)
-        h, mapping = gh.rebase(self.number, target, reset=True, commits=commits)
-        msg = self._build_merge_message(self, related_prs=related_prs)
-        merge_head = gh.merge(h, target, str(msg))['sha']
-        self.commits_map = json.dumps({**mapping, '': merge_head})
-        return merge_head
-
-    def _stage_merge(self, gh, target, commits, related_prs=()):
-        pr_head = commits[-1] # oldest to newest
-        base_commit = None
-        head_parents = {p['sha'] for p in pr_head['parents']}
-        if len(head_parents) > 1:
-            # look for parent(s?) of pr_head not in PR, means it's
-            # from target (so we merged target in pr)
-            merge = head_parents - {c['sha'] for c in commits}
-            external_parents = len(merge)
-            if external_parents > 1:
-                raise exceptions.Unmergeable(
-                    "The PR head can only have one parent from the base branch "
-                    "(not part of the PR itself), found %d: %s" % (
-                        external_parents,
-                        ', '.join(merge)
-                    ))
-            if external_parents == 1:
-                [base_commit] = merge
-
-        commits_map = {c['sha']: c['sha'] for c in commits}
-        if base_commit:
-            # replicate pr_head with base_commit replaced by
-            # the current head
-            original_head = gh.head(target)
-            merge_tree = gh.merge(pr_head['sha'], target, 'temp merge')['tree']['sha']
-            new_parents = [original_head] + list(head_parents - {base_commit})
-            msg = self._build_merge_message(pr_head['commit']['message'], related_prs=related_prs)
-            copy = gh('post', 'git/commits', json={
-                'message': str(msg),
-                'tree': merge_tree,
-                'author': pr_head['commit']['author'],
-                'committer': pr_head['commit']['committer'],
-                'parents': new_parents,
-            }).json()
-            gh.set_ref(target, copy['sha'])
-            # merge commit *and old PR head* map to the pr head replica
-            commits_map[''] = commits_map[pr_head['sha']] = copy['sha']
-            self.commits_map = json.dumps(commits_map)
-            return copy['sha']
-        else:
-            # otherwise do a regular merge
-            msg = self._build_merge_message(self)
-            merge_head = gh.merge(self.head, target, str(msg))['sha']
-            # and the merge commit is the normal merge head
-            commits_map[''] = merge_head
-            self.commits_map = json.dumps(commits_map)
-            return merge_head
 
     def unstage(self, reason, *args):
         """ If the PR is staged, cancel the staging. If the PR is split and
@@ -2255,82 +1815,6 @@ class Batch(models.Model):
                     raise ValidationError("All prs of a batch must have different target repositories, got a duplicate %s on %s" % (pr.repository, pr))
                 repos |= pr.repository
 
-    def stage(self, meta, prs):
-        """
-        Updates meta[*][head] on success
-
-        :return: () or Batch object (if all prs successfully staged)
-        """
-        new_heads = {}
-        pr_fields = self.env['runbot_merge.pull_requests']._fields
-        for pr in prs:
-            gh = meta[pr.repository]['gh']
-
-            _logger.info(
-                "Staging pr %s for target %s; method=%s",
-                pr.display_name, pr.target.name,
-                pr.merge_method or (pr.squash and 'single') or None
-            )
-
-            target = 'tmp.{}'.format(pr.target.name)
-            original_head = gh.head(target)
-            try:
-                try:
-                    method, new_heads[pr] = pr._stage(gh, target, related_prs=(prs - pr))
-                    _logger.info(
-                        "Staged pr %s to %s by %s: %s -> %s",
-                        pr.display_name, pr.target.name, method,
-                        original_head, new_heads[pr]
-                    )
-                except Exception:
-                    # reset the head which failed, as rebase() may have partially
-                    # updated it (despite later steps failing)
-                    gh.set_ref(target, original_head)
-                    # then reset every previous update
-                    for to_revert in new_heads.keys():
-                        it = meta[to_revert.repository]
-                        it['gh'].set_ref('tmp.{}'.format(to_revert.target.name), it['head'])
-                    raise
-            except github.MergeError as e:
-                raise exceptions.MergeError(pr) from e
-            except exceptions.Mismatch as e:
-                def format_items(items):
-                    """ Bit of a pain in the ass because difflib really wants
-                    all lines to be newline-terminated, but not all values are
-                    actual lines, and also needs to split multiline values.
-                    """
-                    for name, value in items:
-                        yield name + ':\n'
-                        if not value.endswith('\n'):
-                            value += '\n'
-                        yield from value.splitlines(keepends=True)
-                        yield '\n'
-
-                old = list(format_items((n, str(v)) for n, v, _ in e.args[1]))
-                new = list(format_items((n, str(v)) for n, _, v in e.args[1]))
-                diff = ''.join(Differ().compare(old, new))
-                _logger.info("data mismatch on %s:\n%s", pr.display_name, diff)
-                self.env.ref('runbot_merge.pr.staging.mismatch')._send(
-                    repository=pr.repository,
-                    pull_request=pr.number,
-                    format_args={
-                        'pr': pr,
-                        'mismatch': ', '.join(pr_fields[f].string for f in e.args[0]),
-                        'diff': diff,
-                        'unchecked': ', '.join(pr_fields[f].string for f in UNCHECKABLE)
-                    }
-                )
-                return self.env['runbot_merge.batch']
-
-        # update meta to new heads
-        for pr, head in new_heads.items():
-            meta[pr.repository]['head'] = head
-        return self.create({
-            'target': prs[0].target.id,
-            'prs': [(4, pr.id, 0) for pr in prs],
-        })
-
-UNCHECKABLE = ['merge_method', 'overrides', 'draft']
 
 class FetchJob(models.Model):
     _name = _description = 'runbot_merge.fetch_job'
@@ -2362,134 +1846,4 @@ class FetchJob(models.Model):
                 self.env.cr.commit()
 
 
-refline = re.compile(rb'([\da-f]{40}) ([^\0\n]+)(\0.*)?\n?$')
-ZERO_REF = b'0'*40
-def parse_refs_smart(read):
-    """ yields pkt-line data (bytes), or None for flush lines """
-    def read_line():
-        length = int(read(4), 16)
-        if length == 0:
-            return None
-        return read(length - 4)
-
-    header = read_line()
-    assert header.rstrip() == b'# service=git-upload-pack', header
-    assert read_line() is None, "failed to find first flush line"
-    # read lines until second delimiter
-    for line in iter(read_line, None):
-        if line.startswith(ZERO_REF):
-            break # empty list (no refs)
-        m = refline.match(line)
-        yield m[1].decode(), m[2].decode()
-
-BREAK = re.compile(r'''
-    ^
-    [ ]{0,3} # 0-3 spaces of indentation
-    # followed by a sequence of three or more matching -, _, or * characters,
-    # each followed optionally by any number of spaces or tabs
-    # so needs to start with a _, - or *, then have at least 2 more such
-    # interspersed with any number of spaces or tabs
-    ([*_-])
-    ([ \t]*\1){2,}
-    [ \t]*
-    $
-''', flags=re.VERBOSE)
-SETEX_UNDERLINE = re.compile(r'''
-    ^
-    [ ]{0,3} # no more than 3 spaces indentation
-    [-=]+ # a sequence of = characters or a sequence of - characters
-    [ ]* # any number of trailing spaces
-    $
-    # we don't care about "a line containing a single -" because we want to
-    # disambiguate SETEX headings from thematic breaks, and thematic breaks have
-    # 3+ -. Doesn't look like GH interprets `- - -` as a line so yay...
-''', flags=re.VERBOSE)
-HEADER = re.compile('^([A-Za-z-]+): (.*)$')
-class Message:
-    @classmethod
-    def from_message(cls, msg):
-        in_headers = True
-        maybe_setex = None
-        # creating from PR message -> remove content following break
-        msg, handle_break = (msg, False) if isinstance(msg, str) else (msg.message, True)
-        headers = []
-        body = []
-        # don't process the title (first line) of the commit message
-        msg = msg.splitlines()
-        for line in reversed(msg[1:]):
-            if maybe_setex:
-                # NOTE: actually slightly more complicated: it's a SETEX heading
-                #       only if preceding line(s) can be interpreted as a
-                #       paragraph so e.g. a title followed by a line of dashes
-                #       would indeed be a break, but this should be good enough
-                #       for now, if we need more we'll need a full-blown
-                #       markdown parser probably
-                if line: # actually a SETEX title -> add underline to body then process current
-                    body.append(maybe_setex)
-                else: # actually break, remove body then process current
-                    body = []
-                maybe_setex = None
-
-            if not line:
-                if not in_headers and body and body[-1]:
-                    body.append(line)
-                continue
-
-            if handle_break and BREAK.match(line):
-                if SETEX_UNDERLINE.match(line):
-                    maybe_setex = line
-                else:
-                    body = []
-                continue
-
-            h = HEADER.match(line)
-            if h:
-                # c-a-b = special case from an existing test, not sure if actually useful?
-                if in_headers or h.group(1).lower() == 'co-authored-by':
-                    headers.append(h.groups())
-                    continue
-
-            body.append(line)
-            in_headers = False
-
-        # if there are non-title body lines, add a separation after the title
-        if body and body[-1]:
-            body.append('')
-        body.append(msg[0])
-        return cls('\n'.join(reversed(body)), Headers(reversed(headers)))
-
-    def __init__(self, body, headers=None):
-        self.body = body
-        self.headers = headers or Headers()
-
-    def __setattr__(self, name, value):
-        # make sure stored body is always stripped
-        if name == 'body':
-            value = value and value.strip()
-        super().__setattr__(name, value)
-
-    def __str__(self):
-        if not self.headers:
-            return self.body + '\n'
-
-        with io.StringIO(self.body) as msg:
-            msg.write(self.body)
-            msg.write('\n\n')
-            # https://git.wiki.kernel.org/index.php/CommitMessageConventions
-            # seems to mostly use capitalised names (rather than title-cased)
-            keys = list(OrderedSet(k.capitalize() for k in self.headers.keys()))
-            # c-a-b must be at the very end otherwise github doesn't see it
-            keys.sort(key=lambda k: k == 'Co-authored-by')
-            for k in keys:
-                for v in self.headers.getlist(k):
-                    msg.write(k)
-                    msg.write(': ')
-                    msg.write(v)
-                    msg.write('\n')
-
-            return msg.getvalue()
-
-    def sub(self, pattern, repl, *, flags):
-        """ Performs in-place replacements on the body
-        """
-        self.body = re.sub(pattern, repl, self.body, flags=flags)
+from .stagings_create import is_mentioned, Message

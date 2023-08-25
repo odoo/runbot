@@ -1,9 +1,11 @@
 import logging
 import re
 
+import requests
 import sentry_sdk
 
-from odoo import models, fields
+from odoo import models, fields, api
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 class Project(models.Model):
@@ -28,11 +30,13 @@ class Project(models.Model):
     )
 
     github_token = fields.Char("Github Token", required=True)
+    github_name = fields.Char(store=True, compute="_compute_identity")
+    github_email = fields.Char(store=True, compute="_compute_identity")
     github_prefix = fields.Char(
         required=True,
         default="hanson", # mergebot du bot du bot du~
         help="Prefix (~bot name) used when sending commands from PR "
-             "comments e.g. [hanson retry] or [hanson r+ p=1]"
+             "comments e.g. [hanson retry] or [hanson r+ p=1]",
     )
 
     batch_limit = fields.Integer(
@@ -46,6 +50,42 @@ class Project(models.Model):
 
     freeze_id = fields.Many2one('runbot_merge.project.freeze', compute='_compute_freeze')
     freeze_reminder = fields.Text()
+
+    @api.depends('github_token')
+    def _compute_identity(self):
+        s = requests.Session()
+        for project in self:
+            if not project.github_token or (project.github_name and project.github_email):
+                continue
+
+            r0 = s.get('https://api.github.com/user', headers={
+                'Authorization': 'token %s' % project.github_token
+            })
+            if not r0.ok:
+                _logger.error("Failed to fetch merge bot information for project %s: %s", project.name, r0.text or r0.content)
+                continue
+
+            r0 = r0.json()
+            project.github_name = r0['name'] or r0['login']
+            if email := r0['email']:
+                project.github_email = email
+                continue
+
+            if 'user:email' not in set(re.split(r',\s*', r0.headers['x-oauth-scopes'])):
+                raise UserError("The merge bot github token needs the user:email scope to fetch the bot's identity.")
+            r1 = s.get('https://api.github.com/user/emails', headers={
+                'Authorization': 'token %s' % project.github_token
+            })
+            if not r1.ok:
+                _logger.error("Failed to fetch merge bot emails for project %s: %s", project.name, r1.text or r1.content)
+                continue
+            project.github_email = next((
+                entry['email']
+                for entry in r1.json()
+                if entry['primary']
+            ), None)
+            if not project.github_email:
+                raise UserError("The merge bot needs a public or accessible primary email set up.")
 
     def _check_stagings(self, commit=False):
         # check branches with an active staging
@@ -64,6 +104,8 @@ class Project(models.Model):
                     self.env.cr.commit()
 
     def _create_stagings(self, commit=False):
+        from .stagings_create import try_staging
+
         # look up branches which can be staged on and have no active staging
         for branch in self.env['runbot_merge.branch'].search([
             ('active_staging_id', '=', False),
@@ -74,7 +116,7 @@ class Project(models.Model):
                 with self.env.cr.savepoint(), \
                     sentry_sdk.start_span(description=f'create staging {branch.name}') as span:
                     span.set_tag('branch', branch.name)
-                    branch.try_staging()
+                    try_staging(branch)
             except Exception:
                 _logger.exception("Failed to create staging for branch %r", branch.name)
             else:

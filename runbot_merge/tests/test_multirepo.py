@@ -5,7 +5,6 @@ source branches).
 When preparing a staging, we simply want to ensure branch-matched PRs
 are staged concurrently in all repos
 """
-import json
 import time
 import xmlrpc.client
 
@@ -182,7 +181,6 @@ def test_stage_match(env, project, repo_a, repo_b, config, page):
     assert 'Related: {}'.format(pr_b.display_name) in repo_a.commit('master').message
     assert 'Related: {}'.format(pr_a.display_name) in repo_b.commit('master').message
 
-    print(pr_a.batch_ids.read(['staging_id', 'prs']))
     # check that related PRs *still* link to one another after merge
     assert get_related_pr_labels(pr_page(page, prx_a)) == [pr_b.display_name]
     assert get_related_pr_labels(pr_page(page, prx_b)) == [pr_a.display_name]
@@ -436,7 +434,7 @@ def test_merge_fail(env, project, repo_a, repo_b, users, config):
         )
     env.run_crons()
 
-    s2 = to_pr(env, pr2a) | to_pr(env, pr2b)
+    pr2a_id, pr2b_id = s2 = to_pr(env, pr2a) | to_pr(env, pr2b)
     st = env['runbot_merge.stagings'].search([])
     assert set(st.batch_ids.prs.ids) == set(s2.ids)
 
@@ -454,12 +452,14 @@ def test_merge_fail(env, project, repo_a, repo_b, users, config):
         c['commit']['message']
         for c in repo_a.log('heads/staging.master')
     ] == [
-        """commit_do-b-thing_00
+        f"""\
+commit_do-b-thing_00
 
-closes %s
+closes {pr2a_id.display_name}
 
-Related: %s
-Signed-off-by: %s""" % (s2[0].display_name, s2[1].display_name, reviewer),
+Related: {pr2b_id.display_name}
+Signed-off-by: {reviewer}
+""",
         'initial'
     ], "dummy commit + squash-merged PR commit + root commit"
 
@@ -1093,13 +1093,6 @@ def test_multi_project(env, make_repo, setreviewers, users, config,
     pr1_id = to_pr(env, pr1)
     pr2_id = to_pr(env, pr2)
 
-    print(
-        pr1.repo.name, pr1.number, pr1_id.display_name, pr1_id.label,
-        '\n',
-        pr2.repo.name, pr2.number, pr2_id.display_name, pr2_id.label,
-        flush=True,
-    )
-
     assert pr1_id.state == 'ready' and not pr1_id.blocked
     assert pr2_id.state == 'validated'
 
@@ -1262,12 +1255,12 @@ def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
 
     c_b = repo_b.commit('1.1')
     assert c_b.message.startswith('Release 1.1 (B)')
-    assert repo_b.read_tree(c_b) == {'f': '1', 'version': ''}
+    assert repo_b.read_tree(c_b) == {'f': '1', 'version': '1.1'}
     assert c_b.parents[0] == master_head_b
 
     c_c = repo_c.commit('1.1')
     assert c_c.message.startswith('Release 1.1 (C)')
-    assert repo_c.read_tree(c_c) == {'f': '2', 'version': ''}
+    assert repo_c.read_tree(c_c) == {'f': '2', 'version': '1.1'}
     assert repo_c.commit(c_c.parents[0]).parents[0] == master_head_c
 
 
@@ -1278,7 +1271,7 @@ def setup_mess(repo_a, repo_b, repo_c):
             [root, _] = r.make_commits(
                 None,
                 Commit('base', tree={'version': '', 'f': '0'}),
-                Commit('release 1.0', tree={'version': '1.0'} if r is repo_a else None),
+                Commit('release 1.0', tree={'version': '1.0'}),
                 ref='heads/1.0'
             )
             master_heads.extend(r.make_commits(root, Commit('other', tree={'f': '1'}), ref='heads/master'))
@@ -1300,7 +1293,7 @@ def setup_mess(repo_a, repo_b, repo_c):
     with repo_b:
         repo_b.make_commits(
             master_heads[1],
-            Commit('Release 1.1 (B)', tree=None),
+            Commit('Release 1.1 (B)', tree={'version': '1.1'}),
             ref='heads/release-1.1'
         )
         pr_rel_b = repo_b.make_pr(target='master', head='release-1.1')
@@ -1309,7 +1302,7 @@ def setup_mess(repo_a, repo_b, repo_c):
         pr_other = repo_c.make_pr(target='master', head='whocares')
         repo_c.make_commits(
             master_heads[2],
-            Commit('Release 1.1 (C)', tree=None),
+            Commit('Release 1.1 (C)', tree={'version': '1.1'}),
             ref='heads/release-1.1'
         )
         pr_rel_c = repo_c.make_pr(target='master', head='release-1.1')
@@ -1437,7 +1430,8 @@ def test_freeze_conflict(env, project, repo_a, repo_b, repo_c, users, config):
 
     # create conflicting branch
     with repo_c:
-        repo_c.make_ref('heads/1.1', heads[2])
+        [c] = repo_c.make_commits(heads[2], Commit("exists", tree={'version': ''}))
+        repo_c.make_ref('heads/1.1', c)
 
     # actually perform the freeze
     with pytest.raises(xmlrpc.client.Fault) as e:

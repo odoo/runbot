@@ -8,6 +8,7 @@ import pathlib
 import pprint
 import time
 import unicodedata
+from typing import Iterable, List, TypedDict, Literal
 
 import requests
 import werkzeug.urls
@@ -46,6 +47,42 @@ def _init_gh_logger():
 
 if odoo.netsvc._logger_init:
     _init_gh_logger()
+
+SimpleUser = TypedDict('SimpleUser', {
+    'login': str,
+    'url': str,
+    'type': Literal['User', 'Organization'],
+})
+Authorship = TypedDict('Authorship', {
+    'name': str,
+    'email': str,
+})
+Commit = TypedDict('Commit', {
+    'tree': str,
+    'url': str,
+    'message': str,
+    # optional when creating a commit
+    'author': Authorship,
+    'committer': Authorship,
+    'comments_count': int,
+})
+CommitLink = TypedDict('CommitLink', {
+    'html_url': str,
+    'sha': str,
+    'url': str,
+})
+PrCommit = TypedDict('PrCommit', {
+    'url': str,
+    'sha': str,
+    'commit': Commit,
+    # optional when creating a commit (in which case it uses the current user)
+    'author': SimpleUser,
+    'committer': SimpleUser,
+    'parents': List[CommitLink],
+    # not actually true but we're smuggling stuff via that key
+    'new_tree': str,
+})
+
 
 GH_LOG_PATTERN = """=> {method} {path}{qs}{body}
 
@@ -137,7 +174,7 @@ class GH(object):
         r.raise_for_status()
         return r.json()
 
-    def head(self, branch):
+    def head(self, branch: str) -> str:
         d = utils.backoff(
             lambda: self('get', 'git/refs/heads/{}'.format(branch)).json(),
             exc=requests.HTTPError
@@ -276,92 +313,6 @@ class GH(object):
                     f"Sanity check ref update of {branch}, expected {sha} got {head}"
         return status
 
-    def merge(self, sha, dest, message):
-        r = self('post', 'merges', json={
-            'base': dest,
-            'head': sha,
-            'commit_message': message,
-        }, check={409: MergeError})
-        try:
-            r = r.json()
-        except Exception:
-            raise MergeError("got non-JSON reponse from github: %s %s (%s)" % (r.status_code, r.reason, r.text))
-        _logger.debug(
-            "merge(%s, %s (%s), %s) -> %s",
-            self._repo, dest, r['parents'][0]['sha'],
-            shorten(message), r['sha']
-        )
-        return dict(r['commit'], sha=r['sha'], parents=r['parents'])
-
-    def rebase(self, pr, dest, reset=False, commits=None):
-        """ Rebase pr's commits on top of dest, updates dest unless ``reset``
-        is set.
-
-        Returns the hash of the rebased head and a map of all PR commits (to the PR they were rebased to)
-        """
-        logger = _logger.getChild('rebase')
-        original_head = self.head(dest)
-        if commits is None:
-            commits = self.commits(pr)
-
-        logger.debug("rebasing %s, %s on %s (reset=%s, commits=%s)",
-                     self._repo, pr, dest, reset, len(commits))
-
-        if not commits:
-            raise MergeError("PR has no commits")
-        prev = original_head
-        for original in commits:
-            if len(original['parents']) != 1:
-                raise MergeError(
-                    "commits with multiple parents ({sha}) can not be rebased, "
-                    "either fix the branch to remove merges or merge without "
-                    "rebasing".format_map(
-                    original
-                ))
-            tmp_msg = 'temp rebasing PR %s (%s)' % (pr, original['sha'])
-            merged = self.merge(original['sha'], dest, tmp_msg)
-
-            # whichever parent is not original['sha'] should be what dest
-            # deref'd to, and we want to check that matches the "left parent" we
-            # expect (either original_head or the previously merged commit)
-            [base_commit] = (parent['sha'] for parent in merged['parents']
-                             if parent['sha'] != original['sha'])
-            if prev != base_commit:
-                raise MergeError(
-                    f"Inconsistent view of branch {dest} while rebasing "
-                    f"PR {pr} expected commit {prev} but the other parent of "
-                    f"merge commit {merged['sha']} is {base_commit}.\n\n"
-                    f"The branch may be getting concurrently modified."
-                )
-            prev = merged['sha']
-            original['new_tree'] = merged['tree']['sha']
-
-        prev = original_head
-        mapping = {}
-        for c in commits:
-            committer = c['commit']['committer']
-            committer.pop('date')
-            copy = self('post', 'git/commits', json={
-                'message': c['commit']['message'],
-                'tree': c['new_tree'],
-                'parents': [prev],
-                'author': c['commit']['author'],
-                'committer': committer,
-            }, check={409: MergeError}).json()
-            logger.debug('copied %s to %s (parent: %s)', c['sha'], copy['sha'], prev)
-            prev = mapping[c['sha']] = copy['sha']
-
-        if reset:
-            self.set_ref(dest, original_head)
-        else:
-            self.set_ref(dest, prev)
-
-        logger.debug('rebased %s, %s on %s (reset=%s, commits=%s) -> %s',
-                      self._repo, pr, dest, reset, len(commits),
-                      prev)
-        # prev is updated after each copy so it's the rebased PR head
-        return prev, mapping
-
     # fetch various bits of issues / prs to load them
     def pr(self, number):
         return (
@@ -383,14 +334,14 @@ class GH(object):
             if not r.links.get('next'):
                 return
 
-    def commits_lazy(self, pr):
+    def commits_lazy(self, pr: int) -> Iterable[PrCommit]:
         for page in itertools.count(1):
-            r = self('get', 'pulls/{}/commits'.format(pr), params={'page': page})
+            r = self('get', f'pulls/{pr}/commits', params={'page': page})
             yield from r.json()
             if not r.links.get('next'):
                 return
 
-    def commits(self, pr):
+    def commits(self, pr: int) -> List[PrCommit]:
         """ Returns a PR's commits oldest first (that's what GH does &
         is what we want)
         """
