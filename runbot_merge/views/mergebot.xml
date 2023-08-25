@@ -291,6 +291,14 @@
                         <h1><field name="sha"/></h1>
                     </div>
                     <field name="statuses" widget="json"/>
+                    <separator string="Pull Requests"/>
+                    <field name="pull_requests" nolabel="1">
+                        <tree>
+                            <button type="object" name="get_formview_action" icon="fa-external-link"/>
+                            <field name="display_name"/>
+                            <field name="state"/>
+                        </tree>
+                    </field>
                     <separator string="Stagings (commits)"/>
                     <field name="commit_ids" nolabel="1" readonly="1">
                         <tree>

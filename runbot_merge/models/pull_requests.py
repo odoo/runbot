@@ -1705,6 +1705,57 @@ class FeedbackTemplate(models.Model):
             _logger.exception("Failed to render template %s", self.get_external_id())
             raise
 
+
+class StagingCommits(models.Model):
+    _name = 'runbot_merge.stagings.commits'
+    _description = "Mergeable commits for stagings, always the actually merged " \
+                   "commit, never a uniquifier"
+    _log_access = False
+
+    staging_id = fields.Many2one('runbot_merge.stagings', required=True)
+    commit_id = fields.Many2one('runbot_merge.commit', index=True, required=True)
+    repository_id = fields.Many2one('runbot_merge.repository', required=True)
+
+    def _auto_init(self):
+        super()._auto_init()
+        # the same commit can be both head and tip (?)
+        tools.create_unique_index(
+            self.env.cr, self._table + "_unique",
+            self._table, ['staging_id', 'commit_id']
+        )
+        # there should be one head per staging per repository, unless one is a
+        # real head and one is a uniquifier head
+        tools.create_unique_index(
+            self.env.cr, self._table + "_unique_per_repo",
+            self._table, ['staging_id', 'repository_id'],
+        )
+
+
+class StagingHeads(models.Model):
+    _name = 'runbot_merge.stagings.heads'
+    _description = "Staging heads, may be the staging's commit or may be a " \
+                   "uniquifier (discarded on success)"
+    _log_access = False
+
+    staging_id = fields.Many2one('runbot_merge.stagings', required=True)
+    commit_id = fields.Many2one('runbot_merge.commit', index=True, required=True)
+    repository_id = fields.Many2one('runbot_merge.repository', required=True)
+
+    def _auto_init(self):
+        super()._auto_init()
+        # the same commit can be both head and tip (?)
+        tools.create_unique_index(
+            self.env.cr, self._table + "_unique",
+            self._table, ['staging_id', 'commit_id']
+        )
+        # there should be one head per staging per repository, unless one is a
+        # real head and one is a uniquifier head
+        tools.create_unique_index(
+            self.env.cr, self._table + "_unique_per_repo",
+            self._table, ['staging_id', 'repository_id'],
+        )
+
+
 class Commit(models.Model):
     """Represents a commit onto which statuses might be posted,
     independent of everything else as commits can be created by
@@ -1719,7 +1770,7 @@ class Commit(models.Model):
 
     head_ids = fields.Many2many('runbot_merge.stagings', relation='runbot_merge_stagings_heads', column2='staging_id', column1='commit_id')
     commit_ids = fields.Many2many('runbot_merge.stagings', relation='runbot_merge_stagings_commits', column2='staging_id', column1='commit_id')
-
+    pull_requests = fields.One2many('runbot_merge.pull_requests', compute='_compute_prs')
 
     def create(self, values):
         values['to_check'] = True
@@ -1769,53 +1820,13 @@ class Commit(models.Model):
         """)
         return res
 
-class StagingCommits(models.Model):
-    _name = 'runbot_merge.stagings.commits'
-    _description = "Mergeable commits for stagings, always the actually merged " \
-                   "commit, never a uniquifier"
-    _log_access = False
+    def _compute_prs(self):
+        for c in self:
+            c.pull_requests = self.env['runbot_merge.pull_requests'].search([
+                ('head', '=', self.sha),
+            ])
 
-    staging_id = fields.Many2one('runbot_merge.stagings', required=True)
-    commit_id = fields.Many2one('runbot_merge.commit', index=True, required=True)
-    repository_id = fields.Many2one('runbot_merge.repository', required=True)
 
-    def _auto_init(self):
-        super()._auto_init()
-        # the same commit can be both head and tip (?)
-        tools.create_unique_index(
-            self.env.cr, self._table + "_unique",
-            self._table, ['staging_id', 'commit_id']
-        )
-        # there should be one head per staging per repository, unless one is a
-        # real head and one is a uniquifier head
-        tools.create_unique_index(
-            self.env.cr, self._table + "_unique_per_repo",
-            self._table, ['staging_id', 'repository_id'],
-        )
-
-class StagingHeads(models.Model):
-    _name = 'runbot_merge.stagings.heads'
-    _description = "Staging heads, may be the staging's commit or may be a " \
-                   "uniquifier (discarded on success)"
-    _log_access = False
-
-    staging_id = fields.Many2one('runbot_merge.stagings', required=True)
-    commit_id = fields.Many2one('runbot_merge.commit', index=True, required=True)
-    repository_id = fields.Many2one('runbot_merge.repository', required=True)
-
-    def _auto_init(self):
-        super()._auto_init()
-        # the same commit can be both head and tip (?)
-        tools.create_unique_index(
-            self.env.cr, self._table + "_unique",
-            self._table, ['staging_id', 'commit_id']
-        )
-        # there should be one head per staging per repository, unless one is a
-        # real head and one is a uniquifier head
-        tools.create_unique_index(
-            self.env.cr, self._table + "_unique_per_repo",
-            self._table, ['staging_id', 'repository_id'],
-        )
 class Stagings(models.Model):
     _name = _description = 'runbot_merge.stagings'
 
