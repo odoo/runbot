@@ -1716,6 +1716,10 @@ class Commit(models.Model):
     statuses = fields.Char(help="json-encoded mapping of status contexts to states", default="{}")
     to_check = fields.Boolean(default=False)
 
+    head_ids = fields.Many2many('runbot_merge.stagings', relation='runbot_merge_stagings_heads', column2='staging_id', column1='commit_id')
+    commit_ids = fields.Many2many('runbot_merge.stagings', relation='runbot_merge_stagings_commits', column2='staging_id', column1='commit_id')
+
+
     def create(self, values):
         values['to_check'] = True
         r = super(Commit, self).create(values)

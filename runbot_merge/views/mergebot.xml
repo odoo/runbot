@@ -20,10 +20,46 @@
                     <separator string="Required Statuses"/>
                     <field name="status_ids">
                         <tree editable="bottom">
+                            <button type="object" name="get_formview_action" icon="fa-external-link"/>
                             <field name="context"/>
                             <field name="branch_filter"/>
                             <field name="prs"/>
                             <field name="stagings"/>
+                        </tree>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="runbot_merge_branch_form" model="ir.ui.view">
+        <field name="name">Branch Form</field>
+        <field name="model">runbot_merge.branch</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="project_id" readonly="1"/>
+                            <field name="sequence" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="active"/>
+                            <field name="staging_enabled"/>
+                        </group>
+                    </group>
+                    <separator string="Stagings"/>
+                    <group>
+                        <field name="active_staging_id"/>
+                    </group>
+                    <field name="staging_ids" nolabel="1" readonly="1">
+                        <tree default_order="staged_at desc">
+                            <button type="object" name="get_formview_action" icon="fa-external-link"/>
+                            <field name="id"/>
+                            <field name="staged_at"/>
+                            <field name="state"/>
                         </tree>
                     </field>
                 </sheet>
@@ -124,6 +160,7 @@
                         <group colspan="4" string="Delegates">
                             <field name="delegates" nolabel="1">
                                 <tree>
+                                    <button type="object" name="get_formview_action" icon="fa-external-link"/>
                                     <field name="name"/>
                                     <field name="github_login"/>
                                 </tree>
@@ -189,17 +226,28 @@
                             <field name="staged_at"/>
                         </group>
                     </group>
-                    <group string="Heads">
-                        <field name="head_ids" colspan="4" nolabel="1">
-                            <tree>
-                                <field name="sha"/>
-                                <field name="statuses"/>
-                            </tree>
-                        </field>
+                    <group>
+                        <group string="Heads">
+                            <field name="head_ids" colspan="2" nolabel="1" readonly="1">
+                                <tree>
+                                    <button type="object" name="get_formview_action" icon="fa-external-link"/>
+                                    <field name="sha"/>
+                                </tree>
+                            </field>
+                        </group>
+                        <group string="Commits">
+                            <field name="commit_ids" colspan="2" nolabel="1" readonly="1">
+                                <tree>
+                                    <button type="object" name="get_formview_action" icon="fa-external-link"/>
+                                    <field name="sha"/>
+                                </tree>
+                            </field>
+                        </group>
                     </group>
                     <group string="PRs">
                         <field name="pr_ids" colspan="4" nolabel="1" readonly="1">
                             <tree>
+                                <button type="object" name="get_formview_action" icon="fa-external-link"/>
                                 <field name="display_name"/>
                                 <field name="github_url" widget="url"/>
                                 <field name="url" widget="url"/>
@@ -209,6 +257,7 @@
                     <group string="Batches">
                         <field name="batch_ids" colspan="4" nolabel="1" readonly="1">
                             <tree>
+                                <button type="object" name="get_formview_action" icon="fa-external-link"/>
                                 <field name="prs" widget="many2many_tags"/>
                             </tree>
                         </field>
@@ -229,8 +278,41 @@
         <field name="arch" type="xml">
             <tree>
                 <field name="sha"/>
-                <field name="statuses"/>
             </tree>
+        </field>
+    </record>
+    <record id="runbot_merge_commits_form" model="ir.ui.view">
+        <field name="name">commits form</field>
+        <field name="model">runbot_merge.commit</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="sha"/></h1>
+                    </div>
+                    <field name="statuses" widget="json"/>
+                    <separator string="Stagings (commits)"/>
+                    <field name="commit_ids" nolabel="1" readonly="1">
+                        <tree>
+                            <button type="object" name="get_formview_action" icon="fa-external-link"/>
+                            <field name="target"/>
+                            <field name="id"/>
+                            <field name="staged_at"/>
+                            <field name="state"/>
+                        </tree>
+                    </field>
+                    <separator string="Stagings (heads)"/>
+                    <field name="head_ids" nolabel="1" readonly="1">
+                        <tree>
+                            <button type="object" name="get_formview_action" icon="fa-external-link"/>
+                            <field name="target"/>
+                            <field name="id"/>
+                            <field name="staged_at"/>
+                            <field name="state"/>
+                        </tree>
+                    </field>
+                </sheet>
+            </form>
         </field>
     </record>
 
