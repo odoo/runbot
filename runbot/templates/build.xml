@@ -288,7 +288,7 @@
                     <t t-else="">
                       <t t-if="'\n' not in l.message" t-esc="l.message"/>
                       <pre t-if="'\n' in l.message" style="margin:0;padding:0; border: none;"><t t-esc="l.message"/></pre>
-                      <t t-if="l.type == 'subbuild' and nb_subbuild &lt;= 20 and build.local_result!='ok' subbuild.sudo().error_log_ids">
+                      <t t-if="l.type == 'subbuild' and nb_subbuild &lt;= 20 and build.local_result != 'ok' and subbuild.sudo().error_log_ids">
                         <a class="show" data-toggle="collapse" t-attf-data-target="#subbuild-{{subbuild.id}}">
                           <i class="fa"/>
                         </a>
