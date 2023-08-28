@@ -64,6 +64,7 @@
                         <field name="module_name"/>
                         <field name="summary"/>
                         <field name="build_count"/>
+                        <button type="object" name="get_formview_action" icon="fa-arrow-right" title="View linked error"/>
                       </tree>
                     </field>
                   </page>
@@ -78,6 +79,7 @@
                         <field name="responsible"/>
                         <field name="fixing_commit"/>
                         <field name="id"/>
+                        <button type="object" name="get_formview_action" icon="fa-arrow-right" title="View linked error"/>
                       </tree>
                     </field>
                   </page>
