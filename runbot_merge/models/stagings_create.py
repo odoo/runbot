@@ -11,7 +11,6 @@ from itertools import takewhile
 from operator import itemgetter
 from typing import Dict, Union, Optional, Literal, Callable, Iterator, Tuple, List, TypeAlias
 
-import requests
 from werkzeug.datastructures import Headers
 
 from odoo import api, models, fields
@@ -263,23 +262,6 @@ def stage_batches(branch: Branch, batched_prs: List[PullRequests], staging_state
                     format_args={'pr': pr, 'reason': reason, 'exc': e},
                 )
     return staged
-
-def check_visibility(repo: Repository, branch_name: str, expected_head: str, token: str):
-    """ Checks the repository actual to see if the new / expected head is
-    now visible
-    """
-    # v1 protocol provides URL for ref discovery: https://github.com/git/git/blob/6e0cc6776106079ed4efa0cc9abace4107657abf/Documentation/technical/http-protocol.txt#L187
-    # for more complete client this is also the capabilities discovery and
-    # the "entry point" for the service
-    url = 'https://github.com/{}.git/info/refs?service=git-upload-pack'.format(repo.name)
-    with requests.get(url, stream=True, auth=(token, '')) as resp:
-        if not resp.ok:
-            return False
-        for head, ref in parse_refs_smart(resp.raw.read):
-            if ref != ('refs/heads/' + branch_name):
-                continue
-            return head == expected_head
-        return False
 
 
 refline = re.compile(rb'([\da-f]{40}) ([^\0\n]+)(\0.*)?\n?')
