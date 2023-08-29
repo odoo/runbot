@@ -15,6 +15,14 @@ def test_update_pr(env, config, make_repo, users):
     only this one and its dependent should be updated?
     """
     prod, _ = make_basic(env, config, make_repo)
+    # create a branch d from c so we can have 3 forward ports PRs, not just 2,
+    # for additional checks
+    env['runbot_merge.project'].search([]).write({
+        'branch_ids': [(0, 0, {'name': 'd', 'sequence': 40})]
+    })
+    with prod:
+        prod.make_commits('c', Commit('1111', tree={'i': 'a'}), ref='heads/d')
+    
     with prod:
         [p_1] = prod.make_commits(
             'a',
@@ -37,7 +45,7 @@ def test_update_pr(env, config, make_repo, users):
     pr0_id, pr1_id = env['runbot_merge.pull_requests'].search([], order='number')
 
     fp_intermediate = (users['user'], '''\
-This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
+This PR targets b and is part of the forward-port chain. Further PRs will be created up to d.
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 ''')
@@ -121,6 +129,52 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         'h': 'a',
         'x': '5'
     }, "the followup FP should also have the update"
+    
+    with prod:
+        prod.post_status(pr2_id.head, 'success', 'ci/runbot')
+        prod.post_status(pr2_id.head, 'success', 'legal/cla')
+    env.run_crons()
+    
+    _0, _1, _2, pr3_id = env['runbot_merge.pull_requests'].search([], order='number')
+    assert pr3_id.parent_id == pr2_id
+    # don't bother updating heads (?)
+    pr3_id.write({'parent_id': False, 'detach_reason': "testing"})
+    # pump feedback messages
+    env.run_crons()
+    
+    pr3 = prod.get_pr(pr3_id.number)
+    assert pr3.comments == [
+        seen(env, pr3, users),
+        (users['user'], f"""\
+@{users['user']} @{users['reviewer']} this PR targets d and is the last of the forward-port chain containing:
+* {pr2_id.display_name}
+
+To merge the full chain, use
+> @{pr3_id.repository.project_id.fp_github_name} r+
+
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
+"""),
+        (users['user'], f"@{users['user']} @{users['reviewer']} this PR was "
+                        f"modified / updated and has become a normal PR. It "
+                        f"should be merged the normal way "
+                        f"(via @{pr3_id.repository.project_id.github_prefix})"
+        )
+    ]
+    pr2 = prod.get_pr(pr2_id.number)
+    assert pr2.comments == [
+        seen(env, pr2, users),
+        (users['user'], """\
+This PR targets c and is part of the forward-port chain. Further PRs will be created up to d.
+
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
+"""),
+        (users['user'], f"@{users['user']} @{users['reviewer']} child PR "
+                        f"{pr3_id.display_name} was modified / updated and has "
+                        f"become a normal PR. This PR (and any of its parents) "
+                        f"will need to be merged independently as approvals "
+                        f"won't cross."),
+    ]
+    
 
 def test_update_merged(env, make_repo, config, users):
     """ Strange things happen when an FP gets closed / merged but then its

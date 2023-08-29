@@ -29,7 +29,7 @@ from pathlib import Path
 import dateutil.relativedelta
 import requests
 
-from odoo import _, models, fields, api
+from odoo import models, fields, api
 from odoo.osv import expression
 from odoo.exceptions import UserError
 from odoo.tools.misc import topological_sort, groupby
@@ -303,7 +303,11 @@ class PullRequests(models.Model):
         # also a bit odd to only handle updating 1 head at a time, but then
         # again 2 PRs with same head is weird so...
         newhead = vals.get('head')
-        with_parents = self.filtered('parent_id')
+        with_parents = {
+            p: p.parent_id
+            for p in self
+            if p.parent_id
+        }
         closed_fp = self.filtered(lambda p: p.state == 'closed' and p.source_id)
         if newhead and not self.env.context.get('ignore_head_update') and newhead != self.head:
             vals.setdefault('parent_id', False)
@@ -323,14 +327,21 @@ class PullRequests(models.Model):
             vals['merge_date'] = fields.Datetime.now()
         r = super().write(vals)
         if self.env.context.get('forwardport_detach_warn', True):
-            for p in with_parents:
-                if not p.parent_id:
-                    self.env.ref('runbot_merge.forwardport.update.detached')._send(
-                        repository=p.repository,
-                        pull_request=p.number,
-                        token_field='fp_github_token',
-                        format_args={'pr': p},
-                    )
+            for p, parent in with_parents.items():
+                if p.parent_id:
+                    continue
+                self.env.ref('runbot_merge.forwardport.update.detached')._send(
+                    repository=p.repository,
+                    pull_request=p.number,
+                    token_field='fp_github_token',
+                    format_args={'pr': p},
+                )
+                self.env.ref('runbot_merge.forwardport.update.parent')._send(
+                    repository=parent.repository,
+                    pull_request=parent.number,
+                    token_field='fp_github_token',
+                    format_args={'pr': parent, 'child': p},
+                )
         for p in closed_fp.filtered(lambda p: p.state != 'closed'):
             self.env.ref('runbot_merge.forwardport.reopen.detached')._send(
                 repository=p.repository,
@@ -927,11 +938,8 @@ class PullRequests(models.Model):
             head_commit = commits[-1]['commit']
 
             to_tuple = operator.itemgetter('name', 'email')
-            to_dict = lambda term, vals: {
-                'GIT_%s_NAME' % term: vals[0],
-                'GIT_%s_EMAIL' % term: vals[1],
-                'GIT_%s_DATE' % term: vals[2],
-            }
+            def to_dict(term, vals):
+                return {'GIT_%s_NAME' % term: vals[0], 'GIT_%s_EMAIL' % term: vals[1], 'GIT_%s_DATE' % term: vals[2]}
             authors, committers = set(), set()
             for c in (c['commit'] for c in commits):
                 authors.add(to_tuple(c['author']))

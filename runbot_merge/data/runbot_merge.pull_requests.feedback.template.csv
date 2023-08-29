@@ -110,6 +110,10 @@ stderr: markdown-formatted stderr of git, if any"
 runbot_merge.forwardport.update.detached,{pr.ping}this PR was modified / updated and has become a normal PR. It should be merged the normal way (via @{pr.repository.project_id.github_prefix}),"Comment when a forwardport PR gets updated, documents that the PR now needs to be merged the “normal” way.
 
 pr: the pr in question "
+runbot_merge.forwardport.update.parent,{pr.ping}child PR {child.display_name} was modified / updated and has become a normal PR. This PR (and any of its parents) will need to be merged independently as approvals won't cross.,"Sent to an open PR when its direct child has been detached.
+
+pr: the pr
+child: its detached child"
 runbot_merge.forwardport.reopen.detached,{pr.ping}this PR was closed then reopened. It should be merged the normal way (via @{pr.repository.project_id.github_prefix}),"Comment when a forwardport PR gets closed then reopened, documents that the PR is now in a detached state.
 
 pr: the pr in question"
