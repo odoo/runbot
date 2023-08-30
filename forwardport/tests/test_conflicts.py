@@ -93,6 +93,10 @@ In the former case, you may want to edit this PR message as well\.
 More info at https://github\.com/odoo/odoo/wiki/Mergebot#forward-port
 ''', re.DOTALL))
     ]
+    with prod:
+        prc.post_comment(f'@{project.fp_github_name} r+', config['role_reviewer']['token'])
+    env.run_crons()
+    assert prc_id.state == 'opened', "approving via fw should not work on a conflict"
 
     prb = prod.get_pr(prb_id.number)
     assert prb.comments == [
