@@ -50,7 +50,7 @@ class re_matches:
         return self._r.match(text)
 
     def __repr__(self):
-        return self._r.pattern + '...'
+        return repr(self._r.pattern)
 
 def seen(env, pr, users):
     return users['user'], f'[Pull request status dashboard]({to_pr(env, pr).url}).'
