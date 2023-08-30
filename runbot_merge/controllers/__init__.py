@@ -98,10 +98,10 @@ class MergebotController(Controller):
             ('name', '=', repo),
         ]).project_id.secret
         if secret:
-            signature = 'sha1=' + hmac.new(secret.encode('ascii'), req.get_data(), hashlib.sha1).hexdigest()
-            if not hmac.compare_digest(signature, req.headers.get('X-Hub-Signature', '')):
-                _logger.warning("Ignored hook with incorrect signature %s",
-                             req.headers.get('X-Hub-Signature'))
+            signature = 'sha256=' + hmac.new(secret.encode(), req.get_data(), hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(signature, req.headers.get('X-Hub-Signature-256', '')):
+                _logger.warning("Ignored hook %s with incorrect signature",
+                                req.headers.get('X-Github-Delivery'))
                 return werkzeug.exceptions.Forbidden()
 
         sentry_sdk.set_context('webhook', request.jsonrequest)
