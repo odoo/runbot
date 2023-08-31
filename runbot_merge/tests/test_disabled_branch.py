@@ -1,9 +1,15 @@
+import pytest
+
 from utils import seen, Commit, pr_page
 
 def test_existing_pr_disabled_branch(env, project, make_repo, setreviewers, config, users, page):
     """ PRs to disabled branches are ignored, but what if the PR exists *before*
     the branch is disabled?
     """
+    # run crons from template to clean up the queue before possibly creating
+    # new work
+    assert env['base'].run_crons()
+
     repo = make_repo('repo')
     project.branch_ids.sequence = 0
     project.write({'branch_ids': [
@@ -81,6 +87,18 @@ def test_existing_pr_disabled_branch(env, project, make_repo, setreviewers, conf
     assert pr_id.target == env['runbot_merge.branch'].search([('name', '=', 'other2')])
     assert pr_id.staging_id
 
+    # staging of `pr` should have generated a staging branch
+    _ = repo.get_ref('heads/staging.other')
+    # stagings should not need a tmp branch anymore, so this should not exist
+    with pytest.raises(AssertionError, match=r'Not Found'):
+        repo.get_ref('heads/tmp.other')
+
+    assert env['base'].run_crons()
+
+    # triggered cleanup should have deleted the staging for the disabled `other`
+    # target branch
+    with pytest.raises(AssertionError, match=r'Not Found'):
+        repo.get_ref('heads/staging.other')
 
 def test_new_pr_no_branch(env, project, make_repo, setreviewers, users):
     """ A new PR to an *unknown* branch should be ignored and warn

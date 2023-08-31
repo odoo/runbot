@@ -282,6 +282,7 @@ class Branch(models.Model):
                 'pull_request': pr.number,
                 'message': tmpl._format(pr=pr),
             } for pr in self.prs])
+            self.env.ref('runbot_merge.branch_cleanup')._trigger()
         return True
 
     @api.depends('staging_ids.active')

@@ -1,0 +1,23 @@
+<odoo>
+    <record id="access_branch_cleanup" model="ir.model.access">
+        <field name="name">Access to branch cleanup is useless</field>
+        <field name="model_id" ref="model_runbot_merge_branch_cleanup"/>
+        <field name="perm_read">0</field>
+        <field name="perm_create">0</field>
+        <field name="perm_write">0</field>
+        <field name="perm_unlink">0</field>
+    </record>
+
+    <record model="ir.cron" id="branch_cleanup">
+        <field name="name">Removal of scratch refs for deactivated branch</field>
+        <field name="model_id" ref="model_runbot_merge_branch_cleanup"/>
+        <field name="state">code</field>
+        <field name="code">model._run()</field>
+        <!--
+        nota: even though this is only triggered, numbercall has to be
+        non-zero because the counter is taken in account by cron triggers
+        -->
+        <field name="numbercall">-1</field>
+        <field name="doall" eval="False"/>
+    </record>
+</odoo>

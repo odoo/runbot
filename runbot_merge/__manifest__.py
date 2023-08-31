@@ -8,6 +8,7 @@
 
         'data/merge_cron.xml',
         'models/crons/git_maintenance.xml',
+        'models/crons/cleanup_scratch_branches.xml',
         'data/runbot_merge.pull_requests.feedback.template.csv',
         'views/res_partner.xml',
         'views/runbot_merge_project.xml',
