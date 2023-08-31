@@ -1,49 +1,35 @@
-import collections
+import pytest
 
-from utils import seen, Commit, make_basic
+from utils import seen, Commit, make_basic, to_pr
 
-Description = collections.namedtuple('Restriction', 'source limit')
-def test_configure(env, config, make_repo):
-    """ Checks that configuring an FP limit on a PR is respected
 
-    * limits to not the latest
-    * limits to the current target (= no FP)
-    * limits to an earlier branch (???)
-    """
+@pytest.mark.parametrize('source,limit,count', [
+    pytest.param('a', 'b', 1, id='not-last'),
+    pytest.param('b', 'b', 0, id='current'),
+    pytest.param('b', 'a', 0, id='earlier'),
+])
+def test_configure_fp_limit(env, config, make_repo, source, limit, count):
     prod, other = make_basic(env, config, make_repo)
     bot_name = env['runbot_merge.project'].search([]).fp_github_name
-    descriptions = [
-        Description(source='a', limit='b'),
-        Description(source='b', limit='b'),
-        Description(source='b', limit='a'),
-    ]
-    originals = []
     with prod:
-        for i, descr in enumerate(descriptions):
-            [c] = prod.make_commits(
-                descr.source, Commit('c %d' % i, tree={str(i): str(i)}),
-                ref='heads/branch%d' % i,
-            )
-            pr = prod.make_pr(target=descr.source, head='branch%d'%i)
-            prod.post_status(c, 'success', 'legal/cla')
-            prod.post_status(c, 'success', 'ci/runbot')
-            pr.post_comment('hansen r+\n%s up to %s' % (bot_name, descr.limit), config['role_reviewer']['token'])
-            originals.append(pr.number)
+        [c] = prod.make_commits(
+            source, Commit('c', tree={'f': 'g'}),
+            ref='heads/branch',
+        )
+        pr = prod.make_pr(target=source, head='branch')
+        prod.post_status(c, 'success', 'legal/cla')
+        prod.post_status(c, 'success', 'ci/runbot')
+        pr.post_comment(f'hansen r+\n{bot_name} up to {limit}', config['role_reviewer']['token'])
     env.run_crons()
     with prod:
-        prod.post_status('staging.a', 'success', 'legal/cla')
-        prod.post_status('staging.a', 'success', 'ci/runbot')
-        prod.post_status('staging.b', 'success', 'legal/cla')
-        prod.post_status('staging.b', 'success', 'ci/runbot')
+        prod.post_status(f'staging.{source}', 'success', 'legal/cla')
+        prod.post_status(f'staging.{source}', 'success', 'ci/runbot')
     env.run_crons()
 
-    # should have created a single FP PR for 0, none for 1 and none for 2
-    prs = env['runbot_merge.pull_requests'].search([], order='number')
-    assert len(prs) == 4
-    assert prs[-1].parent_id == prs[0]
-    assert prs[0].number == originals[0]
-    assert prs[1].number == originals[1]
-    assert prs[2].number == originals[2]
+    descendants = env['runbot_merge.pull_requests'].search([
+        ('source_id', '=', to_pr(env, pr).id)
+    ])
+    assert len(descendants) == count
 
 
 def test_ignore(env, config, make_repo):
