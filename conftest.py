@@ -302,7 +302,7 @@ class DbDict(dict):
             subprocess.run([
                 'odoo', '--no-http',
                 *(['--addons-path', self._adpath] if self._adpath else []),
-                '-d', db, '-i', module + ',auth_oauth',
+                '-d', db, '-i', module + ',saas_worker,auth_oauth',
                 '--max-cron-threads', '0',
                 '--stop-after-init',
                 '--log-level', 'warn'
@@ -317,7 +317,7 @@ class DbDict(dict):
         return db
 
 @pytest.fixture(scope='session')
-def dbcache(request, tmp_path_factory):
+def dbcache(request, tmp_path_factory, addons_path):
     """ Creates template DB once per run, then just duplicates it before
     starting odoo and running the testcase
     """
@@ -327,7 +327,7 @@ def dbcache(request, tmp_path_factory):
         # level up to deref it
         shared_dir = shared_dir.parent
 
-    dbs = DbDict(request.config.getoption('--addons-path'), shared_dir)
+    dbs = DbDict(addons_path, shared_dir)
     yield dbs
 
 @pytest.fixture
@@ -381,7 +381,17 @@ def dummy_addons_path():
     with tempfile.TemporaryDirectory() as dummy_addons_path:
         mod = pathlib.Path(dummy_addons_path, 'saas_worker')
         mod.mkdir(0o700)
-        (mod / '__init__.py').write_bytes(b'')
+        (mod / '__init__.py').write_text('''\
+from odoo import api, fields, models
+
+
+class Base(models.AbstractModel):
+    _inherit = 'base'
+
+    def run_crons(self):
+        self.env['ir.cron']._process_jobs(self.env.cr.dbname)
+        return True
+''', encoding='utf-8')
         (mod / '__manifest__.py').write_text(pprint.pformat({
             'name': 'dummy saas_worker',
             'version': '1.0',
@@ -393,18 +403,20 @@ def from_role(*_, **__):
 
         yield dummy_addons_path
 
+@pytest.fixture(scope='session')
+def addons_path(request, dummy_addons_path):
+    return ','.join(map(str, filter(None, [
+        request.config.getoption('--addons-path'),
+        dummy_addons_path,
+    ])))
+
 @pytest.fixture
-def server(request, db, port, module, dummy_addons_path, tmpdir):
+def server(request, db, port, module, addons_path, tmpdir):
     log_handlers = [
         'odoo.modules.loading:WARNING',
     ]
     if not request.config.getoption('--log-github'):
         log_handlers.append('github_requests:WARNING')
-
-    addons_path = ','.join(map(str, filter(None, [
-        request.config.getoption('--addons-path'),
-        dummy_addons_path,
-    ])))
 
     cov = []
     if request.config.getoption('--coverage'):
