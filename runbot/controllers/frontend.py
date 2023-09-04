@@ -234,8 +234,16 @@ class Runbot(Controller):
         build = slot.sudo()._create_missing_build()
         return werkzeug.utils.redirect('/runbot/build/%s' % build.id)
 
-    @route(['/runbot/commit/<model("runbot.commit"):commit>'], website=True, auth='public', type='http', sitemap=False)
-    def commit(self, commit=None, **kwargs):
+    @route([
+        '/runbot/commit/<model("runbot.commit"):commit>',
+        '/runbot/commit/<string(minlength=6, maxlength=40):commit_hash>'
+    ], website=True, auth='public', type='http', sitemap=False)
+    def commit(self, commit=None, commit_hash=None, **kwargs):
+        if commit_hash:
+            commit = request.env['runbot.commit'].search([('name', '=like', f'{commit_hash}%')], limit=1)
+            if not commit.exists():
+                raise NotFound()
+            return request.redirect(f"/runbot/commit/{slug(commit)}")
         status_list = request.env['runbot.commit.status'].search([('commit_id', '=', commit.id)], order='id desc')
         last_status_by_context = dict()
         for status in status_list:
