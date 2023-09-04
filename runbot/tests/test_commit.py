@@ -6,6 +6,17 @@ from werkzeug.urls import url_parse
 from odoo.tests.common import HttpCase, new_test_user, tagged
 from odoo.tools import mute_logger
 
+from .common import RunbotCaseMinimalSetup
+
+class TestCommitDate(RunbotCaseMinimalSetup):
+
+    def test_commit_has_date(self):
+        commit = self.Commit.create({
+            'name': 'caca00caca00ffffffffffffffffffffffffffff',
+            'repo_id': self.repo_server.id
+        })
+
+        self.assertNotEqual(commit.date, False, "A commit should always have a date")
 
 @tagged('post_install', '-at_install')
 class TestCommitStatus(HttpCase):

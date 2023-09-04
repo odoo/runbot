@@ -34,6 +34,13 @@ class Commit(models.Model):
     dname = fields.Char('Display name', compute='_compute_dname')
     rebase_on_id = fields.Many2one('runbot.commit', 'Rebase on commit')
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if 'date' not in vals:
+                vals['date'] = fields.Datetime.now()
+        return super().create(vals_list)
+
     def _get(self, name, repo_id, vals=None, rebase_on_id=False):
         commit = self.search([('name', '=', name), ('repo_id', '=', repo_id), ('rebase_on_id', '=', rebase_on_id)])
         if not commit:
