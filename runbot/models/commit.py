@@ -41,10 +41,24 @@ class Commit(models.Model):
                 vals['date'] = fields.Datetime.now()
         return super().create(vals_list)
 
+    def _get_commit_infos(self, sha, repo):
+        fields = ['date', 'author', 'author_email', 'commiter', 'commiter_email', 'subject']
+        pretty_format = '%00'.join(['%ct', '%an', '%ae', '%cn', '%ce', '%s'])
+        vals = {}
+        try:
+            vals = zip(fields, repo._git(['show', '-s', f'--pretty=format:{pretty_format}', sha]).split('\x00'))
+            vals['date'] = datetime.datetime.fromtimestamp(int(vals['date']))
+        except subprocess.CalledProcessError as e:
+            _logger.warning('git show failed with message %s', e.output.decode())
+        return vals
+
     def _get(self, name, repo_id, vals=None, rebase_on_id=False):
         commit = self.search([('name', '=', name), ('repo_id', '=', repo_id), ('rebase_on_id', '=', rebase_on_id)])
         if not commit:
-            commit = self.env['runbot.commit'].create({**(vals or {}), 'name': name, 'repo_id': repo_id, 'rebase_on_id': rebase_on_id})
+            if not vals:
+                repo = self.env['runbot.repo'].browse(repo_id)
+                vals = self._get_commit_infos(name, repo)
+            commit = self.env['runbot.commit'].create({**vals, 'name': name, 'repo_id': repo_id, 'rebase_on_id': rebase_on_id})
         return commit
 
     def _rebase_on(self, commit):
