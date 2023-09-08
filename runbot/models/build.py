@@ -219,7 +219,8 @@ class BuildResult(models.Model):
     orphan_result = fields.Boolean('No effect on the parent result', default=False)
 
     build_url = fields.Char('Build url', compute='_compute_build_url', store=False)
-    build_error_ids = fields.Many2many('runbot.build.error', 'runbot_build_error_ids_runbot_build_rel', string='Errors')
+    build_error_link_ids = fields.One2many('runbot.build.error.link', 'build_id')
+    build_error_ids = fields.Many2many('runbot.build.error', compute='_compute_build_error_ids', string='Errors')
     keep_running = fields.Boolean('Keep running', help='Keep running', index=True)
     log_counter = fields.Integer('Log Lines counter', default=100)
 
@@ -310,6 +311,11 @@ class BuildResult(models.Model):
                         record.global_result = children_result
                 else:
                     record.global_result = record.local_result
+
+    @api.depends('build_error_link_ids')
+    def _compute_build_error_ids(self):
+        for record in self:
+            record.build_error_ids = record.build_error_link_ids.mapped('build_error_id')
 
     def _get_worst_result(self, results, max_res=False):
         results = [result for result in results if result]  # filter Falsy values
@@ -1128,7 +1134,7 @@ class BuildResult(models.Model):
         """ Parse build logs to classify errors """
         BuildError = self.env['runbot.build.error']
         # only parse logs from builds in error and not already scanned
-        builds_to_scan = self.search([('id', 'in', self.ids), ('local_result', 'in', ('ko', 'killed', 'warn')), ('build_error_ids', '=', False)])
+        builds_to_scan = self.search([('id', 'in', self.ids), ('local_result', 'in', ('ko', 'killed', 'warn')), ('build_error_link_ids', '=', False)])
         ir_logs = self.env['ir.logging'].search([('level', 'in', ('ERROR', 'WARNING', 'CRITICAL')), ('type', '=', 'server'), ('build_id', 'in', builds_to_scan.ids)])
         return BuildError._parse_logs(ir_logs)
 

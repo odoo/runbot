@@ -2,11 +2,11 @@
 {
     'name': "runbot",
     'summary': "Runbot",
-    'description': "Runbot for Odoo 15.0",
+    'description': "Runbot for Odoo 16.0",
     'author': "Odoo SA",
     'website': "http://runbot.odoo.com",
     'category': 'Website',
-    'version': '5.4',
+    'version': '5.5',
     'application': True,
     'depends': ['base', 'base_automation', 'website'],
     'data': [
