@@ -4,6 +4,8 @@ import hashlib
 import logging
 import re
 
+from psycopg2 import sql
+
 from collections import defaultdict
 from dateutil.relativedelta import relativedelta
 from werkzeug.urls import url_join
@@ -11,6 +13,26 @@ from odoo import models, fields, api
 from odoo.exceptions import ValidationError, UserError
 
 _logger = logging.getLogger(__name__)
+
+
+class BuildErrorLink(models.Model):
+    _name = 'runbot.build.error.link'
+    _description = 'Build Build Error Extended Relation'
+    _order = 'log_date desc, build_id desc'
+
+    build_id = fields.Many2one('runbot.build', required=True, index=True)
+    build_error_id =fields.Many2one('runbot.build.error', required=True, index=True)
+    log_date = fields.Datetime(string='Log date')
+    host = fields.Char(related='build_id.host')
+    dest = fields.Char(related='build_id.dest')
+    version_id = fields.Many2one(related='build_id.version_id')
+    trigger_id = fields.Many2one(related='build_id.trigger_id')
+    description = fields.Char(related='build_id.description')
+    build_url = fields.Char(related='build_id.build_url')
+
+    _sql_constraints = [
+        ('error_build_rel_unique', 'UNIQUE (build_id, build_error_id)', 'A link between a build and an error must be unique'),
+    ]
 
 
 class BuildError(models.Model):
@@ -35,7 +57,9 @@ class BuildError(models.Model):
     fixing_pr_id = fields.Many2one('runbot.branch', 'Fixing PR', tracking=True, domain=[('is_pr', '=', True)])
     fixing_pr_alive = fields.Boolean('Fixing PR alive', related='fixing_pr_id.alive')
     fixing_pr_url = fields.Char('Fixing PR url', related='fixing_pr_id.branch_url')
-    build_ids = fields.Many2many('runbot.build', 'runbot_build_error_ids_runbot_build_rel', string='Affected builds')
+    build_error_link_ids = fields.One2many('runbot.build.error.link', 'build_error_id')
+    children_build_error_link_ids = fields.One2many('runbot.build.error.link', compute='_compute_children_build_error_link_ids')
+    build_ids = fields.Many2many('runbot.build', compute= '_compute_build_ids')
     bundle_ids = fields.One2many('runbot.bundle', compute='_compute_bundle_ids')
     version_ids = fields.One2many('runbot.version', compute='_compute_version_ids', string='Versions', search='_search_version')
     trigger_ids = fields.Many2many('runbot.trigger', compute='_compute_trigger_ids', string='Triggers', search='_search_trigger_ids')
@@ -47,9 +71,9 @@ class BuildError(models.Model):
     children_build_ids = fields.Many2many('runbot.build', compute='_compute_children_build_ids', string='Children builds')
     error_history_ids = fields.Many2many('runbot.build.error', compute='_compute_error_history_ids', string='Old errors', context={'active_test': False})
     first_seen_build_id = fields.Many2one('runbot.build', compute='_compute_first_seen_build_id', string='First Seen build')
-    first_seen_date = fields.Datetime(string='First Seen Date', related='first_seen_build_id.create_date', depends=['first_seen_build_id'])
+    first_seen_date = fields.Datetime(string='First Seen Date', compute='_compute_seen_date', store=True)
     last_seen_build_id = fields.Many2one('runbot.build', compute='_compute_last_seen_build_id', string='Last Seen build', store=True)
-    last_seen_date = fields.Datetime(string='Last Seen Date', related='last_seen_build_id.create_date', store=True, depends=['last_seen_build_id'])
+    last_seen_date = fields.Datetime(string='Last Seen Date', compute='_compute_seen_date', store=True)
     test_tags = fields.Char(string='Test tags', help="Comma separated list of test_tags to use to reproduce/remove this error", tracking=True)
 
     @api.constrains('test_tags')
@@ -105,6 +129,16 @@ class BuildError(models.Model):
                     build_error.team_id = False
         return result
 
+    @api.depends('build_error_link_ids')
+    def _compute_build_ids(self):
+        for record in self:
+            record.build_ids = record.build_error_link_ids.mapped('build_id')
+
+    @api.depends('build_error_link_ids')
+    def _compute_children_build_error_link_ids(self):
+        for record in self:
+            record.children_build_error_link_ids = record.build_error_link_ids | record.child_ids.build_error_link_ids
+
     @api.depends('build_ids', 'child_ids.build_ids')
     def _compute_build_counts(self):
         for build_error in self:
@@ -131,6 +165,7 @@ class BuildError(models.Model):
         for build_error in self:
             build_error.summary = build_error.content[:80]
 
+
     @api.depends('build_ids', 'child_ids.build_ids')
     def _compute_children_build_ids(self):
         for build_error in self:
@@ -141,6 +176,13 @@ class BuildError(models.Model):
     def _compute_last_seen_build_id(self):
         for build_error in self:
             build_error.last_seen_build_id = build_error.children_build_ids and build_error.children_build_ids[0] or False
+
+    @api.depends('build_error_link_ids', 'child_ids')
+    def _compute_seen_date(self):
+        for build_error in self:
+            error_dates = (build_error.build_error_link_ids | build_error.child_ids.build_error_link_ids).mapped('log_date')
+            build_error.first_seen_date = error_dates and min(error_dates)
+            build_error.last_seen_date = error_dates and max(error_dates)
 
     @api.depends('children_build_ids')
     def _compute_first_seen_build_id(self):
@@ -179,8 +221,11 @@ class BuildError(models.Model):
         build_errors |= existing_errors
         for build_error in existing_errors:
             logs = hash_dict[build_error.fingerprint]
-            for build in logs.mapped('build_id'):
-                build.build_error_ids += build_error
+            self.env['runbot.build.error.link'].create([{
+                    'build_id': rec.build_id.id,
+                    'build_error_id': build_error.id,
+                    'log_date': rec.create_date}
+            for rec in logs if rec.build_id not in build_error.build_ids])
 
             # update filepath if it changed. This is optionnal and mainly there in case we adapt the OdooRunner log 
             if logs[0].path != build_error.file_path:
@@ -191,13 +236,19 @@ class BuildError(models.Model):
 
         # create an error for the remaining entries
         for fingerprint, logs in hash_dict.items():
-            build_errors |= self.env['runbot.build.error'].create({
+            new_build_error = self.env['runbot.build.error'].create({
                 'content': logs[0].message,
                 'module_name': logs[0].name.removeprefix('odoo.').removeprefix('addons.'),
                 'file_path': logs[0].path,
                 'function': logs[0].func,
-                'build_ids': [(6, False, [r.build_id.id for r in logs])],
             })
+            build_errors |= new_build_error
+            self.env['runbot.build.error.link'].create([{
+                'build_id': rec.build_id.id,
+                'build_error_id': new_build_error.id,
+                'log_date': rec.create_date}
+            for rec in logs])
+
 
         if build_errors:
             window_action = {

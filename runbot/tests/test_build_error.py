@@ -1,5 +1,6 @@
 import hashlib
 
+from odoo import fields
 from odoo.exceptions import ValidationError
 from .common import RunbotCase
 
@@ -30,6 +31,7 @@ class TestBuildError(RunbotCase):
     def setUp(self):
         super(TestBuildError, self).setUp()
         self.BuildError = self.env['runbot.build.error']
+        self.BuildErrorLink = self.env['runbot.build.error.link']
         self.BuildErrorTeam = self.env['runbot.team']
         self.ErrorRegex = self.env['runbot.error.regex']
 
@@ -62,10 +64,12 @@ class TestBuildError(RunbotCase):
 
     def test_merge(self):
         build_a = self.create_test_build({'local_result': 'ko', 'local_state': 'done'})
-        error_a = self.BuildError.create({'content': 'foo bar', 'build_ids': [(6, 0, [build_a.id])]})
+        error_a = self.BuildError.create({'content': 'foo bar'})
+        self.BuildErrorLink.create({'build_id': build_a.id, 'build_error_id': error_a.id})
 
         build_b = self.create_test_build({'local_result': 'ko', 'local_state': 'done'})
-        error_b = self.BuildError.create({'content': 'foo bar', 'build_ids': [(6, 0, [build_b.id])]})
+        error_b = self.BuildError.create({'content': 'foo bar'})
+        self.BuildErrorLink.create({'build_id': build_b.id, 'build_error_id': error_b.id})
 
         (error_a | error_b)._merge()
         self.assertEqual(len(self.BuildError.search([('fingerprint', '=', error_a.fingerprint)])), 1)
@@ -85,10 +89,13 @@ class TestBuildError(RunbotCase):
         top_error = self.BuildError.create({'content': 'foo foo', 'active': False})
 
         build_a = self.create_test_build({'local_result': 'ko', 'local_state': 'done'})
-        error_a = self.BuildError.create({'content': 'foo bar', 'parent_id': top_error.id , 'build_ids': [(6, 0, [build_a.id])]})
+        error_a = self.BuildError.create({'content': 'foo bar', 'parent_id': top_error.id })
+        self.BuildErrorLink.create({'build_id': build_a.id, 'build_error_id': error_a.id})
 
         build_b = self.create_test_build({'local_result': 'ko', 'local_state': 'done'})
-        error_b = self.BuildError.create({'content': 'foo bar', 'test_tags': 'footag', 'build_ids': [(6, 0, [build_b.id])]})
+        error_b = self.BuildError.create({'content': 'foo bar', 'test_tags': 'footag'})
+        self.BuildErrorLink.create({'build_id': build_b.id, 'build_error_id': error_b.id})
+
         linked_error = self.BuildError.create({'content': 'foo foo bar', 'parent_id': error_b.id})
 
         (error_a | error_b)._merge()
@@ -124,6 +131,7 @@ class TestBuildError(RunbotCase):
         })
 
         log = {
+            'create_date': fields.Datetime.from_string('2023-08-29 00:46:21'),
             'message': RTE_ERROR,
             'build_id': ko_build.id,
             'level': 'ERROR',
@@ -144,12 +152,17 @@ class TestBuildError(RunbotCase):
 
         ko_build._parse_logs()
         ok_build._parse_logs()
-        build_error = self.BuildError.search([('build_ids', 'in', [ko_build.id])])
+        # build_error = self.BuildError.search([('build_ids', 'in', [ko_build.id])])
+        build_error = self.BuildErrorLink.search([('build_id.id', '=', ko_build.id)]).mapped('build_error_id')
         self.assertTrue(build_error)
         self.assertTrue(build_error.fingerprint.startswith('af0e88f3'))
         self.assertTrue(build_error.cleaned_content.startswith('%'), 'The cleaner should have replace "FAIL: " with a "%" sign by default')
+        error_link = self.env['runbot.build.error.link'].search([('build_id', '=', ko_build.id), ('build_error_id', '=', build_error.id)])
+        self.assertTrue(error_link, 'An error link should exists')
+        self.assertIn(ko_build, build_error.build_error_link_ids.mapped('build_id'), 'Ko build should be in build_error_link_ids')
+        self.assertEqual(error_link.log_date, fields.Datetime.from_string('2023-08-29 00:46:21'))
         self.assertIn(ko_build, build_error.build_ids, 'The parsed build should be added to the runbot.build.error')
-        self.assertFalse(self.BuildError.search([('build_ids', 'in', [ok_build.id])]), 'A successful build should not associated to a runbot.build.error')
+        self.assertFalse(self.BuildErrorLink.search([('build_id', '=', ok_build.id)]), 'A successful build should not be associated to a runbot.build.error')
         self.assertEqual(error_team, build_error.team_id)
 
         # Test that build with same error is added to the errors
@@ -175,7 +188,7 @@ class TestBuildError(RunbotCase):
         IrLog.create(log)
         ko_build_new._parse_logs()
         self.assertNotIn(ko_build_new, build_error.build_ids, 'The parsed build should not be added to a fixed runbot.build.error')
-        new_build_error = self.BuildError.search([('build_ids', 'in', [ko_build_new.id])])
+        new_build_error = self.BuildErrorLink.search([('build_id', '=', ko_build_new.id)]).mapped('build_error_id')
         self.assertIn(ko_build_new, new_build_error.build_ids, 'The parsed build with a re-apearing error should generate a new runbot.build.error')
         self.assertIn(build_error, new_build_error.error_history_ids, 'The old error should appear in history')
 
@@ -185,15 +198,17 @@ class TestBuildError(RunbotCase):
 
         error_a = self.env['runbot.build.error'].create({
             'content': 'foo',
-            'build_ids': [(6, 0, [build_a.id])],
             'active': False  # Even a fixed error coul be linked
         })
 
+        self.BuildErrorLink.create({'build_id': build_a.id, 'build_error_id': error_a.id})
+
         error_b = self.env['runbot.build.error'].create({
             'content': 'bar',
-            'build_ids': [(6, 0, [build_b.id])],
             'random': True
         })
+
+        self.BuildErrorLink.create({'build_id': build_b.id, 'build_error_id': error_b.id})
 
         #  test that the random bug is parent when linking errors
         all_errors = error_a | error_b
