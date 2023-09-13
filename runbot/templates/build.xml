@@ -335,7 +335,7 @@
                   <tr>
                     <td/><td/><td/>
                     <td t-attf-class="bg-{{'info' if error.active else 'success'}}-light {{size}}" colspan="2">
-                      This error is already <t t-esc="'known' if error.active else 'fixed'"/>.
+                      This error is already <a href="#" t-attf-title="{{'Was detected by runbot in nightly builds.' if error.active else 'Either the error is not properly fixed or the branch does not contain the fix.'}}"><t t-esc="'known' if error.active else 'fixed'"/></a>.
                       <a groups="runbot.group_user" t-attf-href="/web#id={{l.error_id.id}}&amp;view_type=form&amp;model=runbot.build.error&amp;menu_id={{env.ref('runbot.runbot_menu_root').id}}" title="View in Backend" target="new">
                         <i t-attf-class="fa fa-{{icon}}"/>
                       </a>
