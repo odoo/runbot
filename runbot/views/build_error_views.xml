@@ -6,7 +6,8 @@
         <field name="arch" type="xml">
           <form>
             <sheet>
-              <widget name="web_ribbon" title="Test-tags" bg_color="bg-warning" attrs="{'invisible': [('test_tags', '=', False)]}"/>
+              <widget name="web_ribbon" title="Test-tags" bg_color="bg-danger" attrs="{'invisible': [('test_tags', '=', False)]}"/>
+              <widget name="web_ribbon" title="Linked to another error" bg_color="bg-warning" attrs="{'invisible': [('parent_id', '=', False)]}"/>
               <header>
               </header>
                 <group name="build_error_group" string="Base info" col="2">
@@ -22,8 +23,8 @@
                     <field name="fixing_pr_id"/>
                     <field name="fixing_pr_url" widget="url"/>
                     <field name="active"/>
-                    <field name="test_tags" readonly="1" groups="!runbot.group_runbot_admin"/>
-                    <field name="test_tags" groups="runbot.group_runbot_admin" attrs="{'readonly': [('parent_id','!=', False), ('test_tags','=', False)]}"/>
+                    <field name="test_tags" decoration-danger="True" readonly="1" groups="!runbot.group_runbot_admin"/>
+                    <field name="test_tags" decoration-danger="True" groups="runbot.group_runbot_admin" attrs="{'readonly': [('parent_id','!=', False), ('test_tags','=', False)]}"/>
                   </group>
                   <group>
                     <field name="version_ids" widget="many2many_tags"/>
@@ -38,7 +39,7 @@
                     <field name="first_seen_build_id" widget="frontend_url"/>
                   </group>
                   <group>
-                    <field name="parent_id"/>
+                    <field name="parent_id" decoration-warning="parent_id != False"/>
                     <field name="last_seen_date"/>
                     <field name="last_seen_build_id" widget="frontend_url"/>
                   </group>
