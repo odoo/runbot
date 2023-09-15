@@ -725,7 +725,9 @@ class ConfigStep(models.Model):
         migrate_cmd += ['-d', migrate_db_name]
         migrate_cmd += ['--stop-after-init']
         migrate_cmd += ['--max-cron-threads=0']
-        # migrate_cmd += ['--upgrades-paths', '/%s' % migration_scripts] upgrades-paths is broken, ln is created automatically in sources
+        migration_scripts = ','.join([repo.name + repo.upgrade_paths.replace(' ', '') for repo in target_commit_ids.mapped('repo_id') if repo.upgrade_paths])
+        if migration_scripts:
+            migrate_cmd += ['--upgrades-paths', migration_scripts]
 
         build._log('run', 'Start migration build %s' % build.dest)
         timeout = self.cpu_limit
