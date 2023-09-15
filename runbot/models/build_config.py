@@ -725,9 +725,13 @@ class ConfigStep(models.Model):
         migrate_cmd += ['-d', migrate_db_name]
         migrate_cmd += ['--stop-after-init']
         migrate_cmd += ['--max-cron-threads=0']
-        migration_scripts = ','.join([repo.name + repo.upgrade_paths.replace(' ', '') for repo in target_commit_ids.mapped('repo_id') if repo.upgrade_paths])
-        if migration_scripts:
-            migrate_cmd += ['--upgrades-paths', migration_scripts]
+        upgrade_paths =  []
+        for repo in target_commit_ids.mapped('repo_id'):
+            if repo.upgrade_paths:
+                for upgrade_path in repo.upgrade_paths.split(','):
+                    upgrade_paths.append(repo.name + upgrade_path.replace(' ', ''))
+        if upgrade_paths:
+            migrate_cmd += ['--upgrade-path', ','.join(upgrade_paths)]
 
         build._log('run', 'Start migration build %s' % build.dest)
         timeout = self.cpu_limit
