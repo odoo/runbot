@@ -116,6 +116,7 @@
                   <field name="server_files"/>
                   <field name="manifest_files"/>
                   <field name="addons_paths"/>
+                  <field name="upgrade_paths"/>
                 </group>
                 <group colspan="4">
                   <field name="remote_ids">

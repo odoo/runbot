@@ -104,17 +104,6 @@ class Commit(models.Model):
                 shutil.rmtree(export_path)
                 raise RunbotException("Apply patch failed for %s...%s with error code %s+%s. (%s)" % (export_sha, self.name, p1.returncode, p2.returncode, message))
 
-        # migration scripts link if necessary
-        icp = self.env['ir.config_parameter']
-        ln_param = icp.get_param('runbot_migration_ln', default='')
-        migration_repo_id = int(icp.get_param('runbot_migration_repo_id', default=0))
-        if ln_param and migration_repo_id and self.repo_id.server_files:
-            scripts_dir = self.env['runbot.repo'].browse(migration_repo_id).name
-            try:
-                os.symlink('/data/build/%s' % scripts_dir,  self._source_path(ln_param))
-            except FileNotFoundError:
-                _logger.warning('Impossible to create migration symlink')
-
         return export_path
 
     def read_source(self, file, mode='r'):

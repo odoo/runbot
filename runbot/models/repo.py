@@ -284,6 +284,7 @@ class Repo(models.Model):
     server_files = fields.Char('Server files', help='Comma separated list of possible server files', tracking=True)  # odoo-bin,openerp-server,openerp-server.py
     manifest_files = fields.Char('Manifest files', help='Comma separated list of possible manifest files', default='__manifest__.py', tracking=True)
     addons_paths = fields.Char('Addons paths', help='Comma separated list of possible addons path', default='', tracking=True)
+    upgrade_paths = fields.Char('Upgrade paths', help='Comma separated list of possible upgrade path', default='', tracking=True)
 
     sequence = fields.Integer('Sequence', tracking=True)
     path = fields.Char(compute='_get_path', string='Directory', readonly=True)
