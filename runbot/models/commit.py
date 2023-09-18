@@ -1,11 +1,12 @@
 
 import subprocess
 
-from ..common import os, RunbotException, _make_github_session
+from ..common import os, RunbotException, make_github_session
 import glob
 import shutil
 
 from odoo import models, fields, api, registry
+from odoo.tools import file_open
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ class Commit(models.Model):
                     module = os.path.basename(os.path.dirname(manifest_path))
                     yield (addons_path, module, manifest_file_name)
 
-    def export(self, build):
+    def _export(self, build):
         """Export a git repo into a sources"""
         #  TODO add automated tests
         self.ensure_one()
@@ -106,19 +107,19 @@ class Commit(models.Model):
 
         return export_path
 
-    def read_source(self, file, mode='r'):
+    def _read_source(self, file, mode='r'):
         file_path = self._source_path(file)
         try:
-            with open(file_path, mode) as f:
+            with file_open(file_path, mode) as f:
                 return f.read()
         except:
             return False
 
-    def _source_path(self, *path):
+    def _source_path(self, *paths):
         export_name = self.name
         if self.rebase_on_id:
             export_name = '%s_%s' % (self.name, self.rebase_on_id.name)
-        return os.path.join(self.env['runbot.runbot']._root(), 'sources', self.repo_id.name, export_name, *path)
+        return self.repo_id._source_path(export_name, *paths)
 
     @api.depends('name', 'repo_id.name')
     def _compute_dname(self):
@@ -201,7 +202,7 @@ class CommitStatus(models.Model):
                         _logger.warning('No token on remote %s, skipping status', remote.mapped("name"))
                     else:
                         if remote.token not in session_cache:
-                            session_cache[remote.token] = _make_github_session(remote.token)
+                            session_cache[remote.token] = make_github_session(remote.token)
                         session = session_cache[remote.token]
                         _logger.info(
                             "github updating %s status %s to %s in repo %s",

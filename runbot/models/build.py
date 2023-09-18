@@ -1,27 +1,31 @@
 # -*- coding: utf-8 -*-
+
+import datetime
 import fnmatch
+import getpass
+import hashlib
 import logging
 import pwd
 import re
 import shutil
-import subprocess
 import time
-import datetime
-import hashlib
-from ..common import dt2time, fqdn, now, grep, local_pgadmin_cursor, s2human, dest_reg, os, list_local_dbs, pseudo_markdown, RunbotException, findall
-from ..container import docker_stop, docker_state, Command, docker_run
-from ..fields import JsonDictField
-from odoo import models, fields, api
-from odoo.exceptions import UserError, ValidationError
-from odoo.http import request
-from odoo.tools import appdirs
-from odoo.tools.safe_eval import safe_eval
+import uuid
+
 from collections import defaultdict
 from pathlib import Path
 from psycopg2 import sql
 from psycopg2.extensions import TransactionRollbackError
-import getpass
-import uuid
+
+from ..common import dt2time, now, grep, local_pgadmin_cursor, s2human, dest_reg, os, list_local_dbs, pseudo_markdown, RunbotException, findall, sanitize
+from ..container import docker_stop, docker_state, Command, docker_run
+from ..fields import JsonDictField
+
+from odoo import models, fields, api
+
+from odoo.exceptions import ValidationError
+from odoo.tools import file_open, file_path
+from odoo.tools.safe_eval import safe_eval
+
 
 _logger = logging.getLogger(__name__)
 
@@ -123,12 +127,6 @@ class BuildParameters(models.Model):
     def _find_existing(self, fingerprint):
         return self.env['runbot.build.params'].search([('fingerprint', '=', fingerprint)], limit=1)
 
-    def write(self, vals):
-        if not self.env.registry.loaded:
-            return
-        raise UserError('Params cannot be modified')
-
-
 class BuildResult(models.Model):
     # remove duplicate management
     # instead, link between bundle_batch and build
@@ -209,10 +207,6 @@ class BuildResult(models.Model):
                                   default='normal',
                                   string='Build type')
 
-    # what about parent_id and duplmicates?
-    # -> always create build, no duplicate? (make sence since duplicate should be the parent and params should be inherited)
-    # -> build_link ?
-
     parent_id = fields.Many2one('runbot.build', 'Parent Build', index=True)
     parent_path = fields.Char('Parent path', index=True, unaccent=False)
     top_parent =  fields.Many2one('runbot.build', compute='_compute_top_parent')
@@ -253,7 +247,7 @@ class BuildResult(models.Model):
     @api.depends('params_id.config_id')
     def _compute_log_list(self):  # storing this field because it will be access trhoug repo viewn and keep track of the list at create
         for build in self:
-            build.log_list = ','.join({step.name for step in build.params_id.config_id.step_ids() if step._has_log()})
+            build.log_list = ','.join({step.name for step in build.params_id.config_id.step_ids if step._has_log()})
         # TODO replace logic, add log file to list when executed (avoid 404, link log on docker start, avoid fake is_docker_step)
 
     @api.depends('children_ids.global_state', 'local_state')
@@ -335,7 +329,7 @@ class BuildResult(models.Model):
     def _get_run_url(self, db_suffix=None):
         if db_suffix is None:
             db_suffix = self.mapped('database_ids')[0].db_suffix
-        if request.env.user._is_internal():
+        if self.env.user._is_internal():
             token, token_info = self._get_run_token()
             db_suffix = f'{db_suffix}-{token}-{token_info}'
         use_ssl = self.env['ir.config_parameter'].sudo().get_param('runbot.use_ssl', default=True)
@@ -410,7 +404,7 @@ class BuildResult(models.Model):
             'host': self.host if self.keep_host else False,
         })
 
-    def result_multi(self):
+    def _result_multi(self):
         if all(build.global_result == 'ok' or not build.global_result for build in self):
             return 'ok'
         if any(build.global_result in ('skipped', 'killed', 'manually_killed') for build in self):
@@ -495,7 +489,7 @@ class BuildResult(models.Model):
         new_build = self.create(values)
         if self.parent_id:
             new_build._github_status()
-        user = request.env.user if request else self.env.user
+        user = self.env.user
         new_build._log('rebuild', 'Rebuild initiated by %s%s' % (user.name, (' :%s' % message) if message else ''))
 
         if self.local_state != 'done':
@@ -688,7 +682,7 @@ class BuildResult(models.Model):
                         'port': port,
                     })
                     build._log('wake_up', '**Waking up build**', log_type='markdown', level='SEPARATOR')
-                    step_ids = build.params_id.config_id.step_ids()
+                    step_ids = build.params_id.config_id.step_ids
                     if step_ids and step_ids[-1]._step_state() == 'running':
                         run_step = step_ids[-1]
                     else:
@@ -748,9 +742,9 @@ class BuildResult(models.Model):
 
             # compute statistics before starting next job
             build.active_step._make_stats(build)
-            build.active_step.log_end(build)
+            build.active_step._log_end(build)
 
-        step_ids = self.params_id.config_id.step_ids()
+        step_ids = self.params_id.config_id.step_ids
         if not step_ids:  # no job to do, build is done
             self.active_step = False
             self.local_state = 'done'
@@ -772,7 +766,7 @@ class BuildResult(models.Model):
                 self.local_state = 'done'
                 self.local_result = 'ko'
                 return False
-            next_index = step_ids.index(self.active_step) + 1
+            next_index = list(step_ids).index(self.active_step) + 1
 
         while True:
             if next_index >= len(step_ids):  # final job, build is done
@@ -810,7 +804,7 @@ class BuildResult(models.Model):
                 build._log("run", message, level='ERROR')
                 build._kill(result='ko')
 
-    def _docker_run(self, cmd=None, ro_volumes=None, **kwargs):
+    def _docker_run(self, step, cmd=None, ro_volumes=None, **kwargs):
         self.ensure_one()
         _ro_volumes = ro_volumes or {}
         ro_volumes = {}
@@ -834,24 +828,24 @@ class BuildResult(models.Model):
             rc_content = cmd.get_config(starting_config=starting_config)
         else:
             rc_content = starting_config
-        self.write_file('.odoorc', rc_content)
+        self._write_file('.odoorc', rc_content)
         user = getpass.getuser()
         ro_volumes[f'/home/{user}/.odoorc'] = self._path('.odoorc')
-        kwargs.pop('build_dir', False)  # todo check python steps
+        kwargs.pop('build_dir', False)
+        kwargs.pop('log_path', False)
+        log_path = self._path('logs', '%s.txt' % step.name)
         build_dir = self._path()
         self.env.flush_all()
         def start_docker():
-            docker_run(cmd=cmd, build_dir=build_dir, ro_volumes=ro_volumes, **kwargs)
+            docker_run(cmd=cmd, build_dir=build_dir, log_path=log_path, ro_volumes=ro_volumes, **kwargs)
         return start_docker
 
-    def _path(self, *l, **kw):
+    def _path(self, *paths):
         """Return the repo build path"""
         self.ensure_one()
-        build = self
-        root = self.env['runbot.runbot']._root()
-        return os.path.join(root, 'build', build.dest, *l)
+        return self.env['runbot.runbot']._path('build', self.dest, *paths)
 
-    def http_log_url(self):
+    def _http_log_url(self):
         use_ssl = self.env['ir.config_parameter'].get_param('runbot.use_ssl', default=True)
         return '%s://%s/runbot/static/build/%s/logs/' % ('https' if use_ssl else 'http', self.host, self.dest)
 
@@ -859,12 +853,10 @@ class BuildResult(models.Model):
         """Return the absolute path to the direcory containing the server file, adding optional *path"""
         self.ensure_one()
         commit = self._get_server_commit()
-        if os.path.exists(commit._source_path('odoo')):
-            return commit._source_path('odoo', *path)
-        return commit._source_path('openerp', *path)
+        return commit._source_path('odoo', *path)
 
     def _docker_source_folder(self, commit):
-        return commit.repo_id.name
+        return sanitize(commit.repo_id.name)
 
     def _checkout(self):
         self.ensure_one()  # will raise exception if hash not found, we don't want to fail for all build.
@@ -876,7 +868,7 @@ class BuildResult(models.Model):
             if build_export_path in exports:
                 self._log('_checkout', 'Multiple repo have same export path in build, some source may be missing for %s' % build_export_path, level='ERROR')
                 self._kill(result='ko')
-            exports[build_export_path] = commit.export(self)
+            exports[build_export_path] = commit._export(self)
 
         checkout_time = time.time() - start
         if checkout_time > 60:
@@ -908,7 +900,7 @@ class BuildResult(models.Model):
     def _get_modules_to_test(self, modules_patterns=''):
         self.ensure_one()
 
-        def filter_patterns(patterns, default, all):
+        def _filter_patterns(patterns, default, all):
             default = set(default)
             patterns_list = (patterns or '').split(',')
             patterns_list = [p.strip() for p in patterns_list]
@@ -924,10 +916,10 @@ class BuildResult(models.Model):
         modules_to_install = set()
         for repo, module_list in self._get_available_modules().items():
             available_modules += module_list
-            modules_to_install |= filter_patterns(repo.modules, module_list, module_list)
+            modules_to_install |= _filter_patterns(repo.modules, module_list, module_list)
 
-        modules_to_install = filter_patterns(self.params_id.modules, modules_to_install, available_modules)
-        modules_to_install = filter_patterns(modules_patterns, modules_to_install, available_modules)
+        modules_to_install = _filter_patterns(self.params_id.modules, modules_to_install, available_modules)
+        modules_to_install = _filter_patterns(modules_patterns, modules_to_install, available_modules)
 
         return sorted(modules_to_install)
 
@@ -942,7 +934,7 @@ class BuildResult(models.Model):
             msg = f"Failed to drop local logs database : {dbname} with exception: {e}"
             _logger.exception(msg)
             host_name = self.env['runbot.host']._get_current_name()
-            self.env['runbot.runbot'].warning(f'Host {host_name}: {msg}')
+            self.env['runbot.runbot']._warning(f'Host {host_name}: {msg}')
 
     def _local_pg_createdb(self, dbname):
         icp = self.env['ir.config_parameter']
@@ -992,7 +984,7 @@ class BuildResult(models.Model):
         if lock:
             self.env.cr.execute("""SELECT id FROM runbot_build WHERE parent_path like %s FOR UPDATE""", ['%s%%' % self.parent_path])
         self.ensure_one()
-        user = request.env.user if request else self.env.user
+        user = self.env.user
         uid = user.id
         build = self
         message = message or 'Killing build %s, requested by %s (user #%s)' % (build.dest, user.name, uid)
@@ -1005,7 +997,7 @@ class BuildResult(models.Model):
             child._ask_kill(lock=False)
 
     def _wake_up(self):
-        user = request.env.user if request else self.env.user
+        user = self.env.user
         self._log('wake_up', f'Wake up initiated by {user.name}')
         if self.local_state != 'done':
             self._log('wake_up', 'Impossibe to wake up, state is not done')
@@ -1031,7 +1023,7 @@ class BuildResult(models.Model):
             source_path = self._docker_source_folder(commit)
             for addons_path in (commit.repo_id.addons_paths or '').split(','):
                 if os.path.isdir(commit._source_path(addons_path)):
-                    yield os.path.join(source_path, addons_path).strip(os.sep)
+                    yield os.sep.join([source_path, addons_path]).strip(os.sep)
 
     def _get_server_info(self, commit=None):
         commit = commit or self._get_server_commit()
@@ -1052,7 +1044,7 @@ class BuildResult(models.Model):
         for commit_id in self.env.context.get('defined_commit_ids') or self.params_id.commit_ids:
             if not self.params_id.skip_requirements and os.path.isfile(commit_id._source_path('requirements.txt')):
                 repo_dir = self._docker_source_folder(commit_id)
-                requirement_path = os.path.join(repo_dir, 'requirements.txt')
+                requirement_path = os.sep.join([repo_dir, 'requirements.txt'])
                 pres.append([f'python{py_version}', '-m', 'pip', 'install','--user', '--progress-bar', 'off', '-r', f'{requirement_path}'])
 
         addons_paths = self._get_addons_path()
@@ -1060,7 +1052,7 @@ class BuildResult(models.Model):
         server_dir = self._docker_source_folder(server_commit)
 
         # commandline
-        cmd = ['python%s' % py_version] + python_params + [os.path.join(server_dir, server_file)]
+        cmd = ['python%s' % py_version] + python_params + [os.sep.join([server_dir, server_file])]
         if sub_command:
             cmd += [sub_command]
 
@@ -1118,7 +1110,7 @@ class BuildResult(models.Model):
         """return the python name to use from build batch"""
         (server_commit, server_file) = self._get_server_info()
         server_path = server_commit._source_path(server_file)
-        with open(server_path, 'r') as f:
+        with file_open(server_path, 'r') as f:
             if f.readline().strip().endswith('python3'):
                 return '3'
         return ''
@@ -1131,52 +1123,35 @@ class BuildResult(models.Model):
         ir_logs = self.env['ir.logging'].search([('level', 'in', ('ERROR', 'WARNING', 'CRITICAL')), ('type', '=', 'server'), ('build_id', 'in', builds_to_scan.ids)])
         return BuildError._parse_logs(ir_logs)
 
-    def is_file(self, file, mode='r'):
+    def _is_file(self, file, mode='r'):
         file_path = self._path(file)
         return os.path.exists(file_path)
 
-    def read_file(self, file, mode='r'):
+    def _read_file(self, file, mode='r'):
         file_path = self._path(file)
         try:
-            with open(file_path, mode) as f:
+            with file_open(file_path, mode) as f:
                 return f.read()
         except Exception as e:
             self._log('readfile', 'exception: %s' % e)
             return False
 
-    def write_file(self, file, data, mode='w'):
-        file_path = self._path(file)
-        file_dir = os.path.split(file_path)[0]
+    def _write_file(self, file, data, mode='w'):
+        _file_path = self._path(file)
+        file_dir = os.path.dirname(_file_path)
         os.makedirs(file_dir, exist_ok=True)
+        file_path(os.path.dirname(_file_path))
         try:
-            with open(file_path, mode) as f:
+            with open(_file_path, mode) as f:
                 f.write(data)
         except Exception as e:
             self._log('write_file', 'exception: %s' % e)
             return False
 
-    def make_dirs(self, dir_path):
-        full_path = self._path(dir_path)
-        try:
-            os.makedirs(full_path, exist_ok=True)
-        except Exception as e:
-            self._log('make_dirs', 'exception: %s' % e)
-            return False
-
-    def build_type_label(self):
-        self.ensure_one()
-        return dict(self.fields_get('build_type', 'selection')['build_type']['selection']).get(self.build_type, self.build_type)
-
-    def get_formated_job_time(self):
-        return s2human(self.job_time)
-
-    def get_formated_build_time(self):
+    def _get_formated_build_time(self):
         return s2human(self.build_time)
 
-    def get_formated_build_age(self):
-        return s2human(self.build_age)
-
-    def get_color_class(self):
+    def _get_color_class(self):
 
         if self.global_result == 'ko':
             return 'danger'
@@ -1230,5 +1205,5 @@ class BuildResult(models.Model):
                     if 'base_' not in build_commit.match_type and commit.repo_id in trigger.repo_ids:
                         commit._github_status(build, trigger.ci_context, state, target_url, desc)
 
-    def parse_config(self):
+    def _parse_config(self):
         return set(findall(self._server("tools/config.py"), '--[\w-]+', ))

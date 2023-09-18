@@ -5,7 +5,7 @@ import time
 from collections import defaultdict
 
 from odoo import models, fields, api
-from odoo.tools import config, ormcache
+from odoo.tools import config, ormcache, file_open
 from ..common import fqdn, local_pgadmin_cursor, os, list_local_dbs, local_pg_cursor
 from ..container import docker_build
 
@@ -106,8 +106,8 @@ class Host(models.Model):
     def _bootstrap(self):
         """ Create needed directories in static """
         dirs = ['build', 'nginx', 'repo', 'sources', 'src', 'docker']
-        static_path = self._get_work_path()
-        static_dirs = {d: os.path.join(static_path, d) for d in dirs}
+        static_path = self.env['runbot.runbot']._root()
+        static_dirs = {d: self.env['runbot.runbot']._path(d) for d in dirs}
         for dir, path in static_dirs.items():
             os.makedirs(path, exist_ok=True)
         self._bootstrap_db_template()
@@ -117,16 +117,14 @@ class Host(models.Model):
         """ build docker images needed by locally pending builds"""
         _logger.info('Building docker images...')
         self.ensure_one()
-        static_path = self._get_work_path()
         self.clear_caches()  # needed to ensure that content is updated on all hosts
         for dockerfile in self.env['runbot.dockerfile'].search([('to_build', '=', True)]):
-            self._docker_build_dockerfile(dockerfile, static_path)
+            self._docker_build_dockerfile(dockerfile)
         _logger.info('Done...')
 
-    def _docker_build_dockerfile(self, dockerfile, workdir):
+    def _docker_build_dockerfile(self, dockerfile):
         start = time.time()
-        # _logger.info('Building %s, %s', dockerfile.name, hash(str(dockerfile.dockerfile)))
-        docker_build_path = os.path.join(workdir, 'docker', dockerfile.image_tag)
+        docker_build_path = self.env['runbot.runbot']._path('docker', dockerfile.image_tag)
         os.makedirs(docker_build_path, exist_ok=True)
 
         user = getpass.getuser()
@@ -139,22 +137,18 @@ class Host(models.Model):
             USER {user}
             ENV COVERAGE_FILE /data/build/.coverage
             """
-
-        with open(os.path.join(docker_build_path, 'Dockerfile'), 'w') as Dockerfile:
+        with open(self.env['runbot.runbot']._path('docker', dockerfile.image_tag, 'Dockerfile'), 'w') as Dockerfile:
             Dockerfile.write(dockerfile.dockerfile + docker_append)
 
         docker_build_success, msg = docker_build(docker_build_path, dockerfile.image_tag)
         if not docker_build_success:
             dockerfile.to_build = False
             dockerfile.message_post(body=f'Build failure:\n{msg}')
-            # self.env['runbot.runbot'].warning(f'Dockerfile build "{dockerfile.image_tag}" failed on host {self.name}')
+            # self.env['runbot.runbot']._warning(f'Dockerfile build "{dockerfile.image_tag}" failed on host {self.name}')
         else:
             duration = time.time() - start
             if duration > 1:
                 _logger.info('Dockerfile %s finished build in %s', dockerfile.image_tag, duration)
-
-    def _get_work_path(self):
-        return os.path.abspath(os.path.join(os.path.dirname(__file__), '../static'))
     
     @ormcache()
     def _host_list(self):
@@ -172,11 +166,11 @@ class Host(models.Model):
     def _get_current_name(self):
         return config.get('forced_host_name') or fqdn()
 
-    def get_running_max(self):
+    def _get_running_max(self):
         icp = self.env['ir.config_parameter']
         return int(icp.get_param('runbot.runbot_running_max', default=5))
 
-    def set_psql_conn_count(self):
+    def _set_psql_conn_count(self):
         _logger.info('Updating psql connection count...')
         self.ensure_one()
         with local_pgadmin_cursor() as local_cr:
@@ -190,7 +184,7 @@ class Host(models.Model):
     def _total_workers(self):
         return sum(host.nb_worker for host in self)
 
-    def disable(self):
+    def _disable(self):
         """ Reserve host if possible """
         self.ensure_one()
         nb_hosts = self.env['runbot.host'].search_count([])
@@ -271,12 +265,12 @@ class Host(models.Model):
             with local_pg_cursor(logs_db_name) as local_cr:
                 local_cr.execute("DELETE FROM ir_logging WHERE id in %s", [tuple(local_log_ids)])
 
-    def get_build_domain(self, domain=None):
+    def _get_build_domain(self, domain=None):
         domain = domain or []
         return [('host', '=', self.name)] + domain
 
-    def get_builds(self, domain, order=None):
-        return self.env['runbot.build'].search(self.get_build_domain(domain), order=order)
+    def _get_builds(self, domain, order=None):
+        return self.env['runbot.build'].search(self._get_build_domain(domain), order=order)
 
     def _process_messages(self):
         self.host_message_ids._process()
@@ -298,5 +292,5 @@ class MessageQueue(models.Model):
         # todo consume messages here
         if records:
             for record in records:
-                self.env['runbot.runbot'].warning(f'Host {record.host_id.name} got an unexpected message {record.message}')
+                self.env['runbot.runbot']._warning(f'Host {record.host_id.name} got an unexpected message {record.message}')
         self.unlink()

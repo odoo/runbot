@@ -123,7 +123,7 @@
                 <field name="archive"/> 
               </group>
               <footer>
-                <button string="Submit" name="submit" type="object" class="btn-primary"/>
+                <button string="Submit" name="action_submit" type="object" class="btn-primary"/>
                 <button string="Cancel" class="btn-secondary" special="cancel"/>
               </footer>
             </sheet>

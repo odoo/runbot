@@ -115,7 +115,7 @@ class TestBuildError(RunbotCase):
 
         #  test that the random bug is parent when linking errors
         all_errors = error_a | error_b
-        all_errors.link_errors()
+        all_errors.action_link_errors()
         self.assertEqual(error_b.child_ids, error_a, 'Random error should be the parent')
 
         #  Test that changing bug resolution is propagated to children
@@ -155,20 +155,20 @@ class TestBuildError(RunbotCase):
 
         error_a.test_tags = 'foo,bar'
         error_b.test_tags = 'blah'
-        self.assertIn('foo', self.BuildError.test_tags_list())
-        self.assertIn('bar', self.BuildError.test_tags_list())
-        self.assertIn('-foo', self.BuildError.disabling_tags())
-        self.assertIn('-bar', self.BuildError.disabling_tags())
+        self.assertIn('foo', self.BuildError._test_tags_list())
+        self.assertIn('bar', self.BuildError._test_tags_list())
+        self.assertIn('-foo', self.BuildError._disabling_tags())
+        self.assertIn('-bar', self.BuildError._disabling_tags())
 
         # test that test tags on fixed errors are not taken into account
-        self.assertNotIn('blah', self.BuildError.test_tags_list())
-        self.assertNotIn('-blah', self.BuildError.disabling_tags())
+        self.assertNotIn('blah', self.BuildError._test_tags_list())
+        self.assertNotIn('-blah', self.BuildError._disabling_tags())
 
         error_a.test_tags = False
         error_b.active = True
         error_b.parent_id = error_a.id
         self.assertEqual(error_b.test_tags, False)
-        self.assertEqual(self.BuildError.disabling_tags(), ['-blah',])
+        self.assertEqual(self.BuildError._disabling_tags(), ['-blah',])
 
 
     def test_build_error_team_wildcards(self):

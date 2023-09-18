@@ -395,7 +395,7 @@ class Runbot(Controller):
             'scheduled_count': scheduled_count,
             'bundles': bundles,
             'hosts_data': hosts_data,
-            'auto_tags': request.env['runbot.build.error'].disabling_tags(),
+            'auto_tags': request.env['runbot.build.error']._disabling_tags(),
             'build_errors': request.env['runbot.build.error'].search([('random', '=', True)]),
             'kwargs': kwargs,
             'title': 'monitoring'

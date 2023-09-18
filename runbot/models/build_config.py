@@ -7,10 +7,11 @@ import re
 import shlex
 import time
 from unidiff import PatchSet
-from ..common import now, grep, time2str, rfind, s2human, os, RunbotException
+from ..common import now, grep, time2str, rfind, s2human, os, RunbotException, ReProxy
 from ..container import docker_get_gateway_ip, Command
 from odoo import models, fields, api
 from odoo.exceptions import UserError, ValidationError
+from odoo.tools.misc import file_open
 from odoo.tools.safe_eval import safe_eval, test_python_expr, _SAFE_OPCODES, to_opcodes
 
 # adding some additionnal optcode to safe_eval. This is not 100% needed and won't be done in standard but will help
@@ -26,26 +27,6 @@ _re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING '
 
 PYTHON_DEFAULT = "# type python code here\n\n\n\n\n\n"
 
-class ReProxy():
-    @classmethod
-    def match(cls, *args, **kwrags):
-        return re.match(*args, **kwrags)
-
-    @classmethod
-    def search(cls, *args, **kwrags):
-        return re.search(*args, **kwrags)
-
-    @classmethod
-    def compile(cls, *args, **kwrags):
-        return re.compile(*args, **kwrags)
-
-    @classmethod
-    def findall(cls, *args, **kwrags):
-        return re.findall(*args, **kwrags)
-
-    VERBOSE = re.VERBOSE
-    MULTILINE = re.MULTILINE
-
 class Config(models.Model):
     _name = 'runbot.build.config'
     _description = "Build config"
@@ -58,6 +39,7 @@ class Config(models.Model):
     protected = fields.Boolean('Protected', default=False, tracking=True)
     group = fields.Many2one('runbot.build.config', 'Configuration group', help="Group of config's and config steps")
     group_name = fields.Char('Group name', related='group.name')
+    step_ids = fields.Many2many('runbot.build.config.step', compute='_compute_step_ids')
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -76,29 +58,25 @@ class Config(models.Model):
         copy.sudo().write({'protected': False})
         return copy
 
-    def unlink(self):
-        super(Config, self).unlink()
-
-    def step_ids(self):
-        if self:
-            self.ensure_one()
-        return [ordered_step.step_id for ordered_step in self.step_order_ids.sorted('sequence')]
+    @api.depends('step_order_ids.sequence', 'step_order_ids.step_id')
+    def _compute_step_ids(self):
+        for config in self:
+            config.step_ids = config.step_order_ids.sorted('sequence').mapped('step_id')
 
     def _check_step_ids_order(self):
         for record in self:
             install_job = False
-            step_ids = record.step_ids()
-            for step in step_ids:
+            for step in record.step_ids:
                 if step.job_type == 'install_odoo':
                     install_job = True
                 if step.job_type == 'run_odoo':
-                    if step != step_ids[-1]:
+                    if step != record.step_ids[-1]:
                         raise UserError('Jobs of type run_odoo should be the last one')
                     if not install_job:
                         raise UserError('Jobs of type run_odoo should be preceded by a job of type install_odoo')
-            record._check_recustion()
+            record._check_recursion()
 
-    def _check_recustion(self, visited=None):
+    def _check_recursion(self, visited=None):
         self.ensure_one()
         visited = visited or []
         recursion = False
@@ -107,10 +85,10 @@ class Config(models.Model):
         visited.append(self)
         if recursion:
             raise UserError('Impossible to save config, recursion detected with path: %s' % ">".join([v.name for v in visited]))
-        for step in self.step_ids():
+        for step in self.step_ids:
             if step.job_type == 'create_build':
                 for create_config in step.create_config_ids:
-                    create_config._check_recustion(visited[:])
+                    create_config._check_recursion(visited[:])
 
 
 class ConfigStepUpgradeDb(models.Model):
@@ -270,7 +248,6 @@ class ConfigStep(models.Model):
                     raise UserError('Invalid extra_params on config step')
 
     def _run(self, build):
-        log_path = build._path('logs', '%s.txt' % self.name)
         build.write({'job_start': now(), 'job_end': False})  # state, ...
         log_link = ''
         if self._has_log():
@@ -278,17 +255,17 @@ class ConfigStep(models.Model):
             url = f"{log_url}/runbot/static/build/{build.dest}/logs/{self.name}.txt"
             log_link = f'[@icon-file-text]({url})'
         build._log('run', 'Starting step **%s** from config **%s** %s' % (self.name, build.params_id.config_id.name, log_link), log_type='markdown', level='SEPARATOR')
-        return self._run_step(build, log_path)
+        return self._run_step(build)
 
-    def _run_step(self, build, log_path, **kwargs):
+    def _run_step(self, build, **kwargs):
         build.log_counter = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_maxlogs', 100)
         run_method = getattr(self, '_run_%s' % self.job_type)
-        docker_params = run_method(build, log_path, **kwargs)
+        docker_params = run_method(build, **kwargs)
         if docker_params:
-            return build._docker_run(**docker_params)
+            return build._docker_run(self, **docker_params)
         return True
 
-    def _run_create_build(self, build, log_path):
+    def _run_create_build(self, build):
         count = 0
         config_data = build.params_id.config_data
         config_ids = config_data.get('create_config_ids', self.create_config_ids)
@@ -308,7 +285,7 @@ class ConfigStep(models.Model):
                     child = build._add_child(_child_data, orphan=self.make_orphan)
                     build._log('create_build', 'created with config %s' % create_config.name, log_type='subbuild', path=str(child.id))
 
-    def make_python_ctx(self, build):
+    def _make_python_ctx(self, build):
         return {
             'self': self,
             # 'fields': fields,
@@ -325,8 +302,8 @@ class ConfigStep(models.Model):
             'PatchSet': PatchSet,
         }
 
-    def _run_python(self, build, log_path, force=False):
-        eval_ctx = self.make_python_ctx(build)
+    def _run_python(self, build, force=False):
+        eval_ctx = self._make_python_ctx(build)
         eval_ctx['force'] = force
         try:
             safe_eval(self.python_code.strip(), eval_ctx, mode="exec", nocopy=True)
@@ -350,7 +327,7 @@ class ConfigStep(models.Model):
         self.ensure_one()
         return self.job_type in ('install_odoo', 'run_odoo', 'restore', 'test_upgrade') or (self.job_type == 'python' and ('docker_params =' in self.python_code or '_run_' in self.python_code))
 
-    def _run_run_odoo(self, build, log_path, force=False):
+    def _run_run_odoo(self, build, force=False):
         if not force:
             if build.parent_id:
                 build._log('_run_run_odoo', 'build has a parent, skip run')
@@ -365,7 +342,7 @@ class ConfigStep(models.Model):
         # run server
         cmd = build._cmd(local_only=False, enable_log_db=self.enable_log_db)
 
-        available_options = build.parse_config()
+        available_options = build._parse_config()
 
         if "--workers" in available_options:
             cmd += ["--workers", "2"]
@@ -406,9 +383,9 @@ class ConfigStep(models.Model):
         except Exception:
             _logger.exception('An error occured while reloading nginx')
             build._log('', "An error occured while reloading nginx, skipping")
-        return dict(cmd=cmd, log_path=log_path, container_name=docker_name, exposed_ports=[build_port, build_port + 1], ro_volumes=exports, env_variables=env_variables)
+        return dict(cmd=cmd, container_name=docker_name, exposed_ports=[build_port, build_port + 1], ro_volumes=exports, env_variables=env_variables)
 
-    def _run_install_odoo(self, build, log_path):
+    def _run_install_odoo(self, build):
         exports = build._checkout()
 
         modules_to_install = self._modules_to_install(build)
@@ -434,7 +411,7 @@ class ConfigStep(models.Model):
             cmd += ['-i', mods]
         config_path = build._server("tools/config.py")
 
-        available_options = build.parse_config()
+        available_options = build._parse_config()
         if self.test_enable:
             if "--test-enable" in available_options:
                 cmd.extend(['--test-enable'])
@@ -452,7 +429,7 @@ class ConfigStep(models.Model):
                 test_tags += self.test_tags.replace(' ', '').split(',')
             if self.enable_auto_tags and not build.params_id.config_data.get('disable_auto_tags', False):
                 if grep(config_path, "[/module][:class]"):
-                    auto_tags = self.env['runbot.build.error'].disabling_tags()
+                    auto_tags = self.env['runbot.build.error']._disabling_tags()
                     if auto_tags:
                         test_tags += auto_tags
 
@@ -486,7 +463,7 @@ class ConfigStep(models.Model):
         cmd.finals.append(['cp', '-r', filestore_path, filestore_dest])
         cmd.finals.append(['cd', dump_dir, '&&', 'zip', '-rmq9', zip_path, '*'])
         infos = '{\n    "db_name": "%s",\n    "build_id": %s,\n    "shas": [%s]\n}' % (db_name, build.id, ', '.join(['"%s"' % build_commit.commit_id.dname for build_commit in build.params_id.commit_link_ids]))
-        build.write_file('logs/%s/info.json' % db_name, infos)
+        build._write_file('logs/%s/info.json' % db_name, infos)
 
         if self.flamegraph:
             cmd.finals.append(['flamegraph.pl', '--title', 'Flamegraph %s for build %s' % (self.name, build.id), self._perfs_data_path(), '>', self._perfs_data_path(ext='svg')])
@@ -494,12 +471,12 @@ class ConfigStep(models.Model):
         max_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=10000))
         timeout = min(self.cpu_limit, max_timeout)
         env_variables = self.additionnal_env.split(';') if self.additionnal_env else []
-        return dict(cmd=cmd, log_path=log_path, container_name=build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports, env_variables=env_variables)
+        return dict(cmd=cmd, container_name=build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports, env_variables=env_variables)
 
     def _upgrade_create_childs(self):
         pass
 
-    def _run_configure_upgrade_complement(self, build, *args):
+    def _run_configure_upgrade_complement(self, build):
         """
         Parameters:
             - upgrade_dumps_trigger_id:  a configure_upgradestep
@@ -512,7 +489,7 @@ class ConfigStep(models.Model):
         builds_references = param.builds_reference_ids
         builds_references_by_version_id = {b.params_id.version_id.id: b for b in builds_references}
         upgrade_complement_step = build.params_id.trigger_id.upgrade_dumps_trigger_id.upgrade_step_id
-        version_domain = build.params_id.trigger_id.upgrade_dumps_trigger_id.get_version_domain()
+        version_domain = build.params_id.trigger_id.upgrade_dumps_trigger_id._get_version_domain()
         valid_targets = build.browse()
         next_versions = version.next_major_version_id | version.next_intermediate_version_ids
         if version_domain:  # filter only on version where trigger is enabled
@@ -542,7 +519,7 @@ class ConfigStep(models.Model):
                         )
                         child._log('', 'This build tests change of schema in stable version testing upgrade to %s' % target.params_id.version_id.name)
 
-    def _run_configure_upgrade(self, build, log_path):
+    def _run_configure_upgrade(self, build):
         """
         Source/target parameters:
             - upgrade_to_current | (upgrade_to_master + (upgrade_to_major_versions | upgrade_to_all_versions))
@@ -704,7 +681,7 @@ class ConfigStep(models.Model):
             if any(fnmatch.fnmatch(db.db_suffix, pat) for pat in pat_list):
                 yield db
 
-    def _run_test_upgrade(self, build, log_path):
+    def _run_test_upgrade(self, build):
         target = build.params_id.upgrade_to_build_id
         commit_ids = build.params_id.commit_ids
         target_commit_ids = target.params_id.commit_ids
@@ -742,9 +719,9 @@ class ConfigStep(models.Model):
         exception_env = self.env['runbot.upgrade.exception']._generate()
         if exception_env:
             env_variables.append(exception_env)
-        return dict(cmd=migrate_cmd, log_path=log_path, container_name=build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports, env_variables=env_variables, image_tag=target.params_id.dockerfile_id.image_tag)
+        return dict(cmd=migrate_cmd, container_name=build._get_docker_name(), cpu_limit=timeout, ro_volumes=exports, env_variables=env_variables, image_tag=target.params_id.dockerfile_id.image_tag)
 
-    def _run_restore(self, build, log_path):
+    def _run_restore(self, build):
         # exports = build._checkout()
         params = build.params_id
         dump_db = params.dump_db
@@ -776,7 +753,7 @@ class ConfigStep(models.Model):
             assert download_db_suffix and dump_build
             download_db_name = '%s-%s' % (dump_build.dest, download_db_suffix)
             zip_name = '%s.zip' % download_db_name
-            dump_url = '%s%s' % (dump_build.http_log_url(), zip_name)
+            dump_url = '%s%s' % (dump_build._http_log_url(), zip_name)
             build._log('test-migration', 'Restoring dump [%s](%s) from build [%s](%s)' % (zip_name, dump_url, dump_build.id, dump_build.build_url), log_type='markdown')
         restore_suffix = self.restore_rename_db_suffix or dump_db.db_suffix or suffix
         assert restore_suffix
@@ -802,7 +779,7 @@ class ConfigStep(models.Model):
 
             ])
 
-        return dict(cmd=cmd, log_path=log_path, container_name=build._get_docker_name(), cpu_limit=self.cpu_limit)
+        return dict(cmd=cmd, container_name=build._get_docker_name(), cpu_limit=self.cpu_limit)
 
     def _reference_builds(self, bundle, trigger):
         upgrade_dumps_trigger_id = trigger.upgrade_dumps_trigger_id
@@ -879,7 +856,7 @@ class ConfigStep(models.Model):
             category_id=category_id
             ).mapped('last_done_batch')
 
-    def log_end(self, build):
+    def _log_end(self, build):
         if self.job_type == 'create_build':
             build._logger('Step %s finished in %s' % (self.name, s2human(build.job_time)))
             return
@@ -888,19 +865,19 @@ class ConfigStep(models.Model):
         if self.job_type == 'install_odoo':
             kwargs['message'] += ' $$fa-download$$'
             db_suffix = build.params_id.config_data.get('db_name') or (build.params_id.dump_db.db_suffix if not self.create_db else False) or self.db_name
-            kwargs['path'] = '%s%s-%s.zip' % (build.http_log_url(), build.dest, db_suffix)
+            kwargs['path'] = '%s%s-%s.zip' % (build._http_log_url(), build.dest, db_suffix)
             kwargs['log_type'] = 'link'
         build._log('', **kwargs)
 
         if self.coverage:
-            xml_url = '%scoverage.xml' % build.http_log_url()
+            xml_url = '%scoverage.xml' % build._http_log_url()
             html_url = 'http://%s/runbot/static/build/%s/coverage/index.html' % (build.host, build.dest)
             message = 'Coverage report: [xml @icon-download](%s), [html @icon-eye](%s)' % (xml_url, html_url)
             build._log('end_job', message, log_type='markdown')
 
         if self.flamegraph:
-            dat_url = '%sflame_%s.%s' % (build.http_log_url(), self.name, 'log.gz')
-            svg_url = '%sflame_%s.%s' % (build.http_log_url(), self.name, 'svg')
+            dat_url = '%sflame_%s.%s' % (build._http_log_url(), self.name, 'log.gz')
+            svg_url = '%sflame_%s.%s' % (build._http_log_url(), self.name, 'svg')
             message = 'Flamegraph report: [data @icon-download](%s), [svg @icon-eye](%s)' % (dat_url, svg_url)
             build._log('end_job', message, log_type='markdown')
 
@@ -932,7 +909,7 @@ class ConfigStep(models.Model):
             for (addons_path, module, _) in commit._get_available_modules():
                 if module not in modules_to_install:
                     # we want to omit docker_source_folder/[addons/path/]module/*
-                    module_path_in_docker = os.path.join(docker_source_folder, addons_path, module)
+                    module_path_in_docker = os.sep.join([docker_source_folder, addons_path, module])
                     pattern_to_omit.add('%s/*' % (module_path_in_docker))
         return ['--omit', ','.join(pattern_to_omit)]
 
@@ -953,7 +930,7 @@ class ConfigStep(models.Model):
             build.write(self._make_restore_results(build))
 
     def _make_python_results(self, build):
-        eval_ctx = self.make_python_ctx(build)
+        eval_ctx = self._make_python_ctx(build)
         safe_eval(self.python_result_code.strip(), eval_ctx, mode="exec", nocopy=True)
         return_value = eval_ctx.get('return_value', {})
         # todo check return_value or write in try except. Example: local result setted to wrong value
@@ -966,7 +943,7 @@ class ConfigStep(models.Model):
         build._log('coverage_result', 'Start getting coverage result')
         cov_path = build._path('coverage/index.html')
         if os.path.exists(cov_path):
-            with open(cov_path, 'r') as f:
+            with file_open(cov_path, 'r') as f:
                 data = f.read()
                 covgrep = re.search(r'pc_cov.>(?P<coverage>\d+)%', data)
                 build_values['coverage_result'] = covgrep and covgrep.group('coverage') or False
@@ -997,11 +974,11 @@ class ConfigStep(models.Model):
         return build_values
 
     def _check_module_states(self, build):
-        if not build.is_file('logs/modules_states.txt'):
+        if not build._is_file('logs/modules_states.txt'):
             build._log('', '"logs/modules_states.txt" file not found.', level='ERROR')
             return 'ko'
 
-        content = build.read_file('logs/modules_states.txt') or ''
+        content = build._read_file('logs/modules_states.txt') or ''
         if '(0 rows)' not in content:
             build._log('', 'Some modules are not in installed/uninstalled/uninstallable state after migration. \n %s' % content)
             return 'ko'
@@ -1155,7 +1132,7 @@ class ConfigStep(models.Model):
             commit = commit_link.commit_id
             modified = commit.repo_id._git(['diff', '--name-only', '%s..%s' % (commit_link.merge_base_commit_id.name, commit.name)])
             if modified:
-                files = [('%s/%s' % (build._docker_source_folder(commit), file)) for file in modified.split('\n') if file]
+                files = [os.sep.join([build._docker_source_folder(commit), file]) for file in modified.split('\n') if file]
                 modified_files[commit_link] = files
         return modified_files
 

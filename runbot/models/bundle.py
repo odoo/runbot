@@ -225,7 +225,7 @@ class Bundle(models.Model):
         self.last_batch = new
         return new
 
-    def consistency_warning(self):
+    def _consistency_warning(self):
         if self.defined_base_id:
             return [('info', 'This bundle has a forced base: %s' % self.defined_base_id.name)]
         warnings = []
@@ -242,34 +242,13 @@ class Bundle(models.Model):
                     warnings.append(('warning', 'Branch %s not starting with version name (%s)' % (branch.dname, self.base_id.name)))
         return warnings
 
-    def branch_groups(self):
+    def _branch_groups(self):
         self.branch_ids.sorted(key=lambda b: (b.remote_id.repo_id.sequence, b.remote_id.repo_id.id, b.is_pr))
         branch_groups = {repo: [] for repo in self.branch_ids.mapped('remote_id.repo_id').sorted('sequence')}
         for branch in self.branch_ids.sorted(key=lambda b: (b.is_pr)):
             branch_groups[branch.remote_id.repo_id].append(branch)
         return branch_groups
 
-    def generate_custom_trigger_multi_action(self):
-        context = {
-            'default_bundle_id': self.id,
-            'default_config_id': self.env.ref('runbot.runbot_build_config_custom_multi').id,
-            'default_child_config_id': self.env.ref('runbot.runbot_build_config_restore_and_test').id,
-            'default_extra_params': False,
-            'default_child_extra_params': '--test-tags /module.test_method',
-            'default_number_build': 10,
-        }
-        return self._generate_custom_trigger_action(context)
-
-    def generate_custom_trigger_restore_action(self):
-        context = {
-            'default_bundle_id': self.id,
-            'default_config_id': self.env.ref('runbot.runbot_build_config_restore_and_test').id,
-            'default_child_config_id': False,
-            'default_extra_params': '--test-tags /module.test_method',
-            'default_child_extra_params': False,
-            'default_number_build': 0,
-        }
-        return self._generate_custom_trigger_action(context)
 
     def _generate_custom_trigger_action(self, context):
         return {
@@ -280,3 +259,25 @@ class Bundle(models.Model):
             'target': 'new',
             'context': context,
         }
+
+    def action_generate_custom_trigger_multi_action(self):
+        context = {
+            'default_bundle_id': self.id,
+            'default_config_id': self.env.ref('runbot.runbot_build_config_custom_multi').id,
+            'default_child_config_id': self.env.ref('runbot.runbot_build_config_restore_and_test').id,
+            'default_extra_params': False,
+            'default_child_extra_params': '--test-tags /module.test_method',
+            'default_number_build': 10,
+        }
+        return self._generate_custom_trigger_action(context)
+
+    def action_generate_custom_trigger_restore_action(self):
+        context = {
+            'default_bundle_id': self.id,
+            'default_config_id': self.env.ref('runbot.runbot_build_config_restore_and_test').id,
+            'default_child_config_id': False,
+            'default_extra_params': '--test-tags /module.test_method',
+            'default_child_extra_params': False,
+            'default_number_build': 0,
+        }
+        return self._generate_custom_trigger_action(context)

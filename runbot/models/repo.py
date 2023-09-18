@@ -11,17 +11,13 @@ import requests
 from pathlib import Path
 
 from odoo import models, fields, api
-from ..common import os, RunbotException, _make_github_session
+from odoo.tools import file_open
+from ..common import os, RunbotException, make_github_session, sanitize
 from odoo.exceptions import UserError
 from odoo.tools.safe_eval import safe_eval
 
 _logger = logging.getLogger(__name__)
 
-
-def _sanitize(name):
-    for i in '@:/':
-        name = name.replace(i, '_')
-    return name
 
 
 class Trigger(models.Model):
@@ -89,7 +85,7 @@ class Trigger(models.Model):
             return [(4, b.id) for b in refs_builds]
         return []
 
-    def get_version_domain(self):
+    def _get_version_domain(self):
         if self.version_domain:
             return safe_eval(self.version_domain)
         return []
@@ -147,7 +143,7 @@ class Remote(models.Model):
 
     def _compute_remote_name(self):
         for remote in self:
-            remote.remote_name = _sanitize(remote.short_name)
+            remote.remote_name = sanitize(remote.short_name)
 
     def create(self, values_list):
         remote = super().create(values_list)
@@ -175,7 +171,7 @@ class Remote(models.Model):
                 url = url.replace(':owner', remote.owner)
                 url = url.replace(':repo', remote.repo_name)
                 url = 'https://api.%s%s' % (remote.repo_domain, url)
-                session = session or _make_github_session(remote.token)
+                session = session or make_github_session(remote.token)
                 while url:
                     if recursive:
                         _logger.info('Getting page %s', url)
@@ -212,12 +208,12 @@ class Remote(models.Model):
                                 else:
                                     raise
 
-    def check_token(self):
+    def action_check_token(self):
         if not self.user_has_groups('runbot.group_runbot_admin'):
             raise UserError('This action is restricted to admin users')
         token_results = {}
         for repo in self:
-            session = _make_github_session(repo.token)
+            session = make_github_session(repo.token)
             if repo.token not in token_results:
                 token_results[repo.token] = session.get("https://api.github.com/user")
             response = token_results[repo.token]
@@ -287,7 +283,7 @@ class Repo(models.Model):
     upgrade_paths = fields.Char('Upgrade paths', help='Comma separated list of possible upgrade path', default='', tracking=True)
 
     sequence = fields.Integer('Sequence', tracking=True)
-    path = fields.Char(compute='_get_path', string='Directory', readonly=True)
+    path = fields.Char(compute='_compute_path', string='Directory', readonly=True)
     mode = fields.Selection([('disabled', 'Disabled'),
                              ('poll', 'Poll'),
                              ('hook', 'Hook')],
@@ -326,12 +322,12 @@ class Repo(models.Model):
         for repo in self:
             repo.hook_time = times.get(repo.id, 0)
 
-    def set_hook_time(self, value):
+    def _set_hook_time(self, value):
         for repo in self:
             self.env['runbot.repo.hooktime'].create({'time': value, 'repo_id': repo.id})
         self.invalidate_recordset(['hook_time'])
 
-    def set_ref_time(self, value):
+    def _set_ref_time(self, value):
         for repo in self:
             self.env['runbot.repo.reftime'].create({'time': value, 'repo_id': repo.id})
         self.invalidate_recordset(['get_ref_time'])
@@ -349,11 +345,16 @@ class Repo(models.Model):
         """)
 
     @api.depends('name')
-    def _get_path(self):
-        """compute the server path of repo from the name"""
-        root = self.env['runbot.runbot']._root()
+    def _compute_path(self):
+        """compute the server path of repo from the for name"""
         for repo in self:
-            repo.path = os.path.join(root, 'repo', _sanitize(repo.name))
+            repo.path = repo._path()
+
+    def _path(self, *path_parts):
+        return self.env['runbot.runbot']._path('repo', sanitize(self.name), *path_parts)
+    
+    def _source_path(self, *path_parts):
+        return self.env['runbot.runbot']._path('sources', sanitize(self.name), *path_parts)
 
     def _git(self, cmd, errors='strict'):
         """Execute a git command 'cmd'"""
@@ -396,7 +397,7 @@ class Repo(models.Model):
 
     def _get_fetch_head_time(self):
         self.ensure_one()
-        fname_fetch_head = os.path.join(self.path, 'FETCH_HEAD')
+        fname_fetch_head = self._path('FETCH_HEAD')
         if os.path.exists(fname_fetch_head):
             return os.path.getmtime(fname_fetch_head)
         return 0
@@ -411,7 +412,7 @@ class Repo(models.Model):
         commit_limit = time.time() - (60 * 60 * 24 * max_age)
         if not self.get_ref_time or get_ref_time > self.get_ref_time:
             try:
-                self.set_ref_time(get_ref_time)
+                self._set_ref_time(get_ref_time)
                 fields = ['refname', 'objectname', 'committerdate:unix', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail']
                 fmt = "%00".join(["%(" + field + ")" for field in fields])
                 cmd = ['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/*/heads/*']
@@ -423,7 +424,7 @@ class Repo(models.Model):
                     return []
                 refs = [tuple(field for field in line.split('\x00')) for line in git_refs.split('\n')]
                 refs = [r for r in refs if not re.match(r'^refs/[\w-]+/heads/\d+$', r[0])]  # remove branches with interger names to avoid confusion with pr names
-                refs = [r for r in refs if int(r[2]) > commit_limit or self.env['runbot.branch'].match_is_base(r[0].split('/')[-1])]
+                refs = [r for r in refs if int(r[2]) > commit_limit or self.env['runbot.branch']._match_is_base(r[0].split('/')[-1])]
                 if ignore:
                     refs = [r for r in refs if r[0].split('/')[-1] not in ignore]
                 return refs
@@ -443,7 +444,7 @@ class Repo(models.Model):
         # FIXME WIP
         names = [r[0].split('/')[-1] for r in refs]
         branches = self.env['runbot.branch'].search([('name', 'in', names), ('remote_id', 'in', self.remote_ids.ids)])
-        ref_branches = {branch.ref(): branch for branch in branches}
+        ref_branches = {branch._ref(): branch for branch in branches}
         new_branch_values = []
         for ref_name, sha, date, author, author_email, subject, committer, committer_email in refs:
             if not ref_branches.get(ref_name):
@@ -462,7 +463,7 @@ class Repo(models.Model):
             _logger.info('Creating new branches')
             new_branches = self.env['runbot.branch'].create(new_branch_values)
             for branch in new_branches:
-                ref_branches[branch.ref()] = branch
+                ref_branches[branch._ref()] = branch
         return ref_branches
 
     def _find_new_commits(self, refs, ref_branches):
@@ -532,11 +533,11 @@ class Repo(models.Model):
             if repo.mode == 'disabled':
                 _logger.info(f'skipping disabled repo {repo.name}')
                 continue
-            if os.path.isdir(os.path.join(repo.path, 'refs')):
-                git_config_path = os.path.join(repo.path, 'config')
+            if os.path.isdir(repo._path('refs')):
+                git_config_path = repo._path('config')
                 template_params = {'repo': repo}
                 git_config = self.env['ir.ui.view']._render_template("runbot.git_config", template_params)
-                with open(git_config_path, 'w') as config_file:
+                with file_open(git_config_path, 'w') as config_file:
                     config_file.write(str(git_config))
                 _logger.info('Config updated for repo %s' % repo.name)
             else:
@@ -546,7 +547,7 @@ class Repo(models.Model):
         """ Clone the remote repo if needed """
         self.ensure_one()
         repo = self
-        if not os.path.isdir(os.path.join(repo.path, 'refs')):
+        if not os.path.isdir(repo._path('refs')):
             _logger.info("Initiating repository '%s' in '%s'" % (repo.name, repo.path))
             git_init = subprocess.run(['git', 'init', '--bare', repo.path], stderr=subprocess.PIPE)
             if git_init.returncode:
@@ -561,11 +562,11 @@ class Repo(models.Model):
         repo = self
         if not repo.remote_ids:
             return False
-        if not os.path.isdir(os.path.join(repo.path)):
+        if not os.path.isdir(repo.path):
             os.makedirs(repo.path)
         force = self._git_init() or force
 
-        fname_fetch_head = os.path.join(repo.path, 'FETCH_HEAD')
+        fname_fetch_head = repo._path('FETCH_HEAD')
         if not force and os.path.isfile(fname_fetch_head):
             fetch_time = os.path.getmtime(fname_fetch_head)
             if repo.mode == 'hook':
@@ -599,9 +600,9 @@ class Repo(models.Model):
                     host.message_post(body=message)
                     icp = self.env['ir.config_parameter'].sudo()
                     if icp.get_param('runbot.runbot_disable_host_on_fetch_failure'):
-                        self.env['runbot.runbot'].warning('Host %s got reserved because of fetch failure' % host.name)
+                        self.env['runbot.runbot']._warning('Host %s got reserved because of fetch failure' % host.name)
                         _logger.exception(message)
-                        host.disable()
+                        host._disable()
         return success
 
     def _update(self, force=False, poll_delay=5*60):

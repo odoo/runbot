@@ -13,7 +13,7 @@ _logger = logging.getLogger(__name__)
 TYPES = [(t, t.capitalize()) for t in 'client server runbot subbuild link markdown'.split()]
 
 
-class runbot_event(models.Model):
+class IrLogging(models.Model):
 
     _inherit = "ir.logging"
     _order = 'id'
@@ -55,7 +55,7 @@ class runbot_event(models.Model):
         for ir_logging in self:
             ir_logging.error_id = False
             if ir_logging.level in ('ERROR', 'CRITICAL', 'WARNING') and ir_logging.type == 'server':
-                fingerprints[self.env['runbot.build.error']._digest(cleaning_regexes.r_sub('%', ir_logging.message))].append(ir_logging)
+                fingerprints[self.env['runbot.build.error']._digest(cleaning_regexes._r_sub('%', ir_logging.message))].append(ir_logging)
         for build_error in self.env['runbot.build.error'].search([('fingerprint', 'in', list(fingerprints.keys()))]):
             for ir_logging in fingerprints[build_error.fingerprint]:
                 ir_logging.error_id = build_error.id
@@ -105,14 +105,6 @@ class RunbotErrorLog(models.Model):
     def _compute_build_url(self):
         for l in self:
             l.build_url = '/runbot/build/%s' % l.build_id.id
-
-    def action_goto_build(self):
-        self.ensure_one()
-        return {
-            "type": "ir.actions.act_url",
-            "url": "runbot/build/%s" % self.build_id.id,
-            "target": "new",
-        }
 
     def _compute_bundle_id(self):
         slots = self.env['runbot.batch.slot'].search([('build_id', 'in', self.mapped('top_parent_id').ids)])
@@ -198,3 +190,11 @@ class RunbotErrorLog(models.Model):
             WHERE
                 l.level = 'ERROR'
         )""")
+
+    def action_goto_build(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_url",
+            "url": "runbot/build/%s" % self.build_id.id,
+            "target": "new",
+        }

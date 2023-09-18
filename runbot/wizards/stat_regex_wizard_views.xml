@@ -19,7 +19,7 @@
                       <field name="message" readonly="1"/>
                     </group>
                     <footer>
-                        <button name="save" string="Save" type="object" class="btn-primary"/>
+                        <button name="action_save" string="Save" type="object" class="btn-primary"/>
                         <button string="Cancel" special="cancel" class="btn-default"/>
                     </footer>
                 </form>

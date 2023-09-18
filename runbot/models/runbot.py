@@ -11,13 +11,13 @@ from contextlib import contextmanager
 from requests.exceptions import HTTPError
 from subprocess import CalledProcessError
 
-from ..common import fqdn, dest_reg, os
+from ..common import dest_reg, os, sanitize
 from ..container import docker_ps, docker_stop
 
 from odoo import models, fields
+from odoo.exceptions import UserError
 from odoo.osv import expression
-from odoo.tools import config
-from odoo.modules.module import get_module_resource
+from odoo.tools import config, file_open
 
 _logger = logging.getLogger(__name__)
 
@@ -33,14 +33,21 @@ class Runbot(models.AbstractModel):
 
     def _root(self):
         """Return root directory of repository"""
-        default = os.path.join(os.path.dirname(__file__), '../static')
-        return os.path.abspath(default)
+        return os.path.abspath(os.sep.join([os.path.dirname(__file__), '../static']))
+    
+    def _path(self, *path_parts):
+        """Return the repo build path"""
+        root = self.env['runbot.runbot']._root()
+        file_path = os.path.normpath(os.sep.join([root] + [sanitize(path) for path_part in path_parts for path in path_part.split(os.sep) if path]))
+        if not file_path.startswith(root):
+            raise UserError('Invalid path')
+        return file_path
 
     def _scheduler(self, host):
         self._gc_testing(host)
         self._commit()
         processed = 0
-        for build in host.get_builds([('requested_action', 'in', ['wake_up', 'deathrow'])]):
+        for build in host._get_builds([('requested_action', 'in', ['wake_up', 'deathrow'])]):
             build = build.browse(build.id)
             processed += 1
             build._process_requested_actions()
@@ -49,7 +56,7 @@ class Runbot(models.AbstractModel):
         self._commit()
         host._process_messages()
         self._commit()
-        for build in host.get_builds([('local_state', 'in', ['testing', 'running'])]) | self._get_builds_to_init(host):
+        for build in host._get_builds([('local_state', 'in', ['testing', 'running'])]) | self._get_builds_to_init(host):
             build = build.browse(build.id)  # remove preftech ids, manage build one by one
             result = build._schedule()
             if result:
@@ -73,7 +80,7 @@ class Runbot(models.AbstractModel):
     def _assign_pending_builds(self, host, nb_worker, domain=None):
         if host.assigned_only or nb_worker <= 0:
             return 0
-        reserved_slots = len(host.get_builds([('local_state', 'in', ('testing', 'pending'))]))
+        reserved_slots = len(host._get_builds([('local_state', 'in', ('testing', 'pending'))]))
         assignable_slots = (nb_worker - reserved_slots)
         if assignable_slots > 0:
             allocated = self._allocate_builds(host, assignable_slots, domain)
@@ -83,8 +90,8 @@ class Runbot(models.AbstractModel):
         return 0
 
     def _get_builds_to_init(self, host):
-        domain_host = host.get_build_domain()
-        used_slots = len(host.get_builds([('local_state', '=', 'testing')]))
+        domain_host = host._get_build_domain()
+        used_slots = len(host._get_builds([('local_state', '=', 'testing')]))
         available_slots = host.nb_worker - used_slots
         build_to_init = self.env['runbot.build']
         if available_slots > 0:
@@ -94,16 +101,16 @@ class Runbot(models.AbstractModel):
         return build_to_init
 
     def _gc_running(self, host):
-        running_max = host.get_running_max()
+        running_max = host._get_running_max()
         Build = self.env['runbot.build']
-        cannot_be_killed_ids = host.get_builds([('keep_running', '=', True)]).ids
+        cannot_be_killed_ids = host._get_builds([('keep_running', '=', True)]).ids
         sticky_bundles = self.env['runbot.bundle'].search([('sticky', '=', True), ('project_id.keep_sticky_running', '=', True)])
         cannot_be_killed_ids += [
             build.id
             for build in sticky_bundles.mapped('last_batchs.slot_ids.build_id')
             if build.host == host.name
         ][:running_max]
-        build_ids = host.get_builds([('local_state', '=', 'running'), ('id', 'not in', cannot_be_killed_ids)], order='job_start desc').ids
+        build_ids = host._get_builds([('local_state', '=', 'running'), ('id', 'not in', cannot_be_killed_ids)], order='job_start desc').ids
         for build in Build.browse(build_ids)[running_max:]:
             build._kill()
 
@@ -112,7 +119,7 @@ class Runbot(models.AbstractModel):
         """garbage collect builds that could be killed"""
         # decide if we need room
         Build = self.env['runbot.build']
-        domain_host = host.get_build_domain()
+        domain_host = host._get_build_domain()
         testing_builds = Build.search(domain_host + [('local_state', 'in', ['testing', 'pending']), ('requested_action', '!=', 'deathrow')])
         used_slots = len(testing_builds)
         available_slots = host.nb_worker - used_slots
@@ -153,9 +160,9 @@ class Runbot(models.AbstractModel):
         env = self.env
         settings = {}
         settings['port'] = config.get('http_port')
-        settings['runbot_static'] = os.path.join(get_module_resource('runbot', 'static'), '')
+        settings['runbot_static'] = self.env['runbot.runbot']._root() + os.sep
         settings['base_url'] = self.get_base_url()
-        nginx_dir = os.path.join(self._root(), 'nginx')
+        nginx_dir = self.env['runbot.runbot']._path('nginx')
         settings['nginx_dir'] = nginx_dir
         settings['re_escape'] = re.escape
         host_name = self.env['runbot.host']._get_current_name()
@@ -166,17 +173,17 @@ class Runbot(models.AbstractModel):
         nginx_config = env['ir.ui.view']._render_template("runbot.nginx_config", settings)
         os.makedirs(nginx_dir, exist_ok=True)
         content = None
-        nginx_conf_path = os.path.join(nginx_dir, 'nginx.conf')
+        nginx_conf_path = self.env['runbot.runbot']._path('nginx', 'nginx.conf')
         content = ''
         if os.path.isfile(nginx_conf_path):
-            with open(nginx_conf_path, 'r') as f:
+            with file_open(nginx_conf_path, 'r') as f:
                 content = f.read()
         if content != nginx_config:
             _logger.info('reload nginx')
             with open(nginx_conf_path, 'w') as f:
                 f.write(str(nginx_config))
             try:
-                pid = int(open(os.path.join(nginx_dir, 'nginx.pid')).read().strip(' \n'))
+                pid = int(file_open(self.env['runbot.runbot']._path('nginx', 'nginx.pid')).read().strip(' \n'))
                 os.kill(pid, signal.SIGHUP)
             except Exception:
                 _logger.info('start nginx')
@@ -210,7 +217,7 @@ class Runbot(models.AbstractModel):
         runbot_do_fetch = get_param('runbot.runbot_do_fetch')
         runbot_do_schedule = get_param('runbot.runbot_do_schedule')
         host = self.env['runbot.host']._get_current()
-        host.set_psql_conn_count()
+        host._set_psql_conn_count()
         host.last_start_loop = fields.Datetime.now()
         self._commit()
         # Bootstrap
@@ -227,18 +234,16 @@ class Runbot(models.AbstractModel):
                     self._fetch_loop_turn(host, pull_info_failures)
                 if runbot_do_schedule:
                     sleep_time = self._scheduler_loop_turn(host, update_frequency)
-                    self.sleep(sleep_time)
+                    time.sleep(sleep_time)
                 else:
-                    self.sleep(update_frequency)
+                    time.sleep(update_frequency)
                 self._commit()
 
             host.last_end_loop = fields.Datetime.now()
 
-    def sleep(self, t):
-        time.sleep(t)
 
     def _fetch_loop_turn(self, host, pull_info_failures, default_sleep=1):
-        with self.manage_host_exception(host) as manager:
+        with self._manage_host_exception(host) as manager:
             repos = self.env['runbot.repo'].search([('mode', '!=', 'disabled')])
             processing_batch = self.env['runbot.batch'].search([('state', 'in', ('preparing', 'ready'))], order='id asc')
             preparing_batch = processing_batch.filtered(lambda b: b.state == 'preparing')
@@ -261,7 +266,7 @@ class Runbot(models.AbstractModel):
                     self.env.clear()
                     pull_number = e.response.url.split('/')[-1]
                     pull_info_failures[pull_number] = time.time()
-                    self.warning('Pr pull info failed for %s', pull_number)
+                    self._warning('Pr pull info failed for %s', pull_number)
                     self._commit()
 
             if processing_batch:
@@ -283,13 +288,13 @@ class Runbot(models.AbstractModel):
         return manager.get('sleep', default_sleep)
 
     def _scheduler_loop_turn(self, host, sleep=5):
-        with self.manage_host_exception(host) as manager:
+        with self._manage_host_exception(host) as manager:
             if self._scheduler(host):
                 sleep = 0.1
         return manager.get('sleep', sleep)
 
     @contextmanager
-    def manage_host_exception(self, host):
+    def _manage_host_exception(self, host):
         res = {}
         try:
             yield res
@@ -335,7 +340,7 @@ class Runbot(models.AbstractModel):
             to_keep = set()
             repos = self.env['runbot.repo'].search([('mode', '!=', 'disabled')])
             for repo in repos:
-                repo_source = os.path.join(self._root(), 'sources', repo.name, '*')
+                repo_source = repo._source_path('*')
                 for source_dir in glob.glob(repo_source):
                     if source_dir not in cannot_be_deleted_path:
                         to_delete.add(source_dir)
@@ -387,9 +392,9 @@ class Runbot(models.AbstractModel):
                 repo._git(['gc', '--prune=all', '--quiet'])
             except CalledProcessError as e:
                 message = f'git gc failed for {repo.name} on {host.name} with exit status {e.returncode} and message "{e.output[:60]} ..."'
-                self.warning(message)
+                self._warning(message)
 
-    def warning(self, message, *args):
+    def _warning(self, message, *args):
         if args:
             message = message % args
         existing = self.env['runbot.warning'].search([('message', '=', message)], limit=1)

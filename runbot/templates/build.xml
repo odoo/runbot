@@ -148,7 +148,7 @@
                   <t t-foreach="build.params_id.build_ids" t-as="simbuild">
                     <a t-if="simbuild.id != build.id" t-attf-href="/runbot/build/#{simbuild.id}">
                       <span
-                        t-attf-class="badge badge-{{simbuild.get_color_class()}}"
+                        t-attf-class="badge badge-{{simbuild._get_color_class()}}"
                         t-esc="simbuild.id"/>
                     </a>
                   </t>
@@ -159,7 +159,7 @@
                 <br/>
               </t>
               <b>Total time:</b>
-              <t t-esc="build.get_formated_build_time()"/>
+              <t t-esc="build._get_formated_build_time()"/>
               <br/>
               <t t-if="build.stat_ids">
                 <b>Stats:</b>
@@ -204,7 +204,7 @@
                     </t>
                   </td>
                   <td>
-                    <span t-attf-class="badge badge-info" t-esc="child.get_formated_build_time()"/>
+                    <span t-attf-class="badge badge-info" t-esc="child._get_formated_build_time()"/>
                   </td>
                   <td>
                     <t t-call="runbot.build_button">
@@ -378,7 +378,7 @@
                     <span t-esc="build.params_id.version_id.name"/>
                   </td>
                   <td>
-                    <span t-esc="build.get_formated_build_time()"/>
+                    <span t-esc="build._get_formated_build_time()"/>
                   </td>
                   <td>
                     <t t-call="runbot.build_button">

@@ -160,7 +160,7 @@
         <field name="arch" type="xml">
           <form>
             <header>
-              <button name="check_token" string="Check token" type="object" class="oe_highlight" groups="runbot.group_runbot_admin"/>
+              <button name="action_check_token" string="Check token" type="object" class="oe_highlight" groups="runbot.group_runbot_admin"/>
             </header>
             <sheet>
               <group name="repo_group">

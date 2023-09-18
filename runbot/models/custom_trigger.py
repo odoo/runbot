@@ -56,17 +56,17 @@ class CustomTriggerWizard(models.TransientModel):
     @api.depends('config_id')
     def _compute_has_create_step(self):
         for record in self:
-            record.has_create_step = any(step.job_type == 'create_build' for step in self.config_id.step_ids())
+            record.has_create_step = any(step.job_type == 'create_build' for step in self.config_id.step_ids)
 
     @api.depends('config_id')
     def _compute_has_restore_step(self):
         for record in self:
-            record.has_restore_step = any(step.job_type == 'restore' for step in self.config_id.step_ids())
+            record.has_restore_step = any(step.job_type == 'restore' for step in self.config_id.step_ids)
 
     @api.depends('child_config_id')
     def _compute_has_child_with_restore_step(self):
         for record in self:
-            record.has_child_with_restore_step = record.child_config_id and any(step.job_type == 'restore' for step in self.child_config_id.step_ids())
+            record.has_child_with_restore_step = record.child_config_id and any(step.job_type == 'restore' for step in self.child_config_id.step_ids)
 
     @api.onchange('extra_params', 'child_extra_params', 'restore_dump_url', 'config_id', 'child_config_id', 'number_build', 'config_id', 'restore_mode', 'restore_database_suffix', 'restore_trigger_id')
     def _onchange_warnings(self):
@@ -164,7 +164,7 @@ class CustomTriggerWizard(models.TransientModel):
     def _get_existing_trigger(self):
         return self.env['runbot.bundle.trigger.custom'].search([('bundle_id', '=', self.bundle_id.id), ('trigger_id', '=', self.trigger_id.id)])
 
-    def submit(self):
+    def action_submit(self):
         self.ensure_one()
         self._get_existing_trigger().unlink()
         self.env['runbot.bundle.trigger.custom'].create({

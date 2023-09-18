@@ -47,7 +47,7 @@ class Batch(models.Model):
             else:
                 batch.buildage_age = 0
 
-    def get_formated_age(self):
+    def _get_formated_age(self):
         return s2human_long(self.age)
 
     def _url(self):
@@ -154,9 +154,9 @@ class Batch(models.Model):
         if not self.bundle_id.base_id:
             # in some case the base can be detected lately. If a bundle has no base, recompute the base before preparing
             self.bundle_id._compute_base_id()
-        for level, message in self.bundle_id.consistency_warning():
+        for level, message in self.bundle_id._consistency_warning():
             if level == "warning":
-                self.warning("Bundle warning: %s" % message)
+                self._warning("Bundle warning: %s" % message)
 
         self.state = 'ready'
 
@@ -174,7 +174,7 @@ class Batch(models.Model):
             ('category_id', '=', self.category_id.id)
         ]).filtered(
             lambda t: not t.version_domain or \
-            self.bundle_id.version_id.filtered_domain(t.get_version_domain())
+            self.bundle_id.version_id.filtered_domain(t._get_version_domain())
         )
 
         pushed_repo = self.commit_link_ids.mapped('commit_id.repo_id')
@@ -185,7 +185,7 @@ class Batch(models.Model):
         ######################################
         # Find missing commits
         ######################################
-        def fill_missing(branch_commits, match_type):
+        def _fill_missing(branch_commits, match_type):
             if branch_commits:
                 for branch, commit in branch_commits.items():  # branch first in case pr is closed.
                     nonlocal missing_repos
@@ -218,7 +218,7 @@ class Batch(models.Model):
 
         # 1.1 FIND missing commit in bundle heads
         if missing_repos:
-            fill_missing({branch: branch.head for branch in bundle.branch_ids.sorted(lambda b: (b.head.id, b.is_pr), reverse=True)}, 'head')
+            _fill_missing({branch: branch.head for branch in bundle.branch_ids.sorted(lambda b: (b.head.id, b.is_pr), reverse=True)}, 'head')
 
         # 1.2 FIND merge_base info for those commits
         #  use last not preparing batch to define previous repos_heads instead of branches heads:
@@ -253,14 +253,14 @@ class Batch(models.Model):
             if batch:
                 if missing_repos:
                     self._log('Using batch [%s](%s) to define missing commits', batch.id, batch._url())
-                    fill_missing({link.branch_id: link.commit_id for link in batch.commit_link_ids}, 'base_match')
+                    _fill_missing({link.branch_id: link.commit_id for link in batch.commit_link_ids}, 'base_match')
                 # check if all mergebase match reference batch
                 batch_exiting_commit = batch.commit_ids.filtered(lambda c: c.repo_id in merge_base_commits.repo_id)
                 not_matching = (batch_exiting_commit - merge_base_commits)
                 if not_matching and not auto_rebase:
                     message = 'Only %s out of %s merge base matched. You may want to rebase your branches to ensure compatibility' % (len(merge_base_commits)-len(not_matching), len(merge_base_commits))
                     suggestions = [('Tip: rebase %s to %s' % (commit.repo_id.name, commit.name)) for commit in not_matching]
-                    self.warning('%s\n%s' % (message, '\n'.join(suggestions)))
+                    self._warning('%s\n%s' % (message, '\n'.join(suggestions)))
             else:
                 self._log('No reference batch found to fill missing commits')
 
@@ -268,14 +268,14 @@ class Batch(models.Model):
         if missing_repos:
             if not bundle.is_base:
                 self._log('Not all commit found in bundle branches and base batch. Fallback on base branches heads.')
-            fill_missing({branch: branch.head for branch in self.bundle_id.base_id.branch_ids}, 'base_head')
+            _fill_missing({branch: branch.head for branch in self.bundle_id.base_id.branch_ids}, 'base_head')
 
         # 3.2 FIND missing commit in master base heads
         if missing_repos:  # this is to get an upgrade branch.
             if not bundle.is_base:
                 self._log('Not all commit found in current version. Fallback on master branches heads.')
             master_bundle = self.env['runbot.version']._get('master').with_context(project_id=self.bundle_id.project_id.id).base_bundle_id
-            fill_missing({branch: branch.head for branch in master_bundle.branch_ids}, 'base_head')
+            _fill_missing({branch: branch.head for branch in master_bundle.branch_ids}, 'base_head')
 
         # 4. FIND missing commit in foreign project
         if missing_repos:
@@ -283,10 +283,10 @@ class Batch(models.Model):
             if foreign_projects:
                 self._log('Not all commit found. Fallback on foreign base branches heads.')
                 foreign_bundles = bundle.search([('name', '=', bundle.name), ('project_id', 'in', foreign_projects.ids)])
-                fill_missing({branch: branch.head for branch in foreign_bundles.mapped('branch_ids').sorted('is_pr', reverse=True)}, 'head')
+                _fill_missing({branch: branch.head for branch in foreign_bundles.mapped('branch_ids').sorted('is_pr', reverse=True)}, 'head')
                 if missing_repos:
                     foreign_bundles = bundle.search([('name', '=', bundle.base_id.name), ('project_id', 'in', foreign_projects.ids)])
-                    fill_missing({branch: branch.head for branch in foreign_bundles.mapped('branch_ids')}, 'base_head')
+                    _fill_missing({branch: branch.head for branch in foreign_bundles.mapped('branch_ids')}, 'base_head')
 
         # CHECK missing commit
         if missing_repos:
@@ -309,7 +309,7 @@ class Batch(models.Model):
             trigger_custom = trigger_customs.get(trigger, self.env['runbot.bundle.trigger.custom'])
             trigger_repos = trigger.repo_ids | trigger.dependency_ids
             if trigger_repos & missing_repos:
-                self.warning('Missing commit for repo %s for trigger %s', (trigger_repos & missing_repos).mapped('name'), trigger.name)
+                self._warning('Missing commit for repo %s for trigger %s', (trigger_repos & missing_repos).mapped('name'), trigger.name)
                 continue
             # in any case, search for an existing build
             config = trigger_custom.config_id or trigger.config_id
@@ -365,7 +365,7 @@ class Batch(models.Model):
             commit = link_commit.commit_id
             base_head = base_head_per_repo.get(commit.repo_id.id)
             if not base_head:
-                self.warning('No base head found for repo %s', commit.repo_id.name)
+                self._warning('No base head found for repo %s', commit.repo_id.name)
                 continue
             link_commit.base_commit_id = base_head
             merge_base_sha = False
@@ -399,9 +399,9 @@ class Batch(models.Model):
                         except ValueError:  # binary files
                             pass
             except subprocess.CalledProcessError:
-                self.warning('Commit info failed between %s and %s', commit.name, base_head.name)
+                self._warning('Commit info failed between %s and %s', commit.name, base_head.name)
 
-    def warning(self, message, *args):
+    def _warning(self, message, *args):
         self.has_warning = True
         _logger.warning('batch %s: ' + message, self.id, *args)
         self._log(message, *args, level='WARNING')
@@ -431,13 +431,13 @@ class BatchLog(models.Model):
         return pseudo_markdown(self.message)
 
 
+fa_link_types = {'created': 'hashtag', 'matched': 'link', 'rebuild': 'refresh'}
 
 class BatchSlot(models.Model):
     _name = 'runbot.batch.slot'
     _description = 'Link between a bundle batch and a build'
     _order = 'trigger_id,id'
 
-    _fa_link_type = {'created': 'hashtag', 'matched': 'link', 'rebuild': 'refresh'}
 
     batch_id = fields.Many2one('runbot.batch', index=True)
     trigger_id = fields.Many2one('runbot.trigger', index=True)
@@ -458,8 +458,8 @@ class BatchSlot(models.Model):
         for slot in self:
             slot.all_build_ids = all_builds.filtered_domain([('id', 'child_of', slot.build_id.ids)])
 
-    def fa_link_type(self):
-        return self._fa_link_type.get(self.link_type, 'exclamation-triangle')
+    def _fa_link_type(self):
+        return fa_link_types.get(self.link_type, 'exclamation-triangle')
 
     def _create_missing_build(self):
         """Create a build when the slot does not have one"""
