@@ -451,7 +451,7 @@ class TestUpgradeFlow(RunbotCase):
 
             def docker_run_upgrade(cmd, *args, ro_volumes=False, **kwargs):
                 user = getpass.getuser()
-                self.assertTrue(ro_volumes.pop(f'/home/{user}/.odoorc').startswith('/tmp/runbot_test/static/build/'))
+                self.assertTrue(ro_volumes.pop(f'/home/{user}/.odoorc').startswith(self.env['runbot.runbot']._path('build')))
                 self.assertEqual(
                     list(ro_volumes.keys()), [
                         '/data/build/addons',

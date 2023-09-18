@@ -190,10 +190,10 @@
 
         <template id="runbot.slot_button">
             <t t-set="bu" t-value="slot.build_id"/>
-            <t t-set="color" t-value="bu.get_color_class()"/>
+            <t t-set="color" t-value="bu._get_color_class()"/>
             <div t-attf-class="btn-group btn-group-ssm slot_button_group">
                 <span t-attf-class="btn btn-{{color}} disabled" t-att-title="slot.link_type">
-                    <i t-attf-class="fa fa-{{slot.fa_link_type()}}"/>
+                    <i t-attf-class="fa fa-{{slot._fa_link_type()}}"/>
                 </span>
                 <a t-if="bu" t-attf-href="/runbot/batch/{{slot.batch_id.id}}/build/#{bu.id}" t-attf-class="btn btn-default slot_name">
                     <span t-esc="slot.trigger_id.name"/>

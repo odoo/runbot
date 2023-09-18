@@ -18,15 +18,12 @@ class TestRepo(RunbotCaseMinimalSetup):
     def setUp(self):
         super(TestRepo, self).setUp()
         self.commit_list = {}
-        self.mock_root = self.patchers['repo_root_patcher']
 
     def test_base_fields(self):
-        self.mock_root.return_value = '/tmp/static'
-
         repo = self.repo_server
         remote = self.remote_server
         # name = 'bla@example.com:base/server'
-        self.assertEqual(repo.path, '/tmp/static/repo/server')
+        self.assertTrue(repo.path.endswith('static/repo/server'))
         self.assertEqual(remote.base_url, 'example.com/base/server')
         self.assertEqual(remote.short_name, 'base/server')
         self.assertEqual(remote.owner, 'base')
@@ -253,7 +250,6 @@ class TestRepo(RunbotCaseMinimalSetup):
 
     @skip('This test is for performances. It needs a lot of real branches in DB to mean something')
     def test_repo_perf_find_new_commits(self):
-        self.mock_root.return_value = '/tmp/static'
         repo = self.env['runbot.repo'].search([('name', '=', 'blabla')])
 
         self.commit_list[self.repo_server.id] = []
@@ -307,8 +303,8 @@ class TestRepo(RunbotCaseMinimalSetup):
             self.assertEqual(repo1[field_name], 1.3)
             self.assertEqual(repo2[field_name], 1.4)
 
-        _test_times('runbot.repo.hooktime', 'set_hook_time', 'hook_time')
-        _test_times('runbot.repo.reftime', 'set_ref_time', 'get_ref_time')
+        _test_times('runbot.repo.hooktime', '_set_hook_time', 'hook_time')
+        _test_times('runbot.repo.reftime', '_set_ref_time', 'get_ref_time')
 
 
 class TestGithub(TransactionCase):
@@ -356,7 +352,6 @@ class TestFetch(RunbotCase):
 
     def setUp(self):
         super(TestFetch, self).setUp()
-        self.mock_root = self.patchers['repo_root_patcher']
         self.fetch_count = 0
         self.force_failure = False
 
@@ -424,13 +419,6 @@ class TestIdentityFile(RunbotCase):
 
 
 class TestRepoScheduler(RunbotCase):
-
-    def setUp(self):
-        # as the _scheduler method commits, we need to protect the database
-        super(TestRepoScheduler, self).setUp()
-
-        mock_root = self.patchers['repo_root_patcher']
-        mock_root.return_value = '/tmp/static'
 
     @patch('odoo.addons.runbot.models.build.BuildResult._kill')
     @patch('odoo.addons.runbot.models.build.BuildResult._schedule')

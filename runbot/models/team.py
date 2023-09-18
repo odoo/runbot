@@ -4,7 +4,7 @@ import hashlib
 import logging
 import re
 
-from ..common import _make_github_session
+from ..common import make_github_session
 from collections import defaultdict
 from dateutil.relativedelta import relativedelta
 from fnmatch import fnmatch
@@ -98,7 +98,7 @@ class RunbotTeam(models.Model):
         for team in self:
             if team.github_team:
                 url = f"https://api.github.com/orgs/{team.organisation}/teams/{team.github_team}"
-                session = _make_github_session(team.project_id.sudo().token)
+                session = make_github_session(team.project_id.sudo().token)
                 response = session.get(url)
                 if response.status_code != 200:
                     raise UserError(f'Cannot find team {team.github_team}')

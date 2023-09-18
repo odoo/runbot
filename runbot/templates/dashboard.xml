@@ -26,7 +26,7 @@
                   <t t-esc="bundle.name"/>
                 </h4>
                 <t t-foreach="bundle.last_done_batch.slot_ids" t-as="slot">
-                  <span t-attf-class="badge badge-{{slot.build_id.get_color_class()}}">
+                  <span t-attf-class="badge badge-{{slot.build_id._get_color_class()}}">
                     <t t-esc="slot.trigger_id.name"/>
                   </span>
                 </t>
@@ -163,12 +163,12 @@
                           </td>
                           <t t-set="build" t-value="slot.build_id"/>
                           <td>
-                            <span t-attf-class="badge badge-{{slot.build_id.get_color_class()}}">
+                            <span t-attf-class="badge badge-{{slot.build_id._get_color_class()}}">
                               <i t-attf-class="fa fa-{{category.icon}}"/>
                             </span>
                           </td>
                           <td t-foreach="build.children_ids" t-as="child">
-                            <span t-attf-class="badge badge-{{slot.build_id.get_color_class()}}">
+                            <span t-attf-class="badge badge-{{slot.build_id._get_color_class()}}">
                               <t t-esc="child.params_id.config_id.name[:4]"/>
                             </span>
                           </td>

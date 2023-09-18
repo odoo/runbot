@@ -6,7 +6,7 @@
         <field name="type">ir.actions.server</field>
         <field name="state">code</field>
         <field name="code">
-            records.link_errors()
+            records.action_link_errors()
         </field>
     </record>
     <record model="ir.actions.server" id="action_clean_build_errors">
@@ -16,7 +16,7 @@
         <field name="type">ir.actions.server</field>
         <field name="state">code</field>
         <field name="code">
-            records.clean_content()
+            records.action_clean_content()
         </field>
     </record>
     <record model="ir.actions.server" id="action_reassign_build_errors">
@@ -26,7 +26,7 @@
         <field name="type">ir.actions.server</field>
         <field name="state">code</field>
         <field name="code">
-            records.assign()
+            records.action_assign()
         </field>
     </record>
 </odoo>

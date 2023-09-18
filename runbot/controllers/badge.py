@@ -44,7 +44,7 @@ class RunbotBadge(Controller):
         if not builds:
             state = 'testing'
         else:
-            result = builds.result_multi()
+            result = builds._result_multi()
             if result == 'ok':
                 state = 'success'
             elif result == 'warn':

@@ -60,7 +60,7 @@ class ConfigStep(models.Model):
             reviewer_per_file[file] = file_reviewers
         return reviewer_per_file
 
-    def _run_codeowner(self, build, log_path):
+    def _run_codeowner(self, build):
         bundle = build.params_id.create_batch_id.bundle_id
         if bundle.is_base:
             build._log('', 'Skipping base bundle')
@@ -133,7 +133,6 @@ class ConfigStep(models.Model):
                 pr = pr_by_commit[commit_link]
                 new_reviewers = reviewers - set((pr.reviewers or '').split(','))
                 if new_reviewers:
-                    # todo replace all team by a runbot team and simplify this logic to remove search
                     author_skippable_teams = skippable_teams.filtered(lambda team: team.skip_team_pr and team.github_team in new_reviewers and pr.pr_author in team._get_members_logins())
                     author_skipped_teams = set(author_skippable_teams.mapped('github_team'))
                     if author_skipped_teams:

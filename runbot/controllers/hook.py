@@ -35,13 +35,13 @@ class Hook(http.Controller):
 
         # force update of dependencies too in case a hook is lost
         if not payload or event == 'push':
-            remote.repo_id.set_hook_time(time.time())
+            remote.repo_id._set_hook_time(time.time())
         elif event == 'pull_request':
             pr_number = payload.get('pull_request', {}).get('number', '')
             branch = request.env['runbot.branch'].sudo().search([('remote_id', '=', remote.id), ('name', '=', pr_number)])
-            branch.recompute_infos(payload.get('pull_request', {}))
+            branch._recompute_infos(payload.get('pull_request', {}))
             if payload.get('action') in ('synchronize', 'opened', 'reopened'):
-                remote.repo_id.set_hook_time(time.time())
+                remote.repo_id._set_hook_time(time.time())
             # remaining recurrent actions: labeled, review_requested, review_request_removed
         elif event == 'delete':
             if payload.get('ref_type') == 'branch':

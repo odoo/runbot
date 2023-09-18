@@ -87,7 +87,7 @@
           <a t-attf-href="/runbot/batch/#{batch.id}" title="View Batch">
             <div class="batch_header">
               <span t-attf-class="badge badge-{{'warning' if batch.has_warning else 'light'}}">
-                <t t-esc="batch.get_formated_age()"/>
+                <t t-esc="batch._get_formated_age()"/>
                 <i class="fa fa-exclamation-triangle" t-if="batch.has_warning"/>
               </span>
               <span class="float-right header_hover">View batch...</span>

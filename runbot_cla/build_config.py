@@ -15,7 +15,7 @@ class Step(models.Model):
 
     job_type = fields.Selection(selection_add=[('cla_check', 'Check cla')], ondelete={'cla_check': 'cascade'})
 
-    def _run_cla_check(self, build, log_path):
+    def _run_cla_check(self, build):
         build._checkout()
         cla_glob = glob.glob(build._get_server_commit()._source_path("doc/cla/*/*.md"))
         error = False

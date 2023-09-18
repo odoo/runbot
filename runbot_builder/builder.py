@@ -12,7 +12,7 @@ _logger = logging.getLogger(__name__)
 class BuilderClient(RunbotClient):
 
     def on_start(self):
-        builds_path = Path(self.env['runbot.runbot']._root()) / 'build'
+        builds_path = self.env['runbot.runbot']._path('build')
         monitoring_thread = threading.Thread(target=docker_monitoring_loop, args=(builds_path,), daemon=True)
         monitoring_thread.start()
 
@@ -24,7 +24,7 @@ class BuilderClient(RunbotClient):
             self.env['runbot.runbot']._source_cleanup()
             self.env['runbot.build']._local_cleanup()
             self.env['runbot.runbot']._docker_cleanup()
-            self.host.set_psql_conn_count()
+            self.host._set_psql_conn_count()
             self.host._docker_build()
             self.env['runbot.repo']._update_git_config()
             self.git_gc()

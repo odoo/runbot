@@ -53,7 +53,7 @@ class StatRegexWizard(models.TransientModel):
             self.key = key
             self.value = value
 
-    def save(self):
+    def action_save(self):
         if self.regex and self.test_text:
             self._validate_regex()
             stat_regex = self.env['runbot.build.stat.regex'].create({

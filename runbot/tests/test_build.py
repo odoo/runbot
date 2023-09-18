@@ -57,10 +57,6 @@ class TestBuildParams(RunbotCaseMinimalSetup):
         self.assertEqual(params.fingerprint, same_params.fingerprint)
         self.assertEqual(params.id, same_params.id)
 
-        # test that params cannot be overwitten
-        with self.assertRaises(UserError):
-            params.write({'modules': 'bar'})
-
         # Test that a copied param without changes does not create a new record
         copied_params = params.copy()
         self.assertEqual(copied_params.id, params.id)
@@ -242,13 +238,13 @@ class TestBuildResult(RunbotCase):
 
         def is_file(file):
             self.assertIn(file, [
-                '/tmp/runbot_test/static/sources/addons/d0d0caca0000ffffffffffffffffffffffffffff/requirements.txt',
-                '/tmp/runbot_test/static/sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/requirements.txt',
-                '/tmp/runbot_test/static/sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/server.py',
-                '/tmp/runbot_test/static/sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/openerp/tools/config.py',
-                '/tmp/runbot_test/static/sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/openerp/sql_db.py'
+                self.env['runbot.runbot']._path('sources/addons/d0d0caca0000ffffffffffffffffffffffffffff/requirements.txt'),
+                self.env['runbot.runbot']._path('sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/requirements.txt'),
+                self.env['runbot.runbot']._path('sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/server.py'),
+                self.env['runbot.runbot']._path('sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/odoo/tools/config.py'),
+                self.env['runbot.runbot']._path('sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/odoo/sql_db.py')
             ])
-            if file == '/tmp/runbot_test/static/sources/addons/d0d0caca0000ffffffffffffffffffffffffffff/requirements.txt':
+            if file == self.env['runbot.runbot']._path('static/sources/addons/d0d0caca0000ffffffffffffffffffffffffffff/requirements.txt'):
                 return False
             return True
 

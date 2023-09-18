@@ -30,7 +30,7 @@
                     </group>
                 </group>
                 <footer>
-                    <button name="submit" string="Submit" type="object" class="btn-primary"/>
+                    <button name="action_submit" string="Submit" type="object" class="btn-primary"/>
                     <button string="Cancel" special="cancel" class="btn-default"/>
                 </footer>
             </form>

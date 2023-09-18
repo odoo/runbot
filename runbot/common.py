@@ -15,7 +15,7 @@ from datetime import timedelta
 from babel.dates import format_timedelta
 from markupsafe import Markup
 
-from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT, html_escape
+from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT, html_escape, file_open
 
 _logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ def now():
 
 
 def findall(filename, pattern):
-    return set(re.findall(pattern, open(filename).read()))
+    return set(re.findall(pattern, file_open(filename).read()))
 
 
 def grep(filename, string):
@@ -54,7 +54,7 @@ def grep(filename, string):
 
 
 def find(filename, string):
-    return open(filename).read().find(string)
+    return file_open(filename).read().find(string)
 
 
 def uniq_list(l):
@@ -69,7 +69,7 @@ def rfind(filename, pattern):
     """Determine in something in filename matches the pattern"""
     if os.path.isfile(filename):
         regexp = re.compile(pattern, re.M)
-        with open(filename, 'r') as f:
+        with file_open(filename, 'r') as f:
             if regexp.findall(f.read()):
                 return True
     return False
@@ -169,9 +169,36 @@ def pseudo_markdown(text):
     return text
 
 
-def _make_github_session(token):
+def make_github_session(token):
     session = requests.Session()
     if token:
         session.auth = (token, 'x-oauth-basic')
     session.headers.update({'Accept': 'application/vnd.github.she-hulk-preview+json'})
     return session
+
+def sanitize(name):
+    for i in ['@', ':', '/', '\\', '..']:
+        name = name.replace(i, '_')
+    return name
+
+
+class ReProxy():
+    @classmethod
+    def match(cls, *args, **kwrags):
+        return re.match(*args, **kwrags)
+
+    @classmethod
+    def search(cls, *args, **kwrags):
+        return re.search(*args, **kwrags)
+
+    @classmethod
+    def compile(cls, *args, **kwrags):
+        return re.compile(*args, **kwrags)
+
+    @classmethod
+    def findall(cls, *args, **kwrags):
+        return re.findall(*args, **kwrags)
+
+    VERBOSE = re.VERBOSE
+    MULTILINE = re.MULTILINE
+

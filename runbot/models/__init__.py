@@ -12,11 +12,11 @@ from . import commit
 from . import custom_trigger
 from . import database
 from . import dockerfile
-from . import event
 from . import host
 from . import ir_cron
 from . import ir_http
 from . import ir_qweb
+from . import ir_logging
 from . import project
 from . import repo
 from . import res_config_settings

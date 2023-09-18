@@ -224,6 +224,7 @@ def prepare_stats_log(dest, previous_stats, current_stats):
     return previous_stats, '\n'.join(log_lines)
 
 def docker_monitoring_loop(builds_dir):
+    builds_dir = Path(builds_dir)
     docker_client = docker.from_env()
     previous_stats_per_docker = {}
     _logger.info('Starting docker monitoring loop thread')
@@ -242,7 +243,8 @@ def docker_monitoring_loop(builds_dir):
                     previous_stats, log_line = prepare_stats_log(dest, previous_stats, current_stats)
                     if log_line:
                         stat_log_file = container_log_dir / f'{suffix}-stats.txt'
-                        stat_log_file.open(mode='a').write(f'{log_line}\n')
+                        with open(stat_log_file, mode='a') as f:
+                            f.write(f'{log_line}\n')
                     stats_per_docker[container.name] = previous_stats
             previous_stats_per_docker = stats_per_docker
             time.sleep(1)

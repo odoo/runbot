@@ -6,6 +6,7 @@ import re
 
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError
+from odoo.tools import file_open
 
 VALUE_PATTERN = r"\(\?P\<value\>.+\)"  # used to verify value group pattern
 
@@ -53,7 +54,7 @@ class BuildStatRegex(models.Model):
         if not os.path.exists(file_path):
             return {}
         stats_matches = {}
-        with open(file_path, "r") as log_file:
+        with file_open(file_path, "r") as log_file:
             data = log_file.read()
             for build_stat_regex in self:
                 current_stat_matches = {}

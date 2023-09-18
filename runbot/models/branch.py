@@ -106,9 +106,6 @@ class Branch(models.Model):
                         break
 
         for branch in self:
-            #branch.target_branch_name = False
-            #branch.pull_head_name = False
-            #branch.pull_head_remote_id = False
             if branch.name:
                 pi = branch.is_pr and (pull_info or pull_info_dict.get((branch.remote_id, branch.name)) or branch._get_pull_info())
                 if pi:
@@ -153,7 +150,7 @@ class Branch(models.Model):
             project = branch.remote_id.repo_id.project_id or self.env.ref('runbot.main_project')
             project.ensure_one()
             bundle = self.env['runbot.bundle'].search([('name', '=', name), ('project_id', '=', project.id)])
-            need_new_base = not bundle and branch.match_is_base(name)
+            need_new_base = not bundle and branch._match_is_base(name)
             if (bundle.is_base or need_new_base) and branch.remote_id != branch.remote_id.repo_id.main_remote_id:
                 _logger.warning('Trying to add a dev branch to base bundle, falling back on dummy bundle')
                 bundle = dummy
@@ -203,18 +200,17 @@ class Branch(models.Model):
         remote = self.remote_id
         if self.is_pr:
             _logger.info('Getting info for %s', self.name)
-            return remote._github('/repos/:owner/:repo/pulls/%s' % self.name, ignore_errors=False) or {}  # TODO catch and send a managable exception
+            return remote._github('/repos/:owner/:repo/pulls/%s' % self.name, ignore_errors=False) or {}
         return {}
 
-    def ref(self):
+    def _ref(self):
         return 'refs/%s/%s/%s' % (
             self.remote_id.remote_name,
             'pull' if self.is_pr else 'heads',
             self.name
         )
 
-    def recompute_infos(self, payload=None):
-        """ public method to recompute infos on demand """
+    def _recompute_infos(self, payload=None):
         was_draft = self.draft
         was_alive = self.alive
         init_target_branch_name = self.target_branch_name
@@ -242,7 +238,7 @@ class Branch(models.Model):
             self.bundle_id._force()
 
     @api.model
-    def match_is_base(self, name):
+    def _match_is_base(self, name):
         """match against is_base_regex ir.config_parameter"""
         if not name:
             return False
@@ -250,6 +246,9 @@ class Branch(models.Model):
         regex = icp.get_param('runbot.runbot_is_base_regex', False)
         if regex:
             return re.match(regex, name)
+        
+    def action_recompute_infos(self):
+        return self._recompute_infos()
 
 
 class RefLog(models.Model):

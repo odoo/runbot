@@ -39,7 +39,7 @@
                                     <tr>
                                         <td>Branches</td>
                                         <td>
-                                            <t t-foreach="bundle.branch_groups().items()" t-as="group">
+                                            <t t-foreach="bundle._branch_groups().items()" t-as="group">
                                                 <t t-foreach="group[1]" t-as="branch">
                                                     <small>
                                                         <div class="btn-toolbar mb-1" role="toolbar">
@@ -75,7 +75,7 @@
                                     </tr>
                                 </table>
                             </div>
-                            <div t-foreach="bundle.consistency_warning()" t-as="warning" t-esc="warning[1]" t-attf-class="alert alert-{{warning[0]}}"/>
+                            <div t-foreach="bundle._consistency_warning()" t-as="warning" t-esc="warning[1]" t-attf-class="alert alert-{{warning[0]}}"/>
                             <div class="batch_row" t-foreach="batchs" t-as="batch">
                                 <t t-call="runbot.batch_tile"/>
                             </div>

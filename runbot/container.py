@@ -17,6 +17,8 @@ import subprocess
 import time
 import warnings
 
+from odoo.tools import file_path
+
 # unsolved issue https://github.com/docker/docker-py/issues/2928
 with warnings.catch_warnings():
     warnings.filterwarnings(
@@ -148,6 +150,9 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
     _logger.info('Docker run command: %s', run_cmd)
     run_cmd = 'cd /data/build;touch start-%s;%s;cd /data/build;touch end-%s' % (container_name, run_cmd, container_name)
     docker_clear_state(container_name, build_dir)  # ensure that no state are remaining
+    build_dir = file_path(build_dir)
+
+    file_path(os.path.dirname(log_path))
     open(os.path.join(build_dir, 'exist-%s' % container_name), 'w+').close()
     logs = open(log_path, 'w')
     logs.write("Docker command:\n%s\n=================================================\n" % cmd_object)
@@ -190,7 +195,7 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
         detach=True
     )
     if container.status not in ('running', 'created') :
-        _logger.error('Container %s started but status is not running or created:  %s', container_name, container.status)  # TODO cleanup
+        _logger.error('Container %s started but status is not running or created:  %s', container_name, container.status)
     else:
         _logger.info('Started Docker container %s (%s)', container_name, container.short_id)
     return
@@ -288,27 +293,3 @@ def sanitize_container_name(name):
     """Returns a container name with unallowed characters removed"""
     name = re.sub('^[^a-zA-Z0-9]+', '', name)
     return re.sub('[^a-zA-Z0-9_.-]', '', name)
-
-
-##############################################################################
-# Ugly monkey patch to set runbot in set runbot in testing mode
-# No Docker will be started, instead a fake docker_run function will be used
-##############################################################################
-
-if os.environ.get('RUNBOT_MODE') == 'test':
-    _logger.warning('Using Fake Docker')
-
-    def fake_docker_run(run_cmd, log_path, build_dir, container_name, exposed_ports=None, cpu_limit=None, preexec_fn=None, ro_volumes=None, env_variables=None, *args, **kwargs):
-        _logger.info('Docker Fake Run: %s', run_cmd)
-        open(os.path.join(build_dir, 'exist-%s' % container_name), 'w').write('fake end')
-        open(os.path.join(build_dir, 'start-%s' % container_name), 'w').write('fake start\n')
-        open(os.path.join(build_dir, 'end-%s' % container_name), 'w').write('fake end')
-        with open(log_path, 'w') as log_file:
-            log_file.write('Fake docker_run started\n')
-            log_file.write('run_cmd: %s\n' % run_cmd)
-            log_file.write('build_dir: %s\n' % container_name)
-            log_file.write('container_name: %s\n' % container_name)
-            log_file.write('.modules.loading: Modules loaded.\n')
-            log_file.write('Initiating shutdown\n')
-
-    docker_run = fake_docker_run

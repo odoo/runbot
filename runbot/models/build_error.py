@@ -63,25 +63,14 @@ class BuildError(models.Model):
         cleaners = self.env['runbot.error.regex'].search([('re_type', '=', 'cleaning')])
         for vals in vals_list:
             content = vals.get('content')
-            cleaned_content = cleaners.r_sub('%', content)
+            cleaned_content = cleaners._r_sub('%', content)
             vals.update({
                 'cleaned_content': cleaned_content,
                 'fingerprint': self._digest(cleaned_content)
             })
         records = super().create(vals_list)
-        records.assign()
+        records.action_assign()
         return records
-
-    def assign(self):
-        if not any((not record.responsible and not record.team_id and record.file_path and not record.parent_id) for record in self):
-            return
-        teams = self.env['runbot.team'].search(['|', ('path_glob', '!=', False), ('module_ownership_ids', '!=', False)])
-        repos = self.env['runbot.repo'].search([])
-        for record in self:
-            if not record.responsible and not record.team_id and record.file_path and not record.parent_id:
-                team = teams._get_team(record.file_path, repos)
-                if team:
-                    record.team_id = team
 
     def write(self, vals):
         if 'active' in vals:
@@ -177,9 +166,9 @@ class BuildError(models.Model):
 
         hash_dict = defaultdict(self.env['ir.logging'].browse)
         for log in ir_logs:
-            if search_regs.r_search(log.message):
+            if search_regs._r_search(log.message):
                 continue
-            fingerprint = self._digest(cleaning_regs.r_sub('%', log.message))
+            fingerprint = self._digest(cleaning_regs._r_sub('%', log.message))
             hash_dict[fingerprint] |= log
 
         build_errors = self.env['runbot.build.error']
@@ -220,7 +209,27 @@ class BuildError(models.Model):
                 window_action["res_id"] = build_errors.id
             return window_action
 
-    def link_errors(self):
+    @api.model
+    def _test_tags_list(self):
+        active_errors = self.search([('test_tags', '!=', False)])
+        test_tag_list = active_errors.mapped('test_tags')
+        return [test_tag for error_tags in test_tag_list for test_tag in (error_tags).split(',')]
+
+    @api.model
+    def _disabling_tags(self):
+        return ['-%s' % tag for tag in self._test_tags_list()]
+
+    def _search_version(self, operator, value):
+        return [('build_ids.version_id', operator, value)]
+
+    def _search_trigger_ids(self, operator, value):
+        return [('build_ids.trigger_id', operator, value)]
+    
+    ####################
+    #   Actions
+    ####################
+
+    def action_link_errors(self):
         """ Link errors with the first one of the recordset
         choosing parent in error with responsible, random bug and finally fisrt seen
         """
@@ -230,26 +239,22 @@ class BuildError(models.Model):
         build_errors = self.search([('id', 'in', self.ids)], order='responsible asc, random desc, id asc')
         build_errors[1:].write({'parent_id': build_errors[0].id})
 
-    def clean_content(self):
+    def action_clean_content(self):
         cleaning_regs = self.env['runbot.error.regex'].search([('re_type', '=', 'cleaning')])
         for build_error in self:
-            build_error.cleaned_content = cleaning_regs.r_sub('%', build_error.content)
+            build_error.cleaned_content = cleaning_regs._r_sub('%', build_error.content)
 
-    @api.model
-    def test_tags_list(self):
-        active_errors = self.search([('test_tags', '!=', False)])
-        test_tag_list = active_errors.mapped('test_tags')
-        return [test_tag for error_tags in test_tag_list for test_tag in (error_tags).split(',')]
+    def action_assign(self):
+        if not any((not record.responsible and not record.team_id and record.file_path and not record.parent_id) for record in self):
+            return
+        teams = self.env['runbot.team'].search(['|', ('path_glob', '!=', False), ('module_ownership_ids', '!=', False)])
+        repos = self.env['runbot.repo'].search([])
+        for record in self:
+            if not record.responsible and not record.team_id and record.file_path and not record.parent_id:
+                team = teams._get_team(record.file_path, repos)
+                if team:
+                    record.team_id = team
 
-    @api.model
-    def disabling_tags(self):
-        return ['-%s' % tag for tag in self.test_tags_list()]
-
-    def _search_version(self, operator, value):
-        return [('build_ids.version_id', operator, value)]
-
-    def _search_trigger_ids(self, operator, value):
-        return [('build_ids.trigger_id', operator, value)]
 
 class BuildErrorTag(models.Model):
 
@@ -272,13 +277,13 @@ class ErrorRegex(models.Model):
     re_type = fields.Selection([('filter', 'Filter out'), ('cleaning', 'Cleaning')], string="Regex type")
     sequence = fields.Integer('Sequence', default=100)
 
-    def r_sub(self, replace, s):
+    def _r_sub(self, replace, s):
         """ replaces patterns from the recordset by replace in the given string """
         for c in self:
             s = re.sub(c.regex, '%', s)
         return s
 
-    def r_search(self, s):
+    def _r_search(self, s):
         """ Return True if one of the regex is found in s """
         for filter in self:
             if re.search(filter.regex, s):
@@ -297,7 +302,13 @@ class ErrorBulkWizard(models.TransientModel):
     archive = fields.Boolean('Close error (archive)', default=False)
     chatter_comment = fields.Text('Chatter Comment')
 
-    def submit(self):
+    @api.onchange('fixing_commit', 'chatter_comment')
+    def _onchange_commit_comment(self):
+        for record in self:
+            if record.fixing_commit or record.chatter_comment:
+                record.archive = True
+
+    def action_submit(self):
         error_ids = self.env['runbot.build.error'].browse(self.env.context.get('active_ids'))
         if error_ids:
             if self.team_id:
@@ -313,9 +324,3 @@ class ErrorBulkWizard(models.TransientModel):
             if self.chatter_comment:
                 for build_error in error_ids:
                     build_error.message_post(body=self.chatter_comment, subject="Bullk Wizard Comment")
-
-    @api.onchange('fixing_commit', 'chatter_comment')
-    def _onchange_commit_comment(self):
-        for record in self:
-            if record.fixing_commit or record.chatter_comment:
-                record.archive = True
