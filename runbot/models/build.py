@@ -687,7 +687,7 @@ class BuildResult(models.Model):
                         run_step = step_ids[-1]
                     else:
                         run_step = self.env.ref('runbot.runbot_build_config_step_run')
-                    run_step._run_step(build, log_path, force=True)()
+                    run_step._run_step(build, force=True)()
                     # reload_nginx will be triggered by _run_run_odoo
                 except Exception:
                     _logger.exception('Failed to wake up build %s', build.dest)
