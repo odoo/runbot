@@ -26,10 +26,16 @@ class Host(models.Model):
     last_success = fields.Datetime('Last success')
     assigned_only = fields.Boolean('Only accept assigned build', default=False, tracking=True)
     nb_worker = fields.Integer(
-        'Number of max paralel build',
+        'Number of max parallel build',
         default=lambda self: self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_workers', default=2),
-        tracking=True
+        tracking=True,
     )
+    nb_run_slot = fields.Integer(
+        'Number of max parallel running build',
+        default=0,
+        tracking=True,
+    )
+
     nb_testing = fields.Integer(compute='_compute_nb')
     nb_running = fields.Integer(compute='_compute_nb')
     last_exception = fields.Char('Last exception')
@@ -40,6 +46,7 @@ class Host(models.Model):
 
     paused = fields.Boolean('Paused', help='Host will stop scheduling while paused')
     profile = fields.Boolean('Profile', help='Enable profiling on this host')
+
 
     def _compute_nb(self):
         groups = self.env['runbot.build'].read_group(
@@ -168,7 +175,7 @@ class Host(models.Model):
 
     def _get_running_max(self):
         icp = self.env['ir.config_parameter']
-        return int(icp.get_param('runbot.runbot_running_max', default=5))
+        return self.nb_run_slot or int(icp.get_param('runbot.runbot_running_max', default=5))
 
     def _set_psql_conn_count(self):
         _logger.info('Updating psql connection count...')

@@ -16,6 +16,7 @@
                         <field name="last_success" readonly='1'/>
                         <field name="assigned_only"/>
                         <field name="nb_worker"/>
+                        <field name="nb_run_slot"/>
                         <field name="build_ids" widget="many2many" options="{'not_delete': True, 'no_create_edit': True}" readonly="1">
                             <tree>
                                 <field name="create_date"/>
@@ -47,6 +48,7 @@
                 <field name="disp_name"/>
                 <field name="assigned_only" widget="boolean_toggle"/>
                 <field name="nb_worker"/>
+                <field name="nb_run_slot"/>
             </tree>
         </field>
     </record>
