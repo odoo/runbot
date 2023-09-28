@@ -702,11 +702,7 @@ class ConfigStep(models.Model):
         migrate_cmd += ['-d', migrate_db_name]
         migrate_cmd += ['--stop-after-init']
         migrate_cmd += ['--max-cron-threads=0']
-        upgrade_paths =  []
-        for repo in target_commit_ids.mapped('repo_id'):
-            if repo.upgrade_paths:
-                for upgrade_path in repo.upgrade_paths.split(','):
-                    upgrade_paths.append(repo.name + upgrade_path.replace(' ', ''))
+        upgrade_paths = list(build._get_upgrade_path())
         if upgrade_paths:
             migrate_cmd += ['--upgrade-path', ','.join(upgrade_paths)]
 

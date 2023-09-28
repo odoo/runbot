@@ -1020,10 +1020,19 @@ class BuildResult(models.Model):
         for commit in (self.env.context.get('defined_commit_ids') or self.params_id.commit_ids):
             if not commit.repo_id.manifest_files:
                 continue  # skip repo without addons
-            source_path = self._docker_source_folder(commit)
+            repo_folder = self._docker_source_folder(commit)
             for addons_path in (commit.repo_id.addons_paths or '').split(','):
                 if os.path.isdir(commit._source_path(addons_path)):
-                    yield os.sep.join([source_path, addons_path]).strip(os.sep)
+                    yield os.sep.join([repo_folder, addons_path]).strip(os.sep)
+
+    def _get_upgrade_path(self):
+        for commit in (self.env.context.get('defined_commit_ids') or self.params_id.commit_ids):
+            if not commit.repo_id.upgrade_paths:
+                continue  # skip repo without addons
+            repo_folder = self._docker_source_folder(commit)
+            for upgrade_path in commit.repo_id.upgrade_paths.split(','):
+                if os.path.isdir(commit._source_path(upgrade_path)):
+                    yield os.sep.join([repo_folder, upgrade_path]).strip(os.sep)
 
     def _get_server_info(self, commit=None):
         commit = commit or self._get_server_commit()
