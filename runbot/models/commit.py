@@ -1,4 +1,5 @@
 
+import datetime
 import subprocess
 
 from ..common import os, RunbotException, make_github_session
@@ -42,11 +43,11 @@ class Commit(models.Model):
         return super().create(vals_list)
 
     def _get_commit_infos(self, sha, repo):
-        fields = ['date', 'author', 'author_email', 'commiter', 'commiter_email', 'subject']
-        pretty_format = '%00'.join(['%ct', '%an', '%ae', '%cn', '%ce', '%s'])
+        fields = ['date', 'author', 'author_email', 'committer', 'committer_email', 'subject']
+        pretty_format = '%x00'.join(['%ct', '%an', '%ae', '%cn', '%ce', '%s'])
         vals = {}
         try:
-            vals = zip(fields, repo._git(['show', '-s', f'--pretty=format:{pretty_format}', sha]).split('\x00'))
+            vals = dict(zip(fields, repo._git(['show', '-s', f'--pretty=format:{pretty_format}', sha]).split('\x00')))
             vals['date'] = datetime.datetime.fromtimestamp(int(vals['date']))
         except subprocess.CalledProcessError as e:
             _logger.warning('git show failed with message %s', e.output.decode())
