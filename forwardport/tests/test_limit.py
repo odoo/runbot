@@ -1,3 +1,4 @@
+
 import pytest
 
 from utils import seen, Commit, make_basic, to_pr
@@ -120,13 +121,11 @@ def test_disable(env, config, make_repo, users):
         seen(env, pr, users),
     }
 
+
 def test_limit_after_merge(env, config, make_repo, users):
-    """ If attempting to set a limit (<up to>) on a PR which is merged
-    (already forward-ported or not), or is a forward-port PR, fwbot should
-    just feedback that it won't do it
-    """
     prod, other = make_basic(env, config, make_repo)
     reviewer = config['role_reviewer']['token']
+    branch_b = env['runbot_merge.branch'].search([('name', '=', 'b')])
     branch_c = env['runbot_merge.branch'].search([('name', '=', 'c')])
     bot_name = env['runbot_merge.project'].search([]).fp_github_name
     with prod:
@@ -150,13 +149,13 @@ def test_limit_after_merge(env, config, make_repo, users):
         pr2.post_comment(bot_name + ' up to b', reviewer)
     env.run_crons()
 
-    assert p1.limit_id == p2.limit_id == branch_c, \
-        "check that limit was not updated"
+    assert p1.limit_id == p2.limit_id == branch_b
     assert pr1.comments == [
         (users['reviewer'], "hansen r+"),
         seen(env, pr1, users),
-        (users['reviewer'], bot_name + ' up to b'),
-        (users['user'], "@%s forward-port limit can only be set before the PR is merged." % users['reviewer']),
+        (users['reviewer'], f'{bot_name} up to b'),
+        (users['user'], "Forward-porting to 'b'."),
+        (users['user'], f"Forward-porting to 'b' (from {p2.display_name})."),
     ]
     assert pr2.comments == [
         seen(env, pr2, users),
@@ -165,12 +164,8 @@ This PR targets b and is part of the forward-port chain. Further PRs will be cre
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """),
-        (users['reviewer'], bot_name + ' up to b'),
-        (users['user'], "@%s forward-port limit can only be set on an origin PR"
-                   " (%s here) before it's merged and forward-ported." % (
-            users['reviewer'],
-            p1.display_name,
-        )),
+        (users['reviewer'], f'{bot_name} up to b'),
+        (users['user'], f"Forward-porting {p1.display_name} to 'b'."),
     ]
 
     # update pr2 to detach it from pr1
@@ -186,7 +181,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     assert p2.source_id == p1
 
     with prod:
-        pr2.post_comment(bot_name + ' up to b', reviewer)
+        pr2.post_comment(f'{bot_name} up to c', reviewer)
     env.run_crons()
 
     assert pr2.comments[4:] == [
@@ -195,9 +190,268 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
             users['user'], users['reviewer'],
             p2.repository.project_id.github_prefix
         )),
-        (users['reviewer'], bot_name + ' up to b'),
-        (users['user'], f"@{users['reviewer']} forward-port limit can only be "
-                        f"set on an origin PR ({p1.display_name} here) before "
-                        f"it's merged and forward-ported."
-        ),
+        (users['reviewer'], f'{bot_name} up to c'),
+        (users['user'], "Forward-porting to 'c'."),
     ]
+    with prod:
+        prod.post_status(p2.head, 'success', 'legal/cla')
+        prod.post_status(p2.head, 'success', 'ci/runbot')
+        pr2.post_comment('hansen r+', reviewer)
+    env.run_crons()
+    with prod:
+        prod.post_status('staging.b', 'success', 'legal/cla')
+        prod.post_status('staging.b', 'success', 'ci/runbot')
+    env.run_crons()
+
+    _, _, p3 = env['runbot_merge.pull_requests'].search([], order='number')
+    assert p3
+    pr3 = prod.get_pr(p3.number)
+    with prod:
+        pr3.post_comment(f"{bot_name} up to c", reviewer)
+    env.run_crons()
+    assert pr3.comments == [
+        seen(env, pr3, users),
+        (users['user'], f"""\
+@{users['user']} @{users['reviewer']} this PR targets c and is the last of the forward-port chain.
+
+To merge the full chain, use
+> @{p1.repository.project_id.fp_github_name} r+
+
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
+"""),
+        (users['reviewer'], f"{bot_name} up to c"),
+        (users['user'], f"Forward-porting {p2.display_name} to 'c'."),
+    ]
+    # 7 of previous check, plus r+
+    assert pr2.comments[8:] == [
+        (users['user'], f"Forward-porting to 'c' (from {p3.display_name}).")
+    ]
+
+
+
+@pytest.mark.parametrize("update_from", [
+    pytest.param(lambda source: [('id', '=', source)], id='source'),
+    pytest.param(lambda source: [('source_id', '=', source), ('target', '=', '2')], id='child'),
+    pytest.param(lambda source: [('source_id', '=', source), ('target', '=', '3')], id='root'),
+    pytest.param(lambda source: [('source_id', '=', source), ('target', '=', '4')], id='parent'),
+    pytest.param(lambda source: [('source_id', '=', source), ('target', '=', '5')], id='current'),
+    # pytest.param(id='tip'), # doesn't exist
+])
+@pytest.mark.parametrize("limit", range(1, 6+1))
+def test_post_merge(
+        env, post_merge, users, config, branches,
+        update_from: callable,
+        limit: int,
+):
+    PRs = env['runbot_merge.pull_requests']
+    project, prod, _ = post_merge
+    reviewer = config['role_reviewer']['token']
+
+    # fetch source PR
+    [source] = PRs.search([('source_id', '=', False)])
+
+    # validate the forward ports for "child", "root", and "parent" so "current"
+    # exists and we have one more target
+    for branch in map(str, range(2, 4+1)):
+        setci(source=source, repo=prod, target=branch)
+        env.run_crons()
+    # update 3 to make it into a root
+    root = PRs.search([('source_id', '=', source.id), ('target.name', '=', '3')])
+    root.write({'parent_id': False, 'detach_reason': 'testing'})
+    # send detach messages so they're not part of the limit stuff batch
+    env.run_crons()
+
+    # cheat: we know PR numbers are assigned sequentially
+    prs = list(map(prod.get_pr, range(1, 6)))
+    before = {p.number: len(p.comments) for p in prs}
+
+    from_id = PRs.search(update_from(source.id))
+    from_ = prod.get_pr(from_id.number)
+    with prod:
+        from_.post_comment(f'{project.fp_github_name} up to {limit}', reviewer)
+    env.run_crons()
+
+    # there should always be a comment on the source and root indicating how
+    # far we port
+    # the PR we post on should have a comment indicating the correction
+    current_id = PRs.search([('number', '=', '5')])
+    actual_limit = max(limit, 5)
+    for p in prs:
+        # case for the PR on which we posted the comment
+        if p.number == from_.number:
+            root_opt = '' if p.number == root.number else f' {root.display_name}'
+            trailer = '' if actual_limit == limit else f" (instead of the requested '{limit}' because {current_id.display_name} already exists)"
+            assert p.comments[before[p.number] + 1:] == [
+                (users['user'], f"Forward-porting{root_opt} to '{actual_limit}'{trailer}.")
+            ]
+        # case for reference PRs source and root (which get their own notifications)
+        elif p.number in (source.number, root.number):
+            assert p.comments[before[p.number]:] == [
+                (users['user'], f"Forward-porting to '{actual_limit}' (from {from_id.display_name}).")
+            ]
+
+@pytest.mark.parametrize('mode', [
+    None,
+    # last forward port should fail ci, and only be validated after target bump
+    'failbump',
+    # last forward port should fail ci, then be validated, then target bump
+    'failsucceed',
+    # last forward port should be merged before bump
+    'mergetip',
+    # every forward port should be merged before bump
+    'mergeall',
+])
+def test_resume_fw(env, post_merge, users, config, branches, mode):
+    """Singleton version of test_post_merge: completes the forward porting
+    including validation then tries to increase the limit, which should resume
+    forward porting
+    """
+
+    PRs = env['runbot_merge.pull_requests']
+    project, prod, _ = post_merge
+    reviewer = config['role_reviewer']['token']
+
+    # fetch source PR
+    [source] = PRs.search([('source_id', '=', False)])
+    with prod:
+        prod.get_pr(source.number).post_comment(f'{project.fp_github_name} up to 5', reviewer)
+    # validate the forward ports for "child", "root", and "parent" so "current"
+    # exists and we have one more target
+    for branch in map(str, range(2, 5+1)):
+        setci(
+            source=source, repo=prod, target=branch,
+            status='failure' if branch == '5' and mode in ('failbump', 'failsucceed') else 'success'
+        )
+        env.run_crons()
+    # cheat: we know PR numbers are assigned sequentially
+    prs = list(map(prod.get_pr, range(1, 6)))
+    before = {p.number: len(p.comments) for p in prs}
+
+    if mode == 'failsucceed':
+        setci(source=source, repo=prod, target=5)
+        # sees the success, limit is still 5, considers the porting finished
+        env.run_crons()
+
+    if mode and mode.startswith('merge'):
+        numbers = range(5 if mode == 'mergetip' else 2, 5 + 1)
+        with prod:
+            for number in numbers:
+                prod.get_pr(number).post_comment(f'{project.github_prefix} r+', reviewer)
+        env.run_crons()
+        with prod:
+            for target in numbers:
+                pr = PRs.search([('target.name', '=', str(target))])
+                print(pr.display_name, pr.state, pr.staging_id)
+                prod.post_status(f'staging.{target}', 'success')
+        env.run_crons()
+        for number in numbers:
+            assert PRs.search([('number', '=', number)]).state == 'merged'
+
+    from_ = prod.get_pr(source.number)
+    with prod:
+        from_.post_comment(f'{project.fp_github_name} up to 6', reviewer)
+    env.run_crons()
+
+    if mode == 'failbump':
+        setci(source=source, repo=prod, target=5)
+        # setci moved the PR from opened to validated, so *now* it can be
+        # forward-ported, but that still needs to actually happen
+        env.run_crons()
+
+    # since PR5 CI succeeded and we've increased the limit there should be a
+    # new PR
+    assert PRs.search([('source_id', '=', source.id), ('target.name', '=', 6)])
+    pr5_id = PRs.search([('source_id', '=', source.id), ('target.name', '=', 5)])
+    if mode == 'failbump':
+        # because the initial forward porting was never finished as the PR CI
+        # failed until *after* we bumped the limit, so it's not *resuming* per se.
+        assert prs[0].comments[before[1]+1:] == [
+            (users['user'], f"Forward-porting to '6'.")
+        ]
+    else:
+        assert prs[0].comments[before[1]+1:] == [
+            (users['user'], f"Forward-porting to '6', resuming forward-port stopped at {pr5_id.display_name}.")
+        ]
+
+def setci(*, source, repo, target, status='success'):
+    """Validates (CI success) the descendant of ``source`` targeting ``target``
+    in  ``repo``.
+    """
+    pr = source.search([('source_id', '=', source.id), ('target.name', '=', str(target))])
+    with repo:
+        repo.post_status(pr.head, status)
+
+
+@pytest.fixture(scope='session')
+def branches():
+    """Need enough branches to make space for:
+
+    - a source
+    - an ancestor (before and separated from the root, but not the source)
+    - a root (break in the parent chain
+    - a parent (between "current" and root)
+    - "current"
+    - the tip branch
+    """
+    return range(1, 6 + 1)
+
+@pytest.fixture
+def post_merge(env, config, users, make_repo, branches):
+    """Create a setup for the post-merge limits test which is both simpler and
+    more complicated than the standard test setup(s): it doesn't need more
+    variety in code, but it needs a lot more "depth" in terms of number of
+    branches it supports. Branches are fixture-ed to make it easier to share
+    between this fixture and the actual test.
+
+    All the branches are set to the same commit because that basically
+    shouldn't matter.
+    """
+    prod = make_repo("post-merge-test")
+    with prod:
+        [c] = prod.make_commits(None, Commit('base', tree={'f': ''}))
+        for i in branches:
+            prod.make_ref(f'heads/{i}', c)
+    dev = prod.fork()
+
+    proj = env['runbot_merge.project'].create({
+        'name': prod.name,
+        'github_token': config['github']['token'],
+        'github_prefix': 'hansen',
+        'fp_github_token': config['github']['token'],
+        'fp_github_name': 'herbert',
+        'fp_github_email': 'hb@example.com',
+        'branch_ids': [
+            (0, 0, {'name': str(i), 'sequence': 1000 - (i * 10)})
+            for i in branches
+        ],
+        'repo_ids': [
+            (0, 0, {
+                'name': prod.name,
+                'required_statuses': 'default',
+                'fp_remote_target': dev.name,
+            })
+        ]
+    })
+
+    env['res.partner'].search([
+        ('github_login', '=', config['role_reviewer']['user'])
+    ]).write({
+        'review_rights': [(0, 0, {'repository_id': proj.repo_ids.id, 'review': True})]
+    })
+
+    mbot = proj.github_prefix
+    reviewer = config['role_reviewer']['token']
+    # merge the source PR
+    source_target = str(branches[0])
+    with prod:
+        [c] = prod.make_commits(source_target, Commit('my pr', tree={'x': ''}), ref='heads/mypr')
+        pr1 = prod.make_pr(target=source_target, head=c, title="a title")
+
+        prod.post_status(c, 'success')
+        pr1.post_comment(f'{mbot} r+', reviewer)
+    env.run_crons()
+    with prod:
+        prod.post_status(f'staging.{source_target}', 'success')
+    env.run_crons()
+
+    return proj, prod, dev

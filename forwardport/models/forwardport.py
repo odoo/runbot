@@ -24,7 +24,20 @@ class Queue:
         raise NotImplementedError
 
     def _process(self):
-        for b in self.search(self._search_domain(), order='create_date, id', limit=self.limit):
+        skip = 0
+        from_clause, where_clause, params = self._search(self._search_domain(), order='create_date, id', limit=1).get_sql()
+        for _ in range(self.limit):
+            self.env.cr.execute(f"""
+                SELECT id FROM {from_clause}
+                WHERE {where_clause or "true"}
+                ORDER BY create_date, id
+                LIMIT 1 OFFSET %s
+                FOR UPDATE SKIP LOCKED
+            """, [*params, skip])
+            b = self.browse(self.env.cr.fetchone())
+            if not b:
+                return
+
             try:
                 with sentry_sdk.start_span(description=self._name):
                     b._process_item()
@@ -33,11 +46,12 @@ class Queue:
             except Exception:
                 _logger.exception("Error while processing %s, skipping", b)
                 self.env.cr.rollback()
-                b._on_failure()
+                if b._on_failure():
+                    skip += 1
                 self.env.cr.commit()
 
     def _on_failure(self):
-        pass
+        return True
 
     def _search_domain(self):
         return []
@@ -48,7 +62,7 @@ class ForwardPortTasks(models.Model, Queue):
 
     limit = 10
 
-    batch_id = fields.Many2one('runbot_merge.batch', required=True)
+    batch_id = fields.Many2one('runbot_merge.batch', required=True, index=True)
     source = fields.Selection([
         ('merge', 'Merge'),
         ('fp', 'Forward Port Followup'),
