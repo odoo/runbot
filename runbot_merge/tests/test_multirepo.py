@@ -87,9 +87,11 @@ def make_branch(repo, name, message, tree, protect=True):
         repo.protect(name)
     return c
 
-def test_stage_one(env, project, repo_a, repo_b, config):
+@pytest.mark.parametrize('uniquifier', [False, True])
+def test_stage_one(env, project, repo_a, repo_b, config, uniquifier):
     """ First PR is non-matched from A => should not select PR from B
     """
+    project.uniquifier = uniquifier
     project.batch_limit = 1
 
     with repo_a:
@@ -112,7 +114,10 @@ def test_stage_one(env, project, repo_a, repo_b, config):
     assert pra_id.state == 'ready'
     assert pra_id.staging_id
     assert repo_a.commit('staging.master').message.startswith('commit_A_00')
-    assert repo_b.commit('staging.master').message.startswith('force rebuild')
+    if uniquifier:
+        assert repo_b.commit('staging.master').message.startswith('force rebuild')
+    else:
+        assert repo_b.commit('staging.master').message == 'initial'
 
     prb_id = to_pr(env, pr_b)
     assert prb_id.state == 'ready'

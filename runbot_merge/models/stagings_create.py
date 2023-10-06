@@ -90,23 +90,11 @@ def try_staging(branch: Branch) -> Optional[Stagings]:
     heads = []
     commits = []
     for repo, it in staging_state.items():
-        if it.head != original_heads[repo]:
-            # if we staged something for that repo, just create a record for
-            # that commit, or flag existing one as to-recheck in case there are
-            # already statuses we want to propagate to the staging or something
-            env.cr.execute(
-                "INSERT INTO runbot_merge_commit (sha, to_check, statuses) "
-                "VALUES (%s, true, '{}') "
-                "ON CONFLICT (sha) DO UPDATE SET to_check=true "
-                "RETURNING id",
-                [it.head]
-            )
-            [commit] = [head] = env.cr.fetchone()
-        else:
-            # if we didn't stage anything for that repo, create a dummy commit
-            # (with a uniquifier to ensure we don't hit a previous version of
-            # the same) to ensure the staging head is new and we're building
-            # everything
+        if it.head == original_heads[repo] and branch.project_id.uniquifier:
+            # if we didn't stage anything for that repo and uniquification is
+            # enabled, create a dummy commit with a uniquifier to ensure we
+            # don't hit a previous version of the same to ensure the staging
+            # head is new and we're building everything
             project = branch.project_id
             uniquifier = base64.b64encode(os.urandom(12)).decode('ascii')
             dummy_head = it.repo.with_config(check=True).commit_tree(
@@ -135,6 +123,18 @@ For-Commit-Id: {it.head}
             )
             ([commit], [head]) = env.cr.fetchall()
             it.head = dummy_head
+        else:
+            # otherwise just create a record for that commit, or flag existing
+            # one as to-recheck in case there are already statuses we want to
+            # propagate to the staging or something
+            env.cr.execute(
+                "INSERT INTO runbot_merge_commit (sha, to_check, statuses) "
+                "VALUES (%s, true, '{}') "
+                "ON CONFLICT (sha) DO UPDATE SET to_check=true "
+                "RETURNING id",
+                [it.head]
+            )
+            [commit] = [head] = env.cr.fetchone()
 
         heads.append(fields.Command.create({
             'repository_id': repo.id,

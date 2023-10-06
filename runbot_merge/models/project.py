@@ -51,6 +51,15 @@ class Project(models.Model):
     freeze_id = fields.Many2one('runbot_merge.project.freeze', compute='_compute_freeze')
     freeze_reminder = fields.Text()
 
+    uniquifier = fields.Boolean(
+        default=True,
+        help="Whether to add a uniquifier commit on repositories without PRs"
+             " during staging. The lack of uniquifier can lead to CI conflicts"
+             " as github works off of commits, so it's possible for an"
+             " unrelated build to trigger a failure if somebody is a dummy and"
+             " includes repos they have no commit for."
+    )
+
     @api.depends('github_token')
     def _compute_identity(self):
         s = requests.Session()

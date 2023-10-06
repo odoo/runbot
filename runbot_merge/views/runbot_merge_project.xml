@@ -32,6 +32,7 @@
                             <field name="secret"/>
                         </group>
                         <group>
+                            <field name="uniquifier"/>
                             <field name="ci_timeout"/>
                             <field name="batch_limit"/>
                         </group>
