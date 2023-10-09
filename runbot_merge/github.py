@@ -57,8 +57,12 @@ Authorship = TypedDict('Authorship', {
     'name': str,
     'email': str,
 })
+CommitTree = TypedDict('CommitTree', {
+    'sha': str,
+    'url': str,
+})
 Commit = TypedDict('Commit', {
-    'tree': str,
+    'tree': CommitTree,
     'url': str,
     'message': str,
     # optional when creating a commit

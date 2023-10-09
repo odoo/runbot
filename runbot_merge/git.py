@@ -107,6 +107,11 @@ class Repo:
         )
         return Repo(to)
 
+    def get_tree(self, commit_hash: str) -> str:
+        r = self.with_config(check=True).rev_parse(f'{commit_hash}^{{tree}}')
+
+        return r.stdout.strip()
+
     def rebase(self, dest: str, commits: Sequence[PrCommit]) -> Tuple[str, Dict[str, str]]:
         """Implements rebase by hand atop plumbing so:
 
@@ -125,6 +130,9 @@ class Repo:
         if not commits:
             raise MergeError("PR has no commits")
 
+        prev_tree = repo.get_tree(dest)
+        prev_original_tree = repo.get_tree(commits[0]['parents'][0]["sha"])
+
         new_trees = []
         parent = dest
         for original in commits:
@@ -135,11 +143,22 @@ class Repo:
                     "rebasing")
 
             new_trees.append(check(repo.merge_tree(parent, original['sha'])).stdout.strip())
+            # allow merging empty commits, but not empty*ing* commits while merging
+            if prev_original_tree != original['commit']['tree']['sha']:
+                if new_trees[-1] == prev_tree:
+                    raise MergeError(
+                        f"commit {original['sha']} results in an empty tree when "
+                        f"merged, it is likely a duplicate of a merged commit, "
+                        f"rebase and remove."
+                    )
+
             parent = check(repo.commit_tree(
                 tree=new_trees[-1],
                 parents=[parent, original['sha']],
                 message=f'temp rebase {original["sha"]}',
             )).stdout.strip()
+            prev_tree = new_trees[-1]
+            prev_original_tree = original['commit']['tree']['sha']
 
         mapping = {}
         for original, tree in zip(commits, new_trees):

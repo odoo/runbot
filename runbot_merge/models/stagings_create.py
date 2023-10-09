@@ -426,7 +426,18 @@ def stage(pr: PullRequests, info: StagingSlice, related_prs: PullRequests) -> Tu
             fn = stage_rebase_ff
         case 'squash':
             fn = stage_squash
-    return method, fn(pr, info, pr_commits, related_prs=related_prs)
+
+    pr_base_tree = info.repo.get_tree(pr_commits[0]['parents'][0]['sha'])
+    pr_head_tree = pr_commits[-1]['commit']['tree']['sha']
+
+    merge_base_tree = info.repo.get_tree(info.head)
+    new_head = fn(pr, info, pr_commits, related_prs=related_prs)
+    merge_head_tree = info.repo.get_tree(new_head)
+
+    if pr_head_tree != pr_base_tree and merge_head_tree == merge_base_tree:
+        raise exceptions.MergeError(pr, f'results in an empty tree when merged, might be the duplicate of a merged PR.')
+
+    return method, new_head
 
 def stage_squash(pr: PullRequests, info: StagingSlice, commits: List[github.PrCommit], related_prs: PullRequests) -> str:
     msg = pr._build_merge_message(pr, related_prs=related_prs)

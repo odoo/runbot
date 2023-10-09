@@ -143,3 +143,112 @@ def test_staging_post_update(env, project, make_repo, setreviewers, users, confi
     assert staging_id.statuses == [
         [repo.name, 'ci/runbot', 'failure', ''],
     ]
+
+def test_merge_empty_commits(env, project, make_repo, setreviewers, users, config):
+    """The mergebot should allow merging already-empty commits.
+    """
+    repo = make_repo('repo')
+    project.write({'repo_ids': [(0, 0, {
+        'name': repo.name,
+        'group_id': False,
+        'required_statuses': 'default',
+    })]})
+    setreviewers(*project.repo_ids)
+
+    with repo:
+        [m] = repo.make_commits(None, Commit('initial', tree={'m': 'm'}), ref='heads/master')
+
+        repo.make_commits(m, Commit('thing1', tree={}), ref='heads/other1')
+        pr1 = repo.make_pr(target='master', head='other1')
+        repo.post_status(pr1.head, 'success')
+        pr1.post_comment('hansen r+', config['role_reviewer']['token'])
+
+        repo.make_commits(m, Commit('thing2', tree={}), ref='heads/other2')
+        pr2 = repo.make_pr(target='master', head='other2')
+        repo.post_status(pr2.head, 'success')
+        pr2.post_comment('hansen r+ rebase-ff', config['role_reviewer']['token'])
+    env.run_crons()
+    pr1_id = to_pr(env, pr1)
+    pr2_id = to_pr(env, pr2)
+    assert pr1_id.staging_id and pr2_id.staging_id
+
+    with repo:
+        repo.post_status('staging.master', 'success')
+    env.run_crons()
+
+    assert pr1_id.state == pr2_id.state == 'merged'
+
+    # log is most-recent-first (?)
+    commits = list(repo.log('master'))
+    head = repo.commit(commits[0]['sha'])
+    assert repo.read_tree(head) == {'m': 'm'}
+
+    assert commits[0]['commit']['message'].startswith('thing2')
+    assert commits[1]['commit']['message'].startswith('thing1')
+    assert commits[2]['commit']['message'] == 'initial'
+
+def test_merge_emptying_commits(env, project, make_repo, setreviewers, users, config):
+    """The mergebot should *not* allow merging non-empty commits which become
+    empty as part of the staging (rebasing)
+    """
+    repo = make_repo('repo')
+    project.write({'repo_ids': [(0, 0, {
+        'name': repo.name,
+        'group_id': False,
+        'required_statuses': 'default',
+    })]})
+    setreviewers(*project.repo_ids)
+
+    with repo:
+        [m, _] = repo.make_commits(
+            None,
+            Commit('initial', tree={'m': 'm'}),
+            Commit('second', tree={'m': 'c'}),
+            ref='heads/master',
+        )
+
+        [c1] = repo.make_commits(m, Commit('thing', tree={'m': 'c'}), ref='heads/branch1')
+        pr1 = repo.make_pr(target='master', head='branch1')
+        repo.post_status(pr1.head, 'success')
+        pr1.post_comment('hansen r+ rebase-ff', config['role_reviewer']['token'])
+
+        [_, c2] = repo.make_commits(
+            m,
+            Commit('thing1', tree={'c': 'c'}),
+            Commit('thing2', tree={'m': 'c'}),
+            ref='heads/branch2',
+        )
+        pr2 = repo.make_pr(target='master', head='branch2')
+        repo.post_status(pr2.head, 'success')
+        pr2.post_comment('hansen r+ rebase-ff', config['role_reviewer']['token'])
+
+        repo.make_commits(
+            m,
+            Commit('thing1', tree={'m': 'x'}),
+            Commit('thing2', tree={'m': 'c'}),
+            ref='heads/branch3',
+        )
+        pr3 = repo.make_pr(target='master', head='branch3')
+        repo.post_status(pr3.head, 'success')
+        pr3.post_comment('hansen r+ squash', config['role_reviewer']['token'])
+    env.run_crons()
+
+    ping = f"@{users['user']} @{users['reviewer']}"
+    # check that first / sole commit emptying is caught
+    assert not to_pr(env, pr1).staging_id
+    assert pr1.comments[3:] == [
+        (users['user'], f"{ping} unable to stage: commit {c1} results in an empty tree when merged, it is likely a duplicate of a merged commit, rebase and remove.")
+    ]
+
+    # check that followup commit emptying is caught
+    assert not to_pr(env, pr2).staging_id
+    assert pr2.comments[3:] == [
+        (users['user'], f"{ping} unable to stage: commit {c2} results in an empty tree when merged, it is likely a duplicate of a merged commit, rebase and remove.")
+    ]
+
+    # check that emptied squashed pr is caught
+    pr3_id = to_pr(env, pr3)
+    assert not pr3_id.staging_id
+    assert pr3.comments[3:] == [
+        (users['user'], f"{ping} unable to stage: results in an empty tree when merged, might be the duplicate of a merged PR.")
+    ]
