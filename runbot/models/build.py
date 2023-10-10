@@ -261,6 +261,7 @@ class BuildResult(models.Model):
                     record.global_state = record.local_state
                 else:
                     record.global_state = 'waiting'
+                self.env.cache._dirty[self._fields['global_state']].update(self._ids)
             else:
                 record.global_state = record.local_state
 
