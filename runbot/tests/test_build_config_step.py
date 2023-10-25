@@ -589,6 +589,28 @@ def run():
         self.assertEqual(retult, {'a': 'b'})
 
     @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
+    def test_run_python_exception(self, mock_checkout):
+        """minimal test for python steps. Also test that `-d` in cmd creates a database"""
+
+        def raise_runbot_exception():
+            raise RunbotException('Nope')
+
+        mock_checkout.side_effect = raise_runbot_exception
+        test_code = """
+def run():
+    build._checkout()
+"""
+        config_step = self.ConfigStep.create({
+            'name': 'default',
+            'job_type': 'python',
+            'python_code': test_code,
+        })
+
+        config_step._run_python(self.parent_build)
+        self.assertEqual(self.parent_build.log_ids.mapped('message'), ['A runbot exception occured:\nNope'])
+        self.assertEqual(self.parent_build.log_ids.mapped('level'), ['ERROR'])
+
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
     def test_sub_command(self, mock_checkout):
         config_step = self.ConfigStep.create({
             'name': 'default',
