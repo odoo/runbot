@@ -218,6 +218,11 @@ class FreezeWizard(models.Model):
         }
         for repo, copy in repos.items():
             copy.fetch(git.source_url(repo, 'github'), '+refs/heads/*:refs/heads/*')
+        for pr in self.release_pr_ids.pr_id | self.bump_pr_ids.pr_id:
+            repos[pr.repository].fetch(
+                git.source_url(pr.repository, 'github'),
+                pr.head,
+            )
 
         # prep new branch (via tmp refs) on every repo
         rel_heads: Dict[Repository, str] = {}

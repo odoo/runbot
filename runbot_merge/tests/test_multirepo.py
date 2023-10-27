@@ -1171,20 +1171,19 @@ def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
     ]})
     r = w_id.action_freeze()
     assert r == w, "the freeze is not ready so the wizard should redirect to itself"
-    owner = repo_c.owner
     assert w_id.errors == f"""\
-* All release PRs must have the same label, found '{owner}:release-1.1, {owner}:whocares'.
+* All release PRs must have the same label, found '{pr_rel_c.user}:release-1.1, {pr_other.user}:whocares'.
 * 2 required PRs not ready."""
     w_id.release_pr_ids[-1].pr_id = release_prs[repo_c.name].id
 
     with repo_a:
         pr_required_a.post_comment('hansen r+', config['role_reviewer']['token'])
-        repo_a.post_status('apr', 'success', 'ci/runbot')
-        repo_a.post_status('apr', 'success', 'legal/cla')
+        repo_a.post_status(pr_required_a.head, 'success', 'ci/runbot')
+        repo_a.post_status(pr_required_a.head, 'success', 'legal/cla')
     with repo_c:
         pr_required_c.post_comment('hansen r+', config['role_reviewer']['token'])
-        repo_c.post_status('cpr', 'success', 'ci/runbot')
-        repo_c.post_status('cpr', 'success', 'legal/cla')
+        repo_c.post_status(pr_required_c.head, 'success', 'ci/runbot')
+        repo_c.post_status(pr_required_c.head, 'success', 'legal/cla')
     env.run_crons()
 
     for repo in [repo_a, repo_b, repo_c]:
@@ -1275,45 +1274,51 @@ def setup_mess(repo_a, repo_b, repo_c):
                 ref='heads/1.0'
             )
             master_heads.extend(r.make_commits(root, Commit('other', tree={'f': '1'}), ref='heads/master'))
+
+    a_fork = repo_a.fork()
+    b_fork = repo_b.fork()
+    c_fork = repo_c.fork()
+    assert a_fork.owner == b_fork.owner == c_fork.owner
+    owner = a_fork.owner
     # have 2 PRs required for the freeze
-    with repo_a:
-        repo_a.make_commits(master_heads[0], Commit('super important file', tree={'g': 'x'}), ref='heads/apr')
-        pr_required_a = repo_a.make_pr(target='master', head='apr')
-    with repo_c:
-        repo_c.make_commits(master_heads[2], Commit('update thing', tree={'f': '2'}), ref='heads/cpr')
-        pr_required_c = repo_c.make_pr(target='master', head='cpr')
+    with repo_a, a_fork:
+        a_fork.make_commits(master_heads[0], Commit('super important file', tree={'g': 'x'}), ref='heads/apr')
+        pr_required_a = repo_a.make_pr(target='master', head=f'{owner}:apr', title="xxx")
+    with repo_c, c_fork:
+        c_fork.make_commits(master_heads[2], Commit('update thing', tree={'f': '2'}), ref='heads/cpr')
+        pr_required_c = repo_c.make_pr(target='master', head=f'{owner}:cpr', title="yyy")
     # have 3 release PRs, only the first one updates the tree (version file)
-    with repo_a:
-        repo_a.make_commits(
+    with repo_a, a_fork:
+        a_fork.make_commits(
             master_heads[0],
             Commit('Release 1.1 (A)', tree={'version': '1.1'}),
             ref='heads/release-1.1'
         )
-        pr_rel_a = repo_a.make_pr(target='master', head='release-1.1')
-    with repo_b:
-        repo_b.make_commits(
+        pr_rel_a = repo_a.make_pr(target='master', head=f'{owner}:release-1.1', title="zzz")
+    with repo_b, b_fork:
+        b_fork.make_commits(
             master_heads[1],
             Commit('Release 1.1 (B)', tree={'version': '1.1'}),
             ref='heads/release-1.1'
         )
-        pr_rel_b = repo_b.make_pr(target='master', head='release-1.1')
-    with repo_c:
-        repo_c.make_commits(master_heads[2], Commit("Some change", tree={'a': '1'}), ref='heads/whocares')
-        pr_other = repo_c.make_pr(target='master', head='whocares')
-        repo_c.make_commits(
+        pr_rel_b = repo_b.make_pr(target='master', head=f'{owner}:release-1.1', title="000")
+    with repo_c, c_fork:
+        c_fork.make_commits(master_heads[2], Commit("Some change", tree={'a': '1'}), ref='heads/whocares')
+        pr_other = repo_c.make_pr(target='master', head=f'{owner}:whocares', title="111")
+        c_fork.make_commits(
             master_heads[2],
             Commit('Release 1.1 (C)', tree={'version': '1.1'}),
             ref='heads/release-1.1'
         )
-        pr_rel_c = repo_c.make_pr(target='master', head='release-1.1')
+        pr_rel_c = repo_c.make_pr(target='master', head=f'{owner}:release-1.1', title="222")
     # have one bump PR on repo A
-    with repo_a:
-        repo_a.make_commits(
+    with repo_a, a_fork:
+        a_fork.make_commits(
             master_heads[0],
             Commit("Bump A", tree={'version': '1.2-alpha'}),
             ref='heads/bump-1.1',
         )
-        pr_bump_a = repo_a.make_pr(target='master', head='bump-1.1')
+        pr_bump_a = repo_a.make_pr(target='master', head=f'{owner}:bump-1.1', title="333")
     return master_heads, (pr_required_a, None, pr_required_c), (pr_rel_a, pr_rel_b, pr_rel_c), pr_bump_a, pr_other
 
 def test_freeze_subset(env, project, repo_a, repo_b, repo_c, users, config):
