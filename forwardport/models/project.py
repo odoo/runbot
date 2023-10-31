@@ -348,7 +348,8 @@ class PullRequests(models.Model):
                 })
 
         if vals.get('parent_id') and 'source_id' not in vals:
-            vals['source_id'] = self.browse(vals['parent_id']).root_id.id
+            parent = self.browse(vals['parent_id'])
+            vals['source_id'] = (parent.source_id or parent).id
         if vals.get('state') == 'merged':
             vals['merge_date'] = fields.Datetime.now()
         r = super().write(vals)
