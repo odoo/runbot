@@ -222,7 +222,11 @@ class BuildError(models.Model):
         return ['-%s' % tag for tag in self._test_tags_list()]
 
     def _search_version(self, operator, value):
-        return [('build_ids.version_id', operator, value)]
+        exclude_domain = []
+        if operator == '=':
+            exclude_ids = self.env['runbot.build.error'].search([('version_ids', '!=', value)])
+            exclude_domain = [('id', 'not in', exclude_ids.ids)]
+        return [('build_ids.version_id', operator, value)] + exclude_domain
 
     def _search_trigger_ids(self, operator, value):
         return [('build_ids.trigger_id', operator, value)]
