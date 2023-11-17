@@ -150,7 +150,7 @@
                   decoration-success="fixing_pr_id and not test_tags and not fixing_pr_alive"
                   decoration-warning="test_tags and fixing_pr_id and not fixing_pr_alive"
                   multi_edit="1"
-                  create="False"
+                  create="false"
                   >
                 <header>
                   <button name="%(runbot.runbot_open_bulk_wizard)d" string="Bulk Update" type="action" groups="runbot.group_runbot_admin,runbot.group_runbot_error_manager"/>
@@ -194,6 +194,7 @@
           <separator/>
           <filter string="Not Assigned" name="not_assigned_errors" domain="[('responsible', '=', False)]"/>
           <filter string="Assigned" name="assigned_errors" domain="[('responsible', '!=', False)]"/>
+          <separator/>
           <filter string="Having a PR" name="pr_set_errors" domain="[('fixing_pr_id', '!=', False)]"/>
           <filter string="Fixing PR is closed" name="pr_closed_errors" domain="[('fixing_pr_id', '!=', False), ('fixing_pr_id.alive', '=', False)]"/>
           <filter string="Fixing PR is open" name="pr_open_errors" domain="[('fixing_pr_id', '!=', False), ('fixing_pr_id.alive', '=', True)]"/>
