@@ -472,7 +472,6 @@ class Runbot(Controller):
 
         # Sort & Filter
         sortby = kwargs.get('sortby', 'count')
-        filterby = kwargs.get('filterby', 'not_one')
         searchbar_sortings = {
             'date': {'label': 'Recently Seen', 'order': 'last_seen_date desc'},
             'count': {'label': 'Nb Seen', 'order': 'build_count desc'},
@@ -483,6 +482,16 @@ class Runbot(Controller):
             'unassigned': {'label': 'Unassigned', 'domain': [('responsible', '=', False)]},
             'not_one': {'label': 'Seen more than once', 'domain': [('build_count', '>', 1)]},
         }
+
+        for trigger in team.build_error_ids.trigger_ids if team else []:
+            k = f'trigger_{trigger.name.lower().replace(" ", "_")}'
+            searchbar_filters.update(
+                {k: {'label': f'Trigger {trigger.name}', 'domain': [('trigger_ids', '=', trigger.id)]}}
+            )
+
+        filterby = kwargs.get('filterby', 'not_one')
+        if filterby not in searchbar_filters:
+            filterby = 'not_one'
         domain = expression.AND([domain, searchbar_filters[filterby]['domain']])
 
         qctx = {
