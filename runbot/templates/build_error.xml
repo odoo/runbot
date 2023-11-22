@@ -9,6 +9,7 @@
               <div class="col">Last seen date</div>
               <div class="col col-md-3">Module</div>
               <div class="col col-md-5">Summary</div>
+              <div class="col">Triggers</div>
               <div class="col">Assigned to</div>
               <div class="col">&amp;nbsp;</div>
             </div>
@@ -25,6 +26,11 @@
                     <i class="fa fa-minus"/>
                   </button>
                   <code><t t-esc="build_error.summary"/></code>
+                </div>
+                <div class="col">
+                  <t t-foreach="build_error.trigger_ids" t-as="trigger">
+                    <span class="badge badge-pill badge-light small"><t t-esc="trigger.name"/></span>
+                  </t>
                 </div>
                 <div class="col">
                   <t t-if="build_error.responsible" t-esc="build_error.responsible.name"/>
