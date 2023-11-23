@@ -191,7 +191,7 @@ class BuildError(models.Model):
         for fingerprint, logs in hash_dict.items():
             build_errors |= self.env['runbot.build.error'].create({
                 'content': logs[0].message,
-                'module_name': logs[0].name,
+                'module_name': logs[0].name.removeprefix('odoo.').removeprefix('addons.'),
                 'file_path': logs[0].path,
                 'function': logs[0].func,
                 'build_ids': [(6, False, [r.build_id.id for r in logs])],
