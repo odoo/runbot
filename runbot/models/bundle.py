@@ -196,17 +196,26 @@ class Bundle(models.Model):
         return "/runbot/bundle/%s" % self.id
 
     def create(self, values_list):
-        res = super().create(values_list)
-        if res.is_base:
-            model = self.browse()
-            model._get_base_ids.clear_cache(model)
-        return res
+        records = super().create(values_list)
+        for record in records:
+            if records.is_base:
+                model = self.browse()
+                model.env.registry.clear_cache()
+            elif record.project_id.tmp_prefix and record.name.startswith(record.project_id.tmp_prefix):
+                record['no_build'] = True
+            elif record.project_id.staging_prefix and record.name.startswith(record.project_id.staging_prefix):
+                name = record.name.removeprefix(record.project_id.staging_prefix, '')
+                base = record.env['runbot.bundle'].search([('name', '=', name), ('project_id', '=', record.project_id.id), ('is_base', '=', True)], limit=1)
+                record['build_all'] = True
+                if base:
+                    record['defined_base_id'] = base
+        return records
 
     def write(self, values):
         res = super().write(values)
         if 'is_base' in values:
             model = self.browse()
-            model._get_base_ids.clear_cache(model)
+            model.env.registry.clear_cache()
         return res
 
     def _force(self, category_id=None):

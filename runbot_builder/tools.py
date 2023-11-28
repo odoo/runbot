@@ -59,6 +59,10 @@ class RunbotClient():
                 try:
                     self.host.last_start_loop = fields.Datetime.now()
                     self.env.cr.commit()
+                    if self.env.registry != self.pool.check_signaling():
+                        # the registry has changed, reload self in the new registry
+                        self.env.reset()
+                        self.env = self.env() #not sure
                     self.count = self.count % self.max_count
                     if self.host.paused:
                         sleep_time = 5

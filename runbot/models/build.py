@@ -173,7 +173,7 @@ class BuildResult(models.Model):
     keep_host = fields.Boolean('Keep host on rebuild and for children')
 
     port = fields.Integer('Port')
-    dest = fields.Char(compute='_compute_dest', type='char', string='Dest', readonly=1, store=True)
+    dest = fields.Char(compute='_compute_dest', type='char', string='Dest', readonly=True, store=True)
     domain = fields.Char(compute='_compute_domain', type='char', string='URL')
     # logs and stats
     log_ids = fields.One2many('ir.logging', 'build_id', string='Logs')

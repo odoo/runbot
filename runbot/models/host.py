@@ -124,7 +124,6 @@ class Host(models.Model):
         """ build docker images needed by locally pending builds"""
         _logger.info('Building docker images...')
         self.ensure_one()
-        self.clear_caches()  # needed to ensure that content is updated on all hosts
         for dockerfile in self.env['runbot.dockerfile'].search([('to_build', '=', True)]):
             self._docker_build_dockerfile(dockerfile)
         _logger.info('Done...')

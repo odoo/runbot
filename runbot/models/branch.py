@@ -30,14 +30,14 @@ class Branch(models.Model):
     pr_body = fields.Char('Pr Body')
     pr_author = fields.Char('Pr Author')
 
-    pull_head_name = fields.Char(compute='_compute_branch_infos', string='PR HEAD name', readonly=1, store=True)
+    pull_head_name = fields.Char(compute='_compute_branch_infos', string='PR HEAD name', readonly=True, store=True)
     pull_head_remote_id = fields.Many2one('runbot.remote', 'Pull head repository', compute='_compute_branch_infos', store=True, index=True)
     target_branch_name = fields.Char(compute='_compute_branch_infos', string='PR target branch', store=True)
     reviewers = fields.Char('Reviewers')
 
     reflog_ids = fields.One2many('runbot.ref.log', 'branch_id')
 
-    branch_url = fields.Char(compute='_compute_branch_url', string='Branch url', readonly=1)
+    branch_url = fields.Char(compute='_compute_branch_url', string='Branch url', readonly=True)
     dname = fields.Char('Display name', compute='_compute_dname', search='_search_dname')
 
     alive = fields.Boolean('Alive', default=True)

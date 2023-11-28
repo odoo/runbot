@@ -39,7 +39,7 @@ class Version(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         model = self.browse()
-        model._get_id.clear_cache(model)
+        model.env.registry.clear_cache()
         return super().create(vals_list)
 
     def _get(self, name):

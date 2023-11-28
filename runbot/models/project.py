@@ -18,7 +18,8 @@ class Project(models.Model):
     master_bundle_id = fields.Many2one('runbot.bundle', string='Master bundle')
     dummy_bundle_id = fields.Many2one('runbot.bundle', string='Dummy bundle')
     always_use_foreign = fields.Boolean('Use foreign bundle', help='By default, check for the same bundle name in another project to fill missing commits.', default=False)
-
+    tmp_prefix = fields.Char('tmp branches prefix', default="tmp.")
+    staging_prefix = fields.Char('staging branches prefix', default="staging.")
 
     @api.model_create_multi
     def create(self, vals_list):
