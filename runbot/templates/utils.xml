@@ -275,7 +275,7 @@
                         Database selector
                     </a>
                 </t>
-                <a class="dropdown-item" t-if="bu.global_state in ['done','running'] or requested_action == 'deathrow'" groups="base.group_user" href="#" data-runbot="rebuild" t-att-data-runbot-build="bu['id']" title="Retry this build, usefull for false positive">
+                <a class="dropdown-item" t-if="bu.global_state in ['done','running'] or bu.requested_action == 'deathrow'" groups="base.group_user" href="#" data-runbot="rebuild" t-att-data-runbot-build="bu['id']" title="Retry this build, usefull for false positive">
                     <i class="fa fa-refresh"/>
                     Rebuild
                 </a>
