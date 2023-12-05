@@ -83,6 +83,7 @@ class Runbot(Controller):
         '/runbot/submit'
     ], type='http', auth="public", methods=['GET', 'POST'], csrf=False)
     def submit(self, more=False, redirect='/', keep_search=False, category=False, filter_mode=False, update_triggers=False, **kwargs):
+        assert redirect.startswith('/runbot/')
         response = werkzeug.utils.redirect(redirect)
         response.set_cookie('more', '1' if more else '0')
         response.set_cookie('keep_search', '1' if keep_search else '0')
