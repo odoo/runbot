@@ -1,4 +1,5 @@
-# -*- coding: utf-8 -*-
+import hashlib
+
 from odoo.exceptions import ValidationError
 from .common import RunbotCase
 
@@ -30,6 +31,82 @@ class TestBuildError(RunbotCase):
         super(TestBuildError, self).setUp()
         self.BuildError = self.env['runbot.build.error']
         self.BuildErrorTeam = self.env['runbot.team']
+        self.ErrorRegex = self.env['runbot.error.regex']
+
+    def test_create_write_clean(self):
+
+        self.ErrorRegex.create({
+            'regex': '\d+',
+            're_type': 'cleaning',
+        })
+
+        error_x = self.BuildError.create({
+            'content': 'foo bar 242',
+        })
+
+        expected = 'foo bar %'
+        expected_hash = hashlib.sha256(expected.encode()).hexdigest()
+        self.assertEqual(error_x.cleaned_content, expected)
+        self.assertEqual(error_x.fingerprint, expected_hash)
+
+        # Let's ensure that the fingerprint changes if we clean with an additional regex
+        self.ErrorRegex.create({
+            'regex': 'bar',
+            're_type': 'cleaning',
+        })
+        error_x.action_clean_content()
+        expected = 'foo % %'
+        expected_hash = hashlib.sha256(expected.encode()).hexdigest()
+        self.assertEqual(error_x.cleaned_content, expected)
+        self.assertEqual(error_x.fingerprint, expected_hash)
+
+    def test_merge(self):
+        build_a = self.create_test_build({'local_result': 'ko', 'local_state': 'done'})
+        error_a = self.BuildError.create({'content': 'foo bar', 'build_ids': [(6, 0, [build_a.id])]})
+
+        build_b = self.create_test_build({'local_result': 'ko', 'local_state': 'done'})
+        error_b = self.BuildError.create({'content': 'foo bar', 'build_ids': [(6, 0, [build_b.id])]})
+
+        (error_a | error_b)._merge()
+        self.assertEqual(len(self.BuildError.search([('fingerprint', '=', error_a.fingerprint)])), 1)
+        self.assertTrue(error_a.active, 'The first merged error should stay active')
+        self.assertFalse(error_b.active, 'The second merged error should have stay deactivated')
+        self.assertIn(build_a, error_a.build_ids)
+        self.assertIn(build_b, error_a.build_ids)
+        self.assertFalse(error_b.build_ids)
+
+        error_c = self.BuildError.create({'content': 'foo foo'})
+
+        # let's ensure we cannot merge errors with different fingerprints
+        with self.assertRaises(AssertionError):
+            (error_a | error_c)._merge()
+
+    def test_merge_linked(self):
+        top_error = self.BuildError.create({'content': 'foo foo', 'active': False})
+
+        build_a = self.create_test_build({'local_result': 'ko', 'local_state': 'done'})
+        error_a = self.BuildError.create({'content': 'foo bar', 'parent_id': top_error.id , 'build_ids': [(6, 0, [build_a.id])]})
+
+        build_b = self.create_test_build({'local_result': 'ko', 'local_state': 'done'})
+        error_b = self.BuildError.create({'content': 'foo bar', 'test_tags': 'footag', 'build_ids': [(6, 0, [build_b.id])]})
+        linked_error = self.BuildError.create({'content': 'foo foo bar', 'parent_id': error_b.id})
+
+        (error_a | error_b)._merge()
+        self.assertEqual(len(self.BuildError.search([('fingerprint', '=', error_a.fingerprint)])), 1)
+        self.assertTrue(error_a.active, 'The first merged error should stay active')
+        self.assertFalse(error_b.active, 'The second merged error should have stay deactivated')
+        self.assertIn(build_a, error_a.build_ids)
+        self.assertIn(build_b, error_a.build_ids)
+        self.assertFalse(error_b.build_ids)
+        self.assertEqual(top_error.test_tags, 'footag')
+        self.assertEqual(top_error.active, True)
+        self.assertEqual(linked_error.parent_id, error_a, 'Linked errors to a merged one should be now linked to the new one')
+
+        tagged_error = self.BuildError.create({'content': 'foo foo', 'test_tags': 'bartag'})
+        (top_error | tagged_error)._merge()
+        self.assertTrue(top_error.active)
+        self.assertTrue(tagged_error.active, 'A differently tagged error cannot be deactivated by the merge')
+
 
     def test_build_scan(self):
         IrLog = self.env['ir.logging']
