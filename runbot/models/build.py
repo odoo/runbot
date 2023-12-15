@@ -1001,7 +1001,7 @@ class BuildResult(models.Model):
         self._log('wake_up', f'Wake up initiated by {user.name}')
         if self.local_state != 'done':
             self._log('wake_up', 'Impossibe to wake up, state is not done')
-        elif self.parent_id and not user.has_group('runbot.group_runbot_advanced_user'):
+        elif self.parent_id.database_ids and not user.has_group('runbot.group_runbot_advanced_user'):
             self._log('wake_up', 'Waking up child builds is for advanced users only')
         else:
             self.requested_action = 'wake_up'
