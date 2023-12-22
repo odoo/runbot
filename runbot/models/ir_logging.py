@@ -55,7 +55,7 @@ class IrLogging(models.Model):
         for ir_logging in self:
             ir_logging.error_id = False
             if ir_logging.level in ('ERROR', 'CRITICAL', 'WARNING') and ir_logging.type == 'server':
-                fingerprints[self.env['runbot.build.error']._digest(cleaning_regexes._r_sub('%', ir_logging.message))].append(ir_logging)
+                fingerprints[self.env['runbot.build.error']._digest(cleaning_regexes._r_sub(ir_logging.message))].append(ir_logging)
         for build_error in self.env['runbot.build.error'].search([('fingerprint', 'in', list(fingerprints.keys()))], order='active asc'):
             for ir_logging in fingerprints[build_error.fingerprint]:
                 ir_logging.error_id = build_error.id

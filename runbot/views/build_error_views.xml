@@ -221,6 +221,7 @@
               <group name="build_regex_group">
                 <field name="regex"/>
                 <field name="re_type"/>
+                <field name="replacement" attrs="{'invisible': [('re_type', '!=', 'cleaning')]}"/>
               </group>
             </sheet>
             <div class="oe_chatter">
@@ -239,6 +240,7 @@
                 <field name="sequence" widget="handle"/>
                 <field name="regex"/>
                 <field name="re_type"/>
+                <field name="replacement"/>
             </tree>
         </field>
     </record>
