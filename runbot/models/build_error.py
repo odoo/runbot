@@ -63,7 +63,7 @@ class BuildError(models.Model):
         cleaners = self.env['runbot.error.regex'].search([('re_type', '=', 'cleaning')])
         for vals in vals_list:
             content = vals.get('content')
-            cleaned_content = cleaners._r_sub('%', content)
+            cleaned_content = cleaners._r_sub(content)
             vals.update({
                 'cleaned_content': cleaned_content,
                 'fingerprint': self._digest(cleaned_content)
@@ -170,7 +170,7 @@ class BuildError(models.Model):
         for log in ir_logs:
             if search_regs._r_search(log.message):
                 continue
-            fingerprint = self._digest(cleaning_regs._r_sub('%', log.message))
+            fingerprint = self._digest(cleaning_regs._r_sub(log.message))
             hash_dict[fingerprint] |= log
 
         build_errors = self.env['runbot.build.error']
@@ -292,7 +292,7 @@ class BuildError(models.Model):
         changed_fingerprints = set()
         for build_error in self:
             fingerprint_before = build_error.fingerprint
-            build_error.cleaned_content = cleaning_regs._r_sub('%', build_error.content)
+            build_error.cleaned_content = cleaning_regs._r_sub(build_error.content)
             if fingerprint_before != build_error.fingerprint:
                 changed_fingerprints.add(build_error.fingerprint)
 
@@ -334,11 +334,12 @@ class ErrorRegex(models.Model):
     regex = fields.Char('Regular expression')
     re_type = fields.Selection([('filter', 'Filter out'), ('cleaning', 'Cleaning')], string="Regex type")
     sequence = fields.Integer('Sequence', default=100)
+    replacement = fields.Char('Replacement string', help="String used as a replacment in cleaning. '%' if not set")
 
-    def _r_sub(self, replace, s):
-        """ replaces patterns from the recordset by replace in the given string """
+    def _r_sub(self, s):
+        """ replaces patterns from the recordset by replacement's or '%' in the given string """
         for c in self:
-            s = re.sub(c.regex, '%', s)
+            s = re.sub(c.regex, c.replacement or '%', s)
         return s
 
     def _r_search(self, s):

@@ -113,7 +113,10 @@ class TestBuildError(RunbotCase):
         ko_build = self.create_test_build({'local_result': 'ok', 'local_state': 'testing'})
         ok_build = self.create_test_build({'local_result': 'ok', 'local_state': 'running'})
 
-
+        cleaner = self.env['runbot.error.regex'].create({
+            'regex': '^FAIL: ',
+            're_type': 'cleaning',
+        })
 
         error_team = self.BuildErrorTeam.create({
             'name': 'test-error-team',
@@ -143,6 +146,8 @@ class TestBuildError(RunbotCase):
         ok_build._parse_logs()
         build_error = self.BuildError.search([('build_ids', 'in', [ko_build.id])])
         self.assertTrue(build_error)
+        self.assertTrue(build_error.fingerprint.startswith('af0e88f3'))
+        self.assertTrue(build_error.cleaned_content.startswith('%'), 'The cleaner should have replace "FAIL: " with a "%" sign by default')
         self.assertIn(ko_build, build_error.build_ids, 'The parsed build should be added to the runbot.build.error')
         self.assertFalse(self.BuildError.search([('build_ids', 'in', [ok_build.id])]), 'A successful build should not associated to a runbot.build.error')
         self.assertEqual(error_team, build_error.team_id)
