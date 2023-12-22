@@ -8,6 +8,7 @@
                 <group>
                     <field name="name"/>
                     <field name="keep_sticky_running"/>
+                    <field name="always_use_foreign"/>
                     <field name="dockerfile_id"/>
                     <field name="group_ids"/>
                     <field name="trigger_ids"/>
@@ -58,6 +59,7 @@
                             <field name="no_auto_run"/>
                             <field name="priority"/>
                             <field name="build_all"/>
+                            <field name="always_use_foreign"/>
                             <field name="dockerfile_id"/>
                             <field name="host_id" readonly="0"/>
                             <field name="commit_limit"/>
