@@ -181,11 +181,13 @@ class Batch(models.Model):
         dependency_repos = triggers.mapped('dependency_ids')
         all_repos = triggers.mapped('repo_ids') | dependency_repos
         missing_repos = all_repos - pushed_repo
+        foreign_projects = dependency_repos.mapped('project_id') - project
 
         ######################################
         # Find missing commits
         ######################################
         def _fill_missing(branch_commits, match_type):
+            used_branches = []
             if branch_commits:
                 for branch, commit in branch_commits.items():  # branch first in case pr is closed.
                     nonlocal missing_repos
@@ -203,6 +205,8 @@ class Batch(models.Model):
                             values['merge_base_commit_id'] = commit.id
                         self.write({'commit_link_ids': [(0, 0, values)]})
                         missing_repos -= commit.repo_id
+                        used_branches.append(branch)
+            return used_branches
 
         # CHECK branch heads consistency
         branch_per_repo = {}
@@ -249,6 +253,14 @@ class Batch(models.Model):
                 if batches:
                     self.base_reference_batch_id = batches[0]
 
+            if missing_repos and bundle.always_use_foreign and foreign_projects:
+                self._log('Starting by filling foreign repo')
+                foreign_bundles = bundle.search([('name', '=', bundle.name), ('project_id', 'in', foreign_projects.ids)])
+                used_branches = _fill_missing({branch: branch.head for branch in foreign_bundles.mapped('branch_ids').sorted('is_pr', reverse=True)}, 'head')
+                if used_branches:
+                    commits = ', '.join([f'[{branch.repo_id.name}]({branch.bundle_id.name})' for branch in used_branches])
+                    self._log(f'Found {len(used_branches)} commits in foreigh repo: {commits}')
+
             batch = self.base_reference_batch_id
             if batch:
                 if missing_repos:
@@ -279,14 +291,9 @@ class Batch(models.Model):
 
         # 4. FIND missing commit in foreign project
         if missing_repos:
-            foreign_projects = dependency_repos.mapped('project_id') - project
             if foreign_projects:
-                self._log('Not all commit found. Fallback on foreign base branches heads.')
-                foreign_bundles = bundle.search([('name', '=', bundle.name), ('project_id', 'in', foreign_projects.ids)])
-                _fill_missing({branch: branch.head for branch in foreign_bundles.mapped('branch_ids').sorted('is_pr', reverse=True)}, 'head')
-                if missing_repos:
-                    foreign_bundles = bundle.search([('name', '=', bundle.base_id.name), ('project_id', 'in', foreign_projects.ids)])
-                    _fill_missing({branch: branch.head for branch in foreign_bundles.mapped('branch_ids')}, 'base_head')
+                base_foreign_bundles = bundle.search([('name', '=', bundle.base_id.name), ('project_id', 'in', foreign_projects.ids)])
+                _fill_missing({branch: branch.head for branch in base_foreign_bundles.mapped('branch_ids')}, 'base_head')
 
         # CHECK missing commit
         if missing_repos:

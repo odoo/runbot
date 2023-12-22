@@ -17,6 +17,8 @@ class Project(models.Model):
     token = fields.Char("Github token", groups="runbot.group_runbot_admin")
     master_bundle_id = fields.Many2one('runbot.bundle', string='Master bundle')
     dummy_bundle_id = fields.Many2one('runbot.bundle', string='Dummy bundle')
+    always_use_foreign = fields.Boolean('Use foreigh bundle', help='By default, check for the same bundle name in another project to fill missing commits.', default=False)
+
 
     @api.model_create_multi
     def create(self, vals_list):

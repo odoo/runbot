@@ -7,8 +7,6 @@ from collections import defaultdict
 from odoo import models, fields, api, tools
 from ..common import dt2time, s2human_long
 
-_logger = logging.getLogger(__name__)
-
 
 class Bundle(models.Model):
     _name = 'runbot.bundle'
@@ -23,6 +21,7 @@ class Bundle(models.Model):
     no_build = fields.Boolean('No build')
     no_auto_run = fields.Boolean('No run')
     build_all = fields.Boolean('Force all triggers')
+    always_use_foreign = fields.Boolean('Use foreigh bundle', help='By default, check for the same bundle name in another project to fill missing commits.', default=lambda self: self.project_id.always_use_foreign)
     modules = fields.Char("Modules to install", help="Comma-separated list of modules to install and test.")
 
     batch_ids = fields.One2many('runbot.batch', 'bundle_id')
