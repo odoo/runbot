@@ -25,6 +25,7 @@ class BuildError(models.Model):
     cleaned_content = fields.Text('Cleaned error message')
     summary = fields.Char('Content summary', compute='_compute_summary', store=False)
     module_name = fields.Char('Module name')  # name in ir_logging
+    content_module = fields.Char('Module from content', compute='_compute_content_module')  # name in ir_logging
     file_path = fields.Char('File Path')  # path in ir logging
     function = fields.Char('Function name')  # func name in ir logging
     fingerprint = fields.Char('Error fingerprint', index=True)
@@ -63,7 +64,7 @@ class BuildError(models.Model):
         cleaners = self.env['runbot.error.regex'].search([('re_type', '=', 'cleaning')])
         for vals in vals_list:
             content = vals.get('content')
-            cleaned_content = cleaners._r_sub('%', content)
+            cleaned_content = cleaners._r_sub(content)
             vals.update({
                 'cleaned_content': cleaned_content,
                 'fingerprint': self._digest(cleaned_content)
@@ -168,7 +169,7 @@ class BuildError(models.Model):
         for log in ir_logs:
             if search_regs._r_search(log.message):
                 continue
-            fingerprint = self._digest(cleaning_regs._r_sub('%', log.message))
+            fingerprint = self._digest(cleaning_regs._r_sub(log.message))
             hash_dict[fingerprint] |= log
 
         build_errors = self.env['runbot.build.error']
@@ -242,18 +243,23 @@ class BuildError(models.Model):
     def action_clean_content(self):
         cleaning_regs = self.env['runbot.error.regex'].search([('re_type', '=', 'cleaning')])
         for build_error in self:
-            build_error.cleaned_content = cleaning_regs._r_sub('%', build_error.content)
+            build_error.cleaned_content = cleaning_regs._r_sub(build_error.content)
+
+    def _compute_content_module(self):
+        modules_regs = self.env['runbot.error.regex'].search([('re_type', '=', 'module')])
+        for build_error in self:
+            build_error.content_module = modules_regs._r_search(build_error.content).get('module')
 
     def action_assign(self):
-        if not any((not record.responsible and not record.team_id and record.file_path and not record.parent_id) for record in self):
+        errors_to_assign = self.filtered(lambda e : (e.file_path and not e.responsible and not  e.team_id and not e.parent_id))
+        if not errors_to_assign:
             return
         teams = self.env['runbot.team'].search(['|', ('path_glob', '!=', False), ('module_ownership_ids', '!=', False)])
         repos = self.env['runbot.repo'].search([])
-        for record in self:
-            if not record.responsible and not record.team_id and record.file_path and not record.parent_id:
-                team = teams._get_team(record.file_path, repos)
-                if team:
-                    record.team_id = team
+        for error in errors_to_assign:
+            team = teams._get_team(file_path=error.file_path, repos=repos, module=error.content_module)
+            if team:
+                error.team_id = team
 
 
 class BuildErrorTag(models.Model):
@@ -274,20 +280,39 @@ class ErrorRegex(models.Model):
     _order = 'sequence, id'
 
     regex = fields.Char('Regular expression')
-    re_type = fields.Selection([('filter', 'Filter out'), ('cleaning', 'Cleaning')], string="Regex type")
+    re_type = fields.Selection([('filter', 'Filter out'), ('cleaning', 'Cleaning'), ('module', 'Module')], string="Regex type")
     sequence = fields.Integer('Sequence', default=100)
+    replacement_pattern = fields.Char('Replacement pattern', default='%')
 
-    def _r_sub(self, replace, s):
+    #debug fields
+    example_error = fields.Text('Error sample')
+    example_output = fields.Text('Output', compute='_compute_example_output')
+
+
+    @api.depends('example_error', 'regex', 're_type', 'replacement_pattern')
+    def _compute_example_output(self):
+        for error in self:
+            method = error._r_sub if self.re_type == 'cleaning' else error._r_search
+            try:
+                if self.re_type == 'filtered':
+                    self.example_output = str(method(self.example_error) or '')
+            except re.error as e:
+                self.example_output = f'<!!ERROR!!>: {e}'
+
+    def _r_sub(self, s):
         """ replaces patterns from the recordset by replace in the given string """
-        for c in self:
-            s = re.sub(c.regex, '%', s)
+        for replace in self:
+            s = re.sub(replace.regex, replace.replacement_pattern, s)
         return s
 
     def _r_search(self, s):
         """ Return True if one of the regex is found in s """
-        for filter in self:
-            if re.search(filter.regex, s):
-                return True
+        for search in self:
+            if result := re.search(search.regex, s):
+                groupdict = result.groupdict()
+                if len(groupdict) == 1:
+                    return groupdict
+                return result.group()
         return False
 
 
