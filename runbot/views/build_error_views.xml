@@ -218,9 +218,16 @@
         <field name="arch" type="xml">
           <form>
             <sheet>
-              <group name="build_regex_group">
-                <field name="regex"/>
-                <field name="re_type"/>
+              <group>
+                <group string="Config">
+                  <field name="re_type"/>
+                  <field name="regex"/>
+                  <field name="replacement_pattern" attrs="{'invisible': [('re_type', '!=', 'cleaning')]}"/>
+                <group name="build_regex_group">
+                </group string="Testing">
+                  <field name="example_error"/>
+                  <field name="example_output"/>
+                </group>
               </group>
             </sheet>
             <div class="oe_chatter">

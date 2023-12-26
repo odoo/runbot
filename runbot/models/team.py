@@ -54,7 +54,7 @@ class RunbotTeam(models.Model):
         return super().create(vals_list)
 
     @api.model
-    def _get_team(self, file_path, repos=None):
+    def _get_team(self, file_path=None, repos=None, module=None):
         # path = file_path.removeprefix('/data/build/')
         path = file_path
         if path.startswith('/data/build/'):
@@ -62,14 +62,15 @@ class RunbotTeam(models.Model):
 
         repo_name = path.split('/')[0]
         module = None
-        if repos:
-            repos = repos.filtered(lambda repo: repo.name == repo_name)
-        else:
-            repos = self.env['runbot.repo'].search([('name', '=', repo_name)])
-        for repo in repos:
-            module = repo._get_module(path)
-            if module:
-                break
+        if not module:
+            if repos:
+                repos = repos.filtered(lambda repo: repo.name == repo_name)
+            else:
+                repos = self.env['runbot.repo'].search([('name', '=', repo_name)])
+            for repo in repos:
+                module = repo._get_module(path)
+                if module:
+                    break
         if module:
             for ownership in self.module_ownership_ids.sorted(lambda t: t.is_fallback):
                 if module == ownership.module_id.name:
