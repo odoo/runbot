@@ -79,6 +79,11 @@
                             <div class="batch_row" t-foreach="batchs" t-as="batch">
                                 <t t-call="runbot.batch_tile"/>
                             </div>
+                            <div>
+                                <span class="pull-right">
+                                    <t t-call="website.pager" />
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
