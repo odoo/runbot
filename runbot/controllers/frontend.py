@@ -352,16 +352,27 @@ class Runbot(Controller):
 
     @route([
         '/runbot/branch/<model("runbot.branch"):branch>',
+        '/runbot/branch/<model("runbot.branch"):branch>/page/<int:page>'
         ], website=True, auth='public', type='http', sitemap=False)
-    def branch(self, branch=None, **kwargs):
+    def branch(self, branch=None, page=1, limit=30, **kwargs):
         pr_branch = branch.bundle_id.branch_ids.filtered(lambda rec: not rec.is_pr and rec.id != branch.id and rec.remote_id.repo_id == branch.remote_id.repo_id)[:1]
         branch_pr = branch.bundle_id.branch_ids.filtered(lambda rec: rec.is_pr and rec.id != branch.id and rec.remote_id.repo_id == branch.remote_id.repo_id)[:1]
+        reflog_count = len(branch.reflog_ids)
+        pager = request.website.pager(
+            url=f'/runbot/branch/{branch.id}',
+            total=reflog_count,
+            page=page,
+            step=30,
+        )
+        reflog_ids = branch.reflog_ids.sorted(reverse=True)[pager.get('offset', 0):pager.get('offset', 0) + limit]
         context = {
             'branch': branch,
             'project': branch.remote_id.repo_id.project_id,
             'title': 'Branch %s' % branch.name,
             'pr_branch': pr_branch,
-            'branch_pr': branch_pr
+            'branch_pr': branch_pr,
+            'reflog_ids': reflog_ids,
+            'pager': pager,
             }
 
         return request.render('runbot.branch', context)

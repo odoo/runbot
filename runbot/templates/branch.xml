@@ -27,13 +27,7 @@
                 <tr>
                   <td>Bundle:</td>
                   <td>
-                    <small>
-                      <div class="btn-toolbar mb-1" role="toolbar">
-                        <div class="btn-group btn-group-ssm w-100" role="group">
-                            <a t-attf-href="/runbot/bundle/{{branch.bundle_id.id}}" t-esc="branch.bundle_id.name" class="btn btn-default text-left" title="View Bundle Details"/>
-                        </div>
-                    </div>
-                    </small>
+                    <a t-attf-href="/runbot/bundle/{{branch.bundle_id.id}}" t-esc="branch.bundle_id.name" title="View Bundle Details"/>
                   </td>
                 </tr>
                 <t t-if="branch.is_pr">
@@ -57,6 +51,9 @@
                   </tr>
                 </t>
               </table>
+              <span class="pull-right">
+                <t t-call="website.pager" />
+              </span>
                 <table t-if="branch.reflog_ids" class="table table-condensed table-stripped" style="table-layout: initial;">
                   <thead>
                       <tr>
@@ -67,10 +64,10 @@
                           <th>Subject</th>
                       </tr>
                   </thead>
-                  <tr t-foreach='branch.reflog_ids' t-as='reflog'>
-                    <td t-esc="reflog.date"/>
+                  <tr t-foreach='reflog_ids' t-as='reflog'>
+                    <td><span class="text-nowrap" t-esc="reflog.date"/></td>
                     <td><a t-attf-href="/runbot/commit/{{reflog.commit_id.id}}" t-esc="reflog.commit_id.name"/></td>
-                    <td t-esc="reflog.commit_id.date"/>
+                    <td><span class="text-nowrap" t-esc="reflog.commit_id.date"/></td>
                     <td t-esc="reflog.commit_id.author"/>
                     <td t-esc="reflog.commit_id.subject"/>
                   </tr>
