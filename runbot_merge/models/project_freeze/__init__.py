@@ -196,7 +196,7 @@ class FreezeWizard(models.Model):
         if self.bump_pr_ids and master.active_staging_id:
             self.env.cr.execute(
                 'SELECT * FROM runbot_merge_stagings WHERE id = %s FOR UPDATE NOWAIT',
-                [master.active_staging_id]
+                [master.active_staging_id.id]
             )
 
         seq = itertools.count(start=1) # start reseq at 1
