@@ -9,28 +9,24 @@ def migrate(cr, version):
     # style is like commit statuses, with the contexts at the toplevel
     # and the status info below.
     cr.execute("""
-UPDATE runbot_merge
+UPDATE runbot_merge_pull_requests
    SET previous_failure = '{}'
  WHERE previous_failure::jsonb ? 'state'
 """)
 
-    # Getting this into postgres native manipulations seems a bit too
-    # complicated, and not really necessary.
     cr.execute("""
-SELECT id, statuses::json
-  FROM runbot_merge_commit
- WHERE jsonb_path_match(statuses::jsonb, '$.*.type() != "object"')
-""")
-    updated = [
-        (id, {
-            k: {'state': r, 'target_url': None, 'description': None}
-            for k, r in st.items()
-        })
-        for id, st in cr.fetchall()
-    ]
-    execute_values(cr._obj, """
-UPDATE runbot_merge_commit c
-   SET c.statuses = data.st
-  FROM (VALUES %s) AS data (id, st)
- WHERE c.id = data.id
-""", updated)
+WITH new_statuses (id, statuses) AS (
+    SELECT id, json_object_agg(
+        key,
+        CASE WHEN jsonb_typeof(value) = 'string'
+            THEN jsonb_build_object('state', value, 'target_url', null, 'description', null)
+        ELSE value
+        END
+    ) AS statuses
+    FROM runbot_merge_commit
+    CROSS JOIN LATERAL jsonb_each(statuses::jsonb) s
+    WHERE jsonb_path_match(statuses::jsonb, '$.*.type() != "object"')
+    GROUP BY id
+)
+UPDATE runbot_merge_commit SET statuses = new_statuses.statuses FROM new_statuses WHERE runbot_merge_commit.id = new_statuses.id
+    """)
