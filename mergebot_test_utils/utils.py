@@ -8,8 +8,7 @@ MESSAGE_TEMPLATE = """{message}
 
 closes {repo}#{number}
 
-{headers}Signed-off-by: {name} <{email}>
-"""
+{headers}Signed-off-by: {name} <{email}>"""
 # target branch '-' source branch '-' base64 unique '-fw'
 REF_PATTERN = r'{target}-{source}-[a-zA-Z0-9_-]{{4}}-fw'
 
@@ -137,4 +136,6 @@ def to_pr(env, pr):
     return pr
 
 def part_of(label, pr_id, *, separator='\n\n'):
-    return f'{label}{separator}Part-of: {pr_id.display_name}\n'
+    """ Adds the "part-of" pseudo-header in the footer.
+    """
+    return f'{label}{separator}Part-of: {pr_id.display_name}'

@@ -439,7 +439,7 @@ def test_merge_fail(env, project, repo_a, repo_b, users, config):
         )
     env.run_crons()
 
-    pr2a_id, pr2b_id = s2 = to_pr(env, pr2a) | to_pr(env, pr2b)
+    s2 = to_pr(env, pr2a) | to_pr(env, pr2b)
     st = env['runbot_merge.stagings'].search([])
     assert set(st.batch_ids.prs.ids) == set(s2.ids)
 
@@ -457,14 +457,12 @@ def test_merge_fail(env, project, repo_a, repo_b, users, config):
         c['commit']['message']
         for c in repo_a.log('heads/staging.master')
     ] == [
-        f"""\
-commit_do-b-thing_00
+        """commit_do-b-thing_00
 
-closes {pr2a_id.display_name}
+closes %s
 
-Related: {pr2b_id.display_name}
-Signed-off-by: {reviewer}
-""",
+Related: %s
+Signed-off-by: %s""" % (s2[0].display_name, s2[1].display_name, reviewer),
         'initial'
     ], "dummy commit + squash-merged PR commit + root commit"
 
