@@ -2916,16 +2916,15 @@ class TestReviewing(object):
     def test_self_review_fail(self, env, repo, users, config):
         """ Normal reviewers can't self-review
         """
+        reviewer = config['role_reviewer']['token']
         with repo:
-            m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
-            m2 = repo.make_commit(m, 'second', None, tree={'m': 'm', 'm2': 'm2'})
-            repo.make_ref('heads/master', m2)
-
-            c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
-            prx = repo.make_pr(title='title', body='body', target='master', head=c1, token=config['role_reviewer']['token'])
+            [m, _] = repo.make_commits(None, Commit('initial', tree={'m': 'm'}), Commit('second', tree={'m2': 'm2'}), ref='heads/master')
+            with repo.fork(token=reviewer) as f:
+                f.make_commits(m, Commit('first', tree={'m': 'c1'}), ref='heads/change')
+            prx = repo.make_pr(title='title', body='body', target='master', head=f'{f.owner}:change', token=reviewer)
             repo.post_status(prx.head, 'success', 'legal/cla')
             repo.post_status(prx.head, 'success', 'ci/runbot')
-            prx.post_comment('hansen r+', config['role_reviewer']['token'])
+            prx.post_comment('hansen r+', reviewer)
         env.run_crons()
 
         assert prx.user == users['reviewer']
@@ -2944,16 +2943,15 @@ class TestReviewing(object):
     def test_self_review_success(self, env, repo, users, config):
         """ Some users are allowed to self-review
         """
+        self_reviewer = config['role_self_reviewer']['token']
         with repo:
-            m = repo.make_commit(None, 'initial', None, tree={'m': 'm'})
-            m2 = repo.make_commit(m, 'second', None, tree={'m': 'm', 'm2': 'm2'})
-            repo.make_ref('heads/master', m2)
-
-            c1 = repo.make_commit(m, 'first', None, tree={'m': 'c1'})
-            prx = repo.make_pr(title='title', body='body', target='master', head=c1, token=config['role_self_reviewer']['token'])
+            [m, _] = repo.make_commits(None, Commit('initial', tree={'m': 'm'}), Commit('second', tree={'m': 'm', 'm2': 'm2'}), ref='heads/master')
+            with repo.fork(token=self_reviewer) as f:
+                f.make_commits(m, Commit('first', tree={'m': 'c1'}), ref='heads/change')
+            prx = repo.make_pr(title='title', body='body', target='master', head=f'{f.owner}:change', token=self_reviewer)
             repo.post_status(prx.head, 'success', 'legal/cla')
             repo.post_status(prx.head, 'success', 'ci/runbot')
-            prx.post_comment('hansen r+', config['role_self_reviewer']['token'])
+            prx.post_comment('hansen r+', self_reviewer)
         env.run_crons()
 
         assert prx.user == users['self_reviewer']
