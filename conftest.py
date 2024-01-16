@@ -65,7 +65,6 @@ import warnings
 import xmlrpc.client
 from contextlib import closing
 
-import psutil
 import pytest
 import requests
 
@@ -197,6 +196,7 @@ def tunnel(pytestconfig, port):
     if tunnel == '':
         yield f'http://localhost:{port}'
     elif tunnel == 'ngrok':
+        own = None
         web_addr = 'http://localhost:4040/api'
         addr = 'localhost:%d' % port
         # try to find out if ngrok is running, and if it's not attempt
@@ -205,13 +205,9 @@ def tunnel(pytestconfig, port):
             # FIXME: this is for xdist to avoid workers running ngrok at the
             #        exact same time, use lockfile instead
             time.sleep(random.SystemRandom().randint(1, 10))
-            # FIXME: use config file so we can set web_addr to something else
-            #        than localhost:4040 (otherwise we can't disambiguate
-            #        between the ngrok we started and an ngrok started by
-            #        some other user)
             requests.get(web_addr)
         except requests.exceptions.ConnectionError:
-            subprocess.Popen(NGROK_CLI, stdout=subprocess.DEVNULL)
+            own = subprocess.Popen(NGROK_CLI, stdout=subprocess.DEVNULL)
             for _ in range(5):
                 time.sleep(1)
                 with contextlib.suppress(requests.exceptions.ConnectionError):
@@ -223,8 +219,8 @@ def tunnel(pytestconfig, port):
         requests.post(f'{web_addr}/tunnels', json={
             'name': str(port),
             'proto': 'http',
-            'bind_tls': True, # only https
             'addr': addr,
+            'schemes': ['https'],
             'inspect': True,
         }).raise_for_status()
 
@@ -252,17 +248,14 @@ def tunnel(pytestconfig, port):
                     raise TimeoutError("ngrok tunnel deletion failed")
 
                 r = requests.get(f'{web_addr}/tunnels')
+                assert r.ok, f'{r.reason} {r.text}'
                 # there are still tunnels in the list -> bail
-                if r.ok and r.json()['tunnels']:
+                if not own or r.json()['tunnels']:
                     return
 
-                # ngrok is broken or all tunnels have been shut down -> try to
-                # find and kill it (but only if it looks a lot like we started it)
-                for p in psutil.process_iter():
-                    if p.name() == 'ngrok' and p.cmdline() == NGROK_CLI:
-                        p.terminate()
-                        break
-                return
+                # no more tunnels and we started ngrok -> try to kill it
+                own.terminate()
+                own.wait(30)
         else:
             raise TimeoutError("ngrok tunnel creation failed (?)")
     elif tunnel == 'localtunnel':
