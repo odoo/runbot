@@ -125,8 +125,6 @@ class Repo:
         repo = self.stdout().with_config(text=True, check=False)
 
         logger = _logger.getChild('rebase')
-        logger.debug("rebasing %s on %s (reset=%s, commits=%s)",
-                     self._repo, dest, len(commits))
         if not commits:
             raise MergeError("PR has no commits")
 

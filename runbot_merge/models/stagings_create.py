@@ -490,12 +490,17 @@ def stage_rebase_ff(pr: PullRequests, info: StagingSlice, commits: List[github.P
     msg = pr._build_merge_message(commits[-1]['commit']['message'], related_prs=related_prs)
     commits[-1]['commit']['message'] = str(msg)
     add_self_references(pr, commits[:-1])
+
+    _logger.debug("rebasing %s on %s (commits=%s)",
+                  pr.display_name, info.head, len(commits))
     head, mapping = info.repo.rebase(info.head, commits=commits)
     pr.commits_map = json.dumps({**mapping, '': head})
     return head
 
 def stage_rebase_merge(pr: PullRequests, info: StagingSlice, commits: List[github.PrCommit], related_prs: PullRequests) -> str :
     add_self_references(pr, commits)
+    _logger.debug("rebasing %s on %s (commits=%s)",
+                  pr.display_name, info.head, len(commits))
     h, mapping = info.repo.rebase(info.head, commits=commits)
     msg = pr._build_merge_message(pr, related_prs=related_prs)
 
