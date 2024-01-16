@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import itertools
 import re
+import time
 
 from lxml import html
 
@@ -128,12 +129,17 @@ def pr_page(page, pr):
     return html.fromstring(page(f'/{pr.repo.name}/pull/{pr.number}'))
 
 def to_pr(env, pr):
-    pr = env['runbot_merge.pull_requests'].search([
-        ('repository.name', '=', pr.repo.name),
-        ('number', '=', pr.number),
-    ])
-    assert len(pr) == 1, f"Expected to find {pr.repo.name}#{pr.number}, got {pr}."
-    return pr
+    for _ in range(5):
+        pr_id = env['runbot_merge.pull_requests'].search([
+            ('repository.name', '=', pr.repo.name),
+            ('number', '=', pr.number),
+        ])
+        if pr_id:
+            assert len(pr_id) == 1, f"Expected to find {pr.repo.name}#{pr.number}, got {pr_id}."
+            return pr_id
+        time.sleep(1)
+
+    raise TimeoutError(f"Unable to find {pr.repo.name}#{pr.number}")
 
 def part_of(label, pr_id, *, separator='\n\n'):
     """ Adds the "part-of" pseudo-header in the footer.

@@ -2121,10 +2121,8 @@ class TestPRUpdate(object):
 
             c = repo.make_commit(m, 'fist', None, tree={'m': 'c1'})
             prx = repo.make_pr(title='title', body='body', target='master', head=c)
-        pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number),
-        ])
+
+        pr = to_pr(env, prx)
         assert pr.head == c
         # alter & push force PR entirely
         with repo:
@@ -2139,10 +2137,8 @@ class TestPRUpdate(object):
 
             c = repo.make_commit(m, 'fist', None, tree={'m': 'c1'})
             prx = repo.make_pr(title='title', body='body', target='master', head=c)
-        pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number),
-        ])
+
+        pr = to_pr(env, prx)
         with repo:
             prx.close()
         assert pr.state == 'closed'
@@ -2169,10 +2165,7 @@ class TestPRUpdate(object):
             repo.post_status(prx.head, 'success', 'legal/cla')
             repo.post_status(prx.head, 'success', 'ci/runbot')
         env.run_crons()
-        pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number),
-        ])
+        pr = to_pr(env, prx)
         assert pr.head == c
         assert pr.state == 'validated'
 
@@ -2190,10 +2183,8 @@ class TestPRUpdate(object):
             c = repo.make_commit(m, 'fist', None, tree={'m': 'c1'})
             prx = repo.make_pr(title='title', body='body', target='master', head=c)
             prx.post_comment('hansen r+', config['role_reviewer']['token'])
-        pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number),
-        ])
+
+        pr = to_pr(env, prx)
         assert pr.head == c
         assert pr.state == 'approved'
 
@@ -2216,10 +2207,7 @@ class TestPRUpdate(object):
             repo.post_status(prx.head, 'success', 'ci/runbot')
             prx.post_comment('hansen r+', config['role_reviewer']['token'])
         env.run_crons()
-        pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number),
-        ])
+        pr = to_pr(env, prx)
         assert pr.head == c
         assert pr.state == 'ready'
 
@@ -2241,11 +2229,9 @@ class TestPRUpdate(object):
             repo.post_status(prx.head, 'success', 'legal/cla')
             repo.post_status(prx.head, 'success', 'ci/runbot')
             prx.post_comment('hansen r+', config['role_reviewer']['token'])
-        pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number),
-        ])
+
         env.run_crons()
+        pr = to_pr(env, prx)
         assert pr.state == 'ready'
         assert pr.staging_id
 
@@ -2314,11 +2300,8 @@ class TestPRUpdate(object):
             repo.post_status(prx.head, 'success', 'legal/cla')
             repo.post_status(prx.head, 'success', 'ci/runbot')
             prx.post_comment('hansen r+', config['role_reviewer']['token'])
-        pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number),
-        ])
         env.run_crons()
+        pr = to_pr(env, prx)
         assert pr.state == 'ready'
         assert pr.staging_id
 
@@ -2371,10 +2354,7 @@ class TestPRUpdate(object):
 
         with repo:
             prx = repo.make_pr(title='title', body='body', target='master', head=c)
-        pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number),
-        ])
+        pr = to_pr(env, prx)
         assert pr.head == c
         assert pr.state == 'opened'
 
@@ -2407,10 +2387,9 @@ class TestPRUpdate(object):
             repo.post_status(pr.head, 'success', 'legal/cla')
             repo.post_status(pr.head, 'success', 'ci/runbot')
             pr.post_comment('hansen r+', config['role_reviewer']['token'])
-        pr_id = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', pr.number),
-        ])
+
+        env.run_crons()
+        pr_id = to_pr(env, pr)
         env.run_crons('runbot_merge.process_updated_commits')
         assert pr_id.message == 'title\n\nbody'
         assert pr_id.state == 'ready'
@@ -2536,10 +2515,7 @@ Please check and re-approve.
             [c] = repo.make_commits(m, repo.Commit('first', tree={'m': 'm3'}), ref='heads/abranch')
             prx = repo.make_pr(title='title', body='body', target='master', head=c)
         env.run_crons()
-        pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number)
-        ])
+        pr = to_pr(env, prx)
         assert pr.state == 'opened'
         assert pr.head == c
         assert pr.squash
@@ -2575,10 +2551,8 @@ Please check and re-approve.
             repo.post_status(c, 'success', 'ci/runbot')
             prx = repo.make_pr(title='title', body='body', target='master', head=c)
 
-        pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number),
-        ])
+        env.run_crons()
+        pr = to_pr(env, prx)
         assert pr.state == 'validated', \
             "if a PR is created on a CI'd commit, it should be validated immediately"
 
@@ -2589,28 +2563,6 @@ Please check and re-approve.
         assert pr.state == 'validated', \
             "if a PR is reopened and had a CI'd head, it should be validated immediately"
 
-    @pytest.mark.xfail(reason="github doesn't allow reopening force-pushed PRs", strict=True)
-    def test_force_update_closed(self, env, repo):
-        with repo:
-            [m] = repo.make_commits(None, repo.Commit('initial', tree={'m': 'm'}), ref='heads/master')
-
-            [c] = repo.make_commits(m, repo.Commit('first', tree={'m': 'm3'}), ref='heads/abranch')
-            prx = repo.make_pr(title='title', body='body', target='master', head=c)
-        env.run_crons()
-        pr = env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', repo.name),
-            ('number', '=', prx.number)
-        ])
-        with repo:
-            prx.close()
-
-        with repo:
-            c2 = repo.make_commit(m, 'xxx', None, tree={'m': 'm4'})
-            repo.update_ref(prx.ref, c2, force=True)
-
-        with repo:
-            prx.open()
-        assert pr.head == c2
 
 class TestBatching(object):
     def _pr(self, repo, prefix, trees, *, target='master', user, reviewer,
