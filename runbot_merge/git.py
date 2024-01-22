@@ -160,7 +160,7 @@ class Repo:
 
         mapping = {}
         for original, tree in zip(commits, new_trees):
-            authorship = check(repo.show('--no-patch', '--pretty="%an%n%ae%n%ai%n%cn%n%ce"', original['sha']))
+            authorship = check(repo.show('--no-patch', '--pretty=%an%n%ae%n%ai%n%cn%n%ce', original['sha']))
             author_name, author_email, author_date, committer_name, committer_email =\
                 authorship.stdout.splitlines()
 
