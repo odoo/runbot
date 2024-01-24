@@ -277,10 +277,10 @@ class BuildError(models.Model):
         if operator == '=':
             exclude_ids = self.env['runbot.build.error'].search([('version_ids', '!=', value)])
             exclude_domain = [('id', 'not in', exclude_ids.ids)]
-        return [('build_ids.version_id', operator, value)] + exclude_domain
+        return [('build_error_link_ids.version_id', operator, value)] + exclude_domain
 
     def _search_trigger_ids(self, operator, value):
-        return [('build_ids.trigger_id', operator, value)]
+        return [('build_error_link_ids.trigger_id', operator, value)]
 
     def _get_form_url(self):
         self.ensure_one()
