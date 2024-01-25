@@ -204,6 +204,8 @@ class BuildError(models.Model):
 
     @api.model
     def _parse_logs(self, ir_logs):
+        if not ir_logs:
+            return
         regexes = self.env['runbot.error.regex'].search([])
         search_regs = regexes.filtered(lambda r: r.re_type == 'filter')
         cleaning_regs = regexes.filtered(lambda r: r.re_type == 'cleaning')
@@ -218,24 +220,19 @@ class BuildError(models.Model):
         build_errors = self.env['runbot.build.error']
         # add build ids to already detected errors
         existing_errors = self.env['runbot.build.error'].search([('fingerprint', 'in', list(hash_dict.keys())), ('active', '=', True)])
+        existing_fingerprints = existing_errors.mapped('fingerprint')
         build_errors |= existing_errors
         for build_error in existing_errors:
             logs = hash_dict[build_error.fingerprint]
-            self.env['runbot.build.error.link'].create([{
-                    'build_id': rec.build_id.id,
-                    'build_error_id': build_error.id,
-                    'log_date': rec.create_date}
-            for rec in logs if rec.build_id not in build_error.build_ids])
-
             # update filepath if it changed. This is optionnal and mainly there in case we adapt the OdooRunner log 
             if logs[0].path != build_error.file_path:
                 build_error.file_path = logs[0].path
                 build_error.function = logs[0].func
 
-            del hash_dict[build_error.fingerprint]
-
         # create an error for the remaining entries
         for fingerprint, logs in hash_dict.items():
+            if fingerprint in existing_fingerprints:
+                continue
             new_build_error = self.env['runbot.build.error'].create({
                 'content': logs[0].message,
                 'module_name': logs[0].name.removeprefix('odoo.').removeprefix('addons.'),
@@ -243,12 +240,17 @@ class BuildError(models.Model):
                 'function': logs[0].func,
             })
             build_errors |= new_build_error
-            self.env['runbot.build.error.link'].create([{
-                'build_id': rec.build_id.id,
-                'build_error_id': new_build_error.id,
-                'log_date': rec.create_date}
-            for rec in logs])
+            existing_fingerprints.append(fingerprint)
 
+        for build_error in build_errors:
+            logs = hash_dict[build_error.fingerprint]
+            for rec in logs:
+                if rec.build_id not in build_error.build_error_link_ids.build_id:
+                    self.env['runbot.build.error.link'].create({
+                        'build_id': rec.build_id.id,
+                        'build_error_id': build_error.id,
+                        'log_date': rec.create_date
+                    })
 
         if build_errors:
             window_action = {
