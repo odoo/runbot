@@ -259,7 +259,7 @@ class Batch(models.Model):
                 used_branches = _fill_missing({branch: branch.head for branch in foreign_bundles.mapped('branch_ids').sorted('is_pr', reverse=True)}, 'head')
                 if used_branches:
                     commits = ', '.join([f'[{branch.remote_id.repo_id.name}]({branch.bundle_id.name})' for branch in used_branches])
-                    self._log(f'Found {len(used_branches)} commits in foreigh repo: {commits}')
+                    self._log(f'Found {len(used_branches)} commits in foreign repo: {commits}')
 
             batch = self.base_reference_batch_id
             if batch:
