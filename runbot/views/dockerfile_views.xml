@@ -6,7 +6,7 @@
         <field name="arch" type="xml">
           <form string="Dockerfile">
             <sheet>
-              <widget name="web_ribbon" title="Empty" bg_color="bg-warning" attrs="{'invisible': [('dockerfile', '!=', '')]}"/>
+              <widget name="web_ribbon" title="Empty" bg_color="bg-warning" invisible="dockerfile != ''"/>
               <group>
                 <field name="name"/>
                 <field name="image_tag"/>

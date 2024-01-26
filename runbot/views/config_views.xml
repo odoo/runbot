@@ -6,7 +6,7 @@
         <field name="arch" type="xml">
             <form string="Build config">
                 <sheet>
-                    <div attrs="{'invisible': [('protected', '=', False)]}">
+                    <div invisible="not protected">
                         <i class="fa fa-warning text-warning"/>This record is protected and can only be edited by config administrator.
                     </div>
                     <group>
@@ -35,7 +35,7 @@
         <field name="arch" type="xml">
             <form string="Build config step">
                 <sheet>
-                    <div class="label label-warning" attrs="{'invisible': [('protected', '=', False)]}">
+                    <div class="label label-warning" invisible="not protected">
                         This record is protected and can only be edited by config administrator.
                     </div>
                     <group string="General settings">
@@ -48,7 +48,7 @@
                         <field name="default_sequence" groups="base.group_no_one"/>
                         <field name="group" groups="base.group_no_one"/>
                     </group>
-                    <group string="Stats regexes" attrs="{'invisible': [('make_stats', '=', False)]}">
+                    <group string="Stats regexes" invisible="not make_stats">
                       <field name="build_stat_regex_ids">
                           <tree string="Regexes" editable="bottom">
                               <field name="name"/>
@@ -57,34 +57,34 @@
                           </tree>
                       </field>
                     </group>
-                    <group string="Python settings" attrs="{'invisible': [('job_type', 'not in', ('python'))]}">
+                    <group string="Python settings" invisible="job_type not in 'python'">
                         <field name="python_code" widget="ace" options="{'mode': 'python'}"/>
                         <field name="python_result_code" widget="ace" options="{'mode': 'python'}"/>
                         <field name="running_job"/>
                     </group>
-                    <group string="Test settings" attrs="{'invisible': [('job_type', 'not in', ('python', 'install_odoo'))]}">
+                    <group string="Test settings" invisible="job_type not in ('python', 'install_odoo')">
                         <field name="create_db" groups="base.group_no_one"/>
                         <field name="install_modules"/>
                         <field name="db_name" groups="base.group_no_one"/>
                         <field name="cpu_limit" groups="base.group_no_one"/>
                         <field name="coverage"/>
-                        <field name="paths_to_omit" attrs="{'invisible': [('coverage', '!=', True)]}"/>
+                        <field name="paths_to_omit" invisible="not coverage"/>
                         <field name="test_enable"/>
                         <field name="test_tags"/>
                         <field name="enable_auto_tags"/>
                         <field name="sub_command"/>
                     </group>
-                    <group string="Extra Parameters" attrs="{'invisible': [('job_type', 'not in', ('python', 'install_odoo', 'test_upgrade', 'run_odoo'))]}">
+                    <group string="Extra Parameters" invisible="job_type not in ('python', 'install_odoo', 'test_upgrade', 'run_odoo')">
                         <field name="extra_params"/>
                         <field name="additionnal_env"/>
                         <field name="enable_log_db"/>
                     </group>
-                    <group string="Create settings" attrs="{'invisible': [('job_type', 'not in', ('python', 'create_build'))]}">
+                    <group string="Create settings" invisible="job_type not in ('python', 'create_build')">
                         <field name="create_config_ids" widget="many2many_tags" options="{'no_create': True}" />
                         <field name="number_builds"/>
                         <field name="make_orphan"/>
                     </group>
-                    <group attrs="{'invisible': [('job_type', 'not in', ('python', 'configure_upgrade'))]}">
+                    <group invisible="job_type not in ('python', 'configure_upgrade')">
                       <group class="col" string="Target version settings">
                         <field string="Current" name="upgrade_to_current"/>
                         <field string="Master" name="upgrade_to_master"/>
@@ -110,12 +110,12 @@
                         </field>
                       </group>
                     </group>
-                    <group string="Restore settings" attrs="{'invisible': [('job_type', '!=', 'restore')]}">
+                    <group string="Restore settings" invisible="job_type != 'restore'">
                         <field name="restore_download_db_suffix"/>
                         <field name="restore_rename_db_suffix"/>
                     </group>
 
-                    <group string="Codeowner settings" attrs="{'invisible': [('job_type', 'not in', ('codeowner', 'python'))]}">
+                    <group string="Codeowner settings" invisible="job_type not in ('codeowner', 'python')">
                         <field name="fallback_reviewer"/>
                     </group>
                     <group>

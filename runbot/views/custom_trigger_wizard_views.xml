@@ -20,9 +20,9 @@
                     </group>
                     <group string="Restore options">
                         <field name="restore_mode"/>
-                        <field name="restore_dump_url" attrs="{'invisible': [('restore_mode', '!=', 'url')]}"/>
-                        <field name="restore_trigger_id" attrs="{'invisible': [('restore_mode', '!=', 'auto')]}"/>
-                        <field name="restore_database_suffix" attrs="{'invisible': [('restore_mode', '!=', 'auto')]}"/>
+                        <field name="restore_dump_url" invisible="restore_mode != 'url'"/>
+                        <field name="restore_trigger_id" invisible="restore_mode != 'auto'"/>
+                        <field name="restore_database_suffix" invisible="restore_mode != 'auto'"/>
                     </group>
                     <group colspan="4">
                         <field name="child_extra_params"/>
