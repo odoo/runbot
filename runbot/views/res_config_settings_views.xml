@@ -6,188 +6,89 @@
             <field name="model">res.config.settings</field>
             <field name="inherit_id" ref="base.res_config_settings_view_form"/>
             <field name="arch" type="xml">
-              <xpath expr="//div[hasclass('settings')]" position="inside">
-                <div class="app_settings_block" data-string="Runbot" string="Runbot" data-key="runbot">
-                  <h2>Runbot Frontend Warning</h2>
-                  <div class="row mt16 o_settings_container" name="frontend_message_settings">
-                    <div class="col-12 col-lg-12 o_setting_box" title="Message on the top frontend page">
-                      <div class="o_setting_right_pane">
-                        <div class="content-group">
-                          <field name="runbot_message" class="w-100"/>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <h2>Runbot Builders Settings</h2>
-                  <div class="row mt16 o_settings_container" name="workers_builder_settings">
-                    <div class="col-12 col-lg-6 o_setting_box">
-                      <div class="o_setting_right_pane">
-                        <div class="content-group" title="Max parallel testing builds per builder host">
-                          <div class="row">
-                            <label for="runbot_workers" class="col-lg-6"/>
-                            <field name="runbot_workers"/>
-                          </div>
-                        </div>
-                        <div class="content-group" title="Max running builds per builder host">
-                          <div class="row">
-                            <label for="runbot_running_max" class="col-lg-6"/>
-                            <field name="runbot_running_max"/>
-                          </div>
-                        </div>
-                        <div class="content-group">
-                          <div class="row">
-                            <label for="runbot_starting_port" class="col-lg-6"/>
-                            <field name="runbot_starting_port"/>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-12 col-lg-6 o_setting_box">
-                      <div class="o_setting_right_pane">
-                        <div class="content-group">
-                          <div class="content-group">
-                            <div class="row">
-                              <label for="runbot_db_gc_days" class="col-lg-6"/>
-                              <field name="runbot_db_gc_days"/>
-                            </div>
-                          </div>
-                          <div class="content-group">
-                            <div class="row">
-                              <label for="runbot_db_gc_days_child" class="col-lg-6"/>
-                              <field name="runbot_db_gc_days_child"/>
-                            </div>
-                          </div>
-                          <div class="content-group">
-                            <div class="row">
-                              <label for="runbot_full_gc_days" class="col-lg-6"/> 
-                              <field name="runbot_full_gc_days"/>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-12 col-lg-6 o_setting_box">
-                      <div class="o_setting_right_pane">
-                        <div class="content-group">
-                          <field name="runbot_use_ssl"/>
-                          <label for="runbot_use_ssl"/>
-                        </div>
-                        <div class="content-group">
-                          <field name="runbot_disable_host_on_fetch_failure"/>
-                          <label for="runbot_disable_host_on_fetch_failure"/>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-12 col-lg-6 o_setting_box">
-                      <div class="o_setting_right_pane">
-                        <div class="content-group">
-                          <div class="row">
-                            <label for="runbot_timeout" class="col-lg-6"/>
-                            <field name="runbot_timeout"/>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-12 col-lg-6 o_setting_box">
-                      <div class="o_setting_right_pane">
-                        <div class="content-group">
-                          <div class="row">
-                            <label for="runbot_containers_memory" class="col-lg-6"/>
-                            <field name="runbot_containers_memory"/>
-                          </div>
-                          <div class="row justify-content-end">
-                            <div class="col-lg-6">
-                              <field name="runbot_memory_bytes" readonly='1' class="text-muted"/>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-12 col-lg-6 o_setting_box">
-                      <div class="o_setting_right_pane">
-                        <div class="content-group">
-                          <div class="row">
-                            <label for="runbot_template" class="col-lg-6"/>
-                            <field name="runbot_template"/>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-12 col-lg-6 o_setting_box">
-                      <div class="o_setting_right_pane">
-                          <div class="content-group">
-                            <div class="row">
-                              <label for="runbot_logdb_name" class="col-lg-6"/>
-                              <field name="runbot_logdb_name"/>
-                            </div>
-                          </div>
-                      </div>
-                    </div>
-                  </div>
-                  <h2>Runbot Leader Settings</h2>
-                  <div class="row mt16 o_settings_container" name="leader_settings">
-                    <div class="col-12 col-lg-6 o_setting_box">
-                      <div class="o_setting_right_pane">
-                        <div class="content-group" title="Older commits won't be fetched. Increase to detect older branches.">
-                          <div class="row">
-                            <label for="runbot_max_age" class="col-lg-6"/>
-                            <field name="runbot_max_age"/>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-12 col-lg-6 o_setting_box">
-                      <div class="o_setting_right_pane">
-                        <label for="runbot_is_base_regex" class="col-lg-6"/>
-                        <div class="content-group" title="Regular expresion to differentiate base branches.">
-                          <div class="row">
-                            <field name="runbot_is_base_regex" class="w-100"/>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-12 col-lg-6 o_setting_box">
-                      <div class="o_setting_right_pane">
-                          <div class="content-group" title="Used by codeowner to filter out fw-port PR's.">
-                            <div class="row">
-                              <label for="runbot_forwardport_author" class="col-lg-6"/>
-                              <field name="runbot_forwardport_author"/>
-                            </div>
-                          </div>
-                      </div>
-                    </div>
-                    <div class="col-12 col-lg-6 o_setting_box">
-                      <div class="o_setting_right_pane">
-                          <div class="content-group" title="Default project organisation.">
-                            <div class="row">
-                              <label for="runbot_organisation" class="col-lg-6"/>
-                              <field name="runbot_organisation"/>
-                            </div>
-                          </div>
-                      </div>
-                    </div>
-                  </div>
-                  <h2>Builds Default odoo.rc</h2>
-                  <div class="row mt16 o_settings_container" name="odoorc_settings">
-                    <div class="col-12 col-lg-12 o_setting_box">
-                      <div class="o_setting_right_pane">
-                        <div class="content-group" title="Default Odoo configuration for running builds. Mainly useful to set a Master Password">
-                          <field name="runbot_default_odoorc" class="w-100"/>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <h2>Upgrade Exceptions Message</h2>
-                  <div class="row mt16 o_settings_container" name="exceptions_message_settings">
-                    <div class="col-12 col-lg-12 o_setting_box">
-                      <div class="o_setting_right_pane">
-                        <div class="content-group">
-                          <field name="runbot_upgrade_exception_message" class="w-100"/>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              <xpath expr="//form" position="inside">
+                <app string="Runbot" name="runbot">
+
+                  <block title="Runbot Frontend Warning">
+                    <setting class="col-lg-12">
+                        <field name="runbot_message" class="w-100"/>
+                    </setting>
+                  </block>
+
+                  <block title="Runbot Builders">
+                    <setting>
+                      <field name="runbot_workers"/>
+                    </setting>
+                    <setting>
+                      <field name="runbot_running_max"/>
+                    </setting>
+                    <setting>
+                      <field name="runbot_starting_port"/>
+                    </setting>
+                    <setting>
+                      <field name="runbot_template"/>
+                    </setting>
+                    <setting>
+                      <field name="runbot_logdb_name"/>
+                    </setting>
+                    <setting>
+                      <field name="runbot_use_ssl"/>
+                    </setting>
+                    <setting>
+                      <field name="runbot_disable_host_on_fetch_failure"/>
+                    </setting>
+                  </block>
+
+                  <block title="Limits">
+                    <setting>
+                      <field name="runbot_timeout"/>
+                    </setting>
+                    <setting>
+                      <field name="runbot_containers_memory"/>
+                      <field name="runbot_memory_bytes" readonly='1' class="text-muted"/>
+                    </setting>
+                  </block>
+
+                  <block title="GC">
+                    <setting>
+                      <field name="runbot_db_gc_days"/>
+                    </setting>
+                    <setting>
+                      <field name="runbot_db_gc_days_child"/>
+                    </setting>
+                    <setting>
+                      <field name="runbot_full_gc_days"/>
+                    </setting>
+                  </block>
+
+                  <block title="Runbot Leader">
+                    <setting>
+                      <field name="runbot_max_age"/>
+                    </setting>
+                    <setting>
+                      <field name="runbot_is_base_regex"/>
+                    </setting>
+                    <setting>
+                      <field name="runbot_forwardport_author"/>
+                    </setting>
+                    <setting>
+                      <field name="runbot_organisation"/>
+                    </setting>
+                  </block>
+
+                  <block title="Builds Default odoo.rc">
+                    <setting class="col-lg-12">
+                       <field name="runbot_default_odoorc" class="w-100"/>
+                    </setting>
+                  </block>
+
+                  <block title="Upgrade Exceptions Message">
+                    <setting class="col-lg-12">
+                      <field name="runbot_upgrade_exception_message" class="w-100"/>
+                    </setting>
+                  </block>
+
+                </app>
               </xpath>
             </field>
         </record>
