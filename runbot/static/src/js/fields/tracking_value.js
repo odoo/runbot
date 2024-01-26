@@ -1,31 +1,42 @@
 /** @odoo-module **/
+import { patch } from "@web/core/utils/patch";
+import { Message } from "@mail/core/common/message";
 
-
-import { useState} from "@odoo/owl";
-import { registerMessagingComponent, getMessagingComponent, unregisterMessagingComponent } from '@mail/utils/messaging_component';
-
-const MailTrackingValue = getMessagingComponent('TrackingValue');
-export class TrackingValue extends MailTrackingValue {
-    static template = 'runbot.TrackingValue'
-    
+patch(Message.prototype, {
     setup() {
-        this.display = useState({kept: false});
-        super.setup()
-        this.oldValue = this.props.value.oldValue.formattedValueOrNone;
-        this.newValue = this.props.value.newValue.formattedValueOrNone;
-        this.multiline = (
-            (this.oldValue && this.oldValue.includes('\n'))
-            && 
-            (this.newValue && this.newValue.includes('\n'))
-        )
-        if (this.multiline) {
-            var diff = this.makeDiff(this.oldValue, this.newValue);
-            this.lines = this.prepareForRendering(diff);
-        }
-    }
+        super.setup(...arguments);
+        this.kept = false;
+    },
+    isMultiline(trackingValue) {
+        console.log(trackingValue)
+        const oldValue = trackingValue.oldValue.value;
+        const newValue = trackingValue.newValue.value;
+        return ((oldValue && oldValue.includes('\n')) && (newValue && newValue.includes('\n')))
+    },
+    formatTracking(trackingType, trackingValue) {
+        console.log('aaa')
+        return super.formatTracking(trackingType, trackingValue) 
+    },
     toggleKept() {
-        this.display.kept = !this.display.kept;
-    }
+        this.kept = !this.kept;
+    },
+    copyOldToClipboard(trackingValue) {
+        return function () {
+            navigator.clipboard.writeText(trackingValue.oldValue.value);
+        };
+    },
+    copyNewToClipboard(trackingValue) {
+        return function () {
+            navigator.clipboard.writeText(trackingValue.newValue.value);
+        };
+    },
+    lines(trackingValue) {
+        const oldValue = trackingValue.oldValue.value;
+        const newValue = trackingValue.newValue.value;
+        const diff = this.makeDiff(oldValue, newValue);
+        const lines = this.prepareForRendering(diff);
+        return lines;
+    },
     makeDiff(text1, text2) {
         var dmp = new diff_match_patch();
         var a = dmp.diff_linesToChars_(text1, text2);
@@ -36,7 +47,7 @@ export class TrackingValue extends MailTrackingValue {
         dmp.diff_charsToLines_(diffs, lineArray);
         dmp.diff_cleanupSemantic(diffs);
         return diffs;
-    }
+    },
     prepareForRendering(diffs) {
         var lines = [];
         var pre_line_counter = 0
@@ -66,16 +77,5 @@ export class TrackingValue extends MailTrackingValue {
             }
         }
         return lines;
-      };
-
-    copyOldToClipboard() {
-        navigator.clipboard.writeText(this.oldValue);
-    }
-
-    copyNewToClipboard() {
-        navigator.clipboard.writeText(this.newValue);
-    }
-}
-
-unregisterMessagingComponent({name:'TrackingValue'});
-registerMessagingComponent(TrackingValue);
+      },
+});

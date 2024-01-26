@@ -6,10 +6,11 @@ import { Many2OneField } from "@web/views/fields/many2one/many2one_field";
 
 import { _lt } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
-import { useDynamicPlaceholder } from "@web/views/fields/dynamicplaceholder_hook";
+import { useDynamicPlaceholder } from "@web/views/fields/dynamic_placeholder_hook";
 import { useInputField } from "@web/views/fields/input_field_hook";
 
-import { onMounted, onWillUnmount, useEffect, useRef, xml, Component } from "@odoo/owl";
+import { useRef, xml, Component } from "@odoo/owl";
+import { useAutoresize } from "@web/core/utils/autoresize";
 
 
 function stringify(obj) {
@@ -30,39 +31,34 @@ export class JsonField extends TextField {
                     t-att-id="props.id"
                     t-att-placeholder="props.placeholder"
                     t-att-rows="rowCount"
-                    t-on-input="onInput"
                     t-ref="textarea"
                 />
             </div>
         </t>
     `;
     setup() {
-        if (this.props.dynamicPlaceholder) {
-            this.dynamicPlaceholder = useDynamicPlaceholder();
-        }
         this.divRef = useRef("div");
         this.textareaRef = useRef("textarea");
+        //if (this.props.dynamicPlaceholder) {
+        //    this.dynamicPlaceholder = useDynamicPlaceholder(this.textareaRef);
+        //}
 
         useInputField({
             getValue: () => this.value,
             refName: "textarea",
             parse: JSON.parse,
         });
-
-        useEffect(() => {
-            if (!this.props.readonly) {
-                this.resize();
-            }
-        });
-        onMounted(this.onMounted);
-        onWillUnmount(this.onWillUnmount);
+        useAutoresize(this.textareaRef, { minimumHeight: 50 });
     }
     get value() {
-        return stringify(this.props.value || "");
+        return stringify(this.props.record.data[this.props.name] || "");
     }
 }
 
-registry.category("fields").add("jsonb", JsonField);
+registry.category("fields").add("runbotjsonb", {
+    supportedTypes: ["jsonb"],
+    component: JsonField,
+});
 
 export class FrontendUrl extends Component {
     static template = xml`
@@ -84,7 +80,10 @@ export class FrontendUrl extends Component {
     }
 }
 
-registry.category("fields").add("frontend_url", FrontendUrl);
+registry.category("fields").add("frontend_url", {
+    supportedTypes: ["many2one"],
+    component: FrontendUrl,
+});
 
 
 export class FieldCharFrontendUrl extends Component {
@@ -108,7 +107,10 @@ export class FieldCharFrontendUrl extends Component {
     }
 }
 
-registry.category("fields").add("char_frontend_url", FieldCharFrontendUrl);
+registry.category("fields").add("char_frontend_url", {
+    supportedTypes: ["char"],
+    component: FieldCharFrontendUrl,
+});
 
 //export class GithubTeamWidget extends CharField {
 
