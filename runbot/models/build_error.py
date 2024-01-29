@@ -298,7 +298,6 @@ class BuildError(models.Model):
         _logger.debug('Merging errors %s', self)
         base_error = self[0]
         base_linked = self[0].parent_id or self[0]
-        old_error_ids = []
         for error in self[1:]:
             assert base_error.fingerprint == error.fingerprint, f'Errors {base_error.id} and {error.id} have a different fingerprint'
             if error.test_tags and not base_linked.test_tags:
@@ -311,8 +310,12 @@ class BuildError(models.Model):
                 error.message_post(body=f'⚠ trying to merge errors with different test-tags from {base_error._get_form_link()} tag: "{base_error.test_tags}"')
                 continue
 
-            base_error.build_ids += error.build_ids
-            error.build_ids = False
+            for build_error_link in error.build_error_link_ids:
+                if build_error_link.build_id not in base_error.build_error_link_ids.build_id:
+                    build_error_link.build_error_id = base_error
+                else:
+                    # as the relation already exists and was not transferred we can remove the old one
+                    build_error_link.unlink()
 
             if error.responsible and not base_linked.responsible:
                 base_error.responsible = error.responsible
@@ -326,7 +329,6 @@ class BuildError(models.Model):
             error.message_post(body=f'Error was merged into {base_linked._get_form_link()}')
             error.child_ids.parent_id = base_error
             error.active = False
-            old_error_ids.append(error.id)
 
     ####################
     #   Actions
@@ -357,7 +359,7 @@ class BuildError(models.Model):
         errors_by_fingerprint = self.env['runbot.build.error'].search([('fingerprint', 'in', list(changed_fingerprints))])
         for fingerprint in changed_fingerprints:
             errors_to_merge = errors_by_fingerprint.filtered(lambda r: r.fingerprint == fingerprint)
-            rec_id = errors_to_merge._merge()
+            errors_to_merge._merge()
 
     def action_assign(self):
         if not any((not record.responsible and not record.team_id and record.file_path and not record.parent_id) for record in self):

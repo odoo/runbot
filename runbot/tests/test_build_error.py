@@ -75,8 +75,11 @@ class TestBuildError(RunbotCase):
         self.assertEqual(len(self.BuildError.search([('fingerprint', '=', error_a.fingerprint)])), 1)
         self.assertTrue(error_a.active, 'The first merged error should stay active')
         self.assertFalse(error_b.active, 'The second merged error should have stay deactivated')
+        self.assertIn(build_a, error_a.build_error_link_ids.build_id)
         self.assertIn(build_a, error_a.build_ids)
+        self.assertIn(build_b, error_a.build_error_link_ids.build_id)
         self.assertIn(build_b, error_a.build_ids)
+        self.assertFalse(error_b.build_error_link_ids)
         self.assertFalse(error_b.build_ids)
 
         error_c = self.BuildError.create({'content': 'foo foo'})
@@ -84,6 +87,15 @@ class TestBuildError(RunbotCase):
         # let's ensure we cannot merge errors with different fingerprints
         with self.assertRaises(AssertionError):
             (error_a | error_c)._merge()
+
+        # merge two build errors while the build <--> build_error relation already exists
+        error_d = self.BuildError.create({'content': 'foo bar'})
+        self.BuildErrorLink.create({'build_id': build_a.id, 'build_error_id': error_d.id})
+        (error_a | error_d)._merge()
+        self.assertIn(build_a, error_a.build_error_link_ids.build_id)
+        self.assertIn(build_a, error_a.build_ids)
+        self.assertFalse(error_d.build_error_link_ids)
+        self.assertFalse(error_d.build_ids)
 
     def test_merge_linked(self):
         top_error = self.BuildError.create({'content': 'foo foo', 'active': False})
