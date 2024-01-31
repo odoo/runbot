@@ -177,7 +177,7 @@ class BuildError(models.Model):
         for build_error in self:
             build_error.last_seen_build_id = build_error.children_build_ids and build_error.children_build_ids[0] or False
 
-    @api.depends('build_error_link_ids', 'child_ids')
+    @api.depends('build_error_link_ids', 'child_ids.build_error_link_ids')
     def _compute_seen_date(self):
         for build_error in self:
             error_dates = (build_error.build_error_link_ids | build_error.child_ids.build_error_link_ids).mapped('log_date')
