@@ -65,15 +65,12 @@
           <field name="name" string="Module"/>
           <field name="func"/>
           <field name="build_id"/>
-          <filter string="Failed builds" name="failed_builds" domain="[('global_state', '=', 'done'), ('global_result', '=', 'ko')]"/>
+          <filter string="Failed builds" name="filter_failed_builds" domain="[('global_state', '=', 'done'), ('global_result', '=', 'ko')]"/>
           <separator/>
-          <filter string="Master bundle" name="master_bundle" domain="[('bundle_ids.name', '=', 'master')]"/>
-          <filter string="Sticky bundles" name="sticky_bundles" domain="[('sticky', '=', True)]"/>
+          <filter string="Master bundle" name="filter_master_bundle" domain="[('bundle_ids.name', '=', 'master')]"/>
+          <filter string="Sticky bundles" name="filter_sticky_bundles" domain="[('sticky', '=', True)]"/>
           <separator/>
-          <!-- <filter name="filter_log_create_date" date="log_create_date" string="Log Date" default_period="last_7_days"/> -->
-          <filter string="Last 7 Days" name="log_date" domain="[
-                        ('log_create_date', '>=', (datetime.datetime.combine(context_today() + relativedelta(days=-7), datetime.time(0,0,0)).to_utc()).strftime('%Y-%m-%d %H:%M:%S')),
-                        ('log_create_date', '&lt;', (datetime.datetime.combine(context_today(), datetime.time(0,0,0)).to_utc()).strftime('%Y-%m-%d %H:%M:%S'))]"/>
+          <filter name="filter_create_date" string="Create Date" date="log_create_date" default_period="this_month"/>
         </search>
       </field>
     </record>
@@ -82,8 +79,7 @@
         <field name="name">Error Logs</field>
         <field name="res_model">runbot.error.log</field>
         <field name="view_mode">tree,form</field>
-        <!-- <field name="context">{'search_default_sticky_bundles': True, 'search_default_failed_builds': True, 'time_ranges': {'field': 'log_create_date', 'range': 'last_7_days'},}</field> -->
-        <field name="context">{'search_default_sticky_bundles': True, 'search_default_failed_builds': True, 'search_default_log_date': True}</field>
+        <field name="context">{'search_default_sticky_bundles': True, 'search_default_failed_builds': True, 'search_default_filter_create_date': True}</field>
     </record>
 
   </data>

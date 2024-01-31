@@ -27,6 +27,7 @@
     <menuitem name="Manage errors" id="runbot_menu_manage_errors" parent="runbot_menu_root" sequence="900"/>
     <menuitem name="Build errors" id="runbot_menu_build_error_tree" parent="runbot_menu_manage_errors" sequence="10" action="open_view_build_error_tree"/>
     <menuitem name="Error Logs" id="runbot_menu_error_logs" parent="runbot_menu_manage_errors" sequence="20" action="open_view_error_log_tree"/>
+    <menuitem name="Builds Ir Logging" id="runbot_menu_ir_logging" parent="runbot_menu_manage_errors" sequence="30" action="open_view_ir_logging_tree"/>
 
     <menuitem name="Teams" id="runbot_menu_teams" parent="runbot_menu_root" sequence="1000"/>
     <menuitem name="Teams" id="runbot_menu_team_tree" parent="runbot_menu_teams" sequence="30" action="open_view_runbot_team"/>
