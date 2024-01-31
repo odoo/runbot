@@ -373,6 +373,25 @@ class BuildError(models.Model):
                     record.team_id = team
 
 
+    def action_search_ir_logs(self):
+        self.ensure_one()
+        context = {
+            'search_default_type': 'server',
+            'search_default_message': self.cleaned_content,
+            'search_default_filter_create_date': True,
+            'search_default_filter_sticky_bundles': True,
+            'search_default_filter_failed_builds': True
+        }
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Search Error In Build Error Views',
+            'view_mode': 'tree',
+            'res_model': 'runbot.error.log',
+            'target': 'fullscreen',
+            'context': context,
+        }
+
+
 class BuildErrorTag(models.Model):
 
     _name = "runbot.build.error.tag"
