@@ -11,10 +11,9 @@ patch(Message.prototype, {
         console.log(trackingValue)
         const oldValue = trackingValue.oldValue.value;
         const newValue = trackingValue.newValue.value;
-        return ((oldValue && oldValue.includes('\n')) && (newValue && newValue.includes('\n')))
+        return ((oldValue && typeof oldValue=== 'string' && oldValue.includes('\n')) && (newValue && typeof oldValue=== 'string' && newValue.includes('\n')))
     },
     formatTracking(trackingType, trackingValue) {
-        console.log('aaa')
         return super.formatTracking(trackingType, trackingValue) 
     },
     toggleKept() {

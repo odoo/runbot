@@ -67,11 +67,11 @@ export class FrontendUrl extends Component {
         <div><a t-att-href="route" target="_blank"><span class="fa fa-play ms-2"/></a></div>
     </div>`;
 
-    static components = { Many2OneField }
+    static components = { Many2OneField };
 
     get route() {
         const model = this.props.relation || this.props.record.fields[this.props.name].relation;
-        const id = this.props.value[0];
+        const id = this.props.record.data[this.props.name][0];
         if (model.startsWith('runbot.') ) {
             return '/runbot/' + model.split('.')[1] + '/' + id;
         } else {
