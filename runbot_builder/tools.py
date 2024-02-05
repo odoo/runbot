@@ -59,10 +59,9 @@ class RunbotClient():
                 try:
                     self.host.last_start_loop = fields.Datetime.now()
                     self.env.cr.commit()
-                    if self.env.registry != self.pool.check_signaling():
-                        # the registry has changed, reload self in the new registry
+                    if self.env.registry != self.env.registry.check_signaling():
                         self.env.reset()
-                        self.env = self.env() #not sure
+                        self.env = self.env()
                     self.count = self.count % self.max_count
                     if self.host.paused:
                         sleep_time = 5
@@ -156,16 +155,15 @@ def run(client_class):
 
     # create environment
     registry = odoo.registry(args.database)
-    with odoo.api.Environment.manage():
+    try:
         with registry.cursor() as cr:
             env = odoo.api.Environment(cr, odoo.SUPERUSER_ID, {})
             client = client_class(env)
             # run main loop
-            try:
-                client.main_loop()
-            except Exception as e:
-                _logger.exception(str(e))
-                raise e
+            client.main_loop()
+    except Exception as e:
+        _logger.exception(str(e))
+        raise e
     _logger.info("Stopping gracefully")
 
 def human_size(nb):
