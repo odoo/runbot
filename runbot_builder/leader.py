@@ -11,10 +11,11 @@ class LeaderClient(RunbotClient):  # Conductor, Director, Main, Maestro, Lead
         super().__init__(env)
 
     def on_start(self):
-        _logger.info('Updating all repos')
-        for repo in self.env['runbot.repo'].search([('mode', '!=', 'disabled')]):
-            repo._update(force=True)
-        _logger.info('update finished')
+        if self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_do_fetch'):
+            _logger.info('Updating all repos')
+            for repo in self.env['runbot.repo'].search([('mode', '!=', 'disabled')]):
+                repo._update(force=True)
+            _logger.info('update finished')
 
     def loop_turn(self):
         if self.count == 0:

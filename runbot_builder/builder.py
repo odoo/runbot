@@ -16,8 +16,9 @@ class BuilderClient(RunbotClient):
         monitoring_thread = threading.Thread(target=docker_monitoring_loop, args=(builds_path,), daemon=True)
         monitoring_thread.start()
 
-        for repo in self.env['runbot.repo'].search([('mode', '!=', 'disabled')]):
-            repo._update(force=True)
+        if self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_do_fetch'):
+            for repo in self.env['runbot.repo'].search([('mode', '!=', 'disabled')]):
+                repo._update(force=True)
 
     def loop_turn(self):
         if self.count == 1: # cleanup at second iteration
