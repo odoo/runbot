@@ -6,8 +6,10 @@ var config = {
     animation: {
       duration: 0
     },
-    legend: {
-        display: false,
+    plugins: {
+      legend: {
+        display: false
+      }
     },
     responsive: true,
     tooltips: {
