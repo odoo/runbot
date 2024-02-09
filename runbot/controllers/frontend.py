@@ -42,6 +42,7 @@ def route(routes, **kw):
                     search = cookie_search
                 else:
                     search = kwargs.get('search', '')
+                has_pr = kwargs.get('has_pr', None)
                 if keep_search and cookie_search != search:
                     response.set_cookie('search', search)
 
@@ -56,7 +57,7 @@ def route(routes, **kw):
                 response.qcontext['filter_mode'] = filter_mode
                 response.qcontext['default_category'] = request.env['ir.model.data']._xmlid_to_res_id('runbot.default_category')
 
-                response.qcontext['qu'] = QueryURL('/runbot/%s' % (slug(project) if project else ''), path_args=['search'], search=search, refresh=refresh)
+                response.qcontext['qu'] = QueryURL('/runbot/%s' % (slug(project) if project else ''), search=search, refresh=refresh, has_pr=has_pr)
                 if 'title' not in response.qcontext:
                     response.qcontext['title'] = 'Runbot %s' % project.name or ''
                 response.qcontext['nb_build_errors'] = nb_build_errors
@@ -107,7 +108,7 @@ class Runbot(Controller):
             '/runbot',
             '/runbot/<model("runbot.project"):project>',
             '/runbot/<model("runbot.project"):project>/search/<search>'], website=True, auth='public', type='http')
-    def bundles(self, project=None, search='', projects=False, refresh=False, for_next_freeze=False, limit=40, **kwargs):
+    def bundles(self, project=None, search='', projects=False, refresh=False, for_next_freeze=False, limit=40, has_pr=None, **kwargs):
         search = search if len(search) < 60 else search[:60]
         env = request.env
         categories = env['runbot.category'].search([])
@@ -127,6 +128,9 @@ class Runbot(Controller):
         }
         if project:
             domain = [('last_batch', '!=', False), ('project_id', '=', project.id), ('no_build', '=', False)]
+
+            if has_pr is not None:
+                domain.append(('has_pr', '=', bool(has_pr)))
 
             filter_mode = request.httprequest.cookies.get('filter_mode', False)
             if filter_mode == 'sticky':
@@ -176,6 +180,8 @@ class Runbot(Controller):
                 'project': project,
                 'triggers': triggers,
                 'trigger_display': trigger_display,
+                'has_pr': has_pr,
+                'search': search,
             })
 
         context.update({'message': request.env['ir.config_parameter'].sudo().get_param('runbot.runbot_message')})

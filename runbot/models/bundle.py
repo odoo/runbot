@@ -35,6 +35,8 @@ class Bundle(models.Model):
     base_id = fields.Many2one('runbot.bundle', 'Base bundle', compute='_compute_base_id', store=True)
     to_upgrade = fields.Boolean('To upgrade', compute='_compute_to_upgrade', store=True, index=False)
 
+    has_pr = fields.Boolean('Has PR', compute='_compute_has_pr', store=True)
+
     version_id = fields.Many2one('runbot.version', 'Version', compute='_compute_version_id', store=True, recursive=True)
     version_number = fields.Char(related='version_id.number', store=True, index=True)
 
@@ -109,6 +111,11 @@ class Bundle(models.Model):
                     fallback = self.browse(bid)
             else:
                 bundle.base_id = master_base or fallback
+
+    @api.depends('branch_ids.is_pr', 'branch_ids.alive')
+    def _compute_has_pr(self):
+        for bundle in self:
+            bundle.has_pr = any(branch.is_pr and branch.alive for branch in bundle.branch_ids)
 
     @tools.ormcache('project_id')
     def _get_base_ids(self, project_id):
