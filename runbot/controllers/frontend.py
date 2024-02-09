@@ -184,9 +184,15 @@ class Runbot(Controller):
 
     @route([
         '/runbot/bundle/<model("runbot.bundle"):bundle>',
-        '/runbot/bundle/<model("runbot.bundle"):bundle>/page/<int:page>'
+        '/runbot/bundle/<model("runbot.bundle"):bundle>/page/<int:page>',
+        '/runbot/bundle/<string:bundle>',
         ], website=True, auth='public', type='http', sitemap=False)
     def bundle(self, bundle=None, page=1, limit=50, **kwargs):
+        if isinstance(bundle, str):
+            bundle = request.env['runbot.bundle'].search([('name', '=', bundle)], limit=1, order='id')
+            if not bundle:
+                raise NotFound
+            return werkzeug.utils.redirect(f'/runbot/bundle/{slug(bundle)}')
         domain = [('bundle_id', '=', bundle.id), ('hidden', '=', False)]
         batch_count = request.env['runbot.batch'].search_count(domain)
         pager = request.website.pager(
@@ -202,8 +208,8 @@ class Runbot(Controller):
             'batchs': batchs,
             'pager': pager,
             'project': bundle.project_id,
-            'title': 'Bundle %s' % bundle.name
-            }
+            'title': 'Bundle %s' % bundle.name,
+        }
 
         return request.render('runbot.bundle', context)
 
