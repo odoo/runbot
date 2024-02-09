@@ -142,6 +142,7 @@ class Host(models.Model):
             && mkdir /home/{user} \\
             && chown -R {user}:{user} /home/{user}
             USER {user}
+            ENV PATH /home/{user}/.local/bin:$PATH
             ENV COVERAGE_FILE /data/build/.coverage
             """
         with open(self.env['runbot.runbot']._path('docker', dockerfile.image_tag, 'Dockerfile'), 'w') as Dockerfile:
