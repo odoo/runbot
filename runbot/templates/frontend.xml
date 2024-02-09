@@ -8,7 +8,13 @@
             <div class="input-group md-form form-sm form-2 pl-0">
               <input class="form-control my-0 py-1" type="text" placeholder="Search" aria-label="Search" name="search" t-att-value="search"/>
               <div class="input-group-append">
-                <button type='submit' class="input-group-text red lighten-3" id="basic-text1">
+                <a t-if="has_pr" class="btn btn-primary active input-group-text" title="All" t-att-href="qu(has_pr=None)">
+                  <i class="fa fa-github text-grey"/>
+                </a>
+                <a t-else="" class="btn input-group-text" title="Open pull requests" t-att-href="qu(has_pr=1)">
+                  <i class="fa fa-github text-grey"/>
+                </a>
+                <button type='submit' class="input-group-text">
                   <i class="fa fa-search text-grey"/>
                 </button>
               </div>

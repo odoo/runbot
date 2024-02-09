@@ -53,6 +53,7 @@
                             <field name="defined_base_id"/>
                             <field name="version_id"/>
                             <field name="for_next_freeze"/>
+                            <field name="has_pr"/>
                         </group>
                         <group string="Testing options">
                             <field name="no_build"/>
@@ -153,6 +154,22 @@
             </tree>
         </field>
     </record>
+
+    <record id="runbot_bundle_search_view" model="ir.ui.view">
+        <field name="name">runbot.bundle.filter</field>
+        <field name="model">runbot.bundle</field>
+        <field name="arch" type="xml">
+          <search string="Search bundle">
+            <field name="name"/>
+            <field name="version_id"/>
+            <separator/>
+            <filter string="For next freeze" name="for_next_freeze" domain="[('for_next_freeze', '=', True)]"/>
+            <filter string="Has open pr" name="has_pr" domain="[('has_pr', '=', True)]"/>
+            <filter string="No pr" name="no_pr" domain="[('branch_ids', '!=', []), '!', ('branch_ids', 'any', [('is_pr', '=', True)])]"/>
+            <separator/>
+          </search>
+        </field>
+      </record>
 
     <record id="view_runbot_batch" model="ir.ui.view">
         <field name="model">runbot.batch</field>
