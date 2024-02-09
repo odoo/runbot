@@ -96,9 +96,9 @@ class TestCodeowner(TestBuildConfigStepCommon):
             'remote_id': self.remote_server.id,
             'target_branch_name': self.dev_bundle.base_id.name,
             'pull_head_remote_id': self.remote_server.id,
+            'pull_head_name': f'{self.remote_server.owner}:{self.dev_branch.name}',
         })
-        second_pr.pull_head_name = f'{self.remote_server.owner}:{self.dev_branch.name}'
-        second_pr.bundle_id = self.dev_bundle.id
+        self.assertEqual(second_pr.bundle_id.id, self.dev_bundle.id)
         self.config_step._run_codeowner(self.parent_build)
         self.assertEqual(self.parent_build.log_ids.mapped('message'), [
             "More than one open pr in this bundle for server: ['1234', '1235']"

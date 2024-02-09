@@ -459,6 +459,10 @@ class Repo(models.Model):
                 new_branch_values.append({'remote_id': remote_id, 'name': name, 'is_pr': branch_type == 'pull'})
                 # TODO catch error for pr info. It may fail for multiple raison. closed? external? check corner cases
                 _logger.info('new branch %s found in %s', name, self.name)
+        pr_to_update = branches.filtered(lambda b: b.is_pr and not b.alive)
+        pr_to_update._update_branch_infos()
+        branch_to_update = branches.filtered(lambda b: not b.is_pr and not b.alive)
+        branch_to_update.write({'alive': True})
         if new_branch_values:
             _logger.info('Creating new branches')
             new_branches = self.env['runbot.branch'].create(new_branch_values)
@@ -488,12 +492,6 @@ class Repo(models.Model):
                         'date': datetime.datetime.fromtimestamp(int(date)),
                     })
                 branch.head = commit
-                if not branch.alive:
-                    if branch.is_pr:
-                        _logger.info('Recomputing infos of dead pr %s', branch.name)
-                        branch._compute_branch_infos()
-                    else:
-                        branch.alive = True
 
                 if branch.reference_name and branch.remote_id and branch.remote_id.repo_id._is_branch_forbidden(branch.reference_name):
                     message = "This branch name is incorrect. Branch name should be prefixed with a valid version"

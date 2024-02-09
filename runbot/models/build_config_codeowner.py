@@ -149,7 +149,7 @@ class ConfigStep(models.Model):
 
                     build._log('', 'Requesting review for pull request [%s](%s): %s' % (pr.dname, pr.branch_url, ', '.join(new_reviewers)), log_type='markdown')
                     response = pr.remote_id._github('/repos/:owner/:repo/pulls/%s/requested_reviewers' % pr.name, {"team_reviewers": list(new_reviewers)}, ignore_errors=False)
-                    pr._compute_branch_infos(response)
+                    pr._update_branch_infos(response)
                     pr['reviewers'] = ','.join(sorted(reviewers))
                 else:
                     build._log('', 'All reviewers are already on pull request [%s](%s)' % (pr.dname, pr.branch_url,), log_type='markdown')

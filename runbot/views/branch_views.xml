@@ -7,6 +7,7 @@
           <form>
             <header>
               <button name="action_recompute_infos" string="Recompute Infos" type="object" class="oe_highlight"/>
+              <button name="action_update_bundle_id" string="Update bundle" type="object" class="oe_highlight"/>
             </header>
             <sheet>
               <group name="branch_group">
