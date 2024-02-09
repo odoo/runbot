@@ -125,15 +125,17 @@ class RunbotCase(TransactionCase):
             'is_pr': False,
             'remote_id': self.remote_server.id,
         })
-        self.dev_pr = self.Branch.create({
-            'name': '1234',
-            'is_pr': True,
-            'remote_id': self.remote_server.id,
-            'target_branch_name': self.dev_bundle.base_id.name,
-            'pull_head_remote_id': self.remote_server.id,
-        })
-        self.dev_pr.pull_head_name = f'{self.remote_server.owner}:{self.dev_branch.name}'
-        self.dev_pr.bundle_id = self.dev_bundle.id,
+        with patch('odoo.addons.runbot.models.branch.Branch._update_branch_infos', return_value=None):
+            self.dev_pr = self.Branch.create({
+                'name': '1234',
+                'is_pr': True,
+                'alive': True,
+                'remote_id': self.remote_server.id,
+                'target_branch_name': self.dev_bundle.base_id.name,
+                'pull_head_remote_id': self.remote_server.id,
+                'pull_head_name': f'{self.remote_server.owner}:{self.dev_branch.name}',
+            })
+        self.assertEqual(self.dev_pr.bundle_id.id, self.dev_bundle.id)
 
         self.dev_batch = self.Batch.create({
             'bundle_id': self.dev_bundle.id,
