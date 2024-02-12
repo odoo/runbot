@@ -356,13 +356,17 @@ class Repo(models.Model):
     def _source_path(self, *path_parts):
         return self.env['runbot.runbot']._path('sources', sanitize(self.name), *path_parts)
 
-    def _git(self, cmd, errors='strict'):
+    def _get_git_command(self, cmd, errors='strict'):
         """Execute a git command 'cmd'"""
         self.ensure_one()
         config_args = []
         if self.identity_file:
             config_args = ['-c', 'core.sshCommand=ssh -i %s/.ssh/%s' % (str(Path.home()), self.identity_file)]
         cmd = ['git', '-C', self.path] + config_args + cmd
+        return cmd
+
+    def _git(self, cmd, errors='strict'):
+        cmd = self._get_git_command(cmd, errors)
         _logger.info("git command: %s", ' '.join(cmd))
         return subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode(errors=errors)
 

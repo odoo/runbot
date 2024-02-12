@@ -383,16 +383,6 @@ class Runbot(models.AbstractModel):
         if ignored:
             _logger.info('docker (%s) not deleted because not dest format', list(ignored))
 
-    def _git_gc(self, host):
-        """
-        cleanup and optimize git repositories on the host
-        """
-        for repo in self.env['runbot.repo'].search([]):
-            try:
-                repo._git(['gc', '--prune=all', '--quiet'])
-            except CalledProcessError as e:
-                message = f'git gc failed for {repo.name} on {host.name} with exit status {e.returncode} and message "{e.output[:60]} ..."'
-                self._warning(message)
 
     def _warning(self, message, *args):
         if args:

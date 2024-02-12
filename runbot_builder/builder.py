@@ -28,7 +28,9 @@ class BuilderClient(RunbotClient):
             self.host._set_psql_conn_count()
             self.host._docker_build()
             self.env['runbot.repo']._update_git_config()
+            self.env.cr.commit()
             self.git_gc()
+            self.env.cr.commit()
         return self.env['runbot.runbot']._scheduler_loop_turn(self.host)
 
 
