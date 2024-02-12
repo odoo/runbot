@@ -9,6 +9,7 @@ import sys
 import threading
 import time
 import signal
+import subprocess
 
 from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
@@ -111,7 +112,25 @@ class RunbotClient():
         """ git gc once a day """
         if self.next_git_gc_date < datetime.now():
             _logger.info('Starting git gc on repositories')
-            self.env['runbot.runbot']._git_gc(self.host)
+            commands = []
+            host_name = self.host.name
+            for repo in self.env['runbot.repo'].search([]):
+                commands.append(repo.name, (repo._get_git_command(['gc', '--prune=all', '--quiet'])))
+            self.env.cr.rollback()
+            # gc commands can be slow, rollbacking to avoid to keep a transaction idle for multiple minutes.
+            messages = []
+            for repo_name, command in commands:
+                try:
+                    start = time.time()
+                    subprocess.check_output(command, stderr=subprocess.STDOUT).decode()
+                    _logger.info('Git gc on %s took %ss', repo_name, time.time() - start)
+                except subprocess.CalledProcessError as e:
+                    message = f'git gc failed for {repo_name} on {host_name} with exit status {e.returncode} and message "{e.output[:60]} ..."'
+                    messages.append(message)
+            for message in messages:
+                self.env['runbot.runbot']._warning(message)
+
+            self.env.cr.commit()
             self.update_next_git_gc_date()
 
 def run(client_class):

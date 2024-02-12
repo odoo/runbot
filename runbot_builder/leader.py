@@ -20,7 +20,9 @@ class LeaderClient(RunbotClient):  # Conductor, Director, Main, Maestro, Lead
     def loop_turn(self):
         if self.count == 0:
             self.env['runbot.repo']._update_git_config()
+            self.env.cr.commit()
             self.git_gc()
+            self.env.cr.commit()
         return self.env['runbot.runbot']._fetch_loop_turn(self.host, self.pull_info_failures)
 
 
