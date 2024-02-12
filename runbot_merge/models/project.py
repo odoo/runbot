@@ -74,9 +74,9 @@ class Project(models.Model):
                 _logger.error("Failed to fetch merge bot information for project %s: %s", project.name, r0.text or r0.content)
                 continue
 
-            r0 = r0.json()
-            project.github_name = r0['name'] or r0['login']
-            if email := r0['email']:
+            r = r0.json()
+            project.github_name = r['name'] or r['login']
+            if email := r['email']:
                 project.github_email = email
                 continue
 
