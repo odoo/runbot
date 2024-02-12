@@ -40,7 +40,7 @@ class MergebotController(Controller):
         ]
 
     @route('/runbot_merge/stagings/<int:from_staging>/<int:to_staging>', auth='none', type='json')
-    def prs_for_staging(self, from_staging, to_staging, include_from=True, include_to=True):
+    def prs_for_stagings(self, from_staging, to_staging, include_from=True, include_to=True):
         Stagings = request.env(user=1, context={"active_test": False})['runbot_merge.stagings']
         from_staging = Stagings.browse(from_staging)
         to_staging = Stagings.browse(to_staging)
