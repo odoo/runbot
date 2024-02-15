@@ -11,7 +11,7 @@
                             <td>
                                 <a t-esc="batch.bundle_id.name" t-attf-href="/runbot/bundle/{{batch.bundle_id.id}}"/>
                                 &amp;emsp;
-                                <a groups="runbot.group_runbot_advanced_user" t-attf-href="/web/#id={{batch.id}}&amp;view_type=form&amp;model=runbot.batch&amp;menu_id={{env.ref('runbot.runbot_menu_root').id}}" class="btn btn-default btn-sm" target="new" title="View Batch in Backend">
+                                <a groups="runbot.group_runbot_advanced_user" t-attf-href="/web/#id={{batch.id}}&amp;view_type=form&amp;model=runbot.batch&amp;menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" class="btn btn-default btn-sm" target="new" title="View Batch in Backend">
                                           <i class="fa fa-list"/>
                                 </a>
                             </td>

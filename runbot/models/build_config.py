@@ -325,7 +325,7 @@ class ConfigStep(models.Model):
         if not self:
             return False
         self.ensure_one()
-        return self.job_type in ('install_odoo', 'run_odoo', 'restore', 'test_upgrade') or (self.job_type == 'python' and ('docker_params =' in self.python_code or '_run_' in self.python_code))
+        return self.job_type in ('install_odoo', 'run_odoo', 'restore', 'test_upgrade') or (self.job_type == 'python' and ('docker_params =' in self.python_code or '_run_' in self.python_code or 'cmd' in self.python_code))
 
     def _run_run_odoo(self, build, force=False):
         if not force:

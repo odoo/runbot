@@ -38,7 +38,7 @@
                 </div>
                 <div class="col">
                   <a t-att-href="build_error.last_seen_build_id.build_url" t-attf-title="View last affected build ({{build_error.last_seen_build_id.id}})"><i class="fa fa-external-link"/></a>
-                  <a groups="base.group_user" t-attf-href="/web/#id={{build_error.id}}&amp;view_type=form&amp;model=runbot.build.error&amp;menu_id={{env.ref('runbot.runbot_menu_root').id}}" target="new" title="View in Backend">
+                  <a groups="base.group_user" t-attf-href="/web/#id={{build_error.id}}&amp;view_type=form&amp;model=runbot.build.error&amp;menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" target="new" title="View in Backend">
                     <span class="badge badge-info" t-esc="build_error.build_count" t-attf-title="This error was seen {{build_error.build_count}} View in backend"/>
                   </a>
                   <span groups="!base.group_user" class="badge badge-info" t-esc="build_error.build_count" t-attf-title="This error was seen {{build_error.build_count}}"/>
@@ -114,7 +114,7 @@
             <div t-if="team" class='col-md-12'>
               <div class="col-lg-12 text-center mb16">
                 <h2>Team <t t-esc="team.name.capitalize()"/>
-                  <a groups="base.group_user" t-attf-href="/web/#id={{team.id}}&amp;view_type=form&amp;model=runbot.team&amp;menu_id={{env.ref('runbot.runbot_menu_root').id}}" target="new" title="View in Backend">
+                  <a groups="base.group_user" t-attf-href="/web/#id={{team.id}}&amp;view_type=form&amp;model=runbot.team&amp;menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" target="new" title="View in Backend">
                     <i class="fa fa-list"/>
                   </a>
                 </h2>
