@@ -12,7 +12,7 @@ import os
 
 from collections import OrderedDict
 from datetime import timedelta
-from babel.dates import format_timedelta
+from babel.dates import LC_TIME, Locale, TIMEDELTA_UNITS
 from markupsafe import Markup
 
 from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT, html_escape, file_open
@@ -80,11 +80,61 @@ def time_delta(time):
         return time
     return timedelta(seconds=-time)
 
+from babel.dates import format_timedelta as _format_timedelta
+
+
+def format_timedelta(delta, granularity='second', max_unit=None, threshold=.85,
+                     add_direction=False, format='long',
+                     locale=LC_TIME):
+    """
+    Modified version of Dates.format_timedelta
+    """
+    if format not in ('narrow', 'short', 'long'):
+        raise TypeError('Format must be one of "narrow", "short" or "long"')
+    if isinstance(delta, timedelta):
+        seconds = int((delta.days * 86400) + delta.seconds)
+    else:
+        seconds = delta
+    locale = Locale.parse(locale)
+
+    def _iter_patterns(a_unit):
+        if add_direction:
+            unit_rel_patterns = locale._data['date_fields'][a_unit]
+            if seconds >= 0:
+                yield unit_rel_patterns['future']
+            else:
+                yield unit_rel_patterns['past']
+        a_unit = 'duration-' + a_unit
+        yield locale._data['unit_patterns'].get(a_unit, {}).get(format)
+
+    for unit, secs_per_unit in TIMEDELTA_UNITS:
+        if max_unit and unit != max_unit:
+            continue
+        max_unit = None
+        value = abs(seconds) / secs_per_unit
+        if value >= threshold or unit == granularity:
+            if unit == granularity and value > 0:
+                value = max(1, value)
+            value = int(round(value))
+            plural_form = locale.plural_form(value)
+            pattern = None
+            for patterns in _iter_patterns(unit):
+                if patterns is not None:
+                    pattern = patterns[plural_form]
+                    break
+            # This really should not happen
+            if pattern is None:
+                return u''
+            return pattern.replace('{0}', str(value))
+
+    return u''
+
 
 def s2human(time):
     """Convert a time in second into an human readable string"""
     return format_timedelta(
         time_delta(time),
+        max_unit='hour',
         format="narrow",
         threshold=2.1,
     )

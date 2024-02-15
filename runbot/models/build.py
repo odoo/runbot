@@ -190,6 +190,9 @@ class BuildResult(models.Model):
     docker_start = fields.Datetime('Docker start')
     job_time = fields.Integer(compute='_compute_job_time', string='Job time')
     build_time = fields.Integer(compute='_compute_build_time', string='Build time')
+    wait_time = fields.Integer(compute='_compute_wait_time', string='Wait time')
+    load_time = fields.Integer(compute='_compute_load_time', string='Load time')
+    last_update = fields.Datetime(compute='_compute_last_update', string='Last update')
 
     gc_date = fields.Datetime('Local cleanup date', compute='_compute_gc_date')
     gc_delay = fields.Integer('Cleanup Delay', help='Used to compute gc_date')
@@ -464,6 +467,24 @@ class BuildResult(models.Model):
                 build.build_time = int(time.time() - dt2time(build.build_start))
             else:
                 build.build_time = 0
+
+    #@api.depends('create_date', 'last_update')
+    def _compute_wait_time(self):
+        for build in self:
+            build.wait_time = dt2time(build.last_update) - dt2time(build.create_date)
+
+    #@api.depends('build_end', 'children_ids.last_update')
+    def _compute_last_update(self):
+        for build in self:
+            if not build.build_end:
+                build.last_update = datetime.datetime.now()
+            else:
+                build.last_update = max([child.last_update for child in build.children_ids] + [build.build_end])
+
+    #@api.depends('build_time', 'children_ids.load_time')
+    def _compute_load_time(self):
+        for build in self:
+            build.load_time = sum([build.build_time] + [child.load_time for child in build.children_ids])
 
     @api.depends('job_start')
     def _compute_build_age(self):
@@ -1162,9 +1183,6 @@ class BuildResult(models.Model):
         except Exception as e:
             self._log('write_file', 'exception: %s' % e)
             return False
-
-    def _get_formated_build_time(self):
-        return s2human(self.build_time)
 
     def _get_color_class(self):
 

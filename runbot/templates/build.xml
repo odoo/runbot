@@ -156,16 +156,35 @@
                 </t>
                 <b>Host:</b>
                 <t t-esc="build.host"/>
-                <br/>
               </t>
-              <b>Total time:</b>
-              <t t-esc="build._get_formated_build_time()"/>
-              <br/>
-              <t t-if="build.stat_ids">
-                <b>Stats:</b>
-                  <a t-attf-href="/runbot/build/stats/{{build.id}}">Build <t t-esc="build.id"/></a>
-                <br/>
-              </t>
+              <div>
+                <b title="Execution time of this build, without child time">
+                  Build time:
+                </b>
+                <t t-att-tile='build.build_time' t-esc="s2human(build.build_time)"/>
+                <i t-if='more'>(<t t-esc="build.build_time"/>s)</i>
+              </div>
+              <div>
+                <b title='Time from creation to finish (queue time + completion time)'>
+                  Wait time:
+                </b>
+                <t t-att-tile='build.wait_time' t-esc="s2human(build.wait_time)"/>
+                <i t-if='more'>(<t t-esc="build.wait_time"/>s)</i>
+              </div>
+              <div>
+                <b title='Total time '>
+                  Load time:
+                </b>
+                <t t-att-tile='build.load_time' t-esc="s2human(build.load_time)"/>
+                <i t-if='more'>(<t t-esc="build.load_time"/>s)</i>
+              </div>
+              <div>
+                <t t-if="build.stat_ids">
+                  <b>Stats:</b>
+                    <a t-attf-href="/runbot/build/stats/{{build.id}}">Build <t t-esc="build.id"/></a>
+                  <br/>
+                </t>
+              </div>
             </div>
           </div>
           <div class="col-md-6" t-if="build.children_ids">
@@ -204,7 +223,7 @@
                     </t>
                   </td>
                   <td>
-                    <span t-attf-class="badge badge-info" t-esc="child._get_formated_build_time()"/>
+                    <span t-attf-class="badge badge-info" t-esc="s2human(child.build_time)"/>
                   </td>
                   <td>
                     <t t-call="runbot.build_button">
@@ -336,7 +355,7 @@
                     <td/><td/><td/>
                     <td t-attf-class="bg-{{'info' if error.active else 'success'}}-light {{size}}" colspan="2">
                       This error is already <a href="#" t-attf-title="{{'Was detected by runbot in nightly builds.' if error.active else 'Either the error is not properly fixed or the branch does not contain the fix.'}}"><t t-esc="'known' if error.active else 'fixed'"/></a>.
-                      <a groups="runbot.group_user" t-attf-href="/web#id={{l.error_id.id}}&amp;view_type=form&amp;model=runbot.build.error&amp;menu_id={{env.ref('runbot.runbot_menu_root').id}}" title="View in Backend" target="new">
+                      <a groups="runbot.group_user" t-attf-href="/web#id={{l.error_id.id}}&amp;view_type=form&amp;model=runbot.build.error&amp;menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" title="View in Backend" target="new">
                         <i t-attf-class="fa fa-{{icon}}"/>
                       </a>
                       <span groups="runbot.group_runbot_admin" t-if="error.responsible or error.responsible.id == uid">(<i t-esc="error.responsible.name"/>)</span>
@@ -387,7 +406,7 @@
                     <span t-esc="build.params_id.version_id.name"/>
                   </td>
                   <td>
-                    <span t-esc="build._get_formated_build_time()"/>
+                    <span t-esc="s2human(build.build_time)"/>
                   </td>
                   <td>
                     <t t-call="runbot.build_button">
