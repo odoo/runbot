@@ -20,24 +20,22 @@
                             <field name="used_custom_trigger"/>
                         </group>
                     </group>
-                    <group>
-                        <notebook>
-                            <page string="Commits">
-                                <field name="commit_link_ids">
-                                    <tree>
-                                        <field name="commit_id"/>
-                                        <field name="match_type"/>
-                                    </tree>
-                                </field>
-                            </page>
-                            <page string="Builds">
-                                <field name="build_ids"/>
-                            </page>
-                            <page string="Reference Builds">
-                                <field name="builds_reference_ids"/>
-                            </page>
-                        </notebook>
-                    </group>
+                    <notebook>
+                        <page string="Commits">
+                            <field name="commit_link_ids">
+                                <tree>
+                                    <field name="commit_id"/>
+                                    <field name="match_type"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Builds">
+                            <field name="build_ids"/>
+                        </page>
+                        <page string="Reference Builds">
+                            <field name="builds_reference_ids"/>
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>
