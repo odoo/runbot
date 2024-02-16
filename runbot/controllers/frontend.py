@@ -216,9 +216,10 @@ class Runbot(Controller):
             raise Forbidden("Only users with a specific group can do that. Please contact runbot administrators")
         _logger.info('user %s forcing bundle %s', request.env.user.name, bundle.name)  # user must be able to read bundle
         batch = bundle.sudo()._force()
-        batch._log('Batch forced by %s', request.env.user.name)
-        batch._prepare(auto_rebase)
-        return werkzeug.utils.redirect('/runbot/batch/%s' % batch.id)
+        if batch:
+            batch._log('Batch forced by %s', request.env.user.name)
+            batch._prepare(auto_rebase)
+            return werkzeug.utils.redirect('/runbot/batch/%s' % batch.id)
 
     @route(['/runbot/batch/<int:batch_id>'], website=True, auth='public', type='http', sitemap=False)
     def batch(self, batch_id=None, **kwargs):
