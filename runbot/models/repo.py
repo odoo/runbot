@@ -7,6 +7,7 @@ import subprocess
 import time
 
 import requests
+import markupsafe
 
 from pathlib import Path
 
@@ -233,27 +234,44 @@ class Remote(models.Model):
                     permission = repo_access['permission']
                     permissions = repo_access['user']['permissions']
                     response
-                    access_info = f'''
-<b>Permissions:</b> {permission}<br/>
+                    access_info = markupsafe.Markup('''
+<b>Permissions:</b> %s<br/>
 <ul>
-<li><b>admin:</b> <span class="fa fa-{'check' if permissions['admin'] else 'times'}"></li>
-<li><b>maintain:</b> <span class="fa fa-{'check' if permissions['maintain'] else 'times'}"/></li>
-<li><b>push:</b> <span class="fa fa-{'check' if permissions['push'] else 'times'}"/></li>
-<li><b>triage:</b> <span class="fa fa-{'check' if permissions['triage'] else 'times'}"/></li>
-<li><b>pull:</b> <span class="fa fa-{'check' if permissions['pull'] else 'times'}"/></li>
+<li><b>admin:</b> <span class="fa fa-%s"></li>
+<li><b>maintain:</b> <span class="fa fa-%s"/></li>
+<li><b>push:</b> <span class="fa fa-%s"/></li>
+<li><b>triage:</b> <span class="fa fa-%s"/></li>
+<li><b>pull:</b> <span class="fa fa-%s"/></li>
 <ul>
-'''
+''') % (
+    permission,
+    'check' if permissions['admin'] else 'times',
+    'check' if permissions['maintain'] else 'times',
+    'check' if permissions['push'] else 'times',
+    'check' if permissions['triage'] else 'times',
+    'check' if permissions['pull'] else 'times',
+)
                 else:
                     access_info = 'Look like this repo does not exist or given token does not have access to it'
-                message = f'''
-<b>User:</b> <a href="{html_url}">{login}</a> <img src={avatar_url} height="20px" width="20px"><br/>
-<b>User id:</b> {user_id}<br/>
-<b>Limit total:</b> {limit_total}<br/>
-<b>Limit used:</b> {limit_used}<br/>
-<b>Limit remaining:</b> {limit_remaining}<br/>
-<b>Limit reset:</b> {limit_reset}<br/>
+                message = markupsafe.Markup('''
+<b>User:</b> <a href="%s">%s</a> <img src=%s height="20px" width="20px"><br/>
+<b>User id:</b> %s<br/>
+<b>Limit total:</b> %s<br/>
+<b>Limit used:</b> %s<br/>
+<b>Limit remaining:</b> %s<br/>
+<b>Limit reset:</b> %s<br/>
 <br/>
-{access_info}'''
+%s''') % (
+    html_url,
+    login,
+    avatar_url,
+    user_id,
+    limit_total,
+    limit_used,
+    limit_remaining,
+    limit_reset,
+    access_info,
+    )
             except Exception as e:
                 _logger.exception('An error occured')
                 message = f"An error occured: \n{str(e)}"
