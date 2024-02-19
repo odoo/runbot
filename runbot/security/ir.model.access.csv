@@ -67,6 +67,9 @@ access_runbot_build_stat_regex_admin,access_runbot_build_stat_regex_admin,runbot
 access_runbot_trigger_user,access_runbot_trigger_user,runbot.model_runbot_trigger,runbot.group_user,1,0,0,0
 access_runbot_trigger_runbot_admin,access_runbot_trigger_runbot_admin,runbot.model_runbot_trigger,runbot.group_runbot_admin,1,1,1,1
 
+access_runbot_module_filter_user,access_runbot_module_filter_user,runbot.model_runbot_module_filter,runbot.group_user,1,0,0,0
+access_runbot_module_filter_runbot_admin,access_runbot_module_filter_runbot_admin,runbot.model_runbot_module_filter,runbot.group_runbot_admin,1,1,1,1
+
 access_runbot_repo_user,access_runbot_repo_user,runbot.model_runbot_repo,runbot.group_user,1,0,0,0
 access_runbot_repo_runbot_admin,access_runbot_repo_runbot_admin,runbot.model_runbot_repo,runbot.group_runbot_admin,1,1,1,1
 

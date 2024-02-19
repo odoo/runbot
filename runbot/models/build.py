@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import datetime
-import fnmatch
 import getpass
 import hashlib
 import logging
@@ -926,29 +925,11 @@ class BuildResult(models.Model):
 
     def _get_modules_to_test(self, modules_patterns=''):
         self.ensure_one()
-
-        def _filter_patterns(patterns, default, all):
-            default = set(default)
-            patterns_list = (patterns or '').split(',')
-            patterns_list = [p.strip() for p in patterns_list]
-            for pat in patterns_list:
-                if pat.startswith('-'):
-                    pat = pat.strip('- ')
-                    default -= {mod for mod in default if fnmatch.fnmatch(mod, pat)}
-                elif pat:
-                    default |= {mod for mod in all if fnmatch.fnmatch(mod, pat)}
-            return default
-
-        available_modules = []
-        modules_to_install = set()
-        for repo, module_list in self._get_available_modules().items():
-            available_modules += module_list
-            modules_to_install |= _filter_patterns(repo.modules, module_list, module_list)
-
-        modules_to_install = _filter_patterns(self.params_id.modules, modules_to_install, available_modules)
-        modules_to_install = _filter_patterns(modules_patterns, modules_to_install, available_modules)
-
-        return sorted(modules_to_install)
+        trigger = self.params_id.trigger_id
+        modules = self._get_available_modules()
+        params_patterns = (self.params_id.modules or '').split(',')
+        modules_patterns = (modules_patterns or '').split(',')
+        return trigger._filter_modules_to_test(modules, params_patterns + modules_patterns)
 
     def _local_pg_dropdb(self, dbname):
         msg = ''

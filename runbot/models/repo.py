@@ -1,24 +1,32 @@
 # -*- coding: utf-8 -*-
 import datetime
+import fnmatch
 import json
 import logging
 import re
 import subprocess
 import time
-
 import requests
 import markupsafe
 
 from pathlib import Path
 
 from odoo import models, fields, api
-from odoo.tools import file_open
+from odoo.tools import file_open, mail
 from ..common import os, RunbotException, make_github_session, sanitize
 from odoo.exceptions import UserError
 from odoo.tools.safe_eval import safe_eval
 
 _logger = logging.getLogger(__name__)
 
+class ModuleFilter(models.Model):
+    _name = 'runbot.module.filter'
+    _description = 'Module filter'
+
+    trigger_id = fields.Many2one('runbot.trigger', string="", required=True)
+    repo_id = fields.Many2one('runbot.repo', string="Repo", required=True)
+    modules = fields.Char(string="Module filter", required=True)
+    description = fields.Char(string="Description")
 
 
 class Trigger(models.Model):
@@ -38,6 +46,7 @@ class Trigger(models.Model):
     project_id = fields.Many2one('runbot.project', string="Project id", required=True)
     repo_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_triggers', string="Triggers", domain="[('project_id', '=', project_id)]")
     dependency_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_dependencies', string="Dependencies")
+    module_filters = fields.One2many('runbot.module.filter', 'trigger_id', string="Module filters", help='Will be combined with repo module filters when used with this trigger')
     config_id = fields.Many2one('runbot.build.config', string="Config", required=True)
     batch_dependent = fields.Boolean('Batch Dependent', help="Force adding batch in build parameters to make it unique and give access to bundle")
 
@@ -90,6 +99,65 @@ class Trigger(models.Model):
         if self.version_domain:
             return safe_eval(self.version_domain)
         return []
+
+    def _filter_modules_to_test(self, modules, module_patterns=None):
+        repo_module_patterns = {}
+        for module_filter in self.module_filters:
+            repo_module_patterns.setdefault(module_filter.repo_id, [])
+            repo_module_patterns[module_filter.repo_id] += module_filter.modules.split(',')
+        module_patterns = module_patterns or []
+
+        def _filter_patterns(patterns_list, default, all):
+            current = set(default)
+            for pat in patterns_list:
+                pat = pat.strip()
+                if not pat:
+                    continue
+                if pat.startswith('-'):
+                    pat = pat.strip('- ')
+                    current -= {mod for mod in current if fnmatch.fnmatch(mod, pat)}
+                elif pat:
+                    current |= {mod for mod in all if fnmatch.fnmatch(mod, pat)}
+            return current
+
+        available_modules = []
+        modules_to_install = set()
+        for repo, repo_available_modules in modules.items():
+            available_modules += repo_available_modules
+
+        # repo specific filters
+        for repo, repo_available_modules in modules.items():
+            repo_modules = repo_available_modules
+            repo_modules = _filter_patterns(repo.modules.split(','), repo_modules, repo_available_modules)
+            module_pattern = repo_module_patterns.get(repo)
+            if module_pattern:
+                repo_modules = _filter_patterns(module_pattern, repo_modules, repo_available_modules)
+            modules_to_install |= repo_modules
+
+        # generic filters
+        modules_to_install = _filter_patterns(module_patterns, modules_to_install, available_modules)
+
+        return sorted(modules_to_install)
+
+    def action_test_modules_filters(self):
+        output = markupsafe.Markup()
+        sticky_bundles = self.env['runbot.bundle'].search([('project_id', '=', self.project_id.id), ('sticky', '=', True)])
+        sticky_bundles = sticky_bundles.sorted(lambda b: b.version_id.number, reverse=True)
+        for sticky_bundle in sticky_bundles:
+            commits = sticky_bundle.last_batch.commit_ids
+            #if not commits:
+            #    continue
+            output += markupsafe.Markup(f'''<h2>%s</h2>''') % sticky_bundle.name
+            for commit in commits:
+                if commit.repo_id in (self.repo_ids + self.dependency_ids).sorted('id'):
+                    try:
+                        module_list = [module for _addons_path, module, _manifest in commit._list_available_modules()]
+                        filtered_modules = self._filter_modules_to_test({commit.repo_id: module_list})
+                        output += markupsafe.Markup(f'''<h4>%s (%s/%s)</h4>''') % (commit.repo_id.name, len(filtered_modules), len(module_list))
+                        output += ','.join(filtered_modules)
+                    except subprocess.CalledProcessError as e:
+                        output += markupsafe.Markup(f'''<h4>{commit.repo_id.name}</h4> Failed to get modules for {commit.repo_id.name}:{commit.name} {e}''')
+        self.message_post(body=output)
 
 
 class Remote(models.Model):

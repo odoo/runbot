@@ -33,6 +33,16 @@
                 <group string="Dependencies">
                   <field name="dependency_ids" nolabel="1" colspan="2"/>
                 </group>
+                <group string="Module filters">
+                  <field name="module_filters" nolabel="1" colspan="4">
+                    <tree string="Module filters" editable="bottom">
+                      <field name="repo_id"  domain="['|', ('id', 'in', parent.repo_ids), ('id', 'in', parent.dependency_ids)]"/>
+                      <field name="modules"/>
+                      <field name="description"/>
+                    </tree>
+                  </field>
+                </group>
+                <button class="btn btn-sm btn-primary" type="object" name="action_test_modules_filters" title="Test filters">List modules</button>
               </group>
               <group>
                 <group>
