@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
-import ast
 import hashlib
 import logging
 import re
 
-from psycopg2 import sql
-
 from collections import defaultdict
 from dateutil.relativedelta import relativedelta
+from markupsafe import Markup
 from werkzeug.urls import url_join
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError, UserError
@@ -290,7 +288,7 @@ class BuildError(models.Model):
 
     def _get_form_link(self):
         self.ensure_one()
-        return f'<a href="{self._get_form_url()}">{self.id}</a>'
+        return Markup(f'<a href="%s">%s</a>') % (self._get_form_url(), self.id)
 
     def _merge(self):
         if len(self) < 2:
@@ -304,10 +302,10 @@ class BuildError(models.Model):
                 base_linked.test_tags = error.test_tags
                 if not base_linked.active and error.active:
                     base_linked.active = True
-                base_error.message_post(body=f'⚠ test-tags inherited from error {error._get_form_link()}')
+                base_error.message_post(body=Markup('⚠ test-tags inherited from error %s') % error._get_form_link())
             elif base_linked.test_tags and error.test_tags and base_linked.test_tags != error.test_tags:
-                base_error.message_post(body=f'⚠ trying to merge errors with different test-tags from {error._get_form_link()} tag: "{error.test_tags}"')
-                error.message_post(body=f'⚠ trying to merge errors with different test-tags from {base_error._get_form_link()} tag: "{base_error.test_tags}"')
+                base_error.message_post(body=Markup('⚠ trying to merge errors with different test-tags from %s tag: "%s"') % (error._get_form_link(), error.test_tags))
+                error.message_post(body=Markup('⚠ trying to merge errors with different test-tags from %s tag: "%s"') % (base_error._get_form_link(), base_error.test_tags))
                 continue
 
             for build_error_link in error.build_error_link_ids:
@@ -320,13 +318,13 @@ class BuildError(models.Model):
             if error.responsible and not base_linked.responsible:
                 base_error.responsible = error.responsible
             elif base_linked.responsible and error.responsible and base_linked.responsible != error.responsible:
-                base_linked.message_post(body=f'⚠ responsible in merged error {error._get_form_link()} was "{error.responsible.name}" and different from this one')
+                base_linked.message_post(body=Markup('⚠ responsible in merged error %s was "%s" and different from this one') % (error._get_form_link(), error.responsible.name))
 
             if error.team_id and not base_error.team_id:
                 base_error.team_id = error.team_id
 
-            base_error.message_post(body=f'Error {error._get_form_link()} was merged into this one')
-            error.message_post(body=f'Error was merged into {base_linked._get_form_link()}')
+            base_error.message_post(body=Markup('Error %s was merged into this one') % error._get_form_link())
+            error.message_post(body=Markup('Error was merged into %s') % base_linked._get_form_link())
             error.child_ids.parent_id = base_error
             error.active = False
 
@@ -441,4 +439,4 @@ class ErrorBulkWizard(models.TransientModel):
                 error_ids['active'] = False
             if self.chatter_comment:
                 for build_error in error_ids:
-                    build_error.message_post(body=self.chatter_comment, subject="Bullk Wizard Comment")
+                    build_error.message_post(body=Markup('%s') % self.chatter_comment, subject="Bullk Wizard Comment")
