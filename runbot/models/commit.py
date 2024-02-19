@@ -75,6 +75,31 @@ class Commit(models.Model):
                     module = os.path.basename(os.path.dirname(manifest_path))
                     yield (addons_path, module, manifest_file_name)
 
+    def _list_files(self, patterns):
+        #example: git ls-files --with-tree=abcf390f90dbdd39fd61abc53f8516e7278e0931 ':(glob)addons/*/*.py' ':(glob)odoo/addons/*/*.py'
+        # note that glob is needed to avoid the star matching **
+        self.ensure_one()
+        return self.repo_id._git(['ls-files', '--with-tree', self.name, *patterns]).split('\n')
+
+    def _list_available_modules(self):
+        # beta version, may replace _get_available_modules latter
+        addons_paths = (self.repo_id.addons_paths or '').split(',')
+        patterns = []
+        for manifest_file_name in self.repo_id.manifest_files.split(','):  # '__manifest__.py' '__openerp__.py'
+            for addon_path in addons_paths:
+                addon_path = addon_path or '.'
+                patterns.append(f':(glob){addon_path}/*/{manifest_file_name}')
+        for file_path in self._list_files(patterns):
+            if file_path:
+                elems = file_path.rsplit('/', 2)
+                if len(elems) == 3:
+                    addons_path, module, manifest_file_name = elems
+                else:
+                    addons_path = ''
+                    module, manifest_file_name = elems
+                yield (addons_path, module, manifest_file_name)
+
+
     def _export(self, build):
         """Export a git repo into a sources"""
         #  TODO add automated tests

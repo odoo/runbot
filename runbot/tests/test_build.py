@@ -189,6 +189,8 @@ class TestBuildResult(RunbotCase):
     def test_filter_modules(self, mock_get_available_modules):
         """ test module filtering """
 
+        self.addons_params.trigger_id = self.trigger_addons
+
         build = self.Build.create({
             'params_id': self.addons_params.id,
         })
@@ -211,6 +213,23 @@ class TestBuildResult(RunbotCase):
         # star to get all available mods
         modules_to_test = build._get_modules_to_test(modules_patterns='*, -hw_*, hw_explicit')
         self.assertEqual(modules_to_test, sorted(['good_module', 'bad_module', 'other_good', 'l10n_be', 'hwgood', 'hw_explicit', 'other_mod_1', 'other_mod_2']))
+
+        self.env['runbot.module.filter'].create([{
+            'trigger_id': self.trigger_addons.id,
+            'repo_id': self.repo_server.id,
+            'modules': '-*',
+        }, {
+            'trigger_id': self.trigger_addons.id,
+            'repo_id': self.repo_addons.id,
+            'modules': '*',
+        }, {
+            'trigger_id': self.trigger_addons.id,
+            'repo_id': self.repo_addons.id,
+            'modules': '-other_mod_1',
+        }])
+        modules_to_test = build._get_modules_to_test(modules_patterns='')
+
+        self.assertEqual(modules_to_test, sorted(['other_mod_2']))
 
     def test_build_cmd_log_db(self, ):
         """ test that the log_db parameter is set in the .odoorc file """
