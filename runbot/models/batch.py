@@ -27,6 +27,9 @@ class Batch(models.Model):
     has_warning = fields.Boolean("Has warning")
     base_reference_batch_id = fields.Many2one('runbot.batch')
 
+    # mergebot
+    staging_identifier = fields.Char('Staging identifier')
+
     @api.depends('slot_ids.build_id')
     def _compute_all_build_ids(self):
         all_builds = self.env['runbot.build'].search([('id', 'child_of', self.slot_ids.build_id.ids)])

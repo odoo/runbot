@@ -10,8 +10,7 @@ import werkzeug.urls
 from collections import defaultdict, OrderedDict
 from werkzeug.exceptions import NotFound, Forbidden
 
-from odoo.addons.http_routing.models.ir_http import slug
-from odoo.addons.website.controllers.main import QueryURL
+from odoo.tools import consteq
 
 from odoo.http import Controller, Response, request, route as o_route
 from odoo.osv import expression
@@ -641,3 +640,38 @@ class Runbot(Controller):
     def parse_log(self, ir_log, **kwargs):
         request.env['runbot.build.error']._parse_logs(ir_log)
         return werkzeug.utils.redirect('/runbot/build/%s' % ir_log.build_id.id)
+
+    @route(['/runbot/stage/'], type='json', auth='public', sitemap=False)
+    def stage(self, params=None, **kwargs):
+        # expected call params: {
+        #     'token': 'token',
+        #     'bundle': 'staging.master',
+        #     'identifier': '12587',
+        #     'commits': [
+        #         {
+        #             'repo_name': 'odoo',
+        #             'name': '0d0015a11d944916ea1a8cc8080b6f840934570f',
+        #         }, {
+        #             'repo_name': 'enterprise',
+        #             'name': '0d00f7a1a6a11d944916ea1a8cc8080b61588844',
+        #         }, ...
+        # }
+        env = request.env
+        token = params['token']
+        commits = env['runbot.commit']
+        for commit_desc in params['commits']:
+            commit = env['runbot.commit'].search([('name', '=', commit_desc['name']), ('repo_id.name', '=', commit_desc['repo_name'])], limit=1)
+            if not commit:
+                return {'error': 'Commit %s not found' % commit_desc}
+            commits |= commit
+        project = commits.mapped('project_id')
+        if not len(commits.mapped('project_id') == 1):
+            return {'error': 'Multiple project found for commits: %s' % project.mapped('name')}
+        if not consteq(project.mapped('merge_token'), token):
+            return {'error': 'Invalid token'}
+        bundle_name = params['bundle']
+        bundle = env['runbot.bundle'].search([('name', '=', bundle_name), ('project_id', '=', project.id)], limit=1)
+        batch = bundle._stage(commits)
+        return {
+
+        }
