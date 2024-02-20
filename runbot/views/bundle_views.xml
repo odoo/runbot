@@ -14,6 +14,8 @@
                     <field name="trigger_ids"/>
                     <field name="sequence"/>
                     <field name="token" password="True"/>
+                    <field name="hidden"/>
+                    <field name="active"/>
                 </group>
             </form>
         </field>
