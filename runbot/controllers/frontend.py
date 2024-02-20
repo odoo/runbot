@@ -24,7 +24,7 @@ def route(routes, **kw):
         @o_route(routes, **kw)
         @functools.wraps(f)
         def response_wrap(*args, **kwargs):
-            projects = request.env['runbot.project'].search([])
+            projects = request.env['runbot.project'].search([('hidden', '=', False)])
             more = request.httprequest.cookies.get('more', False) == '1'
             filter_mode = request.httprequest.cookies.get('filter_mode', 'all')
             keep_search = request.httprequest.cookies.get('keep_search', False) == '1'

@@ -20,6 +20,8 @@ class Project(models.Model):
     always_use_foreign = fields.Boolean('Use foreign bundle', help='By default, check for the same bundle name in another project to fill missing commits.', default=False)
     tmp_prefix = fields.Char('tmp branches prefix', default="tmp.")
     staging_prefix = fields.Char('staging branches prefix', default="staging.")
+    hidden = fields.Boolean('Hidden', help='Hide this project from the main page')
+    active = fields.Boolean("Active", default=True)
 
     @api.model_create_multi
     def create(self, vals_list):
