@@ -115,7 +115,7 @@ class RunbotClient():
             commands = []
             host_name = self.host.name
             for repo in self.env['runbot.repo'].search([]):
-                commands.append(repo.name, (repo._get_git_command(['gc', '--prune=all', '--quiet'])))
+                commands.append((repo.name, repo._get_git_command(['gc', '--prune=all', '--quiet'])))
             self.env.cr.rollback()
             # gc commands can be slow, rollbacking to avoid to keep a transaction idle for multiple minutes.
             messages = []
