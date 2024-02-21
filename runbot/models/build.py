@@ -929,7 +929,7 @@ class BuildResult(models.Model):
         modules = self._get_available_modules()
         params_patterns = (self.params_id.modules or '').split(',')
         modules_patterns = (modules_patterns or '').split(',')
-        return trigger._filter_modules_to_test(modules, params_patterns + modules_patterns)
+        return trigger._filter_modules_to_test(modules, params_patterns + modules_patterns)  # we may switch params_patterns and modules_patterns order
 
     def _local_pg_dropdb(self, dbname):
         msg = ''

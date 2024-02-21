@@ -201,6 +201,12 @@ class TestBuildResult(RunbotCase):
         }
 
         self.repo_server.modules = '-bad_module,-hw_*,hw_explicit,-l10n_*'
+
+        self.repo_addons.modules = False  # no filter, should not crash
+
+        modules_to_test = build._get_modules_to_test(modules_patterns='')
+        self.assertEqual(modules_to_test, sorted(['good_module', 'hwgood', 'other_good', 'hw_explicit', 'other_mod_1', 'other_mod_2']))
+
         self.repo_addons.modules = '-*'
 
         modules_to_test = build._get_modules_to_test(modules_patterns='')

@@ -127,8 +127,9 @@ class Trigger(models.Model):
 
         # repo specific filters
         for repo, repo_available_modules in modules.items():
-            repo_modules = repo_available_modules
-            repo_modules = _filter_patterns(repo.modules.split(','), repo_modules, repo_available_modules)
+            repo_modules = set(repo_available_modules)
+            if repo.modules:
+                repo_modules = _filter_patterns(repo.modules.split(','), repo_modules, repo_available_modules)
             module_pattern = repo_module_patterns.get(repo)
             if module_pattern:
                 repo_modules = _filter_patterns(module_pattern, repo_modules, repo_available_modules)
