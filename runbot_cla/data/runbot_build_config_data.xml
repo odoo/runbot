@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<odoo>
-    <record id="runbot_build_config_step_check_cla" model="runbot.build.config.step">
-        <field name="name">cla_check</field>
-        <field name="job_type">cla_check</field>
-        <field name="protected" eval="True"/>
-    </record>
-</odoo>
