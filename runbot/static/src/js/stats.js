@@ -16,35 +16,39 @@ var config = {
       mode: 'point'
     },
     scales: {
-      xAxes: [{
+      x: {
         display: true,
         scaleLabel: {
           display: true,
           labelString: 'Builds'
         }
-      }],
-      yAxes: [{
+      },
+      y: {
         display: true,
         scaleLabel: {
           display: true,
           labelString: 'Value'
         },
-      }]
-    }
-  }
+      },
+    },
+  },
 };
+
+var shifted = false;
+$(document).on('keyup keydown', function(e){shifted = e.shiftKey} );
 
 config.options.onClick = function(event, activeElements) {
     if (activeElements.length === 0){
-        var x_label_index = this.scales['x-axis-0'].getValueForPixel(event.x);
-        var build_id = config.data.labels[x_label_index]
-        if (event.layerY > this.chartArea.bottom && event.layerY < this.chartArea.bottom + this.scales['x-axis-0'].height){
-          config.searchParams['center_build_id'] = build_id;
-          fetchUpdateChart();
-        }
-        return;
+      return
     }
-    window.open('/runbot/build/stats/' + config.data.labels[activeElements[0]._index]);
+    const build_id = config.data.labels[activeElements[0].index];
+    if (shifted){ 
+      config.searchParams['center_build_id'] = build_id;
+      fetchUpdateChart();
+    } else {
+      window.open('/runbot/build/stats/' + build_id);
+    }
+
 };
 
 function fetch(path, data, then) {

@@ -92,6 +92,7 @@
               <button id="fast_forward_button" class="btn btn-default" title="Previous Builds" aria-label="Previous Builds">
                 <i t-attf-class="fa fa-fast-forward"/>
               </button>
+              <p>Tips: click a bullet to see corresponding build stats, shift+click to center the graph on this build</p>
               <i id="chart_spinner" class="fa fa-2x fa-circle-o-notch fa-spin"/>
             </div>
           </nav>
