@@ -25,7 +25,7 @@ class GC(models.TransientModel):
         # run on all repos with a forwardport target (~ forwardport enabled)
         for repo in self.env['runbot_merge.repository'].search([]):
             repo_git = get_local(repo, prefix=None)
-            if not repo:
+            if not repo_git:
                 continue
 
             _gc.info('Running maintenance on %s', repo.name)

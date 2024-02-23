@@ -4,6 +4,7 @@ import logging
 import os
 import pathlib
 import resource
+import stat
 import subprocess
 from typing import Optional, TypeVar, Union, Sequence, Tuple, Dict
 
@@ -41,6 +42,14 @@ def get_local(repository, prefix: Optional[str]) -> 'Optional[Repo]':
         repo.config('--add', 'remote.origin.fetch', '^refs/heads/tmp.*')
         repo.config('--add', 'remote.origin.fetch', '^refs/heads/staging.*')
         return repo
+    else:
+        _logger.warning(
+            "Unable to acquire %s: %s",
+            repo_dir,
+            "doesn't exist" if not repo_dir.exists()\
+        else oct(stat.S_IFMT(repo_dir.stat().st_mode))
+        )
+        return None
 
 
 ALWAYS = ('gc.auto=0', 'maintenance.auto=0')
