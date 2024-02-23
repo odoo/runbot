@@ -264,7 +264,7 @@
                     Force Build
                 </a>
                 <t t-if="bu.local_state=='running'">
-                    <t t-foreach="bu.database_ids.sorted('name')[1:]" t-as="db">
+                    <t t-foreach="bu.database_ids[1:].sorted('name')" t-as="db">
                         <a class="dropdown-item" t-attf-href="/runbot/run/{{bu.id}}/{{db.db_suffix}}">
                             <i class="fa fa-sign-in"/>
                             Connect <t t-esc="db.db_suffix"></t>
