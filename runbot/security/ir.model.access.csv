@@ -135,3 +135,7 @@ access_runbot_trigger_custom_wizard,access_runbot_trigger_custom_wizard,model_ru
 access_runbot_build_stat_regex_wizard,access_runbot_build_stat_regex_wizard,model_runbot_build_stat_regex_wizard,runbot.group_runbot_admin,1,1,1,1
 
 access_runbot_host_message,access_runbot_host_message,runbot.model_runbot_host_message,runbot.group_runbot_admin,1,0,0,0
+
+access_runbot_modules_wizard,access_runbot_modules_wizard,model_runbot_modules_wizard,runbot.group_runbot_admin,1,1,1,1
+access_runbot_odoo_module,access_runbot_odoo_module,model_runbot_odoo_module,runbot.group_runbot_admin,1,1,1,1
+
