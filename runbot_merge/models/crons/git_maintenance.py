@@ -32,6 +32,6 @@ class GC(models.TransientModel):
             r = repo_git\
                 .stdout(True)\
                 .with_config(stderr=subprocess.STDOUT, text=True, check=False)\
-                .gc(aggressive=True, prune='now')
+                .gc('--prune=now', aggressive=True)
             if r.returncode:
                 _gc.warning("Maintenance failure (status=%d):\n%s", r.returncode, r.stdout)
