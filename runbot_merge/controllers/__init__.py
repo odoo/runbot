@@ -96,17 +96,23 @@ class MergebotController(Controller):
 
         secret = env['runbot_merge.repository'].search([
             ('name', '=', repo),
-        ]).project_id.secret.strip()
-        if secret:
-            signature = 'sha256=' + hmac.new(secret.encode(), req.get_data(), hashlib.sha256).hexdigest()
+        ]).project_id.secret
+        if secret and secret.strip():
+            signature = 'sha256=' + hmac.new(secret.strip().encode(), req.get_data(), hashlib.sha256).hexdigest()
             if not hmac.compare_digest(signature, req.headers.get('X-Hub-Signature-256', '')):
                 _logger.warning(
-                    "Ignored hook %s with incorrect signature: got %s expected %s",
+                    "Ignored hook %s with incorrect signature on %s: got %s expected %s, in:\n%s",
                     req.headers.get('X-Github-Delivery'),
+                    repo,
                     req.headers.get('X-Hub-Signature-256'),
                     signature,
+                    req.headers,
                 )
                 return werkzeug.exceptions.Forbidden()
+        elif req.headers.get('X-Hub-Signature-256'):
+            _logger.info("No secret for %s but received a signature in:\n%s", repo, req.headers)
+        else:
+            _logger.info("No secret or signature for %s", repo)
 
         sentry_sdk.set_context('webhook', request.jsonrequest)
         return c(env, request.jsonrequest)
