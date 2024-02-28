@@ -79,6 +79,9 @@ server {
       proxy_set_header Upgrade $http_upgrade;
       proxy_set_header Connection "Upgrade";
     }
+    location /runbot/ssh {
+      proxy_pass http://127.0.0.1:8888;
+    }
 }
 </t>
 server {

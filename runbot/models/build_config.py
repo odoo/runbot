@@ -387,6 +387,7 @@ class ConfigStep(models.Model):
         exposed_ports = {
             build_port: 8069,
             build_port + 1: 8070,
+            build_port + 2: 8888,
         }
         return dict(cmd=cmd, container_name=docker_name, exposed_ports=exposed_ports, ro_volumes=exports, env_variables=env_variables)
 
