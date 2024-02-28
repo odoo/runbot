@@ -913,17 +913,20 @@ class ConfigStep(models.Model):
         log_time = self._get_log_last_write(build)
         if log_time:
             build.job_end = log_time
-        if self.job_type == 'python' and self.python_result_code and self.python_result_code != PYTHON_DEFAULT:
-            build.write(self._make_python_results(build))
-        elif self.job_type in ['install_odoo', 'python']:
+        if self.job_type == 'python':
+            if self.python_result_code and self.python_result_code != PYTHON_DEFAULT:
+                self._make_python_results(build)
+            elif self.test_enable:
+                self._make_tests_results(build)
+        elif self.job_type == 'install_odoo':
             if self.coverage:
                 build.write(self._make_coverage_results(build))
-            if self.test_enable or self.test_tags:
-                build.write(self._make_tests_results(build))
+            self._make_tests_results(build)
+
         elif self.job_type == 'test_upgrade':
-            build.write(self._make_upgrade_results(build))
+            self._make_upgrade_results(build)
         elif self.job_type == 'restore':
-            build.write(self._make_restore_results(build))
+            self._make_restore_results(build)
 
     def _make_python_results(self, build):
         eval_ctx = self._make_python_ctx(build)
@@ -932,7 +935,8 @@ class ConfigStep(models.Model):
         # todo check return_value or write in try except. Example: local result setted to wrong value
         if not isinstance(return_value, dict):
             raise RunbotException('python_result_code must set return_value to a dict values on build')
-        return return_value
+        if return_value:
+            build.write(return_value)
 
     def _make_coverage_results(self, build):
         build_values = {}
@@ -952,7 +956,6 @@ class ConfigStep(models.Model):
         return build_values
 
     def _make_upgrade_results(self, build):
-        build_values = {}
         build._log('upgrade', 'Getting results for build %s' % build.dest)
 
         if build.local_result != 'ko':
@@ -964,10 +967,7 @@ class ConfigStep(models.Model):
                 self._check_build_ended,
                 self._check_warning,
             ]
-            local_result = self._get_checkers_result(build, checkers)
-            build_values['local_result'] = build._get_worst_result([build.local_result, local_result])
-
-        return build_values
+            build.local_result = self._get_checkers_result(build, checkers)
 
     def _check_module_states(self, build):
         if not build._is_file('logs/modules_states.txt'):
@@ -1037,7 +1037,6 @@ class ConfigStep(models.Model):
         return 'ok'
 
     def _make_tests_results(self, build):
-        build_values = {}
         build._log('run', 'Getting results for build %s' % build.dest)
 
         if build.local_result != 'ko':
@@ -1045,25 +1044,20 @@ class ConfigStep(models.Model):
                 self._check_log,
                 self._check_module_loaded,
                 self._check_error,
-                self._check_build_ended
+                self._check_build_ended,
             ]
             if build.local_result != 'warn':
                 checkers.append(self._check_warning)
 
-            local_result = self._get_checkers_result(build, checkers)
-            build_values['local_result'] = build._get_worst_result([build.local_result, local_result])
-        return build_values
+            build.local_result = self._get_checkers_result(build, checkers)
 
     def _make_restore_results(self, build):
-        build_values = {}
-        if build.local_result != 'warn':
+        if build.local_result not in ['ko', 'warn']:
             checkers = [
                 self._check_log,
-                self._check_restore_ended
+                self._check_restore_ended,
             ]
-            local_result = self._get_checkers_result(build, checkers)
-            build_values['local_result'] = build._get_worst_result([build.local_result, local_result])
-        return build_values
+            build.local_result = self._get_checkers_result(build, checkers)
 
     def _make_stats(self, build):
         if not self.make_stats:  # TODO garbage collect non sticky stat

@@ -782,8 +782,32 @@ Initiating shutdown
 
         # no result defined
         config_step.python_result_code = ""
-        mock_make_tests_results.return_value = {'local_result': 'warn'}
+
+        def set_ok(self, build):
+            build.local_result = 'ok'
+
+        def set_warning(self, build):
+            build.local_result = 'warn'
+
+        def set_ko(self, build):
+            build.local_result = 'ko'
+
+        mock_make_tests_results.side_effect = set_warning
         config_step._make_results(build)
         self.assertEqual(build.local_result, 'warn')
+
+        mock_make_tests_results.side_effect = set_ok
+        config_step._make_results(build)
+        self.assertEqual(build.local_result, 'warn')
+
+        # can go to error from warning
+        mock_make_tests_results.side_effect = set_ko
+        config_step._make_results(build)
+        self.assertEqual(build.local_result, 'ko')
+
+        # cannot go to ok
+        mock_make_tests_results.side_effect = set_ok
+        config_step._make_results(build)
+        self.assertEqual(build.local_result, 'ko')
 
 # TODO add generic test to copy_paste _run_* in a python step
