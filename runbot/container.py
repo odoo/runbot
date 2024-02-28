@@ -133,7 +133,7 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
                       This directory is shared as a volume with the container
     :param container_name: used to give a name to the container for later reference
     :param image_tag: Docker image tag name to select which docker image to use
-    :param exposed_ports: if not None, starting at 8069, ports will be exposed as exposed_ports numbers
+    :param exposed_ports: if not None, ports will be exposed as exposed_ports numbers
     :param memory: memory limit in bytes for the container
     :params ro_volumes: dict of dest:source volumes to mount readonly in builddir
     :params env_variables: list of environment variables
@@ -171,7 +171,7 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
 
     ports = {}
     if exposed_ports:
-        for dp, hp in enumerate(exposed_ports, start=8069):
+        for dp, hp in exposed_ports.items():
             ports[f'{dp}/tcp'] = ('127.0.0.1', hp)
 
     ulimits = [docker.types.Ulimit(name='core', soft=0, hard=0)]  # avoid core dump in containers
