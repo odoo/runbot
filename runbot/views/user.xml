@@ -46,6 +46,8 @@
             <xpath expr="//notebook" position="inside">
                 <page string="Runbot">
                     <group>
+                        <button type="object" name="action_generate_token" string="Set token"/>
+                        <field name="runbot_api_token"/>
                         <field name="github_login"/>
                         <field name="runbot_team_ids"/>
                     </group>
