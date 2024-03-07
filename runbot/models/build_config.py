@@ -777,9 +777,9 @@ class ConfigStep(models.Model):
 
         return dict(cmd=cmd, container_name=build._get_docker_name(), cpu_limit=self.cpu_limit)
 
-    def _reference_builds(self, bundle, trigger):
+    def _reference_builds(self, batch, trigger):
         upgrade_dumps_trigger_id = trigger.upgrade_dumps_trigger_id
-        refs_batches = self._reference_batches(bundle, trigger)
+        refs_batches = self._reference_batches(batch, trigger)
         refs_builds = refs_batches.mapped('slot_ids').filtered(
             lambda slot: slot.trigger_id == upgrade_dumps_trigger_id
             ).mapped('build_id')
@@ -791,13 +791,14 @@ class ConfigStep(models.Model):
     def _is_upgrade_step(self):
         return self.job_type in ('configure_upgrade', 'configure_upgrade_complement')
 
-    def _reference_batches(self, bundle, trigger):
+    def _reference_batches(self, batch, trigger):
         if self.job_type == 'configure_upgrade_complement':
-            return self._reference_batches_complement(bundle, trigger)
+            return self._reference_batches_complement(batch, trigger)
         else:
-            return self._reference_batches_upgrade(bundle, trigger.upgrade_dumps_trigger_id.category_id.id)
+            return self._reference_batches_upgrade(batch, trigger.upgrade_dumps_trigger_id.category_id.id)
 
-    def _reference_batches_complement(self, bundle, trigger):
+    def _reference_batches_complement(self, batch, trigger):
+        bundle = batch.bundle_id
         category_id = trigger.upgrade_dumps_trigger_id.category_id.id
         version = bundle.version_id
         next_versions = version.next_major_version_id | version.next_intermediate_version_ids  # TODO filter on trigger version
@@ -810,10 +811,11 @@ class ConfigStep(models.Model):
                 if bundle.version_id in upgrade_complement_step._get_upgrade_source_versions(next_version):
                     target_versions |= next_version
         return target_versions.with_context(
-            category_id=category_id, project_id=bundle.project_id.id
+            category_id=category_id, project_id=bundle.project_id.id,
             ).mapped('base_bundle_id').filtered('to_upgrade').mapped('last_done_batch')
 
-    def _reference_batches_upgrade(self, bundle, category_id):
+    def _reference_batches_upgrade(self, batch, category_id):
+        bundle = batch.bundle_id
         target_refs_bundles = self.env['runbot.bundle']
         upgrade_domain = [('to_upgrade', '=', True), ('project_id', '=', bundle.project_id.id)]
         if self.upgrade_to_version_ids:

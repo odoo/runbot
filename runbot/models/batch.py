@@ -335,7 +335,8 @@ class Batch(models.Model):
                 'create_batch_id': self.id,
                 'used_custom_trigger': bool(trigger_custom),
             }
-            params_value['builds_reference_ids'] = trigger._reference_builds(bundle)
+
+            params_value['builds_reference_ids'] = trigger._reference_builds(self)
 
             params = self.env['runbot.build.params'].create(params_value)
 
