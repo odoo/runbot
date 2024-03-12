@@ -810,9 +810,9 @@ class ConfigStep(models.Model):
             for next_version in next_versions:
                 if bundle.version_id in upgrade_complement_step._get_upgrade_source_versions(next_version):
                     target_versions |= next_version
-        return target_versions.with_context(
-            category_id=category_id, project_id=bundle.project_id.id,
-            ).mapped('base_bundle_id').filtered('to_upgrade').mapped('last_done_batch')
+
+        base_batch = batch if bundle.is_base else batch.base_reference_batch_id
+        return base_batch.reference_batch_ids.filtered(lambda batch: batch.bundle_id.version_id in target_versions and batch.category_id.id == category_id)
 
     def _reference_batches_upgrade(self, batch, category_id):
         bundle = batch.bundle_id
@@ -850,9 +850,9 @@ class ConfigStep(models.Model):
                 from_versions(f_bundle)
             source_refs_bundles = source_refs_bundles.filtered('to_upgrade')
 
-        return (target_refs_bundles | source_refs_bundles).with_context(
-            category_id=category_id
-            ).mapped('last_done_batch')
+        ref_bundles = target_refs_bundles | source_refs_bundles
+        base_batch = batch if bundle.is_base else batch.base_reference_batch_id
+        return base_batch.reference_batch_ids.filtered(lambda batch: batch.bundle_id in ref_bundles and batch.category_id.id == category_id)
 
     def _log_end(self, build):
         if self.job_type == 'create_build':

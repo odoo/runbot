@@ -53,7 +53,7 @@ class Host(models.Model):
             [('host', 'in', self.mapped('name')), ('local_state', 'in', ('testing', 'running'))],
             ['host', 'local_state'],
             ['host', 'local_state'],
-            lazy=False
+            lazy=False,
         )
         count_by_host_state = {host.name: {} for host in self}
         for group in groups:
