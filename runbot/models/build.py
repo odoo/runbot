@@ -1056,11 +1056,35 @@ class BuildResult(models.Model):
         python_params = python_params or []
         py_version = py_version if py_version is not None else build._get_py_version()
         pres = []
-        for commit_id in self.env.context.get('defined_commit_ids') or self.params_id.commit_ids:
+        extra_python_paths = []
+        commit_ids = self.env.context.get('defined_commit_ids') or self.params_id.commit_ids
+        for commit_id in commit_ids:
             if not self.params_id.skip_requirements and os.path.isfile(commit_id._source_path('requirements.txt')):
-                repo_dir = self._docker_source_folder(commit_id)
-                requirement_path = os.sep.join([repo_dir, 'requirements.txt'])
-                pres.append([f'python{py_version}', '-m', 'pip', 'install','--user', '--progress-bar', 'off', '-r', f'{requirement_path}'])
+                requirement_path = 'requirements/%s.txt' % commit_id.repo_id.name
+                content = commit_id._read_source('requirements.txt')
+                new_content = ''
+                for line in content.split('\n'):
+                    for pattern in ('file:', 'git+'):
+                        if pattern in line:
+                            corresponding_repo = None
+                            if 'git+' in line and '/' in line:
+                                repo_name = line.rsplit('/', 1)[-1]
+                                for target_commit in commit_ids:
+                                    repo = target_commit.repo_id
+                                    if repo.name == repo_name:
+                                        corresponding_repo = repo
+                                        pres.append([f'python{py_version}', '-m', 'pip', 'install', '--user', '--progress-bar', 'off', '/data/build/' + self._docker_source_folder(target_commit)])
+                                        break
+                            if corresponding_repo:
+                                build._log('', 'Installing repo %s and removing line %s' % (corresponding_repo.name, line), log_type='markdown')
+                            else:
+                                build._log('', '**CAUTION** a requirement containing a `%s` was removed: %s' % (pattern, line), log_type='markdown')
+                            break
+                    else:
+                        new_content += line + '\n'
+                if new_content:
+                    build._write_file(requirement_path, new_content)
+                    pres.append([f'python{py_version}', '-m', 'pip', 'install', '--user', '--progress-bar', 'off', '-r', f'{requirement_path}'])
 
         addons_paths = self._get_addons_path()
         (server_commit, server_file) = self._get_server_info()
