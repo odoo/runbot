@@ -292,8 +292,14 @@ class Batch(models.Model):
         # 4. FIND missing commit in foreign project
         if missing_repos:
             if foreign_projects:
-                base_foreign_bundles = bundle.search([('name', '=', bundle.base_id.name), ('project_id', 'in', foreign_projects.ids)])
-                _fill_missing({branch: branch.head for branch in base_foreign_bundles.mapped('branch_ids')}, 'base_head')
+                foreign_branches = self.env['runbot.branch']
+                all_versions = missing_repos.single_version | bundle.version_id
+                foreign_bundles = bundle.search([('version_id', 'in', all_versions.ids), ('is_base', '=', True), ('project_id', 'in', missing_repos.project_id.ids)])
+                all_foreign_branches = foreign_bundles.mapped('branch_ids')
+                for repo in missing_repos:
+                    version = repo.single_version or bundle.version_id
+                    foreign_branches |= all_foreign_branches.filtered(lambda b: b.remote_id.repo_id == repo and b.bundle_id.version_id == version)
+                _fill_missing({branch: branch.head for branch in foreign_branches}, 'base_head')
 
         # CHECK missing commit
         if missing_repos:
