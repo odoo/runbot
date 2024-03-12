@@ -363,12 +363,13 @@ class PullRequests(models.Model):
                     token_field='fp_github_token',
                     format_args={'pr': p},
                 )
-                self.env.ref('runbot_merge.forwardport.update.parent')._send(
-                    repository=parent.repository,
-                    pull_request=parent.number,
-                    token_field='fp_github_token',
-                    format_args={'pr': parent, 'child': p},
-                )
+                if parent.state not in ('closed', 'merged'):
+                    self.env.ref('runbot_merge.forwardport.update.parent')._send(
+                        repository=parent.repository,
+                        pull_request=parent.number,
+                        token_field='fp_github_token',
+                        format_args={'pr': parent, 'child': p},
+                    )
         for p in closed_fp.filtered(lambda p: p.state != 'closed'):
             self.env.ref('runbot_merge.forwardport.reopen.detached')._send(
                 repository=p.repository,

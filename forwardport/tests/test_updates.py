@@ -4,10 +4,13 @@ initial merge has succeeded (and forward-porting has started)
 """
 import re
 
+import pytest
+
 from utils import seen, re_matches, Commit, make_basic, to_pr
 
 
-def test_update_pr(env, config, make_repo, users):
+@pytest.mark.parametrize("merge_parent", [False, True])
+def test_update_pr(env, config, make_repo, users, merge_parent) -> None:
     """ Even for successful cherrypicks, it's possible that e.g. CI doesn't
     pass or the reviewer finds out they need to update the code.
 
@@ -134,7 +137,18 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         prod.post_status(pr2_id.head, 'success', 'ci/runbot')
         prod.post_status(pr2_id.head, 'success', 'legal/cla')
     env.run_crons()
-    
+
+    pr2 = prod.get_pr(pr2_id.number)
+    if merge_parent:
+        with prod:
+            pr2.post_comment('hansen r+', config['role_reviewer']['token'])
+        env.run_crons()
+        with prod:
+            prod.post_status('staging.c', 'success', 'ci/runbot')
+            prod.post_status('staging.c', 'success', 'legal/cla')
+        env.run_crons()
+        assert pr2_id.state == 'merged'
+
     _0, _1, _2, pr3_id = env['runbot_merge.pull_requests'].search([], order='number')
     assert pr3_id.parent_id == pr2_id
     # don't bother updating heads (?)
@@ -160,21 +174,29 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
                         f"(via @{pr3_id.repository.project_id.github_prefix})"
         )
     ]
-    pr2 = prod.get_pr(pr2_id.number)
-    assert pr2.comments == [
+
+    assert pr2.comments[:2] == [
         seen(env, pr2, users),
         (users['user'], """\
 This PR targets c and is part of the forward-port chain. Further PRs will be created up to d.
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """),
-        (users['user'], f"@{users['user']} @{users['reviewer']} child PR "
-                        f"{pr3_id.display_name} was modified / updated and has "
-                        f"become a normal PR. This PR (and any of its parents) "
-                        f"will need to be merged independently as approvals "
-                        f"won't cross."),
     ]
-    
+
+    if merge_parent:
+        assert pr2.comments[2:] == [
+            (users['reviewer'], "hansen r+"),
+        ]
+    else:
+        assert pr2.comments[2:] == [
+            (users['user'], f"@{users['user']} @{users['reviewer']} child PR "
+                            f"{pr3_id.display_name} was modified / updated and has "
+                            f"become a normal PR. This PR (and any of its parents) "
+                            f"will need to be merged independently as approvals "
+                            f"won't cross."),
+        ]
+
 
 def test_update_merged(env, make_repo, config, users):
     """ Strange things happen when an FP gets closed / merged but then its
