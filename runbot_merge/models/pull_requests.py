@@ -96,28 +96,30 @@ All substitutions are tentatively applied sequentially to the input.
             self._cr, 'runbot_merge_unique_repo', self._table, ['name'])
         return res
 
-    def _load_pr(self, number):
+    def _load_pr(self, number, *, closing=False):
         gh = self.github()
 
         # fetch PR object and handle as *opened*
         issue, pr = gh.pr(number)
 
+        repo_name = pr['base']['repo']['full_name']
         if not self.project_id._has_branch(pr['base']['ref']):
-            _logger.info("Tasked with loading PR %d for un-managed branch %s:%s, ignoring",
-                         number, self.name, pr['base']['ref'])
-            self.env.ref('runbot_merge.pr.load.unmanaged')._send(
-                repository=self,
-                pull_request=number,
-                format_args = {
-                    'pr': pr,
-                    'repository': self,
-                },
-            )
+            _logger.info("Tasked with loading %s PR %s#%d for un-managed branch %s:%s, ignoring",
+                         pr['state'], repo_name, number, self.name, pr['base']['ref'])
+            if not closing:
+                self.env.ref('runbot_merge.pr.load.unmanaged')._send(
+                    repository=self,
+                    pull_request=number,
+                    format_args = {
+                        'pr': pr,
+                        'repository': self,
+                    },
+                )
             return
 
         # if the PR is already loaded, force sync a few attributes
         pr_id = self.env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', pr['base']['repo']['full_name']),
+            ('repository.name', '=', repo_name),
             ('number', '=', number),
         ])
         if pr_id:
@@ -143,11 +145,21 @@ All substitutions are tentatively applied sequentially to the input.
                     'pull_request': pr,
                     'sender': {'login': self.project_id.github_prefix}
                 }) + '. '
+            if pr_id.state != 'closed' and pr['state'] == 'closed':
+                # don't go through controller because try_closing does weird things
+                # for safety / race condition reasons which ends up committing
+                # and breaks everything
+                pr_id.state = 'closed'
             self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': pr_id.repository.id,
                 'pull_request': number,
                 'message': f"{edit}. {edit2}{sync}.",
             })
+            return
+
+        # special case for closed PRs, just ignore all events and skip feedback
+        if closing:
+            self.env['runbot_merge.pull_requests']._from_gh(pr)
             return
 
         sender = {'login': self.project_id.github_prefix}
@@ -199,7 +211,7 @@ All substitutions are tentatively applied sequentially to the input.
             'sender': sender,
         })
         pr_id = self.env['runbot_merge.pull_requests'].search([
-            ('repository.name', '=', pr['base']['repo']['full_name']),
+            ('repository.name', '=', repo_name),
             ('number', '=', number),
         ])
         if pr['state'] == 'closed':
@@ -520,7 +532,7 @@ class PullRequests(models.Model):
         for r in self:
             r.batch_id = r.batch_ids.filtered(lambda b: b.active)[:1]
 
-    def _get_or_schedule(self, repo_name, number, target=None):
+    def _get_or_schedule(self, repo_name, number, *, target=None, closing=False):
         repo = self.env['runbot_merge.repository'].search([('name', '=', repo_name)])
         if not repo:
             return
@@ -546,6 +558,7 @@ class PullRequests(models.Model):
         Fetch.create({
             'repository': repo.id,
             'number': number,
+            'closing': closing,
         })
 
     def _parse_command(self, commandstring):
@@ -1823,6 +1836,7 @@ class FetchJob(models.Model):
     active = fields.Boolean(default=True)
     repository = fields.Many2one('runbot_merge.repository', required=True)
     number = fields.Integer(required=True, group_operator=None)
+    closing = fields.Boolean(default=False)
 
     def _check(self, commit=False):
         """
@@ -1835,7 +1849,7 @@ class FetchJob(models.Model):
 
             self.env.cr.execute("SAVEPOINT runbot_merge_before_fetch")
             try:
-                f.repository._load_pr(f.number)
+                f.repository._load_pr(f.number, closing=f.closing)
             except Exception:
                 self.env.cr.execute("ROLLBACK TO SAVEPOINT runbot_merge_before_fetch")
                 _logger.exception("Failed to load pr %s, skipping it", f.number)

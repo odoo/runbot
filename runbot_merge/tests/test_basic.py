@@ -3218,6 +3218,74 @@ class TestUnknownPR:
                             "as I didn't see previous commands."),
         ]
 
+    def test_close_unknown_unmanaged(self, env, repo, users, config):
+        """If an "unknown PR" is *closed*, it should be saved as closed but not
+        commented on, because that's unnecessary spam.
+        """
+        with repo:
+            m, _ = repo.make_commits(
+                None,
+                Commit('initial', tree={'m': 'm'}),
+                Commit('second', tree={'m2': 'm2'}),
+                ref='heads/master')
+
+            [c1] = repo.make_commits(m, Commit('first', tree={'m': 'c1'}))
+            pr = repo.make_pr(title='title', body='body', target='master', head=c1)
+        env.run_crons()
+        assert pr.comments == [seen(env, pr, users)]
+
+        to_pr(env, pr).unlink()
+        env['runbot_merge.commit'].search([('sha', '=', pr.head)]).unlink()
+
+        with repo:
+            pr.close()
+
+        Fetch = env['runbot_merge.fetch_job']
+        fetches = Fetch.search([('repository', '=', repo.name), ('number', '=', pr.number)])
+        assert len(fetches) == 1, f"expected one fetch for {pr.number}, found {len(fetches)}"
+
+        env.run_crons('runbot_merge.fetch_prs_cron')
+        env.run_crons()
+        assert not Fetch.search([('repository', '=', repo.name), ('number', '=', pr.number)])
+
+        assert to_pr(env, pr).state == 'closed'
+        assert pr.comments == [seen(env, pr, users)]
+
+
+    def test_close_unknown_disabled(self, env, repo, users, config):
+        """If an "unknown PR" on an disabled branch is *closed*, it should be
+        saved as closed but not commented on, because that's unnecessary spam.
+        """
+        with repo:
+            m, _ = repo.make_commits(
+                None,
+                Commit('initial', tree={'m': 'm'}),
+                Commit('second', tree={'m2': 'm2'}),
+                ref='heads/master')
+
+            [c1] = repo.make_commits(m, Commit('first', tree={'m': 'c1'}))
+            pr = repo.make_pr(title='title', body='body', target='master', head=c1)
+        env.run_crons()
+        assert pr.comments == [seen(env, pr, users)]
+
+        to_pr(env, pr).unlink()
+        env['runbot_merge.commit'].search([('sha', '=', pr.head)]).unlink()
+        env['runbot_merge.branch'].search([('name', '=', 'master')]).active = False
+
+        with repo:
+            pr.close()
+
+        Fetch = env['runbot_merge.fetch_job']
+        fetches = Fetch.search([('repository', '=', repo.name), ('number', '=', pr.number)])
+        assert len(fetches) == 1, f"expected one fetch for {pr.number}, found {len(fetches)}"
+
+        env.run_crons('runbot_merge.fetch_prs_cron')
+        env.run_crons()
+        assert not Fetch.search([('repository', '=', repo.name), ('number', '=', pr.number)])
+
+        assert to_pr(env, pr).state == 'closed'
+        assert pr.comments == [seen(env, pr, users)]
+
     def test_rplus_unmanaged(self, env, repo, users, config):
         """ r+ on an unmanaged target should notify about
         """

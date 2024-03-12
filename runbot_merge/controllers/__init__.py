@@ -257,7 +257,7 @@ def handle_pr(env, event):
         pr_obj = env['runbot_merge.pull_requests']._from_gh(pr)
         return "Tracking PR as {}".format(pr_obj.id)
 
-    pr_obj = env['runbot_merge.pull_requests']._get_or_schedule(r, pr['number'])
+    pr_obj = env['runbot_merge.pull_requests']._get_or_schedule(r, pr['number'], closing=event['action'] == 'closed')
     if not pr_obj:
         _logger.info("webhook %s on unknown PR %s#%s, scheduled fetch", event['action'], repo.name, pr['number'])
         return "Unknown PR {}:{}, scheduling fetch".format(repo.name, pr['number'])
