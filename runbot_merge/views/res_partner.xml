@@ -50,6 +50,7 @@
             </xpath>
             <xpath expr="//notebook" position="inside">
                 <page string="Mergebot" groups="runbot_merge.group_admin">
+                    <field name="override_sensitive" invisible="1"/>
                     <group>
                         <group>
                             <field name="github_login"/>
@@ -57,7 +58,12 @@
                     </group>
                     <group>
                         <group colspan="4" string="Review Rights">
-                            <field name="review_rights" nolabel="1">
+                            <div colspan="4" class="alert alert-warning" role="alert" attrs="{'invisible': [('review_rights', '=', [])]}">
+                                Review access requires successfully following
+                                the Code Review (QDP) and Security (DLE)
+                                trainings. Please check before giving r+ access.
+                            </div>
+                            <field colspan="4" name="review_rights" nolabel="1">
                                 <tree string="Review ACLs" editable="bottom">
                                     <field name="repository_id"/>
                                     <field name="review"/>
@@ -66,7 +72,12 @@
                             </field>
                         </group>
                         <group colspan="4">
-                            <field name="override_rights" widget="many2many_tags"/>
+                            <div colspan="4" class="alert alert-danger" role="alert" attrs="{'invisible': [('override_sensitive', '=', False)]}">
+                                Security Override <b>REQUIRES</b> successfully
+                                following the Security training. Please ask DLE
+                                before granting access.
+                            </div>
+                            <field colspan="4" name="override_rights" widget="many2many_tags"/>
                         </group>
                     </group>
                     <group>

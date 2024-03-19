@@ -19,6 +19,7 @@ class Partner(models.Model):
     formatted_email = fields.Char(string="commit email", compute='_rfc5322_formatted')
     review_rights = fields.One2many('res.partner.review', 'partner_id')
     override_rights = fields.Many2many('res.partner.override')
+    override_sensitive = fields.Boolean(compute="_compute_sensitive_overrides")
 
     def _auto_init(self):
         res = super(Partner, self)._auto_init()
@@ -44,6 +45,11 @@ class Partner(models.Model):
         for p in self.filtered(lambda p: p.github_login and p.email is False):
             p.email = gh.user(p.github_login)['email'] or False
         return False
+
+    @api.depends("override_rights.context")
+    def _compute_sensitive_overrides(self):
+        for p in self:
+            p.override_sensitive = any(o.context == 'ci/security' for o in p.override_rights)
 
 class PartnerMerge(models.TransientModel):
     _inherit = 'base.partner.merge.automatic.wizard'
