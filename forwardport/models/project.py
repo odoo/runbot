@@ -332,6 +332,7 @@ class PullRequests(models.Model):
         with_parents = {
             p: p.parent_id
             for p in self
+            if p.state not in ('merged', 'closed')
             if p.parent_id
         }
         closed_fp = self.filtered(lambda p: p.state == 'closed' and p.source_id)

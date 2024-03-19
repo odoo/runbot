@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from utils import seen, Commit, make_basic, REF_PATTERN, MESSAGE_TEMPLATE, validate_all, part_of
+from utils import seen, Commit, make_basic, REF_PATTERN, MESSAGE_TEMPLATE, validate_all, part_of, to_pr
 
 FMT = '%Y-%m-%d %H:%M:%S'
 FAKE_PREV_WEEK = (datetime.now() + timedelta(days=1)).strftime(FMT)
@@ -883,6 +883,84 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
                 project.github_prefix,
             ),
         )
+
+    def test_close_disabled(self, env, make_repo, users, config):
+        """ If an fwport's target is disabled and its branch is closed, it
+        should not be notified (multiple times), also its descendant should not
+        be nodified if already merged, also there should not be recursive
+        notifications (odoo/odoo#145969, odoo/odoo#145984)
+        """
+        repo, _ = make_basic(env, config, make_repo)
+        env['runbot_merge.repository'].search([]).required_statuses = 'default'
+        # prep: merge PR, create two forward ports
+        with repo:
+            [c1] = repo.make_commits('a', Commit('first', tree={'m': 'c1'}))
+            pr1 = repo.make_pr(title='title', body='body', target='a', head=c1)
+            pr1.post_comment('hansen r+', config['role_reviewer']['token'])
+            repo.post_status(c1, 'success')
+        env.run_crons()
+
+        pr1_id = to_pr(env, pr1)
+        assert pr1_id.state == 'ready', pr1_id.blocked
+
+        with repo:
+            repo.post_status('staging.a', 'success')
+        env.run_crons()
+
+        pr1_id_, pr2_id = env['runbot_merge.pull_requests'].search([], order='number')
+        assert pr1_id_ == pr1_id
+        with repo:
+            repo.post_status(pr2_id.head, 'success')
+        env.run_crons()
+
+        _, _, pr3_id = env['runbot_merge.pull_requests'].search([], order='number')
+
+        # disable second branch
+        pr2_id.target.active = False
+        env.run_crons()
+
+        pr2 = repo.get_pr(pr2_id.number)
+        assert pr2.comments == [
+            seen(env, pr2, users),
+            (users['user'], "This PR targets b and is part of the forward-port chain. "
+                           "Further PRs will be created up to c.\n\n"
+                           "More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n"),
+            (users['user'], "@{user} @{reviewer} the target branch 'b' has been disabled, you may want to close this PR.".format_map(
+                users
+            )),
+        ]
+        pr3 = repo.get_pr(pr3_id.number)
+        assert pr3.comments == [
+            seen(env, pr3, users),
+            (users['user'], """\
+@{user} @{reviewer} this PR targets c and is the last of the forward-port chain containing:
+* {pr2_id.display_name}
+
+To merge the full chain, use
+> @herbert r+
+
+More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
+""".format(pr2_id=pr2_id, **users)),
+        ]
+
+        # some time later, notice PR3 is open and merge it
+        with repo:
+            pr3.post_comment('hansen r+', config['role_reviewer']['token'])
+            repo.post_status(pr3.head, 'success')
+        env.run_crons()
+        with repo:
+            repo.post_status('staging.c', 'success')
+        env.run_crons()
+
+        assert pr3_id.status == 'success'
+
+        # even later, notice PR2 is still open but not mergeable anymore
+        with repo:
+            pr2.close()
+        env.run_crons()
+
+        assert pr2.comments[3:] == []
+        assert pr3.comments[2:] == [(users['reviewer'], "hansen r+")]
 
 class TestBranchDeletion:
     def test_delete_normal(self, env, config, make_repo):
