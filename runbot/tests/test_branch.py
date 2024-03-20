@@ -173,6 +173,14 @@ class TestBranchIsBase(RunbotCaseMinimalSetup):
         self.assertTrue(branch.bundle_id.is_base, "A branch matching the is_base_regex parameter should create is_base bundle")
         self.assertTrue(branch.bundle_id.sticky, "A branch matching the is_base_regex parameter should create sticky bundle")
 
+        staging = self.Branch.create({
+            'remote_id': self.remote_server.id,
+            'name': 'staging.saas-13.4',
+            'is_pr': False,
+        })
+        self.assertEqual(staging.bundle_id.base_id, branch.bundle_id, 'The staging branch should have the correct nase bundle')
+
+
     def test_host(self):
         r10 = self.env['runbot.host'].create({'name': 'runbot10.odoo.com'})
         r12 = self.env['runbot.host'].create({'name': 'runbot12.odoo.com', 'assigned_only': True})

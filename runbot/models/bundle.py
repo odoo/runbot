@@ -211,7 +211,7 @@ class Bundle(models.Model):
             elif record.project_id.tmp_prefix and record.name.startswith(record.project_id.tmp_prefix):
                 record['no_build'] = True
             elif record.project_id.staging_prefix and record.name.startswith(record.project_id.staging_prefix):
-                name = record.name.removeprefix(record.project_id.staging_prefix, '')
+                name = record.name.removeprefix(record.project_id.staging_prefix)
                 base = record.env['runbot.bundle'].search([('name', '=', name), ('project_id', '=', record.project_id.id), ('is_base', '=', True)], limit=1)
                 record['build_all'] = True
                 if base:
