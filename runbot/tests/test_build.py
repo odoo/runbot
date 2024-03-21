@@ -237,13 +237,32 @@ class TestBuildResult(RunbotCase):
 
         self.assertEqual(modules_to_test, sorted(['other_mod_2']))
 
-    def test_build_cmd_log_db(self, ):
+    def test_build_cmd_log_db(self):
         """ test that the log_db parameter is set in the .odoorc file """
         build = self.Build.create({
             'params_id': self.server_params.id,
         })
         cmd = build._cmd(py_version=3)
         self.assertIn('log_db = runbot_logs', cmd.get_config())
+
+
+    def test_build_cmd_custom_pre_post(self):
+        """ test that the log_db parameter is set in the .odoorc file """
+        custom_pre = ['pip install something:someversion'.split()]
+        custom_post = ["psql -l > database list".split()]
+        self.server_params.config_data = {
+            'pres': [custom_pre],
+            'posts': [custom_post],
+        }
+        self.env.flush_all()
+        build = self.Build.create({
+            'params_id': self.server_params.id,
+        })
+        cmd = build._cmd(py_version=3)
+        self.assertIn('python3 -m pip install --user --progress-bar off -r server/requirements.txt'.split(), cmd.pres)
+        self.assertIn(custom_pre, cmd.pres)
+        self.assertIn(custom_post, cmd.posts)
+
 
     def test_build_cmd_server_path_no_dep(self):
         """ test that the server path and addons path """
