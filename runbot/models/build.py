@@ -1073,7 +1073,7 @@ class BuildResult(models.Model):
         if sub_command:
             cmd += [sub_command]
 
-        if not self.params_id.extra_params or '--addons-path' not in self.params_id.extra_params :
+        if not self.params_id.extra_params or '--addons-path' not in self.params_id.extra_params:
             cmd += ['--addons-path', ",".join(addons_paths)]
 
         # options
@@ -1083,7 +1083,14 @@ class BuildResult(models.Model):
         if grep(config_path, "no-netrpc"):
             cmd.append("--no-netrpc")
 
-        command = Command(pres, cmd, [], cmd_checker=build)
+        posts = []
+        if pre := self.params_id.config_data.get('pres'):
+            pres += pre
+
+        if post := self.params_id.config_data.get('posts'):
+            posts += (post)
+
+        command = Command(pres, cmd, posts, cmd_checker=build)
 
         # use the username of the runbot host to connect to the databases
         command.add_config_tuple('db_user', '%s' % pwd.getpwuid(os.getuid()).pw_name)
