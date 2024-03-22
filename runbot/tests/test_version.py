@@ -16,7 +16,7 @@ class TestVersion(RunbotCase):
 
         self.assertGreater(saas_version.number, major_version.number)
 
-        master_version = self.Version.create({'name': 'master'})
+        master_version = self.Version.search([('name', '=', 'master')])
         self.assertEqual(master_version.number, '~')
         self.assertGreater(master_version.number, saas_version.number)
 

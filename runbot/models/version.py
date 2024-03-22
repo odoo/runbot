@@ -1,7 +1,7 @@
 import logging
 import re
 from odoo import models, fields, api, tools
-
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -25,6 +25,10 @@ class Version(models.Model):
 
     dockerfile_id = fields.Many2one('runbot.dockerfile', default=lambda self: self.env.ref('runbot.docker_default', raise_if_not_found=False))
 
+    _sql_constraints = [
+        ('unique_name', 'unique (name)', 'avoid duplicate versions'),
+    ]
+
     @api.depends('name')
     def _compute_version_number(self):
         for version in self:
@@ -42,6 +46,13 @@ class Version(models.Model):
         model.env.registry.clear_cache()
         return super().create(vals_list)
 
+    def write(self, values):
+        if 'name' in values:
+            icp = self.env['ir.config_parameter'].sudo()
+            regex = icp.get_param('runbot.runbot_is_base_regex', False)
+            if regex and not re.match(regex, values['name']):
+                raise UserError(f"Version name {values['name']} does not match a valid base name.")
+
     def _get(self, name):
         return self.browse(self._get_id(name))
 
@@ -49,6 +60,10 @@ class Version(models.Model):
     def _get_id(self, name):
         version = self.search([('name', '=', name)])
         if not version:
+            icp = self.env['ir.config_parameter'].sudo()
+            regex = icp.get_param('runbot.runbot_is_base_regex', False)
+            if regex and not re.match(regex, name):
+                return False
             version = self.create({
                 'name': name,
             })

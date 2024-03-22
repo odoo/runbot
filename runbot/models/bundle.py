@@ -1,7 +1,4 @@
-import time
-import logging
-import datetime
-import subprocess
+import re
 
 from collections import defaultdict
 from odoo import models, fields, api, tools
@@ -30,7 +27,7 @@ class Bundle(models.Model):
     last_done_batch = fields.Many2many('runbot.batch', 'Last batchs', compute='_compute_last_done_batch')
 
     sticky = fields.Boolean('Sticky', compute='_compute_sticky', store=True, index=True)
-    is_base = fields.Boolean('Is base', index=True)
+    is_base = fields.Boolean('Is base', index=True, readonly=True)
     defined_base_id = fields.Many2one('runbot.bundle', 'Forced base bundle', domain="[('project_id', '=', project_id), ('is_base', '=', True)]")
     base_id = fields.Many2one('runbot.bundle', 'Base bundle', compute='_compute_base_id', store=True)
     to_upgrade = fields.Boolean('To upgrade', compute='_compute_to_upgrade', store=True, index=False)
