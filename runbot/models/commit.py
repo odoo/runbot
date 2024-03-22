@@ -25,6 +25,7 @@ class Commit(models.Model):
         )
     ]
     name = fields.Char('SHA')
+    tree_hash = fields.Char('Tree hash')
     repo_id = fields.Many2one('runbot.repo', string='Repo group')
     date = fields.Datetime('Commit date')
     author = fields.Char('Author')
@@ -43,8 +44,8 @@ class Commit(models.Model):
         return super().create(vals_list)
 
     def _get_commit_infos(self, sha, repo):
-        fields = ['date', 'author', 'author_email', 'committer', 'committer_email', 'subject']
-        pretty_format = '%x00'.join(['%ct', '%an', '%ae', '%cn', '%ce', '%s'])
+        fields = ['date', 'author', 'author_email', 'committer', 'committer_email', 'subject', 'tree_hash']
+        pretty_format = '%x00'.join(['%ct', '%an', '%ae', '%cn', '%ce', '%s', '%T'])
         vals = {}
         try:
             vals = dict(zip(fields, repo._git(['show', '-s', f'--pretty=format:{pretty_format}', sha]).split('\x00')))
