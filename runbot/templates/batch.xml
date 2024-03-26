@@ -37,13 +37,6 @@
                                 <span class="badge text-bg-info" t-out="s2human(batch.last_update - batch.create_date)"/>
                             </td>
                         </tr>
-                        <tr t-if="more and batch.reference_batch_ids">
-                            <td>Version reference batches (for upgrade)</td>
-                            <td>
-                                <t t-foreach="batch.reference_batch_ids" t-as="reference_batch"/>
-                                <div><a t-attf-href="/runbot/batch/{{reference_batch.id}}"><t t-out="reference_batch.bundle_id.version_id.name"/> (<t t-out="reference_batch.id"/>)</a></div>
-                            </td>
-                        </tr>
                         <tr>
                             <td t-att-class="batch_class" >Commits</td>
                             <td t-att-class="batch_class" >
@@ -116,6 +109,30 @@
                                     </t>
                                     <hr/>
                                 </div>
+                            </td>
+                        </tr>
+                        <tr t-if="more">
+                            <t t-set="reference_batch_ids" t-value="batch.reference_batch_ids"/>
+                            <td>
+                                <t t-if="batch.bundle_id.is_base">
+                                    Reference batches (is base)
+                                </t>
+                                <t t-else="">
+                                    <t t-if="reference_batch_ids">
+                                        Reference batches (custom, not using base)
+                                    </t>
+                                    <t t-else="">
+                                        <t t-set="reference_batch_ids" t-value="batch.base_reference_batch_id.reference_batch_ids"/>
+                                        Reference batches (from base)
+                                    </t>
+                                </t>
+                            </td>
+                            <td>
+                                <t t-foreach="reference_batch_ids.sorted(lambda b: b.bundle_id.version_id.number, reverse=True)" t-as="reference_batch">
+                                    <div t-att-title="f'Created {s2human(reference_batch.create_date - batch.create_date)} before this one'">
+                                         <a t-attf-href="/runbot/batch/{{reference_batch.id}}"><t t-out="reference_batch.bundle_id.version_id.name"/> (<t t-out="reference_batch.id"/>)</a>
+                                    </div>
+                                </t>
                             </td>
                         </tr>
                     </table>
