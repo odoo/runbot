@@ -629,7 +629,7 @@ class ConfigStep(models.Model):
                         dbs = dump_builds.database_ids.sorted('db_suffix')
                         valid_databases += list(self._filter_upgrade_database(dbs, upgrade_db.db_pattern))
                         if not valid_databases:
-                            build._log('_run_configure_upgrade', 'No datase found for pattern %s' % (upgrade_db.db_pattern), level='ERROR')
+                            build._log('_run_configure_upgrade', 'No database found for pattern %s' % (upgrade_db.db_pattern), level='ERROR')
                 for db in valid_databases:
                     #commit_ids = build.params_id.commit_ids
                     #if commit_ids != target.params_id.commit_ids:
@@ -643,7 +643,7 @@ class ConfigStep(models.Model):
                         'upgrade_to_build_id': target.id,
                         'upgrade_from_build_id': source,
                         'dump_db': db.id,
-                        'config_id': self.upgrade_config_id
+                        'config_id': self.upgrade_config_id,
                     })
 
                     child.description = 'Testing migration from %s to %s using db %s (%s)' % (
