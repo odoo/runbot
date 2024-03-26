@@ -26,6 +26,13 @@ class Batch(models.Model):
     log_ids = fields.One2many('runbot.batch.log', 'batch_id')
     has_warning = fields.Boolean("Has warning")
     base_reference_batch_id = fields.Many2one('runbot.batch')
+    reference_batch_ids = fields.Many2many(
+        'runbot.batch',
+        string="Reference batches",
+        relation='batch__reference_batch_ids_rel',
+        column1='batch_id',
+        column2='referenced_batch_id',
+    )
 
     @api.depends('slot_ids.build_id')
     def _compute_all_build_ids(self):
@@ -232,6 +239,19 @@ class Batch(models.Model):
         self._update_commits_infos(base_head_per_repo)  # set base_commit, diff infos, ...
 
         # 2. FIND missing commit in a compatible base bundle
+        if bundle.is_base or auto_rebase:
+            self.reference_batch_ids = self.env['runbot.batch'].browse(result[1] for result in self.env['runbot.batch']._read_group(
+                domain=[
+                    ('state', '=', 'done'),
+                    ('bundle_id.project_id', '=', bundle.project_id.id),
+                    ('bundle_id.to_upgrade', '=', True),
+                    ('bundle_id.is_base', '=', True),
+                    ('category_id', '=', self.category_id.id),  # not 100% correct since it should match upgrade_dumps_trigger_id,
+                                                                # but all trigger should have upgrade_dumps_trigger_id in the same category
+                ],
+                groupby=['bundle_id'],
+                aggregates=['id:max'],
+            ))
         if not bundle.is_base:
             merge_base_commits = self.commit_link_ids.mapped('merge_base_commit_id')
             if self.base_reference_batch_id:
@@ -335,7 +355,8 @@ class Batch(models.Model):
                 'create_batch_id': self.id,
                 'used_custom_trigger': bool(trigger_custom),
             }
-            params_value['builds_reference_ids'] = trigger._reference_builds(bundle)
+
+            params_value['builds_reference_ids'] = trigger._reference_builds(self)
 
             params = self.env['runbot.build.params'].create(params_value)
 

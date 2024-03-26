@@ -86,12 +86,12 @@ class Trigger(models.Model):
             raise UserError('Upgrade trigger should have a config with step of type Configure Upgrade')
         return upgrade_step
 
-    def _reference_builds(self, bundle):
+    def _reference_builds(self, batch):
         self.ensure_one()
         if self.upgrade_step_id:  # this is an upgrade trigger, add corresponding builds
-            custom_config = next((trigger_custom.config_id for trigger_custom in bundle.trigger_custom_ids if trigger_custom.trigger_id == self), False)
+            custom_config = next((trigger_custom.config_id for trigger_custom in batch.bundle_id.trigger_custom_ids if trigger_custom.trigger_id == self), False)
             step = self._upgrade_step_from_config(custom_config) if custom_config else self.upgrade_step_id
-            refs_builds = step._reference_builds(bundle, self)
+            refs_builds = step._reference_builds(batch, self)
             return [(4, b.id) for b in refs_builds]
         return []
 
