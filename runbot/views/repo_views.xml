@@ -26,44 +26,57 @@
                   <field name="version_domain" widget="domain" options="{'model': 'runbot.version', 'in_dialog': True}"/>
                 </group>
               </group>
-              <group>
-                <group string="Repositories">
-                  <field name="repo_ids" nolabel="1" colspan="2"/>
-                </group>
-                <group string="Dependencies">
-                  <field name="dependency_ids" nolabel="1" colspan="2"/>
-                </group>
-                <group string="Module filters">
-                  <field name="module_filters" nolabel="1" colspan="4">
-                    <tree string="Module filters" editable="bottom">
-                      <field name="repo_id"  domain="['|', ('id', 'in', parent.repo_ids), ('id', 'in', parent.dependency_ids)]"/>
-                      <field name="modules"/>
-                      <field name="description"/>
+              <notebook>
+                <page name="repo_dep" string="Repositories and Dependencies">
+                  <group>
+                    <group string="Repositories">
+                      <field name="repo_ids" nolabel="1" colspan="2"/>
+                    </group>
+                    <group string="Dependencies">
+                      <field name="dependency_ids" nolabel="1" colspan="2"/>
+                    </group>
+                  </group>
+                </page>
+                <page name="module_filters" string="Module Filters">
+                  <group>
+                    <group name="module_filters">
+                      <field name="module_filters" nolabel="1" colspan="4">
+                        <tree string="Module filters" editable="bottom">
+                          <field name="repo_id"  domain="['|', ('id', 'in', parent.repo_ids), ('id', 'in', parent.dependency_ids)]"/>
+                          <field name="modules"/>
+                          <field name="description"/>
+                        </tree>
+                      </field>
+                    </group>
+                  </group>
+                  <button class="btn btn-sm btn-info" style="width: 100%;" type="object" name="action_test_modules_filters" title="Test filters">Test Filters</button>
+                </page>
+              </notebook>
+              <notebook>
+                <page name="other" string="Other infos">
+                  <group>
+                    <group>
+                      <field name="hide"/>
+                      <field name="manual"/>
+                      <field name="restore_trigger_id"/>
+                    </group>
+                    <group>
+                      <field name="ci_context"/>
+                      <field name="ci_url"/>
+                      <field name="ci_description"/>
+                    </group>
+                  </group>
+                </page>
+                <page name="teams" string="Teams">
+                  <field name="team_ids">
+                    <tree>
+                      <field name="name"/>
+                      <field name="github_team"/>
+                      <field name="user_ids" widget="many2many_tags"/>
                     </tree>
                   </field>
-                </group>
-                <button class="btn btn-sm btn-primary" type="object" name="action_test_modules_filters" title="Test filters">List modules</button>
-              </group>
-              <group>
-                <group>
-                  <field name="hide"/>
-                  <field name="manual"/>
-                  <field name="restore_trigger_id"/>
-                </group>
-                <group>
-                  <field name="ci_context"/>
-                  <field name="ci_url"/>
-                  <field name="ci_description"/>
-                </group>
-              </group>
-              <group string="Managing Team (nightly failure, manual start, ...)"></group>
-              <field name="team_ids">
-                <tree>
-                  <field name="name"/>
-                  <field name="github_team"/>
-                  <field name="user_ids" widget="many2many_tags"/>
-                </tree>
-              </field>
+                </page>
+              </notebook>
             </sheet>
             <div class="oe_chatter">
                 <field name="message_follower_ids"/>
@@ -87,6 +100,45 @@
                 <field name="dependency_ids" widget="many2many_tags"/>
                 <field name="manual"/>
             </tree>
+        </field>
+      </record>
+
+      <record id="odoo_module_view_tree" model="ir.ui.view">
+        <field name="name">runbot.odoo.module.tree</field>
+        <field name="model">runbot.odoo.module</field>
+        <field name="arch" type="xml">
+            <tree string="Repositories">
+                <field name="repo_id"/>
+                <field name="name"/>
+            </tree>
+        </field>
+      </record>
+
+      <record model="ir.ui.view" id="runbot_modules_wizard_form">
+        <field name="name">runbot_modules_wizard</field>
+        <field name="model">runbot.modules.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Module Filter Test Wizard">
+              <div class="alert alert-danger" role="alert" invisible="not error_messages">
+                <field name="error_messages"/>
+              </div>
+              <field name="search_pattern" string="Filter" placeholder="filter module list"/>
+              <notebook>
+                <page name="modules" string="Modules">
+                  <group>
+                      <field name="filtered_module_ids"/>
+                  </group>
+                </page>
+                <page name="module_list" string="Comma Separated">
+                  <group>
+                      <field name="filtered_module_list"/>
+                  </group>
+                </page>
+              </notebook>
+              <footer>
+                  <button string="Close" special="cancel" class="btn-default"/>
+              </footer>
+            </form>
         </field>
       </record>
 

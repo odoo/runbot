@@ -141,24 +141,66 @@ class Trigger(models.Model):
         return sorted(modules_to_install)
 
     def action_test_modules_filters(self):
-        output = markupsafe.Markup()
         sticky_bundles = self.env['runbot.bundle'].search([('project_id', '=', self.project_id.id), ('sticky', '=', True)])
         sticky_bundles = sticky_bundles.sorted(lambda b: b.version_id.number, reverse=True)
         for sticky_bundle in sticky_bundles:
             commits = sticky_bundle.last_batch.commit_ids
             #if not commits:
             #    continue
-            output += markupsafe.Markup(f'''<h2>%s</h2>''') % sticky_bundle.name
+            error_messages = []
+            module_ids = self.env['runbot.odoo.module']
             for commit in commits:
                 if commit.repo_id in (self.repo_ids + self.dependency_ids).sorted('id'):
                     try:
                         module_list = [module for _addons_path, module, _manifest in commit._list_available_modules()]
                         filtered_modules = self._filter_modules_to_test({commit.repo_id: module_list})
-                        output += markupsafe.Markup(f'''<h4>%s (%s/%s)</h4>''') % (commit.repo_id.name, len(filtered_modules), len(module_list))
-                        output += ','.join(filtered_modules)
+                        module_ids |= self.env['runbot.odoo.module'].create([{'name': m, 'repo_id': commit.repo_id.id} for m in filtered_modules])
                     except subprocess.CalledProcessError as e:
-                        output += markupsafe.Markup(f'''<h4>{commit.repo_id.name}</h4> Failed to get modules for {commit.repo_id.name}:{commit.name} {e}''')
-        self.message_post(body=output)
+                        error_messages.append(f'{commit.repo_id.name}: Failed to get modules for {commit.repo_id.name}:{commit.name} "{e}"')
+
+        wizard = self.env['runbot.modules.wizard'].create({
+            'module_ids':module_ids,
+            'error_messages': ''.join(error_messages),
+        })
+
+        return {
+            'name': 'Modules',
+            'type': 'ir.actions.act_window',
+            'view_mode': 'form',
+            'res_model': 'runbot.modules.wizard',
+            'res_id': wizard.id,
+            'target': 'new',
+        }
+
+class OdooModule(models.TransientModel):
+    """For use by the ModuleListWizard"""
+    _name = 'runbot.odoo.module'
+    _description = "module to use in filter wizard"
+    _order = "repo_id, name"
+
+    name = fields.Char('Module Name')
+    repo_id = fields.Many2one('runbot.repo')
+
+
+class ModuleListWizard(models.TransientModel):
+    """Conveniant Wizard just to display result of Trigger Module Filters"""
+    _name = 'runbot.modules.wizard'
+    _description = "Trigger modules filter wizard"
+
+    module_ids = fields.Many2many('runbot.odoo.module', readonly=True)
+    filtered_module_ids = fields.Many2many('runbot.odoo.module', compute="_compute_filtered_modules", readonly=True)
+    filtered_module_list = fields.Text('Module list', compute="_compute_filtered_modules", readonly=True)
+    error_messages = fields.Text('Error Messages', readonly=True)
+    search_pattern = fields.Char('Search term')
+
+    @api.depends('search_pattern')
+    def _compute_filtered_modules(self):
+        for wizard in self:
+            if wizard.search_pattern:
+                wizard.filtered_module_ids = wizard.module_ids.filtered_domain([('name', 'ilike', self.search_pattern)])
+            else:
+                wizard.filtered_module_ids = wizard.module_ids
+            wizard.filtered_module_list = ','.join(wizard.filtered_module_ids.mapped('name'))
 
 
 class Remote(models.Model):
