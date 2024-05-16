@@ -171,9 +171,10 @@ def run(client_class):
         config_addons_path = ','.join([config_addons_path, addon_path])
     odoo.tools.config['addons_path'] = config_addons_path
     odoo.tools.config['forced_host_name'] = args.forced_host_name
+    import odoo.modules
 
     # create environment
-    registry = odoo.registry(args.database)
+    registry = odoo.modules.registry.Registry(args.database)
     try:
         with registry.cursor() as cr:
             env = odoo.api.Environment(cr, odoo.SUPERUSER_ID, {})

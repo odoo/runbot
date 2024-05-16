@@ -34,6 +34,7 @@ class Bundle(models.Model):
     defined_base_id = fields.Many2one('runbot.bundle', 'Forced base bundle', domain="[('project_id', '=', project_id), ('is_base', '=', True)]")
     base_id = fields.Many2one('runbot.bundle', 'Base bundle', compute='_compute_base_id', store=True)
     to_upgrade = fields.Boolean('To upgrade', compute='_compute_to_upgrade', store=True, index=False)
+    to_upgrade_from = fields.Boolean('To upgrade From', compute='_compute_to_upgrade_from', store=True, index=False)
 
     has_pr = fields.Boolean('Has PR', compute='_compute_has_pr', store=True)
 
@@ -88,6 +89,11 @@ class Bundle(models.Model):
     def _compute_to_upgrade(self):
         for bundle in self:
             bundle.to_upgrade = bundle.is_base
+
+    @api.depends('is_base')
+    def _compute_to_upgrade_from(self):
+        for bundle in self:
+            bundle.to_upgrade_from = bundle.is_base
 
     @api.depends('name', 'is_base', 'defined_base_id', 'base_id.is_base', 'project_id')
     def _compute_base_id(self):

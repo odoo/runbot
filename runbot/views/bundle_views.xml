@@ -50,6 +50,7 @@
                             <field name="project_id"/>
                             <field name="sticky" readonly="0"/>
                             <field name="to_upgrade" readonly="0"/>
+                            <field name="to_upgrade_from" readonly="0"/>
                             <field name="is_base"/>
                             <field name="base_id"/>
                             <field name="defined_base_id"/>
@@ -150,6 +151,7 @@
                 <field name="is_base"/>
                 <field name="sticky"/>
                 <field name="to_upgrade"/>
+                <field name="to_upgrade_from"/>
                 <field name="no_build"/>
                 <field name="branch_ids"/>
                 <field name="version_id"/>
@@ -168,6 +170,8 @@
             <filter string="For next freeze" name="for_next_freeze" domain="[('for_next_freeze', '=', True)]"/>
             <filter string="Has open pr" name="has_pr" domain="[('has_pr', '=', True)]"/>
             <filter string="No pr" name="no_pr" domain="[('branch_ids', '!=', []), '!', ('branch_ids', 'any', [('is_pr', '=', True)])]"/>
+            <filter string="Is base" name="is_base" domain="[('is_base', '=', True)]"/>
+            <filter string="Is sticky" name="is_sticky" domain="[('sticky', '=', True)]"/>
             <separator/>
           </search>
         </field>

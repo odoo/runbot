@@ -822,6 +822,8 @@ class ConfigStep(models.Model):
 
     def _reference_batches_complement(self, batch, trigger):
         bundle = batch.bundle_id
+        if not bundle.base_id.to_upgrade or not bundle.base_id.to_upgrade_from:
+            return self.env['runbot.batch']
         category_id = trigger.upgrade_dumps_trigger_id.category_id.id
         version = bundle.version_id
         next_versions = version.next_major_version_id | version.next_intermediate_version_ids  # TODO filter on trigger version
@@ -829,7 +831,7 @@ class ConfigStep(models.Model):
 
         upgrade_complement_step = trigger.upgrade_dumps_trigger_id.upgrade_step_id
 
-        if next_versions and bundle.base_id.to_upgrade:
+        if next_versions:
             for next_version in next_versions:
                 if bundle.version_id in upgrade_complement_step._get_upgrade_source_versions(next_version):
                     target_versions |= next_version
@@ -871,7 +873,7 @@ class ConfigStep(models.Model):
                 from_versions(bundle)
             for f_bundle in target_refs_bundles:
                 from_versions(f_bundle)
-            source_refs_bundles = source_refs_bundles.filtered('to_upgrade')
+            source_refs_bundles = source_refs_bundles.filtered('to_upgrade_from')
 
         return (target_refs_bundles | source_refs_bundles).with_context(
             category_id=category_id
