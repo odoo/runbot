@@ -16,7 +16,7 @@ from psycopg2 import sql
 from psycopg2.extensions import TransactionRollbackError
 
 from ..common import dt2time, now, grep, local_pgadmin_cursor, s2human, dest_reg, os, list_local_dbs, pseudo_markdown, RunbotException, findall, sanitize, markdown_escape
-from ..container import docker_stop, docker_state, Command, docker_run
+from ..container import docker_stop, docker_state, Command, docker_run, docker_pull
 from ..fields import JsonDictField
 
 from odoo import models, fields, api
@@ -853,6 +853,15 @@ class BuildResult(models.Model):
         if 'image_tag' not in kwargs:
             kwargs.update({'image_tag': self.params_id.dockerfile_id.image_tag})
         self._log('Preparing', 'Using Dockerfile Tag [%s](/runbot/dockerfile/tag/%s)', kwargs['image_tag'], kwargs['image_tag'], log_type='markdown')
+        icp = self.env['ir.config_parameter']
+        docker_registry_host = self.env['runbot.host'].browse(int(icp.get_param('runbot.docker_registry_host_id', default=0)))
+        if docker_registry_host and self.host_id.use_remote_docker_registry:
+            result = docker_pull(f"dockerhub.{docker_registry_host.name}/{kwargs['image_tag']}")
+            if result['success']:
+                result['image'].tag(kwargs['image_tag'])
+            if result.get('log_progress'):
+                self._log('Docker Run', f'Docker image was pulled {"" if result["success"] else "with errors"}')
+
         containers_memory_limit = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_containers_memory', 0)
         if containers_memory_limit and 'memory' not in kwargs:
             kwargs['memory'] = int(float(containers_memory_limit) * 1024 ** 3)

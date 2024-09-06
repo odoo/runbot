@@ -166,7 +166,7 @@ def _docker_pull(image_tag):
     """Pull a docker image from a registry.
     :param image_tag: the full image tag, including the registry host
     e.g.: `dockerhub.runbot102.odoo.com/odoo:PureNobleTest`
-    :return: tuple(success, image) where success is a boolean and image a Docker image object or None in case of failure
+    :return: DockerMager.result dict
     """
     with DockerManager(image_tag) as dm:
         for chunk in dm.consume(dm.docker_client.api.pull(image_tag, stream=True)):

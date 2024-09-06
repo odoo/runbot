@@ -128,6 +128,7 @@ class Dockerfile(models.Model):
     arch_base = fields.Text(related='template_id.arch_base', readonly=False, related_sudo=True)
     dockerfile = fields.Text(compute='_compute_dockerfile', tracking=True)
     to_build = fields.Boolean('To Build', help='Build Dockerfile. Check this when the Dockerfile is ready.', default=False)
+    always_pull = fields.Boolean('Always pull', help='Always Pull on the hosts, not only at the use time', default=False, tracking=True)
     version_ids = fields.One2many('runbot.version', 'dockerfile_id', string='Versions')
     description = fields.Text('Description')
     view_ids = fields.Many2many('ir.ui.view', compute='_compute_view_ids', groups="runbot.group_runbot_admin")

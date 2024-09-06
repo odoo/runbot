@@ -13,6 +13,7 @@
                 <field name="name"/>
                 <field name="image_tag"/>
                 <field name="to_build"/>
+                <field name="always_pull"/>
                 <field name="version_ids" widget="many2many_tags"/>
                 <field name="project_ids" widget="many2many_tags"/>
                 <field name="template_id"/>
@@ -104,6 +105,8 @@
             <field name="image_tag"/>
             <field name="to_build" groups="!runbot.group_runbot_admin"/>
             <field name="to_build" widget="boolean_toggle" groups="runbot.group_runbot_admin"/>
+            <field name="always_pull" groups="!runbot.group_runbot_admin"/>
+            <field name="always_pull" widget="boolean_toggle" groups="runbot.group_runbot_admin"/>
             <field name="version_ids" widget="many2many_tags"/>
             <field name="project_ids" widget="many2many_tags"/>
             <field name="use_count"/>

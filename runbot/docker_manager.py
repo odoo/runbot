@@ -57,6 +57,7 @@ class DockerManager:
     def __exit__(self, exception_type, exception_value, exception_traceback):
         if self.log_progress:
             _logger.info('Finished in %.2fs', self.duration)
+            self.result['log_progress'] = self.log_progress
         if exception_value:
             self.result['success'] = False
             _logger.warning(exception_value)

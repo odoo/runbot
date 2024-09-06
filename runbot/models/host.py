@@ -130,11 +130,16 @@ class Host(models.Model):
         all_tags = set(all_docker_files.mapped('image_tag'))
         if docker_registry_host and self.use_remote_docker_registry and not is_registry:
             _logger.info('Pulling docker images...')
-            for dockerfile in all_docker_files:
+            total_duration = 0
+            for dockerfile in all_docker_files.filtered('always_pull'):
                 remote_tag = f'dockerhub.{docker_registry_host.name}/{dockerfile.image_tag}'
                 result = docker_pull(remote_tag)
                 if result['success']:
                     result['image'].tag(dockerfile.image_tag)
+                total_duration += result['duration']
+                if total_duration > 60:
+                    _logger.warning("Pulling images took more than 60 seconds... will continue later")
+                    break
         else:
             _logger.info('Building docker images...')
             for dockerfile in self.env['runbot.dockerfile'].search([('to_build', '=', True)]):
