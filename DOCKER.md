@@ -24,14 +24,14 @@ Let say USER in the docker image is 10000 and name is odoo
 - Grant access to the user to potgresql (this example give admin access, be carefull)
     sudo -u postgres createuser -d -R -S runbot
 
-- edit  /etc/postgresql/14/main/pg_ident.conf and add this line 
+- edit  /etc/postgresql/14/main/pg_ident.conf and add thoses lines 
     runbot runbot odoo
     runbot odoo odoo
 
 - edit  /etc/postgresql/14/main/pg_hba.conf and change this line 
+    local   all             odoo                                     peer map=runbot
+before this line
     local   all             all                                     peer
-with this line
-    local   all             all                                     peer map=runbot
 
 
 Finally, add the volume when stating the docker 

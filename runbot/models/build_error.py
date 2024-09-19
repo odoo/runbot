@@ -23,7 +23,11 @@ class BuildErrorLink(models.Model):
     _order = 'log_date desc, build_id desc'
 
     build_id = fields.Many2one('runbot.build', required=True, index=True)
+<<<<<<< HEAD
     error_content_id = fields.Many2one('runbot.build.error.content', required=True, index=True, ondelete='cascade')
+=======
+    build_error_id = fields.Many2one('runbot.build.error', required=True, index=True, ondelete='cascade')
+>>>>>>> 2774ecf9 (wip)
     log_date = fields.Datetime(string='Log date')
     host = fields.Char(related='build_id.host')
     dest = fields.Char(related='build_id.dest')
