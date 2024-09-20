@@ -413,8 +413,9 @@ class ConfigStep(models.Model):
 
     def _run_install_odoo(self, build):
         exports = build._checkout()
-
-        modules_to_install = self._modules_to_install(build)
+        modules_to_install = build.params_id.get('mods')
+        if not modules_to_install:
+            modules_to_install = set(build._get_modules_to_test(modules_patterns=self.install_modules))
         mods = ",".join(modules_to_install)
         python_params = []
         py_version = build._get_py_version()
@@ -901,9 +902,6 @@ class ConfigStep(models.Model):
             svg_url = '%sflame_%s.%s' % (build._http_log_url(), self.name, 'svg')
             message = 'Flamegraph report: [data @icon-download](%s), [svg @icon-eye](%s)'
             build._log('end_job', message, dat_url, svg_url, log_type='markdown')
-
-    def _modules_to_install(self, build):
-        return set(build._get_modules_to_test(modules_patterns=self.install_modules))
 
     def _post_install_commands(self, build, modules_to_install, py_version=None):
         cmds = []

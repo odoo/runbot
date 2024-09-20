@@ -24,46 +24,8 @@ def route(routes, **kw):
         @o_route(routes, **kw)
         @functools.wraps(f)
         def response_wrap(*args, **kwargs):
-            projects = request.env['runbot.project'].search([('hidden', '=', False)])
-            more = request.httprequest.cookies.get('more', False) == '1'
-            filter_mode = request.httprequest.cookies.get('filter_mode', 'all')
-            keep_search = request.httprequest.cookies.get('keep_search', False) == '1'
-            cookie_search = request.httprequest.cookies.get('search', '')
-            refresh = kwargs.get('refresh', False)
-            nb_build_errors = request.env['runbot.build.error'].search_count([('random', '=', True), ('parent_id', '=', False)])
-            nb_assigned_errors = request.env['runbot.build.error'].search_count([('responsible', '=', request.env.user.id)])
-            nb_team_errors = request.env['runbot.build.error'].search_count([('responsible', '=', False), ('team_id', 'in', request.env.user.runbot_team_ids.ids)])
-            kwargs['more'] = more
-            kwargs['projects'] = projects
 
             response = f(*args, **kwargs)
-            if isinstance(response, Response):
-                if keep_search and cookie_search and 'search' not in kwargs:
-                    search = cookie_search
-                else:
-                    search = kwargs.get('search', '')
-                has_pr = kwargs.get('has_pr', None)
-                if keep_search and cookie_search != search:
-                    response.set_cookie('search', search)
-
-                project = response.qcontext.get('project') or projects and projects[0]
-
-                response.qcontext['theme'] = kwargs.get('theme', request.httprequest.cookies.get('theme', 'legacy'))
-                response.qcontext['projects'] = projects
-                response.qcontext['more'] = more
-                response.qcontext['keep_search'] = keep_search
-                response.qcontext['search'] = search
-                response.qcontext['current_path'] = request.httprequest.full_path
-                response.qcontext['refresh'] = refresh
-                response.qcontext['filter_mode'] = filter_mode
-                response.qcontext['default_category'] = request.env['ir.model.data']._xmlid_to_res_id('runbot.default_category')
-
-                response.qcontext['qu'] = QueryURL('/runbot/%s' % (slug(project) if project else ''), search=search, refresh=refresh, has_pr=has_pr)
-                if 'title' not in response.qcontext:
-                    response.qcontext['title'] = 'Runbot %s' % project.name or ''
-                response.qcontext['nb_build_errors'] = nb_build_errors
-                response.qcontext['nb_assigned_errors'] = nb_assigned_errors
-                response.qcontext['nb_team_errors'] = nb_team_errors
             return response
         return response_wrap
     return decorator
@@ -84,7 +46,7 @@ class Runbot(Controller):
     @o_route([
         '/runbot/submit'
     ], type='http', auth="public", methods=['GET', 'POST'], csrf=False)
-    def submit(self, more=False, redirect='/', keep_search=False, category=False, filter_mode=False, update_triggers=False, **kwargs):
+    def submit(self, more=False, redirect='/', category=False, filter_mode=False, update_triggers=False, **kwargs):
         assert redirect.startswith('/')
         response = werkzeug.utils.redirect(redirect)
         response.set_cookie('more', '1' if more else '0')
@@ -106,10 +68,11 @@ class Runbot(Controller):
             '/runbot',
             '/runbot/<model("runbot.project"):project>',
             '/runbot/<model("runbot.project"):project>/search/<search>'], website=True, auth='public', type='http')
-    def bundles(self, project=None, search='', projects=False, refresh=False, for_next_freeze=False, limit=40, has_pr=None, **kwargs):
+    def bundles(self, project=None, search='', refresh=False, for_next_freeze=False, limit=40, has_pr=None, **kwargs):
         search = search if len(search) < 60 else search[:60]
         env = request.env
         categories = env['runbot.category'].search([])
+        projects = request.env['runbot.project'].search([('hidden', '=', False)])
         if not project and projects:
             project = projects[0]
 
@@ -123,6 +86,7 @@ class Runbot(Controller):
             'pending_level': level,
             'scheduled_count': scheduled_count,
             'hosts_data': request.env['runbot.host'].search([('assigned_only', '=', False)]),
+            'projects': projects
         }
         if project:
             domain = [('last_batch', '!=', False), ('project_id', '=', project.id)]
@@ -180,8 +144,8 @@ class Runbot(Controller):
                 'project': project,
                 'triggers': triggers,
                 'trigger_display': trigger_display,
-                'has_pr': has_pr,
                 'search': search,
+                'has_pr': has_pr,
             })
 
         context.update({'message': request.env['ir.config_parameter'].sudo().get_param('runbot.runbot_message')})
