@@ -1,6 +1,7 @@
 import logging
 
 from collections import defaultdict
+from docker.errors import ImageNotFound
 
 from odoo import models, fields, api
 from odoo.tools import config, ormcache
@@ -145,7 +146,10 @@ class Host(models.Model):
             for dockerfile in self.env['runbot.dockerfile'].search([('to_build', '=', True)]):
                 dockerfile._build(self)
                 if is_registry:
-                    docker_push(dockerfile.image_tag)
+                    try:
+                        docker_push(dockerfile.image_tag)
+                    except ImageNotFound:
+                        _logger.warning("Image tag `%s` not found. Skipping push", dockerfile.image_tag)
 
         _logger.info('Cleaning docker images...')
         for image in docker_images():
