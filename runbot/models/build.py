@@ -996,7 +996,7 @@ class BuildResult(models.Model):
                 message = message % args
             except TypeError:
                 _logger.exception(f'Error while formating `{message}` with `{args}`')
-                message = ' ' .join([message] + args)
+                message = ' ' .join([message] + list(args))
 
         message = truncate(message)
 
