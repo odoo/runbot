@@ -9,6 +9,7 @@
               <div class="col">Last seen date</div>
               <div class="col col-md-3">Module</div>
               <div class="col col-md-5">Summary</div>
+              <div class="col">Version</div>
               <div class="col">Triggers</div>
               <div class="col">Assigned to</div>
               <div class="col">&amp;nbsp;</div>
@@ -25,6 +26,11 @@
                   <button class="btn accordion-button collapsed" type="button" data-bs-toggle="collapse" t-attf-data-bs-target="#collapse{{build_error.id}}" aria-expanded="true" aria-controls="collapseOne">
                     <code><t t-esc="build_error.summary"/></code>
                   </button>
+                </div>
+                <div class="col">
+                  <t t-foreach="build_error.version_ids" t-as="version">
+                    <span t-attf-class="{{'text-bg-warning' if version.is_major else 'text-bg-info'}}" class="badge text-bg-pill small"><t t-esc="version.name"/></span>
+                  </t>
                 </div>
                 <div class="col">
                   <t t-foreach="build_error.trigger_ids" t-as="trigger">
