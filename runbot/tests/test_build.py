@@ -388,7 +388,8 @@ class TestBuildResult(RunbotCase):
         self.assertEqual('waiting', build1.global_state)
         self.assertEqual('testing', build1_1.global_state)
 
-        # with self.assertQueries([]): # write the same value, no update should be triggered
+        #with self.assertQueries(['''UPDATE "runbot_build" SET "global_state" = %s, "write_date" = %s, "write_uid" = %s WHERE id IN %s''']):
+
         build1.local_state = 'done'
         build1.flush_recordset()
 

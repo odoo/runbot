@@ -288,12 +288,9 @@ class ConfigStep(models.Model):
     def _make_python_ctx(self, build):
         return {
             'self': self,
-            # 'fields': fields,
-            # 'models': models,
             'build': build,
             '_logger': _logger,
             'log_path': build._path('logs', '%s.txt' % self.name),
-            'glob': glob.glob,
             'Command': Command,
             're': ReProxy,
             'grep': grep,
@@ -311,15 +308,19 @@ class ConfigStep(models.Model):
             if run and callable(run):
                 return run()
             return eval_ctx.get('docker_params')
-        except ValueError as e:
-            save_eval_value_error_re = r'<class \'odoo.addons.runbot.models.repo.RunbotException\'>: "(.*)" while evaluating\n.*'
+        except RunbotException as e:
             message = e.args[0]
-            groups = re.match(save_eval_value_error_re, message)
-            if groups:
-                build._log("run", groups[1], level='ERROR')
-                build._kill(result='ko')
-            else:
-                raise
+            build._log("run", f'A runbot exception occured:\n{message}', level='ERROR')
+            build._kill(result='ko')
+        #except ValueError as e:
+        #    save_eval_value_error_re = r'''<class 'odoo.addons.runbot.commona.RunbotException'>: "(.*)" while evaluating\n.*'''
+        #    message = e.args[0]
+        #    groups = re.match(save_eval_value_error_re, message)
+        #    if groups:
+        #        build._log("run", groups[1], level='ERROR')
+        #        build._kill(result='ko')
+        #    else:
+        #        raise
 
     def _is_docker_step(self):
         if not self:
