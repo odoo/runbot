@@ -1,0 +1,41 @@
+<odoo>
+  <data>
+    <record model="ir.actions.act_window" id="open_view_ir_logging_tree">
+      <field name="name">Builds Ir Logging</field>
+      <field name="res_model">ir.logging</field>
+      <field name="view_mode">tree,form</field>
+      <field name="search_view_id" ref="base.ir_logging_search_view" />
+      <field name="context">{'search_default_type': 'server', 'search_default_filter_warning_or_error': True}</field>
+    </record>
+
+    <record id="ir_logging_tree_view_runbot" model="ir.ui.view">
+      <field name="name">ir.logging.tree.view</field>
+      <field name="model">ir.logging</field>
+      <field name="inherit_id" ref="base.ir_logging_tree_view" />
+      <field name="arch" type="xml">
+      <xpath expr="//tree" position="attributes">
+        <attribute name="create">0</attribute>
+      </xpath>
+      <xpath expr="//field[@name='func']" position="after">
+        <field name="error_id"/>
+      </xpath>
+      </field>
+    </record>
+
+    <record id="ir_logging_search_view_runbot" model="ir.ui.view">
+      <field name="name">ir.logging.tree.view</field>
+      <field name="model">ir.logging</field>
+      <field name="inherit_id" ref="base.ir_logging_search_view" />
+      <field name="arch" type="xml">
+      <xpath expr="//field[@name='message']" position="after">
+        <filter name="filter_create_date" string="Create Date" date="create_date" default_period="this_month"/>
+        <separator/>
+        <filter name="filter_warning_or_error" string="Warning or Error" domain="[('level', 'in', ('WARNING', 'ERROR'))]"/>
+        <filter name="filter_error" string="Error" domain="[('level', '=', 'ERROR')]"/>
+        <filter name="filter_warning" string="Warning"  domain="[('level', '=', 'WARNING')]"/>
+        <filter name="filter_info" string="Info"  domain="[('level', '=', 'INFO')]"/>
+      </xpath>
+      </field>
+    </record>
+  </data>
+</odoo>
