@@ -487,6 +487,11 @@ class TestBuildConfigStep(TestBuildConfigStepCommon):
         self.assertEqual(cmds[1].split(' server/server.py')[0], 'python3')
         return cmds[1].split('--test-tags ')[1].split(' ')[0]
 
+    def get_odoo_cmd(self, params):
+        cmds = params['cmd'].build().split(' && ')
+        self.assertTrue(any('server/server.py' in cmd for cmd in cmds), 'did not find start command')
+        return next(iter(cmd for cmd in cmds if 'server/server.py' in cmd))
+
     @patch('odoo.addons.runbot.models.build.BuildResult._parse_config')
     @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
     def test_install_tags(self, mock_checkout, parse_config):
@@ -625,6 +630,139 @@ def run():
 
         self.assertEqual(call_count, 1)
 
+    @patch('odoo.addons.runbot.models.build.BuildResult._parse_config')
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
+    def test_install_demo_mode_default_default_without_demo(self, mock_checkout, parse_config):
+        # Test demo_mode = 'default' when the default is without_demo
+        parse_config.return_value = {'--with-demo'}
+        config_step = self.ConfigStep.create({
+            'name': 'all',
+            'job_type': 'install_odoo',
+        })
+        child = self.parent_build._add_child({'config_data': {}})
+
+        params = config_step._run_install_odoo(child)
+        cmd = self.get_odoo_cmd(params)
+        self.assertNotIn('--with-demo', cmd)
+        self.assertNotIn('--without-demo', cmd)
+
+        child.params_id.config_data = {'demo_mode': 'default'}
+        params = config_step._run_install_odoo(child)
+        cmd = self.get_odoo_cmd(params)
+        self.assertNotIn('--with-demo', cmd)
+        self.assertNotIn('--without-demo', cmd)
+
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
+    def test_install_demo_mode_default_default_with_demo(self, mock_checkout):
+        # Test demo_mode = 'default' when the default is with_demo
+        config_step = self.ConfigStep.create({
+            'name': 'all',
+            'job_type': 'install_odoo',
+        })
+        child = self.parent_build._add_child({'config_data': {}})
+
+        params = config_step._run_install_odoo(child)
+        cmd = self.get_odoo_cmd(params)
+        self.assertNotIn('--with-demo', cmd)
+        self.assertNotIn('--without-demo', cmd)
+
+        child.params_id.config_data = {'demo_mode': 'default'}
+        params = config_step._run_install_odoo(child)
+        cmd = self.get_odoo_cmd(params)
+        self.assertNotIn('--with-demo', cmd)
+        self.assertNotIn('--without-demo', cmd)
+
+    @patch('odoo.addons.runbot.models.build.BuildResult._parse_config')
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
+    def test_install_demo_mode_with_demo_default_without_demo(self, mock_checkout, parse_config):
+        # Test demo_mode = 'with_demo' when the default is without_demo
+        parse_config.return_value = {'--with-demo'}
+        config_step = self.ConfigStep.create({
+            'name': 'all',
+            'job_type': 'install_odoo',
+            'demo_mode': 'with_demo',
+        })
+        child = self.parent_build._add_child({'config_data': {}})
+
+        params = config_step._run_install_odoo(child)
+        cmd = self.get_odoo_cmd(params)
+        self.assertIn('--with-demo', cmd)
+        self.assertNotIn('--without-demo', cmd)
+
+        config_step.demo_mode = 'default'
+        child.params_id.config_data = {'demo_mode': 'with_demo'}
+        params = config_step._run_install_odoo(child)
+        cmd = self.get_odoo_cmd(params)
+        self.assertIn('--with-demo', cmd)
+        self.assertNotIn('--without-demo', cmd)
+
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
+    def test_install_demo_mode_with_demo_default_with_demo(self, mock_checkout):
+        # Test demo_mode = 'with_demo' when the default is with_demo
+        config_step = self.ConfigStep.create({
+            'name': 'all',
+            'job_type': 'install_odoo',
+            'demo_mode': 'with_demo',
+        })
+        child = self.parent_build._add_child({'config_data': {}})
+
+        params = config_step._run_install_odoo(child)
+        cmd = self.get_odoo_cmd(params)
+        self.assertNotIn('--with-demo', cmd)
+        self.assertNotIn('--without-demo', cmd)
+
+        config_step.demo_mode = 'default'
+        child.params_id.config_data = {'demo_mode': 'with_demo'}
+        params = config_step._run_install_odoo(child)
+        cmd = self.get_odoo_cmd(params)
+        self.assertNotIn('--with-demo', cmd)
+        self.assertNotIn('--without-demo', cmd)
+
+    @patch('odoo.addons.runbot.models.build.BuildResult._parse_config')
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
+    def test_install_demo_mode_without_demo_default_without_demo(self, mock_checkout, parse_config):
+        # Test demo_mode = 'without_demo' when the default is without_demo
+        parse_config.return_value = {'--with-demo'}
+        config_step = self.ConfigStep.create({
+            'name': 'all',
+            'job_type': 'install_odoo',
+            'demo_mode': 'without_demo',
+        })
+        child = self.parent_build._add_child({'config_data': {}})
+
+        params = config_step._run_install_odoo(child)
+        cmd = self.get_odoo_cmd(params)
+        self.assertNotIn('--with-demo', cmd)
+        self.assertNotIn('--without-demo', cmd)
+
+        config_step.demo_mode = 'default'
+        child.params_id.config_data = {'demo_mode': 'without_demo'}
+        params = config_step._run_install_odoo(child)
+        cmd = self.get_odoo_cmd(params)
+        self.assertNotIn('--with-demo', cmd)
+        self.assertNotIn('--without-demo', cmd)
+
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
+    def test_install_demo_mode_without_demo_default_with_demo(self, mock_checkout):
+        # Test demo_mode = 'without_demo' when the default is with_demo
+        config_step = self.ConfigStep.create({
+            'name': 'all',
+            'job_type': 'install_odoo',
+            'demo_mode': 'without_demo',
+        })
+        child = self.parent_build._add_child({'config_data': {}})
+
+        params = config_step._run_install_odoo(child)
+        cmd = self.get_odoo_cmd(params)
+        self.assertNotIn('--with-demo', cmd)
+        self.assertIn('--without-demo', cmd)
+
+        config_step.demo_mode = 'default'
+        child.params_id.config_data = {'demo_mode': 'without_demo'}
+        params = config_step._run_install_odoo(child)
+        cmd = self.get_odoo_cmd(params)
+        self.assertNotIn('--with-demo', cmd)
+        self.assertIn('--without-demo', cmd)
 
 class TestMakeResult(RunbotCase):
 

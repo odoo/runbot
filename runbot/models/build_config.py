@@ -160,6 +160,10 @@ class ConfigStep(models.Model):
     extra_params = fields.Char('Extra cmd args', tracking=True)
     additionnal_env = fields.Char('Extra env', help='Example: foo="bar";bar="foo". Cannot contains \' ', tracking=True)
     enable_log_db = fields.Boolean("Enable log db", default=True)
+    demo_mode = fields.Selection(
+        [('default', 'Default'), ('without_demo', 'Without Demo'), ('with_demo', 'With Demo')],
+        "Install demo data", default='default', tracking=True, required=True,
+    )
     # python
     python_code = fields.Text('Python code', tracking=True, default=PYTHON_DEFAULT)
     python_result_code = fields.Text('Python code for result', tracking=True, default=PYTHON_DEFAULT)
@@ -431,13 +435,23 @@ class ConfigStep(models.Model):
         if self.create_db:
             build._local_pg_createdb(db_name)
         cmd += ['-d', db_name]
+
+        # Demo data behavior changed in 18.1 -> demo data became opt-in instead of opt-out
+        available_options = build._parse_config()
+        # True if build has demo data by default
+        demo_installed_by_default = '--with-demo' not in available_options
+        demo_mode = build.params_id.config_data.get('demo_mode', self.demo_mode)
+        if demo_mode == 'with_demo' and not demo_installed_by_default:
+            cmd.append('--with-demo')
+        elif demo_mode == 'without_demo' and demo_installed_by_default:
+            cmd.append('--without-demo=true')
+
         # list module to install
         extra_params = build.params_id.extra_params or self.extra_params or ''
         if mods and '-i' not in extra_params:
             cmd += ['-i', mods]
         config_path = build._server("tools/config.py")
 
-        available_options = build._parse_config()
         if self.test_enable:
             if "--test-enable" in available_options:
                 cmd.extend(['--test-enable'])

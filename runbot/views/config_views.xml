@@ -64,6 +64,7 @@
                     <group string="Test settings" invisible="job_type not in ('python', 'install_odoo')">
                         <field name="create_db" groups="base.group_no_one"/>
                         <field name="install_modules"/>
+                        <field name="demo_mode"/>
                         <field name="db_name" groups="base.group_no_one"/>
                         <field name="cpu_limit" groups="base.group_no_one"/>
                         <field name="container_cpus" groups="base.group_no_one"/>

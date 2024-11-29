@@ -258,7 +258,8 @@ class TestUpgradeFlow(RunbotCase):
 
         return builds_nigthly, builds_weekly
 
-    def test_all(self):
+    @patch('odoo.addons.runbot.models.build.BuildResult._parse_config')
+    def test_all(self, *_):
         # Test setup
         self.assertEqual(self.branch_server.bundle_id, self.branch_upgrade.bundle_id)
         self.assertTrue(self.branch_upgrade.bundle_id.is_base)
