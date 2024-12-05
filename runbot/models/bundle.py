@@ -144,65 +144,55 @@ class Bundle(models.Model):
 
     @api.depends_context('category_id')
     def _compute_last_batchs(self):
-        batch_ids = defaultdict(list)
+        batches_by_bundle = defaultdict(lambda: self.env['runbot.batch'])
         if self.ids:
             category_id = self.env.context.get('category_id', self.env['ir.model.data']._xmlid_to_res_id('runbot.default_category'))
             self.env.cr.execute("""
-                SELECT
-                    id
-                FROM (
-                    SELECT
-                        batch.id AS id,
-                        row_number() OVER (PARTITION BY batch.bundle_id order by batch.id desc) AS row
-                    FROM
-                        runbot_bundle bundle INNER JOIN runbot_batch batch ON bundle.id=batch.bundle_id
-                    WHERE
-                        bundle.id in %s
-                        AND batch.category_id = %s
-                    ) AS bundle_batch
-                WHERE
-                    row <= 4
-                ORDER BY row, id desc
-                """, [tuple(self.ids), category_id]
-            )
-            batchs = self.env['runbot.batch'].browse([r[0] for r in self.env.cr.fetchall()])
-            for batch in batchs:
-                batch_ids[batch.bundle_id.id].append(batch.id)
-
+                SELECT bundle.id, ARRAY_AGG(batch.id)
+                  FROM runbot_bundle bundle
+          JOIN LATERAL (
+                        SELECT b.id
+                          FROM runbot_batch b
+                         WHERE b.category_id = %s
+                           AND b.bundle_id = bundle.id
+                      ORDER BY id desc
+                         LIMIT 4
+                    ) batch ON TRUE
+                 WHERE bundle.id in %s
+              GROUP BY bundle.id;
+            """, (category_id, tuple(self.ids)))
+            for bundle_id, batch_ids in self.env.cr.fetchall():
+                batches_by_bundle[bundle_id] = self.env['runbot.batch'].browse(batch_ids)
         for bundle in self:
-            bundle.last_batchs = [(6, 0, batch_ids[bundle.id])] if bundle.id in batch_ids else False
+            bundle.last_batchs = batches_by_bundle[bundle.id]
 
     @api.depends_context('category_id')
     def _compute_last_done_batch(self):
-        if self:
-            self.env['runbot.batch'].flush_model()
-            self.env['runbot.bundle'].flush_model()
-            # self.env['runbot.batch'].flush()
-            for bundle in self:
-                bundle.last_done_batch = False
-            category_id = self.env.context.get('category_id', self.env['ir.model.data']._xmlid_to_res_id('runbot.default_category'))
-            self.env.cr.execute("""
-                SELECT
-                    id
-                FROM (
-                    SELECT
-                        batch.id AS id,
-                        row_number() OVER (PARTITION BY batch.bundle_id order by batch.id desc) AS row
-                    FROM
-                        runbot_bundle bundle INNER JOIN runbot_batch batch ON bundle.id=batch.bundle_id
-                    WHERE
-                        bundle.id in %s
-                        AND batch.state = 'done'
-                        AND batch.category_id = %s
-                    ) AS bundle_batch
-                WHERE
-                    row = 1
-                ORDER BY row, id desc
-                """, [tuple(self.ids), category_id]
-            )
-            batchs = self.env['runbot.batch'].browse([r[0] for r in self.env.cr.fetchall()])
-            for batch in batchs:
-                batch.bundle_id.last_done_batch = batch
+        if not self:
+            return
+        self.env['runbot.batch'].flush_model()
+        self.env['runbot.bundle'].flush_model()
+        # self.env['runbot.batch'].flush()
+        self.last_done_batch = False
+        category_id = self.env.context.get('category_id', self.env['ir.model.data']._xmlid_to_res_id('runbot.default_category'))
+        # Could be expressed as a subselect but similar enough to `_compute_last_batchs` query to keep them the same.
+        self.env.cr.execute("""
+                SELECT bundle.id, batch.id
+                  FROM runbot_bundle bundle
+          JOIN LATERAL (
+                        SELECT b.id
+                          FROM runbot_batch b
+                         WHERE b.category_id = %s
+                           AND b.bundle_id = bundle.id
+                           AND b.state = 'done'
+                      ORDER BY id desc
+                         LIMIT 1
+                    ) batch ON TRUE
+                 WHERE bundle.id in %s;
+            """, [category_id, tuple(self.ids)]
+        )
+        for bundle_id, batch_id in self.env.cr.fetchall():
+            self.browse(bundle_id).last_done_batch = self.env['runbot.batch'].browse(batch_id)
 
     def _url(self):
         self.ensure_one()
