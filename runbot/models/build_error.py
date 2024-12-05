@@ -518,7 +518,7 @@ class BuildErrorContent(models.Model):
         for record in self:
             all_qualifiers = {}
             for qualify_regex in qualify_regexes:
-                res = qualify_regex._qualify(record.content)  # TODO, MAYBE choose the source field
+                res = qualify_regex._qualify(record)
                 if res:
                     # res.update({'qualifier_id': qualify_regex.id}) Probably not a good idea
                     all_qualifiers.update(res)
@@ -668,17 +668,13 @@ class ErrorQualifyRegex(models.Model):
     sequence = fields.Integer('Sequence', default=100)
     active = fields.Boolean('Active', default=True, tracking=True)
     regex = fields.Char('Regular expression', required=True)
-    source_field = fields.Selection(
-        [
-            ("content", "Content"),
-            ("module", "Module Name"),
-            ("function", "Function Name"),
-            ("file_path", "File Path"),
-        ],
-        default="content",
-        string="Source Field",
-        help="Build error field on which the regex will be applied to extract a qualifier",
-    )
+
+    check_module_name = fields.Boolean('Check Module Name', default=False, help='Apply regex on Error Module Name')
+    check_file_path = fields.Boolean('Check File Path', default=False, help='Apply regex on Error Module Name')
+    check_function = fields.Boolean('Check Function name', default=False, help='Apply regex on Error Function Name')
+    check_content = fields.Boolean('Check content', default=True, help='Apply regex on Error Csontent')
+
+    check_fields = fields.Char('Checked Fields', compute='_compute_check_fields', help='Fields on which regex is applied')
 
     test_ids = fields.One2many('runbot.error.qualify.test', 'qualify_regex_id', string="Test Sample", help="Error samples to test qualifying regex")
 
@@ -717,20 +713,22 @@ for error_content in self:
                     "The regular expresion should contain at least one named group pattern e.g: '(?P<module>.+)'"
                 )
 
-    def _qualify(self, content):
+    @api.depends('check_module_name', 'check_file_path', 'check_function', 'check_content')
+    def _compute_check_fields(self):
+        for record in self:
+            res = []
+            for cf in ['module_name', 'file_path', 'function', 'content']:
+                if record[f'check_{cf}']:
+                    res.append(cf)
+            record.check_fields = ','.join(res)
+
+    def _qualify(self, build_error_content):
         self.ensure_one()
+        content = '\n'.join([build_error_content[sf] for sf in self.check_fields.split(',') if self.check_fields])
         result = False
         if content and self.regex:
             result = re.search(self.regex, content, flags=re.MULTILINE)
         return result.groupdict() if result else {}
-
-    @api.depends('regex', 'test_string')
-    def _compute_qualifiers(self):
-        for record in self:
-            if record.regex and record.test_string:
-                record.qualifiers = record._qualify(record.test_string)
-            else:
-                record.qualifiers = {}
 
 
 class QualifyErrorTest(models.Model):
@@ -738,9 +736,9 @@ class QualifyErrorTest(models.Model):
     _description = 'Extended Relation between a qualify regex and a build error taken as sample'
 
     qualify_regex_id = fields.Many2one('runbot.error.qualify.regex', required=True)
-    error_content_id = fields.Many2one('runbot.build.error.content', string='Build Error', required=True)
-    build_error_summary = fields.Char(related='error_content_id.summary')
-    build_error_content = fields.Text(related='error_content_id.content')
+    error_content_id = fields.Many2one('runbot.build.error.content', string='Content Id', required=True)
+    build_error_summary = fields.Char(compute='_compute_summary')
+    build_error_content = fields.Text(compute='_compute_content')
     expected_result = JsonDictField('Expected Qualifiers')
     result = JsonDictField('Result', compute='_compute_result')
     is_matching = fields.Boolean(compute='_compute_result', default=False)
@@ -748,5 +746,16 @@ class QualifyErrorTest(models.Model):
     @api.depends('qualify_regex_id.regex', 'error_content_id', 'expected_result', 'result')
     def _compute_result(self):
         for record in self:
-            record.result = record.qualify_regex_id._qualify(record.build_error_content)
+            record.result = record.qualify_regex_id._qualify(record.error_content_id)
             record.is_matching = record.result == record.expected_result and record.result != {}
+
+    @api.depends('error_content_id')
+    def _compute_summary(self):
+        for record in self:
+            content = record.error_content_id.content
+            record.build_error_summary = content[:70] if content else False
+
+    @api.depends('qualify_regex_id', 'error_content_id')
+    def _compute_content(self):
+        for record in self:
+            record.build_error_content = '\n'.join([record.error_content_id[sf] or '' for sf in record.qualify_regex_id.check_fields.split(',')])

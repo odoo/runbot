@@ -424,7 +424,7 @@
             <list string="Qualifying Regexes">
                 <field name="sequence" widget="handle"/>
                 <field name="regex" readonly="1"/>
-                <field name="source_field" readonly="1"/>
+                <field name="check_fields" readonly="1"/>
             </list>
         </field>
     </record>
@@ -443,7 +443,10 @@
             <sheet>
               <group name="Regex And Source">
                 <field name="regex"/>
-                <field name="source_field"/>
+                <field name="check_module_name"/>
+                <field name="check_file_path"/>
+                <field name="check_function"/>
+                <field name="check_content"/>
               </group>
               <group>
                 <field name="test_ids">
@@ -486,6 +489,16 @@
         <field name="name">Build Errors Qualifying Regexes</field>
         <field name="res_model">runbot.error.qualify.regex</field>
         <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="runbot_qualify_regex_search_view" model="ir.ui.view">
+      <field name="name">runbot.qualify.regex.filter</field>
+      <field name="model">runbot.error.qualify.regex</field>
+      <field name="arch" type="xml">
+        <search string="Search regex">
+          <field name="regex"/>
+        </search>
+      </field>
     </record>
 
   </data>
