@@ -33,7 +33,7 @@
                   <field name="customer"/>
                   <field name="team_id"/>
                   <field name="fixing_pr_id"/>
-                  <field name="fixing_pr_url" widget="url"/>
+                  <field name="fixing_pr_url" widget="pull_request_url"/>
                   <field name="active"/>
                   <field name="test_tags" decoration-danger="True" readonly="1" groups="!runbot.group_runbot_admin"/>
                   <field name="test_tags" decoration-danger="True" groups="runbot.group_runbot_admin"/>
@@ -236,7 +236,7 @@
               <field name="tags_max_version_id" string="Tags Max" optional="hide"/>
               <field name="fixing_pr_id" optional="hide"/>
               <field name="fixing_pr_alive" optional="hide"/>
-              <field name="fixing_pr_url" widget="url" text="view PR" readonly="1" invisible="not fixing_pr_url"/>
+              <field name="fixing_pr_url" widget="pull_request_url" text="view PR" readonly="1" invisible="not fixing_pr_url"/>
           </list>
       </field>
   </record>
