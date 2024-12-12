@@ -49,11 +49,19 @@ class Branch(models.Model):
             branch.dname = '%s:%s' % (branch.remote_id.short_name, branch.name)
 
     def _search_dname(self, operator, value):
-        if ':' not in value:
-            return [('name', operator, value)]
-        repo_short_name, branch_name = value.split(':')
-        owner, repo_name = repo_short_name.split('/')
-        return ['&', ('remote_id', '=', self.env['runbot.remote'].search([('owner', '=', owner), ('repo_name', '=', repo_name)]).id), ('name', operator, branch_name)]
+        # Match format (owner?, repo, branch)
+        owner = repo = branch = None
+        if (m := re.match(r'(?:([\w-]+)/)?([\w-]+):([\w\.-]+)', value)):
+            owner, repo, branch = m.groups()
+        # Match PR url format
+        if (m := re.search(r'/([\w-]+)/([\w-]+)/pull/(\d+)', value)):
+            owner, repo, branch = m.groups()
+        if repo and branch:
+            domain = [('name', operator, branch), ('remote_id.repo_name', '=', repo)]
+            if owner:
+                domain.append(('remote_id.owner', '=', owner))
+            return domain
+        return [('name', operator, value)]
 
     @api.depends('name', 'is_pr', 'target_branch_name', 'pull_head_name', 'pull_head_remote_id')
     def _compute_reference_name(self):

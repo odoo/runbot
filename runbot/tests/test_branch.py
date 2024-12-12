@@ -29,6 +29,38 @@ class TestBranch(RunbotCase):
         self.assertEqual(pr.target_branch_name, 'master')
         self.assertEqual(pr.pull_head_name, 'foo-dev:bar_branch')
 
+    def test_branch_dname_search(self):
+        # Basic branch
+        self.assertEqual(
+            self.branch_server,
+            self.Branch.search([('dname', '=', self.branch_server.dname)]),
+        )
+        # Basic pr
+        self.assertEqual(
+            self.dev_pr,
+            self.Branch.search([('dname', '=', self.dev_pr.dname)]),
+        )
+        # PR from pull request url
+        self.assertEqual(
+            self.dev_pr,
+            self.Branch.search([('dname', '=', self.dev_pr.branch_url)]),
+        )
+        # With subtree of PR url
+        self.assertEqual(
+            self.dev_pr,
+            self.Branch.search([('dname', '=', self.dev_pr.branch_url + '/files')]),
+        )
+        # Branch with a . inside of it
+        branch = self.Branch.create({
+            'name': '18.0-test',
+            'remote_id': self.remote_server.id,
+            'is_pr': False,
+        })
+        self.assertEqual(
+            branch,
+            self.Branch.search([('dname', '=', branch.dname)]),
+        )
+
 class TestBranchRelations(RunbotCase):
 
     def setUp(self):
