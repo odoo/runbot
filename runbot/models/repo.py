@@ -278,9 +278,9 @@ class Remote(models.Model):
                     while try_count < nb_tries:
                         try:
                             if payload:
-                                response = session.post(url, data=json.dumps(payload))
+                                response = session.post(url, data=json.dumps(payload), timeout=20)
                             else:
-                                response = session.get(url)
+                                response = session.get(url, timeout=20)
                             response.raise_for_status()
                             if try_count > 0:
                                 _logger.info('Success after %s tries', (try_count + 1))
