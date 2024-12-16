@@ -2435,6 +2435,37 @@ class Stagings(models.Model):
                         })
                 if self.issues_to_close:
                     self.env['runbot_merge.issues_closer'].create(self.issues_to_close)
+
+                # FIXME: error prone, should probably store the previous
+                #        staging on creation instead?
+                last2 = self.with_context(active_search=False).search([
+                    ('state', '=', 'success'),
+                    ('target', '=', self.target.id),
+                ], order='id desc', limit=2)
+                if len(last2) == 2:
+                    _self, previous = last2
+                elif self.target != project.branch_ids[:1]:
+                    _self = last2
+                    previous = self.search([
+                        ('state', '=', 'success'),
+                        ('target', '=', project.branch_ids[:1].id),
+                        ('active', '=', False),
+                    ], order='id desc', limit=1)
+                else:
+                    # no previous branch
+                    _self = last2
+                    previous = self.browse()
+                if self == _self:
+                    self.env['runbot_merge.staging.reifier'].create({
+                        'previous_staging_id': previous.id,
+                        'staging_id': self.id,
+                    })
+                else:
+                    _logger.warning(
+                        "Got different self (%s) and last success (%s)",
+                        self,
+                        _self,
+                    )
             finally:
                 self.write({'active': False})
         elif self.state == 'failure' or self.is_timed_out():
