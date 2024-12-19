@@ -372,7 +372,7 @@ class Batch(models.Model):
             # in any case, search for an existing build
             config = trigger_custom.config_id or trigger.config_id
             extra_params = trigger_custom.extra_params or ''
-            config_data = trigger_custom.config_data or {}
+            config_data = dict(trigger.config_data or {}) | dict(trigger_custom.config_data or {})
             params_value = {
                 'version_id':  version_id,
                 'extra_params': extra_params,
