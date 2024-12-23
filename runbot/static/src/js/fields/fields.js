@@ -138,15 +138,19 @@ registry.category("fields").add("char_frontend_url", {
 
 
 // Pull Request URL Widget
+const pullRequestRegex = /\/([a-zA-Z-_]+\/[a-zA-Z-_]+)\/pull\/(\d+)/;
 class PullRequestUrlField extends UrlField {
     static template = xml`
-    <a class="o_field_widget o_form_uri" t-on-click.stop="" t-att-href="formattedHref" t-esc="props.record.data[props.name].replace('https://github.com/odoo','').replace('/pull','') || ''" target="_blank"/>
+        <UrlField t-props="fieldProps"/>
     `;
     static components = { UrlField }
-    setup() {
-        if (!this.props.readonly) {
-            throw new Error("This widget works only on readonly fields");
+    get fieldProps() {
+        const props = {...this.props};
+        const parts = pullRequestRegex.exec(this.props.record.data[props.name])
+        if (parts) {
+            props.text = `${parts[1]}#${parts[2]}`;
         }
+        return props
     }
 }
 
