@@ -456,16 +456,16 @@ class TestBuildError(RunbotCase):
         self.assertNotIn('-blah', self.BuildError._disabling_tags())
 
     def test_build_error_test_tags_min_max_version(self):
-        version_17 = self.Version.create({'name': '17.0'})
-        version_saas_171 = self.Version.create({'name': 'saas-17.1'})
-        version_master = self.Version.create({'name': 'master'})
+        version_17 = self.env['runbot.version']._get('17.0')
+        version_saas_171 = self.env['runbot.version']._get('saas-17.1')
+        version_master = self.env['runbot.version']._get('master')
 
         build_v13 = self.create_test_build({'local_result': 'ko'})
         build_v17 = self.create_test_build({'local_result': 'ko', 'params_id': self.create_params({'version_id': version_17.id}).id})
         build_saas_171 = self.create_test_build({'local_result': 'ko', 'params_id': self.create_params({'version_id': version_saas_171.id}).id})
         build_master = self.create_test_build({'local_result': 'ko', 'params_id': self.create_params({'version_id': version_master.id}).id})
 
-        self.BuildError.create(
+        errors = self.BuildError.create(
             [
                 {
                     "content": "foobar",
@@ -494,11 +494,35 @@ class TestBuildError(RunbotCase):
             ]
         )
 
+        self.assertEqual(errors[1].tags_min_version_id, version_17)
+        self.assertEqual(errors[3].tags_min_version_id, version_saas_171)
+
+        self.assertEqual(errors[3].tags_min_version_excluded_id, version_17, f'{errors[3].tags_min_version_excluded_id.name} does not match version_17')
+
         self.assertEqual(sorted(['-every', '-where', '-tag_17_up_to_master', '-tag_up_to_17', '-tag_only_17.1']), sorted(self.BuildError._disabling_tags()), "Should return the whole list without parameters")
         self.assertEqual(sorted(['-every', '-where', '-tag_up_to_17']), sorted(self.BuildError._disabling_tags(build_v13)))
         self.assertEqual(sorted(['-every', '-where', '-tag_up_to_17', '-tag_17_up_to_master']), sorted(self.BuildError._disabling_tags(build_v17)))
         self.assertEqual(sorted(['-every', '-where', '-tag_17_up_to_master', '-tag_only_17.1']), sorted(self.BuildError._disabling_tags(build_saas_171)))
         self.assertEqual(sorted(['-every', '-where', '-tag_17_up_to_master']), sorted(self.BuildError._disabling_tags(build_master)))
+        error_master = self.BuildError.create([{
+                "content": "blah",
+                "build_ids": [(6, 0, [build_v17.id])],
+                "test_tags": "tag_master_only",
+                "tags_max_version_id": version_master.id,
+                "tags_min_version_id": version_master.id,
+        }])
+
+        self.assertEqual(error_master.tags_min_version_id, version_master)
+        self.assertEqual(error_master.tags_max_version_id, version_master)
+        self.assertEqual(error_master.tags_min_version_excluded_id, version_saas_171)
+        
+        version_99 = self.env['runbot.version']._get('99.0')
+        self.env.flush_all()
+        self.env.cache.invalidate()
+        build_v99 = self.create_test_build({'local_result': 'ko', 'params_id': self.create_params({'version_id': version_99.id}).id})
+        self.assertEqual(error_master.tags_min_version_excluded_id, version_saas_171, "excluded id shouldn't have changed")
+        self.assertEqual(error_master.tags_min_version_id, version_99)
+        self.assertEqual(sorted(['-every', '-where', '-tag_17_up_to_master', '-tag_master_only']), sorted(self.BuildError._disabling_tags(build_v99)))
 
     def test_build_error_test_tags_fixing_pr(self):
         fix_commit = self.env['runbot.commit'].create({

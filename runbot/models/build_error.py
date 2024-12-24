@@ -100,7 +100,8 @@ class BuildError(models.Model):
     fixing_pr_url = fields.Char('Fixing PR url', related='fixing_pr_id.branch_url')
 
     test_tags = fields.Char(string='Test tags', help="Comma separated list of test_tags to use to reproduce/remove this error", tracking=True)
-    tags_min_version_id = fields.Many2one('runbot.version', 'Tags Min version', help="Minimal version where the test tags will be applied.", tracking=True)
+    tags_min_version_excluded_id = fields.Many2one('runbot.version', 'Tag min version (excluded)')
+    tags_min_version_id = fields.Many2one('runbot.version', 'Tags Min version', compute="_compute_tags_min_version_id", inverse="_inverse_tags_min_version_id", help="Minimal version where the test tags will be applied.", tracking=True)
     tags_max_version_id = fields.Many2one('runbot.version', 'Tags Max version', help="Maximal version where the test tags will be applied.", tracking=True)
 
     common_qualifiers = JsonDictField('Common Qualifiers', compute='_compute_common_qualifiers', store=True, help="Minimal qualifiers in common needed to link error content.")
@@ -120,6 +121,27 @@ class BuildError(models.Model):
     tag_ids = fields.Many2many('runbot.build.error.tag', string='Tags', compute=_compute_related_error_content_ids('tag_ids'), search=_search_related_error_content_ids('tag_ids'))
 
     random = fields.Boolean('Random', compute="_compute_random", store=True)
+
+    @api.constrains('tags_min_version_id', 'tags_max_version_id')
+    def _check_min_max_version(self):
+        for build_error in self:
+            if build_error.tags_min_version_id and build_error.tags_max_version_id and build_error.tags_min_version_id.number >= build_error.tags_max_version_id.number:
+                raise ValidationError('Tags Min version should be lower than Tags Max version')
+
+    def _inverse_tags_min_version_id(self):
+        all_versions = self.env['runbot.version'].search([]).sorted(lambda rec: (rec.sequence, rec.number), reverse=True)
+        for records in self:
+            records.tags_min_version_excluded_id = False
+            if records.tags_min_version_id:
+                records.tags_min_version_excluded_id = next((version for version in all_versions if version.number < records.tags_min_version_id.number), False)
+
+    @api.depends('tags_min_version_id')
+    def _compute_tags_min_version_id(self):
+        all_versions = self.env['runbot.version'].search([]).sorted(lambda rec: (rec.sequence, rec.number))
+        for records in self:
+            records.tags_min_version_id = False
+            if records.tags_min_version_excluded_id:
+                records.tags_min_version_id = next((version for version in all_versions if version.number > records.tags_min_version_excluded_id.number), False)
 
     @api.depends('build_error_link_ids')
     def _compute_unique_build_error_link_ids(self):
