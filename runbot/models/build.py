@@ -1269,3 +1269,22 @@ class BuildResult(models.Model):
 
     def _parse_config(self):
         return set(findall(self._server("tools/config.py"), r'--[\w-]+', ))
+
+    def _get_view_class(self):
+        """
+        Returns the color class to use according to bootstrap (+ killed).
+        """
+        self.ensure_one()
+
+        if self.global_state in ('running', 'done'):
+            if self.global_result == 'ok':
+                return 'success'
+            elif self.global_result == 'skipped':
+                return 'skipped'
+            elif self.global_result in ('killed', 'manually_killed'):
+                return 'killed'
+        if self.global_result == 'ko':
+            return 'danger'
+        elif self.global_result == 'warn':
+            return 'warning'
+        return 'info'

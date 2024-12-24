@@ -23,7 +23,6 @@
 	--bs-btn-disabled-color: var(--btn-default-color);
 	--bs-btn-disabled-bg: var(--bs-body-bg);
 	--bs-btn-disabled-border-color: var(--btn-default-border);
-	;
 }
 
 .btn-info {
@@ -102,7 +101,7 @@ a {
 		color: #005452;
 	}
 
-	.slots_infos:hover {
+	&.slots_infos:hover {
 		text-decoration: none;
 	}
 }
@@ -156,6 +155,10 @@ body,
 	content: none;
 }
 
+.dropdown-toggle-caret:after {
+	content: ' ';
+}
+
 .one_line {
 	white-space: nowrap;
 	overflow: hidden;
@@ -183,12 +186,16 @@ body,
 	margin-left: auto;
 }
 
-.bg-killed {
-	background-color: #aaa;
+.bg-killed,
+.bg-killed-subtle,
+.bg-skipped,
+.bg-skipped-subtle {
+	background-color: var(--bs-tertiary-bg);
 }
 
 .text-bg-killed {
-	background-color: #aaa;
+	color: var(--bs-body-color) !important;
+	background-color: var(--bs-tertiary-bg);
 }
 
 .table-condensed td {
@@ -342,4 +349,299 @@ body,
 
 code {
 	white-space: pre-wrap;
+}
+
+/* NEW STUFF */
+
+.o_runbot_sticky_star {
+	color: #f0ad4e;
+}
+
+/* Layout */
+.o_runbot_main_container>.row {
+	padding: .5rem 0;
+}
+
+.o_runbot_main_container>.row:not(:last-child) {
+	border-bottom: var(--bs-border-width) var(--bs-border-style) var(--bs-border-color) !important;
+}
+
+/* Navbar */
+.o_runbot_navbar_username {
+	max-width: 16rem;
+}
+
+.o_runbot_btn_haspr {
+	color: var(--bs-btn-color) !important;
+	background-color: var(--bs-btn-bg) !important;
+	border-color: var(--bs-btn-border-color) !important;
+}
+
+.o_runbot_btn_haspr:has(input:checked) {
+	color: var(--bs-btn-active-color) !important;
+	background-color: var(--bs-btn-active-bg) !important;
+	border-color: var(--bs-btn-active-border-color) !important;
+}
+
+/* Bundles */
+@media (min-width: 768px) {
+	.o_runbot_bundle_info {
+		width: 16rem;
+		max-width: 16rem;
+	}
+}
+
+.o_runbot_bundle_row .o_runbot_batch_card>.o_runbot_batch_card_content>.o_runbot_batch_card_slots>.o_runbot_batch_card_slot {
+	min-width: 50%;
+	flex-grow: 1;
+}
+
+@media (min-width: 1400px) {
+	.o_runbot_bundle_row .o_runbot_batch_card>.o_runbot_batch_card_content>.o_runbot_batch_card_slots>.o_runbot_batch_card_slot:not(.o_runbot_batch_card_slot_preparing) {
+		max-width: 50%;
+	}
+}
+
+@media (max-width: 576px) {
+	.o_runbot_bundle .o_runbot_batch_card>.o_runbot_batch_card_content>.o_runbot_batch_card_slots>.o_runbot_batch_card_slot {
+		min-width: 50%;
+		flex-grow: 1;
+	}
+}
+
+@media (min-width: 576px) {
+	.o_runbot_bundle .o_runbot_batch_card>.o_runbot_batch_card_content>.o_runbot_batch_card_slots>.o_runbot_batch_card_slot {
+		flex-basis: 200px;
+		flex-grow: 1;
+		max-width: 25%;
+	}
+}
+
+@media (min-width: 992px) {
+	.o_runbot_bundle .o_runbot_batch_card>.o_runbot_batch_card_content>.o_runbot_batch_card_slots>.o_runbot_batch_card_slot {
+		flex-basis: 200px;
+		flex-grow: 1;
+		max-width: 20%;
+		min-width: 12.5%;
+	}
+}
+
+.o_runbot_bundle>.col-12 {
+	--bs-gutter-x: 0.5rem;
+	--bs-gutter-y: 0.5rem;
+}
+
+/* Batch */
+:root[data-bs-theme="legacy"] .o_runbot_batch_card {
+	/* In legacy theme we want to keep the card's border color */
+	border: var(--bs-card-border-width) solid var(--bs-card-border-color) !important;
+}
+
+.o_runbot_batch_card>.o_runbot_batch_card_content>.o_runbot_batch_card_slots>.o_runbot_batch_card_slot>.o_runbot_slot_btn_group {
+	width: 100%;
+}
+
+.o_runbot_batch_card>.o_runbot_batch_card_content>.o_runbot_batch_card_commits {
+	font-size: 80%;
+}
+
+.o_runbot_batch>.o_runbot_batch_slots .o_runbot_slot_btn_group {
+	width: 100%;
+}
+
+/* Slot */
+// .btn-group-ssm > * {
+// 	align-items: center;
+// }
+.btn-group-ssm {
+	>* {
+		align-content: center;
+	}
+
+	.o_runbot_slot_btn_small,
+	.o_runbot_build_menu {
+		flex: 0 0 25px;
+	}
+}
+
+.o_runbot_slot_btn_group .o_runbot_slot_btn_small,
+.o_runbot_slot_btn_group>.o_runbot_build_menu {
+	flex: 0 0 25px;
+}
+
+.o_runbot_grid {
+	// Max width for regular columns
+	--runbot-grid-fit-content-width: 200px;
+
+	display: grid;
+	line-height: normal;
+	min-width: 0;
+	grid-template-columns: (
+		repeat(calc(var(--runbot-grid-columns) - 1), fit-content(var(--runbot-grid-fit-content-width)))
+		1fr
+	);
+
+	&.o_runbot_grid_auto {
+		grid-template-columns: repeat(var(--runbot-grid-columns), 1fr);
+	}
+
+	&>* {
+		padding: 0.25rem;
+	}
+
+	&>.separator {
+		grid-column: span var(--runbot-grid-columns);
+	}
+
+	&>*:not(.separator) {
+		// Same as .border-bottom;
+		border-bottom: var(--bs-border-width) var(--bs-border-style) var(--bs-border-color) !important;
+	}
+
+	&>.o_runbot_grid_full_row {
+		grid-column: span var(--runbot-grid-columns);
+	}
+}
+
+@for $size from 2 through 5 {
+	.o_runbot_grid_#{$size} {
+		--runbot-grid-columns: #{$size};
+
+		&>*:nth-last-child(-n + #{$size}) {
+			border-bottom: none !important;
+		}
+
+		&>*:not(:nth-child(#{$size}n+1)) {
+			border-left: var(--bs-border-width) var(--bs-border-style) var(--bs-border-color) !important;
+		}
+	}
+}
+
+.o_runbot_commit_status_grid {
+	grid-template-columns: fit-content(var(--runbot-grid-fit-content-width)) 1fr repeat(3, fit-content(var(--runbot-grid-fit-content-width)));
+}
+
+.o_runbot_commit_status_history_grid {
+	grid-template-columns: fit-content(var(--runbot-grid-fit-content-width)) 1fr repeat(2, fit-content(var(--runbot-grid-fit-content-width)));
+}
+
+.o_runbot_log_grid {
+	display: grid;
+	grid-template-columns: repeat(3, fit-content(200px)) 1fr;
+	line-height: normal;
+	min-width: 0;
+
+	&>*:not(.separator) {
+		// Same as .border-bottom;
+		border-bottom: var(--bs-border-width) var(--bs-border-style) var(--bs-border-color) !important;
+	}
+
+	&>.separator {
+		grid-column: span 4;
+	}
+
+	&>.o_runbot_log_grid_header {
+		font-weight: bold;
+		padding: 0.5rem 0;
+	}
+
+	&>.o_runbot_log_grid_date {
+		padding-left: 0.5rem;
+	}
+
+	&>*:not(.o_runbot_log_grid_message) {
+		padding-right: 0.5rem;
+	}
+
+	&>.o_runbot_log_grid_message {
+		overflow: hidden;
+
+		&>* {
+			overflow: auto;
+			text-wrap: nowrap;
+		}
+
+		.o_runbot_log_message_toolbox {
+			display: flex;
+			position: sticky;
+			left: 0;
+			width: fit-content;
+			margin-top: 0.5rem;
+			opacity: 0.8;
+
+			&:hover {
+				opacity: 1;
+
+				// .btn.disabled has a different opacity
+				&>* {
+					--bs-btn-disabled-opacity: 1;
+				}
+			}
+		}
+	}
+}
+
+/* TODO: remove if not used */
+.bg-danger-subtle-hover:hover {
+	background-color: var(--bs-danger) !important;
+	color: #fff !important;
+}
+
+.bg-success-subtle-hover:hover {
+	background-color: var(--bs-success) !important;
+	color: #fff !important;
+}
+
+.bg-warning-subtle-hover:hover {
+	background-color: var(--bs-warning) !important;
+	color: #000 !important;
+}
+
+.bg-info-subtle-hover:hover {
+	background-color: var(--bs-info) !important;
+	color: #000 !important;
+}
+
+.bg-killed-subtle-hover:hover {
+	background-color: var(--body-secondary-bg);
+	color: var(--body-secondary-color);
+}
+
+
+@media (min-width: 768px) {
+	.w-md-auto {
+		width: auto !important;
+	}
+}
+
+.modal:not([data-bs-backdrop="false"]) {
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.fa-bounce {
+	animation: bounceIn 2s 1;
+}
+
+@keyframes bounceIn {
+    0% {
+        transform: scale(1) translateY(0);
+    }
+    // 10% {
+    //     transform:  translateY(0);
+    // }
+    // 30% {
+    //     transform:  translateY(var(--fa-bounce-height, -.5em));
+    // }
+    50% {
+        transform: scale(1.1) translateY(0);
+    }
+    // 57% {
+    //     transform: scale(1) translateY(var(--fa-bounce-rebound, -.125em));
+    // }
+    // 64% {
+    //     transform: scale(1) translateY(0);
+    // }
+    100% {
+        transform: scale(1) translateY(0);
+    }
 }

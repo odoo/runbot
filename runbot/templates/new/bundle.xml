@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Homepage and bundles search -->
+    <template id="runbot.bundles_new">
+        <t t-call="runbot.layout_new">
+            <div class="o_runbot_bundle_row row" t-foreach="bundles" t-as="bundle" t-if="bundle.last_batchs">
+                <!-- TODO: missing style -->
+                <div class="o_runbot_bundle_info col-12 col-md-auto me-1 mb-2">
+                    <div class="text-truncate">
+                        <i t-if="bundle.sticky" class="o_runbot_sticky_star fa fa-star"/>
+                        <a t-attf-href="/runbot/bundle/#{bundle.id}" t-attf-title="View Bundle {{bundle.name}}" class="fw-bold" t-out="bundle.name"/>
+                    </div>
+                    <div class="btn-toolbar" role="toolbar">
+                        <!-- Fetch last batch for each category -->
+                        <t t-set="categories_and_batch"
+                            t-value="[(category, bundle.with_context(category_id=category.id).last_done_batch) for category in categories if category.id != active_category_id]"
+                        />
+                        <t t-set="categories_and_batch" t-value="[tpl for tpl in categories_and_batch if tpl[1]]"/>
+                        <div class="btn-group btn-group-ssm" role="group" t-if="categories_and_batch">
+                            <t t-foreach="categories_and_batch" t-as="category_and_batch">
+                                <t t-if="category_and_batch[0].view_id" t-call="{{category_and_batch[0].view_id.sudo().key}}">
+                                    <t t-set="category" t-value="category_and_batch[0]"/>
+                                    <t t-set="last_category_batch" t-value="category_and_batch[1]"/>
+                                </t>
+                                <a t-else=""
+                                    t-attf-title="View last {{category_and_batch[0].name}} batch"
+                                    t-attf-href="/runbot/batch/{{category_and_batch[1].id}}"
+                                    t-attf-class="btn btn-default fa fa-{{category_and_batch[0].icon}}"
+                                />
+                            </t>
+                        </div>
+                        <div class="btn-group" role="group">
+                            <t t-if="not bundle.sticky" t-call="runbot.branch_copy_button"/>
+                            <!-- TODO: check branch_github_menu -->
+                            <t t-call="runbot.branch_github_menu"/>
+                        </div>
+                    </div>
+                    <div t-if="bundle.host_id">
+                        <span class="badge text-bg-info" t-out="bundle.host_id.name"/>
+                    </div>
+                </div>
+                <div class="o_runbot_bundle_batch_row col">
+                    <div class="row g-2">
+                        <t t-foreach="enumerate(bundle.last_batchs)" t-as="e_batch">
+                            <t t-set="index" t-value="e_batch[0]"/>
+                            <div t-att-class="'col-12 col-sm-6 col-xl-3' if index &lt; 2 else 'col-xl-3 d-none d-xl-block'">
+                                <t t-call="runbot.batch_card">
+                                    <t t-set="batch" t-value="e_batch[1]"/>
+                                </t>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- Bundle "form" view -->
+    <template id="runbot.bundle_toolbar_middle_section">
+        <div class="btn-group btn-group-sm" role="group">
+            <a groups="runbot.group_runbot_advanced_user" t-attf-href="/web/#id={{bundle.id}}&amp;view_type=form&amp;model=runbot.bundle&amp;menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" class="btn btn-default" target="new" title="View in Backend">
+                <i class="fa fa-list"/>
+            </a>
+            <a groups="runbot.group_runbot_advanced_user" class="btn btn-default" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Force A New Batch">
+                <i class="fa fa-refresh"/>
+            </a>
+            <a t-if="bundle.env.user.has_group('runbot.group_runbot_advanced_user') or (bundle.env.user.has_group('runbot.group_user') and ':' in bundle.name)" class="btn btn-default" t-attf-href="/runbot/bundle/{{bundle.id}}/force/1" title="Force A New Batch with automatic rebase">
+                <i class="fa fa-fast-forward"/>
+            </a>
+            <t t-call="runbot.branch_copy_button">
+                <t t-set="btn_size" t-value="'btn'"/>
+            </t>
+            <t t-call="runbot.bundle_stats_dropdown"/>
+        </div>
+    </template>
+
+    <template id="runbot.bundle_new">
+        <t t-call="runbot.layout_new">
+            <div class="o_runbot_bundle row p-2">
+                <div class="col-12">
+                    <div class="container-lg p-0 card o_runbot_bundle_meta">
+                        <div class="card-header fw-medium"><t t-out="bundle.name"/> <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e" /></div>
+                        <div class="o_runbot_grid o_runbot_grid_2">
+                            <t groups="base.group_user" t-if="not bundle.sticky and not bundle.is_base">
+                                <t t-if="bundle.no_build">
+                                    <div class="text-danger">Build disabled</div>
+                                    <div>
+                                        <a class="btn btn-primary btn-ssm"
+                                            t-attf-href="/runbot/bundle/toggle_no_build/{{bundle.id}}/0">
+                                        Enable builds
+                                        </a>
+                                    </div>
+                                </t>
+                                <t t-else="">
+                                    <div>Build enabled</div>
+                                    <div>
+                                        <a class="btn btn-secondary btn-ssm"
+                                            t-attf-href="/runbot/bundle/toggle_no_build/{{bundle.id}}/1">
+                                        Disable builds
+                                        </a>
+                                    </div>
+                                </t>
+                            </t>
+                            <div>Version</div>
+                            <div t-out="bundle.version_id.name"/>
+                            <div>Branches</div>
+                            <div class="row gx-0 gy-1">
+                                <t t-foreach="bundle._branch_groups().items()" t-as="group">
+                                    <div t-foreach="group[1]" t-as="branch" class="btn-group btn-group-ssm" role="group">
+                                        <a t-att-href="branch.branch_url" class="o_runbot_slot_btn_small btn btn-default text-start" title="View Branch on Github"><i class="fa fa-github"/></a>
+                                        <a groups="runbot.group_runbot_admin" class="o_runbot_slot_btn_small btn btn-default fa fa-list text-start" t-attf-href="/web/#id={{branch.id}}&amp;view_type=form&amp;model=runbot.branch" target="new" title="View Branch in Backend"/>
+                                        <a href="#" t-out="branch.remote_id.short_name" class="btn btn-default disabled text-start flex-grow-1"/>
+                                        <a t-attf-href="/runbot/branch/{{branch.id}}" class="btn btn-default text-start flex-grow-0" title="View Branch Details"><span t-att-class="'' if branch.alive else 'line-through'" t-out="branch.name"/> <i t-if="not branch.alive" title="deleted/closed" class="fa fa-ban text-danger"/></a>
+                                        <t t-if="not any (b.is_pr and b.alive for b in group[1]) and not branch.is_pr">
+                                            <a t-attf-href="https://{{group[0].main_remote_id.base_url}}/compare/{{bundle.version_id.name}}...{{branch.remote_id.owner}}:{{branch.name}}?expand=1" class="btn btn-default text-start flex-grow-0" title="Create pr"><i class="fa fa-code-fork"/> Create pr</a>
+                                        </t>
+                                    </div>
+                                </t>
+                            </div>
+                            <t t-if="more">
+                                <div>Project</div>
+                                <div t-out="bundle.project_id.name"/>
+                                <div>New build enabled</div>
+                                <div t-attf-class="fa fa-{{'times' if bundle.no_build else 'check'}}"/>
+                                <div>Modules</div>
+                                <div t-out="bundle.modules or '/'"/>
+                            </t>
+                        </div>
+                    </div>
+                </div>
+                <div t-foreach="bundle._consistency_warning()" t-as="warning" t-out="warning[1]" t-attf-class="col-12 alert alert-{{warning[0]}}"/>
+                <div class="col-12" t-foreach="batchs" t-as="batch">
+                    <t t-call="runbot.batch_card"/>
+                </div>
+            </div>
+        </t>
+    </template>
+</odoo>

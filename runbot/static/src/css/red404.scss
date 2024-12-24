@@ -25,4 +25,20 @@
         --bs-btn-disabled-bg: #b90e6c;
         --bs-btn-disabled-border-color: #b90e6c;
     }
+
+	.o_runbot_batch_card > .card-header {
+		--bs-success-rgb: 205, 255, 185;
+		--bs-info-rgb: 182, 226, 248;
+		--bs-danger-rgb: 230, 126, 207;
+		--bs-warning-rgb: 250, 233, 177;
+		&.text-bg-danger {
+			color: #fff !important;
+		}
+		&.text-bg-success {
+			color: #000 !important;
+		}
+		.badge {
+			--bs-warning-rgb: 255, 193, 7;
+		}
+	}
 }

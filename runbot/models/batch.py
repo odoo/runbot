@@ -34,6 +34,10 @@ class Batch(models.Model):
         column2='referenced_batch_id',
     )
 
+    def _compute_display_name(self):
+        for batch in self:
+            batch.display_name = f'Batch #{batch.id}'
+
     @api.depends('slot_ids.build_id')
     def _compute_all_build_ids(self):
         all_builds = self.env['runbot.build'].search([('id', 'child_of', self.slot_ids.build_id.ids)])

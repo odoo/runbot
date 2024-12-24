@@ -14,6 +14,10 @@
         color: #fff !important; // It's black by default, color forced to fit with --bs-info-rgb
     }
 
+    .text-bg-success {
+        color: #000 !important;
+    }
+
     .btn-success {
         --bs-btn-color: #fff;
         --bs-btn-bg: #198754;
@@ -30,4 +34,17 @@
         --bs-btn-disabled-bg: #28a745;
         --bs-btn-disabled-border-color: #28a745;
     }
+
+	.o_runbot_batch_card > .card-header {
+		--bs-success-rgb: 223, 240, 216;
+		--bs-info-rgb: 217, 237, 247;
+		--bs-danger-rgb: 242, 222, 222;
+		--bs-warning-rgb: 255, 249, 230;
+		&.text-bg-info, &.text-bg-danger {
+			color: #000 !important;
+		}
+		.badge {
+			--bs-warning-rgb: 255, 193, 7;
+		}
+	}
 }

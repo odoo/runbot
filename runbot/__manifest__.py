@@ -36,6 +36,12 @@
         'templates/git.xml',
         'templates/nginx.xml',
         'templates/build_error.xml',
+        'templates/new/page.xml',
+        'templates/new/bundle.xml',
+        'templates/new/batch.xml',
+        'templates/new/build.xml',
+        'templates/new/slot.xml',
+        'templates/new/commit.xml',
 
         'views/branch_views.xml',
         'views/build_error_views.xml',
@@ -94,6 +100,8 @@
 
             '/runbot/static/src/libs/bootstrap/js/bootstrap.bundle.js',
             '/runbot/static/src/js/runbot.js',
+            '/runbot/static/src/js/manage_preferences_dialog.js',
+            '/runbot/static/src/js/manage_preferences_dialog.xml',
         ],
     },
     'post_load': 'runbot_post_load',
