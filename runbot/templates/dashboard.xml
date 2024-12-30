@@ -38,8 +38,8 @@
     </template>
 
     <template id="frontend_no_nav" inherit_id="runbot.layout" primary="True">
-      <xpath expr="//header" position="replace">
-      </xpath>
+      <!-- <xpath expr="//header" position="replace">
+      </xpath> -->
     </template>
 
     <template id="runbot.config_monitoring">

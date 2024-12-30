@@ -1,133 +1,121 @@
-
+<?xml version="1.0" encoding="UTF-8"?>
 <odoo>
-  <data>
-    <template id="runbot.commit_status_state_td">
-      <!-- Must be called with a `state` variable !-->
-      <td t-if="state=='pending'">
-        <i class="fa fa-circle text-warning"/>
-        &amp;nbsp;
-        <t t-out="state"/>
-      </td>
-      <td t-if="state=='success'">
-        <i class="fa fa-check text-success"/>
-        &amp;nbsp;
-        <t t-out="state"/>
-      </td>
-      <td t-if="state in ('failure', 'error')">
-        <i class="fa fa-times text-danger"/>
-        &amp;nbsp;
-        <t t-out="state"/>
-      </td>
-    </template>
+  <template id="runbot.commit_status_state_cell">
+    <div>
+      <t t-if="state == 'pending'">
+        <i class="fa fa-circle text-warning"/> <t t-out="state"/>
+      </t>
+      <t t-if="state == 'success'">
+        <i class="fa fa-check text-success"/> <t t-out="state"/>
+      </t>
+      <t t-if="state in ('failure', 'error')">
+        <i class="fa fa-times text-danger"/> <t t-out="state"/>
+      </t>
+    </div>
+  </template>
 
-    <template id="runbot.commit">
-      <t t-call='runbot.layout'>
-        <div class="row g-0">
-          <!-- Commit base informations -->
-          <div class="col-md-6">
-            <table class="table table-stripped">
-              <tr>
-                <td>Name</td>
-                <td>
-                  <t t-out="commit.name"/>
-                  <div class="btn-group" role="group">
-                    <a t-att-href="'' if not reflogs else 'https://%s/commit/%s' % (reflogs[0].branch_id.remote_id.base_url, commit.name)" class="btn btn-sm text-start" title="View Commit on Github"><i class="fa fa-github"/></a>
-                    <a groups="runbot.group_runbot_admin" class="btn btn-sm fa fa-list text-start"
-                      t-attf-href="/odoo/runbot.commit/{{commit.id}}?menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" target="new" title="View Commit in Backend"/>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td>Tree hash</td>
-                <td>
-                  <t t-out="commit.tree_hash"/>
-                </td>
-              </tr>
-              <tr>
-                <td>Repo</td>
-                <td t-out="commit.repo_id.name"/>
-              </tr>
-              <tr>
-                <td>Subject</td>
-                <td t-out="commit.subject"/>
-              </tr>
-              <tr>
-                <td>Date</td>
-                <td t-out="commit.date"/>
-              </tr>
-              <tr>
-                <td>Author</td>
-                <td>
-                  <t t-out="commit.author"/>
-                  <small t-out="commit.author_email"/>
-                </td>
-              </tr>
-              <tr t-if="commit.author != commit.committer">
-                <td>Commiter</td>
-                <td>
+  <template id="runbot.commit">
+    <t t-call="runbot.layout">
+      <div class="o_runbot_commit row g-2">
+        <!-- Commit base information -->
+        <div class="col-lg-6">
+          <div class="card">
+            <div class="card-header px-2 py-1">Commit</div>
+            <div class="o_runbot_grid o_runbot_grid_2 o_runbot_grid_striped">
+              <div>Name</div>
+              <div>
+                <t t-out="commit.name"/>
+                <div class="btn-group" role="group">
+                  <a t-att-href="'' if not reflogs else 'https://%s/commit/%s' % (reflogs[0].branch_id.remote_id.base_url, commit.name)" class="btn btn-sm text-start" title="View Commit on Github"><i class="fa fa-github"/></a>
+                  <a groups="runbot.group_runbot_admin" class="btn btn-sm fa fa-list text-start" t-attf-href="/web/#id={{commit.id}}&amp;view_type=form&amp;model=runbot.commit" target="new" title="View Commit in Backend"/>
+                </div>
+              </div>
+              <div>Tree hash</div>
+              <div t-out="commit.tree_hash"/>
+              <div>Repo</div>
+              <div t-out="commit.repo_id.name"/>
+              <div>Subject</div>
+              <div t-out="commit.subject"/>
+              <div>Date</div>
+              <div t-out="commit.date"/>
+              <div>Author</div>
+              <div>
+                <t t-out="commit.author"/>
+                <small t-out="commit.author_email"/>
+              </div>
+              <t t-if="commit.author != commit.committer">
+                <div>Committer</div>
+                <div>
                   <t t-out="commit.committer"/>
                   <small t-out="commit.committer_email"/>
-                </td>
-              </tr>
-            </table>
-          </div>
-          <!-- Status -->
-          <div class="col-md-4">
-            <h3>Last Status</h3>
-            <table class="table table-sm table-borderless">
-              <tr t-foreach='last_status_by_context' t-as='context'>
-                <t t-set="status" t-value="last_status_by_context[context]"/>
-                <td t-out="status.sent_date and status.sent_date.strftime('%Y-%m-%d %H:%M:%S') or '—'"/>
-                <td t-out="context"/>
-                <t t-call="runbot.commit_status_state_td">
-                  <t t-set="state" t-value="status.state"/>
-                </t>
-                <td>
-                  <a t-att-href="status.target_url">
-                    build
-                    <t t-if="status.target_url" t-out="status.target_url.split('/')[-1]" />
-                  </a>
-                </td>
-                <td groups="base.group_user">
-                  <a t-attf-href="/runbot/commit/resend/{{status.id}}" title="Resend github status">
-                    <i class="fa fa-repeat"/>
-                  </a>
-                </td>
-              </tr>
-            </table>
+                </div>
+              </t>
+            </div>
           </div>
         </div>
-        <div class="row g-0">
-          <div class="col-md-6">
-            <h3>Branch presence history</h3>
-            <table class="table table-stripped">
-              <tr t-foreach='reflogs' t-as='reflog'>
-                <td t-out="reflog.date"/>
-                <td t-out="reflog.branch_id.remote_id.short_name"/>
-                <td><a t-attf-href="/runbot/branch/{{reflog.branch_id.id}}" t-out="reflog.branch_id.name" title="View Branch Details"/></td>
-              </tr>
-            </table>
-          </div>
-          <div class="col-md-6">
-            <h3>Status history</h3>
-            <table class="table table-stripped">
-              <tr t-foreach='status_list' t-as='status'>
-                <td t-out="status.sent_date and status.sent_date.strftime('%Y-%m-%d %H:%M:%S') or '—'"/>
-                <td t-out="status.context"/>
-                <t t-call="runbot.commit_status_state_td">
+        <!-- Status -->
+        <div class="col-lg-6">
+          <div class="card">
+            <div class="card-header px-2 py-1">Last Status</div>
+            <div class="o_runbot_grid o_runbot_grid_5 o_runbot_commit_status_grid">
+              <t t-foreach="last_status_by_context" t-as="context">
+                <t t-set="status" t-value="last_status_by_context[context]"/>
+                <div t-out="status.sent_date and status.sent_date.strftime('%Y-%m-%d %H:%M:%S') or '—'"/>
+                <div t-out="context"/>
+                <t t-call="runbot.commit_status_state_cell">
                   <t t-set="state" t-value="status.state"/>
                 </t>
-                <td>
+                <div>
+                  <a t-att-href="status.target_url">
+                    Build <t t-if="status.target_url" t-out="status.target_url.split('/')[-1]"/>
+                  </a>
+                </div>
+                <div>
+                  <div class="btn-group btn-group-ssm" role="group">
+                    <a groups="base.group_user" class="btn btn-default" t-attf-href="/runbot/commit/resent/{{status.id}}" title="Resend github status">
+                      <i class="fa fa-repeat"/>
+                    </a>
+                  </div>
+                </div>
+              </t>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card">
+            <div class="card-header px-2 py-1">Branch presence history</div>
+            <div class="o_runbot_grid o_runbot_grid_3 o_runbot_grid_auto">
+              <t t-foreach="reflogs" t-as="reflog">
+                <div t-out="reflog.date"/>
+                <div t-out="reflog.branch_id.remote_id.short_name"/>
+                <div>
+                  <a t-attf-href="/runbot/branch/{{reflog.branch_id.id}}" t-out="reflog.branch_id.name" title="View Branch Details"/>
+                </div>
+              </t>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card">
+            <div class="card-header px-2 py-1">Status history</div>
+            <div class="o_runbot_grid o_runbot_grid_4 o_runbot_commit_status_history_grid">
+              <t t-foreach="status_list" t-as="status">
+                <div t-out="status.sent_date and status.sent_date.strftime('%Y-%m-%d %H:%M:%S') or '—'"/>
+                <div t-out="status.context"/>
+                <t t-call="runbot.commit_status_state_cell">
+                  <t t-set="state" t-value="status.state"/>
+                </t>
+                <div>
                   <a t-attf-href="/runbot/build/{{status.build_id.id}}">
                     build
                     <t t-out="status.build_id.id" />
                   </a>
-                </td>
-              </tr>
-            </table>
+                </div>
+              </t>
+            </div>
           </div>
         </div>
-      </t>
-    </template>
-  </data>
+      </div>
+    </t>
+  </template>
 </odoo>

@@ -3,6 +3,7 @@ import datetime
 import werkzeug
 import logging
 import functools
+from typing import TypedDict, Optional, List, NamedTuple
 
 import werkzeug.utils
 import werkzeug.urls
@@ -18,13 +19,39 @@ from odoo.osv import expression
 _logger = logging.getLogger(__name__)
 
 
+class Breadcrumb(NamedTuple):
+    url: str
+    name: str
+
+Breadcrumbs = List[Breadcrumb]
+
+class ToolbarContext(TypedDict):
+    """
+    Context used by 'runbot.layout_toolbar', should be provided through the 'toolbar' context key.
+    """
+    sticky: Optional[bool] # Defines if the toolbar is sticky or not, defaults to true
+
+    start_template: Optional[str] # Default to 'runbot.layout_toolbar_start_section'
+    # start_template default expected values
+    breadcrumbs: Optional[Breadcrumbs]
+    middle_template: Optional[str] # Defaults to 'runbot.layout_toolbar_middle_section'
+    # middle_template default expected values
+    message: Optional[str]
+    end_template: Optional[str] # Defaults to 'runbot.layout_toolbar_end_section'
+    # end_template expected values
+    pending_count: Optional[int]
+    pending_level: Optional[int]
+    pending_assigned_count: Optional[int]
+    # hosts_data: Optional[request.env['runbot.host']]
+
+
 def route(routes, **kw):
     def decorator(f):
         @o_route(routes, **kw)
         @functools.wraps(f)
         def response_wrap(*args, **kwargs):
             projects = request.env['runbot.project'].search([('hidden', '=', False)])
-            more = request.httprequest.cookies.get('more', False) == '1'
+            more = request.httprequest.cookies.get('more', False) in ('1', 'true')
             filter_mode = request.httprequest.cookies.get('filter_mode', 'all')
             keep_search = request.httprequest.cookies.get('keep_search', False) == '1'
             cookie_search = request.httprequest.cookies.get('search', '')
@@ -47,7 +74,6 @@ def route(routes, **kw):
 
                 project = response.qcontext.get('project') or projects and projects[0]
 
-                response.qcontext['theme'] = kwargs.get('theme', request.httprequest.cookies.get('theme', 'legacy'))
                 response.qcontext['projects'] = projects
                 response.qcontext['more'] = more
                 response.qcontext['keep_search'] = keep_search
@@ -72,6 +98,22 @@ def route(routes, **kw):
 
 class Runbot(Controller):
 
+    def _get_default_toolbar(self, *, include_message=False):
+        pending_count, level, _, pending_assigned_count = self._pending()
+
+        if include_message:
+            message = request.env['ir.config_parameter'].sudo().get_param('runbot.runbot_message')
+        else:
+            message = None
+
+        return ToolbarContext(
+            pending_count=pending_count,
+            pending_level=level,
+            pending_assigned_count=pending_assigned_count,
+            hosts_data=request.env['runbot.host'].search([('assigned_only', '=', False)]),
+            message=message,
+        )
+
     def _pending(self):
         ICP = request.env['ir.config_parameter'].sudo().get_param
         warn = int(ICP('runbot.pending.warning', 5))
@@ -81,27 +123,6 @@ class Runbot(Controller):
         pending_assigned_count = request.env['runbot.build'].search_count([('local_state', '=', 'pending'), ('build_type', '!=', 'scheduled'), ('host', '!=', False)])
         level = ['info', 'warning', 'danger'][int(pending_count > warn) + int(pending_count > crit)]
         return pending_count, level, scheduled_count, pending_assigned_count
-
-    @o_route([
-        '/runbot/submit'
-    ], type='http', auth="public", methods=['GET', 'POST'], csrf=False)
-    def submit(self, more=False, redirect='/', keep_search=False, category=False, filter_mode=False, update_triggers=False, **kwargs):
-        assert redirect.startswith('/')
-        response = werkzeug.utils.redirect(redirect)
-        response.set_cookie('more', '1' if more else '0')
-        if update_triggers:
-            enabled_triggers = []
-            project_id = int(update_triggers)
-            for key in kwargs.keys():
-                if key.startswith('trigger_'):
-                    enabled_triggers.append(key.replace('trigger_', ''))
-
-            key = 'trigger_display_%s' % project_id
-            if len(request.env['runbot.trigger'].search([('project_id', '=', project_id)])) == len(enabled_triggers):
-                response.delete_cookie(key)
-            else:
-                response.set_cookie(key, '-'.join(enabled_triggers))
-        return response
 
     @route(['/',
             '/runbot',
@@ -114,15 +135,10 @@ class Runbot(Controller):
         if not project and projects:
             project = projects[0]
 
-        pending_count, level, scheduled_count, pending_assigned_count = self._pending()
         context = {
             'categories': categories,
             'search': search,
-            'message': request.env['ir.config_parameter'].sudo().get_param('runbot.runbot_message'),
-            'pending_count': pending_count,
-            'pending_assigned_count': pending_assigned_count,
-            'pending_level': level,
-            'scheduled_count': scheduled_count,
+            'toolbar': self._get_default_toolbar(include_message=True),
             'hosts_data': request.env['runbot.host'].search([('assigned_only', '=', False)]),
         }
         if project:
@@ -185,7 +201,6 @@ class Runbot(Controller):
                 'search': search,
             })
 
-        context.update({'message': request.env['ir.config_parameter'].sudo().get_param('runbot.runbot_message')})
         # request.is_frontend = False  # remove inherit branding
         return request.render('runbot.bundles', context)
 
@@ -201,13 +216,18 @@ class Runbot(Controller):
                 raise NotFound
             slug = request.env['ir.http']._slug
             return werkzeug.utils.redirect(f'/runbot/bundle/{slug(bundle)}')
+        if isinstance(limit, str):
+            limit = int(limit)
         domain = [('bundle_id', '=', bundle.id), ('hidden', '=', False)]
         batch_count = request.env['runbot.batch'].search_count(domain)
         pager = request.website.pager(
             url='/runbot/bundle/%s' % bundle.id,
             total=batch_count,
             page=page,
-            step=50,
+            step=limit,
+            url_args={
+                'limit': limit,
+            }
         )
         batchs = request.env['runbot.batch'].search(domain, limit=limit, offset=pager.get('offset', 0), order='id desc')
 
@@ -218,6 +238,14 @@ class Runbot(Controller):
             'project': bundle.project_id,
             'title': 'Bundle %s' % bundle.name,
             'page_info_state': bundle.last_batch._get_global_result(),
+            'toolbar': ToolbarContext(
+                breadcrumbs=[
+                    Breadcrumb('/runbot/%s' % request.env['ir.http']._slug(bundle.project_id), bundle.project_id.display_name),
+                    Breadcrumb('/runbot/bundle/%s' % bundle.id, bundle.display_name),
+                ],
+                middle_template='runbot.bundle_toolbar_middle_section',
+                end_template='runbot.pager',
+            )
         }
 
         return request.render('runbot.bundle', context)
@@ -239,11 +267,21 @@ class Runbot(Controller):
     @route(['/runbot/batch/<int:batch_id>'], website=True, auth='public', type='http', sitemap=False)
     def batch(self, batch_id=None, **kwargs):
         batch = request.env['runbot.batch'].browse(batch_id)
+        bundle = batch.bundle_id
+        project = bundle.project_id
         context = {
             'batch': batch,
-            'project': batch.bundle_id.project_id,
+            'project': project,
             'title': 'Batch %s (%s)' % (batch.id, batch.bundle_id.name),
             'page_info_state': batch._get_global_result(),
+            'toolbar': ToolbarContext(
+                breadcrumbs=[
+                    Breadcrumb('/runbot/%s' % request.env['ir.http']._slug(project), project.display_name),
+                    Breadcrumb('/runbot/bundle/%s' % bundle.id, bundle.display_name),
+                    Breadcrumb('/runbot/bundle/batch/%s' % batch.id, batch.display_name),
+                ],
+                middle_template='runbot.batch_toolbar_middle_section',
+            ),
         }
         return request.render('runbot.batch', context)
 
@@ -275,7 +313,7 @@ class Runbot(Controller):
             'reflogs': request.env['runbot.ref.log'].search([('commit_id', '=', commit.id)]),
             'status_list': status_list,
             'last_status_by_context': last_status_by_context,
-            'title': 'Commit %s' % commit.name[:8]
+            'title': 'Commit %s' % commit.name[:8],
         }
         return request.render('runbot.commit', context)
 
@@ -329,10 +367,34 @@ class Runbot(Controller):
         if not build.exists():
             return request.not_found()
         siblings = (build.parent_id.children_ids if build.parent_id else from_batch.slot_ids.build_id if from_batch else build).sorted('id')
+        project = build.params_id.trigger_id.project_id
+        breadcrumbs: Breadcrumbs = [Breadcrumb('/runbot/%s' % request.env['ir.http']._slug(project), project.display_name)]
+        batch = bundle = None
+        if from_batch:
+            batch = from_batch
+            batches = batch
+            bundle = batch.bundle_id
+            bundles = bundle
+        else:
+            batches = build.top_parent.with_context(active_test=False).slot_ids.batch_id
+            bundles = batches.bundle_id
+            if len(batches) == 1:
+                batch = batches
+            if len(bundles) == 1:
+                bundle = bundles
+        if bundle:
+            breadcrumbs.append(Breadcrumb(bundle._url(), bundle.display_name))
+        if batch:
+            breadcrumbs.append(Breadcrumb(batch._url(), batch.display_name))
+        breadcrumbs.extend(
+            Breadcrumb(ancestor.build_url, ancestor.description or ancestor.config_id.name) for ancestor in build.ancestors
+        )
         context = {
             'build': build,
+            'batches': batches,
+            'bundles': bundles,
             'from_batch': from_batch,
-            'project': build.params_id.trigger_id.project_id,
+            'project': project,
             'title': 'Build %s' % build.id,
             'siblings': siblings,
             'page_info_state': build.global_result,
@@ -341,8 +403,13 @@ class Runbot(Controller):
             'prev_bu': next((b for b in reversed(siblings) if b.id < build.id), Build),
             'next_bu': next((b for b in siblings if b.id > build.id), Build),
             'next_ko': next((b for b in siblings if b.id > build.id and b.global_result != 'ok'), Build),
+            'toolbar': ToolbarContext(
+                breadcrumbs=breadcrumbs,
+                middle_template='runbot.build_toolbar_middle_section',
+                end_template='runbot.build_toolbar_end_section',
+            )
         }
-        return request.render("runbot.build", context)
+        return request.render('runbot.build', context)
 
     @route([
     '/runbot/build/search',

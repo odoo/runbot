@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <!--
+    The toolbar is inserted in the default layout if the 'toolbar' context value is set.
+    (see frontend.py for default implementation.)
+
+    The toolbar is a 3 part row similar to odoo's toolbar, the middle section wraps first
+    when the window becomes too small.
+
+    The default toolbar template renders the following:
+     1) Breadcrumbs
+     2) Message (if there is an alert)
+     3) Runbot status
+   -->
+  <template id="runbot.toolbar">
+    <div t-if="toolbar" t-att-class="'o_runbot_toolbar row bg-body' + (' position-sticky z-1' if toolbar.get('sticky', True) else '')">
+      <div class="d-flex flex-wrap flex-md-nowrap justify-content-between align-items-center gap-md-3">
+        <t t-call="{{toolbar.get('start_template', 'runbot.toolbar_start_section')}}" />
+        <t t-call="{{toolbar.get('middle_template', 'runbot.toolbar_middle_section')}}" />
+        <t t-call="{{toolbar.get('end_template', 'runbot.toolbar_end_section')}}" />
+      </div>
+    </div>
+  </template>
+
+  <!-- Toolbar item layout and content are separated such that everything can be customised -->
+  <template id="runbot.toolbar_section_empty">
+  </template>
+
+  <template id="runbot.toolbar_start">
+    <div class="d-flex d-empty-none order-0" style="flex: 1;">
+      <t t-out="0"/>
+    </div>
+  </template>
+
+  <template id="runbot.toolbar_start_section">
+    <t t-call="runbot.toolbar_start">
+      <div t-if="toolbar.get('breadcrumbs') and len(toolbar.get('breadcrumbs')) > 1" class="o_runbot_toolbar_breadcrumbs d-flex">
+        <t t-set="breadcrumbs" t-value="toolbar.get('breadcrumbs')" />
+        <ol class="breadcrumb flex-nowrap text-nowrap lh-sm">
+          <li
+            t-foreach="breadcrumbs" t-as="breadcrumb"
+            t-attf-class="breadcrumb-item d-inline-flex{{' active' if breadcrumb == breadcrumbs[-1] else None}}"
+            t-att-aria-current="'page' if breadcrumb == breadcrumbs[-1] else None"
+          >
+            <a t-if="breadcrumb != breadcrumbs[-1]" t-att-href="breadcrumb.url"
+              t-out="breadcrumb.name" />
+            <t t-else="" t-out="breadcrumb.name" />
+          </li>
+        </ol>
+      </div>
+    </t>
+  </template>
+
+  <template id="runbot.toolbar_middle">
+    <div class="d-flex d-empty-none justify-content-start justify-content-md-around order-2 order-md-1 w-100 w-md-auto mw-100">
+      <t t-out="0"/>
+    </div>
+  </template>
+
+  <template id="runbot.toolbar_middle_section">
+    <!-- TODO: remove t-call and use whole row instead -->
+    <t t-call="runbot.toolbar_middle">
+      <div t-if="toolbar.get('message')" class="alert alert-warning m-0" role="alert"
+        t-out="toolbar.get('message')" />
+    </t>
+  </template>
+
+  <template id="runbot.toolbar_end">
+    <div class="d-flex d-empty-none justify-content-end order-1 order-md-2 flex-grow-1 gap-1" style="flex: 1;">
+      <t t-out="0"/>
+    </div>
+  </template>
+
+  <template id="runbot.toolbar_end_section">
+    <t t-call="runbot.toolbar_end">
+      <a t-if="toolbar.get('pending_count')" href="/runbot/load_info" class="text-decoration-none">
+        <span t-attf-class="badge text-bg-{{toolbar.get('pending_level')}}"> Pending: <t
+            t-out="toolbar.get('pending_count')" />
+                  <span t-if="toolbar.get('pending_assigned_count')"
+            title="Assigned build (reserved host)"> (<t t-out="toolbar.get('pending_assigned_count')" />
+          )
+                  </span>
+        </span>
+      </a>
+      <a href="/runbot/load_info" t-if="toolbar.get('hosts_data') is not None"
+        class="slots_infos text-decoration-none">
+        <t t-set="testing" t-value="toolbar.get('hosts_data')._total_testing()" />
+        <t t-set="workers" t-value="toolbar.get('hosts_data')._total_workers()" />
+        <t t-set="klass">success</t>
+        <t t-if="not workers" t-set="klass">danger</t>
+        <t t-else="">
+          <t t-if="int(testing)/workers > 0" t-set="klass">info</t>
+          <t t-if="int(testing)/workers > 0.75" t-set="klass">warning</t>
+          <t t-if="int(testing)/workers >= 1" t-set="klass">danger</t>
+        </t>
+        <span t-attf-class="badge text-bg-{{klass}}"> Testing: <t t-out="testing" /> / <t
+            t-out="workers" />
+        </span>
+      </a>
+    </t>
+  </template>
+
+</odoo>

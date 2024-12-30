@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <!-- TODO: figure out proper keepquery logic -->
+  <template id="runbot.navbar">
+    <!-- 
+      Context used;
+      class Navbar(TypedDict):
+          project: self.env['runbot.project']
+          projects: Optional[self.env['runbot.project']]
+          qu: QueryURL object
+          nb_assigned_errors: int
+          nb_team_errors: int
+          nb_build_errors: int
+          has_pr: Optional[bool]
+    -->
+    <nav class="navbar navbar-expand-sm sticky-top shadow-sm bg-body-tertiary">
+      <div class="container-fluid">
+        <div class="navbar-brand">
+          <a class="text-reset text-decoration-none text-initial" t-out="project.name"
+            t-att-href="qu('/runbot/%s' % slug(project))" />
+          <span t-if="projects and len(projects) > 1"
+            class="dropdown-toggle dropdown-toggle-caret d-none d-sm-inline" role="button"
+            data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" />
+          <ul t-if="projects and len(projects) > 1" class="dropdown-menu">
+            <li>
+              <h6 class="dropdown-header">Change Project</h6>
+            </li>
+            <li>
+              <a class="dropdown-item active" t-out="project.name"
+                t-att-href="qu('/runbot/%s' % slug(project))" />
+            </li>
+            <li>
+              <hr class="dropdown-divider" />
+            </li>
+            <t t-foreach="projects" t-as="_project">
+              <li t-if="project.id != _project.id">
+                <a class="dropdown-item" t-att-href="qu('/runbot/%s' % slug(_project))"
+                  t-out="_project.name" />
+              </li>
+            </t>
+          </ul>
+        </div>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="offcanvas"
+          data-bs-target="#navbarOffCanvas"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="offcanvas offcanvas-end" tabindex="-1" id="navbarOffCanvas">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" t-out="project.name" />
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="offcanvas"
+              aria-label="Close"
+            />
+          </div>
+          <div class="offcanvas-body">
+            <ul class="navbar-nav justify-content-end flex-grow-1 pe-3">
+              <li class="nav-item d-sm-none">
+                <a class="nav-link active" aria-current="page"
+                  t-att-href="qu('/runbot/%s' % slug(project))" t-out="project.name" />
+              </li>
+              <t t-foreach="projects" t-as="_project">
+                <li t-if="project.id != _project.id" class="nav-item d-sm-none">
+                  <a class="nav-link" t-att-href="qu('/runbot/%s' % slug(_project))"
+                    t-out="_project.name" />
+                </li>
+              </t>
+              <!-- TODO: js code to open preferences -->
+              <li class="nav-item divider" />
+              <li class="nav-item dropdown o_runbot_preferences">
+                <a class="nav-link" href="#" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                  <i class="fa fa-gear" />
+                </a>
+                <div class="dropdown-menu" role="menu">
+                  <div class="form-check form-switch m-2"
+                    title="Displays more information (requires reload)">
+                    <label class="form-check-label" for="navbarMoreInfo">More info</label>
+                    <input class="form-check-input o_runbot_more_info" id="navbarMoreInfo"
+                      t-att-checked="more" type="checkbox" />
+                  </div>
+                  <div class="dropdown-divider" />
+                  <div class="form-floating m-2">
+                    <select class="form-select o_runbot_theme_switcher" id="navbarThemeSelector"
+                      aria-label="Change Theme">
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                      <option value="legacy">Legacy</option>
+                      <option value="red404">Red404</option>
+                    </select>
+                    <label for="navbarThemeSelector">Theme</label>
+                  </div>
+                  <div class="dropdown-divider" groups="base.group_user" />
+                  <a class="dropdown-item o_runbot_manage_filters" role="menuitem" href="#"
+                    groups="base.group_user">
+                    Manage filters
+                  </a>
+                </div>
+              </li>
+              <li class="nav-item divider" />
+              <t t-if="not user_id._is_public()">
+                <li class="nav-item" t-if="nb_assigned_errors">
+                  <a href="/runbot/errors" class="nav-link text-danger"
+                    t-attf-title="You have {{nb_assigned_errors}} random bug assigned">
+                    <i class="fa fa-bug" />
+                    <t t-out="nb_assigned_errors" />
+                    <span class="text-warning" t-if="nb_team_errors"
+                      t-out="'+ ' + str(nb_team_errors)" />
+                  </a>
+                </li>
+                <li class="nav-item" t-elif="nb_team_errors">
+                  <a href="/runbot/errors" class="nav-link text-warning"
+                    t-attf-title="Your team has {{nb_team_errors}} random bug assigned">
+                    <i class="fa fa-bug" />
+                    <t t-out="nb_team_errors" />
+                  </a>
+                </li>
+                <li class="nav-item" t-elif="nb_build_errors">
+                  <a href="/runbot/errors" class="nav-link" title="Random Bugs">
+                    <i class="fa fa-bug" />
+                  </a>
+                </li>
+                <li class="nav-item dropdown" t-ignore="true">
+                  <a href="#" class="o_runbot_navbar_username nav-link fw-bold text-truncate"
+                    data-bs-toggle="dropdown" t-out="user_id.name" />
+                  <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" id="o_logout" role="menuitem"
+                      t-attf-href="/web/session/logout?redirect=/">Logout</a>
+                    <a class="dropdown-item" role="menuitem" t-attf-href="/web">Web</a>
+                    <div t-if="user_id.runbot_team_ids" class="dropdown-divider" />
+                    <div t-if="user_id.runbot_team_ids" class="dropdown-header">Teams</div>
+                    <a t-foreach="user_id.runbot_team_ids" t-as="team" class="dropdown-item"
+                      role="menuitem" t-attf-href="/runbot/teams/{{team.id}}">
+                      <t t-out="team.name.capitalize()" />
+                    </a>
+                  </div>
+                </li>
+              </t>
+              <li class="nav-item" t-else="" t-ignore="true">
+                <a class="nav-link fw-bold"
+                  t-attf-href="/web/login?redirect={{request.httprequest.path}}">Login</a>
+              </li>
+            </ul>
+            <form class="mt-3 mb-0 mt-sm-0 d-flex" t-attf-action="/runbot/{{slug(project)}}">
+              <div class="input-group me-2 flex-grow-1">
+                <input class="form-control" type="search" name="search" placeholder="Search"
+                  aria-label="Search" t-att-value="search"/>
+              </div>
+              <div class="btn-group">
+                <div class="input-group-text o_runbot_btn_haspr btn btn-outline-primary p-0"
+                  type="button" tabindex="0">
+                  <input type="checkbox" tabindex="0" id="searchHasPr" name="has_pr" class="d-none"
+                    t-att-checked="bool(request.params.get('has_pr'))"/>
+                  <label for="searchHasPr" class="py-2 px-3 w-100 h-100 align-content-center"
+                    role="button">
+                    <i class="fa fa-github"></i>
+                  </label>
+                </div>
+                <button class="btn btn-outline-success" type="submit">Search</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </nav>
+  </template>
+</odoo>

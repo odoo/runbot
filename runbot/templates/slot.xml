@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <template id="runbot.slot_btn_group">
+    <t t-set="bu" t-value="slot.build_id" />
+    <t t-set="color" t-value="bu._get_color_class()" />
+    <div class="o_runbot_slot_btn_group btn-group btn-group-ssm">
+      <button t-attf-class="o_runbot_slot_btn_small btn btn-{{color}} disabled fa fa-{{slot._fa_link_type()}}" t-att-title="slot.link_type" />
+      <a t-att-href="'/runbot/batch/%s/build/%s' % (slot.batch_id.id, bu.id) if bu else None"
+        t-attf-class="btn btn-default text-start text-nowrap text-truncate flex-grow-1{{' disabled' if not bu else ''}}"
+        t-out="slot.trigger_id.name"
+      />
+      <a t-if="slot.trigger_id.report_view_id" title="View last trigger report" t-attf-href="/runbot/trigger/report/{{slot.trigger_id.id}}"
+        class="o_runbot_slot_btn_small fa fa-eye btn btn-info" />
+      <a t-if="bu.local_state == 'running' and bu.database_ids" t-attf-href="/runbot/run/{{bu.id}}" class="o_runbot_slot_btn_small fa fa-sign-in btn btn-info" />
+      <a t-if="bu.static_run" t-att-href="bu.static_run" class="o_runbot_slot_btn_small fa fa-sign-in btn btn-info" />
+      <t t-if="bu" t-call="runbot.build_menu" />
+      <a t-if="not bu" groups="base.group_user" class="o_runbot_slot_btn_small btn btn-default" title="Create build"
+        t-attf-href="/runbot/batch/slot/{{slot.id}}/build">
+        <i class="fa fa-play fa-fw" />
+      </a>
+    </div>
+  </template>
+</odoo>

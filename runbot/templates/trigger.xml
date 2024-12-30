@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <template id="runbot.trigger_report">
+    <t t-call="runbot.layout">
+      <t t-call="{{trigger.report_view_id.id}}">
+      </t>
+    </t>
+  </template>
+</odoo>

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <!-- Empty page layout, only contains assets -->
+  <template id="runbot.base_layout">
+    <html>
+      <title t-out="title or 'Runbot'" />
+
+      <meta name="runbot-project-id" t-att-content="project.id" />
+
+      <t t-call-assets="runbot.assets_frontend" />
+
+      <t t-if="refresh">
+        <!-- TODO: replace this with javascript code -->
+        <meta http-equiv="refresh" t-att-content="refresh" />
+      </t>
+
+      <t t-if="not page_info_state or page_info_state == 'ok' or page_info_state not in ('warn', 'ko', 'skipped', 'killed', 'manually_killed')">
+        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_ok.png" />
+        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_ok.svg" />
+      </t>
+      <t t-elif="page_info_state == 'ko'">
+        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_ko.png" />
+        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_ko.svg" />
+      </t>
+      <t t-elif="page_info_state == 'warn'">
+        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_warn.png" />
+        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_warn.svg" />
+      </t>
+      <t t-elif="page_info_state == 'skipped'">
+        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_skipped.png" />
+        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_skipped.svg" />
+      </t>
+      <t t-elif="page_info_state == 'killed' or page_info_state == 'manually_killed'">
+        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_killed.png" />
+        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_killed.svg" />
+      </t>
+
+    </html>
+    <body>
+      <t t-out="0" />
+    </body>
+  </template>
+
+  <!-- Layout with navbar, container potential toolbar -->
+  <template id="runbot.layout">
+    <t t-call="runbot.base_layout">
+      <t t-call="{{layout_nav_template or 'runbot.navbar'}}" />
+      <div class="container-fluid o_runbot_main_container d-flex flex-column">
+        <t t-call="{{layout_toolbar_template or 'runbot.toolbar'}}" />
+        <t t-out="0" />
+      </div>
+    </t>
+  </template>
+</odoo>

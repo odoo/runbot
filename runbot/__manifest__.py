@@ -23,6 +23,7 @@
         'security/ir.model.access.csv',
         'security/ir.rule.csv',
 
+        'templates/layout.xml',
         'templates/utils.xml',
         'templates/badge.xml',
         'templates/batch.xml',
@@ -32,10 +33,13 @@
         'templates/bundle.xml',
         'templates/commit.xml',
         'templates/dashboard.xml',
-        'templates/frontend.xml',
         'templates/git.xml',
         'templates/nginx.xml',
         'templates/build_error.xml',
+        'templates/navbar.xml',
+        'templates/slot.xml',
+        'templates/toolbar.xml',
+        'templates/trigger.xml',
 
         'views/branch_views.xml',
         'views/build_error_views.xml',
@@ -66,15 +70,18 @@
             'runbot/static/src/js/fields/*',
         ],
         'runbot.assets_frontend': [
-            '/web/static/lib/bootstrap/dist/css/bootstrap.css',
-            '/web/static/src/libs/fontawesome/css/font-awesome.css',
+            ('include', 'web.assets_frontend_minimal'),
+            # New stuff
+            '/runbot/static/src/css/runbot_new.scss',
+
+            # Old stuff
+            '/runbot/static/src/libs/bootstrap/css/bootstrap.css',
+            '/runbot/static/src/libs/fontawesome/css/font-awesome.css',
             '/runbot/static/src/css/runbot.css',
 
-            '/web/static/lib/jquery/jquery.js',
-            '/web/static/lib/popper/popper.js',
-            #'/web/static/lib/bootstrap/js/dist/util.js',
-            '/web/static/lib/bootstrap/js/dist/dropdown.js',
-            '/web/static/lib/bootstrap/js/dist/collapse.js',
+            '/runbot/static/src/libs/jquery/jquery.js',
+            '/runbot/static/src/libs/popper/popper.js',
+            '/runbot/static/src/libs/bootstrap/js/bootstrap.bundle.js',
             '/runbot/static/src/js/runbot.js',
         ],
     },
