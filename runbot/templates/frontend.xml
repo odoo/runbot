@@ -40,9 +40,9 @@
                         <b t-out="bundle.name"/>
                       </a>
                     </div>
-                    <div class="btn-toolbar" role="toolbar" aria-label="Toolbar with button groups">
-                      <div class="btn-group" role="group">
-                        <t t-foreach="categories" t-as="category">
+                    <div class="btn-toolbar gap-1" role="toolbar" aria-label="Toolbar with button groups">
+                      <!-- No space is necessary for d-empty-none to work properly. -->
+                      <div class="btn-group d-empty-none" role="group"><t t-foreach="categories" t-as="category">
                           <t t-if="active_category_id != category.id">
                             <t t-set="last_category_batch" t-value="bundle.with_context(category_id=category.id).last_done_batch"/>
                             <t t-if="last_category_batch">
@@ -50,12 +50,11 @@
                               <a t-else=""
                                 t-attf-title="View last {{category.name}} batch"
                                 t-attf-href="/runbot/batch/{{last_category_batch.id}}"
-                                t-attf-class="fa fa-{{category.icon}}"
+                                t-attf-class="btn btn-default btn-ssm fa fa-{{category.icon}}"
                                 />
                             </t>
                           </t>
-                        </t>
-                      </div>
+                        </t></div>
                       <div class="btn-group" role="group">
                         <t t-if="not bundle.sticky" t-call="runbot.branch_copy_button"/>
                         <t t-call="runbot.branch_github_menu"/>

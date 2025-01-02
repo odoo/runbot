@@ -418,3 +418,7 @@ body, .table {
 code {
 	white-space: pre-wrap;
 }
+
+.d-empty-none:empty {
+    display: none !important;
+}
