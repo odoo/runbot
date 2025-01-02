@@ -25,7 +25,6 @@ from . import res_users
 from . import runbot
 from . import team
 from . import upgrade
-from . import user
 from . import version
 
 # those imports have to be at the end otherwise the sql view cannot be initialised

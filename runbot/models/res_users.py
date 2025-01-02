@@ -10,6 +10,10 @@ class ResUsers(models.Model):
     runbot_team_ids = fields.Many2many('runbot.team', string="Runbot Teams")
     github_login = fields.Char('Github account')
 
+    # Add default action_id
+    action_id = fields.Many2one('ir.actions.actions',
+                                default=lambda self: self.env.ref('runbot.open_view_warning_tree', raise_if_not_found=False))
+
     _sql_constraints = [
         (
             "github_login_unique",
