@@ -37,3 +37,42 @@ function copyToClipboard(text) {
     }
     navigator.clipboard.writeText(text);
 }
+
+/**
+ * Shamelessly stolen from owl's code, execute a function when the DOM is ready.
+ *
+ * @param {*} fn function to call when the DOM is ready.
+ * @returns {Promise} Promise that can be awaited for after DOM is ready.
+ */
+function whenReady(fn) {
+    return new Promise(function (resolve) {
+        if (document.readyState !== "loading") {
+            resolve(true);
+        } else {
+            document.addEventListener("DOMContentLoaded", resolve, false);
+        }
+    }).then(fn || function () { });
+}
+
+// Hidden checkbox with keyboard support
+whenReady(() => {
+    Array.from(
+        document.querySelectorAll('label.o_runbot_hidden_checkbox')
+    ).filter(
+        (label) => !!label.control
+    ).forEach(
+        (label) => {
+            label.addEventListener(
+                'keydown', (event) => {
+                    const { key } = event;
+                    if (key === ' ') {
+                        label.control.checked = !label.control.checked;
+                        event.preventDefault();
+                    } else if (key === 'Enter') {
+                        label.closest('form').submit();
+                    }
+                }
+            );
+        }
+    );
+})
