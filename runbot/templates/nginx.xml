@@ -77,19 +77,26 @@ server {
 
 <t t-foreach="builds" t-as="build">
 <t id="server_build_anchor"/>
+
+<t t-set="re_dest" t-value="re_escape(build.dest)"/>
+<t t-set="re_host" t-value="re_escape(build.host)"/>
+<t t-set="token" t-value="build._get_run_token()[0]"/>
+<t t-set="db_group" t-value="'(?&lt;db&gt;-[a-z0-9_-]+)?'"/>
+<t t-set="fingerprint_group" t-value="'(?&lt;fingerprint&gt;-[a-z0-9_]+)'"/>
+
 server {
   listen 8080;
-  server_name ~^<t t-out="re_escape(build.dest)"/>(-[a-z0-9_-]+)?-<t t-out="build._get_run_token()[0]"/>(-[a-z0-9_]+)\.<t t-out="re_escape(build.host)"/>$;
+  server_name ~^<t t-out="re_dest"/><t t-out="db_group"/>-<t t-out="token"/><t t-out="fingerprint_group"/>\.<t t-out="re_host"/>$;
   <t id="build_anchor_authenticated"/>
-  location / {
+  location ~ /(?&lt;path&gt;.*) {
     <t id="build_anchor_authenticated_side_effect"/>
-    return 307 http://<t t-out="build.dest"/>$1.<t t-out="build.host"/>;
+    return 307 http://<t t-out="build.dest"/>$db.<t t-out="build.host"/>/$path;
   }
 }
 
 server {
     listen 8080;
-    server_name ~^<t t-out="re_escape(build.dest)"/>(-[a-z0-9_-]+)?\.<t t-out="re_escape(build.host)"/>$;
+    server_name ~^<t t-out="re_dest"/>(-[a-z0-9_-]+)?\.<t t-out="re_host"/>$;
     <t id="build_anchor"/>
     location / { proxy_pass http://127.0.0.1:<t t-out="build.port"/>; }
     location /longpolling { proxy_pass http://127.0.0.1:<t t-out="build.port + 1"/>; }
