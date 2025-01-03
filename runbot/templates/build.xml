@@ -327,10 +327,10 @@
                     <td/><td/><td/>
                     <td t-attf-class="bg-{{'info' if error.active else 'success'}}-subtle" colspan="2">
                       This error is already <em t-attf-title="{{'Was detected by runbot in nightly builds.' if error.active else 'Either the error is not properly fixed or the branch does not contain the fix.'}}"><t t-out="'known' if error.active else 'fixed'"/></em>.
-                      <!--a groups="runbot.group_user" t-attf-href="/web#id={{error_content.id}}&amp;view_type=form&amp;model=runbot.build.error.content&amp;menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" title="View in Backend" target="new">
+                      <!--a groups="runbot.group_user" t-attf-href="/web#id={{error_content.id}}&amp;view_type=form&amp;model=runbot.build.error.content&amp;menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" title="View in Backend" target="_blank">
                         <i t-attf-class="fa fa-search"/>
                       </a-->
-                      <a groups="runbot.group_user" t-attf-href="/web#id={{error.id}}&amp;view_type=form&amp;model=runbot.build.error&amp;menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" title="View in Backend" target="new">
+                      <a groups="runbot.group_user" t-attf-href="/web#id={{error.id}}&amp;view_type=form&amp;model=runbot.build.error&amp;menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" title="View in Backend" target="_blank">
                         <i t-attf-class="fa fa-list"/>
                       </a>
                       <span groups="runbot.group_runbot_admin" t-if="error.responsible or error.responsible.id == uid">(<i t-out="error.responsible.name"/>)</span>

@@ -12,7 +12,7 @@
                                     <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e" />
                                     <div class="btn-group" role="group">
                                         <a groups="runbot.group_runbot_advanced_user"
-                                            t-attf-href="/odoo/runbot.bundle/{{bundle.id}}?menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" class="btn btn-default" target="new" title="View in Backend">
+                                            t-attf-href="/odoo/runbot.bundle/{{bundle.id}}?menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" class="btn btn-default" target="_blank" title="View in Backend">
                                           <i class="fa fa-list"/>
                                         </a>
                                         <a groups="runbot.group_runbot_advanced_user" class="btn btn-default" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Force A New Batch">
@@ -69,7 +69,7 @@
                                                             <div class="btn-group btn-group-ssm" role="group">
                                                                 <a t-att-href="branch.branch_url" class="btn btn-default text-start" title="View Branch on Github"><i class="fa fa-github"/></a>
                                                                 <a groups="runbot.group_runbot_admin" class="btn btn-default fa fa-list text-start"
-                                                                    t-attf-href="/odoo/runbot.branch/{{branch.id}}?menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" target="new" title="View Branch in Backend"/>
+                                                                    t-attf-href="/odoo/runbot.branch/{{branch.id}}?menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" target="_blank" title="View Branch in Backend"/>
                                                                 <a href="#" t-out="branch.remote_id.short_name" class="btn btn-default disabled text-start"/>
                                                                 <a t-attf-href="/runbot/branch/{{branch.id}}" class="btn btn-default text-start" title="View Branch Details"><span t-att-class="'' if branch.alive else 'line-through'" t-out="branch.name"/> <i t-if="not branch.alive" title="deleted/closed" class="fa fa-ban text-danger"/></a>
                                                                 <t t-if="not any (b.is_pr and b.alive for b in group[1]) and not branch.is_pr">

@@ -196,7 +196,7 @@
               <t t-set="failed_builds" t-value="tile.build_ids.filtered(lambda b: b.top_parent.slot_ids.batch_id.bundle_id == bundle)"/>
               <h4 class="card-title" t-if="failed_builds" t-out="bundle.name"/>
               <p t-foreach="failed_builds" t-as="build" class="my-0">
-                  <a class="text-danger" t-attf-href="/runbot/build/{{build.id}}" target="new">
+                  <a class="text-danger" t-attf-href="/runbot/build/{{build.id}}" target="_blank">
                     <t t-out="build.description or build.id"/>
                   </a>
               </p>
