@@ -418,3 +418,9 @@ body, .table {
 code {
 	white-space: pre-wrap;
 }
+
+input:checked + label.o_runbot_hidden_checkbox, input + label.o_runbot_hidden_checkbox:hover {
+	color: var(--bs-btn-active-color);
+	background-color: var(--bs-btn-active-bg);
+	border-color: var(--bs-btn-active-border-color);
+}
