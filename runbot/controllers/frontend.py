@@ -516,7 +516,7 @@ class Runbot(Controller):
         qctx = {
             'team': team,
             'teams': teams,
-            'build_assignment_ids': request.env['runbot.build.error'].search(domain, order=order),
+            'assignment_ids': request.env['runbot.build.error'].search(domain, order=order),
             'hide_empty': bool(hide_empty),
             'searchbar_sortings': searchbar_sortings,
             'sortby': sortby,
