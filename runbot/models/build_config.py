@@ -813,7 +813,7 @@ class ConfigStep(models.Model):
                     build._kill(result='ko')
                     return
                 if reference_build.local_state not in ('done', 'running'):
-                    build._log('_run_restore', f'Reference build [{reference_build.id}]({reference_build.build_url} is not yet finished, database may not exist', log_type='markdown', level='WARNING')
+                    build._log('_run_restore', f'Reference build [{reference_build.id}]({reference_build.build_url}) is not yet finished, database may not exist', log_type='markdown', level='WARNING')
                 dump_db = reference_build.database_ids.filtered(lambda d: d.db_suffix == dump_suffix)
                 if not dump_db:
                     build._log('_run_restore', f'No dump with suffix {dump_suffix} found in build [{reference_build.id}]({reference_build.build_url})', log_type='markdown', level='ERROR')
