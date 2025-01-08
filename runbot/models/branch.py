@@ -23,7 +23,7 @@ class Branch(models.Model):
     head_name = fields.Char('Head name', related='head.name', store=True)
 
     reference_name = fields.Char(compute='_compute_reference_name', string='Bundle name', store=True)
-    bundle_id = fields.Many2one('runbot.bundle', 'Bundle', compute='_compute_bundle_id', store=True, ondelete='cascade', index=True)
+    bundle_id = fields.Many2one('runbot.bundle', 'Bundle', ondelete='cascade', index=True)
 
     is_pr = fields.Boolean('IS a pr', required=True)
     pr_title = fields.Char('Pr Title')
