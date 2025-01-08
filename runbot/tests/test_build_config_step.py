@@ -209,7 +209,6 @@ class TestCodeowner(TestBuildConfigStepCommon):
         ])
         self.config_step._run_codeowner(self.parent_build)
         logs = self.parent_build.log_ids
-        print
         self.assertEqual(
             logs[2]._markdown(),
             'Adding team_01, team_py to reviewers for file <a href="https://False/blob/dfdfcfcf/core/addons/module1/some/__init__.py">server/core/addons/module1/some/__init__.py</a>',

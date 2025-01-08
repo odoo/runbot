@@ -212,8 +212,15 @@ def pseudo_markdown(text):
     text = re_icon.sub('<i class="fa fa-\\g<1>"></i>', text)
 
     # links
-    re_links = re.compile(rf'{escape}\[(.+?){escape}\]{escape}\(((http|/).+?{escape})\)')
-    text = re_links.sub('<a href="\\g<2>">\\g<1></a>', text)
+    re_links = re.compile(
+        rf'{escape}\[(?P<name>.+?){escape}\]{escape}\((?P<url>(?:http|\/).+?{escape})(?: (?P<target>\w+))?\)'
+    )
+    def compile_url(match):
+        groups = match.groupdict()
+        target = groups.get('target')
+        target_tag = f' target="{target}"' if target else ''
+        return f'<a href="{groups["url"]}"{target_tag}>{groups["name"]}</a>'
+    text = re_links.sub(compile_url, text)
 
     def code_replace(match):
         return f'<code>{codes[int(match.group(1))]}</code>'
