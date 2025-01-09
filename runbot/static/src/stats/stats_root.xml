@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <t t-name="runbot.StatsRoot">
+    <div class="container-fluid">
+      <UrlUpdater/>
+      <!-- Controls -->
+      <StatsConfig t-props="props"/>
+      <!-- Chart -->
+      <StatsChart bundle_id="props.bundle.id" trigger_id="props.trigger.id"/>
+    </div>
+  </t>
+</odoo>

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <t t-name="runbot.StatsChart">
+    <div class="row">
+      <div class="col-xs-9 col-md-10"><canvas t-ref="canvas"/></div>
+      <div class="col-xs-3 col-md-2">
+        <b>Mode:</b>
+        <select class="form-select" aria-label="Display Mode" t-model="config.mode">
+          <option title="Real Values ordered by value" value="normal">Value</option>
+          <option title="Real Values ordered by name" value="alpha">Alphabetical</option>
+          <option title="Delta With Reference Build Values" value="difference">Difference</option>
+          <option title="Bigger # of datapoint varying from previous one" value="change_count">Noisy</option>
+        </select>
+        <br/>
+        <b>Display:</b>
+        <select class="form-select" aria-label="Number Of Builds" t-on-change="(ev) => this.onChangeNbDataset(ev)">
+          <option value="-1">Custom</option>
+          <option value="0">0</option>
+          <option value="10">Top 10</option>
+          <option value="20">Top 20</option>
+          <option value="50">Top 50</option>
+        </select>
+        <br/>
+        <b>Display aggregate:</b>
+        <select class="form-select" aria-label="Display sum" t-model="config.display_aggregate">
+          <option value="none">No</option>
+          <option value="sum">Sum</option>
+          <option value="average">Average</option>
+        </select><br/>
+        <!-- legend -->
+        <div class="chart-legend" t-if="chartConfig.data?.datasets">
+          <ul>
+            <li t-foreach="chartConfig.data?.datasets" t-as="dataset" t-key="dataset.label" t-att-class="dataset.hidden ? 'disabled' : undefined"
+              t-on-click.stop.prevent="() => this.onClickLegendItem(dataset.label)"
+            >
+              <span class="color" t-attf-style="border: 2px solid {{dataset.borderColor}}"/>
+              <span class="label" t-att-title="dataset.label" t-out="dataset.label"/>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </t>
+</odoo>

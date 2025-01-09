@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <t t-name="runbot.StatsConfig">
+    <nav class="navbar navbar-light">
+      <div class="container">
+        <b>Bundle:</b><t t-out="props.bundle.name"/>
+        <b>Trigger:</b><t t-out="props.trigger.name"/>
+        <b>Stat Category:</b>
+        <select class="form-select text-capitalize" aria-label="Stat Category" t-model="config.key_category"> 
+          <option t-foreach="props.stats_categories" t-as="category" t-key="category" t-attf-value="{{category}}">
+            <t t-out="category.replaceAll('_', ' ')"/>
+          </option>
+        </select>
+        <b>Nb of builds:</b>
+        <select class="form-select" aria-label="Number Of Builds" t-model.number="config.limit">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="250">250</option>
+        </select>
+        <button class="btn btn-default" title="Previous Builds" aria-label="Previous Builds" t-on-click="() => this.onClickPrevious()">
+          <i t-attf-class="fa fa-backward"/>
+        </button>
+        <button class="btn btn-default" title="Next Builds" aria-label="Next Builds" t-on-click="() => this.onClickNext()">
+          <i t-attf-class="fa fa-forward"/>
+        </button>
+        <button t-if="config.center_build_id != 0" class="btn btn-default" title="Latest Builds" aria-label="Latest Builds" t-on-click="() => this.config.center_build_id = 0">
+          <i t-attf-class="fa fa-fast-forward"/>
+        </button>
+        <p>Tips: click a bullet to see corresponding build stats, shift+click to center the graph on this build</p>
+        <i t-if="state.loading" class="fa fa-2x fa-circle-o-notch fa-spin"/>
+      </div>
+    </nav>
+  </t>
+</odoo>

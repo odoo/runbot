@@ -65,6 +65,20 @@
             'runbot/static/src/libs/diff_match_patch/diff_match_patch.js',
             'runbot/static/src/js/fields/*',
         ],
+        'runbot.assets_stats': [
+            # Required for module loading
+            ('include', 'web.assets_frontend_minimal'),
+            # Required for separate js and xml files
+            '/web/static/src/core/template_inheritance.js',
+            '/web/static/src/core/templates.js', # ^
+            # Owl
+            'web/static/lib/owl/owl.js',
+            'web/static/lib/owl/odoo_module.js',
+            # Runbot
+            '/runbot/static/src/utils.js',
+            '/runbot/static/src/chartjs_module.js',
+            '/runbot/static/src/stats/**/*',
+        ],
         'runbot.assets_frontend': [
             '/web/static/lib/bootstrap/dist/css/bootstrap.css',
             '/web/static/src/libs/fontawesome/css/font-awesome.css',
