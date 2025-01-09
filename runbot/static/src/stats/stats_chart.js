@@ -175,7 +175,12 @@ export class StatsChart extends Component {
                 return dict;
             }, {},
         );
-        keys.sort((k1, k2) => sortValues[k2] - sortValues[k1]);
+        keys.sort((k1, k2) => {
+            if (mode === 'alpha') {
+                return sortValues[k1].localeCompare(sortValues[k2]);
+            }
+            return sortValues[k2] - sortValues[k1]
+        });
         let visibleKeys;
         if (this.config.nb_dataset !== -1) {
             visibleKeys = new Set(keys.slice(0, this.config.nb_dataset));
