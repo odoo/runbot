@@ -43,6 +43,15 @@ export class Config {
     }
 
     /**
+     * Returns the config a an URLSearchParams object.
+     *
+     * @return {URLSearchParams}
+     */
+    asSearchParams() {
+        return new URLSearchParams({...this});
+    }
+
+    /**
      * Updates the url hash according to the current state of the config.
      */
     updateSearchParams() {
@@ -68,6 +77,15 @@ export class Config {
      */
     getChartUpdateKeys() {
         return ['mode', 'nb_dataset', 'display_aggregate', 'visible_keys'];
+    }
+
+    /**
+     * Gets a set of keys that should not be kept when changing trigger.
+     *
+     * @returns {string[]} set of keys to remove when changing trigger.
+     */
+    getTriggerSpecificKeys() {
+        return ['center_build_id', 'key_category', 'visible_keys'];
     }
 
     /**

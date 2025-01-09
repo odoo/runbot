@@ -3,6 +3,7 @@ import datetime
 import werkzeug
 import logging
 import functools
+import itertools
 
 import werkzeug.utils
 import werkzeug.urls
@@ -620,10 +621,27 @@ class Runbot(Controller):
 
         categories = sorted(categories)
 
+        triggers = bundle.project_id.trigger_ids.filtered(
+            lambda t: t.has_stats and not t.manual
+        ).sorted(
+            lambda t: (t.category_id.id, t.sequence, t.id)
+        )
+        triggers_by_category = defaultdict(list)
+        slug = request.env['ir.http']._slug
+        for trig in triggers:
+            triggers_by_category[trig.category_id.name].append(
+                {
+                    'id': trig.id,
+                    'slug': slug(trig),
+                    'name': trig.name,
+                },
+            )
         context = {
             'stats_categories': categories,
             'bundle': bundle,
             'trigger': trigger,
+            # Category name -> List of trigger name + id
+            'triggers_by_category': triggers_by_category
         }
 
         return request.render("runbot.modules_stats", context)

@@ -28,6 +28,20 @@ export class StatsRoot extends Component {
             },
         },
         stats_categories: { type: Array, element: String },
+        triggers_by_category: {
+            type: Object,
+            values: {
+                type: Array,
+                element: {
+                    type: Object,
+                    shape: {
+                        id: { type: Number },
+                        slug: { type: String },
+                        name: { type: String },
+                    }
+                }
+            }
+        },
     };
 
     setup() {

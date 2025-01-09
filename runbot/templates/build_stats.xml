@@ -70,6 +70,7 @@
             'bundle': {'id': bundle.id, 'name': bundle.name},
             'trigger': {'id': trigger.id, 'name': trigger.name},
             'stats_categories': stats_categories,
+            'triggers_by_category': triggers_by_category,
           })"/>;
         </script>
         <div id="wrapwrap">This page requires javascript to load</div>
