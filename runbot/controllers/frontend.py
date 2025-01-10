@@ -104,6 +104,48 @@ class Runbot(Controller):
                 response.set_cookie(key, '-'.join(enabled_triggers))
         return response
 
+    def _get_bundles(self, /, project, search='', has_pr=None, for_next_freeze=False, limit=40, **_):
+        domain = [('last_batch', '!=', False), ('project_id', '=', project.id)]
+        if not search:
+            domain.append(('no_build', '=', False))
+
+        if has_pr is not None:
+            domain.append(('has_pr', '=', bool(has_pr)))
+
+        filter_mode = request.httprequest.cookies.get('filter_mode', False)
+        if filter_mode == 'sticky':
+            domain.append(('sticky', '=', True))
+        elif filter_mode == 'nosticky':
+            domain.append(('sticky', '=', False))
+
+        if for_next_freeze:
+            domain.append(('for_next_freeze', '=', True))
+
+        if search:
+            search_domains = []
+            pr_numbers = []
+            for search_elem in search.split("|"):
+                if search_elem.isnumeric():
+                    pr_numbers.append(int(search_elem))
+                operator = '=ilike' if '%' in search_elem else 'ilike'
+                search_domains.append([('name', operator, search_elem)])
+            if pr_numbers:
+                res = request.env['runbot.branch'].search([('name', 'in', pr_numbers)])
+                if res:
+                    search_domains.append([('id', 'in', res.mapped('bundle_id').ids)])
+            search_domain = expression.OR(search_domains)
+            domain = expression.AND([domain, search_domain])
+
+        e = expression.expression(domain, request.env['runbot.bundle'])
+        query = e.query
+        query.order = """
+            (case when "runbot_bundle".sticky then 1 when "runbot_bundle".sticky is null then 2 else 2 end),
+                case when "runbot_bundle".sticky then "runbot_bundle".version_number end collate "C" desc,
+                "runbot_bundle".last_batch desc
+        """
+        query.limit = min(int(limit), 200)
+        return request.env['runbot.bundle'].browse(query)
+
     @route(['/',
             '/runbot',
             '/runbot/<model("runbot.project"):project>',
@@ -127,46 +169,7 @@ class Runbot(Controller):
             'hosts_data': request.env['runbot.host'].search([('assigned_only', '=', False)]),
         }
         if project:
-            domain = [('last_batch', '!=', False), ('project_id', '=', project.id)]
-            if not search:
-                domain.append(('no_build', '=', False))
-
-            if has_pr is not None:
-                domain.append(('has_pr', '=', bool(has_pr)))
-
-            filter_mode = request.httprequest.cookies.get('filter_mode', False)
-            if filter_mode == 'sticky':
-                domain.append(('sticky', '=', True))
-            elif filter_mode == 'nosticky':
-                domain.append(('sticky', '=', False))
-
-            if for_next_freeze:
-                domain.append(('for_next_freeze', '=', True))
-
-            if search:
-                search_domains = []
-                pr_numbers = []
-                for search_elem in search.split("|"):
-                    if search_elem.isnumeric():
-                        pr_numbers.append(int(search_elem))
-                    operator = '=ilike' if '%' in search_elem else 'ilike'
-                    search_domains.append([('name', operator, search_elem)])
-                if pr_numbers:
-                    res = request.env['runbot.branch'].search([('name', 'in', pr_numbers)])
-                    if res:
-                        search_domains.append([('id', 'in', res.mapped('bundle_id').ids)])
-                search_domain = expression.OR(search_domains)
-                domain = expression.AND([domain, search_domain])
-
-            e = expression.expression(domain, request.env['runbot.bundle'])
-            query = e.query
-            query.order = """
-             (case when "runbot_bundle".sticky then 1 when "runbot_bundle".sticky is null then 2 else 2 end),
-                    case when "runbot_bundle".sticky then "runbot_bundle".version_number end collate "C" desc,
-                    "runbot_bundle".last_batch desc
-            """
-            query.limit = min(int(limit), 200)
-            bundles = env['runbot.bundle'].browse(query)
+            bundles = self._get_bundles(project=project, search=search, has_pr=has_pr, for_next_freeze=for_next_freeze, limit=limit)
 
             category_id = int(request.httprequest.cookies.get('category') or 0) or request.env['ir.model.data']._xmlid_to_res_id('runbot.default_category')
 
@@ -558,9 +561,18 @@ class Runbot(Controller):
         }
         return request.render("runbot.build_stats", context)
 
+    @route([
+        '/runbot/bundles_json',
+        '/runbot/bundles_json/<model("runbot.project"):project>',
+        '/runbot/bundles_json/<model("runbot.project"):project>/search/<search>'], type='http', auth='public', website=False, sitemap=False)
+    def bundles_json(self, project=None, projects=False, **kwargs):
+        if not project and projects:
+            project = projects[0]
+        bundles = self._get_bundles(project=project, **kwargs)
+        return request.make_json_response(bundles.read(['id', 'name']))
 
     @route(['/runbot/stats/'], type='json', auth="public", website=False, sitemap=False)
-    def stats_json(self, bundle_id=False, trigger_id=False, key_category='', center_build_id=False, ok_only=False, limit=100, search=None, **post):
+    def stats_json(self, bundle_id=False, trigger_id=False, key_category='', center_build_id=False, ok_only=False, limit=100, search=None, add_bundles='', **post):
         """ Json stats """
         trigger_id = trigger_id and int(trigger_id)
         bundle_id = bundle_id and int(bundle_id)
@@ -572,9 +584,15 @@ class Runbot(Controller):
         if not trigger_id or not bundle_id or not trigger.exists() or not bundle.exists():
             return request.not_found()
 
+        bundle_ids = [bundle_id]
+        for bundle_id in add_bundles.split(','):
+            if not bundle_id.isdigit():
+                continue
+            bundle_ids.append(int(bundle_id))
+
         builds_domain = [
             ('global_state', 'in', ('running', 'done')),
-            ('slot_ids.batch_id.bundle_id', '=', bundle_id),
+            ('slot_ids.batch_id.bundle_id', 'in', bundle_ids),
             ('params_id.trigger_id', '=', trigger.id),
         ]
         if ok_only:
@@ -640,6 +658,7 @@ class Runbot(Controller):
             'stats_categories': categories,
             'bundle': bundle,
             'trigger': trigger,
+            'project': bundle.project_id,
             # Category name -> List of trigger name + id
             'triggers_by_category': triggers_by_category
         }

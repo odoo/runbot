@@ -10,6 +10,7 @@ export class Config {
     constructor({
         limit = 25, center_build_id = '0', key_category = 'module_loading_queries',
         mode = 'normal', nb_dataset = 20, display_aggregate = 'none', visible_keys = '',
+        add_bundles = '',
     }) {
         this.limit = limit;
         this.center_build_id = center_build_id;
@@ -18,6 +19,7 @@ export class Config {
         this.nb_dataset = nb_dataset;
         this.display_aggregate = display_aggregate;
         this.visible_keys = visible_keys;
+        this.add_bundles = add_bundles; // comma-separated list of bundle ids
     }
 
     /**
@@ -66,7 +68,7 @@ export class Config {
      */
     getRefetchKeys() {
         return [
-            'limit', 'center_build_id', 'key_category',
+            'limit', 'center_build_id', 'key_category', 'add_bundles',
         ];
     }
 
@@ -120,6 +122,31 @@ export class Config {
             keys.splice(keyIdx, 1);
         }
         this.pushVisibleKeys(keys);
+    }
+
+    /**
+     * Gets the bundle ids to add to the stat request.
+     *
+     * @returns {Number[]} list of bundle ids
+     */
+    getBundles() {
+        return this.add_bundles.split(',').filter(s => s.length).map(Number);
+    }
+
+    /**
+     * Toggles a bundle within the search.
+     *
+     * @param {Number} bundleId id of the bundle
+     */
+    toggleBundle(bundleId) {
+        const bundles = this.getBundles();
+        const bundleIdx = bundles.indexOf(bundleId);
+        if (bundleIdx === -1) {
+            bundles.push(bundleId);
+        } else {
+            bundles.splice(bundleIdx, 1);
+        }
+        this.add_bundles = bundles.join(',');
     }
 }
 

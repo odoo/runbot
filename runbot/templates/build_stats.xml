@@ -69,6 +69,7 @@
           __runbot_stats_values = <t t-out="json.dumps({
             'bundle': {'id': bundle.id, 'name': bundle.name},
             'trigger': {'id': trigger.id, 'name': trigger.name},
+            'project': {'id': project.id, 'name': project.name},
             'stats_categories': stats_categories,
             'triggers_by_category': triggers_by_category,
           })"/>;

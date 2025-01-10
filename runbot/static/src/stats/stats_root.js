@@ -27,6 +27,13 @@ export class StatsRoot extends Component {
                 name: { type: String },
             },
         },
+        project: {
+            type: Object,
+            shape: {
+                id: { type: Number },
+                name: { type: String },
+            },
+        },
         stats_categories: { type: Array, element: String },
         triggers_by_category: {
             type: Object,

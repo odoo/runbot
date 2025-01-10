@@ -4,8 +4,32 @@
     <div class="container mb-4">
       <div class="row mt-2 g-1">
         <div class="col-12">
-          <label for="bundle" class="form-label fw-bold mb-0">Bundle</label>
-          <input id="bundle" class="form-control" disabled="" t-att-value="props.bundle.name" aria-label="Bundle"/>
+          <label for="bundle" class="form-label fw-bold mb-0">Bundles</label>
+          <div class="form-control p-0">
+            <div class="m-2 d-flex flex-wrap gap-1">
+              <span t-foreach="bundles" t-as="bundle" t-key="bundle.id"
+                class="badge rounded-pill" t-attf-style="background-color: {{bundleColor(bundle)}};"
+              >
+                <t t-out="bundle.name"/>
+                <t t-if="bundle.id !== props.bundle.id">
+                  <span class="ms-2 badge rounded-pill px-1" role="button" t-on-click="() => this.onClickRemoveBundle(bundle)">
+                    <i role="button" class="fa fa-times"/>
+                  </span>
+                </t>
+              </span>
+            </div>
+            <input id="bundle" class="form-control border-0" aria-label="Bundle" t-model="state.search"/>
+            <div>
+              <t t-set="_searchBundles" t-value="searchBundles"/>
+              <ul t-if="_searchBundles.length || state.searchLoading" class="dropdown-menu show">
+                <li><a class="dropdown-item fw-bold" t-on-click="() => this.state.search = ''">Clear search</a></li>
+                <li t-if="state.searchLoading" class="text-center"><i class="fa fa-circle-o-notch fa-spin"/></li>
+                <li t-if="_searchBundles.length" t-foreach="_searchBundles" t-as="bundle" t-key="bundle.id">
+                  <a class="dropdown-item" t-out="bundle.name" t-on-click="() => this.onClickAddBundle(bundle)"/>
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
         <div class="col-12">
           <label for="trigger" class="form-label fw-bold mb-0">Trigger</label>
