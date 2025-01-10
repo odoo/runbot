@@ -41,13 +41,7 @@ export class StatsConfig extends Component {
     };
 
     setup() {
-        this.state = useState({
-            loading: true,
-        })
         this.config = useConfig();
-
-        useBus(this.env.bus, 'start-loading', () => this.state.loading = true);
-        useBus(this.env.bus, 'stop-loading', () => this.state.loading = false);
     }
 
     onClickPrevious() {

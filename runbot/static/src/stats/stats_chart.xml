@@ -2,7 +2,14 @@
 <odoo>
   <t t-name="runbot.StatsChart">
     <div class="row">
-      <div class="col-xs-9 col-md-10"><canvas t-ref="canvas"/></div>
+      <div class="col-xs-9 col-md-10">
+        <div class="position-relative">
+          <div t-if="state.loading" class="o_runbot_stat_chart_backdrop position-absolute h-100 w-100 text-center align-content-center">
+            <i class="fa fa-2x fa-circle-o-notch fa-spin"/>
+          </div>
+          <canvas t-ref="canvas"/>
+        </div>
+      </div>
       <div class="col-xs-3 col-md-2">
         <b>Mode:</b>
         <select class="form-select" aria-label="Display Mode" t-model="config.mode">

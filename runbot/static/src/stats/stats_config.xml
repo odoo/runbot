@@ -34,7 +34,6 @@
           <i t-attf-class="fa fa-fast-forward"/>
         </button>
         <p>Tips: click a bullet to see corresponding build stats, shift+click to center the graph on this build</p>
-        <i t-if="state.loading" class="fa fa-2x fa-circle-o-notch fa-spin"/>
       </div>
     </nav>
   </t>

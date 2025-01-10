@@ -20,6 +20,7 @@ export class StatsChart extends Component {
         this.config = useConfig();
         this.canvas = useRef('canvas');
         this.state = useState({
+            loading: false,
             data: {},
         });
         this.chartConfig = useState({
@@ -84,8 +85,7 @@ export class StatsChart extends Component {
      * on the debounced _fetchStat.
      */
     fetchStats() {
-        this.loading = true;
-        this.env.bus.trigger('start-loading', {});
+        this.state.loading = true;
         this._fetchStats(); // debounced
     }
 
@@ -106,7 +106,7 @@ export class StatsChart extends Component {
             },
         });
         this.state.data = (await result.json()).result;
-        this.env.bus.trigger('stop-loading', {});
+        this.state.loading = false;
     }
 
     /**
