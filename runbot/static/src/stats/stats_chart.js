@@ -3,7 +3,6 @@
 import { Component, useEffect, useRef, useState } from '@odoo/owl';
 
 import { debounce, filterKeys, randomColor } from '@runbot/utils';
-import { useBus } from '@runbot/stats/use_bus';
 import { useConfig, onConfigChange } from '@runbot/stats/use_config';
 import { Chart } from '@runbot/chartjs';
 
@@ -70,14 +69,34 @@ export class StatsChart extends Component {
         });
 
         onConfigChange(() => this.fetchStats(), true);
-        useBus(this.env.bus, 'click-previous', () => this.selectPrevious());
-        useBus(this.env.bus, 'click-next', () => this.selectNext());
         useEffect(() => {
             this.updateChart();
         }, () => [
             this.canvas, this.state.data,
             ...Object.values(filterKeys(this.config, this.config.getChartUpdateKeys()))
         ]);
+    }
+
+    /**
+     * Whether to display the next button
+     */
+    get shouldDisplayNext() {
+        const builds = Object.keys(this.state.data);
+        if (!builds.length) {
+            return false;
+        }
+        return this.config.center_build_id !== '0' && this.config.center_build_id !== builds[builds.length - 1];
+    }
+
+    /**
+     * Whether to display the previous button
+     */
+    get shouldDisplayPrevious() {
+        const builds = Object.keys(this.state.data);
+        if (!builds.length) {
+            return false;
+        }
+        return this.config.center_build_id !== builds[0];
     }
 
     /**
@@ -281,7 +300,7 @@ export class StatsChart extends Component {
     /**
      * Selects the first build as the center build for the next fetch.
      */
-    selectPrevious() {
+    onClickPrevious() {
         const builds = Object.keys(this.state.data);
         if (!builds || !builds.length) {
             return
@@ -292,7 +311,7 @@ export class StatsChart extends Component {
     /**
      * Selects the last build as the center build for the next fetch.
      */
-    selectNext() {
+    onClickNext() {
         const builds = Object.keys(this.state.data);
         if (!builds || !builds.length) {
             return

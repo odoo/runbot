@@ -1,9 +1,59 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
   <t t-name="runbot.StatsChart">
+    <div class="container">
+      <!-- Controls strictly related to dataset or chart behavior -->
+      <div class="row g-1">
+        <div class="col-4">
+          <label for="mode" class="form-label fw-bold mb-0">Mode</label>
+          <select class="form-select" id="mode" aria-label="Display Mode" t-model="config.mode">
+            <option title="Real Values ordered by value" value="normal">Value</option>
+            <option title="Real Values ordered by name" value="alpha">Alphabetical</option>
+            <option title="Delta With Reference Build Values" value="difference">Difference</option>
+            <option title="Bigger # of datapoint varying from previous one" value="change_count">Noisy</option>
+          </select>
+        </div>
+        <div class="col-4">
+          <label for="nb_dataset" class="form-label fw-bold mb-0">Display</label>
+          <select class="form-select" id="nb_dataset" aria-label="Number Of Builds" t-on-change="(ev) => this.onChangeNbDataset(ev)">
+            <option value="-1">Custom</option>
+            <option value="0">0</option>
+            <option value="10">Top 10</option>
+            <option value="20">Top 20</option>
+            <option value="50">Top 50</option>
+          </select>
+        </div>
+        <div class="col-4">
+          <label for="display_aggregate" class="form-label fw-bold mb-0">Display Aggregate</label>
+          <select class="form-select" id="display_aggregate" aria-label="Display sum" t-model="config.display_aggregate">
+            <option value="none">No</option>
+            <option value="sum">Sum</option>
+            <option value="average">Average</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <div class="d-flex justify-content-between gap-4">
+            <div t-if="!state.loading &amp;&amp; (shouldDisplayPrevious || shouldDisplayNext || config.center_build_id !== '0')" class="d-flex justify-content-between flex-grow-1">
+              <button t-if="shouldDisplayPrevious" class="btn btn-default" title="Previous Builds" aria-label="Previous Builds" t-on-click="() => this.onClickPrevious()">
+                <i t-attf-class="fa fa-backward"/>
+              </button>
+              <button t-if="shouldDisplayNext" class="btn btn-default" title="Next Builds" aria-label="Next Builds" t-on-click="() => this.onClickNext()">
+                <i t-attf-class="fa fa-forward"/>
+              </button>
+              <button t-if="config.center_build_id !== '0'" class="btn btn-default" title="Latest Builds" aria-label="Latest Builds" t-on-click="() => this.config.center_build_id = '0'">
+                <i t-attf-class="fa fa-fast-forward"/>
+              </button>
+            </div>
+            <div class="align-content-center text-center flex-grow-1">
+              Tips: click a bullet to see corresponding build stats, shift+click to center the graph on this build
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="row">
       <div class="col-xs-9 col-md-10">
-        <div class="position-relative">
+        <div class="position-relative w-100 h-100">
           <div t-if="state.loading" class="o_runbot_stat_chart_backdrop position-absolute h-100 w-100 text-center align-content-center">
             <i class="fa fa-2x fa-circle-o-notch fa-spin"/>
           </div>
@@ -11,29 +61,6 @@
         </div>
       </div>
       <div class="col-xs-3 col-md-2">
-        <b>Mode:</b>
-        <select class="form-select" aria-label="Display Mode" t-model="config.mode">
-          <option title="Real Values ordered by value" value="normal">Value</option>
-          <option title="Real Values ordered by name" value="alpha">Alphabetical</option>
-          <option title="Delta With Reference Build Values" value="difference">Difference</option>
-          <option title="Bigger # of datapoint varying from previous one" value="change_count">Noisy</option>
-        </select>
-        <br/>
-        <b>Display:</b>
-        <select class="form-select" aria-label="Number Of Builds" t-on-change="(ev) => this.onChangeNbDataset(ev)">
-          <option value="-1">Custom</option>
-          <option value="0">0</option>
-          <option value="10">Top 10</option>
-          <option value="20">Top 20</option>
-          <option value="50">Top 50</option>
-        </select>
-        <br/>
-        <b>Display aggregate:</b>
-        <select class="form-select" aria-label="Display sum" t-model="config.display_aggregate">
-          <option value="none">No</option>
-          <option value="sum">Sum</option>
-          <option value="average">Average</option>
-        </select><br/>
         <!-- legend -->
         <div class="chart-legend" t-if="chartConfig.data?.datasets">
           <ul>

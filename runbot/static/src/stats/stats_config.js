@@ -1,8 +1,7 @@
 /** @odoo-module **/
 
-import { Component, useState } from '@odoo/owl';
+import { Component } from '@odoo/owl';
 
-import { useBus } from '@runbot/stats/use_bus';
 import { useConfig } from '@runbot/stats/use_config';
 
 
@@ -42,14 +41,6 @@ export class StatsConfig extends Component {
 
     setup() {
         this.config = useConfig();
-    }
-
-    onClickPrevious() {
-        this.env.bus.trigger('click-previous', {});
-    }
-    
-    onClickNext() {
-        this.env.bus.trigger('click-next', {});
     }
 
     /**

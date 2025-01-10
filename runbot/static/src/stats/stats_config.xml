@@ -1,40 +1,39 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
   <t t-name="runbot.StatsConfig">
-    <nav class="navbar navbar-light">
-      <div class="container">
-        <b>Bundle:</b><t t-out="props.bundle.name"/>
-        <b>Trigger:</b>
-        <select class="form-select text-capitalize" aria-label="Select Trigger" t-on-change="(ev) => this.onChangeTrigger(ev)">
-          <optgroup t-foreach="Object.entries(props.triggers_by_category)" t-as="entry" t-key="entry[0]" t-att-label="entry[0]">
-            <option t-foreach="entry[1]" t-as="trigger" t-key="trigger.slug" t-out="trigger.name" t-att-value="trigger.slug" t-att-selected="trigger.id === props.trigger.id ? 'selected' : undefined"/>
-          </optgroup>
-        </select>
-        <b>Stat Category:</b>
-        <select class="form-select text-capitalize" aria-label="Stat Category" t-model="config.key_category"> 
-          <option t-foreach="props.stats_categories" t-as="category" t-key="category" t-attf-value="{{category}}">
-            <t t-out="category.replaceAll('_', ' ')"/>
-          </option>
-        </select>
-        <b>Nb of builds:</b>
-        <select class="form-select" aria-label="Number Of Builds" t-model.number="config.limit">
-          <option value="10">10</option>
-          <option value="25">25</option>
-          <option value="50">50</option>
-          <option value="100">100</option>
-          <option value="250">250</option>
-        </select>
-        <button class="btn btn-default" title="Previous Builds" aria-label="Previous Builds" t-on-click="() => this.onClickPrevious()">
-          <i t-attf-class="fa fa-backward"/>
-        </button>
-        <button class="btn btn-default" title="Next Builds" aria-label="Next Builds" t-on-click="() => this.onClickNext()">
-          <i t-attf-class="fa fa-forward"/>
-        </button>
-        <button t-if="config.center_build_id != 0" class="btn btn-default" title="Latest Builds" aria-label="Latest Builds" t-on-click="() => this.config.center_build_id = 0">
-          <i t-attf-class="fa fa-fast-forward"/>
-        </button>
-        <p>Tips: click a bullet to see corresponding build stats, shift+click to center the graph on this build</p>
+    <div class="container mb-4">
+      <div class="row mt-2 g-1">
+        <div class="col-12">
+          <label for="bundle" class="form-label fw-bold mb-0">Bundle</label>
+          <input id="bundle" class="form-control" disabled="" t-att-value="props.bundle.name" aria-label="Bundle"/>
+        </div>
+        <div class="col-12">
+          <label for="trigger" class="form-label fw-bold mb-0">Trigger</label>
+          <select class="form-select text-capitalize" id="trigger" aria-label="Select Trigger" t-on-change="(ev) => this.onChangeTrigger(ev)">
+            <optgroup t-foreach="Object.entries(props.triggers_by_category)" t-as="entry" t-key="entry[0]" t-att-label="entry[0]">
+              <option t-foreach="entry[1]" t-as="trigger" t-key="trigger.slug" t-out="trigger.name" t-att-value="trigger.slug" t-att-selected="trigger.id === props.trigger.id ? 'selected' : undefined"/>
+            </optgroup>
+          </select>
+        </div>
+        <div class="col-12">
+          <label for="key_category" class="form-label fw-bold mb-0">Stat Category</label>
+          <select class="form-select text-capitalize" id="key_category" aria-label="Stat Category" t-model="config.key_category"> 
+            <option t-foreach="props.stats_categories" t-as="category" t-key="category" t-attf-value="{{category}}">
+              <t t-out="category.replaceAll('_', ' ')"/>
+            </option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label for="limit" class="form-label fw-bold mb-0">Number of builds:</label>
+          <select class="form-select" id="limit" aria-label="Number Of Builds" t-model.number="config.limit">
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="250">250</option>
+          </select>
+        </div>
       </div>
-    </nav>
+    </div>
   </t>
 </odoo>

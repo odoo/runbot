@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, whenReady, App, EventBus, useSubEnv } from '@odoo/owl';
+import { Component, whenReady, App } from '@odoo/owl';
 import { getTemplate } from '@web/core/templates';
 
 import { StatsConfig } from '@runbot/stats/stats_config';
@@ -47,11 +47,6 @@ export class StatsRoot extends Component {
     setup() {
         // Initialize shared configuration for children components.
         useConfig(false);
-
-        // Bus for communicating between children
-        useSubEnv({
-            bus: new EventBus(),
-        });
     }
 }
 

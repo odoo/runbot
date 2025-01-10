@@ -8,7 +8,7 @@ import { reactive, useEffect, useState, useEnv, useSubEnv } from '@odoo/owl';
  */
 export class Config {
     constructor({
-        limit = 25, center_build_id = 0, key_category = 'module_loading_queries',
+        limit = 25, center_build_id = '0', key_category = 'module_loading_queries',
         mode = 'normal', nb_dataset = 20, display_aggregate = 'none', visible_keys = '',
     }) {
         this.limit = limit;
@@ -27,7 +27,7 @@ export class Config {
      */
     static fromSearchParams() {
         const config = Object.fromEntries(new URLSearchParams(window.location.hash.substring(1)));
-        const numberKeys = ['limit', 'center_build_id', 'nb_dataset'];
+        const numberKeys = ['limit', 'nb_dataset'];
         numberKeys.forEach((key) => {
             if (!(key in config)) {
                 return;
