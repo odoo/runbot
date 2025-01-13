@@ -88,7 +88,7 @@ export class StatsChart extends Component {
             this.updateChart();
         }, () => [
             this.canvas, this.state.data,
-            ...Object.values(filterKeys(this.config, this.config.getChartUpdateKeys()))
+            ...Object.values(filterKeys(this.config, ['mode', 'display_aggregate']))
         ]);
     }
 
@@ -157,7 +157,6 @@ export class StatsChart extends Component {
         const {
             display_aggregate: aggregate,
             mode,
-            nb_dataset,
         } = this.config;
 
         /** @type {StatsQueryResult[]} */
@@ -273,17 +272,22 @@ export class StatsChart extends Component {
             }
             return ds2._sortValue - ds1._sortValue;
         });
-        // Change visibility of datasets according to config
-        let visibleKeys;
-        if (nb_dataset !== -1) {
-            visibleKeys = new Set(datasets.slice(0, nb_dataset).map(ds => ds.label));
-        } else {
-            visibleKeys = new Set(this.config.getVisibleKeys());
-        }
-        datasets.forEach(ds => ds.hidden = !visibleKeys.has(ds.label));
         this.chartConfig.data = {
             datasets,
         };
+    }
+
+    /**
+     * Recomputes the visibility of the datasets according to config.
+     */
+    _computeVisibility() {
+        let visibleKeys;
+        if (this.config.nb_dataset !== -1) {
+            visibleKeys = new Set(this.chartConfig.data.datasets.slice(0, this.config.nb_dataset).map(ds => ds.label));
+        } else {
+            visibleKeys = new Set(this.config.getVisibleKeys());
+        }
+        this.chartConfig.data.datasets.forEach(ds => ds.hidden = !visibleKeys.has(ds.label));
     }
 
     /**
@@ -292,12 +296,15 @@ export class StatsChart extends Component {
      *
      * @param {Boolean} recompute whether to recompute the chart's dataset or not.
      */
-    updateChart(recompute = true) {
+    updateChart(recompute = true, computeVisibility = true) {
         if (!this.canvas || !this.canvas.el) {
             return
         }
         if (recompute) {
             this._computeChartData();
+        }
+        if (computeVisibility) {
+            this._computeVisibility();
         }
         if (!this.chart) {
             this.chart = new Chart(this.canvas.el.getContext('2d'), this.chartConfig);
@@ -337,6 +344,7 @@ export class StatsChart extends Component {
         } else {
             dataset.hidden = false;
         }
+        this.updateChart(false, true);
     }
 
     /**
@@ -353,6 +361,7 @@ export class StatsChart extends Component {
             this.config.pushVisibleKeys([]);
         }
         this.config.nb_dataset = value;
+        this.updateChart(false, true);
     }
 
     /**
