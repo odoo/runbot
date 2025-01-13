@@ -3,7 +3,6 @@ import datetime
 import werkzeug
 import logging
 import functools
-import itertools
 
 import werkzeug.utils
 import werkzeug.urls
@@ -600,7 +599,7 @@ class Runbot(Controller):
         builds = request.env['runbot.build'].with_context(active_test=False)
         if center_build_id:
             builds = builds.search(
-                expression.AND([builds_domain, [('id', '>=', center_build_id)]]),
+                expression.AND([builds_domain, [('id', '>', center_build_id)]]),
                 order='id', limit=limit/2)
             builds_domain = expression.AND([builds_domain, [('id', '<=', center_build_id)]])
             limit -= len(builds)
@@ -612,13 +611,28 @@ class Runbot(Controller):
         builds = builds.search([('id', 'child_of', builds.ids)])
 
         parents = {b.id: b.top_parent.id for b in builds.with_context(prefetch_fields=False)}
+        # Prefetch bundle name, we need to be able to bind a
+        builds.with_context(prefetch_fields=False).fetch([
+            'create_date', 'slot_ids',
+        ])
+        res_arr = [
+            {
+                'id': b.id,
+                'values': {},
+                'create_date': b.create_date.isoformat(),
+                'bundle_id': b.slot_ids.batch_id.bundle_id.id,
+            }
+            for b in builds.with_context(prefetch_fields=False).sorted('id')
+        ]
+        res_dict = {r['id']: r['values'] for r in res_arr}
         request.env.cr.execute("SELECT build_id, values FROM runbot_build_stat WHERE build_id IN %s AND category = %s", [tuple(builds.ids), key_category])  # read manually is way faster than using orm
-        res = {}
         for (build_id, values) in request.env.cr.fetchall():
             if values:
-                res.setdefault(parents[build_id], {}).update(values)
+                res_dict[parents[build_id]].update(values)
             # we need to update here to manage the post install case: we want to combine stats from all post_install childrens.
-        return res
+        # Filter out results without values
+        res_arr = [r for r in res_arr if r['values']]
+        return res_arr
 
     @route(['/runbot/stats/<model("runbot.bundle"):bundle>/<model("runbot.trigger"):trigger>'], type='http', auth="public", website=True, sitemap=False)
     def modules_stats(self, bundle, trigger, search=None, **post):

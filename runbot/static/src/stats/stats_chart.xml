@@ -16,11 +16,11 @@
         <div class="col-4">
           <label for="nb_dataset" class="form-label fw-bold mb-0">Display</label>
           <select class="form-select" id="nb_dataset" aria-label="Number Of Builds" t-on-change="(ev) => this.onChangeNbDataset(ev)">
-            <option value="-1">Custom</option>
-            <option value="0">0</option>
-            <option value="10">Top 10</option>
-            <option value="20">Top 20</option>
-            <option value="50">Top 50</option>
+            <option value="-1" t-att-selected="config.nb_dataset === -1 ? 'selected' : undefined">Custom</option>
+            <option value="0" t-att-selected="config.nb_dataset === 0 ? 'selected' : undefined">0</option>
+            <option value="10" t-att-selected="config.nb_dataset === 10 ? 'selected' : undefined">Top 10</option>
+            <option value="20" t-att-selected="config.nb_dataset === 20 ? 'selected' : undefined">Top 20</option>
+            <option value="50" t-att-selected="config.nb_dataset === 50 ? 'selected' : undefined">Top 50</option>
           </select>
         </div>
         <div class="col-4">
@@ -62,7 +62,7 @@
       </div>
       <div class="col-xs-3 col-md-2">
         <!-- legend -->
-        <div class="chart-legend" t-if="chartConfig.data?.datasets">
+        <div class="chart-legend overflow-x-auto" t-if="chartConfig.data?.datasets">
           <ul>
             <li t-foreach="chartConfig.data?.datasets" t-as="dataset" t-key="dataset.label" t-att-class="dataset.hidden ? 'disabled' : undefined"
               t-on-click.stop.prevent="() => this.onClickLegendItem(dataset.label)"

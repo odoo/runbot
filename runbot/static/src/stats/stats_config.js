@@ -3,6 +3,7 @@
 import { Component, useEffect, useState } from '@odoo/owl';
 
 import { useConfig } from '@runbot/stats/use_config';
+import { getBundleName, populateCache } from '@runbot/stats/cache';
 import { debounce, randomColor } from '@runbot/utils';
 
 
@@ -12,26 +13,6 @@ import { debounce, randomColor } from '@runbot/utils';
  * @property {Number} id
  * @property {String} name
  */
-
-const bundleNameCache = {}; // id to name
-
-/**
- * Returns the name of the bundle according to the cache.
- *
- * @param {Number} bundleId id of the bundle
- */
-const getBundleName = (bundleId) => {
-    return bundleNameCache[bundleId] || bundleId.toString();
-}
-
-/**
- * Populates the cache when a new list of bundle is loaded.
- *
- * @param {Bundle[]} bundles list of bundles
- */
-const populateCache = (bundles) => {
-    bundles.forEach(({ id, name }) => bundleNameCache[id] = name);
-}
 
 export class StatsConfig extends Component {
     static template = 'runbot.StatsConfig';

@@ -13,8 +13,8 @@ class BuildStat(models.Model):
 
     _sql_constraints = [
         (
-            "build_config_key_unique",
-            "unique (build_id, config_step_id, category)",
+            "category_build_config_step_unique_key",
+            "unique (category, build_id, config_step_id)",
             "Build stats must be unique for the same build step",
         )
     ]
@@ -23,5 +23,5 @@ class BuildStat(models.Model):
     config_step_id = fields.Many2one(
         "runbot.build.config.step", "Step", ondelete="cascade"
     )
-    category = fields.Char("Category", index=True)
+    category = fields.Char("Category")
     values = JsonDictField("Value")

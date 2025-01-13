@@ -5,8 +5,17 @@ import { Component, useEffect, useRef, useState } from '@odoo/owl';
 import { debounce, filterKeys, randomColor } from '@runbot/utils';
 import { useConfig, onConfigChange } from '@runbot/stats/use_config';
 import { Chart } from '@runbot/chartjs';
+import { getBundleName } from '@runbot/stats/cache';
 
 
+/**
+ * @typedef StatsQueryResult
+ *
+ * @property {Number} id id of the build
+ * @property {Object.<string, number>} values object with value name as key and value as value
+ * @property {String} create_date creation date of the build
+ * @property {Number} bundle_id bundle id of the build
+ */
 export class StatsChart extends Component {
     static template = 'runbot.StatsChart';
     static props = {
@@ -39,6 +48,7 @@ export class StatsChart extends Component {
                 },
                 scales: {
                     x: {
+                        type: 'time',
                         display: true,
                         scaleLabel: {
                             display: true,
@@ -58,11 +68,16 @@ export class StatsChart extends Component {
                     if (activeElements.length === 0) {
                         return;
                     }
-                    const build_id = this.chartConfig.data.labels[activeElements[0].index];
+                    const { datasetIndex, index } = activeElements[0];
+                    const queryResult = this.chartConfig.data.datasets[datasetIndex].data[index]._queryResult;
+                    if (!queryResult) {
+                        return console.error('Queryresult not present for datasetIndex and index ', datasetIndex, index);
+                    }
+                    const { id } = queryResult;
                     if (shiftKey) {
-                        this.config.center_build_id = build_id;
+                        this.config.center_build_id = id;
                     } else {
-                        window.open(`/runbot/build/stats/${build_id}`);
+                        window.open(`/runbot/build/stats/${id}`);
                     }
                 }
             },
@@ -142,89 +157,132 @@ export class StatsChart extends Component {
         const {
             display_aggregate: aggregate,
             mode,
+            nb_dataset,
         } = this.config;
-        const { data } = this.state;
-        const builds = Object.keys(data);
-        const newestBuildStats = data[builds[builds.length - 1]];
-        const oldestBuildStats = data[builds[0]];
-        const keys = Object.keys(newestBuildStats);
-        let idx = keys.indexOf('Aggregate Sum');
-        if (aggregate === 'sum' && idx === -1) {
-            keys.push('Aggregate Sum');
-            Object.values(data).forEach((buildData) => {
-                buildData['Aggregate Sum'] = Object.values(buildData).reduce((a, b) => a + b, 0);
-            });
-        } else if (aggregate !== 'sum' && idx !== -1) {
-            keys.splice(idx, 1);
+
+        /** @type {StatsQueryResult[]} */
+        const data = this.state.data;
+        const bundles = new Set(data.map(({bundle_id}) => bundle_id));
+        const hasMultiBundle = bundles.size > 1;
+        /**
+         * Gets the label (group by key) for the given queryResult
+         *
+         * @param {StatsQueryResult} queryResult
+         * @param {String} valueName
+         */
+        const getLabel = (queryResult, valueName) => {
+            // Q: Change to bundleName if not main bundle?
+            if (hasMultiBundle) {
+                return `${valueName} (${getBundleName(queryResult.bundle_id)})`;
+            }
+            return `${valueName}`;
         }
-        idx = keys.indexOf('Aggregate Average');
-        if (aggregate === 'average' && idx === -1) {
-            keys.push('Aggregate Average');
-            Object.values(data).forEach((buildData) => {
-                buildData['Aggregate Average'] = (Object.values(buildData).reduce((a, b) => a + b, 0) / Object.values(buildData).length);
-            });
-        } else if (aggregate !== 'average' && idx !== -1) {
-            keys.splice(idx, 1);
-        }
-        // Mapping of keys to their sort value
-        const sortValues = keys.reduce(
-            (dict, key) => {
-                const getValue = () => {
-                    if (mode === 'normal') {
-                        return newestBuildStats[key];
-                    } else if (mode === 'alpha') {
-                        return key;
-                    } else if (mode === 'change_count') {
-                        return builds.reduce((agg, build, buildIdx) => {
-                            const currentBuild = data[build];
-                            const current = currentBuild[key];
-                            const previous = buildIdx === 0 ? undefined : data[builds[buildIdx - 1]][key];
-                            if (previous !== undefined && current !== undefined && previous != current) {
-                                agg += 1;
-                            }
-                            return agg;
-                        }, 0);
-                    } else if (mode === 'difference') {
-                        return Math.abs(
-                            newestBuildStats[key] - (oldestBuildStats[key] || 0)
-                        );
+        // Group values by (valueName, bundle Id) we want to separate bundle ids.
+        const datasets = Object.values(data.reduce((agg, queryResult) => {
+            Object.entries(queryResult.values).forEach(([valueName, value]) => {
+                const label = getLabel(queryResult, valueName);
+                if (!(agg[label])) {
+                    agg[label] = {
+                        label,
+                        data: [],
+                        borderColor: randomColor(label),
+                        backgroundColor: 'rgba(0, 0, 0, 0)',
+                        lineTension: 0,
+                        hidden: false,
+                        _queryResult: queryResult,
                     }
                 }
-                dict[key] = getValue();
-                return dict;
-            }, {},
-        );
-        keys.sort((k1, k2) => {
-            if (mode === 'alpha') {
-                return sortValues[k1].localeCompare(sortValues[k2]);
+                agg[label].data.push({
+                    x: queryResult.create_date,
+                    y: value,
+                    _queryResult: queryResult,
+                });
+            })
+            return agg;
+        }, {}));
+
+        // Compute selected aggregate
+        if (aggregate != 'none') {
+            const queryResultsByBundle = data.reduce((agg, queryResult) => {
+                if (!(agg[queryResult.bundle_id])) {
+                    agg[queryResult.bundle_id] = [];
+                }
+                agg[[queryResult.bundle_id]].push(queryResult);
+                return agg
+            }, {});
+            Object.values(queryResultsByBundle).forEach((queryResults) => {
+                const newData = queryResults.map((qs) => {
+                    return {
+                        x: qs.create_date,
+                        y: Object.values(qs.values).reduce((s, v) => s + v, 0),
+                        _queryResult: qs,
+                    }
+                });
+                let label = getLabel(datasets[0]._queryResult, 'Aggregate Sum');
+                if (aggregate === 'average') {
+                    label = getLabel(datasets[0]._queryResult, 'Aggregate Average');
+                    newData.forEach(d => d.y /= Object.values(d._queryResult.values).length);
+                }
+                datasets.push({
+                    label,
+                    data: newData,
+                    borderColor: randomColor(label),
+                    backgroundColor: 'rgba(0, 0, 0, 0)',
+                    lineTension: 0,
+                    hidden: false,
+                    _queryResult: datasets[0]._queryResult,
+                });
+            });
+        }
+        // Compute a sorting value for each dataset, sort
+        // Also recompute data if mode requires it.
+        datasets.forEach((dataset) => {
+            const getSortValue = () => {
+                if (mode === 'normal') {
+                    return dataset.data[0].y;
+                } else if (mode === 'alpha') {
+                    return dataset.label;
+                } else if (mode === 'change_count') {
+                    return dataset.data.reduce((agg, {y}, dataIdx) => {
+                        const previous = dataIdx === 0 ? undefined : dataset.data[dataIdx - 1].y;
+                        if (previous !== undefined && y !== undefined && previous != y) {
+                            agg += 1;
+                        }
+                        return agg;
+                    }, 0);
+                } else if (mode === 'difference') {
+                    return Math.abs(
+                        dataset.data[dataset.data.length - 1].y - dataset.data[0].y
+                    );
+                }
             }
-            return sortValues[k2] - sortValues[k1]
+            dataset._sortValue = getSortValue();
+            if (mode === 'change_count' || mode === 'difference') {
+                const firstValue = dataset.data[0].y;
+                dataset.data = dataset.data.map(d => {
+                    return {
+                        ...d,
+                        y: d.y - firstValue,
+                    };
+                });
+            }
         });
+        datasets.sort((ds1, ds2) => {
+            if (mode === 'alpha') {
+                return ds1._sortValue.localeCompare(ds2._sortValue);
+            }
+            return ds2._sortValue - ds1._sortValue;
+        });
+        // Change visibility of datasets according to config
         let visibleKeys;
-        if (this.config.nb_dataset !== -1) {
-            visibleKeys = new Set(keys.slice(0, this.config.nb_dataset));
+        if (nb_dataset !== -1) {
+            visibleKeys = new Set(datasets.slice(0, nb_dataset).map(ds => ds.label));
         } else {
             visibleKeys = new Set(this.config.getVisibleKeys());
         }
-        const getDisplayValue = (key, build) => {
-            if (build[key] === undefined) {
-                return NaN;
-            }
-            if (mode === 'normal' || mode === 'alpha') {
-                return build[key];
-            }
-            return build[key] - (oldestBuildStats[key] || 0)
-        }
+        datasets.forEach(ds => ds.hidden = !visibleKeys.has(ds.label));
         this.chartConfig.data = {
-            labels: builds,
-            datasets: keys.map((key) => ({
-                label: key,
-                data: builds.map(build => getDisplayValue(key, data[build])),
-                borderColor: randomColor(key),
-                backgroundColor: 'rgba(0, 0, 0, 0)',
-                lineTension: 0,
-                hidden: !visibleKeys.has(key),
-            })),
+            datasets,
         };
     }
 

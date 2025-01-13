@@ -7,6 +7,7 @@ import { StatsConfig } from '@runbot/stats/stats_config';
 import { StatsChart } from '@runbot/stats/stats_chart';
 import { useConfig } from '@runbot/stats/use_config';
 import { UrlUpdater } from '@runbot/stats/url_updater';
+import { populateCache } from '@runbot/stats/cache';
 
 
 export class StatsRoot extends Component {
@@ -54,6 +55,7 @@ export class StatsRoot extends Component {
     setup() {
         // Initialize shared configuration for children components.
         useConfig(false);
+        populateCache([this.props.bundle]);
     }
 }
 

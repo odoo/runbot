@@ -77,6 +77,8 @@
         <div id="wrapwrap">This page requires javascript to load</div>
       </t>
       <script type="text/javascript" src="/web/static/lib/Chart/Chart.js"></script>
+      <script type="text/javascript" src="/web/static/lib/luxon/luxon.js"/>
+      <script type="text/javascript" src="/web/static/lib/chartjs-adapter-luxon/chartjs-adapter-luxon.js"/>
       <t t-call-assets="runbot.assets_stats"/>
     </template>
   </data>
