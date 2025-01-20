@@ -50,18 +50,17 @@ class Host(models.Model):
     docker_registry_url = fields.Char('Registry Url', help="Override global registry URL for this host.")
 
     def _compute_nb(self):
-        groups = self.env['runbot.build'].read_group(
+        # Array of tuple (host, state, count)
+        groups = self.env['runbot.build']._read_group(
             [('host', 'in', self.mapped('name')), ('local_state', 'in', ('testing', 'running'))],
             ['host', 'local_state'],
-            ['host', 'local_state'],
+            ['id:count'],
             lazy=False,
         )
-        count_by_host_state = {host.name: {} for host in self}
-        for group in groups:
-            count_by_host_state[group['host']][group['local_state']] = group['__count']
+        count_by_host_state = dict(((host, state), count) for host, state, count in groups)
         for host in self:
-            host.nb_testing = count_by_host_state[host.name].get('testing', 0)
-            host.nb_running = count_by_host_state[host.name].get('running', 0)
+            host.nb_testing = count_by_host_state.get((host.name, 'testing'), 0)
+            host.nb_running = count_by_host_state.get((host.name, 'running'), 0)
 
     def _compute_build_ids(self):
         for host in self:

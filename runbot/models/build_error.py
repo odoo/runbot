@@ -677,7 +677,7 @@ class BuildErrorContent(models.Model):
     def _get_duplicates(self):
         """ returns a list of lists of duplicates"""
         domain = [('id', 'in', self.ids)] if self else []
-        return [r['id_arr'] for r in self.env['runbot.build.error.content'].read_group(domain, ['id_count:count(id)', 'id_arr:array_agg(id)', 'fingerprint'], ['fingerprint']) if r['id_count'] >1]
+        return [r[1] for r in self._read_group(domain, ('fingerprint'), ('id:array_agg'), [('id:count', '>', 1)])]
 
     def _qualify(self):
         qualify_regexes = self.env['runbot.error.qualify.regex'].search([])
