@@ -168,8 +168,8 @@ class RunbotErrorLog(models.Model):
 
     def init(self):
         """ Create an SQL view for ir.logging """
-        tools.drop_view_if_exists(self._cr, 'runbot_error_log')
-        self._cr.execute(""" CREATE VIEW runbot_error_log AS (
+        tools.drop_view_if_exists(self.env.cr, 'runbot_error_log')
+        self.env.cr.execute(""" CREATE VIEW runbot_error_log AS (
             SELECT
                 l.id  AS id,
                 l.name  AS name,

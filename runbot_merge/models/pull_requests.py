@@ -105,7 +105,7 @@ All substitutions are tentatively applied sequentially to the input.
     def _auto_init(self):
         res = super()._auto_init()
         tools.create_unique_index(
-            self._cr, 'runbot_merge_unique_repo', self._table, ['name'])
+            self.env.cr, 'runbot_merge_unique_repo', self._table, ['name'])
         return res
 
     def _load_pr(
@@ -297,7 +297,7 @@ class Branch(models.Model):
     def _auto_init(self):
         res = super()._auto_init()
         tools.create_unique_index(
-            self._cr, 'runbot_merge_unique_branch_per_repo',
+            self.env.cr, 'runbot_merge_unique_branch_per_repo',
             self._table, ['name', 'project_id'])
         return res
 
@@ -1335,11 +1335,11 @@ For your own safety I've ignored *everything in your entire comment*.
 
         super()._auto_init()
         # incorrect index: unique(number, target, repository).
-        tools.drop_index(self._cr, 'runbot_merge_unique_pr_per_target', self._table)
+        tools.drop_index(self.env.cr, 'runbot_merge_unique_pr_per_target', self._table)
         # correct index:
         tools.create_unique_index(
-            self._cr, 'runbot_merge_unique_pr_per_repo', self._table, ['repository', 'number'])
-        self._cr.execute("CREATE INDEX IF NOT EXISTS runbot_merge_pr_head "
+            self.env.cr, 'runbot_merge_unique_pr_per_repo', self._table, ['repository', 'number'])
+        self.env.cr.execute("CREATE INDEX IF NOT EXISTS runbot_merge_pr_head "
                          "ON runbot_merge_pull_requests "
                          "USING hash (head)")
 
@@ -2037,12 +2037,12 @@ class Commit(models.Model):
 
     def _auto_init(self):
         res = super()._auto_init()
-        self._cr.execute("""
+        self.env.cr.execute("""
             CREATE INDEX IF NOT EXISTS runbot_merge_unique_statuses
             ON runbot_merge_commit
             USING hash (sha)
         """)
-        self._cr.execute("""
+        self.env.cr.execute("""
             CREATE INDEX IF NOT EXISTS runbot_merge_to_process
             ON runbot_merge_commit ((1)) WHERE to_check
         """)

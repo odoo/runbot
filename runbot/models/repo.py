@@ -250,12 +250,12 @@ class Remote(models.Model):
         remote = super().create(values_list)
         if not remote.repo_id.main_remote_id:
             remote.repo_id.main_remote_id = remote
-        remote._cr.postcommit.add(remote.repo_id._update_git_config)
+        remote.env.cr.postcommit.add(remote.repo_id._update_git_config)
         return remote
 
     def write(self, values):
         res = super().write(values)
-        self._cr.postcommit.add(self.repo_id._update_git_config)
+        self.env.cr.postcommit.add(self.repo_id._update_git_config)
         return res
 
     def _github(self, url, payload=None, ignore_errors=False, nb_tries=2, recursive=False, session=None):
