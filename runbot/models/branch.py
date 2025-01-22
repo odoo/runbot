@@ -51,7 +51,7 @@ class Branch(models.Model):
     def _search_dname(self, operator, value):
         # Match format (owner?, repo, branch)
         owner = repo = branch = None
-        if (m := re.match(r'(?:([\w-]+)/)?([\w-]+):([\w\.-]+)', value)):
+        if (m := re.match(r'(?:([\w-]+)/)?([\w-]+)[:#]([\w\.-]+)', value)):
             owner, repo, branch = m.groups()
         # Match PR url format
         if (m := re.search(r'/([\w-]+)/([\w-]+)/pull/(\d+)', value)):

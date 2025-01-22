@@ -35,6 +35,10 @@ class TestBranch(RunbotCase):
             self.branch_server,
             self.Branch.search([('dname', '=', self.branch_server.dname)]),
         )
+        self.assertEqual(
+            self.branch_server,
+            self.Branch.search([('dname', '=', self.branch_server.dname.replace(':', '#'))]),
+        )
         # Basic pr
         self.assertEqual(
             self.dev_pr,
