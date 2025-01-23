@@ -103,6 +103,13 @@ class BuildError(models.Model):
     tags_min_version_id = fields.Many2one('runbot.version', 'Tags Min version', help="Minimal version where the test tags will be applied.")
     tags_max_version_id = fields.Many2one('runbot.version', 'Tags Max version', help="Maximal version where the test tags will be applied.")
 
+    common_qualifiers = JsonDictField('Common Qualifiers', compute='_compute_common_qualifiers', store=True, help="Minimal qualifiers in common needed to link error content.")
+    similar_ids = fields.One2many('runbot.build.error', compute='_compute_similar_ids', string="Similar Errors", help="Similar Errors based on common qualifiers")
+    similar_content_ids = fields.One2many('runbot.build.error.content', compute='_compute_similar_content_ids', string="Similar Error Contents", help="Similar Error contents based on common qualifiers")
+    unique_qualifiers = JsonDictField('Non conflicting Qualifiers', compute='_compute_unique_qualifiers', store=True, help="Non conflicting qualifiers in common needed to link error content.")
+    analogous_ids = fields.One2many('runbot.build.error', compute='_compute_analogous_ids', string="Analogous Errors", help="Analogous Errors based on unique qualifiers")
+    analogous_content_ids= fields.One2many('runbot.build.error.content', compute='_compute_analogous_content_ids', string="Analogous Error Contents", help="Analogous Error contents based on unique qualifiers")
+
     # Build error related data
     build_error_link_ids = fields.Many2many('runbot.build.error.link', compute=_compute_related_error_content_ids('build_error_link_ids'), search=_search_related_error_content_ids('build_error_link_ids'))
     unique_build_error_link_ids = fields.Many2many('runbot.build.error.link', compute='_compute_unique_build_error_link_ids')
@@ -148,6 +155,84 @@ class BuildError(models.Model):
     def _compute_random(self):
         for record in self:
             record.random = any(error.random for error in record.error_content_ids)
+
+    @api.depends('error_content_ids.qualifiers')
+    def _compute_common_qualifiers(self):
+        for record in self:
+            qualifiers = defaultdict(set)
+            key_count = defaultdict(int)
+            for content in record.error_content_ids:
+                for key, value in content.qualifiers.dict.items():
+                    qualifiers[key].add(value)
+                    key_count[key] += 1
+            record.common_qualifiers = {k: v.pop() for k, v in qualifiers.items() if len(v) == 1 and key_count[k] == len(record.error_content_ids)}
+
+    @api.depends('error_content_ids.qualifiers')
+    def _compute_unique_qualifiers(self):
+        for record in self:
+            qualifiers = defaultdict(set)
+            key_count = defaultdict(int)
+            for content in record.error_content_ids:
+                for key, value in content.qualifiers.dict.items():
+                    qualifiers[key].add(value)
+                    key_count[key] += 1
+            record.unique_qualifiers = {k: v.pop() for k, v in qualifiers.items() if len(v) == 1}
+
+    @api.depends('common_qualifiers')
+    def _compute_similar_ids(self):
+        for record in self:
+            if record.common_qualifiers:
+                query = SQL(
+                    r"""SELECT id FROM runbot_build_error WHERE id != %s AND common_qualifiers @> %s""",
+                    record.id,
+                    json.dumps(record.common_qualifiers.dict),
+                )
+                self.env.cr.execute(query)
+                record.similar_ids = self.env['runbot.build.error'].browse([rec[0] for rec in self.env.cr.fetchall()])
+            else:
+                record.similar_ids = False
+
+    @api.depends('common_qualifiers')
+    def _compute_similar_content_ids(self):
+        for record in self:
+            if record.common_qualifiers:
+                query = SQL(
+                    r"""SELECT id FROM runbot_build_error_content WHERE error_id != %s AND qualifiers @> %s""",
+                    record.id,
+                    json.dumps(record.common_qualifiers.dict),
+                )
+                self.env.cr.execute(query)
+                record.similar_content_ids = self.env['runbot.build.error.content'].browse([rec[0] for rec in self.env.cr.fetchall()])
+            else:
+                record.similar_content_ids = False
+
+    @api.depends('common_qualifiers')
+    def _compute_analogous_ids(self):
+        for record in self:
+            if record.common_qualifiers:
+                query = SQL(
+                    r"""SELECT id FROM runbot_build_error WHERE id != %s AND unique_qualifiers @> %s""",
+                    record.id,
+                    json.dumps(record.unique_qualifiers.dict),
+                )
+                self.env.cr.execute(query)
+                record.analogous_ids = self.env['runbot.build.error'].browse([rec[0] for rec in self.env.cr.fetchall()])
+            else:
+                record.analogous_ids = False
+
+    @api.depends('common_qualifiers')
+    def _compute_analogous_content_ids(self):
+        for record in self:
+            if record.common_qualifiers:
+                query = SQL(
+                    r"""SELECT id FROM runbot_build_error_content WHERE error_id != %s AND qualifiers @> %s""",
+                    record.id,
+                    json.dumps(record.unique_qualifiers.dict),
+                )
+                self.env.cr.execute(query)
+                record.analogous_content_ids = self.env['runbot.build.error.content'].browse([rec[0] for rec in self.env.cr.fetchall()])
+            else:
+                record.analogous_content_ids = False
 
 
     @api.constrains('test_tags')
@@ -202,6 +287,8 @@ class BuildError(models.Model):
                 if not error.team_id:
                     error.team_id = previous_error.team_id
             previous_error.error_content_ids.write({'error_id': self})
+            previous_error.common_qualifiers = dict()
+            previous_error.unique_qualifiers = dict()
             if not previous_error.test_tags:
                 previous_error.message_post(body=Markup('Error merged into %s') % error._get_form_link())
                 previous_error.active = False
@@ -243,6 +330,50 @@ class BuildError(models.Model):
             'domain': [('error_id', '=', self.id)],
             'context': {'active_test': False},
             'target': 'current',
+        }
+
+    def action_view_similary_qualified(self):
+        return {
+            'type': 'ir.actions.act_window',
+            'views': [(False, 'list'), (False, 'form')],
+            'res_model': 'runbot.build.error',
+            'domain': [('id', 'in', [self.id] + self.similar_ids.ids)],
+            'context': {'active_test': False},
+            'target': 'current',
+            'name': 'Similary Qualified Errors'
+        }
+
+    def action_view_similary_qualified_contents(self):
+        return {
+            'type': 'ir.actions.act_window',
+            'views': [(False, 'list'), (False, 'form')],
+            'res_model': 'runbot.build.error.content',
+            'domain': [('id', 'in', self.similar_content_ids.ids)],
+            'context': {'active_test': False},
+            'target': 'current',
+            'name': 'Similary Qualified Contents'
+        }
+
+    def action_view_analogous_qualified(self):
+        return {
+            'type': 'ir.actions.act_window',
+            'views': [(False, 'list'), (False, 'form')],
+            'res_model': 'runbot.build.error',
+            'domain': [('id', 'in', [self.id] + self.analogous_ids.ids)],
+            'context': {'active_test': False},
+            'target': 'current',
+            'name': 'Similary Qualified Errors'
+        }
+
+    def action_view_analogous_qualified_contents(self):
+        return {
+            'type': 'ir.actions.act_window',
+            'views': [(False, 'list'), (False, 'form')],
+            'res_model': 'runbot.build.error.content',
+            'domain': [('id', 'in', self.analogous_content_ids.ids)],
+            'context': {'active_test': False},
+            'target': 'current',
+            'name': 'Similary Qualified Contents'
         }
 
     def action_assign(self):
@@ -731,7 +862,8 @@ for error_content in self:
         result = False
         if content and self.regex:
             result = re.search(self.regex, content, flags=re.MULTILINE)
-        return result.groupdict() if result else {}
+        # filtering empty values to allow non mandatory named groups
+        return {k:v for k,v in result.groupdict().items() if v} if result else {}
 
 
 class QualifyErrorTest(models.Model):

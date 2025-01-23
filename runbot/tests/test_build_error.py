@@ -529,6 +529,61 @@ class TestBuildError(RunbotCase):
         self.assertEqual([], self.BuildError._disabling_tags(build_fixing))
         self.assertEqual(['-bar'], self.BuildError._disabling_tags(build_random))
 
+    def test_build_error_qualifers(self):
+        error_contents = self.BuildErrorContent.create(
+            [
+                {
+                    "content": "Tour foobar_tour failed at step click_here in mode admin",
+                },
+                                {
+                    "content": "Tour foobar_tour failed at step click_here in mode demo",
+                },
+                {
+                    "content": "Tour foobar_tour failed -> click_here",
+                },
+                {
+                    "content": "Tour foobar_tour failed",
+                },
+            ]
+        )
+        self.assertEqual(len(error_contents), 4)
+        self.assertEqual(len(self.BuildError.search([('error_content_ids', 'in', error_contents.ids)])), 4)
+
+        self.env['runbot.error.qualify.regex'].create({
+            "regex": r"Tour (?P<tour_name>\w+) failed( at step (?P<tour_step>\w+) in mode (?P<tour_mode>\w+))?"
+        })
+        error_contents._qualify()
+
+        expected_common_qualifiers = {'tour_name': 'foobar_tour', 'tour_step': 'click_here'}
+        self.assertEqual(error_contents[0].qualifiers.dict, {**expected_common_qualifiers, 'tour_mode': 'admin'})
+        self.assertEqual(error_contents[1].qualifiers.dict, {**expected_common_qualifiers, 'tour_mode': 'demo'})
+        self.assertEqual(error_contents[2].qualifiers.dict, {'tour_name': 'foobar_tour'})
+
+        self.env['runbot.error.qualify.regex'].create({
+            "regex": r"Tour (?P<tour_name>\w+) failed -> (?P<tour_step>\w+)"
+        })
+
+        error_contents._qualify()
+        self.assertEqual(error_contents[0].qualifiers.dict, {**expected_common_qualifiers, 'tour_mode': 'admin'})
+        self.assertEqual(error_contents[1].qualifiers.dict, {**expected_common_qualifiers, 'tour_mode': 'demo'})
+        self.assertEqual(error_contents[2].qualifiers.dict, expected_common_qualifiers)
+
+        # now let's say that we merge admin and demo errors
+        main_error = error_contents[0].error_id
+        self.assertEqual(len(main_error.error_content_ids), 1)
+        main_error._merge(error_contents[1].error_id)
+        self.assertEqual(len(main_error.error_content_ids), 2)
+
+        self.assertEqual(main_error.common_qualifiers.dict, expected_common_qualifiers)
+        self.env.flush_all()
+        self.assertEqual(len(main_error.similar_ids), 1)
+        self.assertEqual(main_error.similar_ids[0], error_contents[2].error_id)
+
+        # let's merge all errors and verify the qualifiers
+        main_error._merge(error_contents.error_id)
+        self.assertEqual(main_error.common_qualifiers.dict, {'tour_name': 'foobar_tour'})
+        self.assertEqual(main_error.unique_qualifiers.dict, {'tour_name': 'foobar_tour', 'tour_step': 'click_here'})
+
     def test_build_error_team_wildcards(self):
         website_team = self.RunbotTeam.create({
             'name': 'website_test',

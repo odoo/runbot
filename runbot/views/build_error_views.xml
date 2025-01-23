@@ -53,7 +53,7 @@
               </group>
               <group>
                 <field name="previous_error_id" readonly="1" invisible="not previous_error_id" text-decoration-danger="True"/>
-              </group>  
+              </group>
               <notebook>
                 <page string="Builds">
                   <field name="unique_build_error_link_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
@@ -80,6 +80,124 @@
                       <field name="error_content_id" widget="many2one" string="Linked Error log"/>
                       <field name="build_url" widget="url" readonly="1" text="View build"/>
                     </list>
+                  </field>
+                </page>
+                <page string="Similary qualified Errors" groups="runbot.group_runbot_admin,runbot.group_runbot_error_manager" invisible="not common_qualifiers">
+                  <div class="btn-group">
+                    <button class="btn btn-sm btn-primary" type="object" name="action_view_similary_qualified">
+                      View similary qualified errors
+                    </button>
+                  </div>
+                  <field name="common_qualifiers" widget="runbotjsonb"/>
+                  <field name="similar_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
+                    <list decoration-danger="test_tags and (fixing_pr_alive or not fixing_pr_id)"
+                          decoration-success="fixing_pr_id and not test_tags and not fixing_pr_alive"
+                          decoration-warning="test_tags and fixing_pr_id and not fixing_pr_alive"
+                          >
+                      <field name="id"/>
+                      <field name="name" optional="show" readonly="1"/>
+                      <field name="description" optional="hide" readonly="1"/>
+                      <field name="first_seen_date" string="First Seen" optional="hide" readonly="1"/>
+                      <field name="last_seen_date" string="Last Seen" readonly="1" options="{'link_field': 'last_seen_build_id'}"/>
+                      <field name="last_seen_build_id" column_invisible="True"/>
+                      <field name="error_count" readonly="1"/>
+                      <field name="build_count" readonly="1"/>
+                      <field name="team_id"/>
+                      <field name="responsible" optional="show"/>
+                      <field name="test_tags" optional="hide"/>
+                      <field name="fixing_pr_id" optional="hide"/>
+                      <field name="fixing_pr_alive" optional="hide"/>
+                    </list>
+                  </field>
+                </page>
+                <page string="Similary qualified Error Contents" groups="runbot.group_runbot_admin,runbot.group_runbot_error_manager" invisible="not common_qualifiers">
+                  <div class="btn-group">
+                    <button class="btn btn-sm btn-primary" type="object" name="action_view_similary_qualified_contents">
+                      View Similary Contents
+                    </button>
+                  </div>
+                  <field name="common_qualifiers" widget="runbotjsonb"/>
+                  <field name="similar_content_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
+                    <list string="Error Contents"
+                          decoration-danger="test_tags and (fixing_pr_alive or not fixing_pr_id)"
+                          decoration-success="fixing_pr_id and not test_tags and not fixing_pr_alive"
+                          decoration-warning="test_tags and fixing_pr_id and not fixing_pr_alive"
+                          >
+                        <field name="error_display_id" optional="show"/>
+                        <field name="module_name" optional="show" readonly="1"/>
+                        <field name="summary" optional="show" readonly="1"/>
+                        <field name="random" string="Random"/>
+                        <field name="first_seen_date" string="First Seen" optional="hide" readonly="1"/>
+                        <field name="last_seen_date" string="Last Seen" readonly="1"/>
+                        <field name="build_count" readonly="1"/>
+                        <field name="team_id"/>
+                        <field name="test_tags" optional="hide"/>
+                        <field name="tags_min_version_id" string="Tags Min" optional="hide"/>
+                        <field name="tags_max_version_id" string="Tags Max" optional="hide"/>
+                        <field name="fixing_pr_id" optional="hide"/>
+                        <field name="fixing_pr_alive" optional="hide"/>
+                        <field name="fixing_pr_url" widget="url" text="view PR" readonly="1" invisible="not fixing_pr_url"/>
+                        <field name="fingerprint" optional="hide"/>
+                      </list>
+                  </field>
+                </page>
+                <page string="Analogous Errors" groups="runbot.group_runbot_admin,runbot.group_runbot_error_manager" invisible="not unique_qualifiers">
+                  <div class="btn-group">
+                    <button class="btn btn-sm btn-primary" type="object" name="action_view_analogous_qualified">
+                      View analogous errors
+                    </button>
+                  </div>
+                  <field name="unique_qualifiers" widget="runbotjsonb"/>
+                  <field name="analogous_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
+                    <list decoration-danger="test_tags and (fixing_pr_alive or not fixing_pr_id)"
+                          decoration-success="fixing_pr_id and not test_tags and not fixing_pr_alive"
+                          decoration-warning="test_tags and fixing_pr_id and not fixing_pr_alive"
+                          >
+                      <field name="id"/>
+                      <field name="name" optional="show" readonly="1"/>
+                      <field name="description" optional="hide" readonly="1"/>
+                      <field name="first_seen_date" string="First Seen" optional="hide" readonly="1"/>
+                      <field name="last_seen_date" string="Last Seen" readonly="1" options="{'link_field': 'last_seen_build_id'}"/>
+                      <field name="last_seen_build_id" column_invisible="True"/>
+                      <field name="error_count" readonly="1"/>
+                      <field name="build_count" readonly="1"/>
+                      <field name="team_id"/>
+                      <field name="responsible" optional="show"/>
+                      <field name="test_tags" optional="hide"/>
+                      <field name="fixing_pr_id" optional="hide"/>
+                      <field name="fixing_pr_alive" optional="hide"/>
+                    </list>
+                  </field>
+                </page>
+                <page string="Analogous Error Contents" groups="runbot.group_runbot_admin,runbot.group_runbot_error_manager" invisible="not unique_qualifiers">
+                  <div class="btn-group">
+                    <button class="btn btn-sm btn-primary" type="object" name="action_view_analogous_qualified_contents">
+                      View Analogous Contents
+                    </button>
+                  </div>
+                  <field name="unique_qualifiers" widget="runbotjsonb"/>
+                  <field name="analogous_content_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
+                    <list string="Error Contents"
+                          decoration-danger="test_tags and (fixing_pr_alive or not fixing_pr_id)"
+                          decoration-success="fixing_pr_id and not test_tags and not fixing_pr_alive"
+                          decoration-warning="test_tags and fixing_pr_id and not fixing_pr_alive"
+                          >
+                        <field name="error_display_id" optional="show"/>
+                        <field name="module_name" optional="show" readonly="1"/>
+                        <field name="summary" optional="show" readonly="1"/>
+                        <field name="random" string="Random"/>
+                        <field name="first_seen_date" string="First Seen" optional="hide" readonly="1"/>
+                        <field name="last_seen_date" string="Last Seen" readonly="1"/>
+                        <field name="build_count" readonly="1"/>
+                        <field name="team_id"/>
+                        <field name="test_tags" optional="hide"/>
+                        <field name="tags_min_version_id" string="Tags Min" optional="hide"/>
+                        <field name="tags_max_version_id" string="Tags Max" optional="hide"/>
+                        <field name="fixing_pr_id" optional="hide"/>
+                        <field name="fixing_pr_alive" optional="hide"/>
+                        <field name="fixing_pr_url" widget="url" text="view PR" readonly="1" invisible="not fixing_pr_url"/>
+                        <field name="fingerprint" optional="hide"/>
+                      </list>
                   </field>
                 </page>
               </notebook>
