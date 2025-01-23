@@ -69,6 +69,7 @@
         <search string="Search exceptions">
           <field name="elements"/>
           <field name="bundle_id"/>
+          <filter string="Created by me" name="created_by_me" domain="[('create_uid', '=', uid)]"/>
         </search>
       </field>
     </record>
