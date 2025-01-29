@@ -137,11 +137,11 @@ def _docker_build(build_dir, image_tag):
         return dm.result
 
 
-def docker_push(image_tag):
-    return _docker_push(image_tag)
+def docker_push(image_tag, push_url='127.0.0.1:5001'):
+    return _docker_push(image_tag, push_url)
 
 
-def _docker_push(image_tag):
+def _docker_push(image_tag, push_url):
     """Push a Docker image to the localy hosted docker registry
     :param image_tag: the image tag (or id) to push
     :return: tuple(success, msg) where success is a boolean and msg is the error message or None
@@ -149,7 +149,7 @@ def _docker_push(image_tag):
 
     with DockerManager(image_tag) as dm:
         image = dm.docker_client.images.get(image_tag)
-        push_tag = f'127.0.0.1:5001/{image_tag}'
+        push_tag = f'{push_url}/{image_tag}'
         image.tag(push_tag)
         for chunk in dm.consume(dm.docker_client.api.push(push_tag, stream=True)):
             if not dm.log_progress and 'Pushing' in chunk.get('status', ''):

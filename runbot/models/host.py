@@ -121,21 +121,32 @@ class Host(models.Model):
         self._bootstrap_db_template()
         self._bootstrap_local_logs_db()
 
+    def _get_docker_registry_url(self):
+        if self.docker_registry_url:
+            return self.docker_registry_url
+        icp = self.env['ir.config_parameter']
+        docker_registry_url = icp.get_param('runbot.docker_registry_url', default=None)
+        if docker_registry_url:
+            return docker_registry_url.strip('/')
+        docker_registry_host = self.browse(int(icp.get_param('runbot.docker_registry_host_id', default=0)))
+        if docker_registry_host:
+            return f'dockerhub.{docker_registry_host.name}'.strip('/')
+
     def _docker_update_images(self):
         """ build docker images needed by locally pending builds"""
         self.ensure_one()
         icp = self.env['ir.config_parameter']
         docker_registry_host = self.browse(int(icp.get_param('runbot.docker_registry_host_id', default=0)))
-        registry_url = self.docker_registry_url.strip('/') if self.docker_registry_url else f'dockerhub.{docker_registry_host.name}'
+        docker_registry_url = self._get_docker_registry_url()
         # pull all images from the runbot docker registry
         is_registry = docker_registry_host == self
         all_docker_files = self.env['runbot.dockerfile'].search([])
         all_tags = set(all_docker_files.mapped('image_tag'))
-        if docker_registry_host and self.use_remote_docker_registry and not is_registry:
+        if docker_registry_url and self.use_remote_docker_registry and not is_registry:
             _logger.info('Pulling docker images...')
             total_duration = 0
             for dockerfile in all_docker_files.filtered('always_pull'):
-                remote_tag = f'{registry_url}/{dockerfile.image_tag}'
+                remote_tag = f'{docker_registry_url}/{dockerfile.image_tag}'
                 result = docker_pull(remote_tag)
                 if result['success']:
                     result['image'].tag(dockerfile.image_tag)
@@ -149,7 +160,13 @@ class Host(models.Model):
                 dockerfile._build(self)
                 if is_registry:
                     try:
-                        docker_push(dockerfile.image_tag)
+                        docker_push(dockerfile.image_tag)  # for now, always push locally
+                        if self.docker_registry_url:
+                            docker_registry_url = self.docker_registry_url
+                        else:
+                            docker_registry_url = icp.get_param('runbot.docker_registry_url', default='').strip('/')
+                        if docker_registry_url:
+                            docker_push(dockerfile.image_tag, docker_registry_url)
                     except ImageNotFound:
                         _logger.warning("Image tag `%s` not found. Skipping push", dockerfile.image_tag)
 

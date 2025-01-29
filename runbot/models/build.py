@@ -853,10 +853,9 @@ class BuildResult(models.Model):
         if 'image_tag' not in kwargs:
             kwargs.update({'image_tag': self.params_id.dockerfile_id.image_tag})
         self._log('Preparing', 'Using Dockerfile Tag [%s](/runbot/dockerfile/tag/%s)', kwargs['image_tag'], kwargs['image_tag'], log_type='markdown')
-        icp = self.env['ir.config_parameter']
-        docker_registry_host = self.env['runbot.host'].browse(int(icp.get_param('runbot.docker_registry_host_id', default=0)))
-        if docker_registry_host and self.host_id.use_remote_docker_registry:
-            result = docker_pull(f"dockerhub.{docker_registry_host.name}/{kwargs['image_tag']}")
+        docker_registry_url = self.host_id._get_docker_registry_url()
+        if docker_registry_url and self.host_id.use_remote_docker_registry:
+            result = docker_pull(f"{docker_registry_url}/{kwargs['image_tag']}")
             if result['success']:
                 result['image'].tag(kwargs['image_tag'])
             if result.get('log_progress'):
