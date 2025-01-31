@@ -500,6 +500,35 @@ class TestBuildError(RunbotCase):
         self.assertEqual(sorted(['-every', '-where', '-tag_17_up_to_master', '-tag_only_17.1']), sorted(self.BuildError._disabling_tags(build_saas_171)))
         self.assertEqual(sorted(['-every', '-where', '-tag_17_up_to_master']), sorted(self.BuildError._disabling_tags(build_master)))
 
+    def test_build_error_test_tags_fixing_pr(self):
+        fix_commit = self.env['runbot.commit'].create({
+            'name': 'dfdfcfcf0000ffffffffffffffffffffffffffff',
+            'repo_id': self.repo_server.id
+        })
+        branch_pr = self.Branch.create({
+            'name': '1337',
+            'remote_id': self.remote_server.id,
+            'is_pr': True,
+            'head': fix_commit.id,
+        })
+        commit_link_id = self.env['runbot.commit.link'].create({
+            'commit_id': fix_commit.id,
+            'match_type': 'head',
+            'branch_id': branch_pr.id,
+        })
+        batch = self.env['runbot.batch'].create({
+            'bundle_id': branch_pr.bundle_id.id,
+        })
+        build_fixing = self.create_test_build({'params_id': self.create_params({'create_batch_id': batch.id, 'commit_link_ids': commit_link_id}).id})
+        build_random = self.create_test_build({})
+        self.BuildError.create({
+            'content': 'foo',
+            'test_tags': 'bar',
+            'fixing_pr_id': branch_pr.id,
+        })
+        self.assertEqual([], self.BuildError._disabling_tags(build_fixing))
+        self.assertEqual(['-bar'], self.BuildError._disabling_tags(build_random))
+
     def test_build_error_team_wildcards(self):
         website_team = self.RunbotTeam.create({
             'name': 'website_test',

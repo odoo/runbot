@@ -209,8 +209,11 @@ class BuildError(models.Model):
     @api.model
     def _test_tags_list(self, build_id=False):
         version = build_id.params_id.version_id.number if build_id else False
+        branches = build_id.create_batch_id.bundle_id.branch_ids if build_id else self.env['runbot.branch']
 
         def filter_tags(e):
+            if e.fixing_pr_id in branches:
+                return False
             if version:
                 min_v = e.tags_min_version_id.number or ''
                 max_v = e.tags_max_version_id.number or '~'
