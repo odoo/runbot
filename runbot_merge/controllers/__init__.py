@@ -14,6 +14,7 @@ from odoo.api import Environment
 from odoo.http import Controller, request, route, Response
 
 from . import dashboard
+from . import misc
 from . import reviewer_provisioning
 from .. import utils, github
 
