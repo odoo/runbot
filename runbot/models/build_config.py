@@ -509,6 +509,8 @@ class ConfigStep(models.Model):
             cmd.finals.append(['flamegraph.pl', '--title', 'Flamegraph %s for build %s' % (self.name, build.id), self._perfs_data_path(), '>', self._perfs_data_path(ext='svg')])
             cmd.finals.append(['gzip', '-f', self._perfs_data_path()])  # keep data but gz them to save disc space
         env_variables = self.additionnal_env.split(';') if self.additionnal_env else []
+        if config_env_variables := build.params_id.config_data.get('env_variables', False):
+            env_variables += config_env_variables.split(';')
         return dict(cmd=cmd, ro_volumes=exports, env_variables=env_variables)
 
     def _upgrade_create_childs(self):
