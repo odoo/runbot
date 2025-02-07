@@ -10,6 +10,7 @@ import werkzeug.exceptions
 from odoo.http import Controller, request, route
 
 from . import dashboard
+from . import misc
 from . import reviewer_provisioning
 from .. import utils, github
 
