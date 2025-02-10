@@ -601,7 +601,7 @@ class ErrorRegex(models.Model):
     _rec_name = 'id'
     _order = 'sequence, id'
 
-    regex = fields.Char('Regular expression')
+    regex = fields.Char('Regular expression', tracking=True)
     re_type = fields.Selection([('filter', 'Filter out'), ('cleaning', 'Cleaning')], string="Regex type")
     sequence = fields.Integer('Sequence', default=100)
     replacement = fields.Char('Replacement string', help="String used as a replacment in cleaning. Use '' to remove the matching string. '%' if not set")
@@ -667,7 +667,7 @@ class ErrorQualifyRegex(models.Model):
 
     sequence = fields.Integer('Sequence', default=100)
     active = fields.Boolean('Active', default=True, tracking=True)
-    regex = fields.Char('Regular expression', required=True)
+    regex = fields.Char('Regular expression', required=True, tracking=True)
 
     check_module_name = fields.Boolean('Check Module Name', default=False, help='Apply regex on Error Module Name')
     check_file_path = fields.Boolean('Check File Path', default=False, help='Apply regex on Error Module Name')
