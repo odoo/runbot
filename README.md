@@ -164,11 +164,11 @@ You can now connect to your backend and preconfigure runbot.
 - Connect as admin (default password: admin).
 
 Check odoo documentation for other needed security configuration (master password). This is mainly needed for production purpose.
-You can check that in the `/web/database/manager` page. ([more info here](https://www.odoo.com/documentation/18.0/administration/on_premise/deploy.html)) \
+You can check that in the `/web/database/manager` page. ([more info here](https://www.odoo.com/documentation/18.0/administration/on_premise/deploy.html#reset-the-master-password)) \
 Change your admin user login and password
 You may want to check the runbot settings (`Runbot > Setting > setting`):
 - Default number of workers should be the max number of parallel build, consider having max `#cpu - 1`
-- Modify `Default odoorc for builds` to change the running build master password to something unique ([idealy a hashed one](https://github.com/odoo/odoo/blob/18.0/odoo/tools/config.py#L787)).
+- Modify `Default odoorc for builds` to change the running build master password to something unique ([ideally a hashed one](https://github.com/odoo/odoo/blob/18.0/odoo/tools/config.py#L787)).
 - Tweak the garbage collection settings, if you have limited disk space.
 - The `number of running build` is the number of parallel running builds.
 - `Max commit age (in days)` will limt the max age of commit to detect. Increase this limit to detect older branches.
