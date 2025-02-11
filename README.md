@@ -10,7 +10,7 @@ This repository contains the source code of Odoo testing bot [runbot.odoo.com](h
 
 **Runbot changes some default odoo behaviours** Runbot database may work with other modules, but without any guarantee.
 
-**Runbot is not safe by itsefl** This tutorial describes the minimal way to deploy runbot, without too many security considerations. Only trusted code should be executed with this single machine setup. For more security the builder should be deployed separately with minimal access.
+**Runbot is not safe by itself** This tutorial describes the minimal way to deploy runbot, without too many security considerations. Only trusted code should be executed with this single machine setup. For more security the builder should be deployed separately with minimal access.
 
 ## Glossary/models
 Runbot use a set of concept in order to cover all the use cases we need
@@ -42,23 +42,23 @@ You may configure a DNS entry for your runbot domain as well as a CNAME for all 
 ```
 *        IN CNAME  runbot.domain.com.
 ```
-This is mainly usefull to access running build but will also give more freedom for future configurations. 
+This is mainly useful to access running build but will also give more freedom for future configurations. 
 This is not needed but many features won't work without that.
 
 ### nginx
 
-An exemple of config is given in the example_scripts folder.
+An exemple of config is given in the `example_scripts` folder.
 
-This may be adapted depending on your setup, mainly for domain names. This can be adapted during the install but serving at least the runbot frontend (proxy pass 80 to 8069) is the minimal config needed.
-Note that runbot also has a dynamic nginx config listening on the 8080 port, mainly for running build.
+This may be adapted depending on your setup, mainly for domain names. This can be adapted during the install but serving at least the runbot frontend (proxy pass `80` to `8069`) is the minimal config needed.
+Note that runbot also has a dynamic nginx config listening on the `8080` port, mainly for running build.
 
-This config is an ir_ui_view (runbot.nginx_config) and can be edited if needed. The config is applied and updated automatically after some time by the builder process.
+This config is an `ir_ui_view` (runbot.nginx_config) and can be edited if needed. The config is applied and updated automatically after some time by the builder process.
 
-It is also advised to adapt this config to work in https.
+It is also advised to adapt this config to work in `https`.
 
 ### Requirements
 
-Runbot is an addon for odoo, meaning that both odoo and runbot code are needed to run. Some tips to configure odoo are available in [odoo setup documentation](https://www.odoo.com/documentation/15.0/setup/install.html#setup-install-source) (requirements, postgres, ...) This page will mainly focus on runbot specificities.
+Runbot is an addon for odoo, meaning that both odoo and runbot code are needed to run. Some tips to configure odoo are available in [odoo setup documentation](https://www.odoo.com/documentation/18.0/setup/install.html#setup-install-source) (requirements, postgres, ...) This page will mainly focus on runbot specificities.
 
 You will also need to install docker and other requirements before running runbot.
 
@@ -90,8 +90,8 @@ cd odoo
 ```
 
 You may [add valid ssh key linked to a github account](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account)
- to this user in order to clone the different repositories. You could clone in https but this may be a problem latter to access your ptivate repositories. 
-It is important to clone the repo with the runbot user
+ to this user in order to clone the different repositories. You could clone in `https` but this may be a problem later to access your private repositories. 
+It is important to clone the repo with the runbot user:
 
 ```bash
 git clone --depth=1 --branch=15.0 git@github.com:odoo/odoo.git
@@ -114,16 +114,16 @@ If it is not working, ensure you have the docker group and logout if needed.
 
 ### Install and start runbot
 
-This parts only consist in configuring and starting the 3 services.
+This part is only consist in configuring and starting the 3 services.
 
 Some example scripts are given in `runbot/runbot/example_scripts`
 
 ```bash
-mkdir ~/bin # if not exist
+mkdir ~/bin # if does not exist
 cp -r ~/odoo/runbot/runbot/example_scripts/runbot ~/bin/runbot
 ```
 
-Scripts should be adapted, mainly forthe  `--forced-host-name parameter` in builder.sh:
+Scripts should be adapted, mainly for the  `--forced-host-name parameter` in `builder.sh`:
 
 ```bash
 sed -i "s/runbot.domain.com/runbot.my_real_domain.com/" ~/bin/runbot/builder.sh
@@ -164,16 +164,16 @@ You can now connect to your backend and preconfigure runbot.
 - Connect as admin (default password: admin).
 
 Check odoo documentation for other needed security configuration (master password). This is mainly needed for production purpose.
-You can check that in the `/web/database/manager` page. [More info here](https://www.odoo.com/documentation/15.0/administration/install/deploy.html#security)
+You can check that in the `/web/database/manager` page. ([more info here](https://www.odoo.com/documentation/18.0/administration/on_premise/deploy.html)) \
 Change your admin user login and password
 You may want to check the runbot settings (`Runbot > Setting > setting`):
 - Default number of workers should be the max number of parallel build, consider having max `#cpu - 1`
-- Modify `Default odoorc for builds` to change the running build master password to something unique ([idealy a hashed one](https://github.com/odoo/odoo/blob/15.0/odoo/tools/config.py#L722)).
-- Tweak the garbage collection settings if you have limited disk space
+- Modify `Default odoorc for builds` to change the running build master password to something unique ([idealy a hashed one](https://github.com/odoo/odoo/blob/18.0/odoo/tools/config.py#L787)).
+- Tweak the garbage collection settings, if you have limited disk space.
 - The `number of running build` is the number of parallel running builds.
 - `Max commit age (in days)` will limt the max age of commit to detect. Increase this limit to detect older branches.
 
-Finally, start the two other services
+Finally, start the two other services:
 
 ```bash
 systemctl start leader
@@ -214,12 +214,12 @@ Access runbot app and go to the `Runbot>Setting>Repositories` menu
 Create a new repo for odoo
 ![Odoo repo configuration](runbot/documentation/images/repo_odoo.png "Odoo repo configuration")
 
-- **Name**: `odoo` It will be used as the directory name to export the sources
-- **Identityfile** is only usefull if you want to use another ssh key to access a repo
+- **Name**: `odoo` It will be used as the directory name to export the sources.
+- **Identity File** is only useful if you want to use another ssh key to access a repo.
 - **Project**: `R&D` by default.
 - **Modules to install**: `-*` in order to remove them from the default `-i`. This will speed up installation. To install and test all modules, leave this space empty or use `*`. Some modules may be blacklisted individually, by using `*-module,-other_module, l10n_*`.
-- **Server files**: `odoo-bin` will allow runbot to know the possible file to use to launch odoo. odoo-bin is the one to use for the last version, but you may want to add other server files for older versions (comma separated list). The same logic is used for manifest files.
-- **Manifest files**: `__manifest__.py`. This field is only usefull to configure old versions of odoo.  
+- **Server files**: `odoo-bin` will allow runbot to know the possible file to use to launch odoo. `odoo-bin` is the one to use for the last version, but you may want to add other server files for older versions (comma separated list). The same logic is used for manifest files.
+- **Manifest files**: `__manifest__.py`. This field is only useful to configure old versions of odoo.  
 - **Addons path**: `addons,odoo/addons`. The paths where addons are stored in this repository.
 - **Mode**: `poll` since github won't hook your runbot instance. Poll mode is limited to one update every 5 minutes. *It is advised to set it in hook mode later and hook it manually of from a cron or automated action to have more control*.
 - **Remotes**: `git@github.com:odoo/odoo.git` A single remote is added, the base odoo repo. Only branches will be fetched to limit disk usage and branches will be created in the backend. It is possible to add multiple remotes for forks.
@@ -232,11 +232,11 @@ Create a repo for your custom addons repo
 ![Odoo repo configuration](runbot/documentation/images/repo_runbot.png "Odoo repo configuration")
 - **Name**: `runbot`
 - **Project**: `runbot`.
-- **Modules to install**: `-*,runbot` ton only install the runbot module.
-- No addons_path given to use repo root as default.
+- **Modules to install**: `-*,runbot` to only install the runbot module.
+- **Addons path**: No `addons_path` given to use repo root as default.
 - (optionnal) For your custom repo, it is advised to configure the repo in `hook` mode if possible, adding a webhook on `/runbot/hook`. Use `/runbot/hook/<repo_id>` to do it manually.
 - **Remotes**: `git@github.com:odoo/runbot.git` 
-- The remote *PR* option can be checked if needed to fetch pull request too . Will only work if a github token is given for this repo.
+- The remote *PR* option can be checked if needed to fetch pull request too. Will work only if a github token is given for this repo.
 
 A config file with your remotes should be created for each repo. You can check the content in `/runbot/static/repo/(runbot|odoo)/config`. The repo will be fetched, this operation may take some time too. After that, you should start seeing empty batches in both projects on the frontend (`/` or `/runbot`)
 
@@ -272,7 +272,7 @@ Create a new trigger like this:
 - *Project id*: `runbot` This is important since you can only chose repo triggering a new build in this project.
 - *Triggers*: `runbot` A new build will be created int the project when pushing on this repo.
 - *Dependencies*: `odoo` Runbot needs odoo to run
-- *Config*: `Default no run` Will start a build but dont make it running at the end. You can still wake up a build.
+- *Config*: `Default no run` Will start a build but don't make it running at the end. You can still wake up a build.
 
 When a branch is pushed, a new batch will be created, and after one minute the new build will be created if no other change is detected.
 
@@ -282,22 +282,22 @@ You can either push, or go on the frontend bundle page and use the `Force new ba
 
 #### Bundles
 
-Bundles can be marked as `no_build`, so that new commit won't create batch creation and the bundle won't be displayed on the main page.
+Bundles can be marked as `no_build`, so that new commit(s) won't create batch creation and the bundle won't be displayed on the main page.
 
 #### Hosts
-Runbot is able to share pending builds across multiple hosts. In the present case, there is only one. A new host will never assign a pending build to himself by default.
-Go in the Build Hosts menu and choose yours. Uncheck *Only accept assigned build*. You can also tweak the number of parallel builds for this host.
+Runbot is able to share pending builds across multiple hosts. In the present case, there is only one. A new host will never assign a pending build to itself by default.
+Go to the "Build Hosts" menu and choose yours. Uncheck *Only accept assigned build*. You can also tweak the number of parallel builds for this host.
 
 ### Modules filters
 Modules to install can be filtered by repo, and by config step. The first filter to be applied is the repo one, creating the default list for a config step.
-Addon -module on a repo will remove the module from the default, it is advised to reflect the default case on repo. To test only a custom module, adding `-*` on odoo repo will disable all odoo addons. Only dependencies of custom modules will be installed. Some specific modules can also be filtered using `-module1,-module1` or somme specific modules can be kept using `-*,module1,module2`.
-Module can also be filtered on a config step with the same logic as repo filter, except that repo's blacklist can be disabled to allow all modules by starting the list with `*` (all available modules)
+Addon `-module` on a repo will remove the module from the default, it is advised to reflect the default case on repo. To test only a custom module, adding `-*` on odoo repo will disable all odoo addons. Only dependencies of custom modules will be installed. Some specific modules can also be filtered using `-module1,-module1` or somme specific modules can be kept using `-*,module1,module2`.
+Modules can also be filtered on a config step with the same logic as repo filter, except that repo's blacklist can be disabled to allow all modules by starting the list with `*` (all available modules)
 It is also possible to add test-tags to config step to allow more module to be installed but only testing some specific one. Test tags: `/module1,/module2`
 
 ### db template
-Db creation will use template0 by default. It is possible to specify a specific template to use in runbot config *Postgresql template*. It is mainly used to add extensions. This will also avoid having issue if template0 is used when creating a new database.
+Db creation will use `template0` by default. It is possible to specify a specific template to use in runbot config *Postgresql template*. It is mainly used to add extensions. This will also avoid having issue if `template0` is used when creating a new database.
 
-It is recommended to generate a `template_runbot`  database based on template0 and set this value in the runbot settings
+It is recommended to generate a `template_runbot`  database based on `template0` and set this value in the runbot settings
 
 ```
 createdb template_runbot -T template0
