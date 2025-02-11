@@ -238,6 +238,7 @@ class BuildResult(models.Model):
     commit_export_ids = fields.One2many('runbot.commit.export', 'build_id')
 
     static_run = fields.Char('Static run URL')
+    db_garbage_collected = fields.Boolean()
 
     access_token = fields.Char('Token', default=lambda self: uuid.uuid4().hex)
 
@@ -961,6 +962,7 @@ class BuildResult(models.Model):
 
     def _local_pg_dropdb(self, dbname):
         msg = ''
+        self._build_from_dest(dbname).db_garbage_collected = True
         try:
             with local_pgadmin_cursor() as local_cr:
                 query = 'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=%s'
@@ -1044,6 +1046,15 @@ class BuildResult(models.Model):
             build.requested_action = 'deathrow'
         for child in build.children_ids:
             child._ask_kill(lock=False)
+
+    def _can_wake_up(self):
+        return (
+            self.local_state == "done" and
+            self.requested_action != 'wake_up' and
+            self.host_id.active and
+            self.database_ids and
+            (not self.parent_id.database_ids or self.env.user.has_group('runbot.group_runbot_advanced_user'))
+        )
 
     def _wake_up(self):
         user = self.env.user
@@ -1268,3 +1279,4 @@ class BuildResult(models.Model):
 
     def _parse_config(self):
         return set(findall(self._server("tools/config.py"), r'--[\w-]+', ))
+    
