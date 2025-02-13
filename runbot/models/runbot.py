@@ -196,53 +196,6 @@ class Runbot(models.AbstractModel):
                     else:
                         _logger.warning('failed to start nginx - failed to kill orphan worker - oh well')
 
-    def _get_cron_period(self):
-        """ Compute a randomized cron period with a 2 min margin below
-        real cron timeout from config.
-        """
-        cron_limit = config.get('limit_time_real_cron')
-        req_limit = config.get('limit_time_real')
-        cron_timeout = cron_limit if cron_limit > -1 else req_limit
-        return cron_timeout / 2
-
-    def _cron(self):
-        """
-        This method is the default cron for new commit discovery and build sheduling.
-        The cron runs for a long time to avoid spamming logs
-        """
-        pull_info_failures = {}
-        start_time = time.time()
-        timeout = self._get_cron_period()
-        get_param = self.env['ir.config_parameter'].get_param
-        update_frequency = int(get_param('runbot.runbot_update_frequency', default=10))
-        runbot_do_fetch = get_param('runbot.runbot_do_fetch')
-        runbot_do_schedule = get_param('runbot.runbot_do_schedule')
-        host = self.env['runbot.host']._get_current()
-        host._set_psql_conn_count()
-        host.last_start_loop = fields.Datetime.now()
-        self._commit()
-        # Bootstrap
-        host._bootstrap()
-        if runbot_do_schedule:
-            host._docker_update_images()
-            self._source_cleanup()
-            self.env['runbot.build']._local_cleanup()
-            self._docker_cleanup()
-        _logger.info('Starting loop')
-        if runbot_do_schedule or runbot_do_fetch:
-            while time.time() - start_time < timeout:
-                if runbot_do_fetch:
-                    self._fetch_loop_turn(host, pull_info_failures)
-                if runbot_do_schedule:
-                    sleep_time = self._scheduler_loop_turn(host, update_frequency)
-                    time.sleep(sleep_time)
-                else:
-                    time.sleep(update_frequency)
-                self._commit()
-
-            host.last_end_loop = fields.Datetime.now()
-
-
     def _fetch_loop_turn(self, host, pull_info_failures, default_sleep=1):
         with self._manage_host_exception(host) as manager:
             repos = self.env['runbot.repo'].search([('mode', '!=', 'disabled')])
