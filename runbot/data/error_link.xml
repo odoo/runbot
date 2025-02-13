@@ -1,6 +1,6 @@
 <odoo>
     <record model="ir.actions.server" id="action_link_build_errors">
-        <field name="name">Link build errors</field>
+        <field name="name">Merge build errors</field>
         <field name="model_id" ref="runbot.model_runbot_build_error" />
         <field name="binding_model_id" ref="runbot.model_runbot_build_error" />
         <field name="type">ir.actions.server</field>
@@ -39,7 +39,7 @@
             records.action_assign()
         </field>
     </record>
-        <record model="ir.actions.server" id="action_deduplicate">
+    <record model="ir.actions.server" id="action_deduplicate">
         <field name="name">Deduplicate Error Contents</field>
         <field name="model_id" ref="runbot.model_runbot_build_error_content" />
         <field name="binding_model_id" ref="runbot.model_runbot_build_error_content" />
@@ -47,6 +47,15 @@
         <field name="state">code</field>
         <field name="code">
             records.action_deduplicate()
+        </field>
+    </record>
+    <record model="ir.actions.server" id="action_view_build_errors">
+        <field name="name">View build errors</field>
+        <field name="model_id" ref="runbot.model_runbot_build"/>
+        <field name="type">ir.actions.server</field>
+        <field name="state">code</field>
+        <field name="code">
+            action = records.action_view_build_errors()
         </field>
     </record>
 </odoo>

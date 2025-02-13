@@ -313,7 +313,7 @@ class BuildError(models.Model):
         if build_error_contents:
             window_action = {
                 "type": "ir.actions.act_window",
-                "res_model": "runbot.build.error",
+                "res_model": "runbot.build.error.content",
                 "views": [[False, "list"]],
                 "domain": [('id', 'in', build_error_contents.ids)]
             }

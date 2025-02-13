@@ -1268,3 +1268,15 @@ class BuildResult(models.Model):
 
     def _parse_config(self):
         return set(findall(self._server("tools/config.py"), r'--[\w-]+', ))
+
+    def action_view_build_errors(self):
+        errors = self.env['runbot.build.error'].browse()
+        for record in self:
+            errors |= record.error_log_ids.error_content_id.error_id
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "runbot.build.error",
+            "domain": [('id', 'in', errors.ids)],
+            "name": "Build errors",
+            "view_mode": "list,form"
+        }
