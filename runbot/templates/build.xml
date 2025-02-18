@@ -134,15 +134,12 @@
                 <b>Extra params:</b>
                 <t t-out="build.params_id.extra_params"/>
                 <br/>
-
-                <t t-if="len(build.params_id.builds_reference_ids) > 1">
+                <t t-if="build.params_id.builds_reference_ids">
                   <b>Reference builds:</b>
-                  <t t-foreach="build.params_id.builds_reference_ids" t-as="reference">
-                    <span t-out="reference.id"/>
-                  </t>
-                  <br/>
+                  <div t-foreach="build.params_id.builds_reference_ids" t-as="reference">
+                    <a t-attf-href="/runbot/build/{{reference.id}}"><t t-esc="reference.id"/></a> - <em t-out="reference.params_id.version_id.name"/>
+                  </div>
                 </t>
-
                 <t t-if="len(build.params_id.build_ids) > 1">
                   <b>Similar builds:</b>
                   <t t-foreach="build.params_id.build_ids" t-as="simbuild">
