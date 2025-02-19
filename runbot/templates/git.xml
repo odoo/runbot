@@ -9,6 +9,7 @@
 [remote "<t t-out="remote_id.remote_name"/>"]
 	url = <t t-out="remote_id.name"/>
 <t t-if = "remote_id.fetch_heads">	fetch = +refs/heads/*:refs/<t t-out='remote_id.remote_name'/>/heads/*</t>
+<t t-if = "remote_id.fetch_heads">	fetch = +refs/notes/*:refs/<t t-out='remote_id.remote_name'/>/notes/*</t>
 <t t-if = "remote_id.fetch_pull">	fetch = +refs/pull/*/head:refs/<t t-out='remote_id.remote_name'/>/pull/*</t>
 </t></template>
     </data>
