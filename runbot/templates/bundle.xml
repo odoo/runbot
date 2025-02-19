@@ -16,10 +16,13 @@
                                           <i class="fa fa-list"/>
                                         </a>
                                         <a groups="runbot.group_runbot_advanced_user" class="btn btn-default" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Force A New Batch">
-                                            <i class="fa fa-refresh"/>
+                                            <i class="fa fa-play"/>
                                         </a>
-                                        <a t-if="bundle.env.user.has_group('runbot.group_runbot_advanced_user') or (bundle.env.user.has_group('runbot.group_user') and ':' in bundle.name)" class="btn btn-default" t-attf-href="/runbot/bundle/{{bundle.id}}/force/1" title="Force A New Batch with automatic rebase">
+                                        <a t-if="bundle.env.user.has_group('runbot.group_runbot_advanced_user') or (bundle.env.user.has_group('runbot.group_user') and ':' in bundle.name)" class="btn btn-default" t-attf-href="/runbot/bundle/{{bundle.id}}/force?auto_rebase=1" title="Force A New Batch with automatic rebase">
                                             <i class="fa fa-fast-forward"/>
+                                        </a>
+                                        <a groups="runbot.group_runbot_advanced_user" class="btn btn-default" t-attf-href="/runbot/bundle/{{bundle.id}}/force?use_base_commits=1" title="Force A New Batch using base commits">
+                                            <i class="fa fa-fast-backward"/>
                                         </a>
                                         <t t-call="runbot.branch_copy_button">
                                             <t t-set="btn_size" t-value="'btn'"/>

@@ -226,13 +226,13 @@ class Runbot(Controller):
         '/runbot/bundle/<model("runbot.bundle"):bundle>/force',
         '/runbot/bundle/<model("runbot.bundle"):bundle>/force/<int:auto_rebase>',
     ], type='http', auth="user", methods=['GET', 'POST'], csrf=False)
-    def force_bundle(self, bundle, auto_rebase=False, **_post):
+    def force_bundle(self, bundle, auto_rebase=False, use_base_commits=False,**_post):
         if not request.env.user.has_group('runbot.group_runbot_advanced_user') and ':' not in bundle.name:
             raise Forbidden("Only users with a specific group can do that. Please contact runbot administrators")
         _logger.info('user %s forcing bundle %s', request.env.user.name, bundle.name)  # user must be able to read bundle
         batch = bundle.sudo()._force()
         batch._log('Batch forced by %s', request.env.user.name)
-        batch._prepare(auto_rebase)
+        batch._prepare(auto_rebase=bool(auto_rebase), use_base_commits=bool(use_base_commits))
         batch._process()
         return werkzeug.utils.redirect('/runbot/batch/%s' % batch.id)
 
