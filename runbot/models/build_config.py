@@ -426,6 +426,14 @@ class ConfigStep(models.Model):
     upgrade_from_all_intermediate_version = fields.Boolean() # 13.2 # 13.1
     upgrade_from_version_ids = fields.Many2many('runbot.version', relation='runbot_upgrade_from_version_ids', string='Forced version to use as source (cartesian with target)')
 
+    # wip replace previous field by matrix
+    upgrade_matrix_id = fields.Many2one('runbot.upgrade.matrix', 'Upgrade matrix', tracking=True)
+    upgrade_current_source = fields.Boolean('Upgrade Curent source', help='Use current build as Source if version match', default=True, tracking=True)
+    upgrade_current_target = fields.Boolean('Upgrade Curent target', help='Use current build as target if version match', default=True, tracking=True)
+    # TODO maybe remove this field in the future, should all work in the same build
+    upgrade_from_bellow = fields.Boolean('Upgrade from bellow', help="Standard upgrade behaviour", default=True, tracking=True)
+    upgrade_to_above = fields.Boolean('Upgrade to above', help="Will behave as a complement", default=True, tracking=True)
+
     upgrade_flat = fields.Boolean("Flat", help="Take all decisions in on build")
 
     upgrade_config_id = fields.Many2one('runbot.build.config',string='Upgrade Config', tracking=True, index=True)
@@ -1169,16 +1177,29 @@ class ConfigStep(models.Model):
         refs_builds = refs_batches.mapped('slot_ids').filtered(
             lambda slot: slot.trigger_id == upgrade_dumps_trigger_id
             ).mapped('build_id')
-        # should we filter on active? implicit. On match type? on skipped ?
-        # is last_"done"_batch enough?
-        # TODO active test false and take last done/running build limit 1 -> in case of rebuild
         return refs_builds
 
     def _is_upgrade_step(self):
         return self.job_type in ('configure_upgrade', 'configure_upgrade_complement')
 
     def _reference_batches(self, batch, trigger):
-        if self.job_type == 'configure_upgrade_complement':
+        # upgrade_current_source
+        # upgrade_current_target
+
+        if self.upgrade_matrix_id:
+            batches = self.env['runbot.batch']
+            base_batch = batch if batch.reference_batch_ids else batch.base_reference_batch_id
+            reference_batch_ids = base_batch.reference_batch_ids
+            if self.upgrade_from_bellow:
+                from_versions = self.upgrade_matrix_id._get_versions_to(batch.version_id)
+                batches |= reference_batch_ids.filtered(lambda batch: batch.bundle_id.version_id in from_versions)
+
+            if self.upgrade_to_above:
+                to_versions = self.upgrade_matrix_id._get_versions_from(batch.version_id)
+                batches |= reference_batch_ids.filtered(lambda batch: batch.bundle_id.version_id in to_versions)
+            return batches
+
+        elif self.job_type == 'configure_upgrade_complement':
             return self._reference_batches_complement(batch, trigger)
         else:
             return self._reference_batches_upgrade(batch, trigger.upgrade_dumps_trigger_id.category_id.id)

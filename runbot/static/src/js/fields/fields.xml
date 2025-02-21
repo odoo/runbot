@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="runbot.Matrixx2ManyField">
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th class="thead-dark" t-foreach="toVersions" t-as="toVersion" t-esc="toVersion" t-key="toVersion"/>
+                </tr>
+            </thead>
+            <tbody>
+                <tr t-foreach="fromVersions" t-as="fromVersion" t-key="fromVersion">
+                    <th class="thead-dark" t-esc="fromVersion"/>
+                    <t t-foreach="toVersions" t-as="toVersion" t-key="toVersion">
+                        <t t-set="entry" t-value="getEntry(fromVersion, toVersion)"/>
+                        <td t-att-style="entry and entry.data.manually_edited ? 'background-color: #CCC'  : ''">
+                            <BooleanToggleField t-if="entry" name="'enabled'" record="entry"/>
+                        </td>
+                    </t>
+                </tr>
+            </tbody>
+        </table>
+    </t>
+
+</templates>

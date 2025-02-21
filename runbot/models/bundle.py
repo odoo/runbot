@@ -240,6 +240,8 @@ class Bundle(models.Model):
             if records.is_base:
                 model = self.browse()
                 model.env.registry.clear_cache()
+                for matrix in self.env['runbot.upgrade.matrix'].search([('project_id', '=', record.project_id.id)], limit=1):
+                    matrix._update_matrix_entries()
             elif record.project_id.tmp_prefix and record.name.startswith(record.project_id.tmp_prefix):
                 record['no_build'] = True
             elif record.project_id.staging_prefix and record.name.startswith(record.project_id.staging_prefix):

@@ -56,33 +56,38 @@
     </record>
 
     <!-- BUNDLES -->
-    <record id="bundle_16_1" model="runbot.bundle">
-        <field name="name">saas-16.1</field>
+    <record id="bundle_saas_1" model="runbot.bundle">
+        <field name="name">saas-19.1</field>
         <field name="is_base">True</field>
         <field name="project_id" ref="runbot.main_project"/>
     </record>
-    <record id="bundle_16" model="runbot.bundle">
+    <record id="bundle_saas_2" model="runbot.bundle">
+        <field name="name">saas-19.2</field>
+        <field name="is_base">True</field>
+        <field name="project_id" ref="runbot.main_project"/>
+    </record>
+    <record id="bundle_main" model="runbot.bundle">
+        <field name="name">19.0</field>
+        <field name="is_base">True</field>
+        <field name="project_id" ref="runbot.main_project"/>
+    </record>
+    <record id="bundle_main_previous_4" model="runbot.bundle">
+        <field name="name">saas-18.4</field>
+        <field name="is_base">True</field>
+        <field name="project_id" ref="runbot.main_project"/>
+    </record>
+    <record id="bundle_main_previous" model="runbot.bundle">
+        <field name="name">18.0</field>
+        <field name="is_base">True</field>
+        <field name="project_id" ref="runbot.main_project"/>
+    </record>
+    <record id="bundle_main_previous_previous" model="runbot.bundle">
+        <field name="name">17.0</field>
+        <field name="is_base">True</field>
+        <field name="project_id" ref="runbot.main_project"/>
+    </record>
+    <record id="bundle_main_deprecated" model="runbot.bundle">
         <field name="name">16.0</field>
-        <field name="is_base">True</field>
-        <field name="project_id" ref="runbot.main_project"/>
-    </record>
-    <record id="bundle_15_4" model="runbot.bundle">
-        <field name="name">saas-15.4</field>
-        <field name="is_base">True</field>
-        <field name="project_id" ref="runbot.main_project"/>
-    </record>
-    <record id="bundle_15" model="runbot.bundle">
-        <field name="name">15.0</field>
-        <field name="is_base">True</field>
-        <field name="project_id" ref="runbot.main_project"/>
-    </record>
-    <record id="bundle_14" model="runbot.bundle">
-        <field name="name">14.0</field>
-        <field name="is_base">True</field>
-        <field name="project_id" ref="runbot.main_project"/>
-    </record>
-    <record id="bundle_13" model="runbot.bundle">
-        <field name="name">13.0</field>
         <field name="is_base">True</field>
         <field name="sticky">False</field>
         <field name="project_id" ref="runbot.main_project"/>
@@ -91,28 +96,16 @@
         <field name="name">master-dev-tri</field>
         <field name="project_id" ref="runbot.main_project"/>
     </record>
-    <record id="bundle_15_0_dev_tri" model="runbot.bundle">
-        <field name="name">15.0-dev-tri</field>
+    <record id="bundle_dev_tri" model="runbot.bundle">
+        <field name="name">19.0-dev-tri</field>
         <field name="project_id" ref="runbot.main_project"/>
     </record>
     <record id="bundle_master_dev_partial_tri" model="runbot.bundle">
         <field name="name">master-dev-partial-tri</field>
         <field name="project_id" ref="runbot.main_project"/>
     </record>
-
-
-    <record id="bundle_runbot_15_0" model="runbot.bundle">
-        <field name="name">15.0</field>
-        <field name="is_base">True</field>
-        <field name="project_id" ref="project_runbot"/>
-    </record>
-    <record id="bundle_runbot_13_0" model="runbot.bundle">
-        <field name="name">13.0</field>
-        <field name="is_base">True</field>
-        <field name="project_id" ref="project_runbot"/>
-    </record>
-    <record id="bundle_runbot_13_dev_tri" model="runbot.bundle">
-        <field name="name">13.0-dev-tri</field>
+    <record id="bundle_runbot_deprecated_dev_tri" model="runbot.bundle">
+        <field name="name">16.0-dev-tri</field>
         <field name="project_id" ref="project_runbot"/>
     </record>
 

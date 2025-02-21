@@ -59,6 +59,7 @@
         'views/res_config_settings_views.xml',
         'views/stat_views.xml',
         'views/upgrade.xml',
+        'views/upgrade_matrix_views.xml',
         'views/warning_views.xml',
         'views/custom_trigger_wizard_views.xml',
         'wizards/stat_regex_wizard_views.xml',

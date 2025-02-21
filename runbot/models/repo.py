@@ -86,7 +86,7 @@ class Trigger(models.Model):
     manual = fields.Boolean('Only start trigger manually', default=False)
     restore_trigger_id = fields.Many2one('runbot.trigger', string='Restore Trigger ID for custom triggers', help="Mainly usefull to automatically define where to find a reference database when creating a custom trigger", tracking=True)
 
-    upgrade_dumps_trigger_id = fields.Many2one('runbot.trigger', string='Template/complement trigger', tracking=True)
+    upgrade_dumps_trigger_id = fields.Many2one('runbot.trigger', string='Template/complement trigger', tracking=True, domain="[('category_id', '=', category_id), ('project_id', '=', project_id)]")
     upgrade_step_id = fields.Many2one('runbot.build.config.step', compute="_compute_upgrade_step_id", store=True)
     ci_url = fields.Char("CI url")
     ci_description = fields.Char("CI description")

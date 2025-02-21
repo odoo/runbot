@@ -9,11 +9,13 @@ import { formatDateTime } from "@web/core/l10n/dates";
 import { registry } from "@web/core/registry";
 import { useInputField } from "@web/views/fields/input_field_hook";
 
-import { useRef, xml, Component, markup, useEffect } from "@odoo/owl";
+import { useRef, xml, Component, markup} from "@odoo/owl";
 import { useAutoresize } from "@web/core/utils/autoresize";
 import { getFormattedValue } from "@web/views/utils";
-
 import { UrlField } from "@web/views/fields/url/url_field";
+import { X2ManyField , x2ManyField} from "@web/views/fields/x2many/x2many_field";
+import { BooleanToggleField } from "@web/views/fields/boolean_toggle/boolean_toggle_field";
+
 
 // https://stackoverflow.com/questions/4810841/pretty-print-json-using-javascript
 function colorizeJson(json) {
@@ -177,3 +179,32 @@ registry.category("fields").add("pull_request_url", {
     supportedTypes: ["char"],
     component: PullRequestUrlField,
 });
+
+
+export class Matrixx2ManyField extends X2ManyField {
+    static template = 'runbot.Matrixx2ManyField';
+
+    static components = { BooleanToggleField };
+
+    getEntry(from, to) {
+        return this.list.records.find(({ data }) => data.from_version_number === from && data.to_version_number === to);
+    }
+
+    get toVersions() {
+        const versions = this.list.records.map(({ data }) => data.to_version_number);
+        return [...new Set(versions)].sort();
+    }
+
+    get fromVersions() {
+        const versions = this.list.records.map(({ data }) => data.from_version_number);
+        return [...new Set(versions)].sort().reverse();
+    }
+}
+export const matrixx2ManyField = {
+    ...x2ManyField,
+    component: Matrixx2ManyField,
+    useSubView: false,
+};
+
+
+registry.category("fields").add("version_matrix", matrixx2ManyField);
