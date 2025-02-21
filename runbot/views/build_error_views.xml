@@ -8,6 +8,7 @@
           <sheet>
               <widget name="web_ribbon" title="Test-tags" bg_color="bg-danger" invisible="not test_tags"/>
               <button name="action_view_errors" string="See all linked errors" type="object" class="oe_highlight"/>
+              <button name="action_search_similar" string="Search similar" type="object" class="oe_highlight"/>
               <group string="Base info">
                 <field name="name"/>
                 <field name="error_content_ids" readonly="1">
@@ -459,6 +460,7 @@
           <filter string="Test Tags" name="test_tagged_errors" domain="[('test_tags', '!=', False)]"/>
           <separator/>
           <filter string="Not seen in one month" name="not_seen_one_month" domain="[('last_seen_date','&lt;', (context_today() - datetime.timedelta(days=30)).strftime('%Y-%m-%d'))]"/>
+          <filter string="Qualifiers" name="context_filter" domain="context.get('filter_domain')" invisible="1"/>
         </search>
       </field>
     </record>

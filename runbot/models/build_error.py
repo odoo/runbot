@@ -9,6 +9,7 @@ from dateutil.relativedelta import relativedelta
 from markupsafe import Markup
 from werkzeug.urls import url_join
 from odoo import models, fields, api
+from odoo.osv import expression
 from odoo.exceptions import ValidationError, UserError
 from odoo.tools import SQL
 
@@ -245,10 +246,7 @@ class BuildError(models.Model):
     def _onchange_test_tags(self):
         if self.test_tags and self.version_ids:
             self.tags_min_version_id = min(self.version_ids, key=lambda rec: rec.number)
-            self.tags_max_version_id = max(self.version_ids, key=lambda rec: rec.number)
-
-    @api.onchange('customer')
-    def _onchange_customer(self):
+            self.tags_max_version_id
         if not self.responsible:
             self.responsible = self.customer
 
@@ -322,6 +320,8 @@ class BuildError(models.Model):
         self.ensure_one()
         return Markup('<a href="%s">%s</a>') % (self._get_form_url(), self.id)
 
+
+    
     def action_view_errors(self):
         return {
             'type': 'ir.actions.act_window',
@@ -329,6 +329,32 @@ class BuildError(models.Model):
             'res_model': 'runbot.build.error.content',
             'domain': [('error_id', '=', self.id)],
             'context': {'active_test': False},
+            'target': 'current',
+        }
+
+    def action_search_similar(self):
+        domain = []
+        available_fields = self.env['runbot.build.error.content']._fields.keys()
+        for key, value in self.unique_qualifiers.items():
+            field = f'x_{key}'
+            if field not in available_fields:
+                continue  # todo add leaf for json?
+            leaf = [(field, '=', value)]
+            if key not in self.common_qualifiers:
+                domain += expression.OR([leaf, [(field, '=', False)]])
+            else:
+                domain += leaf
+        
+        search_context = {
+            'search_default_context_filter': True,
+            'filter_domain': domain,
+        }
+        return {
+            'type': 'ir.actions.act_window',
+            'views': [(False, 'list'), (False, 'form')],
+            'res_model': 'runbot.build.error.content',
+            'domain': domain,
+            'context': {'active_test': False, **search_context},
             'target': 'current',
         }
 
