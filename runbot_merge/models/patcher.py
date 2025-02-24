@@ -126,6 +126,7 @@ class PatchFailure(Exception):
 class PatchFile(models.TransientModel):
     _name = "runbot_merge.patch.file"
     _description = "metadata for single file to patch"
+    _order = "create_date desc"
 
     name = fields.Char()
 
