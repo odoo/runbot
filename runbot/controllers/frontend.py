@@ -629,10 +629,14 @@ class Runbot(Controller):
         return request.render("runbot.modules_stats", context)
 
     @route(['/runbot/load_info'], type='http', auth="user", website=True, sitemap=False)
-    def load_infos(self, **post):
+    def load_infos(self, host: str | None = None, **post):
         build_by_bundle = {}
 
-        for build in request.env['runbot.build'].search([('local_state', 'in', ('pending', 'testing'))], order='id'):
+        domain = [('local_state', 'in', ('pending', 'testing'))]
+        if host:
+            domain.append(('host', '=', host))
+
+        for build in request.env['runbot.build'].search(domain, order='id'):
             build_by_bundle.setdefault(build.params_id.create_batch_id.bundle_id, []).append(build)
 
         build_by_bundle = list(build_by_bundle.items())

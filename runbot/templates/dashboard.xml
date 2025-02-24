@@ -87,11 +87,11 @@
                   <t t-if="host.nb_testing > host.nb_worker">
                     <t t-set="klass">danger</t>
                   </t>
-                  <span t-attf-class="badge text-bg-{{klass}}">
+                  <a t-attf-class="badge text-bg-{{klass}}" t-attf-href="/runbot/load_info?host={{host.name}}">
                     <span t-out="host.nb_testing"/>
                     /
                     <span t-out="host.nb_worker"/>
-                  </span>
+                  </a>
                   <t t-out="host.nb_running"/>
                   <t t-set="succes_time" t-value="int(datetime.datetime.now().timestamp() - host.last_success.timestamp())"/>
                   <t t-set="start_time" t-value="int(datetime.datetime.now().timestamp() - host.last_start_loop.timestamp())"/>
