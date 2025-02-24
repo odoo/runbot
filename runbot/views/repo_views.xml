@@ -70,6 +70,7 @@
                   <field name="ci_context"/>
                   <field name="ci_url"/>
                   <field name="ci_description"/>
+                  <field name="ci_send_all"/>
                 </group>
               </group>
               <group string="Managing Team (nightly failure, manual start, ...)"></group>

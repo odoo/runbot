@@ -85,6 +85,7 @@ class Trigger(models.Model):
     upgrade_step_id = fields.Many2one('runbot.build.config.step', compute="_compute_upgrade_step_id", store=True)
     ci_url = fields.Char("CI url")
     ci_description = fields.Char("CI description")
+    ci_send_all = fields.Boolean('Send ci on dependencies', default=False)
     has_stats = fields.Boolean('Has a make_stats config step', compute="_compute_has_stats", store=True)
 
     team_ids = fields.Many2many('runbot.team', string="Runbot Teams", help="Teams responsible of this trigger, mainly usefull for nightly")

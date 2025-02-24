@@ -1263,7 +1263,7 @@ class BuildResult(models.Model):
                 target_url = trigger.ci_url or "%s/runbot/build/%s" % (self.get_base_url(), build.id)
                 for build_commit in self.params_id.commit_link_ids:
                     commit = build_commit.commit_id
-                    if 'base_' not in build_commit.match_type and commit.repo_id in trigger.repo_ids:
+                    if 'base_' not in build_commit.match_type and (trigger.ci_send_all or (commit.repo_id in trigger.repo_ids)):
                         commit._github_status(build, trigger.ci_context, state, target_url, desc)
 
     def _parse_config(self):
