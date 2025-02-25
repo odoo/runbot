@@ -27,6 +27,7 @@ from . import team
 from . import upgrade
 from . import user
 from . import version
+from . import website
 
 # those imports have to be at the end otherwise the sql view cannot be initialised
 from . import build_stat
