@@ -380,7 +380,7 @@ class TestGithub(TransactionCase):
             'repo_id': repo_server.id,
         })
         # Should not raise -> no secret on remote
-        payload_body = '{"payload": "data"}'.encode('utf-8')
+        payload_body = b'{"payload": "data"}'
         verify_signature(payload_body, remote, '')
         verify_signature(payload_body, remote, None)
         # Should not raise, valid signature

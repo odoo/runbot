@@ -375,6 +375,7 @@
       <field name="path">error</field>
       <field name="view_mode">list,form</field>
       <field name="context">{'search_default_not_fixed_errors': True, 'active_test': False}</field>
+      <field name="path">runbot-error</field>
     </record>
 
     <record id="open_view_build_error_content_tree" model="ir.actions.act_window">

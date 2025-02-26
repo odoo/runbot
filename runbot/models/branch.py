@@ -125,6 +125,29 @@ class Branch(models.Model):
                 if pr.remote_id == forwardport.remote_id and re.match(rf'^.*-{rname}-\w+-fw$', forwardport.pull_head_name.split(':')[1]):
                     forwardport.forwardport_of_id = pr
 
+    def _match_errors_from_body(self):
+        """
+        Checks the pr_body for any reference to runbot errors and links the branch
+        to those errors if they exist.
+        """
+        self.ensure_one()
+        if not self.pr_body or not self.pull_head_remote_id:
+            return
+        pr_body_regexes = [
+            r'^(?:.*runbot(?:.build)?.error(?:.id)?[ :\-~]+(\d+))\r?$',
+            r'^(?:.*https://[\w\.]+/odoo/[\w\.-]*error/(\d+)\/?(?:\).*)?)\r?$',
+            ]
+        error_ids = []
+        for pr_body_regex in pr_body_regexes:
+            error_ids += re.findall(pr_body_regex, self.pr_body, re.IGNORECASE | re.MULTILINE)
+        # We need to check if they exist and search does nothing if error_ids is empty
+        errors = self.env['runbot.build.error'].sudo().search([
+            ('id', 'in', error_ids), ('fixing_pr_id', '=', False),
+        ])
+        errors.fixing_pr_id = self
+        for error in errors:
+            error.message_post(body='Fixing pr automatically set through PR message')
+
     def _update_branch_infos(self, pull_info=None):
         """compute branch_url, pull_head_name and target_branch_name based on name"""
         name_to_remote = {}
@@ -169,6 +192,7 @@ class Branch(models.Model):
                                 owner, repo_name = pull_head_repo_name.split('/')
                                 name_to_remote[pull_head_repo_name] = self.env['runbot.remote'].search([('owner', '=', owner), ('repo_name', '=', repo_name)], limit=1)
                             branch.pull_head_remote_id = name_to_remote[pull_head_repo_name]
+                        branch._match_errors_from_body()
                     except (TypeError, AttributeError):
                         _logger.exception('Error for pr %s using pull_info %s', branch.name, pi)
                         raise

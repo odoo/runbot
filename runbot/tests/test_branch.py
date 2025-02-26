@@ -66,6 +66,66 @@ class TestBranch(RunbotCase):
             self.Branch.search([('dname', '=', branch.dname)]),
         )
 
+    def test_automatic_match_with_error(self):
+        self.env['runbot.build.error'].search([]).active = False
+        another_unrelated_error = self.env['runbot.build.error'].create([{}])
+        error = self.env['runbot.build.error'].create([{}])
+        branch = self.Branch.create({
+            'name': '989898',
+            'remote_id': self.remote_server.id,
+            'is_pr': True,
+            'pull_head_remote_id': self.remote_server.id,
+        })
+        # Does not crash without pr_body or nothing on pr_body
+        branch._match_errors_from_body()
+        branch.pr_body = ''
+        branch._match_errors_from_body()
+        # Does not link unknown errors
+        branch.pr_body = f'This is an error {error.id}'
+        branch._match_errors_from_body()
+        self.assertFalse(error.fixing_pr_id)
+        # Test multiple formats
+        self.assertNotEqual(error.id, 123, "Error should not be specific action id")
+        for format in [
+            f"Runbot error \n{another_unrelated_error.id}",
+            f"[Runbot error](https://domain.com/runbot/build/{another_unrelated_error.id})",
+        ]:
+            error.fixing_pr_id = False
+            branch.pr_body = format
+            branch._match_errors_from_body()
+            self.assertEqual(another_unrelated_error.fixing_pr_id.id, False, f"{format!r} should not match the error {error.id}")
+
+        for format in [
+            f"Runbot error {error.id}",
+            f"runbot error {error.id}",
+            f"runbot-error-{error.id}",
+            f"runbot build error {error.id}",
+            f"runbot-error-id~{error.id}",
+            f"https://domain.com/odoo/runbot.build.error/{error.id}",
+            f"https://domain.com/odoo/runbot-error/{error.id}/",
+            f"[runbot_error {error.id}](https://runbot.odoo.com/odoo/error/{error.id})",
+            f"[runbot_error](https://runbot.odoo.com/odoo/error/{error.id})",
+            f"Runbot Errors:\r\nhttps://runbot.odoo.com/odoo/error/{error.id}\r\nhttps://runbot.odoo.com/odoo/error/849849848'"
+            # f"Runbot error: https://domain.com/odoo/action-{another_unrelated_error.id}/{error.id}",
+        ]:
+            error.fixing_pr_id = False
+            branch.pr_body = format
+            branch._match_errors_from_body()
+            self.assertNotEqual(another_unrelated_error.fixing_pr_id.id, branch.id, f"'{format}' should not match the error {error.id}")
+            self.assertEqual(error.fixing_pr_id.id, branch.id, f"{format!r} should match the error {error.id}")
+
+        # Test that it does not reassign
+        error.fixing_pr_id = False
+        branch.pr_body = f'Runbot error {error.id}'
+        other_branch = self.Branch.create({
+            'name': 'other-branch',
+            'remote_id': self.remote_server.id,
+            'is_pr': True,
+        })
+        error.fixing_pr_id = other_branch
+        branch._match_errors_from_body()
+        self.assertEqual(error.fixing_pr_id, other_branch)
+
 class TestBranchRelations(RunbotCase):
 
     def setUp(self):

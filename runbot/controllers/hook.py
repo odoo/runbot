@@ -35,6 +35,7 @@ def verify_signature(payload_body, remote, signature_header):
         _logger.info('Received payload with invalid signature for remote %s', remote.name)
         raise BadRequest(description="Request signatures didn't match!")
 
+
 class Hook(http.Controller):
 
     @http.route(['/runbot/hook', '/runbot/hook/<int:remote_id>'], type='http', auth="public", website=True, csrf=False, sitemap=False)
