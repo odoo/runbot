@@ -183,6 +183,7 @@
                       <field name="fetch_pull" string="PR"/>
                       <field name="send_status"/>
                       <field name="token" password="True"/>
+                      <field name="webhook_secret" password="True"/>
                     </list>
                   </field>
                 </group>
@@ -221,6 +222,7 @@
                 <field name="sequence"/>
                 <field name="repo_id"/>
                 <field name="token"/>
+                <field name="webhook_secret"/>
                 <field name="fetch_pull"/>
                 <field name="fetch_heads"/>
                 <field name="send_status"/>

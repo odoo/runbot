@@ -256,6 +256,7 @@ class Remote(models.Model):
     send_status = fields.Boolean('Send status', default=False, tracking=True)
 
     token = fields.Char("Github token", groups="runbot.group_runbot_admin")
+    webhook_secret = fields.Char("Webhook secret", groups="runbot.group_runbot_admin")
 
     @api.depends('name')
     def _compute_base_infos(self):

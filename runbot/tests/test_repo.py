@@ -3,14 +3,19 @@ import datetime
 import logging
 import time
 import re
+import hmac
+import hashlib
 
 from unittest import skip
 from unittest.mock import patch, Mock
 from subprocess import CalledProcessError
+from werkzeug.exceptions import HTTPException
 
 from odoo import fields
 from odoo.tests import common, TransactionCase
 from odoo.tools import mute_logger
+
+from odoo.addons.runbot.controllers.hook import verify_signature
 
 from .common import RunbotCase, RunbotCaseMinimalSetup
 
@@ -363,6 +368,31 @@ class TestGithub(TransactionCase):
                 self.assertIn('Success after 2 tries', assert_log.output[0])
 
             self.assertEqual(2, mock_session.return_value.post.call_count, "_github method should try two times by default")
+
+    def test_verify_signature(self):
+        project = self.env['runbot.project'].create({'name': 'Tests'})
+        repo_server = self.env['runbot.repo'].create({
+            'name': 'server',
+            'project_id': project.id,
+        })
+        remote = self.env['runbot.remote'].create({
+            'name': 'bla@example.com:base/server',
+            'repo_id': repo_server.id,
+        })
+        # Should not raise -> no secret on remote
+        payload_body = '{"payload": "data"}'.encode('utf-8')
+        verify_signature(payload_body, remote, '')
+        verify_signature(payload_body, remote, None)
+        # Should not raise, valid signature
+        remote.webhook_secret = 'IAMRUNBOT'
+        signature_header = f'sha256={hmac.new(remote.webhook_secret.encode("utf-8"), msg=payload_body, digestmod=hashlib.sha256).hexdigest()}'
+        verify_signature(payload_body, remote, signature_header)
+        # Should raise invalid signature
+        with self.assertRaises(HTTPException):
+            verify_signature(payload_body, remote, 'invalid header')
+        # Should raise if no signature and webhook_secret is set
+        with self.assertRaises(HTTPException):
+            verify_signature(payload_body, remote, None)
 
 
 class TestFetch(RunbotCase):
