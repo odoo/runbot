@@ -3,14 +3,19 @@ import datetime
 import logging
 import time
 import re
+import hmac
+import hashlib
 
 from unittest import skip
 from unittest.mock import patch, Mock
 from subprocess import CalledProcessError
+from werkzeug.exceptions import HTTPException
 
 from odoo import fields
 from odoo.tests import common, TransactionCase
 from odoo.tools import mute_logger
+
+from odoo.addons.runbot.controllers.hook import verify_signature
 
 from .common import RunbotCase, RunbotCaseMinimalSetup
 

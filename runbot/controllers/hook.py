@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 
-import time
 import json
+import time
 import logging
+import hashlib
+import hmac
+
+from werkzeug.exceptions import BadRequest
 
 from odoo import http, fields
 from odoo.http import request
@@ -11,12 +15,32 @@ from ..common import from_role
 _logger = logging.getLogger(__name__)
 
 
+def verify_signature(remote):
+    req = request.httprequest
+    webhook_secret = remote.webhook_secret or remote.repo_id.project_id.webhook_secret
+    signature_header = req.headers.get('X-Hub-Signature-256', '')
+    if not webhook_secret:  # TODO enforce webhook_secret if signature_header is given
+        if signature_header:
+            _logger.warning('No webhook_secret on remote %s while one is configured on webhook', remote.name)
+        return
+    if not signature_header:
+        _logger.warning('Received payload without signature header')
+        raise BadRequest(description="x-hub-signature-256 header is missing!")
+    signature = 'sha256=' + hmac.new(webhook_secret.strip().encode(), req.get_data(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(signature, signature_header):
+        _logger.info('Received payload with invalid signature for remote %s: %s', remote.name, signature_header)
+        raise BadRequest(description="Request signatures didn't match!")
+
+
 class Hook(http.Controller):
 
     @http.route(['/runbot/hook', '/runbot/hook/<int:remote_id>'], type='http', auth="public", website=True, csrf=False, sitemap=False)
     def hook(self, remote_id=None, **_post):
         event = request.httprequest.headers.get("X-Github-Event")
-        payload = json.loads(request.params.get('payload', '{}'))
+        if request.httprequest.mimetype == 'application/json':
+            payload = request.get_json_data() if request.httprequest.data else {}
+        else:
+            payload = json.loads(request.params.get('payload', '{}'))
         if remote_id is None:
             repo_data = payload.get('repository')
             if repo_data:
@@ -32,7 +56,10 @@ class Hook(http.Controller):
                 remote_id = remote.id
                 if not remote_id:
                     _logger.error("Remote %s not found", repo_data['ssh_url'])
-        remote = request.env['runbot.remote'].sudo().browse(remote_id)
+        remote = request.env['runbot.remote'].sudo().browse(remote_id).exists()
+        if not remote:
+            raise BadRequest(description='Invalid remote')
+        verify_signature(remote)
 
         # force update of dependencies too in case a hook is lost
         if not payload or event == 'push':
