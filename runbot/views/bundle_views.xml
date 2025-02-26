@@ -15,6 +15,7 @@
                     <field name="trigger_ids"/>
                     <field name="sequence"/>
                     <field name="token" password="True"/>
+                    <field name="webhook_secret" password="True"/>
                     <field name="hidden"/>
                     <field name="active"/>
                     <field name="process_delay"/>

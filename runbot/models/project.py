@@ -16,6 +16,7 @@ class Project(models.Model):
     sequence = fields.Integer('Sequence')
     organisation = fields.Char('organisation', default=lambda self: self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_organisation'))
     token = fields.Char("Github token", groups="runbot.group_runbot_admin")
+    webhook_secret = fields.Char("Webhook secret", groups="runbot.group_runbot_admin")
     master_bundle_id = fields.Many2one('runbot.bundle', string='Master bundle')
     dummy_bundle_id = fields.Many2one('runbot.bundle', string='Dummy bundle')
     always_use_foreign = fields.Boolean('Use foreign bundle', help='By default, check for the same bundle name in another project to fill missing commits.', default=False)
