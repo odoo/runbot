@@ -798,3 +798,41 @@ class HookTime(models.Model):
 
     time = fields.Float('Time')
     repo_id = fields.Many2one('runbot.repo', 'Repository', required=True, ondelete='cascade')
+
+
+class HookPayload(models.Model):
+    _name = 'runbot.repo.hook.payload'
+    _description = "Repo hook payloads"
+    _log_access = False
+
+    create_date = fields.Datetime(default=fields.Datetime.now, required=True)
+    remote_id = fields.Many2one('runbot.remote', required=True, ondelete='cascade')
+    event = fields.Char(required=True)
+    payload = JsonDictField(required=True)
+
+    @api.model
+    def _process_all(self):
+        create_date_limit = self.env.cr.now()
+        while (records := self.search([('create_date', '<=', create_date_limit)], limit=1000)):
+            for record in records:
+                record._process_one()
+            records.unlink()
+            self.env.cr.commit()
+
+    def _process_one(self):
+        self.ensure_one()
+        payload = self.payload.dict
+        remote = self.remote_id
+        if self.event == 'pull_request':
+            pr_number = payload.get('pull_request', {}).get('number', '')
+            branch = self.env['runbot.branch'].sudo().search([('remote_id', '=', remote.id), ('name', '=', pr_number)])
+            branch._recompute_infos(payload.get('pull_request', {}))
+            if payload.get('action') in ('synchronize', 'opened', 'reopened'):
+                remote.repo_id._set_hook_time(time.time())
+            # remaining recurrent actions: labeled, review_requested, review_request_removed
+        elif self.event == 'delete':
+            if payload.get('ref_type') == 'branch':
+                branch_ref = payload.get('ref')
+                _logger.info('Branch %s in repo %s was deleted', branch_ref, remote.repo_id.name)
+                branch = self.env['runbot.branch'].sudo().search([('remote_id', '=', remote.id), ('name', '=', branch_ref)])
+                branch.alive = False

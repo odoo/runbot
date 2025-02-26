@@ -68,17 +68,10 @@ class Hook(http.Controller):
         # force update of dependencies too in case a hook is lost
         if not payload or event == 'push':
             remote.repo_id._set_hook_time(time.time())
-        elif event == 'pull_request':
-            pr_number = payload.get('pull_request', {}).get('number', '')
-            branch = request.env['runbot.branch'].sudo().search([('remote_id', '=', remote.id), ('name', '=', pr_number)])
-            branch._recompute_infos(payload.get('pull_request', {}))
-            if payload.get('action') in ('synchronize', 'opened', 'reopened'):
-                remote.repo_id._set_hook_time(time.time())
-            # remaining recurrent actions: labeled, review_requested, review_request_removed
-        elif event == 'delete':
-            if payload.get('ref_type') == 'branch':
-                branch_ref = payload.get('ref')
-                _logger.info('Branch %s in repo %s was deleted', branch_ref, remote.repo_id.name)
-                branch = request.env['runbot.branch'].sudo().search([('remote_id', '=', remote.id), ('name', '=', branch_ref)])
-                branch.alive = False
+        else:
+            request.env['runbot.repo.hook.payload'].sudo().create({
+                'remote_id': remote.id,
+                'payload': payload,
+                'event': event,
+            })
         return ""
