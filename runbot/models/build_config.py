@@ -855,16 +855,16 @@ class ConfigStep(models.Model):
 
         return dict(cmd=cmd)
 
-    def _reference_builds(self, batch, trigger):
+    def _reference_slots(self, batch, trigger):
         upgrade_dumps_trigger_id = trigger.upgrade_dumps_trigger_id
         refs_batches = self._reference_batches(batch, trigger)
-        refs_builds = refs_batches.mapped('slot_ids').filtered(
+        refs_slots = refs_batches.mapped('slot_ids').filtered(
             lambda slot: slot.trigger_id == upgrade_dumps_trigger_id
-            ).mapped('build_id')
+            )
         # should we filter on active? implicit. On match type? on skipped ?
         # is last_"done"_batch enough?
         # TODO active test false and take last done/running build limit 1 -> in case of rebuild
-        return refs_builds
+        return refs_slots
 
     def _is_upgrade_step(self):
         return self.job_type in ('configure_upgrade', 'configure_upgrade_complement')

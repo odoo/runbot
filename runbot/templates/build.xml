@@ -134,10 +134,15 @@
                 <b>Extra params:</b>
                 <t t-out="build.params_id.extra_params"/>
                 <br/>
-                <t t-if="build.params_id.builds_reference_ids">
-                  <b>Reference builds:</b>
-                  <div t-foreach="build.params_id.builds_reference_ids" t-as="reference">
-                    <a t-attf-href="/runbot/build/{{reference.id}}"><t t-esc="reference.id"/></a> - <em t-out="reference.params_id.version_id.name"/>
+                <t t-if="build.params_id.slot_reference_ids">
+                  <b>Reference slots:</b>
+                  <div t-foreach="build.params_id.slot_reference_ids" t-as="slot_reference">
+                    <t t-if="slot_reference.build_id">
+                      <a t-attf-href="/runbot/build/{{slot_reference.build_id.id}}"><t t-esc="slot_reference.build_id.id"/></a> - <em t-out="slot_reference.params_id.version_id.name"/>
+                    </t>
+                    <t t-else="">
+                      <a t-attf-href="/runbot/batch/{{slot_reference.batch_id.id}}">Missing build for slot<t t-esc="slot_reference.trigger_id.name"/></a> - <em t-out="slot_reference.params_id.version_id.name"/>
+                    </t>
                   </div>
                 </t>
                 <t t-if="len(build.params_id.build_ids) > 1">

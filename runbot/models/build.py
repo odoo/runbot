@@ -69,7 +69,9 @@ class BuildParameters(models.Model):
     used_custom_trigger = fields.Boolean('Custom trigger was used to generate this build')
 
     build_ids = fields.One2many('runbot.build', 'params_id')
-    builds_reference_ids = fields.Many2many('runbot.build', relation='runbot_build_params_references', copy=True)
+    #builds_reference_ids = fields.Many2many('runbot.build', relation='runbot_build_params_references', copy=True)
+    builds_reference_ids = fields.Many2many('runbot.build', compute='_compute_builds_reference_ids')
+    slot_reference_ids = fields.Many2many('runbot.batch.slot', relation='runbot_build_params_slot_references', copy=True)
     modules = fields.Char('Modules')
 
     upgrade_to_build_id = fields.Many2one('runbot.build', index=True)  # use to define sources to use with upgrade script
@@ -96,7 +98,7 @@ class BuildParameters(models.Model):
                 'config_data': param.config_data.dict,
                 'modules': param.modules or '',
                 'commit_link_ids': sorted(param.commit_link_ids.commit_id.ids),
-                'builds_reference_ids': sorted(param.builds_reference_ids.ids),
+                'slot_reference_ids': sorted(param.slot_reference_ids.ids),
                 'upgrade_from_build_id': param.upgrade_from_build_id.id,
                 'upgrade_to_build_id': param.upgrade_to_build_id.id,
                 'dump_db': param.dump_db.id,
@@ -109,6 +111,10 @@ class BuildParameters(models.Model):
                 cleaned_vals['used_custom_trigger'] = True
 
             param.fingerprint = hashlib.sha256(str(cleaned_vals).encode('utf8')).hexdigest()
+
+    def _compute_builds_reference_ids(self):
+        for params in self:
+            params.builds_reference_ids = params.slot_reference_ids.build_id
 
     @api.depends('commit_link_ids')
     def _compute_commit_ids(self):

@@ -129,7 +129,7 @@
                             </td>
                             <td>
                                 <t t-foreach="reference_batch_ids.sorted(lambda b: b.bundle_id.version_id.number, reverse=True)" t-as="reference_batch">
-                                    <div t-att-title="f'Created {s2human(reference_batch.create_date - batch.create_date)} before this one'">
+                                    <div t-attf-title="Created {{s2human(reference_batch.create_date - batch.create_date)}} before this one">
                                          <a t-attf-href="/runbot/batch/{{reference_batch.id}}"><t t-out="reference_batch.bundle_id.version_id.name"/> (<t t-out="reference_batch.id"/>)</a>
                                     </div>
                                 </t>

@@ -397,7 +397,7 @@ class Batch(models.Model):
                 'used_custom_trigger': bool(trigger_custom),
             }
 
-            params_value['builds_reference_ids'] = trigger._reference_builds(self)
+            params_value['slot_reference_ids'] = [(4, s.id) for s in trigger._reference_slots(self)]
 
             params = self.env['runbot.build.params'].create(params_value)
 
