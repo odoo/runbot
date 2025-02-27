@@ -100,8 +100,8 @@ class BuildError(models.Model):
     fixing_pr_url = fields.Char('Fixing PR url', related='fixing_pr_id.branch_url')
 
     test_tags = fields.Char(string='Test tags', help="Comma separated list of test_tags to use to reproduce/remove this error", tracking=True)
-    tags_min_version_id = fields.Many2one('runbot.version', 'Tags Min version', help="Minimal version where the test tags will be applied.")
-    tags_max_version_id = fields.Many2one('runbot.version', 'Tags Max version', help="Maximal version where the test tags will be applied.")
+    tags_min_version_id = fields.Many2one('runbot.version', 'Tags Min version', help="Minimal version where the test tags will be applied.", tracking=True)
+    tags_max_version_id = fields.Many2one('runbot.version', 'Tags Max version', help="Maximal version where the test tags will be applied.", tracking=True)
 
     common_qualifiers = JsonDictField('Common Qualifiers', compute='_compute_common_qualifiers', store=True, help="Minimal qualifiers in common needed to link error content.")
     similar_ids = fields.One2many('runbot.build.error', compute='_compute_similar_ids', string="Similar Errors", help="Similar Errors based on common qualifiers")
