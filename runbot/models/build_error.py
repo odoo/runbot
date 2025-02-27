@@ -130,6 +130,9 @@ class BuildError(models.Model):
     analogous_ids = fields.One2many('runbot.build.error', compute='_compute_analogous_ids', string="Analogous Errors", help="Analogous Errors based on unique qualifiers")
     analogous_content_ids = fields.One2many('runbot.build.error.content', compute='_compute_analogous_content_ids', string="Analogous Error Contents", help="Analogous Error contents based on unique qualifiers")
 
+    min_version_id = fields.Many2one('runbot.version', string='Min Version', compute='_compute_min_max_version', search='_search_min_version')
+    max_version_id = fields.Many2one('runbot.version', string='Max Version', compute='_compute_min_max_version', search='_search_max_version')
+
     # Build error related data
     build_error_link_ids = fields.Many2many('runbot.build.error.link', compute=_compute_related_error_content_ids('build_error_link_ids'), search=_search_related_error_content_ids('build_error_link_ids'))
     unique_build_error_link_ids = fields.Many2many('runbot.build.error.link', compute='_compute_unique_build_error_link_ids')
@@ -348,6 +351,76 @@ class BuildError(models.Model):
                 for day in range(31)
             ]
             error.graph_day_of_month_recurence = draw_svg(day_of_month_recurrence)
+
+    @api.depends('error_content_ids')
+    def _compute_min_max_version(self):
+        query = SQL(
+            r"""
+                  SELECT runbot_build_error.id, MIN(runbot_version.number), MAX(runbot_version.number)
+                    FROM runbot_build_error_link
+                    JOIN runbot_build_error_content
+                      ON runbot_build_error_link.error_content_id = runbot_build_error_content.id
+                    JOIN runbot_build_error
+                      ON runbot_build_error.id = runbot_build_error_content.error_id
+                    JOIN runbot_build
+                      ON runbot_build_error_link.build_id = runbot_build.id
+                    JOIN runbot_version
+                      ON runbot_build.version_id = runbot_version.id
+                   WHERE runbot_build.version_id is not null
+                     AND runbot_build_error.id IN %s
+                GROUP BY runbot_build_error.id;
+            """,
+            tuple(self.ids)
+        )
+        self.env.cr.execute(query)
+        min_max_by_error_id = {error_id: (vmin, vmax) for error_id,vmin,vmax in self.env.cr.fetchall()}
+        all_versions_by_number = {rec.number:rec.id for rec in self.env['runbot.version'].search([])}
+        for record in self:
+            min_max = min_max_by_error_id.get(record.id, False)
+            record.min_version_id = all_versions_by_number[min_max[0]] if min_max else False
+            record.max_version_id = all_versions_by_number[min_max[1]] if min_max else False
+
+    def _search_min_max(self, version, aggregator):
+        comp = '>=' if aggregator == 'MIN' else '<='
+        query = SQL(
+            rf"""
+                  SELECT runbot_build_error.id
+                    FROM runbot_build_error_link
+                    JOIN runbot_build_error_content
+                      ON runbot_build_error_link.error_content_id = runbot_build_error_content.id
+                    JOIN runbot_build_error
+                      ON runbot_build_error.id = runbot_build_error_content.error_id
+                    JOIN runbot_build
+                      ON runbot_build_error_link.build_id = runbot_build.id
+                    JOIN runbot_version
+                      ON runbot_build.version_id = runbot_version.id
+                   WHERE runbot_build.version_id is not null
+                GROUP BY runbot_build_error.id
+                  HAVING {aggregator}(runbot_version.number) {comp} %s
+                ;
+            """,
+            version.number
+        )
+        self.env.cr.execute(query)
+        return [rec[0] for rec in self.env.cr.fetchall()]
+
+    def _search_min_version(self, operator, value):
+        if operator not in ('=', 'ilike'):
+            raise NotImplementedError()
+        if isinstance(value, str):
+            min_version = self.env['runbot.version'].search([('name', operator, value)], limit=1)
+        else:
+            min_version = self.env['runbot.version'].browse(value)
+        return [('id', 'in', self._search_min_max(min_version, 'MIN'))]
+
+    def _search_max_version(self, operator, value):
+        if operator not in ('=', 'ilike'):
+            raise NotImplementedError()
+        if isinstance(value, str):
+            min_version = self.env['runbot.version'].search([('name', operator, value)], limit=1)
+        else:
+            min_version = self.env['runbot.version'].browse(value)
+        return [('id', 'in', self._search_min_max(min_version, 'MAX'))]
 
     @api.constrains('test_tags')
     def _check_test_tags(self):
@@ -631,6 +704,8 @@ class BuildErrorContent(models.Model):
     build_ids = fields.Many2many('runbot.build', compute='_compute_build_ids')
     bundle_ids = fields.One2many('runbot.bundle', compute='_compute_bundle_ids')
     version_ids = fields.One2many('runbot.version', compute='_compute_version_ids', string='Versions', search='_search_version')
+    min_version_id = fields.Many2one('runbot.version', compute='_compute_version_ids', string='Min Version', search='_search_min_version')
+    max_version_id = fields.Many2one('runbot.version', compute='_compute_version_ids', string='Max Version')
     trigger_ids = fields.Many2many('runbot.trigger', compute='_compute_trigger_ids', string='Triggers', search='_search_trigger_ids')
     tag_ids = fields.Many2many('runbot.build.error.tag', string='Tags')
     qualifiers = JsonDictField('Qualifiers', index=True)
@@ -712,7 +787,10 @@ class BuildErrorContent(models.Model):
     @api.depends('build_ids')
     def _compute_version_ids(self):
         for build_error in self:
-            build_error.version_ids = build_error.build_ids.version_id
+            version_ids = build_error.build_ids.mapped('version_id').sorted(lambda rec: rec.number)
+            build_error.version_ids = version_ids
+            build_error.min_version_id = version_ids[0] if version_ids else False
+            build_error.max_version_id = version_ids[-1] if version_ids else False
 
     @api.depends('build_ids')
     def _compute_trigger_ids(self):
@@ -753,11 +831,9 @@ class BuildErrorContent(models.Model):
         return hashlib.sha256(s.encode()).hexdigest()
 
     def _search_version(self, operator, value):
-        exclude_domain = []
-        if operator == '=':
-            exclude_ids = self.env['runbot.build.error'].search([('version_ids', '!=', value)])
-            exclude_domain = [('id', 'not in', exclude_ids.ids)]
-        return [('build_error_link_ids.version_id', operator, value)] + exclude_domain
+        _logger.info('operator: %s', operator)
+        _logger.info('value: %s', value)
+        return [('build_error_link_ids.version_id', operator, value)]
 
     def _search_trigger_ids(self, operator, value):
         return [('build_error_link_ids.trigger_id', operator, value)]

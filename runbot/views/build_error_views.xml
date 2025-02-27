@@ -350,6 +350,8 @@
               <field name="first_seen_date" string="First Seen" optional="hide" readonly="1"/>
               <field name="last_seen_date" string="Last Seen" readonly="1" options="{'link_field': 'last_seen_build_id'}"/>
               <field name="last_seen_build_id" column_invisible="True"/>
+              <field name="min_version_id" optional="hide"/>
+              <field name="max_version_id" optional="hide"/>
               <field name="error_count" readonly="1"/>
               <field name="build_count" readonly="1"/>
               <field name="team_id"/>
@@ -412,6 +414,8 @@
           <field name="content"/>
           <field name="canonical_tags"/>
           <field name="version_ids"/>
+          <field name="min_version_id"/>
+          <field name="max_version_id"/>
           <field name="responsible"/>
           <field name="team_id"/>
           <filter string="Assigned to me" name="my_errors" domain="[('responsible', '=', uid)]"/>
