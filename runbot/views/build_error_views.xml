@@ -5,6 +5,9 @@
       <field name="model">runbot.build.error</field>
       <field name="arch" type="xml">
         <form>
+          <header>
+            <field name="state" widget="statusbar" options="{'clickable': '1'}"/>
+          </header>
           <sheet>
               <div name="button_box">
                 <button class="oe_stat_button" type="object" icon="fa-exclamation-circle" name="action_get_build_link_record">
@@ -329,6 +332,55 @@
         <field name="binding_view_types">list</field>
     </record>
 
+    <record id="build_error_view_kanban" model="ir.ui.view">
+      <field name="name">runbot.build.error.kanban</field>
+      <field name="model">runbot.build.error</field>
+      <field name="arch" type="xml">
+          <kanban default_group_by="state" quick_create="false" default_order="last_seen_date desc">
+              <templates>
+                <t t-name="card">
+                  <widget name="web_ribbon" title="Test-tags" bg_color="bg-danger" invisible="not test_tags"/>
+                  <field name="name" class="fw-bold fs-5"/>
+                  <group>
+                    <div class="d-flex align-items-center">
+                      <i class="fa fa-clock-o me-2" title="Date interval from first seen to last seen"/>
+                      <field name="first_seen_date" widget="remaining_days"/>
+                      <i class="fa fa-long-arrow-right mx-2 oe_read_only" title="to"/>
+                      <field name="last_seen_date" widget="remaining_days"/>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-1">
+                      <i class="fa fa-repeat" title="Number of occurence"/>
+                      <field name="error_count"/>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-1">
+                      <i class="fa fa-bullseye" title="Triggers"/>
+                      <field name="trigger_ids" widget="many2many_tags"/>
+                    </div>
+                  </group>
+
+                  <footer>
+                    <div class="d-flex align-items-center gap-1">
+                      <field name="activity_ids" widget="kanban_activity"/>
+                    </div>
+                    <div class="d-flex align-items-center gap-1 ms-auto">
+                      <i class="fa fa-random text-danger" title="inconsistant" invisible="not random"/>
+                      <i class="fa fa-users" title="Responsible team"/>
+                      <field name="team_id"/> <i t-if="!record.team_id.raw_value">no team</i>
+                      <i class="fa fa-address-card" title="Investigator"/>
+                      <field name="customer" widget="many2one_avatar_user"/>
+                      <i class="fa fa-wrench" title="Solver"/>
+                      <field name="responsible" widget="many2one_avatar_user"/>
+                      <field name="fixing_pr_url" widget="url" text="PR" invisible="not fixing_pr_url"/>
+                    </div>
+                  </footer>
+                </t>
+              </templates>
+          </kanban>
+      </field>
+    </record>
+
     <record id="build_error_view_tree" model="ir.ui.view">
       <field name="name">runbot.build.error.list</field>
       <field name="model">runbot.build.error</field>
@@ -478,7 +530,7 @@
       <field name="name">Errors</field>
       <field name="res_model">runbot.build.error</field>
       <field name="path">error</field>
-      <field name="view_mode">list,form</field>
+      <field name="view_mode">list,kanban,form</field>
       <field name="context">{'search_default_not_fixed_errors': True, 'active_test': False}</field>
     </record>
 
