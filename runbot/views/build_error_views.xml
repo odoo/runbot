@@ -6,6 +6,11 @@
       <field name="arch" type="xml">
         <form>
           <sheet>
+              <div name="button_box">
+                <button class="oe_stat_button" type="object" icon="fa-exclamation-circle" name="action_get_build_link_record">
+                  <field string="Builds Link" name="build_count" widget="statinfo"/>
+                </button>
+              </div>
               <widget name="web_ribbon" title="Test-tags" bg_color="bg-danger" invisible="not test_tags"/>
               <button name="action_view_errors" string="See all linked errors" type="object" class="oe_highlight"/>
               <group string="Base info">
@@ -56,31 +61,10 @@
               </group>
               <notebook>
                 <page string="Builds">
-                  <field name="unique_build_error_link_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
-                    <list default_order="log_date desc,id desc">
-                      <field name="log_date"/>
-                      <field name="host" groups="base.group_no_one" optional="hide"/>
-                      <field name="dest" optional="hide"/>
-                      <field name="version_id"/>
-                      <field name="trigger_id"/>
-                      <field name="description"/>
-                      <field name="build_url" widget="url" readonly="1" text="View build"/>
-                    </list>
-                  </field>
+                  <field name="unique_build_error_link_ids" widget="one2many" context="{'hide_linked_error': 'True'}"/>
                 </page>
                 <page string="All links">
-                  <field name="build_error_link_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
-                    <list default_order="log_date desc,id desc">
-                      <field name="log_date"/>
-                      <field name="host" groups="base.group_no_one" optional="hide"/>
-                      <field name="dest" optional="hide"/>
-                      <field name="version_id"/>
-                      <field name="trigger_id"/>
-                      <field name="description"/>
-                      <field name="error_content_id" widget="many2one" string="Linked Error log"/>
-                      <field name="build_url" widget="url" readonly="1" text="View build"/>
-                    </list>
-                  </field>
+                  <field name="build_error_link_ids" widget="one2many"/>
                 </page>
                 <page string="Similary qualified Errors" groups="runbot.group_runbot_admin,runbot.group_runbot_error_manager" invisible="not common_qualifiers">
                   <div class="btn-group">

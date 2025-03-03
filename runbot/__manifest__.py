@@ -38,6 +38,7 @@
         'templates/build_error.xml',
 
         'views/branch_views.xml',
+        'views/build_error_link_views.xml',
         'views/build_error_views.xml',
         'views/build_views.xml',
         'views/bundle_views.xml',

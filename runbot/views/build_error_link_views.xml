@@ -1,0 +1,50 @@
+<odoo>
+  <record id="runbot_build_error_link_tree" model="ir.ui.view">
+      <field name="name">Runbot Build Error Link List</field>
+      <field name="model">runbot.build.error.link</field>
+      <field name="arch" type="xml">
+          <list default_order="log_date desc,id desc" create="false" delete="false" edit="false">
+            <field name="log_date"/>
+            <field name="host" groups="base.group_no_one" optional="hide"/>
+            <field name="dest" optional="hide"/>
+            <field name="version_id"/>
+            <field name="trigger_id"/>
+            <field name="description"/>
+            <field name="error_content_id" widget="many2one" string="Linked Error log" optional="show" column_invisible="context.get('hide_linked_error', False)"/>
+            <field name="build_url" widget="url" readonly="1" text="View build"/>
+          </list>
+      </field>
+  </record>
+
+  <record id="runbot_build_error_link_search" model="ir.ui.view">
+      <field name="name">Runbot Build Error Link Search</field>
+      <field name="model">runbot.build.error.link</field>
+      <field name="arch" type="xml">
+          <search>
+              <field name="description"/>
+              <field name="version_id"/>
+              <field name="trigger_id"/>
+
+              <filter string="Today" name="filter_today" domain="[('log_date', '&gt;', (context_today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d'))]"/>
+              <filter string="Last 7 days" name="filter_week" domain="[('log_date', '&gt;', (context_today() - datetime.timedelta(days=7)).strftime('%Y-%m-%d'))]"/>
+              <filter string="Last 15 days" name="filter_2weeks" domain="[('log_date', '&gt;', (context_today() - datetime.timedelta(days=15)).strftime('%Y-%m-%d'))]"/>
+              <separator/>
+              <filter string="Single App builds" name="filter_single_app" domain="[('description', '=like', 'Testing module %')]"/>
+
+              <group expand="0" string="Group By">
+                  <filter string="Description" name="group_by_description" context="{'group_by': 'description'}"/>
+                  <filter string="Version" name="group_by_version_id" context="{'group_by': 'version_id'}"/>
+                  <filter string="Trigger" name="group_by_trigger_id" context="{'group_by': 'trigger_id'}"/>
+                  <separator/>
+                  <filter string="Log Date" name="group_by_log_date" context="{'group_by': 'log_date'}"/>
+              </group>
+          </search>
+      </field>
+  </record>
+
+  <record id="runbot_build_error_link_action" model="ir.actions.act_window">
+    <field name="name">Runbot Build Error Link</field>
+    <field name="res_model">runbot.build.error.link</field>
+    <field name="view_mode">list,pivot,form</field>
+  </record>
+</odoo>

@@ -322,6 +322,16 @@ class BuildError(models.Model):
         self.ensure_one()
         return Markup('<a href="%s">%s</a>') % (self._get_form_url(), self.id)
 
+    def action_get_build_link_record(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'view_mode': 'list,form,pivot',
+            'res_model': 'runbot.build.error.link',
+            'domain': [('id', 'in', self.unique_build_error_link_ids.ids)],
+            'context': "{'create': False}"
+        }
+
     def action_view_errors(self):
         return {
             'type': 'ir.actions.act_window',
