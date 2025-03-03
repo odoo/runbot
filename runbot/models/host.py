@@ -94,10 +94,21 @@ class Host(models.Model):
                         path character varying NOT NULL,
                         line character varying NOT NULL,
                         type character varying NOT NULL,
+                        metadata jsonb,
                         message text NOT NULL);
                     """)
             except Exception as e:
                 _logger.exception('Failed to create local logs database: %s', e)
+        else:
+            # TODO cleanup remove in 20.0
+            with local_pg_cursor(logs_db_name) as local_cr:
+                local_cr.execute("""SELECT 1
+                FROM information_schema.columns
+                WHERE table_name='ir_logging' and column_name='metadata'""")
+                if not local_cr.fetchone():
+                    _logger.info('Adding metadata column to ir_logging table')
+                    local_cr.execute("""ALTER TABLE ir_logging ADD COLUMN metadata jsonb""")
+
 
     def _bootstrap_db_template(self):
         """ boostrap template database if needed """
@@ -237,7 +248,7 @@ class Host(models.Model):
             query = f"""
                     SELECT *
                     FROM (
-                            SELECT id, create_date, name, level, dbname, func, path, line, type, message, split_part(dbname, '-', 1) as build_id
+                            SELECT id, create_date, name, level, dbname, func, path, line, type, message, split_part(dbname, '-', 1) as build_id, metadata
                             FROM ir_logging
                             )
                         AS ir_logs

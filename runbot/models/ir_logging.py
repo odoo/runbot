@@ -5,6 +5,7 @@ import logging
 from collections import defaultdict
 
 from ..common import pseudo_markdown
+from ..fields import JsonDictField
 from odoo import models, fields, tools, api
 from odoo.exceptions import UserError
 from odoo.tools import html_escape
@@ -24,6 +25,7 @@ class IrLogging(models.Model):
     type = fields.Selection(selection_add=TYPES, string='Type', required=True, index=True, ondelete={t[0]: 'cascade' for t in TYPES})
     error_content_id = fields.Many2one('runbot.build.error.content', compute='_compute_known_error')  # remember to never store this field
     dbname = fields.Char(string='Database Name', index=False)
+    metadata = JsonDictField('Metadata')
 
     @api.model_create_multi
     def create(self, vals_list):
