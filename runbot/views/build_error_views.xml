@@ -221,6 +221,7 @@
                 </group>
                 <group name="build_error_group" string="Base info" col="2">
                   <field name="content" readonly="1"/>
+                  <field name="metadata" readonly="1"/>
                   <field name="module_name" readonly="1"/>
                   <field name="function" readonly="1"/>
                   <field name="file_path" readonly="1"/>
