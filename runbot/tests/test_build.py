@@ -125,6 +125,28 @@ class TestBuildParams(RunbotCaseMinimalSetup):
         build_slot = bundle.last_batch.slot_ids.filtered(lambda rec: rec.trigger_id == self.trigger_server)
         self.assertEqual(build_slot.build_id.params_id.config_id, custom_config)
 
+        # Test custom trigger if targetting non base bundle
+        branch_b_name = 'master-test-something-other-thing'
+        self.push_commit(self.remote_server_dev, branch_b_name, 'Subject', sha='d0d0abab')
+        self.repo_server.project_id.process_delay = 10
+        self.repo_server._update_batches()
+        bundle_b = self.Bundle.search([('name', '=', branch_b_name), ('project_id', '=', self.project.id)])
+        bundle_b.write({
+            'branch_ids': [(0, 0, {
+                'name': '1',
+                'is_pr': True,
+                'pull_head_remote_id': self.remote_server.id,
+                'pull_head_name': f'remote:{branch_b_name}',
+                'target_branch_name': bundle.name,
+                'remote_id': self.remote_server.id,
+            })]
+        })
+        self.assertEqual(bundle.all_trigger_custom_ids, bundle_b.all_trigger_custom_ids)
+        self.repo_server.project_id.process_delay = 0
+        bundle_b.last_batch._process()
+        build_slot = bundle_b.last_batch.slot_ids.filtered(lambda rec: rec.trigger_id == self.trigger_server)
+        self.assertEqual(build_slot.build_id.params_id.config_id, custom_config)
+
     def test_trigger_dependency(self):
         self.start_patchers()
         self.additionnal_setup()

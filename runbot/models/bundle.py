@@ -48,6 +48,7 @@ class Bundle(models.Model):
 
     # Custom parameters
     trigger_custom_ids = fields.One2many('runbot.bundle.trigger.custom', 'bundle_id')
+    all_trigger_custom_ids = fields.Many2many('runbot.bundle.trigger.custom', compute='_compute_all_trigger_custom_ids', recursive=True)
     host_id = fields.Many2one('runbot.host', compute="_compute_host_id", store=True)
     dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, help="Use a custom Dockerfile")
     commit_limit = fields.Integer("Commit limit")
@@ -193,6 +194,17 @@ class Bundle(models.Model):
         )
         for bundle_id, batch_id in self.env.cr.fetchall():
             self.browse(bundle_id).last_done_batch = self.env['runbot.batch'].browse(batch_id)
+
+    @api.depends('branch_ids.target_branch_name', 'branch_ids.is_pr')
+    def _compute_all_trigger_custom_ids(self):
+        for bundle in self:
+            pr_branches = bundle.branch_ids.filtered('is_pr')
+            targets = set(pr_branches.mapped('target_branch_name'))
+            if len(targets) != 1 or targets == {bundle.base_id.name} or bundle.trigger_custom_ids:
+                bundle.all_trigger_custom_ids = bundle.trigger_custom_ids
+            else:
+                parent_bundle = self.env['runbot.bundle'].search([('name', '=', targets.pop())])
+                bundle.all_trigger_custom_ids = parent_bundle.all_trigger_custom_ids
 
     def _url(self):
         self.ensure_one()

@@ -366,7 +366,7 @@ class Batch(models.Model):
         version_id = self.bundle_id.version_id.id
         project_id = self.bundle_id.project_id.id
         trigger_customs = {}
-        for trigger_custom in self.bundle_id.trigger_custom_ids:
+        for trigger_custom in self.bundle_id.all_trigger_custom_ids:
             trigger_customs[trigger_custom.trigger_id] = trigger_custom
         for trigger in triggers:
             trigger_custom = trigger_customs.get(trigger, self.env['runbot.bundle.trigger.custom'])
@@ -427,7 +427,7 @@ class Batch(models.Model):
         bundle_repos = bundle.branch_ids.filtered('alive').mapped('remote_id.repo_id')
         success_trigger = self.slot_ids.filtered(lambda s: s.build_id.global_state in ('running', 'done') and s.build_id.global_result == "ok").trigger_id
         trigger_customs = {}
-        for trigger_custom in self.bundle_id.trigger_custom_ids:
+        for trigger_custom in self.bundle_id.all_trigger_custom_ids:
             trigger_customs[trigger_custom.trigger_id] = trigger_custom
         for slot in self.slot_ids:
             if slot.build_id:
