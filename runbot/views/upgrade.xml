@@ -26,7 +26,6 @@
         </field>
     </record>
 
-
     <record id="upgrade_exception_form" model="ir.ui.view">
       <field name="name">runbot.upgrade.exception</field>
       <field name="model">runbot.upgrade.exception</field>
@@ -36,12 +35,20 @@
               <group>
                 <field name="active"/>
                 <field name="bundle_id" widget="frontend_url"/>
+                <field name="pr_ids">
+                  <list>
+                    <field name="branch_url" widget="url"/>
+                    <field name="alive"/>
+                  </list>
+                </field>
                 <field name="elements"/>
                 <field name="info"/>
                 <field name="create_date"/>
                 <field name="create_uid"/>
                 <field name="team_id"/>
-                <field name="message"/>
+                <field name="message"  readonly="0"/>
+                <button name="action_post_message" string="Post message on all pull requests" type="object" invisible="not create_date"/>
+                <button name="action_auto_rebuild" string="rebuild templates" type="object" invisible="not create_date"/>
               </group>
             </sheet>
             <chatter/>
