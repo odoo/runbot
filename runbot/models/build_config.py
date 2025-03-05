@@ -45,6 +45,7 @@ class Config(models.Model):
     _inherit = "mail.thread"
 
     name = fields.Char('Config name', required=True, tracking=True, help="Unique name for config please use trigram as postfix for custom configs")
+    active = fields.Boolean(default=True)
 
     description = fields.Char('Config description')
     step_order_ids = fields.One2many('runbot.build.config.step.order', 'config_id', copy=True)
