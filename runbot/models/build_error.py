@@ -125,7 +125,7 @@ class BuildError(models.Model):
     @api.constrains('tags_min_version_id', 'tags_max_version_id')
     def _check_min_max_version(self):
         for build_error in self:
-            if build_error.tags_min_version_id and build_error.tags_max_version_id and build_error.tags_min_version_id.number >= build_error.tags_max_version_id.number:
+            if build_error.tags_min_version_id and build_error.tags_max_version_id and build_error.tags_min_version_id.number > build_error.tags_max_version_id.number:
                 raise ValidationError('Tags Min version should be lower than Tags Max version')
 
     def _inverse_tags_min_version_id(self):
