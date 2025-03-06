@@ -230,7 +230,7 @@ class Runbot(Controller):
         if not request.env.user.has_group('runbot.group_runbot_advanced_user') and ':' not in bundle.name:
             raise Forbidden("Only users with a specific group can do that. Please contact runbot administrators")
         _logger.info('user %s forcing bundle %s', request.env.user.name, bundle.name)  # user must be able to read bundle
-        batch = bundle.sudo()._force()
+        batch = bundle.sudo()._force() or bundle.sudo().last_batch
         batch._log('Batch forced by %s', request.env.user.name)
         batch._prepare(auto_rebase=bool(auto_rebase), use_base_commits=bool(use_base_commits))
         batch._process()
