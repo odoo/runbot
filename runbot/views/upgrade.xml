@@ -47,7 +47,7 @@
                 <field name="create_uid"/>
                 <field name="team_id"/>
                 <field name="message"  readonly="0"/>
-                <button name="action_post_message" string="Post message on all pull requests" type="object" invisible="not create_date"/>
+                <button name="action_post_message" groups="runbot.group_runbot_admin" string="Post message on all pull requests" type="object" invisible="not create_date"/>
                 <button name="action_auto_rebuild" string="rebuild templates" type="object" invisible="not create_date"/>
               </group>
             </sheet>
