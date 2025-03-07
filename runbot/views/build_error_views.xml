@@ -32,20 +32,16 @@
                     </list>
                 </field>
               </group>
-              <group name="fixer_info" string="Fixing" col="2">
-                <group>
+              <group>
+                <group name="fixer_info" string="Fixing" col="2">
                   <field name="responsible"/>
                   <field name="customer"/>
                   <field name="team_id"/>
                   <field name="fixing_pr_id"/>
                   <field name="fixing_pr_url" widget="pull_request_url"/>
                   <field name="active"/>
-                  <field name="test_tags" decoration-danger="True" readonly="1" groups="!runbot.group_runbot_admin"/>
-                  <field name="test_tags" decoration-danger="True" groups="runbot.group_runbot_admin"/>
-                  <field name="tags_min_version_id" invisible="not test_tags"/>
-                  <field name="tags_max_version_id" invisible="not test_tags"/>
                 </group>
-                <group>
+                <group name="appearance_info" string="Appearance" col="2">
                   <field name="version_ids" widget="many2many_tags"/>
                   <field name="trigger_ids" widget="many2many_tags"/>
                   <field name="tag_ids" widget="many2many_tags"/>
@@ -55,6 +51,14 @@
                   <field name="first_seen_build_id" invisible="True"/>
                   <field name="last_seen_build_id" invisible="True"/>
                 </group>
+              </group>
+              <group name="test_tags_group" string="Disabling">
+                <field name="canonical_tags"/>
+                <button name="action_copy_canonical_tag" type="object" groups="runbot.group_runbot_admin">Disable test using canonical tag</button>
+                <field name="test_tags" decoration-danger="True" readonly="1" groups="!runbot.group_runbot_admin"/>
+                <field name="test_tags" decoration-danger="True" groups="runbot.group_runbot_admin"/>
+                <field name="tags_min_version_id" invisible="not test_tags"/>
+                <field name="tags_max_version_id" invisible="not test_tags" />
               </group>
               <group>
                 <field name="previous_error_id" readonly="1" invisible="not previous_error_id" text-decoration-danger="True"/>
@@ -205,7 +209,8 @@
                 </group>
                 <group name="build_error_group" string="Base info" col="2">
                   <field name="content" readonly="1"/>
-                  <field name="metadata" readonly="1"/>
+                  <field name="canonical_tag"/>
+                  <field name="metadata" readonly="0" widget="runbotjsonb"/>
                   <field name="module_name" readonly="1"/>
                   <field name="function" readonly="1"/>
                   <field name="file_path" readonly="1"/>
@@ -325,6 +330,7 @@
                 <button name="%(runbot.runbot_open_bulk_wizard)d" string="Bulk Update" type="action" groups="runbot.group_runbot_admin,runbot.group_runbot_error_manager"/>
               </header>
               <field name="name" optional="show" readonly="1"/>
+              <field name="canonical_tags" optional="hide" readonly="1"/>
               <field name="description" optional="hide" readonly="1"/>
               <field name="random" string="Random"/>
               <field name="first_seen_date" string="First Seen" optional="hide" readonly="1"/>
@@ -360,7 +366,8 @@
                   <button name="action_qualify" string="Qualify" type="object" groups="runbot.group_runbot_admin,runbot.group_runbot_error_manager"/>
                 </header>
                 <field name="error_display_id" optional="show"/>
-                <field name="module_name" optional="show" readonly="1"/>
+                <field name="canonical_tag" optional="show" readonly="1"/>
+                <field name="module_name" optional="hide" readonly="1"/>
                 <field name="summary" optional="show" readonly="1"/>
                 <field name="random" string="Random"/>
                 <field name="first_seen_date" string="First Seen" optional="hide" readonly="1"/>
@@ -384,7 +391,7 @@
       <field name="arch" type="xml">
         <search string="Search errors">
           <field name="content"/>
-          <field name="description"/>
+          <field name="canonical_tags"/>
           <field name="version_ids"/>
           <field name="responsible"/>
           <field name="team_id"/>
@@ -548,6 +555,7 @@
             <sheet>
               <group name="Regex And Source">
                 <field name="regex"/>
+                <field name="check_canonical_tag"/>
                 <field name="check_module_name"/>
                 <field name="check_file_path"/>
                 <field name="check_function"/>

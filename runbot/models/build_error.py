@@ -100,6 +100,7 @@ class BuildError(models.Model):
     fixing_pr_url = fields.Char('Fixing PR url', related='fixing_pr_id.branch_url')
 
     test_tags = fields.Char(string='Test tags', help="Comma separated list of test_tags to use to reproduce/remove this error", tracking=True)
+    canonical_tags = fields.Char('Canonical tag', compute='_compute_canonical_tags', store=True)
     tags_min_version_excluded_id = fields.Many2one('runbot.version', 'Tag min version (excluded)')
     tags_min_version_id = fields.Many2one('runbot.version', 'Tags Min version', compute="_compute_tags_min_version_id", inverse="_inverse_tags_min_version_id", help="Minimal version where the test tags will be applied.", tracking=True)
     tags_max_version_id = fields.Many2one('runbot.version', 'Tags Max version', help="Maximal version where the test tags will be applied.", tracking=True)
@@ -134,6 +135,11 @@ class BuildError(models.Model):
             records.tags_min_version_excluded_id = False
             if records.tags_min_version_id:
                 records.tags_min_version_excluded_id = next((version for version in all_versions if version.number < records.tags_min_version_id.number), False)
+
+    @api.depends('error_content_ids.canonical_tag')
+    def _compute_canonical_tags(self):
+        for record in self:
+            record.canonical_tags = ','.join(record.error_content_ids.filtered('canonical_tag').mapped('canonical_tag'))
 
     @api.depends('tags_min_version_id')
     def _compute_tags_min_version_id(self):
@@ -423,6 +429,12 @@ class BuildError(models.Model):
                             record.team_id = team
                             break
 
+    def action_copy_canonical_tag(self):
+        for record in self:
+            if record.canonical_tags:
+                record.test_tags = record.canonical_tags
+                record._onchange_test_tags()
+
     @api.model
     def _parse_logs(self, ir_logs):
         if not ir_logs:
@@ -506,6 +518,7 @@ class BuildErrorContent(models.Model):
     content = fields.Text('Error message', required=True)
     cleaned_content = fields.Text('Cleaned error message')
     metadata = JsonDictField('Metadata')
+    canonical_tag = fields.Char('Canonical tag', compute='_compute_canonical_tag', store=True)
     summary = fields.Char('Content summary', compute='_compute_summary', store=False)
     module_name = fields.Char('Module name')  # name in ir_logging
     file_path = fields.Char('File Path')  # path in ir logging
@@ -578,6 +591,11 @@ class BuildErrorContent(models.Model):
                 if not previous_error.error_content_ids:
                     build_error.error_id._merge(previous_error)
         return result
+    
+    @api.depends('metadata')
+    def _compute_canonical_tag(self):
+        for record in self:
+            record.canonical_tag = record.metadata.get('test', {}).get('canonical_tag')
 
     @api.depends('build_error_link_ids')
     def _compute_build_ids(self):
@@ -835,10 +853,11 @@ class ErrorQualifyRegex(models.Model):
     active = fields.Boolean('Active', default=True, tracking=True)
     regex = fields.Char('Regular expression', required=True, tracking=True)
 
+    check_canonical_tag = fields.Boolean('Check canonical tag', default=False, help='Apply regex on canonical tag')
     check_module_name = fields.Boolean('Check Module Name', default=False, help='Apply regex on Error Module Name')
     check_file_path = fields.Boolean('Check File Path', default=False, help='Apply regex on Error Module Name')
     check_function = fields.Boolean('Check Function name', default=False, help='Apply regex on Error Function Name')
-    check_content = fields.Boolean('Check content', default=True, help='Apply regex on Error Csontent')
+    check_content = fields.Boolean('Check content', default=True, help='Apply regex on Error Content')
 
     check_fields = fields.Char('Checked Fields', compute='_compute_check_fields', help='Fields on which regex is applied')
 
@@ -879,11 +898,11 @@ for error_content in self:
                     "The regular expresion should contain at least one named group pattern e.g: '(?P<module>.+)'"
                 )
 
-    @api.depends('check_module_name', 'check_file_path', 'check_function', 'check_content')
+    @api.depends('check_module_name', 'check_file_path', 'check_function', 'check_content', 'check_canonical_tag')
     def _compute_check_fields(self):
         for record in self:
             res = []
-            for cf in ['module_name', 'file_path', 'function', 'content']:
+            for cf in ['canonical_tag', 'module_name', 'file_path', 'function', 'content']:
                 if record[f'check_{cf}']:
                     res.append(cf)
             record.check_fields = ','.join(res)
