@@ -359,7 +359,7 @@ class BuildError(models.Model):
             'type': 'ir.actions.act_window',
             'views': [(False, 'list'), (False, 'form')],
             'res_model': 'runbot.build.error.content',
-            'domain': [('error_id', '=', self.id)],
+            'domain': [('error_id', 'in', self.ids)],
             'context': {'active_test': False},
             'target': 'current',
         }

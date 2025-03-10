@@ -323,6 +323,7 @@
                 >
               <header>
                 <button name="%(runbot.runbot_open_bulk_wizard)d" string="Bulk Update" type="action" groups="runbot.group_runbot_admin,runbot.group_runbot_error_manager"/>
+                <button name="action_view_errors" string="See all linked errors" type="object" class="oe_highlight"/>
               </header>
               <field name="name" optional="show" readonly="1"/>
               <field name="description" optional="hide" readonly="1"/>
