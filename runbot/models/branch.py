@@ -32,7 +32,7 @@ class Branch(models.Model):
 
     pull_head_name = fields.Char(string='PR HEAD name', readonly=True, store=True)
     pull_head_remote_id = fields.Many2one('runbot.remote', 'Pull head repository', store=True, index=True)
-    target_branch_name = fields.Char( string='PR target branch', store=True)
+    target_branch_name = fields.Char(string='PR target branch', store=True)
     reviewers = fields.Char('Reviewers')
 
     reflog_ids = fields.One2many('runbot.ref.log', 'branch_id')
