@@ -139,7 +139,8 @@ class BuildError(models.Model):
     @api.depends('error_content_ids.canonical_tag')
     def _compute_canonical_tags(self):
         for record in self:
-            record.canonical_tags = ','.join(record.error_content_ids.filtered('canonical_tag').mapped('canonical_tag'))
+            canonical_tags = sorted(set(record.error_content_ids.filtered('canonical_tag').mapped('canonical_tag')))
+            record.canonical_tags = ','.join(canonical_tags)
 
     @api.depends('tags_min_version_id')
     def _compute_tags_min_version_id(self):
@@ -909,7 +910,7 @@ for error_content in self:
 
     def _qualify(self, build_error_content):
         self.ensure_one()
-        content = '\n'.join([build_error_content[sf] for sf in self.check_fields.split(',') if self.check_fields])
+        content = '\n'.join([(build_error_content[sf] or '') for sf in self.check_fields.split(',') if self.check_fields])
         result = False
         if content and self.regex:
             result = re.search(self.regex, content, flags=re.MULTILINE)
