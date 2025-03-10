@@ -67,6 +67,16 @@
             'runbot/static/src/diff_match_patch_module.js',
             'runbot/static/src/fields/*',
         ],
+        'runbot.assets_frontend': [
+            ('include', 'web.assets_frontend_minimal'), # Pray the gods this stays named correctly
+
+            'runbot/static/libs/owl.js',
+            'runbot/static/src/owl_module.js',
+
+            'runbot/static/src/vendored/**/*', # Vendored files coming from odoo modules
+
+            'runbot/static/src/frontend/root.js',
+        ]
     },
     'post_load': 'runbot_post_load',
 }

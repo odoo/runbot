@@ -15,6 +15,8 @@
                     <script type="text/javascript" src="/runbot/static/libs/bootstrap/js/bootstrap.bundle.js"/>
                     <script type="text/javascript" src="/runbot/static/src/frontend/runbot.js"/>
 
+                    <t t-call-assets="runbot.assets_frontend"/>
+
                     <t t-if="refresh">
                         <meta http-equiv="refresh" t-att-content="refresh"/>
                     </t>
