@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import datetime
 import hashlib
 import json
 import logging
@@ -6,6 +7,7 @@ import re
 
 from collections import defaultdict
 from dateutil.relativedelta import relativedelta
+from dateutil import rrule
 from markupsafe import Markup
 from werkzeug.urls import url_join
 from odoo import models, fields, api
@@ -16,6 +18,18 @@ from ..fields import JsonDictField
 
 _logger = logging.getLogger(__name__)
 
+
+def get_color(value: int):
+    if value >= 10:
+        return 'red'
+    elif value >= 5:
+        return 'orange'
+    return 'green'
+
+def draw_svg(values: list[int], max_value: int = 10, height: int = 30):
+    lines = ''.join(f'<line x1="0" x2="{len(values) * 10}" y1="{v * 10}" y2="{v * 10}" stroke="gray" stroke_width="1"/>' for v in range(0, max_value, 2))
+    rects = ''.join(f'<rect fill="{get_color(value)}" width="9" height="{min(value, max_value) * 10}" x="{idx * 10 + 0.5}" y="{(max_value - min(value, max_value)) * 10}"/>' for idx, value in enumerate(values))
+    return f'<div style="height: {height}px"><svg xmlns="https://www.w3.org/2000/svg" viewbox="0 0 {len(values) * 10} {max_value * 10}" style="border: 1px solid black; height: 100%; width: 100%;" preserveAspectRatio="none" shape-rendering="cripsEdges">{lines}{rects}</svg></div>'
 
 class BuildErrorLink(models.Model):
     _name = 'runbot.build.error.link'
@@ -122,6 +136,12 @@ class BuildError(models.Model):
     tag_ids = fields.Many2many('runbot.build.error.tag', string='Tags', compute=_compute_related_error_content_ids('tag_ids'), search=_search_related_error_content_ids('tag_ids'))
 
     random = fields.Boolean('Random', compute="_compute_random", store=True)
+
+    graph_history = fields.Html('30 days history', compute='_compute_graph', sanitize=False)
+    graph_hourly_recurence = fields.Html('Hourly recurence', compute='_compute_graph', sanitize=False)
+    graph_day_of_week_recurence = fields.Html('Weekly recurence', compute='_compute_graph', sanitize=False)
+    graph_day_of_month_recurence = fields.Html('Monthly recurence', compute='_compute_graph', sanitize=False)
+
 
     @api.constrains('tags_min_version_id', 'tags_max_version_id')
     def _check_min_max_version(self):
@@ -263,6 +283,67 @@ class BuildError(models.Model):
             else:
                 record.analogous_content_ids = False
 
+    def _get_log_dates(self, start_date: datetime.datetime, end_date: datetime.datetime):
+        """
+        Returns an count of build_error per hour for the last 30 days.
+        -> Dict[Self, Dict[datetime, int]]
+        """
+        assert self, 'Method does not work if called with empty recordset.'
+        result = defaultdict(dict)
+        if not self._origin.ids:
+            return result
+        self.env.cr.execute("""
+            SELECT error.id as error_id, date_trunc('hour', link.log_date) as time, count(*) as count
+              FROM runbot_build_error AS error
+              JOIN runbot_build_error_content AS content ON content.error_id = error.id
+              JOIN runbot_build_error_link AS link ON link.error_content_id = content.id
+             WHERE error.id IN %s AND link.log_date BETWEEN %s AND %s
+          GROUP BY error.id, date_trunc('hour', link.log_date)
+        """, (tuple(self.ids), start_date, end_date))
+        data = self.env.cr.dictfetchall()
+        for d in data:
+            result[self.browse(d['error_id'])][d['time']] = d['count']
+        return result
+
+    @api.depends('build_error_link_ids')
+    def _compute_graph(self):
+        end_date = fields.Date.today() + relativedelta(days=1)
+        start_date = end_date - relativedelta(days=30)
+        log_date_per_error = self._get_log_dates(start_date, end_date)
+        for error in self:
+            dates = log_date_per_error[error]
+            daily_freq = [
+                sum(
+                    count
+                    for hour, count in dates.items() if hour.date() == date.date()
+                )
+                for date in rrule.rrule(rrule.DAILY, dtstart=start_date, until=end_date)
+            ]
+            error.graph_history = draw_svg(daily_freq, max_value=max(daily_freq))
+            hourly_freq = [
+                sum(
+                    count
+                    for hour, count in dates.items() if hour.hour == h
+                )
+                for h in range(24)
+            ]
+            error.graph_hourly_recurence = draw_svg(hourly_freq)
+            day_of_week_freq = [
+                sum(
+                    count
+                    for hour, count in dates.items() if hour.isoweekday() -1 == day
+                )
+                for day in range(7)
+            ]
+            error.graph_day_of_week_recurence = draw_svg(day_of_week_freq)
+            day_of_month_recurrence = [
+                sum(
+                    count
+                    for hour, count in dates.items() if hour.day - 1 == day
+                )
+                for day in range(31)
+            ]
+            error.graph_day_of_month_recurence = draw_svg(day_of_month_recurrence)
 
     @api.constrains('test_tags')
     def _check_test_tags(self):

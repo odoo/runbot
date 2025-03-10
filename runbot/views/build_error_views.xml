@@ -48,6 +48,7 @@
                   <field name="random"/>
                   <field name="first_seen_date" widget="frontend_url" options="{'link_field': 'first_seen_build_id'}"/>
                   <field name="last_seen_date" widget="frontend_url" options="{'link_field': 'last_seen_build_id'}"/>
+                  <field name="graph_history"/>
                   <field name="first_seen_build_id" invisible="True"/>
                   <field name="last_seen_build_id" invisible="True"/>
                 </group>
@@ -187,6 +188,18 @@
                         <field name="fingerprint" optional="hide"/>
                       </list>
                   </field>
+                </page>
+                <page string="Frequency graphs">
+                  <group>
+                    <group>
+                      <field name="graph_history"/>
+                      <field name="graph_hourly_recurence"/>
+                    </group>
+                    <group>
+                      <field name="graph_day_of_week_recurence"/>
+                      <field name="graph_day_of_month_recurence"/>
+                    </group>
+                  </group>
                 </page>
               </notebook>
           </sheet>
@@ -347,6 +360,11 @@
               <field name="fixing_pr_id" optional="hide"/>
               <field name="fixing_pr_alive" optional="hide"/>
               <field name="fixing_pr_url" widget="pull_request_url" text="view PR" readonly="1" invisible="not fixing_pr_url"/>
+              <field name="graph_history" optional="show"/>
+              <field name="graph_hourly_recurence" optional="hide"/>
+              <field name="graph_day_of_week_recurence" optional="hide"/>
+              <field name="graph_day_of_month_recurence" optional="hide"/>
+
           </list>
       </field>
   </record>
