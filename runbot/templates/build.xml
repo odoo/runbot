@@ -234,6 +234,14 @@
             </table>
           </div>
           <t t-set="nb_subbuild" t-value="len(build.children_ids)"/>
+          <t t-set="warning" t-value="([b.config_id.warning for b in build.ancestors if b.config_id.warning] + [''])[0]"/>
+          <div class="col-md-12" t-if="warning">
+            <div class="row">
+              <div t-attf-class="alert alert-warning text-center">
+                  <b t-out="warning"/>
+              </div>
+            </div>
+          </div>
           <div class="col-md-12">
             <table class="table table-condensed">
               <tr>
