@@ -64,6 +64,7 @@
     'assets': {
         'web.assets_backend': [
             'runbot/static/libs/diff_match_patch/diff_match_patch.js',
+            'runbot/static/src/diff_match_patch_module.js',
             'runbot/static/src/fields/*',
         ],
     },
