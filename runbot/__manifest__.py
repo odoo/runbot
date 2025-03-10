@@ -77,6 +77,7 @@
             'runbot/static/src/vendored/**/*', # Vendored files coming from odoo modules
 
             'runbot/static/src/frontend/root.js',
+            'runbot/static/src/frontend/runbot.js',
         ]
     },
     'post_load': 'runbot_post_load',

@@ -1,39 +1,51 @@
-(function($) {
-    "use strict";   
-    $(function () {
-        $(document).on('click', '[data-runbot]', function (e) {
-            e.preventDefault();
-            var data = $(this).data();
-            var operation = data.runbot;
-            if (!operation) { 
-                return; 
-            }
-            var xhr = new XMLHttpRequest();
-            var url = e.target.href
-            if (data.runbotBuild) {
-                url = '/runbot/build/' + data.runbotBuild + '/' + operation
-            }
-            var elem = e.target 
-            xhr.addEventListener('load', function () {
-                if (operation == 'rebuild' && window.location.href.split('?')[0].endsWith('/build/' + data.runbotBuild)){
-                    window.location.href = window.location.href.replace('/build/' + data.runbotBuild, '/build/' + xhr.responseText);
-                } else if (operation == 'action') {
-                    elem.parentElement.innerText = this.responseText
-                } else {
-                    window.location.reload();
-                }
-            });
-            xhr.open('POST', url);
-            xhr.send();
+import { registry } from '@web/core/registry';
+import { Interaction } from '@web/public/interaction';
+
+
+class Runbot extends Interaction {
+    static selector = '.frontend';
+    dynamicContent = {
+        '[data-runbot]': {
+            't-on-click.prevent': this.onClickDataRunbot,
+        },
+        '[data-clipboard-copy]': {
+            't-on-click.prevent': this.onClickClipboardCopy
+        }
+    };
+
+    /**
+     * @param {Event} ev
+     */
+    async onClickDataRunbot({currentTarget: target}) {
+        const {runbot: operation, runbotBuild} = target.dataset;
+        if (!operation) {
+            return;
+        }
+        let url = target.href;
+        if (runbotBuild) {
+            url = `/runbot/build/${runbotBuild}/${operation}`;
+        }
+        const response = await fetch(url, {
+            method: 'POST',
         });
-    });
-})(jQuery);
-
-
-function copyToClipboard(text) {
-    if (!navigator.clipboard) {
-        console.error('Clipboard not supported');
-        return;
+        if (operation == 'rebuild' && window.location.href.split('?')[0].endsWith(`/build/${runbotBuild}`)) {
+            window.location.href = window.location.href.replace('/build/' + runbotBuild, '/build/' + await response.text());
+        } else if (operation == 'action') {
+            target.parentElement.innerText = await response.text();
+        } else {
+            window.location.reload();
+        }
     }
-    navigator.clipboard.writeText(text);
+
+    /**
+     * @param {Event} ev
+     */
+    async onClickClipboardCopy({ currentTarget: target }) {
+        if (!navigator.clipboard) {
+            return;
+        }
+        navigator.clipboard.writeText(target.dataset.clipboardCopy);
+    }
 }
+
+registry.category('public.interactions').add('runbot', Runbot);
