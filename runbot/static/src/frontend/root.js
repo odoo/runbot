@@ -1,8 +1,9 @@
-import { whenReady, Component, xml, App, onError } from '@runbot/owl';
+import { whenReady, Component, xml, App, onError, EventBus } from '@runbot/owl';
 
 import { getTemplate } from '@web/core/templates';
 import { registry } from '@web/core/registry';
 import { useRegistry } from '@web/core/registry_hook';
+import { InteractionService } from '@web/public/interaction_service';
 
 
 const mainComponents = registry.category('main.components');
@@ -56,9 +57,20 @@ class ComponentContainer extends Component {
 (async function startApp() {
     await whenReady();
 
+    const env = {
+        // These attributes are required by vendored data
+        bus: new EventBus(),
+        isReady: Promise.resolve(true),
+        services: {},
+        debug: odoo.debug,
+    };
+
     const app = new App(ComponentContainer, {
         getTemplate,
-        env: {},
+        env,
     });
     await app.mount(document.body);
+    const Interactions = registry.category('public.interactions').getAll();
+    const service = new InteractionService(document.body, env);
+    service.activate(Interactions);
 })();
