@@ -71,6 +71,13 @@
         'runbot.assets_frontend': [
             ('include', 'web.assets_frontend_minimal'), # Pray the gods this stays named correctly
 
+            'runbot/static/libs/bootstrap/css/bootstrap.css',
+            'runbot/static/libs/fontawesome/css/font-awesome.css',
+            'runbot/static/src/css/runbot.css',
+            'runbot/static/libs/jquery/jquery.js',
+            'runbot/static/libs/popper/popper.js',
+            'runbot/static/libs/bootstrap/js/bootstrap.bundle.js',
+
             'runbot/static/libs/owl.js',
             'runbot/static/src/owl_module.js',
 
