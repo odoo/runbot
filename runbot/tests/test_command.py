@@ -12,9 +12,16 @@ foo = bar
 class Test_Command(common.TransactionCase):
 
     def test_command(self):
+        cmd = Command([], ['python3', 'odoo-bin', '--test-tags', "-.test_js[core > utils,core > display]"], [])
+        self.assertEqual(cmd.build(), 'python3 odoo-bin --test-tags "-.test_js[core > utils,core > display]"')
+
+        cmd = Command([], ['psql', '-c', '"SQL query"', '>', 'some_file'], [])
+        self.assertEqual(cmd.build(), 'psql -c "SQL query" > some_file')
+
+
         pres = ['pip3', 'install', 'foo']
         posts = ['python3', '-m', 'coverage', 'html']
-        finals = ['pgdump bar']
+        finals = ['pgdump', 'bar']
         cmd = Command([pres], ['python3', 'odoo-bin'], [posts], finals=[finals])
         self.assertEqual(str(cmd), 'python3 odoo-bin')
 
@@ -33,6 +40,9 @@ class Test_Command(common.TransactionCase):
         self.assertIn('foo = bar', content)
         self.assertIn('a = b', content)
         self.assertIn('x = y', content)
+
+
+
 
         with self.assertRaises(AssertionError):
             cmd.add_config_tuple('http-interface', '127.0.0.1')

@@ -777,7 +777,7 @@ class ConfigStep(models.Model):
         migrate_db_name = '%s-%s' % (build.dest, db_suffix)  # only ok if restore does not force db_suffix
 
         migrate_cmd = build._cmd(enable_log_db=self.enable_log_db)
-        migrate_cmd += ['-u all']
+        migrate_cmd += ['-u', 'all']
         migrate_cmd += ['-d', migrate_db_name]
         migrate_cmd += ['--stop-after-init']
         migrate_cmd += ['--max-cron-threads=0']

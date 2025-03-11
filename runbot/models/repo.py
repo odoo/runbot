@@ -8,6 +8,7 @@ import subprocess
 import time
 import requests
 import markupsafe
+import shlex
 
 from pathlib import Path
 
@@ -486,7 +487,7 @@ class Repo(models.Model):
 
     def _git(self, cmd, errors='strict'):
         cmd = self._get_git_command(cmd, errors)
-        _logger.info("git command: %s", ' '.join(cmd))
+        _logger.info("git command: %s", shlex.join(cmd))
         return subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode(errors=errors)
 
     def _fetch(self, sha):
