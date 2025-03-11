@@ -78,6 +78,7 @@
                     <group string="Extra Parameters" invisible="job_type not in ('python', 'install_odoo', 'test_upgrade', 'run_odoo')">
                         <field name="extra_params"/>
                         <field name="additionnal_env"/>
+                        <field name="secret_env"/>
                         <field name="enable_log_db"/>
                     </group>
                     <group string="Create settings" invisible="job_type not in ('python', 'create_build')">

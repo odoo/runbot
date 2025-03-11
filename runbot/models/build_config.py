@@ -159,6 +159,7 @@ class ConfigStep(models.Model):
     sub_command = fields.Char('Subcommand', tracking=True)
     extra_params = fields.Char('Extra cmd args', tracking=True)
     additionnal_env = fields.Char('Extra env', help='Example: foo="bar";bar="foo". Cannot contains \' ', tracking=True)
+    secret_env = fields.Char('Secret env', help='Hidden environment variables\nExample: foo="bar";bar="foo". Cannot contain \' ', groups="runbot.group_runbot_admin")
     enable_log_db = fields.Boolean("Enable log db", default=True)
     demo_mode = fields.Selection(
         [('default', 'Default'), ('without_demo', 'Without Demo'), ('with_demo', 'With Demo')],
@@ -268,6 +269,18 @@ class ConfigStep(models.Model):
                 if not re.match(reg, values.get('extra_params')):
                     _logger.log('%s tried to create an non supported test_param %s' % (self.env.user.name, values.get('extra_params')))
                     raise UserError('Invalid extra_params on config step')
+
+    def _get_env_variables(self, build=None) -> list[str]:
+        """Returns a list of environment variables in the format KEY=VALUE"""
+        self.ensure_one()
+        variables = []
+        if self.additionnal_env:
+            variables.extend(self.additionnal_env.split(';'))
+        if self.secret_env:
+            variables.extend(self.secret_env.split(';'))
+        if build and (config_env_variables := build.params_id.config_data.get('env_variables', False)):
+            variables.extend(config_env_variables.split(';'))
+        return variables
 
     def _run(self, build):
         build.write({'job_start': now(), 'job_end': False})  # state, ...
@@ -405,7 +418,7 @@ class ConfigStep(models.Model):
         extra_params = self.extra_params or ''
         if extra_params:
             cmd.extend(shlex.split(extra_params))
-        env_variables = self.additionnal_env.split(';') if self.additionnal_env else []
+        env_variables = self._get_env_variables(build=build)
 
         build_port = build.port
         try:
@@ -508,9 +521,7 @@ class ConfigStep(models.Model):
         if self.flamegraph:
             cmd.finals.append(['flamegraph.pl', '--title', 'Flamegraph %s for build %s' % (self.name, build.id), self._perfs_data_path(), '>', self._perfs_data_path(ext='svg')])
             cmd.finals.append(['gzip', '-f', self._perfs_data_path()])  # keep data but gz them to save disc space
-        env_variables = self.additionnal_env.split(';') if self.additionnal_env else []
-        if config_env_variables := build.params_id.config_data.get('env_variables', False):
-            env_variables += config_env_variables.split(';')
+        env_variables = self._get_env_variables(build=build)
         return dict(cmd=cmd, ro_volumes=exports, env_variables=env_variables)
 
     def _upgrade_create_childs(self):
@@ -789,7 +800,7 @@ class ConfigStep(models.Model):
 
         migrate_cmd.finals.append(['psql', migrate_db_name, '-c', '"SELECT id, name, state FROM ir_module_module WHERE state NOT IN (\'installed\', \'uninstalled\', \'uninstallable\') AND name NOT LIKE \'test_%\' "', '>', '/data/build/logs/modules_states.txt'])
 
-        env_variables = self.additionnal_env.split(';') if self.additionnal_env else []
+        env_variables = self._get_env_variables(build=build)
         exception_env = self.env['runbot.upgrade.exception']._generate()
         if exception_env:
             env_variables.append(exception_env)

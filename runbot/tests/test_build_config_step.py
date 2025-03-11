@@ -548,9 +548,36 @@ class TestBuildConfigStep(TestBuildConfigStepCommon):
 
         child = self.parent_build._add_child({'config_data': {'env_variables': 'CHROME_CPU_THROTTLE=10'}})
 
+        env_variables = config_step._get_env_variables(build=child)
+        self.assertEqual(env_variables, ['CHROME_CPU_THROTTLE=10'])
+
         params = config_step._run_install_odoo(child)
         env_variables = params.get('env_variables', [])
         self.assertEqual(env_variables, ['CHROME_CPU_THROTTLE=10'])
+
+    @patch('odoo.addons.runbot.models.build.BuildResult._parse_config')
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
+    def test_config_env_variables(self, mock_checkout, parse_config):
+        parse_config.return_value = {'--test-enable', '--test-tags'}
+        config_step = self.ConfigStep.create({
+            'name': 'all',
+            'job_type': 'install_odoo',
+            'additionnal_env': 'CONFIG=1;CONFIG_2=2',
+            'secret_env': 'SECRET=secret',
+        })
+
+        child = self.parent_build._add_child({'config_data': {'env_variables': 'BUILD=FOO'}})
+
+        env_variables = config_step._get_env_variables(build=child)
+        self.assertEqual(
+            env_variables,
+            [
+                'CONFIG=1',
+                'CONFIG_2=2',
+                'SECRET=secret',
+                'BUILD=FOO',
+            ],
+        )
 
     @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
     def test_db_name(self, mock_checkout):
