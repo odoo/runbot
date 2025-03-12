@@ -51,7 +51,7 @@
                 <body>
                     <header>
                         <nav class="navbar navbar-expand-md bg-body-tertiary">
-                            <a t-if="project" t-att-href="qu(search=search)">
+                            <a t-if="project" t-att-href="qu(search='')">
                                 <b class="active_project">
                                     <t t-out="project.name"/>
                                 </b>
