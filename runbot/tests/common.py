@@ -97,7 +97,7 @@ class RunbotCase(TransactionCase):
             'token': '123',
         })
 
-        self.version_13 = self.Version.create({'name': '13.0'})
+        self.version_13 = self.Version._get('13.0')
         self.default_config = self.env.ref('runbot.runbot_build_config_default')
 
         self.initial_server_commit = self.Commit.create({

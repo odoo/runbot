@@ -1,6 +1,7 @@
 import logging
 import re
 from odoo import models, fields, api, tools
+from odoo.exceptions import ValidationError
 
 
 _logger = logging.getLogger(__name__)
@@ -24,6 +25,20 @@ class Version(models.Model):
     next_intermediate_version_ids = fields.Many2many('runbot.version', compute='_compute_version_relations')
 
     dockerfile_id = fields.Many2one('runbot.dockerfile', default=lambda self: self.env['runbot.version'].search([('name', '=', 'master')], limit=1).dockerfile_id or self.env.ref('runbot.docker_default', raise_if_not_found=False))
+
+    _sql_constraints = [
+        ('unique_name', 'unique (name)', 'avoid duplicate name'),
+        ('unique_number', 'unique (number)', 'avoid duplicate number'),
+    ]
+
+    @api.constrains("name")
+    def _check_match_is_base(self):
+        icp = self.env['ir.config_parameter'].sudo()
+        regex = icp.get_param('runbot.runbot_is_base_regex', False)
+        if regex:
+            for record in self:
+                if not re.match(regex, record.name):
+                    raise ValidationError(f"Version name {record.name} does not match base version regex {regex}")
 
     @api.depends('name')
     def _compute_version_number(self):
