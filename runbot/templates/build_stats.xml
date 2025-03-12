@@ -131,7 +131,7 @@
         </div>
       </t>
       <script type="text/javascript" src="/web/static/lib/Chart/Chart.js"></script>
-      <script type="text/javascript" src="/runbot/static/src/js/stats.js"></script>
+      <script type="text/javascript" src="/runbot/static/src/frontend/stats.js"></script>
     </template>
   </data>
 </odoo>

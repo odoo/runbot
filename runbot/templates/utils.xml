@@ -6,38 +6,32 @@
             <html t-att-data-bs-theme="theme">
                 <head>
                     <title t-out="title or 'Runbot'"/>
-                    <link rel="stylesheet" type="text/css" href="/runbot/static/src/libs/bootstrap/css/bootstrap.css"/>
-                    <link rel="stylesheet" type="text/css" href="/runbot/static/src/libs/fontawesome/css/font-awesome.css"/>
-                    <link rel="stylesheet" type="text/css" href="/runbot/static/src/css/runbot.css"/>
 
-                    <script src="/runbot/static/src/libs/jquery/jquery.js" type="text/javascript"/>
-                    <script type="text/javascript" src="/runbot/static/src/libs/popper/popper.js"/>
-                    <script type="text/javascript" src="/runbot/static/src/libs/bootstrap/js/bootstrap.bundle.js"/>
-                    <script type="text/javascript" src="/runbot/static/src/js/runbot.js"/>
+                    <t t-call-assets="runbot.assets_frontend"/>
 
                     <t t-if="refresh">
                         <meta http-equiv="refresh" t-att-content="refresh"/>
                     </t>
 
                     <t t-if="not page_info_state or page_info_state == 'ok' or page_info_state not in ('warn', 'ko', 'skipped', 'killed', 'manually_killed')">
-                        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_ok.png"/>
-                        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_ok.svg"/>
+                        <link rel="icon" type="image/png" href="/runbot/static/img/icon_ok.png"/>
+                        <link rel="icon" type="image/svg+xml" href="/runbot/static/img/icon_ok.svg"/>
                     </t>
                     <t t-elif="page_info_state == 'ko'">
-                        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_ko.png"/>
-                        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_ko.svg"/>
+                        <link rel="icon" type="image/png" href="/runbot/static/img/icon_ko.png"/>
+                        <link rel="icon" type="image/svg+xml" href="/runbot/static/img/icon_ko.svg"/>
                     </t>
                     <t t-elif="page_info_state == 'warn'">
-                        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_warn.png"/>
-                        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_warn.svg"/>
+                        <link rel="icon" type="image/png" href="/runbot/static/img/icon_warn.png"/>
+                        <link rel="icon" type="image/svg+xml" href="/runbot/static/img/icon_warn.svg"/>
                     </t>
                     <t t-elif="page_info_state == 'skipped'">
-                        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_skipped.png"/>
-                        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_skipped.svg"/>
+                        <link rel="icon" type="image/png" href="/runbot/static/img/icon_skipped.png"/>
+                        <link rel="icon" type="image/svg+xml" href="/runbot/static/img/icon_skipped.svg"/>
                     </t>
                     <t t-elif="page_info_state == 'killed' or page_info_state == 'manually_killed'">
-                        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_killed.png"/>
-                        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_killed.svg"/>
+                        <link rel="icon" type="image/png" href="/runbot/static/img/icon_killed.png"/>
+                        <link rel="icon" type="image/svg+xml" href="/runbot/static/img/icon_killed.svg"/>
                     </t>
                 </head>
                 <body>
@@ -390,7 +384,7 @@
         </template>
 
         <template id="runbot.branch_copy_button">
-            <button t-attf-class="btn btn-default {{btn_size or 'btn-ssm'}}" title="Copy Bundle name" aria-label="Copy Bundle name" t-attf-onclick="copyToClipboard('{{ bundle.name.split(':')[-1] }}')">
+            <button t-attf-class="btn btn-default {{btn_size or 'btn-ssm'}}" title="Copy Bundle name" aria-label="Copy Bundle name" t-attf-data-clipboard-copy="{{ bundle.name.split(':')[-1] }}">
               <i t-attf-class="fa fa-clipboard"/>
             </button>
         </template>
