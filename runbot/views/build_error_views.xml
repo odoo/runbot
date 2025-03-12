@@ -16,7 +16,7 @@
               <group string="Base info">
                 <field name="name"/>
                 <field name="error_content_ids" readonly="1">
-                    <list>
+                    <list limit="5">
                       <field name="content" readonly="1"/>
                       <!--field name="module_name" readonly="1"/-->
                       <!--field name="function" readonly="1"/-->
