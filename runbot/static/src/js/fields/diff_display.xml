@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates>
+    <t t-name="runbot.DiffDisplay">
+        <div class="code_diff">
+            <table>
+                <tr t-foreach="lines" t-as="line" t-key="line_index" t-if="props.lineFilter(line)">
+                    <td class="col_number" t-out="line.colOne"/>
+                    <td class="col_number" t-out="line.colTwo"/>
+                    <td class="code" t-att-class="line.type" t-out="line.line"/>
+                </tr>
+            </table>
+        </div>
+    </t>
+</templates>
