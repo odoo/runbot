@@ -452,6 +452,24 @@ class BuildError(models.Model):
             'target': 'current',
         }
 
+    def action_search_common_qualifier(self):
+        context = {}
+        model = self.env['runbot.build.error.content']
+        for key, value in self.common_qualifiers.dict.items():
+            key_fields = f'x_{key}'
+            if key_fields in model._fields:
+                context[f'search_default_{key_fields}'] = value
+        return {
+            'type': 'ir.actions.act_window',
+            'views': [(False, 'list'), (False, 'form')],
+            'res_model': model._name,
+            #'domain': domain,
+            #'context': {'active_test': False, 'parse_domain': True},
+            'context': context,
+            'target': 'current',
+            'name': 'Search Common qualifiers'
+        }
+
     def action_view_similary_qualified(self):
         return {
             'type': 'ir.actions.act_window',

@@ -13,6 +13,7 @@
               </div>
               <widget name="web_ribbon" title="Test-tags" bg_color="bg-danger" invisible="not test_tags"/>
               <button name="action_view_errors" string="See all linked errors" type="object" class="oe_highlight"/>
+              <button name="action_search_common_qualifier" string="Search common_qualifiers" type="object" class="oe_highlight"/>
               <group string="Base info">
                 <field name="name"/>
                 <field name="error_content_ids" readonly="1">
