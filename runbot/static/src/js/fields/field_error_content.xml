@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates>
+    <t t-name="runbot.ErrorContentOne2ManyList" t-inherit="web.X2ManyField" t-inherit-mode="primary">
+        <div class="o_x2m_control_panel d-empty-none mt-1 mb-4" position="attributes">
+            <attribute name="class">o_x2m_control_panel d-empty-none mt-1</attribute>
+        </div>
+        <div role="toolbar" position="inside">
+            <CheckBox
+                className="'o_boolean_toggle form-switch'"
+                value="state.useDiff"
+                onChange.bind="onToggle"
+            >
+                Toggle diff mode
+            </CheckBox>
+        </div>
+    </t>
+
+    <t t-name="runbot.FieldErrorContentContent">
+        <t t-if="isParent || !this.state.useDiff">
+            <TextField t-props="this.props"/>
+        </t>
+        <DiffDisplay t-else=""
+            fromValue="parent.data.content" toValue="props.record.data.content"
+            lineFilter="(line) => line.type === 'added'"
+        />
+    </t>
+</templates>

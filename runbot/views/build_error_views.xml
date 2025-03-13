@@ -15,9 +15,9 @@
               <button name="action_view_errors" string="See all linked errors" type="object" class="oe_highlight"/>
               <group string="Base info">
                 <field name="name"/>
-                <field name="error_content_ids" readonly="1">
+                <field name="error_content_ids" readonly="1" widget="error_content_list">
                     <list limit="5">
-                      <field name="content" readonly="1"/>
+                      <field name="content" readonly="1" widget="error_content_content"/>
                       <!--field name="module_name" readonly="1"/-->
                       <!--field name="function" readonly="1"/-->
                       <!--field name="file_path" readonly="1"/-->
