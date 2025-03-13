@@ -853,6 +853,8 @@ class BuildResult(models.Model):
             ro_volumes[f'/data/build/{dest}'] = source
         if 'image_tag' not in kwargs:
             kwargs.update({'image_tag': self.params_id.dockerfile_id.image_tag})
+        if self.params_id.config_data.get('docker_use_future') and not kwargs['image_tag'].endswith('.future'):
+            kwargs['image_tag'] += '.future'
         self._log('Preparing', 'Using Dockerfile Tag [%s](/runbot/dockerfile/tag/%s)', kwargs['image_tag'], kwargs['image_tag'], log_type='markdown')
         docker_registry_url = self.host_id._get_docker_registry_url()
         if docker_registry_url and self.host_id.use_remote_docker_registry:

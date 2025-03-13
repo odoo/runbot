@@ -145,6 +145,24 @@ def _docker_build(build_dir, image_tag):
         return dm.result
 
 
+def docker_tag(identifier_or_tag, new_tag):
+    return _docker_tag(identifier_or_tag, new_tag)
+
+def _docker_tag(identifier_or_tag, new_tag):
+    if not identifier_or_tag:
+        return
+    _logger.info('Tagging image %s to "%s"', identifier_or_tag, new_tag)
+    docker_client = docker.from_env()
+    repo, tag = new_tag.split(':')  # runbot DockerFile tags contains the repo part
+    try:
+        image = docker_client.images.get(identifier_or_tag)
+        image.tag(repo, tag)
+    except docker.errors.ImageNotFound:
+        _logger.warning('failed to find docker image with identifier %s', identifier_or_tag)
+    except docker.errors.APIError:
+        _logger.warning('failed to retag docker image with identifier %s', identifier_or_tag)
+
+
 def docker_push(image_tag, push_url='127.0.0.1:5001'):
     return _docker_push(image_tag, push_url)
 

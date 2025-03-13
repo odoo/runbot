@@ -97,6 +97,9 @@
                     <setting>
                       <field name="runbot_docker_registry_host_id"/>
                     </setting>
+                    <setting class="col-lg-12">
+                      <field name="runbot_docker_registry_url"/>
+                    </setting>
                   </block>
                 </app>
               </xpath>

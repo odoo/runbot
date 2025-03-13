@@ -181,6 +181,11 @@ class RunbotCase(TransactionCase):
         self.start_patcher('docker_run', 'odoo.addons.runbot.container._docker_run')
         self.start_patcher('docker_build', 'odoo.addons.runbot.container._docker_build')
         self.start_patcher('docker_push', 'odoo.addons.runbot.container._docker_push')
+        self.start_patcher('docker_prune', 'odoo.addons.runbot.container._docker_prune')
+        self.start_patcher('docker_pull', 'odoo.addons.runbot.container._docker_pull')
+        self.start_patcher('docker_tag', 'odoo.addons.runbot.container._docker_tag')
+        self.start_patcher('docker_images', 'odoo.addons.runbot.container._docker_images')
+        self.start_patcher('docker_remove', 'odoo.addons.runbot.container._docker_remove')
         self.start_patcher('docker_ps', 'odoo.addons.runbot.container._docker_ps', [])
         self.start_patcher('docker_stop', 'odoo.addons.runbot.container._docker_stop')
         self.start_patcher('docker_get_gateway_ip', 'odoo.addons.runbot.models.build_config.docker_get_gateway_ip', None)
@@ -195,7 +200,6 @@ class RunbotCase(TransactionCase):
         self.start_patcher('_local_pg_createdb', 'odoo.addons.runbot.models.build.BuildResult._local_pg_createdb', True)
         self.start_patcher('getmtime', 'odoo.addons.runbot.common.os.path.getmtime', datetime.datetime.now().timestamp())
         self.start_patcher('file_exist', 'odoo.tools.misc.os.path.exists', True)
-
 
         self.start_patcher('_get_py_version', 'odoo.addons.runbot.models.build.BuildResult._get_py_version', 3)
 

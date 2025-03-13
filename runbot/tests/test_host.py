@@ -1,5 +1,7 @@
 import logging
 
+from unittest.mock import call
+
 from .common import RunbotCase
 
 from datetime import datetime, timedelta
@@ -111,3 +113,54 @@ class TestHost(RunbotCase):
         self.patchers['fetch_local_logs'].return_value = logs
         self.test_host._process_logs()
         self.patchers['host_local_pg_cursor'].assert_called()
+
+    def test_docker_builder_existing_image(self):
+        self.start_patcher('build_patcher', 'odoo.addons.runbot.models.docker.Dockerfile._build')
+
+        # deactivate DockerDefault to avoid test pollution
+        self.env.ref('runbot.docker_default').active = False
+
+        icp = self.env['ir.config_parameter']
+        icp.set_param('runbot.docker_registry_host_id', self.test_host.id)
+        icp.set_param('runbot.docker_registry_url', 'registryhost_nowhere')
+        dockerfile = self.env['runbot.dockerfile'].create({
+            'name': 'Docker Test',
+            'to_build': True,
+            'image_identifier': 'current',
+            'image_future_identifier': 'current'
+        })
+
+        self.assertEqual(dockerfile.image_tag, 'odoo:DockerTest')
+        self.assertEqual(dockerfile.image_future_tag, 'odoo:DockerTest.future')
+
+        self.patchers['build_patcher'].side_effect = lambda x: False  # simulate a build failure
+        self.test_host._docker_update_images()
+
+        self.assertEqual(dockerfile.image_future_identifier, 'current')
+
+        self.patchers['build_patcher'].side_effect = lambda x: 'future'  # now simulate a success
+        self.test_host._docker_update_images()
+
+        self.assertEqual(dockerfile.image_future_identifier, 'future')
+
+        expected_docker_tag_calls = [
+            call('current', 'odoo:DockerTest.previous'),
+            call('current', 'odoo:DockerTest'),
+            call('future', 'odoo:DockerTest.future')
+        ]
+
+        self.patchers['docker_tag'].assert_has_calls(expected_docker_tag_calls)
+
+        expected_push_calls = [
+            call('odoo:DockerTest.previous', '127.0.0.1:5001'),
+            call('odoo:DockerTest.previous', 'registryhost_nowhere'),
+            call('odoo:DockerTest', '127.0.0.1:5001'),
+            call('odoo:DockerTest', 'registryhost_nowhere'),
+            call('odoo:DockerTest.future', '127.0.0.1:5001'),
+            call('odoo:DockerTest.future', 'registryhost_nowhere')
+        ]
+
+        self.patchers['docker_push'].assert_has_calls(expected_push_calls)
+        self.patchers['docker_pull'].assert_not_called()
+
+

@@ -7,10 +7,13 @@
           <form string="Dockerfile">
             <sheet>
               <widget name="web_ribbon" title="Empty" bg_color="bg-warning" invisible="dockerfile != ''"/>
+              <widget name="web_ribbon" title="Newer identifier" bg_color="bg-danger" invisible="image_identifier == image_future_identifier"/>
               <widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
               <group>
                 <field name="active" invisible="1"/>
                 <field name="name"/>
+                <field name="image_identifier"/>
+                <field name="image_future_identifier"/>
                 <field name="image_tag"/>
                 <field name="to_build"/>
                 <field name="always_pull"/>
@@ -97,7 +100,7 @@
         <field name="name">runbot.dockerfile.list</field>
         <field name="model">runbot.dockerfile</field>
         <field name="arch" type="xml">
-          <list string="Dockerfile" decoration-danger="dockerfile == ''" decoration-warning="to_build == False">
+          <list string="Dockerfile" decoration-danger="dockerfile == '' or image_identifier != image_future_identifier" decoration-warning="to_build == False">
             <field name="name"/>
             <field name="image_tag"/>
             <field name="to_build" groups="!runbot.group_runbot_admin"/>

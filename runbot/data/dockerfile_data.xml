@@ -199,4 +199,15 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1</field>
 RUN python3 -m pip install --no-cache-dir -r /tmp/requirements.txt</field>
     </record>
 
+    <record model="ir.actions.server" id="action_sync_docker_identifiers">
+        <field name="name">Sync Identifiers</field>
+        <field name="model_id" ref="runbot.model_runbot_dockerfile" />
+        <field name="binding_model_id" ref="runbot.model_runbot_dockerfile" />
+        <field name="type">ir.actions.server</field>
+        <field name="state">code</field>
+        <field name="code">
+            records.action_sync_identifiers()
+        </field>
+    </record>
+
 </odoo>

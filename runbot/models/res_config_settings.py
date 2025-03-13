@@ -51,7 +51,8 @@ class ResConfigSettings(models.TransientModel):
     runbot_pending_warning = fields.Integer('Pending warning limit', default=5, config_parameter='runbot.pending.warning')
     runbot_pending_critical = fields.Integer('Pending critical limit', default=5, config_parameter='runbot.pending.critical')
 
-    runbot_docker_registry_host_id = fields.Many2one('runbot.host', 'Docker registry', help='Runbot host which handles Docker registry.', config_parameter='runbot.docker_registry_host_id')
+    runbot_docker_registry_host_id = fields.Many2one('runbot.host', 'Docker builder', help='Runbot host which handles Docker builds.', config_parameter='runbot.docker_registry_host_id')
+    runbot_docker_registry_url = fields.Char('Docker Registry url', help='Remote Registry Url', config_parameter='runbot.docker_registry_url')
     # TODO other icp
     # runbot.runbot_maxlogs 100
     # migration db
