@@ -63,7 +63,7 @@ class Host(models.Model):
 
     def _compute_build_ids(self):
         for host in self:
-            host.build_ids = self.env['runbot.build'].search([('host', '=', host.name), ('local_state', '!=', 'done')])
+            host.build_ids = self.env['runbot.build'].search([('host', '=', host.name), ('local_state', 'in', ('pending', 'testing', 'running'))])
 
     @api.model_create_multi
     def create(self, vals_list):
