@@ -207,6 +207,7 @@ class RunbotCase(TransactionCase):
             _logger.info('Skipping commit')
 
         self.patch(self.env.cr, 'commit', no_commit)
+        self.addCleanup(self.env.cr.cache.clear)
 
 
     def start_patcher(self, patcher_name, patcher_path, return_value=DEFAULT, side_effect=DEFAULT, new=DEFAULT):

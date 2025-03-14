@@ -62,7 +62,7 @@
                 <field name="tags_max_version_id" invisible="not test_tags" options="{'no_create': True, 'no_create_edit':True}" />
               </group>
               <group>
-                <field name="previous_error_id" readonly="1" invisible="not previous_error_id" text-decoration-danger="True"/>
+                <field name="previous_error_id" readonly="1" invisible="not previous_error_id" decoration-danger="True"/>
               </group>
               <notebook>
                 <page string="Builds">
@@ -364,7 +364,6 @@
               <field name="graph_hourly_recurence" optional="hide"/>
               <field name="graph_day_of_week_recurence" optional="hide"/>
               <field name="graph_day_of_month_recurence" optional="hide"/>
-
           </list>
       </field>
   </record>
@@ -379,6 +378,7 @@
                   decoration-warning="test_tags and fixing_pr_id and not fixing_pr_alive"
                   multi_edit="1"
                   create="false"
+                  expand="1"
                   >
                 <header>
                   <button name="action_find_duplicates" type="object" string="Find duplicates" display="always"/>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+      <template id="runbot.error_merge_result">
+        <t t-call='runbot.layout'>
+            <t t-set="title">Error Merge</t>
+            <h3>Error merge rule: <t t-esc="merger.name"/> (<t t-esc="len(results)"/>)</h3>
+            <div class="row">
+                <t t-foreach="results" t-as="result">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <span><t t-esc="'|'.join(result[:-1])"/></span>
+                            </div>
+                            <div class="card-body">
+                                <table class="table">
+                                <t t-foreach="env['runbot.build.error.content'].browse(result[-1])" t-as="error_content">
+                                    <tr>
+                                        <td><t t-esc="error_content.error_id.active"/></td> 
+                                        <td><a t-attf-href="/odoo/error_merge/{{merger.id}}/error_content/{{error_content.id}}"><t t-esc="error_content.id"/></a></td>
+                                        <td><a t-attf-href="/odoo/error_merge/{{merger.id}}/error/{{error_content.error_id.id}}"><t t-esc="error_content.error_id.id"/></a></td>
+                                        <td>
+                                            <span data-bs-toggle="collapse" t-attf-data-bs-target="#collapse{{error_content.id}}"><t t-esc="error_content.content.split('\n')[0]"/></span>
+                                            <pre t-attf-id="collapse{{error_content.id}}" class="collapse"><t t-esc="error_content.content"/></pre>
+                                        </td>
+                                    </tr>
+                                </t>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </div>
+        </t>
+      </template>
+    </data>
+</odoo>

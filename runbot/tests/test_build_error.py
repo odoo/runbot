@@ -18,7 +18,27 @@ Tour rte_translator failed at step click language dropdown (trigger: .js_languag
 """
 
 
-class TestBuildError(RunbotCase):
+class TestBuildErrorCommon(RunbotCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+
+        qualify_tour = cls.env['runbot.error.qualify.regex'].create({
+            "regex": r"Tour (?P<tour_name>\w+) failed( at step (?P<tour_step>[\w ]+) in mode (?P<tour_mode>\w+))?",
+        })
+        qualify_test = cls.env['runbot.error.qualify.regex'].create({
+            "regex": r"FAIL: (?P<test_class>\w+).(?P<test_method>\w+)",
+        })
+
+        qualify_tour.action_generate_fields()
+        qualify_test.action_generate_fields()
+        #cls.env.registry.setup_models(cls.env.cr)
+        model = cls.env['ir.model']._get('runbot.build.error.content').id
+        cls.x_tour_name = cls.env['ir.model.fields'].search([('name', '=', 'x_tour_name'), ('model_id', '=', model)], limit=1)
+        cls.x_tour_step = cls.env['ir.model.fields'].search([('name', '=', 'x_tour_step'), ('model_id', '=', model)], limit=1)
+        cls.x_tour_mode = cls.env['ir.model.fields'].search([('name', '=', 'x_tour_mode'), ('model_id', '=', model)], limit=1)
+        cls.x_test_class = cls.env['ir.model.fields'].search([('name', '=', 'x_test_class'), ('model_id', '=', model)], limit=1)
+        cls.x_test_method = cls.env['ir.model.fields'].search([('name', '=', 'x_test_method'), ('model_id', '=', model)], limit=1)
 
     def create_test_build(self, vals):
         create_vals = {
@@ -51,15 +71,17 @@ class TestBuildError(RunbotCase):
         log_vals.update(vals)
         return self.IrLog.create(log_vals)
 
-
     def setUp(self):
-        super(TestBuildError, self).setUp()
+        super().setUp()
         self.BuildError = self.env['runbot.build.error']
         self.BuildErrorContent = self.env['runbot.build.error.content']
         self.BuildErrorLink = self.env['runbot.build.error.link']
         self.RunbotTeam = self.env['runbot.team']
         self.ErrorRegex = self.env['runbot.error.regex']
         self.IrLog = self.env['ir.logging']
+
+
+class TestBuildError(TestBuildErrorCommon):
 
     def test_create_write_clean(self):
 
@@ -559,7 +581,7 @@ class TestBuildError(RunbotCase):
                 {
                     "content": "Tour foobar_tour failed at step click_here in mode admin",
                 },
-                                {
+                {
                     "content": "Tour foobar_tour failed at step click_here in mode demo",
                 },
                 {
@@ -572,11 +594,6 @@ class TestBuildError(RunbotCase):
         )
         self.assertEqual(len(error_contents), 4)
         self.assertEqual(len(self.BuildError.search([('error_content_ids', 'in', error_contents.ids)])), 4)
-
-        self.env['runbot.error.qualify.regex'].create({
-            "regex": r"Tour (?P<tour_name>\w+) failed( at step (?P<tour_step>\w+) in mode (?P<tour_mode>\w+))?"
-        })
-        error_contents._qualify()
 
         expected_common_qualifiers = {'tour_name': 'foobar_tour', 'tour_step': 'click_here'}
         self.assertEqual(error_contents[0].qualifiers.dict, {**expected_common_qualifiers, 'tour_mode': 'admin'})
@@ -605,6 +622,8 @@ class TestBuildError(RunbotCase):
 
         # let's merge all errors and verify the qualifiers
         main_error._merge(error_contents.error_id)
+
+        self.assertEqual(len(main_error.error_content_ids), 4)
         self.assertEqual(main_error.common_qualifiers.dict, {'tour_name': 'foobar_tour'})
         self.assertEqual(main_error.unique_qualifiers.dict, {'tour_name': 'foobar_tour', 'tour_step': 'click_here'})
 
@@ -667,26 +686,115 @@ class TestBuildError(RunbotCase):
 
         self.assertEqual(dashboard.build_ids, failed_build)
 
+
+class TestErrorMerge(TestBuildErrorCommon):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.env['runbot.build.error.merge'].create({
+            'name': 'Test Merge',
+            'merge_filter_ids': [
+                (0, 0, {'field_id': cls.x_tour_name.id}),
+                (0, 0, {'field_id': cls.x_tour_step.id}),
+            ],
+            'auto_merge': True,
+        })
+        cls.env['runbot.error.qualify.regex'].create({
+            "regex": r"Tour (?P<tour_name>\w+) failed -> (?P<tour_step>\w+)"
+        })
+
+    def create_errors(self, active):
+        error_content_1 = self.env['runbot.build.error.content'].create({
+            'content': 'Tour foobar_tour failed at step click_here in mode admin',
+        })
+
+        self.assertEqual(error_content_1.qualifiers.dict, {'tour_name': 'foobar_tour', 'tour_step': 'click_here', 'tour_mode': 'admin'})
+        error_content_1.error_id.active = active
+
+        error_content_2 = self.env['runbot.build.error.content'].create({
+            'content': 'Tour foobar_tour failed -> click_here',
+        })
+        return error_content_1, error_content_2
+
+    def test_auto_merge(self):
+        error_content_1, error_content_2 = self.create_errors(True)
+        self.assertEqual(error_content_1.error_id, error_content_2.error_id, "Errors should have been merged automatically")
+
+    def test_auto_merge_inactive(self):
+        error_content_1, error_content_2 = self.create_errors(False)
+        self.assertNotEqual(error_content_1.error_id, error_content_2.error_id, "Errors should not have been merged automatically since first error was archived")
+
+
+    def _prepare_perfs_tests(self):
+        self.env.user.name
+        # create a first error to warmup caches
+        self.env['runbot.build.error.content'].create({
+            'content': f'Something',
+        })
+        self.env.flush_all()
+
+    def test_error_merge_performance_multi(self):
+        error_contents = self.env['runbot.build.error.content']
+        self._prepare_perfs_tests()
+        with self.profile(collectors=['sql']), self.assertQueryCount(44):  # TODO improve me
+            # +2 flush: 2 query for build count (on error and on content)
+            # +4*10 for each error_content, 4 query
+            #   search the error matching the content
+            #   insert
+            #   post message create
+            #   search error history (could be computed)
+            # +2 to create the first error
+
+            for i in range(10):
+                mode = chr(97 + i)
+                error_contents |= self.env['runbot.build.error.content'].create({
+                    'content': f'Tour foobar_tour failed at step click_here in mode mode_{mode}',
+                })
+            self.assertEqual(len(error_contents), 10)
+            self.assertEqual(len(error_contents.error_id), 1)
+
+    def test_error_merge_performance_multi_no_auto_merge(self):
+        error_contents = self.env['runbot.build.error.content']
+        self._prepare_perfs_tests()
+        with self.profile(collectors=['sql']), self.assertQueryCount(62):  # TODO improve me
+            # +2 flush: 2 query for build count (on error and on content)
+            # +6*10 for each error_content, 4 query
+            #   search the error matching the content (only i enough qualifiers match a rule)
+            #   create the error
+            #   post message on error
+            #   insert
+            #   post message create
+            #   search error history (could be computed)
+            for i in range(10):
+                step = chr(97 + i)
+                error_contents |= self.env['runbot.build.error.content'].create({
+                    'content': f'Tour foobar_tour failed at step step_{step} in mode mode',
+                })
+            self.assertEqual(len(error_contents), 10)
+            self.assertEqual(len(error_contents.error_id), 10)
+
+
 class TestCodeOwner(RunbotCase):
 
     def setUp(self):
         super().setUp()
         self.cow_deb = self.env['runbot.codeowner'].create({
-            'project_id' : self.project.id,
+            'project_id': self.project.id,
             'github_teams': 'runbot',
-            'regex': '.*debian.*'
+            'regex': '.*debian.*',
         })
 
         self.cow_web = self.env['runbot.codeowner'].create({
-            'project_id' : self.project.id,
+            'project_id': self.project.id,
             'github_teams': 'website',
-            'regex': '.*website.*'
+            'regex': '.*website.*',
         })
 
         self.cow_crm = self.env['runbot.codeowner'].create({
-            'project_id' : self.project.id,
+            'project_id': self.project.id,
             'github_teams': 'crm',
-            'regex': '.*crm.*'
+            'regex': '.*crm.*',
         })
 
         self.cow_all = self.cow_deb | self.cow_web | self.cow_crm
@@ -696,5 +804,5 @@ class TestCodeOwner(RunbotCase):
             self.env['runbot.codeowner'].create({
                 'project_id': self.project.id,
                 'regex': '*debian.*',
-                'github_teams': 'rd-test'
+                'github_teams': 'rd-test',
             })

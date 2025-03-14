@@ -1,0 +1,55 @@
+<odoo>
+  <data>
+    <record id="build_error_merge_view_form" model="ir.ui.view">
+        <field name="name">runbot.build.error.merge.form</field>
+        <field name="model">runbot.build.error.merge</field>
+        <field name="arch" type="xml">
+          <form>
+            <header>
+              <button name="action_summary" string="Summary" type="object" class="oe_highlight"/>
+              <button name="action_search_error_content_matches" string="Search error content" type="object" class="oe_highlight"/>
+              <button name="action_auto_merge" string="Automerge" type="object" class="oe_highlight btn btn-danger"/>
+            </header>
+            <sheet>
+              <group>
+                <field name="name"/>
+                <field name="auto_merge"/>
+                <field name="merge_filter_ids">
+                    <list editable="bottom">
+                        <field name="field_id"/>
+                        <field name="field_name"/>
+                    </list>
+                </field>
+              </group>
+              <group>
+                <field name="matching_contents_ids">
+                    <list>
+                        <field name="auto_merge_descriptor"/>
+                        <field name="summary"/>
+                    </list>
+                </field>
+              </group>
+            </sheet>
+            <chatter/>
+          </form>
+        </field>
+    </record>
+    <record id="build_error_merge_view_list" model="ir.ui.view">
+        <field name="name">runbot.build.error.merge.list</field>
+        <field name="model">runbot.build.error.merge</field>
+        <field name="arch" type="xml">
+            <list string="Error merge">
+                <field name="name"/>
+                <field name="auto_merge"/>
+                <field name="oneline_description"/>
+            </list>
+        </field>
+    </record>
+    <record id="open_build_error_merge_views" model="ir.actions.act_window">
+        <field name="name">Error merge</field>
+        <field name="path">error_merge</field>
+        <field name="res_model">runbot.build.error.merge</field>
+        <field name="view_mode">list,form</field>
+    </record>
+  </data>
+</odoo>

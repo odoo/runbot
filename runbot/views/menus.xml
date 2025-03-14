@@ -38,6 +38,8 @@
     <menuitem name="Errors" id="runbot_menu_build_error_tree" parent="runbot_menu_manage_errors" sequence="5" action="open_view_build_error_tree"/>
     <menuitem name="Errors contents" id="runbot_menu_build_error_content_tree" parent="runbot_menu_manage_errors" sequence="10" action="open_view_build_error_content_tree"/>
     <menuitem name="Errors Qualifying" id="runbot_menu_build_error_qualify_regex_tree" parent="runbot_menu_manage_errors" sequence="10" action="open_view_build_error_qualify_regex_tree"/>
+    <menuitem name="Error regex" id="runbot_menu_error_regex_tree" parent="runbot_menu_manage_errors" sequence="20" action="open_view_error_regex"/>
+    <menuitem name="Error auto merge" id="runbot_menu_error_auto_merge" parent="runbot_menu_manage_errors" sequence="25" action="open_build_error_merge_views"/>
 
     <menuitem name="Teams" id="runbot_menu_teams" parent="runbot_menu_root" sequence="1000"/>
     <menuitem name="Teams" id="runbot_menu_team_tree" parent="runbot_menu_teams" sequence="30" action="open_view_runbot_team"/>
@@ -59,7 +61,7 @@
     <menuitem id="runbot_menu_upgrade_regex_tree" parent="menu_runbot_settings" sequence="60" action="open_view_upgrade_regex_tree"/>
     <menuitem name="Stats Regexes" id="runbot_menu_stat" parent="menu_runbot_settings" sequence="70" action="open_view_stat_regex_tree"/>
     <menuitem name="Stat Regex Wizard" id="runbot_menu_stat_wizard" parent="menu_runbot_settings" sequence="80" action="runbot_stat_regex_wizard_action"/>
-    <menuitem name="Error regex" id="runbot_menu_error_regex_tree" parent="menu_runbot_settings" sequence="20" action="open_view_error_regex"/>
+
     
     <menuitem name="Technical" id="runbot_menu_technical" parent="menu_runbot_settings" sequence="10000" groups="base.group_system"/>
     <menuitem id="runbot_menu_ir_cron_act" action="base.ir_cron_act" parent="runbot_menu_technical"/>

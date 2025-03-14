@@ -1,26 +1,43 @@
 # -*- coding: utf-8 -*-
 
 import contextlib
+import functools
 import itertools
 import logging
+import os
 import psycopg2
 import re
 import requests
 import socket
 import time
-import os
 
+from babel.dates import LC_TIME, TIMEDELTA_UNITS, Locale
 from collections import OrderedDict
 from datetime import timedelta
-from babel.dates import LC_TIME, Locale, TIMEDELTA_UNITS
 from markupsafe import Markup
 
-from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT, html_escape, file_open
+from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT, file_open, html_escape
 
 _logger = logging.getLogger(__name__)
 
 dest_reg = re.compile(r'^\d{5,}-.+$')
 
+
+def transactioncache(method):
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        assert not self.ids
+        cache = self.env.cr.cache
+        method_key = method
+        params_key = (args, frozenset(kwargs.items()))
+        # should check id key is serializable
+        if method_key not in cache:
+            cache[method_key] = {}
+        if params_key not in cache[method_key]:
+            cache[method_key][params_key] = method(self.with_context({}), *args, **kwargs)
+        return cache[method_key][params_key]
+    wrapper.clear_transaction_cache = lambda self: self.env.cr.cache.pop(method, None)
+    return wrapper
 
 class RunbotException(Exception):
     pass

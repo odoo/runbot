@@ -15,8 +15,10 @@ from werkzeug.urls import url_join
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import SQL, lazy
+from odoo.osv import expression
 
 from ..fields import JsonDictField
+from ..common import transactioncache
 
 _logger = logging.getLogger(__name__)
 
@@ -52,10 +54,9 @@ class BuildErrorLink(models.Model):
         ('error_build_rel_unique', 'UNIQUE (build_id, error_content_id)', 'A link between a build and an error must be unique'),
     ]
 
-
 class BuildErrorSeenMixin(models.AbstractModel):
     _name = 'runbot.build.error.seen.mixin'
-    _description = "Add last/firt build/log_date for error and asssignments"
+    _description = "Add last/first build/log_date for error and asssignments"
 
     first_seen_build_id = fields.Many2one('runbot.build', compute='_compute_seen', string='First Seen build', store=True)
     first_seen_date = fields.Datetime(string='First Seen Date', compute='_compute_seen', store=True)
@@ -145,7 +146,6 @@ class BuildError(models.Model):
     graph_hourly_recurence = fields.Html('Hourly recurence', compute='_compute_graph', sanitize=False)
     graph_day_of_week_recurence = fields.Html('Weekly recurence', compute='_compute_graph', sanitize=False)
     graph_day_of_month_recurence = fields.Html('Monthly recurence', compute='_compute_graph', sanitize=False)
-
 
     @api.constrains('tags_min_version_id', 'tags_max_version_id')
     def _check_min_max_version(self):
@@ -556,6 +556,7 @@ class BuildError(models.Model):
         existing_errors_contents = self.env['runbot.build.error.content'].search([('fingerprint', 'in', list(hash_dict.keys())), ('error_id.active', '=', True)])
         existing_fingerprints = {error.fingerprint: error for error in existing_errors_contents}
         build_error_contents |= existing_errors_contents
+
         # create an error for the remaining entries
         for fingerprint, logs in hash_dict.items():
             if fingerprint in existing_fingerprints:
@@ -563,15 +564,18 @@ class BuildError(models.Model):
                 error = existing_fingerprints[fingerprint]
                 if not error.metadata and logs[0].metadata:
                     error.metadata = logs[0].metadata
-
                 continue
+
             new_build_error_content = self.env['runbot.build.error.content'].create({
+                'error_id': None,
                 'content': logs[0].message,
                 'module_name': logs[0].name.removeprefix('odoo.').removeprefix('addons.'),
                 'file_path': logs[0].path,
                 'function': logs[0].func,
                 'metadata': logs[0].metadata,
+                'canonical_tag': logs[0].metadata.get('test', {}).get('canonical_tag')
             })
+
             build_error_contents |= new_build_error_content
             existing_fingerprints[fingerprint] = new_build_error_content
 
@@ -605,7 +609,6 @@ class BuildError(models.Model):
         base_error = self_sorted[0]
         base_error._merge(self_sorted - base_error)
 
-
 class BuildErrorContent(models.Model):
 
     _name = 'runbot.build.error.content'
@@ -614,6 +617,7 @@ class BuildErrorContent(models.Model):
     _inherit = ('mail.thread', 'mail.activity.mixin', 'runbot.build.error.seen.mixin')
     _rec_name = "id"
 
+    error_active = fields.Boolean('Active', related='error_id.active')
     error_id = fields.Many2one('runbot.build.error', 'Linked to', index=True, required=True)
     error_display_id = fields.Integer(compute='_compute_error_display_id', string="Error id")
     content = fields.Text('Error message', required=True)
@@ -633,7 +637,7 @@ class BuildErrorContent(models.Model):
     version_ids = fields.One2many('runbot.version', compute='_compute_version_ids', string='Versions', search='_search_version')
     trigger_ids = fields.Many2many('runbot.trigger', compute='_compute_trigger_ids', string='Triggers', search='_search_trigger_ids')
     tag_ids = fields.Many2many('runbot.build.error.tag', string='Tags')
-    qualifiers = JsonDictField('Qualifiers', index=True)
+    qualifiers = JsonDictField('Qualifiers', index=True, store=True, compute="_compute_qualifiers")
     similar_ids = fields.One2many('runbot.build.error.content', compute='_compute_similar_ids')
 
     responsible = fields.Many2one(related='error_id.responsible')
@@ -646,6 +650,8 @@ class BuildErrorContent(models.Model):
     test_tags = fields.Char(related='error_id.test_tags')
     tags_min_version_id = fields.Many2one(related='error_id.tags_min_version_id')
     tags_max_version_id = fields.Many2one(related='error_id.tags_max_version_id')
+
+    auto_merge_descriptor = fields.Char('Auto merge descriptor', compute='_compute_auto_merge_descriptor')
 
     def _set_error_history(self):
         for error_content in self:
@@ -660,22 +666,38 @@ class BuildErrorContent(models.Model):
                     error_content.error_id.message_post(body=f"An historical error was found for error {error_content.id}: {previous_error_content.id}")
                     error_content.error_id.previous_error_id = previous_error_content.error_id
 
+    @transactioncache
+    def _get_error_auto_merge(self):
+        return self.env['runbot.build.error.merge'].search([('auto_merge', '=', True), ('active', '=', True)])
+
     @api.model_create_multi
     def create(self, vals_list):
-        cleaners = self.env['runbot.error.regex'].search([('re_type', '=', 'cleaning')])
+        auto_merge = self._get_error_auto_merge()
+        cleaners = self.env['runbot.error.regex']._get_cleaners()
         for vals in vals_list:
+            self._qualify(vals)  # populate vals with qualifiers
+            for k, v in vals['qualifiers'].items():  # this would be done automaticaly bu the compute but is needed to be able to merge vals 
+                field = f'x_{k}'
+                if field in self._fields:
+                    vals[field] = v
             if not vals.get('error_id'):
-                # TODO, try to find an existing one that could match, will be done in another pr
-                name = vals.get('content', '').split('\n')[0][:1000]
-                error = self.env['runbot.build.error'].create({
-                    'name': name,
-                })
-                vals['error_id'] = error.id
+                temp = self.new(vals)
+                similar_domain = auto_merge._get_similar_domain(temp)
+                similar_domain = expression.AND([similar_domain, [('error_id.active', '=', True)]])
+                error_candidates = self.env['runbot.build.error.content'].search(similar_domain, order="id", limit=1)
+                if error_candidates:
+                    vals['error_id'] = error_candidates[0].error_id.id
+                else:
+                    name = vals.get('content', '').split('\n')[0][:1000]
+                    error = self.env['runbot.build.error'].create({
+                        'name': name,
+                    })
+                    vals['error_id'] = error.id
             content = vals.get('content')
             cleaned_content = cleaners._r_sub(content)
             vals.update({
                 'cleaned_content': cleaned_content,
-                'fingerprint': self._digest(cleaned_content)
+                'fingerprint': self._digest(cleaned_content),
             })
         records = super().create(vals_list)
         records._set_error_history()
@@ -692,7 +714,19 @@ class BuildErrorContent(models.Model):
                 if not previous_error.error_content_ids:
                     build_error.error_id._merge(previous_error)
         return result
-    
+
+    @api.depends_context('params.res_id')
+    def _compute_auto_merge_descriptor(self):
+        error_merge_ids = self.env.context.get('error_merge_ids')
+        if error_merge_ids and len(error_merge_ids) == 1:
+            error_merge = self.env['runbot.build.error.merge'].browse(error_merge_ids)
+        def make_descriptor(content):
+            if error_merge_ids:
+                return '|'.join([content[f] for f in error_merge.merge_filter_ids.mapped('field_name')])
+            return ''
+        for record in self:
+            record.auto_merge_descriptor = make_descriptor(record)
+
     @api.depends('metadata')
     def _compute_canonical_tag(self):
         for record in self:
@@ -744,6 +778,10 @@ class BuildErrorContent(models.Model):
                 record.similar_ids = self.env['runbot.build.error.content'].browse([rec[0] for rec in self.env.cr.fetchall()])
             else:
                 record.similar_ids = False
+
+    @api.depends('content', 'canonical_tag', 'module_name', 'file_path', 'function')
+    def _compute_qualifiers(self):
+        self._qualify()
 
     @api.model
     def _digest(self, s):
@@ -798,16 +836,20 @@ class BuildErrorContent(models.Model):
         domain = [('id', 'in', self.ids)] if self else []
         return [r[1] for r in self._read_group(domain, ('fingerprint'), ('id:array_agg'), [('id:count', '>', 1)])]
 
-    def _qualify(self):
-        qualify_regexes = self.env['runbot.error.qualify.regex'].search([])
-        for record in self:
+    def _qualify(self, vals=None):
+        if vals is None:
+            vals = self
+        else:
+            vals = [vals]
+        qualify_regexes = self.env['runbot.error.qualify.regex']._get_cache()
+        for record in vals:
             all_qualifiers = {}
             for qualify_regex in qualify_regexes:
                 res = qualify_regex._qualify(record)
                 if res:
                     # res.update({'qualifier_id': qualify_regex.id}) Probably not a good idea
                     all_qualifiers.update(res)
-            record.qualifiers = all_qualifiers
+            record['qualifiers'] = all_qualifiers
 
     ####################
     #   Actions
@@ -907,6 +949,10 @@ class ErrorRegex(models.Model):
                 return True
         return False
 
+    @transactioncache
+    def _get_cleaners(self):
+        return self.search([('re_type', '=', 'cleaning')])
+
 
 class ErrorBulkWizard(models.TransientModel):
     _name = 'runbot.error.bulk.wizard'
@@ -964,6 +1010,15 @@ class ErrorQualifyRegex(models.Model):
 
     test_ids = fields.One2many('runbot.error.qualify.test', 'qualify_regex_id', string="Test Sample", help="Error samples to test qualifying regex")
 
+    @transactioncache
+    def _get_cache(self):
+        return self.env['runbot.error.qualify.regex'].search([])
+
+    def create(self, vals):
+        res = super().create(vals)
+        self._get_cache.clear_transaction_cache(self)
+        return res
+
     def action_generate_fields(self):
         for rec in self:
             for field in list(re.compile(rec.regex).groupindex.keys()):
@@ -1010,12 +1065,18 @@ for error_content in self:
 
     def _qualify(self, build_error_content):
         self.ensure_one()
-        content = '\n'.join([(build_error_content[sf] or '') for sf in self.check_fields.split(',') if self.check_fields])
+        if not self.check_fields:
+            return {}
+        fields_to_check = self.check_fields.split(',')
+        values = build_error_content
+        if not isinstance(build_error_content, dict):
+            values = build_error_content.read(fields_to_check)[0]
+        content = '\n'.join([(values[sf] or '') for sf in fields_to_check])
         result = False
         if content and self.regex:
             result = re.search(self.regex, content, flags=re.MULTILINE)
         # filtering empty values to allow non mandatory named groups
-        return {k:v for k,v in result.groupdict().items() if v} if result else {}
+        return {k: v for k, v in result.groupdict().items() if v} if result else {}
 
 
 class QualifyErrorTest(models.Model):
