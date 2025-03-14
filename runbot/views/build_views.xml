@@ -92,13 +92,22 @@
         <field name="model">runbot.build</field>
         <field name="arch" type="xml">
             <list string="Builds">
-                <field name="dest"/>
+                <field name="dest" 
+                    decoration-bg-danger="global_result == 'ko'"
+                    decoration-bg-warning="global_result == 'warn'"
+                    decoration-bg-success="global_result == 'ok' and global_state == 'done'"
+                    decoration-bg-info="global_result == 'ok' and global_state != 'done'"
+                />
+                <field name="create_bundle_id"/>
+                <field name="global_result" optional="hide"/>
                 <field name="global_state"/>
-                <field name="global_result"/>
-                <field name="job"/>
+                <field name="trigger_id"/>
+                <field name="config_id"/>
+                <field name="job" string="Active_Step"/>
                 <field name="host"/>
                 <field name="build_time"/>
                 <field name="build_age"/>
+                <field name="build_url" widget="url"/>
             </list>
         </field>
     </record>
@@ -119,6 +128,7 @@
                 <field name="id"/>
                 <field name="global_state"/>
                 <field name="dest"/>
+                <field name="host" operator="="/>
                 <filter string="Pending" name='pending' domain="[('global_state','=', 'pending')]"/>
                 <filter string="Testing" name='testing' domain="[('global_state','in', ('testing', 'waiting'))]"/>
                 <filter string="Running" name='running' domain="[('global_state','=', 'running')]"/>

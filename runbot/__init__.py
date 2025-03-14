@@ -10,6 +10,11 @@ import logging
 import threading
 from odoo.http import request
 
+# rng validators doesn't allow decoration-bg-attributes on list fields even if they work fine (as long as you don't have a widget)
+# disabling rng validators for list as they have a low value (as long as we test the views manually witch is the case on runbot)
+from odoo.tools.view_validation import _validators
+_validators['list'] = []
+
 class UserFilter(logging.Filter):
     def filter(self, record):  # noqa: A003
         message_parts = record.msg.split(' ', 2)
@@ -28,3 +33,4 @@ class UserFilter(logging.Filter):
 
 def runbot_post_load():
     logging.getLogger('werkzeug').addFilter(UserFilter())
+

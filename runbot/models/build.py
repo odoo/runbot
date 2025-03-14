@@ -163,6 +163,7 @@ class BuildResult(models.Model):
     config_id = fields.Many2one('runbot.build.config', related='params_id.config_id', store=True, index=True)
     trigger_id = fields.Many2one('runbot.trigger', related='params_id.trigger_id', store=True, index=True)
     create_batch_id = fields.Many2one('runbot.batch', related='params_id.create_batch_id', store=True, index=True)
+    create_bundle_id = fields.Many2one('runbot.bundle', related='params_id.create_batch_id.bundle_id', index=True)
 
     # state machine
     global_state = fields.Selection(make_selection(state_order), string='Status', compute='_compute_global_state', store=True, recursive=True)
