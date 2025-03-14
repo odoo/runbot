@@ -93,7 +93,12 @@
         <field name="arch" type="xml">
             <list string="Builds">
                 <field name="dest"/>
-                <field name="global_state"/>
+                <field name="global_state" 
+                    decoration-bg-danger="global_result == 'ko'"
+                    decoration-bg-warning="global_result == 'warn'"
+                    decoration-bg-success="global_result == 'ok' and global_state == 'done'"
+                    decoration-bg-info="global_result == 'ok' and global_state != 'done'"
+                />
                 <field name="global_result"/>
                 <field name="job"/>
                 <field name="host"/>
@@ -119,16 +124,17 @@
                 <field name="id"/>
                 <field name="global_state"/>
                 <field name="dest"/>
+                <field name="host" operator="="/>
                 <filter string="Pending" name='pending' domain="[('global_state','=', 'pending')]"/>
                 <filter string="Testing" name='testing' domain="[('global_state','in', ('testing', 'waiting'))]"/>
                 <filter string="Running" name='running' domain="[('global_state','=', 'running')]"/>
                 <filter string="Done" name='done' domain="[('global_state','=','done')]"/>
                 <filter string="Duplicate" name='duplicate' domain="[('local_state','=', 'duplicate')]"/>
                 <group expand="0" string="Group By...">
-                    <filter string="Status" name='status' domain="[]" context="{'group_by':'global_state'}"/>
-                    <filter string="Result" name='result' domain="[]" context="{'group_by':'global_result'}"/>
-                    <filter string="Start" name='start' domain="[]" context="{'group_by':'job_start'}"/>
-                    <filter string="Host" name='host' domain="[]" context="{'group_by':'host'}"/>
+                    <filter string="Status" name='group_status' domain="[]" context="{'group_by':'global_state'}"/>
+                    <filter string="Result" name='group_result' domain="[]" context="{'group_by':'global_result'}"/>
+                    <filter string="Start" name='group_start' domain="[]" context="{'group_by':'job_start'}"/>
+                    <filter string="Host" name='group_host' domain="[]" context="{'group_by':'host'}"/>
                     <filter string="Create Date" name='create_date' domain="[]" context="{'group_by':'create_date'}"/>
                 </group>
             </search>

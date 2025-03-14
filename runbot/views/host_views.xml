@@ -21,12 +21,10 @@
                         <field name="nb_run_slot"/>
                         <field name="last_exception" readonly='1'/>
                         <field name="exception_count" readonly='1'/>
+                        <button type="object" name="action_list_all_builds">See all host builds</button>
                     </group>
                     <notebook>
-                        <page string="Messages">
-                            <field name="host_message_ids" readonly='1'/>
-                        </page>
-                        <page string="Builds">
+                        <page string="Current Builds">
                             <field name="build_ids" widget="many2many" options="{'not_delete': True, 'no_create_edit': True}" readonly='1'>
                                 <list string="Builds">
                                     <field name="create_date"/>
@@ -36,6 +34,9 @@
                                     <field name="dest" widget="char_frontend_url"/>
                                 </list>
                             </field>
+                        </page>
+                        <page string="Messages">
+                            <field name="host_message_ids" readonly='1'/>
                         </page>
                     </notebook>
                 </sheet>

@@ -172,8 +172,8 @@ class BuildResult(models.Model):
 
     requested_action = fields.Selection([('wake_up', 'To wake up'), ('deathrow', 'To kill')], string='Action requested', index=True)
     # web infos
-    host = fields.Char('Host name')
-    host_id = fields.Many2one('runbot.host', string="Host", compute='_compute_host_id')
+    host = fields.Char('Host name', index=True)
+    host_id = fields.Many2one('runbot.host', string="Host", compute='_compute_host_id', search="_search_host_id")
     keep_host = fields.Boolean('Keep host on rebuild and for children')
 
     port = fields.Integer('Port')
@@ -251,6 +251,12 @@ class BuildResult(models.Model):
         get_host = self.env['runbot.host']._get_host
         for record in self:
             record.host_id = get_host(record.host)
+
+    def _search_host_id(self, operator, value):
+        names = self.env['runbot.host'].browse(value).mapped('name')
+        if isinstance(value, int):
+            names = names[0]
+        return [('host', operator, names)]
 
     @api.depends('children_ids.global_state', 'local_state')
     def _compute_global_state(self):
@@ -969,8 +975,6 @@ class BuildResult(models.Model):
         except Exception as e:
             msg = f"Failed to drop local logs database : {dbname} with exception: {e}"
             _logger.exception(msg)
-            host_name = self.env['runbot.host']._get_current_name()
-            self.env['runbot.runbot']._warning(f'Host {host_name}: {msg}')
 
     def _local_pg_createdb(self, dbname):
         icp = self.env['ir.config_parameter']

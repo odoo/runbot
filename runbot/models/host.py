@@ -63,7 +63,7 @@ class Host(models.Model):
 
     def _compute_build_ids(self):
         for host in self:
-            host.build_ids = self.env['runbot.build'].search([('host', '=', host.name), ('local_state', '!=', 'done')])
+            host.build_ids = self.env['runbot.build'].search([('host', '=', host.name), ('local_state', 'in', (('pending', 'testing', 'running')))])
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -320,6 +320,15 @@ class Host(models.Model):
     def _process_messages(self):
         self.host_message_ids._process()
 
+    def action_list_all_builds(self):
+        return {
+            'type': 'ir.actions.act_window',
+            'views': [(False, 'list'), (False, 'form')],
+            'name': 'Host builds',
+            'res_model': 'runbot.build',
+            'context': {'search_default_host': self.name},
+            'target': 'current',
+        }
 
 class MessageQueue(models.Model):
     _name = 'runbot.host.message'
