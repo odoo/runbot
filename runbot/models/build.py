@@ -49,6 +49,7 @@ def make_selection(array):
 class BuildParameters(models.Model):
     _name = 'runbot.build.params'
     _description = "All information used by a build to run, should be unique and set on create only"
+    _inherit = ['runbot.public.model.mixin']
 
     # on param or on build?
     # execution parametter
@@ -56,17 +57,17 @@ class BuildParameters(models.Model):
     commit_ids = fields.Many2many('runbot.commit', compute='_compute_commit_ids')
     version_id = fields.Many2one('runbot.version', required=True, index=True)
     project_id = fields.Many2one('runbot.project', required=True, index=True)  # for access rights
-    trigger_id = fields.Many2one('runbot.trigger', index=True)  # for access rights
-    create_batch_id = fields.Many2one('runbot.batch', index=True)
-    category = fields.Char('Category', index=True)  # normal vs nightly vs weekly, ...
+    trigger_id = fields.Many2one('runbot.trigger', index=True, public=True)  # for access rights
+    create_batch_id = fields.Many2one('runbot.batch', index=True, public=True)
+    category = fields.Char('Category', index=True, public=True)  # normal vs nightly vs weekly, ...
     dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, default=lambda self: self.env.ref('runbot.docker_default', raise_if_not_found=False))
     skip_requirements = fields.Boolean('Skip requirements.txt auto install')
     # other informations
     extra_params = fields.Char('Extra cmd args')
-    config_id = fields.Many2one('runbot.build.config', 'Run Config', required=True,
+    config_id = fields.Many2one('runbot.build.config', 'Run Config', required=True, public=True,
                                 default=lambda self: self.env.ref('runbot.runbot_build_config_default', raise_if_not_found=False), index=True)
-    config_data = JsonDictField('Config Data')
-    used_custom_trigger = fields.Boolean('Custom trigger was used to generate this build')
+    config_data = JsonDictField('Config Data', public=True)
+    used_custom_trigger = fields.Boolean('Custom trigger was used to generate this build', public=True)
 
     build_ids = fields.One2many('runbot.build', 'params_id')
     builds_reference_ids = fields.Many2many('runbot.build', relation='runbot_build_params_references', copy=True)
@@ -83,6 +84,10 @@ class BuildParameters(models.Model):
     _sql_constraints = [
         ('unique_fingerprint', 'unique (fingerprint)', 'avoid duplicate params'),
     ]
+
+    @api.model
+    def _api_request_allow_direct_access(self):
+        return False
 
     # @api.depends('version_id', 'project_id', 'extra_params', 'config_id', 'config_data', 'modules', 'commit_link_ids', 'builds_reference_ids')
     def _compute_fingerprint(self):
@@ -141,6 +146,7 @@ class BuildResult(models.Model):
 
     _name = 'runbot.build'
     _description = "Build"
+    _inherit = ['runbot.public.model.mixin']
 
     _parent_store = True
     _order = 'id desc'
@@ -154,27 +160,27 @@ class BuildResult(models.Model):
     no_auto_run = fields.Boolean('No run')
     # could be a default value, but possible to change it to allow duplicate accros branches
 
-    description = fields.Char('Description', help='Informative description')
-    md_description = fields.Html(compute='_compute_md_description', string='MD Parsed Description', help='Informative description markdown parsed', sanitize=False)
-    display_name = fields.Char(compute='_compute_display_name')
+    description = fields.Char('Description', help='Informative description', public=True)
+    md_description = fields.Html(compute='_compute_md_description', string='MD Parsed Description', help='Informative description markdown parsed', sanitize=False, public=True)
+    display_name = fields.Char(compute='_compute_display_name', public=True)
 
     # Related fields for convenience
-    version_id = fields.Many2one('runbot.version', related='params_id.version_id', store=True, index=True)
-    config_id = fields.Many2one('runbot.build.config', related='params_id.config_id', store=True, index=True)
-    trigger_id = fields.Many2one('runbot.trigger', related='params_id.trigger_id', store=True, index=True)
-    create_batch_id = fields.Many2one('runbot.batch', related='params_id.create_batch_id', store=True, index=True)
-    create_bundle_id = fields.Many2one('runbot.bundle', related='params_id.create_batch_id.bundle_id', index=True)
+    version_id = fields.Many2one('runbot.version', related='params_id.version_id', store=True, index=True, public=True)
+    config_id = fields.Many2one('runbot.build.config', related='params_id.config_id', store=True, index=True, public=True)
+    trigger_id = fields.Many2one('runbot.trigger', related='params_id.trigger_id', store=True, index=True, public=True)
+    create_batch_id = fields.Many2one('runbot.batch', related='params_id.create_batch_id', store=True, index=True, public=True)
+    create_bundle_id = fields.Many2one('runbot.bundle', related='params_id.create_batch_id.bundle_id', index=True, public=True)
 
     # state machine
-    global_state = fields.Selection(make_selection(state_order), string='Status', compute='_compute_global_state', store=True, recursive=True)
-    local_state = fields.Selection(make_selection(state_order), string='Build Status', default='pending', required=True, index=True)
-    global_result = fields.Selection(make_selection(result_order), string='Result', compute='_compute_global_result', store=True, recursive=True)
-    local_result = fields.Selection(make_selection(result_order), string='Build Result', default='ok')
+    global_state = fields.Selection(make_selection(state_order), string='Status', compute='_compute_global_state', store=True, recursive=True, public=True)
+    local_state = fields.Selection(make_selection(state_order), string='Build Status', default='pending', required=True, index=True, public=True)
+    global_result = fields.Selection(make_selection(result_order), string='Result', compute='_compute_global_result', store=True, recursive=True, public=True)
+    local_result = fields.Selection(make_selection(result_order), string='Build Result', default='ok', public=True)
 
-    requested_action = fields.Selection([('wake_up', 'To wake up'), ('deathrow', 'To kill')], string='Action requested', index=True)
+    requested_action = fields.Selection([('wake_up', 'To wake up'), ('deathrow', 'To kill')], string='Action requested', index=True, public=True)
     # web infos
-    host = fields.Char('Host name')
-    host_id = fields.Many2one('runbot.host', string="Host", compute='_compute_host_id')
+    host = fields.Char('Host name', public=True)
+    host_id = fields.Many2one('runbot.host', string="Host", compute='_compute_host_id', public=True)
     keep_host = fields.Boolean('Keep host on rebuild and for children')
 
     port = fields.Integer('Port')
@@ -184,7 +190,7 @@ class BuildResult(models.Model):
     log_ids = fields.One2many('ir.logging', 'build_id', string='Logs')
     error_log_ids = fields.One2many('ir.logging', 'build_id', domain=[('level', 'in', ['WARNING', 'ERROR', 'CRITICAL'])], string='Error Logs')
     stat_ids = fields.One2many('runbot.build.stat', 'build_id', string='Statistics values')
-    log_list = fields.Char('Comma separted list of step_ids names with logs')
+    log_list = fields.Char('Comma separted list of step_ids names with logs', public=True)
 
     active_step = fields.Many2one('runbot.build.config.step', 'Active step')
     job = fields.Char('Active step display name', compute='_compute_job')
@@ -235,12 +241,16 @@ class BuildResult(models.Model):
     slot_ids = fields.One2many('runbot.batch.slot', 'build_id')
     killable = fields.Boolean('Killable')
 
-    database_ids = fields.One2many('runbot.database', 'build_id')
+    database_ids = fields.One2many('runbot.database', 'build_id', public=True)
     commit_export_ids = fields.One2many('runbot.commit.export', 'build_id')
 
     static_run = fields.Char('Static run URL')
 
     access_token = fields.Char('Token', default=lambda self: uuid.uuid4().hex)
+
+    @api.model
+    def _api_project_id_field_path(self):
+        return 'params_id.project_id'
 
     @api.depends('description', 'params_id.config_id')
     def _compute_display_name(self):

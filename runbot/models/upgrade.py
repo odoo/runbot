@@ -57,7 +57,7 @@ class UpgradeRegex(models.Model):
 
 
 class BuildResult(models.Model):
-    _inherit = 'runbot.build'
+    _inherit = ['runbot.build']
 
     def _parse_upgrade_errors(self):
         ir_logs = self.env['ir.logging'].search([('level', 'in', ('ERROR', 'WARNING', 'CRITICAL')), ('type', '=', 'server'), ('build_id', 'in', self.ids)])

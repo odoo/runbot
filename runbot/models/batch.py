@@ -12,16 +12,17 @@ _logger = logging.getLogger(__name__)
 class Batch(models.Model):
     _name = 'runbot.batch'
     _description = "Bundle batch"
+    _inherit = ['runbot.public.model.mixin']
 
-    last_update = fields.Datetime('Last ref update')
+    last_update = fields.Datetime('Last ref update', public=True)
     bundle_id = fields.Many2one('runbot.bundle', required=True, index=True, ondelete='cascade')
-    commit_link_ids = fields.Many2many('runbot.commit.link')
+    commit_link_ids = fields.Many2many('runbot.commit.link', public=True)
     commit_ids = fields.Many2many('runbot.commit', compute='_compute_commit_ids')
-    slot_ids = fields.One2many('runbot.batch.slot', 'batch_id')
+    slot_ids = fields.One2many('runbot.batch.slot', 'batch_id', public=True)
     all_build_ids = fields.Many2many('runbot.build', compute='_compute_all_build_ids', help="Recursive builds")
-    state = fields.Selection([('preparing', 'Preparing'), ('ready', 'Ready'), ('done', 'Done'), ('skipped', 'Skipped')])
+    state = fields.Selection([('preparing', 'Preparing'), ('ready', 'Ready'), ('done', 'Done'), ('skipped', 'Skipped')], public=True)
     hidden = fields.Boolean('Hidden', default=False)
-    age = fields.Integer(compute='_compute_age', string='Build age')
+    age = fields.Integer(compute='_compute_age', string='Build age', public=True)
     category_id = fields.Many2one('runbot.category', index=True, default=lambda self: self.env.ref('runbot.default_category', raise_if_not_found=False))
     log_ids = fields.One2many('runbot.batch.log', 'batch_id')
     has_warning = fields.Boolean("Has warning")
@@ -33,6 +34,10 @@ class Batch(models.Model):
         column1='batch_id',
         column2='referenced_batch_id',
     )
+
+    @api.model
+    def _api_project_id_field_path(self):
+        return 'bundle_id.project_id'
 
     @api.depends('slot_ids.build_id')
     def _compute_all_build_ids(self):
@@ -522,19 +527,24 @@ class BatchSlot(models.Model):
     _name = 'runbot.batch.slot'
     _description = 'Link between a bundle batch and a build'
     _order = 'trigger_id,id'
+    _inherit = ['runbot.public.model.mixin']
 
-    batch_id = fields.Many2one('runbot.batch', index=True)
-    trigger_id = fields.Many2one('runbot.trigger', index=True)
-    build_id = fields.Many2one('runbot.build', index=True)
-    all_build_ids = fields.Many2many('runbot.build', compute='_compute_all_build_ids')
+    batch_id = fields.Many2one('runbot.batch', index=True, public=True)
+    trigger_id = fields.Many2one('runbot.trigger', index=True, public=True)
+    build_id = fields.Many2one('runbot.build', index=True, public=True)
+    all_build_ids = fields.Many2many('runbot.build', compute='_compute_all_build_ids', public=True)
     params_id = fields.Many2one('runbot.build.params', index=True, required=True)
-    link_type = fields.Selection([('created', 'Build created'), ('matched', 'Existing build matched'), ('rebuild', 'Rebuild')], required=True)  # rebuild type?
-    active = fields.Boolean('Attached', default=True)
+    link_type = fields.Selection([('created', 'Build created'), ('matched', 'Existing build matched'), ('rebuild', 'Rebuild')], required=True, public=True)  # rebuild type?
+    active = fields.Boolean('Attached', default=True, public=True)
     skipped = fields.Boolean('Skipped', default=False)
     # rebuild, what to do: since build can be in multiple batch:
     # - replace for all batch?
     # - only available on batch and replace for batch only?
     # - create a new bundle batch will new linked build?
+
+    @api.model
+    def _api_request_allow_direct_access(self):
+        return False
 
     @api.depends('build_id')
     def _compute_all_build_ids(self):
