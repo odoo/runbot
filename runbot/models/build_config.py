@@ -808,10 +808,15 @@ class ConfigStep(models.Model):
             if 'dump_trigger_id' in params.config_data:
                 dump_trigger = self.env['runbot.trigger'].browse(params.config_data['dump_trigger_id'])
                 dump_suffix = params.config_data.get('dump_suffix', 'all')
-                base_batch = build.params_id.create_batch_id.base_reference_batch_id
-                reference_build = base_batch.slot_ids.filtered(lambda s: s.trigger_id == dump_trigger).mapped('build_id')
+
+                if params.config_data.get('dump_from_current_batch'):
+                    reference_batch = build.params_id.create_batch_id
+                else:
+                    reference_batch = build.params_id.create_batch_id.base_reference_batch_id
+
+                reference_build = reference_batch.slot_ids.filtered(lambda s: s.trigger_id == dump_trigger).mapped('build_id')
                 if not reference_build:
-                    build._log('_run_restore', f'No reference build found in batch {base_batch.id} for trigger {dump_trigger.name}', log_type='markdown', level='ERROR')
+                    build._log('_run_restore', f'No reference build found in batch {reference_batch.id} for trigger {dump_trigger.name}', log_type='markdown', level='ERROR')
                     build._kill(result='ko')
                     return
                 if reference_build.local_state not in ('done', 'running'):
