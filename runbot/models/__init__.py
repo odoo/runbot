@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from . import public_model_mixin
+
 from . import batch
 from . import branch
 from . import build
