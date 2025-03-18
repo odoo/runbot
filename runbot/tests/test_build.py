@@ -397,7 +397,7 @@ class TestBuildResult(RunbotCase):
             'params_id': self.server_params.id,
         })
         cmd = build._cmd(py_version=3)
-        self.assertIn('python3 -m pip install --user --progress-bar off -r server/requirements.txt'.split(), cmd.pres)
+        self.assertIn('python3 -m pip install --progress-bar off -r server/requirements.txt'.split(), cmd.pres)
         self.assertIn(custom_pre, cmd.pres)
         self.assertIn(custom_post, cmd.posts)
 
