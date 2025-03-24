@@ -154,9 +154,9 @@ class TestHost(RunbotCase):
         self.assertEqual(dockerfile.image_future_identifier, 'future')
 
         expected_docker_tag_calls = [
-            call('future', 'odoo:DockerTest.future'),
             call(False, 'odoo:DockerTest.previous'),
-            call('current', 'odoo:DockerTest')
+            call('current', 'odoo:DockerTest'),
+            call('future', 'odoo:DockerTest.future')
         ]
 
         self.patchers['docker_tag'].assert_has_calls(expected_docker_tag_calls)
