@@ -136,24 +136,32 @@ class TestHost(RunbotCase):
         self.patchers['build_patcher'].side_effect = lambda x: False  # simulate a build failure
         self.test_host._docker_update_images()
 
+        # For the first build there is no previous identifier
+        # As the docker build is in failure, it's not tagged to future
+        expected_docker_tag_calls = [
+            call(False, 'odoo:DockerTest.previous'),
+            call('current', 'odoo:DockerTest'),
+        ]
+
+        self.patchers['docker_tag'].assert_has_calls(expected_docker_tag_calls)
+
         self.assertEqual(dockerfile.image_future_identifier, 'current')
 
         self.patchers['build_patcher'].side_effect = lambda x: 'future'  # now simulate a success
+        self.patchers['docker_tag'].reset_mock()
         self.test_host._docker_update_images()
 
         self.assertEqual(dockerfile.image_future_identifier, 'future')
 
         expected_docker_tag_calls = [
-            call('current', 'odoo:DockerTest.previous'),
-            call('current', 'odoo:DockerTest'),
-            call('future', 'odoo:DockerTest.future')
+            call('future', 'odoo:DockerTest.future'),
+            call(False, 'odoo:DockerTest.previous'),
+            call('current', 'odoo:DockerTest')
         ]
 
         self.patchers['docker_tag'].assert_has_calls(expected_docker_tag_calls)
 
         expected_push_calls = [
-            call('odoo:DockerTest.previous', '127.0.0.1:5001'),
-            call('odoo:DockerTest.previous', 'registryhost_nowhere'),
             call('odoo:DockerTest', '127.0.0.1:5001'),
             call('odoo:DockerTest', 'registryhost_nowhere'),
             call('odoo:DockerTest.future', '127.0.0.1:5001'),
