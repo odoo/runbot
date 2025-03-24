@@ -150,7 +150,7 @@ class Host(models.Model):
         # pull all images from the runbot docker registry
         is_registry = docker_registry_host == self
         all_docker_files = self.env['runbot.dockerfile'].search([])
-        all_tags = set(all_docker_files.mapped('image_tag')) | set(all_docker_files.mapped('image_future_tag'))
+        all_tags = set(all_docker_files.mapped('image_tag'))
         if docker_registry_url and self.use_remote_docker_registry and not is_registry:
             _logger.info('Pulling docker images...')
             total_duration = 0
@@ -166,13 +166,17 @@ class Host(models.Model):
         else:
             _logger.info('Building docker images...')
             for dockerfile in self.env['runbot.dockerfile'].search([('to_build', '=', True)]):
-                docker_tag(dockerfile.image_identifier, dockerfile.image_previous_tag)
-                identifier = dockerfile._build(self)
-                dockerfile.image_future_identifier = identifier or dockerfile.image_future_identifier
-                docker_tag(dockerfile.image_identifier, dockerfile.image_tag)
-                docker_tag(dockerfile.image_future_identifier, dockerfile.image_future_tag)
+                future_identifier = None
+                if not dockerfile.in_error:
+                    future_identifier = dockerfile._build(self)
+                    if future_identifier:
+                        docker_tag(future_identifier, dockerfile.image_future_tag)
                 if is_registry:
-                    for tag in [dockerfile.image_previous_tag, dockerfile.image_tag, dockerfile.image_future_tag]:
+                    if future_identifier:
+                        dockerfile.image_future_identifier = future_identifier
+                    docker_tag(dockerfile.image_previous_identifier, dockerfile.image_previous_tag)
+                    docker_tag(dockerfile.image_identifier, dockerfile.image_tag)
+                    for tag in [dockerfile.image_tag, dockerfile.image_future_tag]:
                         try:
                             docker_push(tag)  # for now, always push locally
                             if self.docker_registry_url:
@@ -182,11 +186,15 @@ class Host(models.Model):
                             if docker_registry_url:
                                 docker_push(tag, docker_registry_url)
                         except ImageNotFound:
-                            _logger.warning("Image tag `%s` not found. Skipping push", dockerfile.image_future_tag)
+                            _logger.warning("Image tag `%s` not found. Skipping push", tag)
+                else:
+                    if future_identifier:
+                        docker_tag(future_identifier, dockerfile.image_tag) # for a setup without registry
 
         _logger.info('Cleaning docker images...')
         for image in docker_images():
             for tag in image.tags:
+                tag = tag.removesuffix('.future').removesuffix('.previous')
                 if tag.startswith('odoo:') and tag not in all_tags:  # what about odoo:latest
                     _logger.info(f"Removing tag '{tag}' since it doesn't exist anymore")
                     docker_remove(tag)

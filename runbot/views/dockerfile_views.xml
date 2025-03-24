@@ -16,6 +16,7 @@
                 <field name="image_future_identifier"/>
                 <field name="image_tag"/>
                 <field name="to_build"/>
+                <field name="in_error"/>
                 <field name="always_pull"/>
                 <field name="version_ids" widget="many2many_tags"/>
                 <field name="project_ids" widget="many2many_tags"/>
@@ -100,11 +101,13 @@
         <field name="name">runbot.dockerfile.list</field>
         <field name="model">runbot.dockerfile</field>
         <field name="arch" type="xml">
-          <list string="Dockerfile" decoration-danger="dockerfile == '' or image_identifier != image_future_identifier" decoration-warning="to_build == False">
+          <list string="Dockerfile" decoration-danger="dockerfile == '' or image_identifier != image_future_identifier" decoration-warning="in_error == True">
             <field name="name"/>
             <field name="image_tag"/>
             <field name="to_build" groups="!runbot.group_runbot_admin"/>
             <field name="to_build" widget="boolean_toggle" groups="runbot.group_runbot_admin"/>
+            <field name="in_error" groups="!runbot.group_runbot_admin"/>
+            <field name="in_error" widget="boolean_toggle" groups="runbot.group_runbot_admin"/>
             <field name="always_pull" groups="!runbot.group_runbot_admin"/>
             <field name="always_pull" widget="boolean_toggle" groups="runbot.group_runbot_admin"/>
             <field name="version_ids" widget="many2many_tags"/>

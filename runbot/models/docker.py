@@ -126,12 +126,14 @@ class Dockerfile(models.Model):
     active = fields.Boolean('Active', default=True, tracking=True)
     image_identifier = fields.Char('Identifier', tracking=True)
     image_future_identifier = fields.Char('Future Identifier', tracking=True)
+    image_previous_identifier = fields.Char('Previous Identifier', tracking=True)
     image_tag = fields.Char(compute='_compute_image_tag', store=True)
     image_future_tag = fields.Char(compute='_compute_image_helper_tags')
     image_previous_tag = fields.Char(compute='_compute_image_helper_tags')
     template_id = fields.Many2one('ir.ui.view', string='Docker Template', domain=[('type', '=', 'qweb')], context={'default_type': 'qweb', 'default_arch_base': '<t></t>'})
     arch_base = fields.Text(related='template_id.arch_base', readonly=False, related_sudo=True)
     dockerfile = fields.Text(compute='_compute_dockerfile', tracking=True)
+    in_error = fields.Boolean('In error', help='The last build failed.', default=False)
     to_build = fields.Boolean('To Build', help='Build Dockerfile. Check this when the Dockerfile is ready.', default=False)
     always_pull = fields.Boolean('Always pull', help='Always Pull on the hosts, not only at the use time', default=False, tracking=True, copy=False)
     version_ids = fields.One2many('runbot.version', 'dockerfile_id', string='Versions')
@@ -196,6 +198,10 @@ class Dockerfile(models.Model):
 
             rec.dockerfile = content
 
+    @api.onchange('dockerfile')
+    def onchange_dockerfile(self):
+        self.in_error = False
+
     @api.depends('name')
     def _compute_image_tag(self):
         for rec in self:
@@ -213,6 +219,12 @@ class Dockerfile(models.Model):
         for rec in self:
             keys = re.findall(r'<t.+t-call="(.+)".+', rec.arch_base or '')
             rec.view_ids = self.env['ir.ui.view'].search([('type', '=', 'qweb'), ('key', 'in', keys)]).ids
+
+    def write(self, values):
+        if 'image_identifier' in values and not 'image_previous_identifier' in values and self.image_identifier != values['image_identifier']:
+            self.ensure_one()
+            values['image_previous_identifier'] = self.image_identifier
+        return super().write(values)
 
     def action_sync_identifiers(self):
         for dockerfile in self:
@@ -357,7 +369,7 @@ class Dockerfile(models.Model):
             docker_build_result_values['identifier'] = image_id
         else:
             docker_build_result_values['result'] = 'error'
-            self.to_build = False
+            self.in_error = True
 
         should_save_result = not success  # always save in case of failure
         if not should_save_result:

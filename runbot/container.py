@@ -151,12 +151,13 @@ def docker_tag(identifier_or_tag, new_tag):
 def _docker_tag(identifier_or_tag, new_tag):
     if not identifier_or_tag:
         return
-    _logger.info('Tagging image %s to "%s"', identifier_or_tag, new_tag)
     docker_client = docker.from_env()
     repo, tag = new_tag.split(':')  # runbot DockerFile tags contains the repo part
     try:
         image = docker_client.images.get(identifier_or_tag)
-        image.tag(repo, tag)
+        if new_tag not in image.tags:
+            _logger.info('Tagging image %s to "%s"', identifier_or_tag, new_tag)
+            image.tag(repo, tag)
     except docker.errors.ImageNotFound:
         _logger.warning('failed to find docker image with identifier %s', identifier_or_tag)
     except docker.errors.APIError:
