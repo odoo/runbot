@@ -53,7 +53,12 @@ class RunbotTeam(models.Model):
                 vals['dashboard_id'] = dashboard.id
         return super().create(vals_list)
 
-    @api.model
+    def _get_team_from_module(self, module: str):
+        for ownership in self.module_ownership_ids.sorted(lambda t: t.is_fallback):
+            if module == ownership.module_id.name:
+                return ownership.team_id
+        return False
+
     def _get_team(self, file_path, repos=None):
         # path = file_path.removeprefix('/data/build/')
         path = file_path
@@ -70,10 +75,8 @@ class RunbotTeam(models.Model):
             module = repo._get_module(path)
             if module:
                 break
-        if module:
-            for ownership in self.module_ownership_ids.sorted(lambda t: t.is_fallback):
-                if module == ownership.module_id.name:
-                    return ownership.team_id
+        if module and (owner_team := self._get_team_from_module(module)):
+            return owner_team
 
         for team in self:
             if not team.path_glob:

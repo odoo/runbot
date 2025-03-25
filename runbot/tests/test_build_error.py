@@ -646,6 +646,7 @@ class TestBuildError(RunbotCase):
         self.assertFalse(teams._get_team('/data/build/odoo/addons/web_studio/tests/test_ui.py'))
         self.assertEqual(website_team, teams._get_team('/data/build/odoo/addons/website_crm/tests/test_website_crm'))
         self.assertEqual(sale_team, teams._get_team('/data/build/enterprise/website_sale/tests/test_sale_process.py'))
+        self.assertEqual(website_team, teams._get_team_from_module('website_crm'))
 
     def test_dashboard_tile_simple(self):
         self.additionnal_setup()

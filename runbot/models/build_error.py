@@ -12,7 +12,7 @@ from markupsafe import Markup
 from werkzeug.urls import url_join
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError, UserError
-from odoo.tools import SQL
+from odoo.tools import SQL, lazy
 
 from ..fields import JsonDictField
 
@@ -107,7 +107,9 @@ class BuildError(models.Model):
 
     responsible = fields.Many2one('res.users', 'Assigned fixer', tracking=True)
     customer = fields.Many2one('res.users', 'Customer', tracking=True)
-    team_id = fields.Many2one('runbot.team', 'Assigned team', tracking=True)
+    team_id = fields.Many2one('runbot.team', 'Assigned team', compute='_compute_team_id', inverse='_inverse_team_id', store=True, tracking=True)
+    manual_team_id = fields.Many2one('runbot.team', 'Manually assigned team')
+    auto_team_id = fields.Many2one('runbot.team', 'Automatically assigned team', readonly=True) # This is a computed field but not really
     fixing_commit = fields.Char('Fixing commit', tracking=True)
     fixing_pr_id = fields.Many2one('runbot.branch', 'Fixing PR', tracking=True, domain=[('is_pr', '=', True)])
     fixing_pr_alive = fields.Boolean('Fixing PR alive', related='fixing_pr_id.alive')
@@ -496,20 +498,35 @@ class BuildError(models.Model):
             'name': 'Similary Qualified Contents'
         }
 
+    @api.depends('manual_team_id', 'auto_team_id')
+    def _compute_team_id(self):
+        for error in self:
+            error.team_id = error.manual_team_id or error.auto_team_id
+
+    def _inverse_team_id(self):
+        self.manual_team_id = self.team_id
+
     def action_assign(self):
-        teams = None
-        repos = None
-        for record in self:
-            if not record.responsible and not record.team_id:
-                for error_content in record.error_content_ids:
-                    if error_content.file_path:
-                        if teams is None:
-                            teams = self.env['runbot.team'].search(['|', ('path_glob', '!=', False), ('module_ownership_ids', '!=', False)])
-                            repos = self.env['runbot.repo'].search([])
-                        team = teams._get_team(error_content.file_path, repos)
-                        if team:
-                            record.team_id = team
-                            break
+        teams = lazy(self.env['runbot.team'].search, ['|', ('path_glob', '!=', False), ('module_ownership_ids', '!=', False)])
+        repos = lazy(self.env['runbot.repo'].search, [])
+
+        def _get_team(*, file_path: str = None, module: str = None): # Get team from file path or module, teams and repos are cached
+            team = False
+            if module:
+                team = teams._get_team_from_module(module)
+            if not team and file_path:
+                team = teams._get_team(file_path, repos)
+            return team
+
+        for error in self:
+            for content in error.error_content_ids:
+                team = _get_team(
+                    file_path=content.file_path,
+                    module=content.qualifiers.dict.get('module')
+                )
+                if team:
+                    error.auto_team_id = team
+                    break
 
     def action_copy_canonical_tag(self):
         for record in self:
