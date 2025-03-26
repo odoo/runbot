@@ -9,7 +9,7 @@ class UpgradeExceptions(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin']
 
     active = fields.Boolean('Active', default=True, tracking=True)
-    elements = fields.Text('Elements', required=True)
+    elements = fields.Text('Elements', required=True, tracking=True)
     bundle_id = fields.Many2one('runbot.bundle', index=True)
     create_build_id = fields.Many2one('runbot.build', 'Build')
     pr_ids = fields.Many2many('runbot.branch', string='Pull requests', default=lambda self: self.default_pr_ids())
