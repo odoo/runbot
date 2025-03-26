@@ -168,9 +168,12 @@ class Dockerfile(models.Model):
             ['id:max'],
         )
         result_ids = dict(rg)
-
         for record in self:
             record.last_successful_result = result_ids.get(record)
+
+    def _get_last_successful_result_for_ident(self, identifier=None):
+        domain = [('result', '=', 'success'), ('dockerfile_id', 'in', self.ids), ('identifier', '=', identifier)]
+        return self.env['runbot.docker_build_result'].search(domain, order='id desc', limit=1)
 
     @api.depends('bundle_ids', 'referencing_dockerlayer_ids', 'project_ids', 'version_ids')
     def _compute_use_count(self):

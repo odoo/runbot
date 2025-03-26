@@ -3,6 +3,7 @@ import getpass
 import logging
 import time
 import warnings
+import re
 
 # unsolved issue https://github.com/docker/docker-py/issues/2928
 with warnings.catch_warnings():
@@ -65,6 +66,15 @@ class DockerManager:
         self.result['duration'] = self.duration
         if self.result['success']:
             self.result['image'] = self.docker_client.images.get(self.image_tag)
-            if 'image_id' in self.result and self.result['image_id'] not in self.result['image'].id:
-                _logger.warning('Image id does not match %s %s', self.result['image_id'], self.result['image'].id)
+            if 'image_id' in self.result:
+                if self.result['image_id'] not in self.result['image'].id:
+                    _logger.warning('Image id does not match %s %s', self.result['image_id'], self.result['image'].id)
+            elif self.result['image']:
+                match = re.search(
+                    r'^sha256:([0-9a-f]+)$',
+                    self.result['image'].id,
+                )
+                if match:
+                    self.result['image_id'] = match.group(1)
+
                 # if this never triggers, we could remove or simplify the success check from docker_build

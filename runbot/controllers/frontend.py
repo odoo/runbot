@@ -692,10 +692,12 @@ class Runbot(Controller):
         '/runbot/dockerfile',
         '/runbot/dockerfile/<int:dockerfile_id>',
         '/runbot/dockerfile/tag/<string:docker_tag>',
+        '/runbot/dockerfile/result/<string:dockerfile_result_id>',
         '/runbot/dockerfile/version/<string:version>',
     ], type='http', auth='public', sitemap=False)
-    def dockerfile_content(self, dockerfile_id=None, version=None, docker_tag=None, **kwargs):
+    def dockerfile_content(self, dockerfile_id=None, version=None, docker_tag=None, dockerfile_result_id=None, **kwargs):
         dockerfile_sudo = request.env['runbot.dockerfile'].sudo()
+        dockerfile_result = None
         if 'id' in kwargs:
             dockerfile_id = int(kwargs['id'])
         if dockerfile_id:  # keep 'id' for historical reasons
@@ -704,16 +706,51 @@ class Runbot(Controller):
             dockerfile = dockerfile_sudo.search([('image_tag', '=', docker_tag)])
         elif version:
             dockerfile = dockerfile_sudo.search([('version_ids.name', '=', version)])
+        elif dockerfile_result_id:
+            dockerfile_result = request.env['runbot.docker_build_result'].sudo().browse(int(dockerfile_result_id)).exists()
+            dockerfile = dockerfile_result.dockerfile_id
         else:
             raise NotFound
 
-        if dockerfile.public_visibility:
-            return Response(response=dockerfile.layer_ids.render_layers({
+        if dockerfile.public_visibility or request.env.user.has_group('runbot.group_runbot_admin'):
+            if dockerfile_result:
+                render = dockerfile_result.content
+            else:
+                render = dockerfile.layer_ids.render_layers({
                 'USERUID': '${USERUID}',
                 'USERGID': '${USERGID}',
                 'USERNAME': '${USERNAME}',
-            }), status=200, mimetype='text/plain')
+            })
+            return Response(response=render, status=200, mimetype='text/plain')
 
         if dockerfile:
             _logger.error('Trying to access a non public docker image')
         raise NotFound
+
+    @route([
+        '/runbot/dockerfile_result/<int:dockerfile_result_id>',
+        '/runbot/dockerfile_result/<dockerfile_tag>/<dockerfile_hash>',
+    ], type='http', auth='public', sitemap=False)
+    def dockerfile_result(self, dockerfile_result_id=None, dockerfile_tag=None, dockerfile_hash=None, **kwargs):
+        dockerfile_result_sudo = request.env['runbot.docker_build_result'].sudo()
+        if dockerfile_result_id:
+            dockerfile_result = dockerfile_result_sudo.browse(dockerfile_result_id).exists()
+        elif dockerfile_tag and dockerfile_hash:
+            dockerfile_result = dockerfile_result_sudo.search([('dockerfile_id.image_tag', '=', dockerfile_tag), ('identifier', '=', dockerfile_hash[:12])], limit=1, order='id desc')
+        else:
+            raise NotFound
+
+        if not dockerfile_result:
+            raise NotFound
+
+        dockerfile = dockerfile_result.dockerfile_id
+
+        if not (dockerfile_result.dockerfile_id.public_visibility or request.env.user.has_group('runbot.group_runbot_admin')):
+            raise NotFound
+
+        return request.render("runbot.docker_result_template", {
+            'dockerfile_result': dockerfile_result,
+            'dockerfile': dockerfile,
+            'future_result': dockerfile._get_last_successful_result_for_ident(dockerfile.image_future_identifier),
+            'current_result': dockerfile._get_last_successful_result_for_ident(dockerfile.image_identifier),
+        })

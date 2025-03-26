@@ -124,7 +124,7 @@ class BuildError(models.Model):
     similar_content_ids = fields.One2many('runbot.build.error.content', compute='_compute_similar_content_ids', string="Similar Error Contents", help="Similar Error contents based on common qualifiers")
     unique_qualifiers = JsonDictField('Non conflicting Qualifiers', compute='_compute_unique_qualifiers', store=True, help="Non conflicting qualifiers in common needed to link error content.")
     analogous_ids = fields.One2many('runbot.build.error', compute='_compute_analogous_ids', string="Analogous Errors", help="Analogous Errors based on unique qualifiers")
-    analogous_content_ids= fields.One2many('runbot.build.error.content', compute='_compute_analogous_content_ids', string="Analogous Error Contents", help="Analogous Error contents based on unique qualifiers")
+    analogous_content_ids = fields.One2many('runbot.build.error.content', compute='_compute_analogous_content_ids', string="Analogous Error Contents", help="Analogous Error contents based on unique qualifiers")
 
     # Build error related data
     build_error_link_ids = fields.Many2many('runbot.build.error.link', compute=_compute_related_error_content_ids('build_error_link_ids'), search=_search_related_error_content_ids('build_error_link_ids'))
