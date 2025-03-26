@@ -26,7 +26,7 @@ class UpgradeExceptions(models.Model):
     def action_auto_rebuild(self):
         builds = self.create_build_id.parent_id.children_ids if self.create_build_id.parent_id else self.create_build_id
         for build in builds:
-            if not build.orphan_result and build.local_result == 'ko':
+            if not build.orphan_result and build.local_result != 'ok':
                 build._rebuild()
 
     @api.depends('create_date')
