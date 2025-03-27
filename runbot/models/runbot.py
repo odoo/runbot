@@ -115,7 +115,6 @@ class Runbot(models.AbstractModel):
         for build in Build.browse(build_ids)[running_max:]:
             build._kill()
 
-
     def _gc_testing(self, host):
         """garbage collect builds that could be killed"""
         # decide if we need room
