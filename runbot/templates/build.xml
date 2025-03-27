@@ -92,7 +92,7 @@
               </t>
 
               <!-- Commits -->
-              <t t-foreach="build.params_id.sudo().commit_link_ids" t-as="build_commit">
+              <t t-foreach="build.params_id.sudo().commit_link_ids.sorted(key=lambda lc: (lc.commit_id.repo_id.sequence, lc.commit_id.repo_id.id))" t-as="build_commit">
                 <b>Commit:</b>
                 <a t-attf-href="/runbot/commit/{{build_commit.commit_id.id}}">
                   <t t-out="build_commit.commit_id.dname"/>
