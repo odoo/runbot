@@ -21,7 +21,6 @@
                 <field name="always_pull"/>
                 <field name="version_ids" widget="many2many_tags"/>
                 <field name="project_ids" widget="many2many_tags"/>
-                <field name="template_id"/>
                 <field name="public_visibility"/>
               </group>
               <group>
@@ -43,9 +42,6 @@
                 </page>
                 <page string="Dockerfile">
                   <field name="dockerfile"/>
-                </page>
-                <page string="Template">
-                  <field name="arch_base" widget="ace" options="{'mode': 'xml'}" readonly="0"/>
                 </page>
                 <page string="Views" groups="runbot.group_runbot_admin">
                   <field name="view_ids" widget="one2many">

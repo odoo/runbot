@@ -12,7 +12,7 @@ def migrate(cr, version):
     dockerfiles = env['runbot.dockerfile'].search([])
     for dockerfile in dockerfiles:
         if dockerfile.template_id and not dockerfile.layer_ids:
-            dockerfile._template_to_layers()
+            dockerfile._template_to_layers()  # Upgrade to the latest version of 17 before upgrading to 18
 
     for dockerfile in dockerfiles:
         if dockerfile.template_id and dockerfile.layer_ids:
