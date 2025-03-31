@@ -143,6 +143,7 @@ class ConfigStep(models.Model):
     group_name = fields.Char('Group name', related='group.name')
     make_stats = fields.Boolean('Make stats', default=False)
     build_stat_regex_ids = fields.Many2many('runbot.build.stat.regex', string='Stats Regexes')
+    dockerfile_variant = fields.Char('Docker Variant')
     # install_odoo
     create_db = fields.Boolean('Create Db', default=True, tracking=True)  # future
     custom_db_name = fields.Char('Custom Db Name', tracking=True)  # future

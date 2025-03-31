@@ -165,7 +165,8 @@ class Host(models.Model):
                     break
         else:
             _logger.info('Building docker images...')
-            for dockerfile in self.env['runbot.dockerfile'].search([('to_build', '=', True)]):
+            # as variants depend on their parent we want to build the parents first
+            for dockerfile in self.env['runbot.dockerfile'].search([('to_build', '=', True)], order='parent_id nulls first'):
                 future_identifier = None
                 if not dockerfile.in_error:
                     future_identifier = dockerfile._build(self)

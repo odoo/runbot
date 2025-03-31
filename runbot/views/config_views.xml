@@ -42,6 +42,7 @@
                         <field name="job_type"/>
                         <field name="make_stats"/>
                         <field name="protected"/>
+                        <field name="dockerfile_variant"/>
                         <field name="default_sequence" groups="base.group_no_one"/>
                         <field name="group" groups="base.group_no_one"/>
                         <field name="break_after_if_ko"/>

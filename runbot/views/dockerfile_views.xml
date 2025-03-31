@@ -10,8 +10,12 @@
               <widget name="web_ribbon" title="Newer identifier" bg_color="bg-danger" invisible="image_identifier == image_future_identifier"/>
               <widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
               <group>
+                <field name="message" invisible="not message" class="text-danger"/> 
                 <field name="active" invisible="1"/>
-                <field name="name"/>
+                <field name="name" invisible="parent_id" required="not parent_id"/>
+                <field name="name" invisible="not parent_id" required="parent_id" label="Variant Name"/>
+                <field name="parent_id" invisible="variant_ids"/>
+                <field name="variant_ids" widget="many2many_tags" readonly="1" invisible="not variant_ids"/>
                 <field name="image_identifier"/>
                 <field name="image_future_identifier"/>
                 <field name="auto_sync"/>
@@ -91,8 +95,9 @@
         <field name="model">runbot.dockerfile</field>
         <field name="arch" type="xml">
           <list string="Dockerfile" decoration-danger="dockerfile == '' or image_identifier != image_future_identifier" decoration-warning="in_error == True">
-            <field name="name"/>
             <field name="image_tag"/>
+            <field name="name"/>
+            <field name="parent_id"/>
             <field name="to_build" groups="!runbot.group_runbot_admin"/>
             <field name="to_build" widget="boolean_toggle" groups="runbot.group_runbot_admin"/>
             <field name="in_error" groups="!runbot.group_runbot_admin"/>
@@ -107,6 +112,17 @@
           </list>
         </field>
     </record>
+
+    <record id="dockerfile_view_search" model="ir.ui.view">
+        <field name="name">runbot.dockerfile.search</field>
+        <field name="model">runbot.dockerfile</field>
+        <field name="arch" type="xml">
+          <search>
+            <field name="image_tag"/>
+          </search>
+        </field>
+    </record>
+
     <record id="docker_layer_form" model="ir.ui.view">
       <field name="name">runbot.docker_layer.form</field>
       <field name="model">runbot.docker_layer</field>
@@ -199,6 +215,28 @@
         </list>
       </field>
     </record>
+
+  <record id="dockerfile_duplicate_fully" model="ir.actions.server">
+      <field name="name">Duplicate With Variants</field>
+      <field name="model_id" ref="runbot.model_runbot_dockerfile"/>
+      <field name="binding_model_id" ref="runbot.model_runbot_dockerfile"/>
+      <field name="type">ir.actions.server</field>
+      <field name="state">code</field>
+      <field name="code">
+        records.with_context(copy_docker_variants=True).copy()
+      </field>
+  </record>
+
+  <record id="dockerfile_create_missing_variants" model="ir.actions.server">
+      <field name="name">Create missing variants</field>
+      <field name="model_id" ref="runbot.model_runbot_dockerfile"/>
+      <field name="binding_model_id" ref="runbot.model_runbot_dockerfile"/>
+      <field name="type">ir.actions.server</field>
+      <field name="state">code</field>
+      <field name="code">
+        records.action_create_missing_variants()
+      </field>
+  </record>
 
   <record id="open_view_dockerfile_tree" model="ir.actions.act_window">
     <field name="name">Dockerfiles</field>

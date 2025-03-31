@@ -853,6 +853,9 @@ class BuildResult(models.Model):
             ro_volumes[f'/data/build/{dest}'] = source
         if 'image_tag' not in kwargs:
             kwargs.update({'image_tag': self.params_id.dockerfile_id.image_tag})
+        dockerfile_variant = self.params_id.config_data.get('dockerfile_variant', step.dockerfile_variant)
+        if dockerfile_variant and f'.{dockerfile_variant.lower()}' not in kwargs['image_tag']:
+            kwargs['image_tag'] += f'.{dockerfile_variant.lower()}'
         if self.params_id.config_data.get('docker_use_future') and not kwargs['image_tag'].endswith('.future'):
             kwargs['image_tag'] += '.future'
         docker_registry_url = self.host_id._get_docker_registry_url()

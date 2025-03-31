@@ -3,11 +3,12 @@ import getpass
 import logging
 import os
 import re
+from psycopg2.errors import UniqueViolation
 
-from odoo import Command
+from odoo import Command, exceptions
 from unittest.mock import patch, mock_open
 
-from odoo.tests.common import tagged, HttpCase
+from odoo.tests.common import tagged, HttpCase, mute_logger
 from .common import RunbotCase
 
 _logger = logging.getLogger(__name__)
@@ -75,7 +76,7 @@ USER TestUser""", docker_render)
 
     def test_dockerfile_base_fields(self):
         dockerfile = self.env['runbot.dockerfile'].create({
-            'name': 'Tests Ubuntu Focal (20.0)[Chrome 86]',
+            'name': 'TestsUbuntuFocal_Chrome86',
             'to_build': True,
             'layer_ids': [
                 Command.create({
@@ -95,7 +96,7 @@ USER TestUser""", docker_render)
             ],
         })
 
-        self.assertEqual(dockerfile.image_tag, 'odoo:TestsUbuntuFocal20.0Chrome86')
+        self.assertEqual(dockerfile.image_tag, 'odoo:TestsUbuntuFocal_Chrome86')
         self.assertIn('86.0.4240.183-1', dockerfile.dockerfile)
         self.assertIn('pip install --no-cache-dir babel==2.8.0', dockerfile.dockerfile)
 
@@ -103,3 +104,48 @@ USER TestUser""", docker_render)
         dockerfile.layer_ids[0].values = {**dockerfile.layer_ids[0].values, 'chrome_version': '87.0.4240.183-1'}
 
         self.assertIn('Install chrome with values {"chrome_version": "87.0.4240.183-1"}', dockerfile.dockerfile)
+
+    def test_dockerfile_variant(self):
+        default_dockerfile = self.env.ref('runbot.docker_default')
+        dockerfile = self.env['runbot.dockerfile'].create({
+            'name': 'Documentation',
+            'parent_id': default_dockerfile.id,
+            'layer_ids': [
+                Command.create({
+                    'name': 'Custom layer',
+                    'layer_type': 'raw',
+                    'content': 'some_random_command',
+                })
+            ]
+        })
+        expected_tag = default_dockerfile.image_tag + '.documentation'
+        self.assertEqual(dockerfile.image_tag, expected_tag)
+        self.assertEqual(dockerfile.image_future_tag, expected_tag + '.future')
+        self.assertIn('some_random_command', dockerfile.dockerfile)
+        self.assertIn('RUN python3 -m pip install --no-cache-dir', dockerfile.dockerfile)
+
+    def test_dockerfile_cycle_parent(self):
+        default_dockerfile = self.env.ref('runbot.docker_default')
+        dockerfile = self.env['runbot.dockerfile'].create({
+            'name': 'Documentation',
+            'parent_id': default_dockerfile.id,
+        })
+        with self.assertRaises(exceptions.ValidationError):
+            default_dockerfile.parent_id = dockerfile
+
+    def test_dockerfile_variant_unique(self):
+        default_dockerfile = self.env.ref('runbot.docker_default')
+        self.env['runbot.dockerfile'].create({
+            'name': 'Documentation',
+            'parent_id': default_dockerfile.id,
+        })
+        with mute_logger('odoo.sql_db'), self.assertRaises(UniqueViolation):
+            self.env['runbot.dockerfile'].create({
+                'name': 'Documentation',
+                'parent_id': default_dockerfile.id,
+            })
+        # But it works with another name
+        self.env['runbot.dockerfile'].create({
+            'name': 'Documentation2',
+            'parent_id': default_dockerfile.id,
+        })

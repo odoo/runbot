@@ -3,8 +3,7 @@ import logging
 import os
 import re
 import docker
-from odoo import api, fields, models
-from odoo.addons.base.models.ir_qweb import QWebException
+from odoo import api, fields, models, exceptions
 
 from ..container import docker_build
 from ..fields import JsonDictField
@@ -41,6 +40,7 @@ class DockerLayer(models.Model):
     all_referencing_dockerlayer_ids = fields.One2many('runbot.docker_layer', compute="_compute_references", string='Layers referencing this one', readonly=True)
     reference_count = fields.Integer('Number of references', compute='_compute_references')
     has_xml_id = fields.Boolean(compute='_compute_has_xml_id')
+
 
     @api.depends('referencing_dockerlayer_ids', 'dockerfile_id.referencing_dockerlayer_ids')
     def _compute_references(self):
@@ -123,16 +123,20 @@ class Dockerfile(models.Model):
     _description = "Dockerfile"
 
     name = fields.Char('Dockerfile name', required=True, help="Name of Dockerfile")
+    parent_id = fields.Many2one(
+        'runbot.dockerfile', 'Parent Dockerfile',
+        help='This field is used to define variants of docker images. Variants implicitly inherit from the parent and have an implicit reference_file layer.'
+    )
     active = fields.Boolean('Active', default=True, tracking=True)
     auto_sync = fields.Boolean('Auto sync', help='Automatically sync the identifier with the future identifier', default=False, tracking=True)
     pull_on_build = fields.Boolean('Pull on build ', help='Add pull option when building to get the latest version of the FROM', default=False, tracking=True)
     image_identifier = fields.Char('Identifier', tracking=True)
     image_future_identifier = fields.Char('Future Identifier', tracking=True)
     image_previous_identifier = fields.Char('Previous Identifier', tracking=True)
-    image_tag = fields.Char(compute='_compute_image_tag', store=True)
+    image_tag = fields.Char(compute='_compute_image_tag', recursive=True, store=True)
     image_future_tag = fields.Char(compute='_compute_image_helper_tags')
     image_previous_tag = fields.Char(compute='_compute_image_helper_tags')
-    dockerfile = fields.Text(compute='_compute_dockerfile', tracking=True)
+    dockerfile = fields.Text(compute='_compute_dockerfile', recursive=True, tracking=True)
     in_error = fields.Boolean('In error', help='The last build failed.', default=False)
     to_build = fields.Boolean('To Build', help='Build Dockerfile. Check this when the Dockerfile is ready.', default=False)
     always_pull = fields.Boolean('Always pull', help='Always Pull on the hosts, not only at the use time', default=False, tracking=True, copy=False)
@@ -149,13 +153,75 @@ class Dockerfile(models.Model):
     # we could also have a variant param, to use the version image in a specific trigger? Add a layer or change a param?
 
     public_visibility = fields.Boolean('Public', default=lambda self: self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_dockerfile_public_by_default'), help="Dockerfile is public and can be accessed by anyone with /runbot/dockerfile route")
+    variant_ids = fields.One2many('runbot.dockerfile', 'parent_id', string='Variants', help="Variants of this dockerfile, they inherit the parent dockerfile layers and can add their own layers.")
+    message = fields.Text('Message', compute='_compute_message')
 
-    _sql_constraints = [('runbot_dockerfile_name_unique', 'unique(name)', 'A Dockerfile with this name already exists')]
+    _sql_constraints = [
+        ('runbot_dockerfile_image_tag_unique', 'unique(image_tag)', 'A Dockerfile with this tag already exists.'),
+    ]
+
+    @api.constrains('name')
+    def _constrains_name(self):
+        if not re.match(r'^\w+$', self.name):
+            raise exceptions.ValidationError('Name can only contain alphanumeric characters and underscore.')
+        if any(r.name.lower() in ('future', 'previous') for r in self):
+            raise exceptions.ValidationError('Variant name cannot be "future".')
+
+    @api.constrains('parent_id')
+    def _constrains_parent_count(self):
+        if self.parent_id.parent_id:
+            raise exceptions.ValidationError('Variants cannot be variants of other variants.')
 
     @api.returns('self', lambda value: value.id)
     def copy(self, default=None):
-        copied_record = super().copy(default={'name': '%s (copy)' % self.name, 'to_build': False})
+        if not default:
+            default = {}
+        copied_record = super().copy(default={'name': '%s_copy' % self.name, 'to_build': False, **default})
+        if 'copy_docker_variants' in self.env.context:
+            old_to_new = dict(zip(self, copied_record))
+            variants = self.env['runbot.dockerfile'].search([('parent_id', 'in', self.ids)])
+            for variant in variants:
+                variant.copy(default={
+                    'parent_id': old_to_new[variant.parent_id].id,
+                    'name': variant.name,
+                })
         return copied_record
+
+    def _compute_message(self):
+        for record in self:
+            messages = []
+            if record.in_error:
+                messages.append("The last build failed and this docker image won't be build anymore, remove the in_error flag to reenable.")
+            elif not record.to_build:
+                messages.append("The docker won't be build automatically")
+            if missing_variants := record.get_missing_variants():
+                messages.append(f'This variants is missing on the following docker files: {", ".join(missing_variants.mapped("name"))}')
+            record.message = '\n'.join(messages)
+
+    def get_missing_variants(self):
+        if self.parent_id:
+            docker_file_with_variant = self.env['runbot.version'].search([]).mapped('dockerfile_id').filtered('active')
+            similar_variants = self.search([('name', '=', self.name), ('parent_id', '!=', False)])
+            missing_variants = docker_file_with_variant - similar_variants.parent_id
+            return missing_variants
+        return None
+
+    def action_create_missing_variants(self):
+        """Create missing variants for this dockerfile"""
+        if not self.parent_id:
+            raise exceptions.UserError('This dockerfile is not a variant, cannot create missing variants.')
+        missing_variants = self.get_missing_variants()
+        if not missing_variants:
+            raise exceptions.UserError('No missing variants to create.')
+
+        for missing_variant in missing_variants:
+            variant = self.copy(default={
+                'parent_id': missing_variant.id,
+                'name': self.name,
+                'to_build': self.to_build,
+                'always_pull': self.always_pull,
+            })
+            _logger.info(f'Created missing variant {variant.image_tag}({variant.id}) for dockerfile {self.name}')
 
     def _compute_last_successful_result(self):
         rg = self.env['runbot.docker_build_result']._read_group(
@@ -180,8 +246,14 @@ class Dockerfile(models.Model):
     def _compute_dockerfile(self):
         for rec in self:
             content = ''
-            content = rec.layer_ids.render_layers()
-
+            layers = rec.layer_ids
+            if rec.parent_id:
+                layers = self.env['runbot.docker_layer'].new({
+                    'name': 'TEMP LAYER',
+                    'layer_type': 'reference_file',
+                    'reference_dockerfile_id': rec.parent_id.id,
+                }) + layers
+            content = layers.render_layers()
             switch_user = f"\nUSER {USERNAME}\n"
             if not content.endswith(switch_user):
                 content = content + switch_user
@@ -192,11 +264,13 @@ class Dockerfile(models.Model):
     def onchange_dockerfile(self):
         self.in_error = False
 
-    @api.depends('name')
+    @api.depends('name', 'parent_id.image_tag')
     def _compute_image_tag(self):
         for rec in self:
-            if rec.name:
-                rec.image_tag = 'odoo:%s' % re.sub(r'[ /:\(\)\[\]]', '', rec.name)
+            if rec.parent_id:
+                rec.image_tag = f'{rec.parent_id.image_tag}.{(rec.name or "<undefined>").lower()}'
+            elif rec.name:
+                rec.image_tag = f'odoo:{rec.name}'
 
     @api.depends('image_tag')
     def _compute_image_helper_tags(self):
