@@ -10,7 +10,6 @@
     'application': True,
     'depends': ['base', 'base_automation', 'website'],
     'data': [
-        'templates/dockerfile.xml',
         'data/dockerfile_data.xml',
         'data/build_parse.xml',
         'data/error_link.xml',
