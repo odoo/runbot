@@ -1,7 +1,7 @@
 from odoo.http import Controller, Response, request, route
 
 
-class ErrorControlle(Controller):
+class ErrorController(Controller):
 
     @route('/runbot/error/merge/result/<filter_id>', type='http', auth='public', website=True)
     def error_filter_result(self, filter_id=None, **kwargs):

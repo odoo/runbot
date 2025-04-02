@@ -19,6 +19,7 @@
                                         <td><t t-esc="error_content.error_id.active"/></td> 
                                         <td><a t-attf-href="/odoo/error_merge/{{merger.id}}/error_content/{{error_content.id}}"><t t-esc="error_content.id"/></a></td>
                                         <td><a t-attf-href="/odoo/error_merge/{{merger.id}}/error/{{error_content.error_id.id}}"><t t-esc="error_content.error_id.id"/></a></td>
+                                        <td>#<t t-esc="len(error_content.error_id.error_content_ids)"/></td>
                                         <td>
                                             <span data-bs-toggle="collapse" t-attf-data-bs-target="#collapse{{error_content.id}}"><t t-esc="error_content.content.split('\n')[0]"/></span>
                                             <pre t-attf-id="collapse{{error_content.id}}" class="collapse"><t t-esc="error_content.content"/></pre>

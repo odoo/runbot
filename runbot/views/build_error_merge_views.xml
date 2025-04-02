@@ -8,7 +8,7 @@
             <header>
               <button name="action_summary" string="Summary" type="object" class="oe_highlight"/>
               <button name="action_search_error_content_matches" string="Search error content" type="object" class="oe_highlight"/>
-              <button name="action_auto_merge" string="Automerge" type="object" class="oe_highlight btn btn-danger"/>
+              <button name="action_auto_merge" string="Automerge" type="object" class="oe_highlight btn btn-danger" title="Apply on all existing matching errors"/>
             </header>
             <sheet>
               <group>
