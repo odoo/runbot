@@ -10,7 +10,7 @@ import time
 from unidiff import PatchSet
 from ..common import now, grep, time2str, rfind, s2human, os, RunbotException, ReProxy, markdown_escape
 from ..container import docker_get_gateway_ip, Command
-from odoo import models, fields, api
+from odoo import models, fields, api, tools
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools.misc import file_open
 from odoo.tools.safe_eval import safe_eval, test_python_expr, _SAFE_OPCODES, to_opcodes
@@ -323,6 +323,11 @@ class ConfigStep(models.Model):
 
     def _make_python_ctx(self, build):
         return {
+            'datetime': tools.safe_eval.datetime,
+            'dateutil': tools.safe_eval.dateutil,
+            'json': tools.safe_eval.json,
+            'b64encode': base64.b64encode,
+            'b64decode': base64.b64decode,
             'self': self,
             # 'fields': fields,
             # 'models': models,
