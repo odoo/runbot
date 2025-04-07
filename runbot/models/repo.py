@@ -49,7 +49,7 @@ class Trigger(models.Model):
 
     _order = 'sequence, id'
 
-    sequence = fields.Integer('Sequence')
+    sequence = fields.Integer('Sequence', public=True)
     name = fields.Char("Name", public=True)
     description = fields.Char("Description", help="Informative description", public=True)
     project_id = fields.Many2one('runbot.project', string="Project id", required=True)
@@ -394,7 +394,7 @@ class Repo(models.Model):
     _name = 'runbot.repo'
     _description = "Repo"
     _order = 'sequence, id'
-    _inherit = 'mail.thread'
+    _inherit = ['mail.thread', 'runbot.public.model.mixin']
 
     name = fields.Char("Name", tracking=True)  # odoo/enterprise/upgrade/security/runbot/design_theme
     identity_file = fields.Char("Identity File", help="Identity file to use with git/ssh", groups="runbot.group_runbot_admin")
@@ -410,7 +410,7 @@ class Repo(models.Model):
     addons_paths = fields.Char('Addons paths', help='Comma separated list of possible addons path', default='', tracking=True)
     upgrade_paths = fields.Char('Upgrade paths', help='Comma separated list of possible upgrade path', default='', tracking=True)
 
-    sequence = fields.Integer('Sequence', tracking=True)
+    sequence = fields.Integer('Sequence', tracking=True, public=True)
     path = fields.Char(compute='_compute_path', string='Directory', readonly=True)
     mode = fields.Selection([('disabled', 'Disabled'),
                              ('poll', 'Poll'),

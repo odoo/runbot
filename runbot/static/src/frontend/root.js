@@ -5,6 +5,8 @@ import { registry } from '@web/core/registry';
 import { useRegistry } from '@web/core/registry_hook';
 import { InteractionService } from '@web/public/interaction_service';
 
+import { getCookie, switchTheme } from './utils';
+
 
 const mainComponents = registry.category('main.components');
 
@@ -54,7 +56,16 @@ class ComponentContainer extends Component {
 /**
  * Bootstrap the frontend.
  */
-(async function startApp() {
+function startInteractions(env) {
+    const Interactions = registry.category('public.interactions').getAll();
+    const service = new InteractionService(document.body, env);
+    service.activate(Interactions);
+};
+
+/**
+ * Bootstrap the frontend.
+ */
+async function startApp(interactions = false) {
     await whenReady();
 
     const env = {
@@ -70,7 +81,12 @@ class ComponentContainer extends Component {
         env,
     });
     await app.mount(document.body);
-    const Interactions = registry.category('public.interactions').getAll();
-    const service = new InteractionService(document.body, env);
-    service.activate(Interactions);
-})();
+    if (interactions) {
+        startInteractions();
+    }
+    const cookieTheme = getCookie('colorScheme');
+    if (cookieTheme) {
+        switchTheme(cookieTheme);
+    }
+};
+odoo.startApp = startApp;

@@ -71,13 +71,14 @@ class Bundle(models.Model):
 
     @api.model
     def _api_request_read_get_records(self, request_data):
-        if 'category_id' in request_data:
-            if not isinstance(request_data['category_id'], int):
-                raise BadRequest('Invalid category_id')
-            category_id = request_data['category_id']
-        else:
-            category_id = self.env['ir.model.data']._xmlid_to_res_id('runbot.default_category')
-        self = self.with_context(category_id=category_id)
+        if 'category_id' not in self.env.context:
+            if 'category_id' in request_data:
+                if not isinstance(request_data['category_id'], int):
+                    raise BadRequest('Invalid category_id')
+                category_id = request_data['category_id']
+            else:
+                category_id = self.env['ir.model.data']._xmlid_to_res_id('runbot.default_category')
+            self = self.with_context(category_id=category_id)
         limit, offset = self._api_request_read_get_offset_limit(request_data)
         e = expression.expression(request_data['domain'], self)
         query = e.query

@@ -23,7 +23,7 @@ SPEC_MAX_DEPTH = 10
 SPEC_METADATA_FIELD = {
     '__type', '__help',
 }
-DEFAULT_LIMIT = 20
+DEFAULT_LIMIT = 40
 DEFAULT_MAX_LIMIT = 60
 
 def _cleaned_spec(spec: Specification | SubSpecification) -> Specification | SubSpecification:

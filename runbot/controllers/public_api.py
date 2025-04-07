@@ -61,6 +61,8 @@ class PublicApi(Controller):
             raise BadRequest(f'Invalid payload, missing keys: {", ".join(missing_keys)}')
         if (unknown_keys := set(data.keys()) - allowed_keys):
             raise BadRequest(f'Invalid payload, unknown keys: {", ".join(unknown_keys)}')
+        if 'context' in data:
+            Model = Model.with_context(**data['context'])
         if Model._api_request_requires_project():
             if not isinstance(data['project_id'], int):
                 raise BadRequest('Invalid project_id, should be an int')

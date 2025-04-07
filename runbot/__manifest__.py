@@ -85,6 +85,7 @@
 
             'runbot/static/src/frontend/root.js',
             'runbot/static/src/frontend/runbot.js',
+            'runbot/static/src/frontend/**/*',
         ]
     },
     'post_load': 'runbot_post_load',

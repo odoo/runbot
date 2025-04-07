@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates>
+    <t t-name="runbot.Link">
+        <!-- TODO: navigation handling -->
+            <!-- Maybe this can be used someday to hide links? -->
+            <!-- t-att-href="this.state.active ? props.href : '#'" -->
+            <!-- t-on-mouseover.synthetic="() => this.state.active = true"
+            t-on-mouseout.synthetic="() => this.state.active = false" -->
+        <a
+            t-att-href="props.href"
+            t-att-class="props.class"
+            t-att-title="props.title"
+            t-on-click="onClick"
+        >
+            <t t-slot="default"/>
+        </a>
+    </t>
+</templates>

@@ -18,6 +18,23 @@ from odoo.osv import expression
 _logger = logging.getLogger(__name__)
 
 
+def supports_owl_frontend(method):
+    """ Marks a route as working with frontend client. """
+    @functools.wraps(method)
+    def _wrapped(*args, **kwargs):
+        if request.httprequest.cookies.get('use_owl_client', '0') == '1':
+            return request.render('runbot.frontend_spa', {
+                'projects': request.env['runbot.project'].search([('hidden', '=', False)]),
+                'categories': request.env['runbot.category'].search([]),
+                'default_category': request.env['ir.model.data']._xmlid_to_res_id('runbot.default_category'),
+                'session_info': request.env['ir.http'].session_info(),
+                'error_count': request.env['runbot.build.error'].search_count([]),
+                'error_assigned_count': request.env['runbot.build.error'].search_count([('responsible', '=', request.env.user.id)]),
+                'error_team_count': request.env['runbot.build.error'].search_count([('responsible', '=', False), ('team_id', 'in', request.env.user.runbot_team_ids.ids)]),
+            })
+        return method(*args, **kwargs)
+    return _wrapped
+
 def route(routes, **kw):
     def decorator(f):
         @o_route(routes, **kw)
@@ -107,6 +124,7 @@ class Runbot(Controller):
             '/runbot',
             '/runbot/<model("runbot.project"):project>',
             '/runbot/<model("runbot.project"):project>/search/<search>'], website=True, auth='public', type='http')
+    @supports_owl_frontend
     def bundles(self, project=None, search='', projects=False, refresh=False, for_next_freeze=False, limit=40, has_pr=None, **kwargs):
         search = search if len(search) < 60 else search[:60]
         env = request.env

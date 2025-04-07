@@ -27,7 +27,7 @@ class Commit(models.Model):
     ]
     name = fields.Char('SHA', public=True)
     tree_hash = fields.Char('Tree hash', readonly=True)
-    repo_id = fields.Many2one('runbot.repo', string='Repo group')
+    repo_id = fields.Many2one('runbot.repo', string='Repo group', public=True)
     date = fields.Datetime('Commit date')
     author = fields.Char('Author')
     author_email = fields.Char('Author Email')
@@ -205,6 +205,7 @@ class CommitLink(models.Model):
     # Link info
     match_type = fields.Selection([('new', 'New head of branch'), ('head', 'Head of branch'), ('base_head', 'Found on base branch'), ('base_match', 'Found on base branch')], public=True)  # HEAD, DEFAULT
     branch_id = fields.Many2one('runbot.branch', string='Found in branch')  # Shouldn't be use for anything else than display
+    remote_base_url = fields.Char(compute='_compute_remote_base_url', public=True)
 
     base_commit_id = fields.Many2one('runbot.commit', 'Base head commit', index=True)
     merge_base_commit_id = fields.Many2one('runbot.commit', 'Merge Base commit', index=True)
@@ -217,6 +218,11 @@ class CommitLink(models.Model):
     @api.model
     def _api_request_allow_direct_access(self):
         return False
+    
+    @api.depends('branch_id.remote_id.base_url')
+    def _compute_remote_base_url(self):
+        for cml in self:
+            cml.remote_base_url = cml.branch_id.remote_id.base_url
 
 
 class CommitStatus(models.Model):

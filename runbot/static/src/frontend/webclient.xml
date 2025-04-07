@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates>
+    <t t-name="runbot.Webclient">
+        <t t-set="routeData" t-value="currentRouteAndProps"/>
+        <t t-if="!routeData">
+            <!-- This should never happen? -->
+        </t>
+        <t t-else="">
+            <t t-set="routeConfig" t-value="routeData[0]"/>
+            <Navbar t-if="routeConfig.hasNavbar"/>
+            <t t-component="routeData[0].Component" t-props="routeData[1]"/>
+        </t>
+    </t>
+</templates>
