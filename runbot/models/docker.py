@@ -124,6 +124,8 @@ class Dockerfile(models.Model):
 
     name = fields.Char('Dockerfile name', required=True, help="Name of Dockerfile")
     active = fields.Boolean('Active', default=True, tracking=True)
+    auto_sync = fields.Boolean('Auto sync', help='Automatically sync the identifier with the future identifier', default=False, tracking=True)
+    pull_on_build = fields.Boolean('Pull on build ', help='Add pull option when building to get the latest version of the FROM', default=False, tracking=True)
     image_identifier = fields.Char('Identifier', tracking=True)
     image_future_identifier = fields.Char('Future Identifier', tracking=True)
     image_previous_identifier = fields.Char('Previous Identifier', tracking=True)
@@ -362,7 +364,7 @@ class Dockerfile(models.Model):
 
         with open(self.env['runbot.runbot']._path('docker', self.image_tag, 'Dockerfile'), 'w') as Dockerfile:
             Dockerfile.write(content)
-        result = docker_build(docker_build_path, self.image_future_tag)
+        result = docker_build(docker_build_path, self.image_future_tag, self.pull_on_build)
         duration = result['duration']
         msg = result['msg']
         success = image_id = result.get('image_id')

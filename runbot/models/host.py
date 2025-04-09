@@ -172,6 +172,8 @@ class Host(models.Model):
                 if is_registry:
                     if future_identifier:
                         dockerfile.image_future_identifier = future_identifier
+                        if dockerfile.auto_sync:
+                            dockerfile.image_identifier = future_identifier
                     docker_tag(dockerfile.image_previous_identifier, dockerfile.image_previous_tag)
                     docker_tag(dockerfile.image_identifier, dockerfile.image_tag)
                     docker_tag(dockerfile.image_future_identifier, dockerfile.image_future_tag)

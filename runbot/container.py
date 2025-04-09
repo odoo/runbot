@@ -108,11 +108,11 @@ class Command():
         return res.read()
 
 
-def docker_build(build_dir, image_tag):
-    return _docker_build(build_dir, image_tag)
+def docker_build(build_dir, image_tag, pull=False):
+    return _docker_build(build_dir, image_tag, pull)
 
 
-def _docker_build(build_dir, image_tag):
+def _docker_build(build_dir, image_tag, pull=False):
     """Build the docker image
     :param build_dir: the build directory that contains Dockerfile.
     :param image_tag: name used to tag the resulting docker image
@@ -122,7 +122,7 @@ def _docker_build(build_dir, image_tag):
     with DockerManager(image_tag) as dm:
         last_step = None
         dm.result['success'] = False  # waiting for an image_id
-        for chunk in dm.consume(dm.docker_client.api.build(path=build_dir, tag=image_tag, rm=True)):
+        for chunk in dm.consume(dm.docker_client.api.build(path=build_dir, tag=image_tag, rm=True, pull=pull)):
             if 'stream' in chunk:
                 stream = chunk['stream']
                 if stream.startswith('Step '):

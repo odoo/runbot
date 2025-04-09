@@ -4,14 +4,16 @@ import hashlib
 import json
 import logging
 import re
-
 from collections import defaultdict
-from dateutil.relativedelta import relativedelta
+
 from dateutil import rrule
+from dateutil.relativedelta import relativedelta
 from markupsafe import Markup
+
 from werkzeug.urls import url_join
-from odoo import models, fields, api
-from odoo.exceptions import ValidationError, UserError
+
+from odoo import api, fields, models
+from odoo.exceptions import UserError, ValidationError
 from odoo.tools import SQL, lazy
 
 from ..fields import JsonDictField
