@@ -13,10 +13,11 @@ class Branch(models.Model):
     _description = "Branch"
     _order = 'name'
     _rec_name = 'dname'
+    _inherit = ['runbot.public.model.mixin']
 
     _sql_constraints = [('branch_repo_uniq', 'unique (name,remote_id)', 'The branch must be unique per repository !')]
 
-    name = fields.Char('Name', required=True)
+    name = fields.Char('Name', required=True, public=True)
     remote_id = fields.Many2one('runbot.remote', 'Remote', required=True, ondelete='cascade', index=True)
 
     head = fields.Many2one('runbot.commit', 'Head Commit', index=True)
@@ -25,7 +26,7 @@ class Branch(models.Model):
     reference_name = fields.Char(compute='_compute_reference_name', string='Bundle name', store=True)
     bundle_id = fields.Many2one('runbot.bundle', 'Bundle', ondelete='cascade', index=True)
 
-    is_pr = fields.Boolean('IS a pr', required=True)
+    is_pr = fields.Boolean('IS a pr', required=True, public=True)
     pr_title = fields.Char('Pr Title')
     pr_body = fields.Char('Pr Body')
     pr_author = fields.Char('Pr Author')
@@ -37,11 +38,15 @@ class Branch(models.Model):
 
     reflog_ids = fields.One2many('runbot.ref.log', 'branch_id')
 
-    branch_url = fields.Char(compute='_compute_branch_url', string='Branch url', readonly=True)
-    dname = fields.Char('Display name', compute='_compute_dname', search='_search_dname')
+    branch_url = fields.Char(compute='_compute_branch_url', string='Branch url', readonly=True, public=True)
+    dname = fields.Char('Display name', compute='_compute_dname', search='_search_dname', public=True)
 
     alive = fields.Boolean('Alive', default=True)
     draft = fields.Boolean('Draft', store=True)
+
+    @api.model
+    def _api_project_id_field_path(self):
+        return 'bundle_id.project_id'
 
     @api.depends('name', 'remote_id.short_name')
     def _compute_dname(self):

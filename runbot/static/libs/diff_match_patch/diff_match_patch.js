@@ -2235,7 +2235,7 @@ var diff_match_patch = function() {
   // /** @suppress {globalThis} */
   // this['DIFF_EQUAL'] = DIFF_EQUAL;
 
-export {
+(typeof window !== "undefined" ? window : this).DiffMatchPatch = {
   diff_match_patch,
   DIFF_DELETE,
   DIFF_INSERT,

@@ -1,3 +1,5 @@
+from werkzeug.exceptions import BadRequest
+
 import time
 import logging
 import datetime
@@ -5,40 +7,41 @@ import subprocess
 
 from collections import defaultdict
 from odoo import models, fields, api, tools
+from odoo.osv import expression
 from ..common import dt2time, s2human_long
 
 
 class Bundle(models.Model):
     _name = 'runbot.bundle'
     _description = "Bundle"
-    _inherit = 'mail.thread'
+    _inherit = ['mail.thread', 'runbot.public.model.mixin']
 
-    name = fields.Char('Bundle name', required=True, help="Name of the base branch")
-    project_id = fields.Many2one('runbot.project', required=True, index=True)
-    branch_ids = fields.One2many('runbot.branch', 'bundle_id')
+    name = fields.Char('Bundle name', required=True, help="Name of the base branch", public=True)
+    project_id = fields.Many2one('runbot.project', required=True, index=True, public=True)
+    branch_ids = fields.One2many('runbot.branch', 'bundle_id', public=True)
 
     # custom behaviour
-    no_build = fields.Boolean('No build')
+    no_build = fields.Boolean('No build', public=True)
     no_auto_run = fields.Boolean('No run')
     build_all = fields.Boolean('Force all triggers')
     always_use_foreign = fields.Boolean('Use foreign bundle', help='By default, check for the same bundle name in another project to fill missing commits.', default=lambda self: self.project_id.always_use_foreign)
     modules = fields.Char("Modules to install", help="Comma-separated list of modules to install and test.")
 
     batch_ids = fields.One2many('runbot.batch', 'bundle_id')
-    last_batch = fields.Many2one('runbot.batch', index=True, domain=lambda self: [('category_id', '=', self.env.ref('runbot.default_category').id)])
-    last_batchs = fields.Many2many('runbot.batch', 'Last batchs', compute='_compute_last_batchs')
+    last_batch = fields.Many2one('runbot.batch', index=True, domain=lambda self: [('category_id', '=', self.env.ref('runbot.default_category').id)], public=True)
+    last_batchs = fields.Many2many('runbot.batch', 'Last batchs', compute='_compute_last_batchs', public=True)
     last_done_batch = fields.Many2many('runbot.batch', 'Last batchs', compute='_compute_last_done_batch')
 
-    sticky = fields.Boolean('Sticky', compute='_compute_sticky', store=True, index=True)
-    is_base = fields.Boolean('Is base', index=True)
+    sticky = fields.Boolean('Sticky', compute='_compute_sticky', store=True, index=True, public=True)
+    is_base = fields.Boolean('Is base', index=True, public=True)
     defined_base_id = fields.Many2one('runbot.bundle', 'Forced base bundle', domain="[('project_id', '=', project_id), ('is_base', '=', True)]")
     base_id = fields.Many2one('runbot.bundle', 'Base bundle', compute='_compute_base_id', store=True)
     to_upgrade = fields.Boolean('To upgrade To', compute='_compute_to_upgrade', store=True, index=False)
     to_upgrade_from = fields.Boolean('To upgrade From', compute='_compute_to_upgrade_from', store=True, index=False)
 
-    has_pr = fields.Boolean('Has PR', compute='_compute_has_pr', store=True)
+    has_pr = fields.Boolean('Has PR', compute='_compute_has_pr', store=True, public=True)
 
-    version_id = fields.Many2one('runbot.version', 'Version', compute='_compute_version_id', store=True, recursive=True)
+    version_id = fields.Many2one('runbot.version', 'Version', compute='_compute_version_id', store=True, recursive=True, public=True)
     version_number = fields.Char(related='version_id.number', store=True, index=True)
 
     previous_major_version_base_id = fields.Many2one('runbot.bundle', 'Previous base bundle', compute='_compute_relations_base_id')
@@ -56,7 +59,37 @@ class Bundle(models.Model):
     disable_codeowner = fields.Boolean("Disable codeowners", tracking=True)
 
     # extra_info
-    for_next_freeze = fields.Boolean('Should be in next freeze')
+    for_next_freeze = fields.Boolean('Should be in next freeze', public=True)
+
+    @api.model
+    def _api_request_allowed_keys(self):
+        return super()._api_request_allowed_keys() | {'category_id'}
+    
+    @api.model
+    def _api_project_id_field_path(self):
+        return 'project_id'
+
+    @api.model
+    def _api_request_read_get_records(self, request_data):
+        if 'category_id' not in self.env.context:
+            if 'category_id' in request_data:
+                if not isinstance(request_data['category_id'], int):
+                    raise BadRequest('Invalid category_id')
+                category_id = request_data['category_id']
+            else:
+                category_id = self.env['ir.model.data']._xmlid_to_res_id('runbot.default_category')
+            self = self.with_context(category_id=category_id)
+        limit, offset = self._api_request_read_get_offset_limit(request_data)
+        e = expression.expression(request_data['domain'], self)
+        query = e.query
+        query.order = """
+        (case when "runbot_bundle".sticky then 1 when "runbot_bundle".sticky is null then 2 else 2 end),
+            case when "runbot_bundle".sticky then "runbot_bundle".version_number end collate "C" desc,
+            "runbot_bundle".last_batch desc
+        """
+        query.limit = limit
+        query.offset = offset
+        return self.browse(query)
 
     @api.depends('name')
     def _compute_host_id(self):

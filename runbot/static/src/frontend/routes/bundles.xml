@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates>
+  <t t-name="runbot.Bundles">
+    <div class="container-fluid">
+      <t t-if="queryState.error">
+        <i class="fa fa-ban" />
+      </t>
+      <t t-elif="queryState.loading">
+        <div class="w-100 h-100 d-flex justify-content-center align-items-center">
+          <i class="fa fa-spinner fa-spin fs-4" />
+        </div>
+      </t>
+      <t t-else="">
+        <!-- TODO: separation of components -->
+        <t t-foreach="queryState.data" t-as="bundle" t-key="bundle.id">
+          <div class="row bundle_row">
+            <div class="col-md-3 col-lg-2 cell">
+              <div class="oneline">
+                <i t-if="bundle.sticky" style="color: #f0ad4e" class="fa fa-star"/>
+                <Link href="`/runbot/bundle/${bundle.id}`" title="`View Bundle ${bundle.name}`"><b t-out="bundle.name"/></Link>
+                <!-- TODO: bundle toolbar -->
+              </div>
+            </div>
+            <div class="col-md-9 col-lg-10">
+              <div class="row gx-0">
+                <!-- TODO: ideally should not render 4 if we are going to hide half of them (for smaller screens) -->
+                <div t-foreach="bundle.last_batchs" t-as="batch" t-key="batch.id" t-att-class="batch_index &lt; 2 ? 'col-md-6 col-xl-3' : 'col-md-6 col-xl-3 d-none d-xl-block'">
+                  <div class="batch_tile if more">
+                    <!-- TODO: card color (success-warning-whatever) -->
+                    <div class="card">
+                      <Link title="'View Batch'" href="`/runbot/batch/${batch.id}`">
+                        <div class="batch_header">
+                          <span class="badge text-bg-default">
+                            <!-- TODO: calculate hours ago with age field -->
+                            X hours ago
+                          </span>
+                          <span class="float-end header_hover">View batch...</span>
+                        </div>
+                      </Link>
+                      <div class="batch_slots">
+                        <!-- TODO: slot filtering, should mostly be done in backend. -->
+                        <div class="slot_container" t-foreach="batch.slot_ids" t-as="slot" t-key="slot.id" t-if="slot.build_id.id">
+                          <t t-set="build" t-value="slot.build_id"/>
+                          <div class="btn-group btn-group-ssm slot_button_group">
+                            <!-- TODO: status reporting + title? -->
+                            <span class="btn btn-success disabled" title="created">
+                              <!-- TODO: different icon depending on link_type -->
+                              <i class="fa fa-hashtag"/>
+                            </span>
+                            <Link class="'btn btn-default slot_name'" href="`/runbot/batch/${batch.id}/build/${build.id}`">
+                              <t t-out="slot.trigger_id.name"/>
+                            </Link>
+                            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                              <i class="fa fa-cog fa-fw"/>
+                              <span class="caret"/>
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                              <!-- TODO: build menu -->
+                              <Link class="'dropdown-item'" href="'#'">
+                                TODO
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <!-- TODO: this should be optional -->
+                      <div class="batch_commits">
+                        <div t-foreach="sortedCommits(batch.commit_link_ids)" t-as="commit_link" class="one_line" t-key="commit_link_index">
+                          <t t-set="match_class" t-value="commit_link.match_type === 'new' ? 'info' : 'secondary'"/>
+                          <Link href="`/runbot/commit/${commit_link.commit_id.id}`" class="`badge text-bg-${match_class}`">
+                            <i class="fa fa-fw fa-hashtag" t-if="commit_link.match_type === 'new'" title="This commit is a new head"/>
+                            <i class="fa fa-fw fa-link" t-if="commit_link.match_type === 'head'" title="This commit is an existing head from bundle branches"/>
+                            <i class="fa fa-fw fa-code-fork" t-if="commit_link.match_type === 'base_match'" title="This commit is matched from a base batch with matching merge_base"/>
+                            <i class="fa fa-fw fa-clock-o" t-if="commit_link.match_type === 'base_head'" title="This commit is the head of a base branch"/>
+                            <t t-out="commit_link.commit_id.dname"/>
+                          </Link>
+                          <Link href="`https://${commit_link.remote_base_url}/commit/${commit_link.commit_id.name}`" class="`badge text-bg-${match_class}`" title="'View Commit on Github'">
+                            <i class="fa fa-github"/>
+                          </Link>
+                          <span t-out="commit_link.commit_id.subject"/>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </t>
+      </t>
+    </div>
+  </t>
+</templates>

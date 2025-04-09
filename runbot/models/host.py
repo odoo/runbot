@@ -15,9 +15,9 @@ class Host(models.Model):
     _name = 'runbot.host'
     _description = "Host"
     _order = 'id'
-    _inherit = 'mail.thread'
+    _inherit = ['mail.thread', 'runbot.public.model.mixin']
 
-    name = fields.Char('Host name', required=True)
+    name = fields.Char('Host name', required=True, public=True)
     disp_name = fields.Char('Display name')
     active = fields.Boolean('Active', default=True, tracking=True)
     last_start_loop = fields.Datetime('Last start')
@@ -48,6 +48,10 @@ class Host(models.Model):
 
     use_remote_docker_registry = fields.Boolean('Use remote Docker Registry', default=False, help="Use docker registry for pulling images")
     docker_registry_url = fields.Char('Registry Url', help="Override global registry URL for this host.")
+
+    @api.model
+    def _api_request_requires_project(self):
+        return False
 
     def _compute_nb(self):
         # Array of tuple (host, state, count)

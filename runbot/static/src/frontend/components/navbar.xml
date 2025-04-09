@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates>
+  <t t-name="runbot.Navbar">
+    <header class="navbar bg-body-tertiary sticky-top">
+      <div class="container-fluid">
+        <div class="d-flex justify-content-between flex-grow-1">
+          <div class="d-flex gap-2">
+            <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbarLeft" aria-label="Toggle Navigation">
+              <span class="navbar-toggler-icon" />
+            </button>
+            <Link class="'navbar-brand text-secondary'" href="'#'">
+              <t t-if="activeProject" t-out="activeProject.name" />
+            </Link>
+          </div>
+          <div class="d-flex">
+            <BundleSearch/>
+          </div>
+        </div>
+        <!-- TODO: make own component -->
+        <div class="offcanvas offcanvas-start" tabindex="-1" id="offcanvasNavbarLeft" aria-labelledby="offcanvasNavbarLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="offcanvasNavbarLabel">Runbot</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close" />
+          </div>
+          <div class="offcanvas-body d-flex flex-column">
+            <hr class="separator" />
+            <div class="text-secondary mb-2">Projects</div>
+            <ul class="nav nav-fill flex-column text-align-left gap-1"
+              style="--bs-nav-link-padding-y: 0.2em;">
+              <li class="nav-item" t-foreach="appState.projects" t-as="project" t-key="project.id">
+                <Link class="'btn btn-sm btn-outline-secondary w-100 text-start border' + (project === appState.activeProject ? ' active' : '')" href="`/runbot/${slugify(project)}`">
+                  <t t-out="project.name" />
+                </Link>
+              </li>
+            </ul>
+            <hr class="separator"/>
+            <div class="text-secondary mb-2">Categories</div>
+            <ul class="nav nav-fill flex-column text-align-left gap-1"
+              style="--bs-nav-link-padding-y: 0.2em;">
+              <li class="nav-item" t-foreach="appState.categories" t-as="category" t-key="category.id">
+                <!-- TODO: save as default -->
+                <a href="#" class="btn btn-sm btn-outline-secondary w-100 text-start border" t-att-class="{active: appState.activeCategory.id === category.id}" t-out="category.name"
+                  t-on-click.prevent="() => appState.activeCategory = category"
+                />
+              </li>
+            </ul>
+            <!-- This element is separating the top from the bottom -->
+            <div class="flex-grow-1" />
+            <hr class="separator" />
+            <ThemeSwitcher/>
+            <hr class="separator" />
+            <a href="#" class="btn btn-sm btn-outline-danger w-100 border"
+              t-on-click.prevent="() => this.backToOldClient()">
+              Send me back to the old client
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+  </t>
+</templates>

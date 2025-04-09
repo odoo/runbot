@@ -44,14 +44,14 @@ class Trigger(models.Model):
     """
 
     _name = 'runbot.trigger'
-    _inherit = 'mail.thread'
+    _inherit = ['mail.thread', 'runbot.public.model.mixin']
     _description = 'Triggers'
 
     _order = 'sequence, id'
 
-    sequence = fields.Integer('Sequence')
-    name = fields.Char("Name")
-    description = fields.Char("Description", help="Informative description")
+    sequence = fields.Integer('Sequence', public=True)
+    name = fields.Char("Name", public=True)
+    description = fields.Char("Description", help="Informative description", public=True)
     project_id = fields.Many2one('runbot.project', string="Project id", required=True)
     repo_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_triggers', string="Triggers", domain="[('project_id', '=', project_id)]")
     dependency_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_dependencies', string="Dependencies")
@@ -78,8 +78,8 @@ class Trigger(models.Model):
     ci_context = fields.Char("CI context", tracking=True)
     category_id = fields.Many2one('runbot.category', default=lambda self: self.env.ref('runbot.default_category', raise_if_not_found=False))
     version_domain = fields.Char(string="Version domain")
-    hide = fields.Boolean('Hide trigger on main page')
-    manual = fields.Boolean('Only start trigger manually', default=False)
+    hide = fields.Boolean('Hide trigger on main page', public=True)
+    manual = fields.Boolean('Only start trigger manually', default=False, public=True)
     restore_trigger_id = fields.Many2one('runbot.trigger', string='Restore Trigger ID for custom triggers', help="Mainly usefull to automatically define where to find a reference database when creating a custom trigger", tracking=True)
 
     upgrade_dumps_trigger_id = fields.Many2one('runbot.trigger', string='Template/complement trigger', tracking=True)
@@ -98,6 +98,10 @@ class Trigger(models.Model):
                                   domain=[('type', '=', 'qweb')],
                                   context={'default_type': 'qweb', 'default_arch_base': '<t></t>'},
     )
+
+    @api.model
+    def _api_project_id_field_path(self):
+        return 'project_id'
 
     @api.depends('config_id.step_order_ids.step_id.make_stats')
     def _compute_has_stats(self):
@@ -201,9 +205,9 @@ class Remote(models.Model):
     _name = 'runbot.remote'
     _description = 'Remote'
     _order = 'sequence, id'
-    _inherit = 'mail.thread'
+    _inherit = ['mail.thread', 'runbot.public.model.mixin']
 
-    name = fields.Char('Url', required=True, tracking=True)
+    name = fields.Char('Url', required=True, tracking=True, public=True)
     repo_id = fields.Many2one('runbot.repo', required=True, tracking=True)
 
     owner = fields.Char(compute='_compute_base_infos', string='Repo Owner', store=True, readonly=True, tracking=True)
@@ -212,7 +216,7 @@ class Remote(models.Model):
 
     base_url = fields.Char(compute='_compute_base_url', string='Base URL', readonly=True, tracking=True)
 
-    short_name = fields.Char('Short name', compute='_compute_short_name', tracking=True)
+    short_name = fields.Char('Short name', compute='_compute_short_name', tracking=True, public=True)
     remote_name = fields.Char('Remote name', compute='_compute_remote_name', tracking=True)
 
     sequence = fields.Integer('Sequence', tracking=True)
@@ -221,6 +225,10 @@ class Remote(models.Model):
     send_status = fields.Boolean('Send status', default=False, tracking=True)
 
     token = fields.Char("Github token", groups="runbot.group_runbot_admin")
+
+    @api.model
+    def _api_request_allow_direct_access(self):
+        return False
 
     @api.depends('name')
     def _compute_base_infos(self):
@@ -386,7 +394,7 @@ class Repo(models.Model):
     _name = 'runbot.repo'
     _description = "Repo"
     _order = 'sequence, id'
-    _inherit = 'mail.thread'
+    _inherit = ['mail.thread', 'runbot.public.model.mixin']
 
     name = fields.Char("Name", tracking=True)  # odoo/enterprise/upgrade/security/runbot/design_theme
     identity_file = fields.Char("Identity File", help="Identity file to use with git/ssh", groups="runbot.group_runbot_admin")
@@ -402,7 +410,7 @@ class Repo(models.Model):
     addons_paths = fields.Char('Addons paths', help='Comma separated list of possible addons path', default='', tracking=True)
     upgrade_paths = fields.Char('Upgrade paths', help='Comma separated list of possible upgrade path', default='', tracking=True)
 
-    sequence = fields.Integer('Sequence', tracking=True)
+    sequence = fields.Integer('Sequence', tracking=True, public=True)
     path = fields.Char(compute='_compute_path', string='Directory', readonly=True)
     mode = fields.Selection([('disabled', 'Disabled'),
                              ('poll', 'Poll'),

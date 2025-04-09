@@ -1,43 +1,65 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
+
+        <template id="runbot.frontend_spa">
+            <html>
+                <title>Runbot</title>
+                <t t-call-assets="runbot.assets_frontend"/>
+
+                <script type="text/javascript">
+                    // Because the frontend is currently optional, bootstraping
+                    // happens here, but should later on be done directly in the
+                    // frontend files.
+                    {
+                        odoo.__runbot_version__ = 'POC';
+                        // TODO: add some data to this stuff.
+                        odoo.__session_info__ = <t t-out="json.dumps(session_info)"/>;
+                        odoo.__runbot_data__ = {
+                            projects: <t t-out="json.dumps(projects.read(['id', 'name']))"/>,
+                            categories: <t t-out="json.dumps(categories.read(['id', 'name']))"/>,
+                            defaultCategory: <t t-out="default_category"/>,
+                        };
+                        odoo.csrf_token = "<t t-esc="request.csrf_token(None)"/>"
+                        odoo.startApp(); // Provided by root.js
+                    }
+                </script>
+                <link rel="icon" type="image/png" href="/runbot/static/img/icon_ok.png"/>
+                <link rel="icon" type="image/svg+xml" href="/runbot/static/img/icon_ok.svg"/>
+            </html>
+        </template>
+
         <!-- base layout -->
         <template id="runbot.base_page">
             <html t-att-data-bs-theme="theme">
                 <head>
                     <title t-out="title or 'Runbot'"/>
-                    <link rel="stylesheet" type="text/css" href="/runbot/static/src/libs/bootstrap/css/bootstrap.css"/>
-                    <link rel="stylesheet" type="text/css" href="/runbot/static/src/libs/fontawesome/css/font-awesome.css"/>
-                    <link rel="stylesheet" type="text/css" href="/runbot/static/src/css/runbot.css"/>
 
-                    <script src="/runbot/static/src/libs/jquery/jquery.js" type="text/javascript"/>
-                    <script type="text/javascript" src="/runbot/static/src/libs/popper/popper.js"/>
-                    <script type="text/javascript" src="/runbot/static/src/libs/bootstrap/js/bootstrap.bundle.js"/>
-                    <script type="text/javascript" src="/runbot/static/src/js/runbot.js"/>
+                    <t t-call-assets="runbot.assets_frontend"/>
 
                     <t t-if="refresh">
                         <meta http-equiv="refresh" t-att-content="refresh"/>
                     </t>
 
                     <t t-if="not page_info_state or page_info_state == 'ok' or page_info_state not in ('warn', 'ko', 'skipped', 'killed', 'manually_killed')">
-                        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_ok.png"/>
-                        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_ok.svg"/>
+                        <link rel="icon" type="image/png" href="/runbot/static/img/icon_ok.png"/>
+                        <link rel="icon" type="image/svg+xml" href="/runbot/static/img/icon_ok.svg"/>
                     </t>
                     <t t-elif="page_info_state == 'ko'">
-                        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_ko.png"/>
-                        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_ko.svg"/>
+                        <link rel="icon" type="image/png" href="/runbot/static/img/icon_ko.png"/>
+                        <link rel="icon" type="image/svg+xml" href="/runbot/static/img/icon_ko.svg"/>
                     </t>
                     <t t-elif="page_info_state == 'warn'">
-                        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_warn.png"/>
-                        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_warn.svg"/>
+                        <link rel="icon" type="image/png" href="/runbot/static/img/icon_warn.png"/>
+                        <link rel="icon" type="image/svg+xml" href="/runbot/static/img/icon_warn.svg"/>
                     </t>
                     <t t-elif="page_info_state == 'skipped'">
-                        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_skipped.png"/>
-                        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_skipped.svg"/>
+                        <link rel="icon" type="image/png" href="/runbot/static/img/icon_skipped.png"/>
+                        <link rel="icon" type="image/svg+xml" href="/runbot/static/img/icon_skipped.svg"/>
                     </t>
                     <t t-elif="page_info_state == 'killed' or page_info_state == 'manually_killed'">
-                        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_killed.png"/>
-                        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_killed.svg"/>
+                        <link rel="icon" type="image/png" href="/runbot/static/img/icon_killed.png"/>
+                        <link rel="icon" type="image/svg+xml" href="/runbot/static/img/icon_killed.svg"/>
                     </t>
                 </head>
                 <body>
@@ -113,6 +135,11 @@
                         <form class="px-4 py-3" method="post" action="/runbot/submit" id="preferences_form">
                             <input type="hidden" name="redirect" t-att-value="current_path"/>
 
+                            <hr class="separator"/>
+                            <div class="form-check form-switch">
+                                <input onclick="document.cookie = 'use_owl_client=1; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" class="form-check-input" type="checkbox" role="switch" id="owl_client"/>
+                                <label class="form-check-label" for="owl_client">Use new webclient (when available)</label>
+                            </div>
                             <hr class="separator"/>
                             <div class="form-check form-switch">
                                 <input onclick="document.getElementById('preferences_form').submit()" class="form-check-input" type="checkbox" role="switch" id="more" name="more" t-att-checked="more"/>
@@ -390,7 +417,7 @@
         </template>
 
         <template id="runbot.branch_copy_button">
-            <button t-attf-class="btn btn-default {{btn_size or 'btn-ssm'}}" title="Copy Bundle name" aria-label="Copy Bundle name" t-attf-onclick="copyToClipboard('{{ bundle.name.split(':')[-1] }}')">
+            <button t-attf-class="btn btn-default {{btn_size or 'btn-ssm'}}" title="Copy Bundle name" aria-label="Copy Bundle name" t-attf-data-clipboard-copy="{{ bundle.name.split(':')[-1] }}">
               <i t-attf-class="fa fa-clipboard"/>
             </button>
         </template>

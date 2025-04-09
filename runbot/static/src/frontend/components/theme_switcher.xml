@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates>
+    <t t-name="runbot.ThemeSwitcher">
+        <small>Switch theme</small>
+        <div class="btn-group btn-group-sm btn-group-toggle">
+            <button title="Switch to light theme" t-on-click="() => this.switchTheme('light')" class="btn btn-outline-secondary fa fa-sun-o" t-att-class="{'active': this.state.theme === 'light'}"/>
+            <button title="Switch to dark theme" t-on-click="() => this.switchTheme('dark')" class="btn btn-outline-secondary fa fa-moon-o" t-att-class="{'active': this.state.theme === 'dark'}"/>
+            <button title="Switch to red404 theme" t-on-click="() => this.switchTheme('red404')" class="btn btn-outline-secondary fa fa-eye-slash" t-att-class="{'active': this.state.theme === 'red404'}"/>
+            <button title="Switch to auto theme" t-on-click="() => this.switchTheme('auto')" class="btn btn-outline-secondary fa fa-ban" t-att-class="{'active': this.state.theme === 'auto'}"/>
+        </div>
+    </t>
+</templates>

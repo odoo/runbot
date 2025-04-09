@@ -6,11 +6,12 @@ class Project(models.Model):
     _name = 'runbot.project'
     _description = 'Project'
     _order = 'sequence, id'
+    _inherit = ['runbot.public.model.mixin']
 
-    name = fields.Char('Project name', required=True)
+    name = fields.Char('Project name', required=True, public=True)
     group_ids = fields.Many2many('res.groups', string='Required groups')
     keep_sticky_running = fields.Boolean('Keep last sticky builds running')
-    trigger_ids = fields.One2many('runbot.trigger', 'project_id', string='Triggers')
+    trigger_ids = fields.One2many('runbot.trigger', 'project_id', string='Triggers', public=True)
     dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, help="Project Default Dockerfile")
     repo_ids = fields.One2many('runbot.repo', 'project_id', string='Repos')
     sequence = fields.Integer('Sequence')
@@ -24,6 +25,10 @@ class Project(models.Model):
     hidden = fields.Boolean('Hidden', help='Hide this project from the main page')
     active = fields.Boolean("Active", default=True)
     process_delay = fields.Integer('Process delay', default=60, required=True, help="Delay between a push and a batch starting its process.")
+
+    @api.model
+    def _api_request_requires_project(self):
+        return False
 
     @api.constrains('process_delay')
     def _constraint_process_delay(self):
