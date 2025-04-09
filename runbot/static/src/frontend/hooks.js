@@ -40,20 +40,31 @@ export const useQuery = (fn, depsFn) => {
 
     useEffect(
         () => {
-            const thisCounter = ++counter;
-            state.loading = true;
-            fn().catch(err => {
-                if (counter !== thisCounter) {
-                    return;
+            // Use effect's effect can't be async.
+            (async () => {
+                const guard = (callback) => {
+                    if (counter !== thisCounter) {
+                        return;
+                    }
+                    callback();
                 }
-                state.error = err;
-            }).then(data => {
-                if (counter !== thisCounter) {
-                    return;
+                const thisCounter = ++counter;
+                state.loading = true;
+                try {
+                    const data = await fn();
+                    guard(() => {
+                        state.loading = false;
+                        state.error = null;
+                        state.data = data;
+                    });
+                } catch (err) {
+                    guard(() => {
+                        state.loading = false;
+                        state.error = err?.message || 'error';
+                        state.data = null;
+                    });
                 }
-                state.loading = false;
-                state.data = data;
-            });
+            })();
         },
         depsFn,
     )

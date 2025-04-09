@@ -93,7 +93,7 @@ export class Bundles extends Component {
             domain.splice(0, 0, '&');
             domain.push(...searchDomain);
         }
-        return fetch(
+        const res = await fetch(
             '/runbot/api/runbot.bundle/read', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -178,7 +178,8 @@ export class Bundles extends Component {
                     }
                 })
             }
-        ).then(d => d.json())
+        )
+        return await res.json();
     }
 
     sortedCommits(commit_links) {
