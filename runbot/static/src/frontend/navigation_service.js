@@ -3,6 +3,7 @@ import { reactive } from '@runbot/owl';
 
 const state = reactive({
     currentPath: window.location.pathname,
+    currentSearch: window.location.search,
 });
 
 export const useNavigation = () => {
@@ -13,6 +14,7 @@ export const useNavigation = () => {
         }
         window.history.pushState({}, '', url);
         state.currentPath = window.location.pathname;
+        state.currentSearch = window.location.search;
     }
 
     return { state, navigate };

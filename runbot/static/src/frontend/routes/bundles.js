@@ -1,4 +1,4 @@
-import { Component, useEffect } from '@runbot/owl';
+import { Component, useEffect, useState } from '@runbot/owl';
 
 import { registry } from '@web/core/registry';
 
@@ -6,6 +6,7 @@ import { Link } from '../components/link';
 
 import { unslug_re } from '../utils';
 import { useAppState, useQuery } from '../hooks';
+import { useNavigation } from '../navigation_service';
 
 
 export class Bundles extends Component {
@@ -26,114 +27,28 @@ export class Bundles extends Component {
 
     setup() {
         this.appState = useAppState();
-
-        if (this.props.projectId) {
-            this.appState.activeProject = Number(this.props.projectId);
-        }
-        if (!this.appState.activeProject) {
-            this.appState.activeProject = this.appState.projects[0].id;
-        }
+        this.navigationState = useState(useNavigation().state);
 
         useEffect(
             () => {
                 if (this.props.projectId) {
-                    console.log('updating activeProject');
-                    this.appState.activeProject = Number(this.props.projectId);
+                    this.appState.activeProject = this.appState.projects.find(p => p.id === Number(this.props.projectId));
+                } else {
+                    this.appState.activeProject = this.appState.projects[0];
                 }
-                const project = this.appState.projects.find(p => p.id === this.appState.activeProject);
-                document.title = `Runbot - ${project.name}`
+                if (this.appState.activeProject) {
+                    document.title = `Runbot - ${this.appState.activeProject.name}`;
+                }
             },
             () => [this.props.projectId],
         );
 
         this.queryState = useQuery(
-            () => fetch(
-                '/runbot/api/runbot.bundle/read', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        domain: [['last_batch', '!=', false]],
-                        project_id: this.appState.activeProject,
-                        category_id: this.appState.activeCategory.id,
-                        context: {
-                            category_id: this.appState.activeCategory.id,
-                        },
-                        specification: {
-                            id: {},
-                            name: {},
-                            sticky: {},
-                            branch_ids: {
-                                fields: {
-                                    id: {},
-                                    dname: {},
-                                    branch_url: {},
-                                }
-                            },
-                            last_batchs: {
-                                fields: {
-                                    id: {},
-                                    state: {},
-                                    age: {},
-                                    slot_ids: {
-                                        fields: {
-                                            link_type: {},
-                                            trigger_id: {
-                                                fields: {
-                                                    name: {},
-                                                },
-                                            },
-                                            build_id: {
-                                                fields: {
-                                                    id: {},
-                                                    local_state: {},
-                                                    local_result: {},
-                                                    global_state: {},
-                                                    global_result: {},
-                                                    requested_action: {},
-                                                    log_list: {},
-                                                    version_id: {},
-                                                    config_id: {},
-                                                    trigger_id: {},
-                                                    create_batch_id: {},
-                                                    host_id: {
-                                                        fields: {
-                                                            name: {}
-                                                        }
-                                                    },
-                                                    database_ids: {
-                                                        fields: {
-                                                            name: {}
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        },
-                                    },
-                                    commit_link_ids: {
-                                        fields: {
-                                            match_type: {},
-                                            remote_base_url: {},
-                                            commit_id: {
-                                                fields: {
-                                                    name: {},
-                                                    dname: {},
-                                                    subject: {},
-                                                    repo_id: {
-                                                        fields: {
-                                                            id: {},
-                                                            sequence: {},
-                                                        }
-                                                    },
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    })
-                }
-            ).then(d => d.json()),
-            () => [this.appState.activeProject, this.appState.activeCategory],
+            () => this.fetchBundleData(),
+            () => [
+                this.appState.activeProject, this.appState.activeCategory,
+                this.navigationState.currentSearch,
+            ],
         )
     }
 
@@ -143,6 +58,127 @@ export class Bundles extends Component {
 
     get errorString() {
         return JSON.stringify(this.queryState.error);
+    }
+
+    async fetchBundleData() {
+        const searchParams = new URLSearchParams(window.location.search);
+        const domain = [['last_batch', '!=', false]];
+        if (searchParams.get('has_pr') === 'on') {
+            domain.splice(0, 0, '&');
+            domain.push(['has_pr', '=', true]);
+        }
+        if (searchParams.has('search')) {
+            const search = searchParams.get('search').trim();
+            const searchDomains = [];
+            const prNumbers = []
+            search.split('|').forEach(
+                searchComponent => {
+                    if (/\d+/.exec(searchComponent)) {
+                        prNumbers.push(Number(searchComponent));
+                    }
+                    const operator = searchComponent.includes('%') ? '=ilike' : 'ilike';
+                    searchDomains.push(['name', operator, searchComponent]);
+                }
+            );
+            if (prNumbers.length) {
+                searchDomains.push(['branch_ids.name', 'in', prNumbers]);
+            }
+            const searchDomain = searchDomains.reduce((domain, leaf, index) => {
+                if (index !== 0) {
+                    domain.splice(0, 0, '|');
+                }
+                domain.push(leaf);
+                return domain;
+            }, []);
+            domain.splice(0, 0, '&');
+            domain.push(...searchDomain);
+        }
+        return fetch(
+            '/runbot/api/runbot.bundle/read', {
+                method: 'POST',
+                body: JSON.stringify({
+                    domain: domain,
+                    project_id: this.appState.activeProject.id,
+                    category_id: this.appState.activeCategory.id,
+                    context: {
+                        category_id: this.appState.activeCategory.id,
+                    },
+                    specification: {
+                        id: {},
+                        name: {},
+                        sticky: {},
+                        branch_ids: {
+                            fields: {
+                                id: {},
+                                dname: {},
+                                branch_url: {},
+                            }
+                        },
+                        last_batchs: {
+                            fields: {
+                                id: {},
+                                state: {},
+                                age: {},
+                                slot_ids: {
+                                    fields: {
+                                        link_type: {},
+                                        trigger_id: {
+                                            fields: {
+                                                name: {},
+                                            },
+                                        },
+                                        build_id: {
+                                            fields: {
+                                                id: {},
+                                                local_state: {},
+                                                local_result: {},
+                                                global_state: {},
+                                                global_result: {},
+                                                requested_action: {},
+                                                log_list: {},
+                                                version_id: {},
+                                                config_id: {},
+                                                trigger_id: {},
+                                                create_batch_id: {},
+                                                host_id: {
+                                                    fields: {
+                                                        name: {}
+                                                    }
+                                                },
+                                                database_ids: {
+                                                    fields: {
+                                                        name: {}
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                },
+                                commit_link_ids: {
+                                    fields: {
+                                        match_type: {},
+                                        remote_base_url: {},
+                                        commit_id: {
+                                            fields: {
+                                                name: {},
+                                                dname: {},
+                                                subject: {},
+                                                repo_id: {
+                                                    fields: {
+                                                        id: {},
+                                                        sequence: {},
+                                                    }
+                                                },
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                })
+            }
+        ).then(d => d.json())
     }
 
     sortedCommits(commit_links) {

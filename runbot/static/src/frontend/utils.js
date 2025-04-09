@@ -15,7 +15,7 @@ export function unslug_re(groupName) {
  * @param {Number} id Id of the object
  * @returns The slugged string
  */
-export function slugify(name, id) {
+export function slugify({name, id}) {
     const slugged = name
         .replaceAll(/\W+/g, '-')
         .replaceAll(/^-*|-*$/g, '')
