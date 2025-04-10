@@ -559,12 +559,16 @@ class Runbot(Controller):
 
 
     @route(['/runbot/stats/'], type='json', auth="public", website=False, sitemap=False)
-    def stats_json(self, bundle_id=False, trigger_id=False, key_category='', center_build_id=False, ok_only=False, limit=100, search=None, **post):
+    def stats_json(self, bundle_id=False, trigger_id=False, key_category='', center_build_id=False, ok_only=False, limit=100, switch_to_base_limit=0, search=None, **post):
         """ Json stats """
         trigger_id = trigger_id and int(trigger_id)
         bundle_id = bundle_id and int(bundle_id)
         center_build_id = center_build_id and int(center_build_id)
         limit = min(int(limit), 1000)
+        switch_to_base_limit = min(int(switch_to_base_limit), limit)
+        if center_build_id and switch_to_base_limit:
+            _logger.warning('switch_to_base_limit and center_build_id are both set, ignoring switch_to_base_limit')
+            switch_to_base_limit = 0
 
         trigger = request.env['runbot.trigger'].browse(trigger_id)
         bundle = request.env['runbot.bundle'].browse(bundle_id)
@@ -572,8 +576,8 @@ class Runbot(Controller):
             return request.not_found()
 
         builds_domain = [
-            ('global_state', 'in', ('running', 'done')),
             ('slot_ids.batch_id.bundle_id', '=', bundle_id),
+            ('global_state', 'in', ('running', 'done')),
             ('params_id.trigger_id', '=', trigger.id),
         ]
         if ok_only:
@@ -586,9 +590,16 @@ class Runbot(Controller):
             builds_domain = expression.AND([builds_domain, [('id', '<=', center_build_id)]])
             limit -= len(builds)
 
-        builds |= builds.search(builds_domain, order='id desc', limit=limit)
+        builds |= builds.search(builds_domain, order='id desc', limit=switch_to_base_limit or limit)
         if not builds:
             return {}
+
+        if switch_to_base_limit:
+            min_build_id = min(builds.ids)
+            builds_domain[0] = ('slot_ids.batch_id.bundle_id', '=', bundle.base_id.id)
+            builds_domain += [('id', '<', min_build_id)]
+            builds |= builds.search(builds_domain, order='id desc', limit=limit - switch_to_base_limit)
+
 
         builds = builds.search([('id', 'child_of', builds.ids)])
 
