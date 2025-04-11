@@ -30,7 +30,7 @@ class RunbotClient():
     def __init__(self, env):
         self.env = env
         self.ask_interrupt = threading.Event()
-        self.host = None
+        self.host = self.env['runbot.host']._get_current()
         self.count = 0
         self.max_count = 60
 

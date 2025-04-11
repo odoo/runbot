@@ -124,12 +124,14 @@ class TestHost(RunbotCase):
 
         icp = self.env['ir.config_parameter']
         icp.set_param('runbot.docker_registry_host_id', self.test_host.id)
+        self.test_host.is_registry = True
         icp.set_param('runbot.docker_registry_url', 'registryhost_nowhere')
         dockerfile = self.env['runbot.dockerfile'].create({
             'name': 'DockerTest',
             'to_build': True,
             'image_identifier': 'current',
-            'image_future_identifier': 'current'
+            'image_future_identifier': 'current',
+            'auto_sync': False,
         })
 
         self.assertEqual(dockerfile.image_tag, 'odoo:DockerTest')
@@ -149,7 +151,9 @@ class TestHost(RunbotCase):
 
         self.assertEqual(dockerfile.image_future_identifier, 'current')
 
-        self.patchers['build_patcher'].side_effect = lambda x: 'future'  # now simulate a success
+        def build_success(arg):
+            return 'future'
+        self.patchers['build_patcher'].side_effect = build_success  # now simulate a success
         self.patchers['docker_tag'].reset_mock()
         self.test_host._docker_update_images()
 
@@ -172,5 +176,3 @@ class TestHost(RunbotCase):
 
         self.patchers['docker_push'].assert_has_calls(expected_push_calls)
         self.patchers['docker_pull'].assert_not_called()
-
-

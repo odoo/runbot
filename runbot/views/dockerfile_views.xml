@@ -20,6 +20,7 @@
                 <field name="image_future_identifier"/>
                 <field name="auto_sync"/>
                 <field name="image_tag"/>
+                <field name="pull_on_build"/>
                 <field name="to_build"/>
                 <field name="in_error"/>
                 <field name="always_pull"/>
@@ -111,6 +112,8 @@
             <field name="use_count"/>
             <field name="dockerfile" invisible="True"/>
             <field name="public_visibility"/>
+            <field name="auto_sync" widget="boolean_toggle" groups="runbot.group_runbot_admin"/>
+            <field name="pull_on_build" widget="boolean_toggle" groups="runbot.group_runbot_admin"/>
           </list>
         </field>
     </record>
@@ -244,6 +247,7 @@
     <field name="name">Dockerfiles</field>
     <field name="res_model">runbot.dockerfile</field>
     <field name="view_mode">list,form</field>
+    <field name="path">docker</field>
   </record>
 
   <record id="open_view_docker_result_tree" model="ir.actions.act_window">

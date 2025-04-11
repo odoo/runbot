@@ -128,7 +128,7 @@ class Dockerfile(models.Model):
         help='This field is used to define variants of docker images. Variants implicitly inherit from the parent and have an implicit reference_file layer.'
     )
     active = fields.Boolean('Active', default=True, tracking=True)
-    auto_sync = fields.Boolean('Auto sync', help='Automatically sync the identifier with the future identifier', default=False, tracking=True)
+    auto_sync = fields.Boolean('Auto sync', help='Automatically sync the identifier with the future identifier', default=lambda self: not self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_dockerfile_disable_auto_sync_by_default', False), tracking=True)
     pull_on_build = fields.Boolean('Pull on build ', help='Add pull option when building to get the latest version of the FROM', default=False, tracking=True)
     image_identifier = fields.Char('Identifier', tracking=True)
     image_future_identifier = fields.Char('Future Identifier', tracking=True)
@@ -138,7 +138,7 @@ class Dockerfile(models.Model):
     image_previous_tag = fields.Char(compute='_compute_image_helper_tags')
     dockerfile = fields.Text(compute='_compute_dockerfile', recursive=True, tracking=True)
     in_error = fields.Boolean('In error', help='The last build failed.', default=False)
-    to_build = fields.Boolean('To Build', help='Build Dockerfile. Check this when the Dockerfile is ready.', default=False)
+    to_build = fields.Boolean('To Build', help='Build Dockerfile. Check this when the Dockerfile is ready.', default=True)
     always_pull = fields.Boolean('Always pull', help='Always Pull on the hosts, not only at the use time', default=False, tracking=True, copy=False)
     version_ids = fields.One2many('runbot.version', 'dockerfile_id', string='Versions')
     description = fields.Text('Description')

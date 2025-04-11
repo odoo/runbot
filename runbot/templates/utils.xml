@@ -79,6 +79,22 @@
                                     </li>
                                     <li class="nav-item divider" t-ignore="true"/>
                                     <t t-if="not user_id._is_public()">
+                                        <t t-if="env.user.has_group('runbot.group_runbot_admin')">
+                                            <t t-set="docker_files" t-value="env['runbot.dockerfile'].search([])"/>
+                                            <t t-set="out_of_sync_docker_files" t-value="docker_files.filtered(lambda d: d.image_identifier != d.image_future_identifier)"/>
+                                            <t t-set="in_error_docker_files" t-value="docker_files.filtered(lambda d: d.to_build and d.in_error)"/>
+                                            <li class="nav-item" t-if="out_of_sync_docker_files or in_error_docker_files">
+                                                <a class="nav-link" href="/odoo/docker">
+                                                    <i class="fa fa-warning"/>
+                                                    <t t-if="in_error_docker_files">
+                                                        <span class="text-danger" t-esc="len(in_error_docker_files)" title="In error docker files"/>
+                                                    </t>
+                                                    <t t-if="out_of_sync_docker_files">
+                                                        <span class="text-warning" t-esc="len(out_of_sync_docker_files)" title="Out of sync docker files"/>
+                                                    </t>
+                                                </a>
+                                            </li>
+                                        </t>
                                         <t t-call="runbot.build_errors_link"/>
                                         <li class="nav-item dropdown" t-ignore="true">
                                             <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">

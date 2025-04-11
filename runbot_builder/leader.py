@@ -5,6 +5,7 @@ import time
 
 _logger = logging.getLogger(__name__)
 
+
 class LeaderClient(RunbotClient):  # Conductor, Director, Main, Maestro, Lead
     def __init__(self, env):
         self.pull_info_failures = {}
@@ -18,6 +19,9 @@ class LeaderClient(RunbotClient):  # Conductor, Director, Main, Maestro, Lead
             _logger.info('update finished')
 
     def loop_turn(self):
+        if not self.host.is_leader:
+            _logger.warning('Leader client is not a leader host, skipping loop_turn')
+            return 10
         if self.count == 0:
             self.env['runbot.repo']._update_git_config()
             self.env.cr.commit()
