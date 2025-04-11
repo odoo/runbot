@@ -7,6 +7,7 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='email']" position="after">
                 <field name="github_login"/>
+                <field name="build_url_path"/>
             </xpath>
         </field>
     </record>
@@ -19,6 +20,7 @@
             <xpath expr="//group[@name='phone_numbers']" position="after">
                 <group name="runbot">
                     <field name="github_login"/>
+                    <field name="build_url_path"/>
                     <field name="runbot_team_ids"/>
                 </group>
             </xpath>
@@ -47,6 +49,7 @@
                 <page string="Runbot">
                     <group>
                         <field name="github_login"/>
+                        <field name="build_url_path"/>
                         <field name="runbot_team_ids"/>
                     </group>
                 </page>

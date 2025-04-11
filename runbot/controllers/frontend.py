@@ -85,7 +85,7 @@ class Runbot(Controller):
     @o_route([
         '/runbot/submit'
     ], type='http', auth="public", methods=['GET', 'POST'], csrf=False)
-    def submit(self, more=False, redirect='/', keep_search=False, category=False, filter_mode=False, update_triggers=False, **kwargs):
+    def submit(self, more=False, redirect='/', keep_search=False, category=False, filter_mode=False, update_triggers=False, build_url_path=None, **kwargs):
         assert redirect.startswith('/')
         response = werkzeug.utils.redirect(redirect)
         response.set_cookie('more', '1' if more else '0')
@@ -101,6 +101,11 @@ class Runbot(Controller):
                 response.delete_cookie(key)
             else:
                 response.set_cookie(key, '-'.join(enabled_triggers))
+        if build_url_path:
+            if request.env.user._is_public():
+                response.set_cookie('build_url_path', build_url_path)
+            else:
+                request.env.user.build_url_path = build_url_path
         return response
 
     @route(['/',
@@ -660,6 +665,10 @@ class Runbot(Controller):
     def access_running(self, build_id, db_suffix=None, **kwargs):
         build = request.env['runbot.build'].browse(int(build_id)).exists()
         run_url = build._get_run_url(db_suffix)
+        if path := request.env.user.build_url_path:
+            if not path.startswith('/'):
+                path = f'/{path}'
+            run_url += path
         _logger.info('Redirecting to %s', run_url)
         return werkzeug.utils.redirect(run_url)
 

@@ -139,6 +139,12 @@
                                     <button t-attf-onclick="document.cookie = 'category={{category.id}}; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if category.id == active_category_id else 'secondary'}}" t-out="category.name"/>
                                 </t>
                             </div>
+
+                            <hr class="separator"/>
+                            <div class="text-nowrap input-group" title="Change this path to change the default path you will be redirected to when accessing a build.">
+                                <span class="input-group-text">Build path</span>
+                                <input type="text" class="form-control" name="build_url_path" t-att-value="build_url_path" placeholder="/" aria-label="Default build path"/>
+                            </div>
         
                             <hr class="separator"/>
                             <div t-if="triggers">

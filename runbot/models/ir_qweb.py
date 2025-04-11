@@ -10,4 +10,9 @@ class IrQweb(models.AbstractModel):
         response = super()._prepare_frontend_environment(values)
         values['s2human'] = s2human
         values['s2human_long'] = s2human_long
+
+        values['build_url_path'] = (
+            request.httprequest.cookies.get('build_url_path', self.env.user.build_url_path)
+        )
+
         return response
