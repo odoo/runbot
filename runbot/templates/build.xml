@@ -70,12 +70,12 @@
             <div class="build_details">
               <!-- Batch/bundles links-->
               <t t-if="len(bundles) > 1">
-                This build is referenced in <t t-out="len(bundles)"/> bundles
-                <ul>
+                This build is referenced in <t t-out="len(bundles)"/> bundles<br/>
+                <ul groups="base.group_user">
                   <li t-foreach="bundles" t-as="bundle" ><a t-out="bundle.name" t-attf-href="/runbot/bundle/{{bundle.id}}"/></li>
                 </ul>
               </t>
-              <t t-if="len(batches) > 1">
+              <t t-if="len(batches) > 1" groups="base.group_user">
                 <b>First apparition:</b> <a t-out="batches[0].bundle_id.name" t-attf-href="/runbot/batch/{{batches[0].id}}"/><br/>
                 <b>Last apparition:</b> <a t-out="batches[-1].bundle_id.name" t-attf-href="/runbot/batch/{{batches[-1].id}}"/><br/>
               </t>

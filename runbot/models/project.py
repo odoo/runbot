@@ -62,3 +62,4 @@ class Category(models.Model):
     name = fields.Char("Name")
     icon = fields.Char("Font awesome icon")
     view_id = fields.Many2one('ir.ui.view', "Link template")
+    active = fields.Boolean('active', default=True)

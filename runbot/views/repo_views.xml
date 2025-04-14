@@ -142,6 +142,7 @@
                 <field name="name"/>
                 <field name="icon"/>
                 <field name="view_id"/>
+                <field name="active"/>
               </group>
             </sheet>
           </form>

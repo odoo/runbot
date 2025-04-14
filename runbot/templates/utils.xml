@@ -71,6 +71,7 @@
                                         </t>
                                     </t>
                                     <li class="nav-item divider"/>
+                                    
                                     <li class="nav-item dropdown">
                                         <a data-bs-toggle="collapse" href="#collapsePreference" role="button" class="nav-link">
                                             <i class="fa fa-gear"/>
@@ -109,36 +110,57 @@
                             </div>
                         </nav>
                     </header>
-                    <div id="collapsePreference" class="collapse">
-                        <form class="px-4 py-3" method="post" action="/runbot/submit" id="preferences_form">
-                            <input type="hidden" name="redirect" t-att-value="current_path"/>
-
-                            <hr class="separator"/>
-                            <div class="form-check form-switch">
-                                <input onclick="document.getElementById('preferences_form').submit()" class="form-check-input" type="checkbox" role="switch" id="more" name="more" t-att-checked="more"/>
-                                <label class="form-check-label" for="flexSwitchCheckDefault" >More info</label>
-                            </div>
-
-                            <hr class="separator"/>
-                            <div class="text-nowrap btn-group btn-group-sm" role="group">
-                                <button onclick="document.cookie = 'theme=legacy; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='legacy' else 'secondary'}}">Legacy</button>
-                                <button onclick="document.cookie = 'theme=dark; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='dark' else 'secondary'}}">Dark</button>
-                                <button onclick="document.cookie = 'theme=light; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='light' else 'secondary'}}">Light</button>
-                                <button onclick="document.cookie = 'theme=red404; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='red404' else 'secondary'}}">Red404</button>
-                            </div>
-
-                            <hr class="separator"/>
-                            <div class="text-nowrap btn-group btn-group-sm" role="group">
+                    <t t-set="not_default_category" t-value="active_category_id and default_category != active_category_id"/>
+                    <t t-set="not_default_filter_mode" t-value="filter_mode and filter_mode not in ('default', 'all')"/>
+                    <div class="container-fluid" t-if="not_default_category or not_default_filter_mode">
+                    <div class="row">
+                        <div class="col-12">
+                            <t t-if="not_default_category">
+                                <div class="text-nowrap btn-group btn-group-sm" role="group">
+                                    <t t-foreach="categories" t-as="category">
+                                        <button t-attf-onclick="document.cookie = 'category={{category.id}}; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if category.id == active_category_id else 'secondary'}}" t-out="category.name"/>
+                                    </t>
+                                </div>
+                            </t>
+                            <div t-if="not_default_filter_mode" class="text-nowrap btn-group btn-group-sm" role="group">
+                                <button onclick="document.cookie = 'filter_mode=default; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if filter_mode=='default' else 'secondary'}}" help="Only display sticky except if searching">Default</button>
                                 <button onclick="document.cookie = 'filter_mode=all; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if filter_mode=='all' else 'secondary'}}">All</button>
                                 <button onclick="document.cookie = 'filter_mode=sticky; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if filter_mode=='sticky' else 'secondary'}}">Sticky only</button>
                                 <button onclick="document.cookie = 'filter_mode=nosticky; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if filter_mode=='nosticky' else 'secondary'}}">Dev only</button>
                             </div>
-
-                            <div class="text-nowrap btn-group btn-group-sm" role="group">
+                        </div>
+                    </div></div>
+                    <div id="collapsePreference" class="collapse">
+                        <form class="px-4 py-3" method="post" action="/runbot/submit" id="preferences_form">
+                            <input type="hidden" name="redirect" t-att-value="current_path"/>
+                            <div>
+                                <div class="form-check form-switch">
+                                <input onclick="document.getElementById('preferences_form').submit()" class="form-check-input" type="checkbox" role="switch" id="more" name="more" t-att-checked="more"/>
+                                <label class="form-check-label" >More info</label>
+                            </div></div>
+                            <div> 
+                                <label for="theme_selection" style="min-width: 80px">Theme:</label>
+                                <div id="theme_selection" class="text-nowrap btn-group btn-group-sm" role="group">
+                                <button onclick="document.cookie = 'theme=legacy; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='legacy' else 'secondary'}}">Legacy</button>
+                                <button onclick="document.cookie = 'theme=dark; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='dark' else 'secondary'}}">Dark</button>
+                                <button onclick="document.cookie = 'theme=light; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='light' else 'secondary'}}">Light</button>
+                                <button onclick="document.cookie = 'theme=red404; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='red404' else 'secondary'}}">Red404</button>
+                            </div></div>
+                            <div>
+                                <label for="theme_selection" style="min-width: 80px">Sticky:</label>
+                                <div class="text-nowrap btn-group btn-group-sm" role="group">
+                                <button onclick="document.cookie = 'filter_mode=default; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if filter_mode=='default' else 'secondary'}}" help="Only display sticky except if searching">Default</button>
+                                <button onclick="document.cookie = 'filter_mode=all; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if filter_mode=='all' else 'secondary'}}">All</button>
+                                <button onclick="document.cookie = 'filter_mode=sticky; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if filter_mode=='sticky' else 'secondary'}}">Sticky only</button>
+                                <button onclick="document.cookie = 'filter_mode=nosticky; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if filter_mode=='nosticky' else 'secondary'}}">Dev only</button>
+                            </div></div>
+                            <div>
+                                <label for="theme_selection" style="min-width: 80px">Category:</label>
+                                <div class="text-nowrap btn-group btn-group-sm" role="group">
                                 <t t-foreach="categories" t-as="category">
                                     <button t-attf-onclick="document.cookie = 'category={{category.id}}; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if category.id == active_category_id else 'secondary'}}" t-out="category.name"/>
                                 </t>
-                            </div>
+                            </div></div>
         
                             <hr class="separator"/>
                             <div t-if="triggers">
@@ -150,7 +172,7 @@
                                         <div class="row">
                                             <t t-foreach="category_triggers" t-as="trigger">
                                                 <div class="col-md-3 text-nowrap">
-                                                    <input t-attf-class="trigger_selection {{'trigger_selection_hide' if trigger.hide else 'trigger_selection_show'}}" type="checkbox" t-attf-name="trigger_{{trigger.id}}" t-attf-id="trigger_{{trigger.id}}" t-att-checked="trigger_display is None or trigger.id in trigger_display"/>
+                                                    <input t-attf-class="trigger_selection {{'trigger_selection_hide' if trigger.hide else 'trigger_selection_show'}}" type="checkbox" t-attf-name="trigger_{{trigger.id}}" t-attf-id="trigger_{{trigger.id}}" t-att-checked="not trigger.hide if trigger_display is None else trigger.id in trigger_display"/>
                                                     <label t-attf-for="trigger_{{trigger.id}}" t-out="trigger.name"/>
                                                 </div>
                                             </t>

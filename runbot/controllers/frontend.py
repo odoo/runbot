@@ -25,9 +25,7 @@ def route(routes, **kw):
         def response_wrap(*args, **kwargs):
             projects = request.env['runbot.project'].search([('hidden', '=', False)])
             more = request.httprequest.cookies.get('more', False) == '1'
-            filter_mode = request.httprequest.cookies.get('filter_mode', 'all')
-            keep_search = request.httprequest.cookies.get('keep_search', False) == '1'
-            cookie_search = request.httprequest.cookies.get('search', '')
+            filter_mode = request.httprequest.cookies.get('filter_mode', 'default')
             refresh = kwargs.get('refresh', False)
             nb_build_errors = request.env['runbot.build.error'].search_count([])
             nb_assigned_errors = request.env['runbot.build.error'].search_count([('responsible', '=', request.env.user.id)])
@@ -37,20 +35,13 @@ def route(routes, **kw):
 
             response = f(*args, **kwargs)
             if isinstance(response, Response):
-                if keep_search and cookie_search and 'search' not in kwargs:
-                    search = cookie_search
-                else:
-                    search = kwargs.get('search', '')
+                search = kwargs.get('search', '')
                 has_pr = kwargs.get('has_pr', None)
-                if keep_search and cookie_search != search:
-                    response.set_cookie('search', search)
-
                 project = response.qcontext.get('project') or projects and projects[0]
 
                 response.qcontext['theme'] = kwargs.get('theme', request.httprequest.cookies.get('theme', 'legacy'))
                 response.qcontext['projects'] = projects
                 response.qcontext['more'] = more
-                response.qcontext['keep_search'] = keep_search
                 response.qcontext['search'] = search
                 response.qcontext['current_path'] = request.httprequest.full_path
                 response.qcontext['refresh'] = refresh
@@ -85,10 +76,10 @@ class Runbot(Controller):
     @o_route([
         '/runbot/submit'
     ], type='http', auth="public", methods=['GET', 'POST'], csrf=False)
-    def submit(self, more=False, redirect='/', keep_search=False, category=False, filter_mode=False, update_triggers=False, **kwargs):
+    def submit(self, more=False, redirect='/', update_triggers=False, **kwargs):
         assert redirect.startswith('/')
         response = werkzeug.utils.redirect(redirect)
-        response.set_cookie('more', '1' if more else '0')
+        response.set_cookie('more', '1' if more else '0', expires=datetime.datetime.now() + datetime.timedelta(days=365 * 10))
         if update_triggers:
             enabled_triggers = []
             project_id = int(update_triggers)
@@ -97,10 +88,12 @@ class Runbot(Controller):
                     enabled_triggers.append(key.replace('trigger_', ''))
 
             key = 'trigger_display_%s' % project_id
-            if len(request.env['runbot.trigger'].search([('project_id', '=', project_id)])) == len(enabled_triggers):
+            default_trigger_ids = set(request.env['runbot.trigger'].search([('hide', '=', False), ('project_id', '=', project_id), ('manual', '=', False)]).ids)
+            selected_trigger_ids = set(map(int, enabled_triggers))
+            if default_trigger_ids == selected_trigger_ids:
                 response.delete_cookie(key)
             else:
-                response.set_cookie(key, '-'.join(enabled_triggers))
+                response.set_cookie(key, '-'.join(enabled_triggers), expires=datetime.datetime.now() + datetime.timedelta(days=365 * 10))
         return response
 
     @route(['/',
@@ -133,11 +126,13 @@ class Runbot(Controller):
             if has_pr is not None:
                 domain.append(('has_pr', '=', bool(has_pr)))
 
-            filter_mode = request.httprequest.cookies.get('filter_mode', False)
+            filter_mode = request.httprequest.cookies.get('filter_mode', 'default')
             if filter_mode == 'sticky':
                 domain.append(('sticky', '=', True))
             elif filter_mode == 'nosticky':
                 domain.append(('sticky', '=', False))
+            elif filter_mode == 'default' and not search:
+                domain.append(('sticky', '=', True))
 
             if for_next_freeze:
                 domain.append(('for_next_freeze', '=', True))
