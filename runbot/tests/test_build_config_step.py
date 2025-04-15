@@ -18,6 +18,7 @@ class TestBuildConfigStepCommon(RunbotCase):
 
         self.server_commit = self.Commit.create({
             'name': 'dfdfcfcf',
+            'tree_hash': '0dfdfcfcf',
             'repo_id': self.repo_server.id
         })
         self.parent_build = self.Build.create({

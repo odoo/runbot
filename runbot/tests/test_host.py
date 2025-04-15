@@ -35,11 +35,13 @@ class TestHost(RunbotCase):
         self.test_host = self.env['runbot.host'].create({'name': 'test_host'})
         self.server_commit = self.Commit.create({
             'name': 'dfdfcfcf0000ffffffffffffffffffffffffffff',
+            'tree_hash': '0dfdfcfcf0000fffffffffffffffffffffffffff',
             'repo_id': self.repo_server.id
         })
 
         self.addons_commit = self.Commit.create({
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'tree_hash': '0d0d0caca0000fffffffffffffffffffffffffff',
             'repo_id': self.repo_addons.id,
         })
 

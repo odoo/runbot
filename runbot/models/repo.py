@@ -472,7 +472,7 @@ class Repo(models.Model):
 
     def _path(self, *path_parts):
         return self.env['runbot.runbot']._path('repo', sanitize(self.name), *path_parts)
-    
+
     def _source_path(self, *path_parts):
         return self.env['runbot.runbot']._path('sources', sanitize(self.name), *path_parts)
 

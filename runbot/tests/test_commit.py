@@ -13,6 +13,7 @@ class TestCommitDate(RunbotCaseMinimalSetup):
     def test_commit_has_date(self):
         commit = self.Commit.create({
             'name': 'caca00caca00ffffffffffffffffffffffffffff',
+            'tree_hash': '0caca00caca00fffffffffffffffffffffffffff',
             'repo_id': self.repo_server.id
         })
 

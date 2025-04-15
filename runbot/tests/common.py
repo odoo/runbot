@@ -102,6 +102,7 @@ class RunbotCase(TransactionCase):
 
         self.initial_server_commit = self.Commit.create({
             'name': 'aaaaaaa',
+            'tree_hash': '0aaaaaaa',
             'repo_id': self.repo_server.id,
             'date': '2006-12-07',
             'subject': 'New trunk',
@@ -236,6 +237,7 @@ class RunbotCase(TransactionCase):
         self.branch_server.bundle_id.is_base = True
         initial_addons_commit = self.Commit.create({
             'name': 'cccccc',
+            'tree_hash': '0cccccc',
             'repo_id': self.repo_addons.id,
             'date': '2015-03-12',
             'subject': 'Initial commit',

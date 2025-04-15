@@ -328,6 +328,7 @@ class Runbot(models.AbstractModel):
             cannot_be_deleted_path = set()
             for commit in self.env['runbot.commit.export'].search([('host', '=', host_name)]).mapped('commit_id'):
                 cannot_be_deleted_path.add(commit._source_path())
+                cannot_be_deleted_path.add(commit._old_source_path())  # TODO remove me after full deployment
 
 
             # the following part won't be usefull anymore once runbot.commit.export is populated
@@ -336,6 +337,7 @@ class Runbot(models.AbstractModel):
             for build in cannot_be_deleted_builds:
                 for build_commit in build.params_id.commit_link_ids:
                     cannot_be_deleted_path.add(build_commit.commit_id._source_path())
+                    cannot_be_deleted_path.add(build_commit.commit_id._old_source_path())  # TODO remove me after full deployment
 
             to_delete = set()
             to_keep = set()

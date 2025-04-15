@@ -41,6 +41,7 @@ class TestUpgradeFlow(RunbotCase):
             'is_pr': False,
             'head': self.Commit.create({
                 'name': '123abc789',
+                'tree_hash': '0123abc789',
                 'repo_id': self.repo_upgrade.id,
             }).id,
         })
@@ -232,7 +233,8 @@ class TestUpgradeFlow(RunbotCase):
                 'remote_id': self.remote_server.id,
                 'is_pr': False,
                 'head': self.Commit.create({
-                    'name': 'server%s' % intname,
+                    'name': f'server{intname}',
+                    'tree_hash': f'0server{intname}',
                     'repo_id': self.repo_server.id,
                 }).id,
             })
@@ -241,7 +243,8 @@ class TestUpgradeFlow(RunbotCase):
                 'remote_id': self.remote_addons.id,
                 'is_pr': False,
                 'head': self.Commit.create({
-                    'name': 'addons%s' % intname,
+                    'name': f'addons{intname}',
+                    'tree_hash': f'0addons{intname}',
                     'repo_id': self.repo_addons.id,
                 }).id,
             })

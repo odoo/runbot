@@ -30,6 +30,7 @@ class TestBuildParams(RunbotCaseMinimalSetup):
 
         server_commit = self.Commit.create({
             'name': 'dfdfcfcf0000ffffffffffffffffffffffffffff',
+            'tree_hash': '0dfdfcfcf0000fffffffffffffffffffffffffff',
             'repo_id': self.repo_server.id
         })
 
@@ -64,6 +65,7 @@ class TestBuildParams(RunbotCaseMinimalSetup):
         # Test copy with a parameter change
         other_commit = self.Commit.create({
             'name': 'deadbeef0000ffffffffffffffffffffffffffff',
+            'tree_hash': '0',
             'repo_id': self.repo_server.id
         })
 
@@ -269,11 +271,13 @@ class TestBuildResult(RunbotCase):
 
         self.server_commit = self.Commit.create({
             'name': 'dfdfcfcf0000ffffffffffffffffffffffffffff',
+            'tree_hash': '0dfdfcfcf0000fffffffffffffffffffffffffff',
             'repo_id': self.repo_server.id
         })
 
         self.addons_commit = self.Commit.create({
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
+            'tree_hash': '0d0d0caca0000fffffffffffffffffffffffffff',
             'repo_id': self.repo_addons.id,
         })
 
@@ -420,21 +424,19 @@ class TestBuildResult(RunbotCase):
 
         def is_file(file):
             self.assertIn(file, [
-                self.env['runbot.runbot']._path('sources/addons/d0d0caca0000ffffffffffffffffffffffffffff/requirements.txt'),
-                self.env['runbot.runbot']._path('sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/requirements.txt'),
-                self.env['runbot.runbot']._path('sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/server.py'),
-                self.env['runbot.runbot']._path('sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/odoo/tools/config.py'),
-                self.env['runbot.runbot']._path('sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/odoo/sql_db.py')
+                self.env['runbot.runbot']._path('sources/addons/0d0d0caca0000fffffffffffffffffffffffffff/requirements.txt'),
+                self.env['runbot.runbot']._path('sources/server/0dfdfcfcf0000fffffffffffffffffffffffffff/requirements.txt'),
+                self.env['runbot.runbot']._path('sources/server/0dfdfcfcf0000fffffffffffffffffffffffffff/server.py'),
+                self.env['runbot.runbot']._path('sources/server/0dfdfcfcf0000fffffffffffffffffffffffffff/odoo/tools/config.py'),
+                self.env['runbot.runbot']._path('sources/server/0dfdfcfcf0000fffffffffffffffffffffffffff/odoo/sql_db.py')
             ])
-            if file == self.env['runbot.runbot']._path('static/sources/addons/d0d0caca0000ffffffffffffffffffffffffffff/requirements.txt'):
-                return False
-            return True
+            return file != self.env['runbot.runbot']._path('static/sources/addons/0d0d0caca0000fffffffffffffffffffffffffff/requirements.txt')
 
         def is_dir(file):
             paths = [
-                'sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/addons',
-                'sources/server/dfdfcfcf0000ffffffffffffffffffffffffffff/core/addons',
-                'sources/addons/d0d0caca0000ffffffffffffffffffffffffffff'
+                'sources/server/0dfdfcfcf0000fffffffffffffffffffffffffff/addons',
+                'sources/server/0dfdfcfcf0000fffffffffffffffffffffffffff/core/addons',
+                'sources/addons/0d0d0caca0000fffffffffffffffffffffffffff'
             ]
             self.assertTrue(any([path in file for path in paths]))  # checking that addons path existence check looks ok
             return True

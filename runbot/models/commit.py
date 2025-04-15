@@ -105,6 +105,7 @@ class Commit(models.Model):
         """Export a git repo into a sources"""
         #  TODO add automated tests
         self.ensure_one()
+        self.repo_id._fetch(self.name)
         if not self.env['runbot.commit.export'].search([('build_id', '=', build.id), ('commit_id', '=', self.id)]):
             self.env['runbot.commit.export'].create({'commit_id': self.id, 'build_id': build.id})
         export_path = self._source_path()
@@ -116,11 +117,12 @@ class Commit(models.Model):
         _logger.info('git export: exporting to %s (new)', export_path)
         os.makedirs(export_path)
 
-        self.repo_id._fetch(self.name)
-        export_sha = self.name
+        export_commit = self
         if self.rebase_on_id:
-            export_sha = self.rebase_on_id.name
-            self.rebase_on_id.repo_id._fetch(export_sha)
+            export_commit = self.rebase_on_id
+            self.rebase_on_id.repo_id._fetch(export_commit)
+
+        export_sha = export_commit.tree_hash
 
         p1 = subprocess.Popen(['git', '--git-dir=%s' % self.repo_id.path, 'archive', export_sha], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         p2 = subprocess.Popen(['tar', '--mtime', self.date.strftime('%Y-%m-%d %H:%M:%S'), '-xC', export_path], stdin=p1.stdout, stdout=subprocess.PIPE)
@@ -140,7 +142,7 @@ class Commit(models.Model):
             # we could be smart here and detect if merge_base == commit, in witch case checkouting base_commit is enough. Since we don't have this info
             # and we are exporting in a custom folder anyway, lets
             _logger.info('Applying patch for %s', self.name)
-            p1 = subprocess.Popen(['git', '--git-dir=%s' % self.repo_id.path, 'diff', '%s...%s' % (export_sha, self.name)], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+            p1 = subprocess.Popen(['git', '--git-dir=%s' % self.repo_id.path, 'diff', '%s...%s' % (export_commit.name, self.name)], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
             p2 = subprocess.Popen(['patch', '-p0', '-d', export_path], stdin=p1.stdout, stdout=subprocess.PIPE)
             p1.stdout.close()
             (message, err) = p2.communicate()
@@ -163,10 +165,14 @@ class Commit(models.Model):
             return False
 
     def _source_path(self, *paths):
-        export_name = self.name
+        export_name = self.tree_hash
         if self.rebase_on_id:
             export_name = '%s_%s' % (self.name, self.rebase_on_id.name)
         return self.repo_id._source_path(export_name, *paths)
+
+    def _old_source_path(self):
+        # TODO remove this method when all code will be migrated to _source_path
+        return self.repo_id._source_path(self.name)
 
     @api.depends('name', 'repo_id.name')
     def _compute_dname(self):

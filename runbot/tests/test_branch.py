@@ -248,6 +248,7 @@ class TestBranchIsBase(RunbotCaseMinimalSetup):
         # master branch on dev remote
         initial_addons_dev_commit = self.Commit.create({
             'name': 'dddddd',
+            'tree_hash': '0dddddd',
             'repo_id': self.repo_addons.id,
             'date': '2015-09-30',
             'subject': 'Please use the right repo',
@@ -266,6 +267,7 @@ class TestBranchIsBase(RunbotCaseMinimalSetup):
         # saas-12.3 branch on dev remote
         initial_server_dev_commit = self.Commit.create({
             'name': 'bbbbbb',
+            'tree_hash': '0bbbbbb',
             'repo_id': self.repo_server.id,
             'date': '2014-05-26',
             'subject': 'Please use the right repo',
@@ -284,6 +286,7 @@ class TestBranchIsBase(RunbotCaseMinimalSetup):
         # 12.0 branch on dev remote
         mistaken_commit = self.Commit.create({
             'name': 'eeeeee',
+            'tree_hash': '0eeeeee',
             'repo_id': self.repo_server.id,
             'date': '2015-06-27',
             'subject': 'dummy commit',
