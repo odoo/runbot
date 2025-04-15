@@ -145,6 +145,11 @@ class Batch(models.Model):
         domain = [('params_id', '=', params.id), ('parent_id', '=', False)]
         if self.bundle_id.host_id:
             domain += [('host', '=', self.bundle_id.host_id.name), ('keep_host', '=', True)]
+
+        if slot.batch_id.bundle_id.is_staging:
+            # don't allow to link failed builds
+            domain += [('global_result', 'in', ('ok', False))]
+
         build = self.env['runbot.build'].search(domain, limit=1, order='id desc')
         link_type = 'matched'
         killed_states = ('skipped', 'killed', 'manually_killed')

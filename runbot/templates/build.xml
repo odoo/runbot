@@ -93,7 +93,7 @@
               </t>
 
               <!-- Commits -->
-              <t t-foreach="build.params_id.sudo().commit_link_ids" t-as="build_commit">
+              <t t-foreach="build.params_id.sudo()._get_batch_commit_link_ids(unique_batch)" t-as="build_commit">
                 <b>Commit:</b>
                 <a t-attf-href="/runbot/commit/{{build_commit.commit_id.id}}">
                   <t t-out="build_commit.commit_id.dname"/>
