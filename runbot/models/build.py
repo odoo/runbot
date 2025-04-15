@@ -88,6 +88,9 @@ class BuildParameters(models.Model):
     # @api.depends('version_id', 'project_id', 'extra_params', 'config_id', 'config_data', 'modules', 'commit_link_ids', 'builds_reference_ids')
     def _compute_fingerprint(self):
         for param in self:
+            commit_ident = sorted(param.commit_link_ids.commit_id.mapped('tree_hash'))
+            if param.trigger_id.batch_dependent:
+                commit_ident = sorted(param.commit_link_ids.commit_id.ids)
             cleaned_vals = {
                 'version_id': param.version_id.id,
                 'project_id': param.project_id.id,
@@ -96,7 +99,7 @@ class BuildParameters(models.Model):
                 'config_id': param.config_id.id,
                 'config_data': param.config_data.dict,
                 'modules': param.modules or '',
-                'commit_link_ids': sorted(param.commit_link_ids.commit_id.ids),
+                'commit_link_ids': commit_ident,
                 'builds_reference_ids': sorted(param.builds_reference_ids.ids),
                 'upgrade_from_build_id': param.upgrade_from_build_id.id,
                 'upgrade_to_build_id': param.upgrade_to_build_id.id,
@@ -110,6 +113,20 @@ class BuildParameters(models.Model):
                 cleaned_vals['used_custom_trigger'] = True
 
             param.fingerprint = hashlib.sha256(str(cleaned_vals).encode('utf8')).hexdigest()
+
+    def _get_batch_commit_link_ids(self, batch):
+        if not batch:
+            return self.commit_link_ids
+        commit_link_per_batch_repo = {cl.commit_id.repo_id: cl for cl in batch.commit_link_ids}
+
+        res = self.env['runbot.commit.link']
+        for cl in self.commit_link_ids:
+            batch_cl = commit_link_per_batch_repo.get(cl.commit_id.repo_id)
+            if batch_cl and batch_cl.commit_id.tree_hash == cl.commit_id.tree_hash:
+                res |= batch_cl
+            else:
+                res |= cl
+        return res
 
     @api.depends('commit_link_ids')
     def _compute_commit_ids(self):
@@ -1285,11 +1302,49 @@ class BuildResult(models.Model):
                     _logger.info("skipping github status for build %s ", build.id)
                     continue
 
-                target_url = trigger.ci_url or "%s/runbot/build/%s" % (build.get_base_url(), build.id)
-                for build_commit in build.params_id.commit_link_ids:
-                    commit = build_commit.commit_id
-                    if 'base_' not in build_commit.match_type and (trigger.ci_send_all or (commit.repo_id in trigger.repo_ids)):
-                        commit._github_status(build, trigger.ci_context, state, target_url, desc)
+                repo_ids_to_notify = {}
+                batch_per_commit = {}
+                for commit_link in build.params_id.commit_link_ids:
+                    commit = commit_link.commit_id
+                    batch_per_commit[commit] = None
+                    if (trigger.ci_send_all or (commit.repo_id in trigger.repo_ids)):
+                        repo_ids_to_notify[commit.repo_id.id] = commit.tree_hash
+
+                batches = self.slot_ids.batch_id
+                # not sure for this part: only send status if batch is the last_batch. Will avoid to send useless status, status of killed builds, ....
+                # we could have a special case if the last_batch is preparing and the new build is linked to the one that just sent a status,
+                # but we send the status when linking a build and it should be enough for this corner case. If the build is not linked, the result
+                # is not relevant.
+                # one problem is that we may not have a status for a commit that is not in the last batch, mainly problematic for sticky
+
+                last_batches = batches.bundle_id.last_batch
+                sticky_batches = batches.filtered(lambda b: b.bundle_id.sticky)
+                if batches - last_batches:
+                    _logger.info("skipping github status for some batches %s, not the last batch", batches - last_batches)
+                batches = (batches & last_batches) | sticky_batches
+
+                batches = batches.sorted(lambda b: (b.bundle_id.sticky, b.id))
+
+                for batch in batches:
+                    for commit_link in batch.commit_link_ids:
+                        commit = commit_link.commit_id
+                        repo = commit.repo_id
+                        original_tree_hash = repo_ids_to_notify.get(repo.id)
+                        if original_tree_hash and 'base_' not in commit_link.match_type:
+                            if commit.tree_hash != original_tree_hash:
+                                _logger.warning("commit for repo %s in batch %s (%s) does not match build %s treehash (%s), something strange happened", repo.id, batch.id, commit.tree_hash, self.id, original_tree_hash)
+                                continue
+                            batch_per_commit[commit_link.commit_id] = batch
+
+                for commit, batch in batch_per_commit.items():
+                    if trigger.ci_url:
+                        target_url = trigger.ci_url
+                    elif batch:
+                        target_url = f"{self.get_base_url()}/runbot/batch/{batch.id}/build/{build.id}"
+                    else:
+                        target_url = f"{self.get_base_url()}/runbot/build/{build.id}"
+
+                    commit._github_status(build, trigger.ci_context, state, target_url, desc)
 
     def _parse_config(self):
         return set(findall(self._server("tools/config.py"), r'--[\w-]+', ))
