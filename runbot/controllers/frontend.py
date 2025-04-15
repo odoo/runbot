@@ -731,6 +731,7 @@ class Runbot(Controller):
         if dockerfile_result_id:
             dockerfile_result = dockerfile_result_sudo.browse(dockerfile_result_id).exists()
         elif dockerfile_tag and dockerfile_hash:
+            dockerfile_tag = dockerfile_tag.removesuffix('.future')
             dockerfile_result = dockerfile_result_sudo.search([('dockerfile_id.image_tag', '=', dockerfile_tag), ('identifier', '=', dockerfile_hash[:12])], limit=1, order='id desc')
         else:
             raise NotFound
