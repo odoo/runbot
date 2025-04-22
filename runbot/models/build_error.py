@@ -300,14 +300,14 @@ class BuildError(models.Model):
 
     @api.depends('build_error_link_ids')
     def _compute_unique_build_error_link_ids(self):
+        # this method is maily made for view form, no need to optimize for api multi
         for record in self:
-            seen = set()
-            id_list = []
-            for error_link in record.build_error_link_ids:
-                if error_link.build_id.id not in seen:
-                    seen.add(error_link.build_id.id)
-                    id_list.append(error_link.id)
-            record.unique_build_error_link_ids = record.env['runbot.build.error.link'].browse(id_list)
+            groups = self.env['runbot.build.error.link']._read_group(
+                domain=[('error_content_id', 'in', record.error_content_ids.ids)],
+                groupby=['build_id'],
+                aggregates=['id:min'])
+            link_ids = [group[1] for group in groups]
+            record.unique_build_error_link_ids = record.env['runbot.build.error.link'].browse(link_ids)
 
     @api.depends('name', 'error_content_ids')
     def _compute_description(self):
@@ -846,10 +846,19 @@ class BuildError(models.Model):
 
                 build_error_contents |= new_build_error_content
                 existing_error_contents_per_key[key] = new_build_error_content
+
+        existing_links = self.env['runbot.build.error.link'].search([
+            ('build_id', 'in', ir_logs.build_id.ids),
+            ('error_content_id', 'in', build_error_contents.ids),
+        ])
+        # using prefetching of error_content_id.builds_ids is quite slow because some errors mays have thousands of linked builds leading to bad performances
+        existing_links_tuples = {(link.build_id.id, link.error_content_id.id) for link in existing_links}
+
         for build_error_content in build_error_contents:
             logs = logs_by_key.get((build_error_content.fingerprint, build_error_content.canonical_tag), [])
             for rec in logs:
-                if rec.build_id not in build_error_content.build_ids:
+                if (rec.build_id.id, build_error_content.id) not in existing_links_tuples:
+                    existing_links_tuples.add((rec.build_id.id, build_error_content.id))
                     self.env['runbot.build.error.link'].with_context(mail_create_nosubscribe=True).create({
                         'build_id': rec.build_id.id,
                         'error_content_id': build_error_content.id,
@@ -1013,7 +1022,7 @@ class BuildErrorContent(models.Model):
     @api.depends('build_error_link_ids')
     def _compute_build_ids(self):
         for record in self:
-            record.build_ids = record.build_error_link_ids.mapped('build_id').sorted('id')
+            record.build_ids = record.build_error_link_ids.build_id.sorted('id')
 
     @api.depends('build_ids')
     def _compute_bundle_ids(self):
