@@ -198,7 +198,7 @@ class Bundle(models.Model):
     @api.depends('branch_ids.target_branch_name', 'branch_ids.is_pr')
     def _compute_all_trigger_custom_ids(self):
         for bundle in self:
-            pr_branches = bundle.branch_ids.filtered('is_pr')
+            pr_branches = bundle.branch_ids.filtered('is_pr').filtered('alive')
             targets = set(pr_branches.mapped('target_branch_name'))
             if len(targets) != 1 or targets == {bundle.base_id.name} or bundle.trigger_custom_ids:
                 bundle.all_trigger_custom_ids = bundle.trigger_custom_ids
