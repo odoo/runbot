@@ -6,10 +6,15 @@ _logger = logging.getLogger(__name__)
 class Database(models.Model):
     _name = 'runbot.database'
     _description = "Database"
+    _inherit = ['runbot.public.model.mixin']
 
-    name = fields.Char('Host name', required=True)
+    name = fields.Char('Host name', required=True, public=True)
     build_id = fields.Many2one('runbot.build', index=True, required=True)
     db_suffix = fields.Char(compute='_compute_db_suffix')
+
+    @api.model
+    def _api_request_allow_direct_access(self):
+        return False
 
     def _compute_db_suffix(self):
         for record in self:

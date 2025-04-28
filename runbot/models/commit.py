@@ -16,6 +16,7 @@ _logger = logging.getLogger(__name__)
 class Commit(models.Model):
     _name = 'runbot.commit'
     _description = "Commit"
+    _inherit = ['runbot.public.model.mixin']
 
     _sql_constraints = [
         (
@@ -24,7 +25,7 @@ class Commit(models.Model):
             "Commit must be unique to ensure correct duplicate matching",
         )
     ]
-    name = fields.Char('SHA')
+    name = fields.Char('SHA', public=True)
     tree_hash = fields.Char('Tree hash', readonly=True)
     repo_id = fields.Many2one('runbot.repo', string='Repo group')
     date = fields.Datetime('Commit date')
@@ -32,9 +33,13 @@ class Commit(models.Model):
     author_email = fields.Char('Author Email')
     committer = fields.Char('Committer')
     committer_email = fields.Char('Committer Email')
-    subject = fields.Text('Subject')
-    dname = fields.Char('Display name', compute='_compute_dname')
+    subject = fields.Text('Subject', public=True)
+    dname = fields.Char('Display name', compute='_compute_dname', public=True)
     rebase_on_id = fields.Many2one('runbot.commit', 'Rebase on commit')
+
+    @api.model
+    def _api_project_id_field_path(self):
+        return 'repo_id.project_id'
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -194,10 +199,11 @@ class Commit(models.Model):
 class CommitLink(models.Model):
     _name = 'runbot.commit.link'
     _description = "Build commit"
+    _inherit = ['runbot.public.model.mixin']
 
-    commit_id = fields.Many2one('runbot.commit', 'Commit', required=True, index=True)
+    commit_id = fields.Many2one('runbot.commit', 'Commit', required=True, index=True, public=True)
     # Link info
-    match_type = fields.Selection([('new', 'New head of branch'), ('head', 'Head of branch'), ('base_head', 'Found on base branch'), ('base_match', 'Found on base branch')])  # HEAD, DEFAULT
+    match_type = fields.Selection([('new', 'New head of branch'), ('head', 'Head of branch'), ('base_head', 'Found on base branch'), ('base_match', 'Found on base branch')], public=True)  # HEAD, DEFAULT
     branch_id = fields.Many2one('runbot.branch', string='Found in branch')  # Shouldn't be use for anything else than display
 
     base_commit_id = fields.Many2one('runbot.commit', 'Base head commit', index=True)
@@ -207,6 +213,10 @@ class CommitLink(models.Model):
     file_changed = fields.Integer('# file changed')
     diff_add = fields.Integer('# line added')
     diff_remove = fields.Integer('# line removed')
+
+    @api.model
+    def _api_request_allow_direct_access(self):
+        return False
 
 
 class CommitStatus(models.Model):
