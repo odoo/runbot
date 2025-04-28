@@ -19,7 +19,7 @@
                         <meta http-equiv="refresh" t-att-content="refresh"/>
                     </t>
 
-                    <t t-if="not page_info_state or page_info_state == 'ok' or page_info_state not in ('warn', 'ko', 'skipped', 'killed', 'manually_killed')">
+                    <t t-if="not page_info_state or page_info_state == 'ok' or page_info_state not in ('warn', 'ko', 'skipped', 'killed')">
                         <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_ok.png"/>
                         <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_ok.svg"/>
                     </t>
@@ -35,7 +35,7 @@
                         <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_skipped.png"/>
                         <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_skipped.svg"/>
                     </t>
-                    <t t-elif="page_info_state == 'killed' or page_info_state == 'manually_killed'">
+                    <t t-elif="page_info_state == 'killed'">
                         <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_killed.png"/>
                         <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_killed.svg"/>
                     </t>
@@ -302,7 +302,7 @@
                 <t t-if="build.global_result == 'skipped'">
                     <t t-set="rowclass">default</t>
                 </t>
-                <t t-if="build.global_result in ['killed', 'manually_killed']">
+                <t t-if="build.global_result in ['killed']">
                     <t t-set="rowclass">killed</t>
                 </t>
             </t>

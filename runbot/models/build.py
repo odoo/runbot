@@ -28,7 +28,7 @@ from odoo.tools.safe_eval import safe_eval
 
 _logger = logging.getLogger(__name__)
 
-result_order = ['ok', 'warn', 'ko', 'skipped', 'killed', 'manually_killed']
+result_order = ['ok', 'warn', 'ko', 'skipped', 'killed']
 state_order = ['pending', 'testing', 'waiting', 'running', 'done']
 
 COPY_WHITELIST = [
@@ -415,7 +415,7 @@ class BuildResult(models.Model):
     def _result_multi(self):
         if all(build.global_result == 'ok' or not build.global_result for build in self):
             return 'ok'
-        if any(build.global_result in ('skipped', 'killed', 'manually_killed') for build in self):
+        if any(build.global_result in ('skipped', 'killed') for build in self):
             return 'killed'
         if any(build.global_result == 'ko' for build in self):
             return 'ko'
@@ -681,7 +681,7 @@ class BuildResult(models.Model):
         if build.requested_action == 'deathrow':
             result = None
             if build.local_state != 'running' and build.global_result not in ('warn', 'ko'):
-                result = 'manually_killed'
+                result = 'killed'
             build._kill(result=result)
             return
 
@@ -1232,7 +1232,7 @@ class BuildResult(models.Model):
         if self.global_result == 'ok':
             return 'success'
 
-        if self.global_result in ('skipped', 'killed', 'manually_killed'):
+        if self.global_result in ('skipped', 'killed'):
             return 'secondary'
         return 'default'
 
