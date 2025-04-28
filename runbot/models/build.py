@@ -1242,11 +1242,11 @@ class BuildResult(models.Model):
             # TODO maybe avoid to send status if build is killable (another new build exist and will send the status)
             if build.parent_id:
                 if build.orphan_result:
-                    _logger.info('Skipping result for orphan build %s', self.id)
+                    _logger.info('Skipping result for orphan build %s', build.id)
                 else:
                     build.parent_id._github_status()
             else:
-                trigger = self.params_id.trigger_id
+                trigger = build.params_id.trigger_id
                 if not trigger.ci_context:
                     continue
 
@@ -1266,8 +1266,8 @@ class BuildResult(models.Model):
                     _logger.info("skipping github status for build %s ", build.id)
                     continue
 
-                target_url = trigger.ci_url or "%s/runbot/build/%s" % (self.get_base_url(), build.id)
-                for build_commit in self.params_id.commit_link_ids:
+                target_url = trigger.ci_url or "%s/runbot/build/%s" % (build.get_base_url(), build.id)
+                for build_commit in build.params_id.commit_link_ids:
                     commit = build_commit.commit_id
                     if 'base_' not in build_commit.match_type and (trigger.ci_send_all or (commit.repo_id in trigger.repo_ids)):
                         commit._github_status(build, trigger.ci_context, state, target_url, desc)
