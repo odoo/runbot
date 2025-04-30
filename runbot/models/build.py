@@ -858,12 +858,16 @@ class BuildResult(models.Model):
         docker_registry_url = self.host_id._get_docker_registry_url()
         image_id = None
         if docker_registry_url and self.host_id.use_remote_docker_registry:
-            result = docker_pull(f"{docker_registry_url}/{kwargs['image_tag']}")
-            if result['success']:
-                result['image'].tag(kwargs['image_tag'])
-            if result.get('log_progress'):
-                self._log('Docker Run', f'Docker image was pulled {"" if result["success"] else "with errors"}')
-            image_id = result.get('image_id')
+            try:
+                result = docker_pull(f"{docker_registry_url}/{kwargs['image_tag']}")
+                if result['success']:
+                    result['image'].tag(kwargs['image_tag'])
+                if result.get('log_progress'):
+                    self._log('Docker Run', f'Docker image was pulled {"" if result["success"] else "with errors"}')
+                image_id = result.get('image_id')
+            except Exception:
+                _logger.exception('Failed to pull docker image %s', kwargs['image_tag'])
+                self._log('Docker Run', 'Failed to pull docker image')
 
         self._log('Preparing', 'Using Dockerfile Tag [%s](/runbot/dockerfile_result/%s/%s)', kwargs['image_tag'], kwargs['image_tag'], image_id, log_type='markdown')
 
