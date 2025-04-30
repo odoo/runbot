@@ -265,7 +265,9 @@
                 <a t-if="slot.trigger_id.report_view_id" title="View last trigger report" t-attf-href="/runbot/trigger/report/{{slot.trigger_id.id}}" class="fa fa-eye btn btn-info"/>
                 <a t-if="bu.local_state == 'running' and bu.database_ids" t-attf-href="/runbot/run/{{bu.id}}" class="fa fa-sign-in btn btn-info"/>
                 <a t-if="bu.static_run" t-att-href="bu.static_run" class="fa fa-sign-in btn btn-info"/>
-                <t t-if="bu" t-call="runbot.build_menu"/>
+                <t t-if="bu" t-call="runbot.build_menu">
+                    <t t-set="from_batch" t-value="slot.batch_id"/>
+                </t>
                 <a t-if="not bu" groups="base.group_user" class="btn btn-default" title="Create build" t-attf-href="/runbot/batch/slot/{{slot.id}}/build">
                     <i class="fa fa-play fa-fw"/>
                 </a>
@@ -288,7 +290,10 @@
                         <i class="fa fa-file-text-o"/>
                     </a>
                     <!--<a t-if="show_commit_button" t-attf-href="https://#{repo.base_url}/commit/#{bu['name']}" class="btn btn-default" title="Open commit on GitHub" aria-label="Open commit on GitHub"><i class="fa fa-github"/></a>-->
-                    <t t-call="runbot.build_menu"/>
+                    <t t-call="runbot.build_menu">
+                        <t t-set="from_batch" t-value="from_batch"/>
+                        <t t-set="from_build_page" t-value="True"/>
+                    </t>
                 </div>
             </div>
         </template>
@@ -337,16 +342,24 @@
                         Database selector
                     </a>
                 </t>
-                <a class="dropdown-item" t-if="bu.global_state in ['done','running'] or bu.requested_action == 'deathrow'" groups="base.group_user" href="#" data-runbot="rebuild" t-att-data-runbot-build="bu['id']" title="Retry this build, usefull for false positive">
-                    <i class="fa fa-refresh"/>
-                    Rebuild
-                </a>
+                <t t-if="from_build_page" groups="base.group_user">
+                    <a class="dropdown-item" t-if="bu.local_result != 'ok' and bu.can_rebuild" href="#" data-runbot="rebuild" t-att-data-runbot-build="bu['id']" title="Retry this build, usefull for false positive">
+                        <i class="fa fa-refresh"/>
+                        Rebuild
+                    </a>
+                    <a class="dropdown-item" t-else="" t-if="more and bu.can_rebuild" href="#" data-runbot="rebuild" t-att-data-runbot-build="bu['id']" title="Build result is ok, you may prefer to rebuild a child.">
+                        <i class="fa fa-refresh text-danger"/>
+                        Advanced Rebuild
+                    </a>
+                </t>
                 <t t-if="bu.global_state != 'done'">
                     <t t-if="bu.requested_action != 'deathrow'">
-                        <a groups="base.group_user" href="#" data-runbot="kill" class="dropdown-item" t-att-data-runbot-build="bu['id']">
+                        <t t-set="cannnot_kill_reason" t-value="bu._cannnot_kill_reason(from_batch)"/>
+                        <a t-if="not cannnot_kill_reason" groups="base.group_user" href="#" data-runbot="kill" class="dropdown-item" t-att-data-runbot-build="bu['id']">
                             <i class="fa fa-crosshairs"/>
                             Kill
                         </a>
+                        <t t-else="" t-out="cannnot_kill_reason"/>
                     </t>
                     <t t-else="">
                         <a groups="base.group_user" class="dropdown-item disabled">

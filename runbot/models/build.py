@@ -164,6 +164,8 @@ class BuildResult(models.Model):
     trigger_id = fields.Many2one('runbot.trigger', related='params_id.trigger_id', store=True, index=True)
     create_batch_id = fields.Many2one('runbot.batch', related='params_id.create_batch_id', store=True, index=True)
     create_bundle_id = fields.Many2one('runbot.bundle', related='params_id.create_batch_id.bundle_id', index=True)
+    base_attached = fields.Boolean('Base attached', compute='_compute_base_attached')
+    can_rebuild = fields.Boolean('Can rebuild', compute='_compute_can_rebuild')
 
     # state machine
     global_state = fields.Selection(make_selection(state_order), string='Status', compute='_compute_global_state', store=True, recursive=True)
@@ -493,6 +495,18 @@ class BuildResult(models.Model):
                 build.build_age = int(time.time() - dt2time(build.build_start))
             else:
                 build.build_age = 0
+
+    def _compute_can_rebuild(self):
+        # note, not recursive, only checks one level of depth to avoid checking to much builds, mainly for nightlies
+        # this is a relaxed condition to help and easier rebuild before waiting for all child to be killed
+        for build in self:
+            build.can_rebuild = False
+            if build.global_state in ['done', 'running']:
+                build.can_rebuild = True
+            elif build.requested_action == 'deathrow':
+                build.can_rebuild = True
+            elif build.local_state in ['done', 'running'] and all(child.can_rebuild for child in build.children_ids):
+                build.can_rebuild = True
 
     def _rebuild(self, message=None):
         """Force a rebuild and return a recordset of builds"""
@@ -1017,6 +1031,24 @@ class BuildResult(models.Model):
             'func': func,
             'line': '0',
         })
+
+    def _compute_base_attached(self):
+        slots = self.env['runbot.batch.slot'].search([('build_id', 'in', self.ids)], order='build_id')
+        slots.batch_id.bundle_id.mapped('is_base')  # prefetch
+        bundle_per_build = defaultdict(list)
+        for slot in slots:
+            bundle_per_build[slot.build_id].append(slot.batch_id.bundle_id)
+        for build in self:
+            build.base_attached = any(bundle.is_base for bundle in bundle_per_build[build])
+
+    def _cannnot_kill_reason(self, from_batch=None):
+        if self.requested_action == 'deathrow':
+            return "Killing"
+        if not self.base_attached:
+            return None
+        if from_batch and from_batch.bundle_id.is_base and self.env.user.has_groups('runbot.group_runbot_admin'):
+            return None
+        return "Cannot be killed, attached to a base bundle"
 
     def _kill(self, result=None):
         host_name = self.env['runbot.host']._get_current_name()
