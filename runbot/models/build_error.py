@@ -63,6 +63,12 @@ class BuildErrorSeenMixin(models.AbstractModel):
     last_seen_build_id = fields.Many2one('runbot.build', compute='_compute_seen', string='Last Seen build', store=True)
     last_seen_date = fields.Datetime(string='Last Seen Date', compute='_compute_seen', store=True)
     build_count = fields.Integer(string='Nb Seen', compute='_compute_seen', store=True)
+    seen_hash = fields.Char(string='Seen hash', compute='_compute_seen_hash', store=True)
+
+    graph_history = fields.Html('30 days history', compute='_compute_graph', sanitize=False)
+    graph_hourly_recurence = fields.Html('Hourly recurence', compute='_compute_graph', sanitize=False)
+    graph_day_of_week_recurence = fields.Html('Weekly recurence', compute='_compute_graph', sanitize=False)
+    graph_day_of_month_recurence = fields.Html('Monthly recurence', compute='_compute_graph', sanitize=False)
 
     @api.depends('build_error_link_ids')
     def _compute_seen(self):
@@ -79,7 +85,76 @@ class BuildErrorSeenMixin(models.AbstractModel):
                 record.first_seen_build_id = first_error_link.build_id
                 record.last_seen_build_id = last_error_link.build_id
                 record.build_count = len(error_link_ids.build_id)
+                record.seen_hash = hashlib.sha256(str(sorted(error_link_ids.build_id.ids)).encode()).hexdigest()
 
+    @api.depends('build_error_link_ids')
+    def _compute_seen_hash(self):
+        for record in self:
+            record.seen_hash = False
+            if record.build_error_link_ids:
+                record.seen_hash = hashlib.sha256(str(sorted(record.build_error_link_ids.build_id.ids)).encode()).hexdigest()
+
+    @api.depends('build_error_link_ids')
+    def _compute_graph(self):
+        end_date = fields.Date.today() + relativedelta(days=1)
+        start_date = end_date - relativedelta(days=30)
+        log_date_per_error = self._get_log_dates(start_date, end_date)
+        for error in self:
+            dates = log_date_per_error[error]
+            daily_freq = [
+                sum(
+                    count
+                    for hour, count in dates.items() if hour.date() == date.date()
+                )
+                for date in rrule.rrule(rrule.DAILY, dtstart=start_date, until=end_date)
+            ]
+            error.graph_history = draw_svg(daily_freq, max_value=max(daily_freq))
+            hourly_freq = [
+                sum(
+                    count
+                    for hour, count in dates.items() if hour.hour == h
+                )
+                for h in range(24)
+            ]
+            error.graph_hourly_recurence = draw_svg(hourly_freq)
+            day_of_week_freq = [
+                sum(
+                    count
+                    for hour, count in dates.items() if hour.isoweekday() - 1 == day
+                )
+                for day in range(7)
+            ]
+            error.graph_day_of_week_recurence = draw_svg(day_of_week_freq)
+            day_of_month_recurrence = [
+                sum(
+                    count
+                    for hour, count in dates.items() if hour.day - 1 == day
+                )
+                for day in range(31)
+            ]
+            error.graph_day_of_month_recurence = draw_svg(day_of_month_recurrence)
+
+    def _get_log_dates(self, start_date: datetime.datetime, end_date: datetime.datetime):
+        """
+        Returns an count of build_error per hour for the last 30 days.
+        -> Dict[Self, Dict[datetime, int]]
+        """
+        assert self, 'Method does not work if called with empty recordset.'
+        result = defaultdict(dict)
+        if not self._origin.ids:
+            return result
+        from_clause, content_field = self.get_log_dates_from_clause()
+        self.env.cr.execute(f"""
+            SELECT record.id as record_id, date_trunc('hour', link.log_date) as time, count(*) as count
+              {from_clause}
+              JOIN runbot_build_error_link AS link ON link.error_content_id = {content_field}.id
+             WHERE record.id IN %s AND link.log_date BETWEEN %s AND %s
+          GROUP BY record.id, date_trunc('hour', link.log_date)
+        """, (tuple(self.ids), start_date, end_date))
+        data = self.env.cr.dictfetchall()
+        for d in data:
+            result[self.browse(d['record_id'])][d['time']] = d['count']
+        return result
 
 def _compute_related_error_content_ids(field_name):
     @api.depends(f'error_content_ids.{field_name}')
@@ -141,11 +216,6 @@ class BuildError(models.Model):
     tag_ids = fields.Many2many('runbot.build.error.tag', string='Tags', compute=_compute_related_error_content_ids('tag_ids'), search=_search_related_error_content_ids('tag_ids'))
 
     random = fields.Boolean('Random', compute="_compute_random", store=True)
-
-    graph_history = fields.Html('30 days history', compute='_compute_graph', sanitize=False)
-    graph_hourly_recurence = fields.Html('Hourly recurence', compute='_compute_graph', sanitize=False)
-    graph_day_of_week_recurence = fields.Html('Weekly recurence', compute='_compute_graph', sanitize=False)
-    graph_day_of_month_recurence = fields.Html('Monthly recurence', compute='_compute_graph', sanitize=False)
 
     @api.constrains('tags_min_version_id', 'tags_max_version_id')
     def _check_min_max_version(self):
@@ -287,68 +357,6 @@ class BuildError(models.Model):
             else:
                 record.analogous_content_ids = False
 
-    def _get_log_dates(self, start_date: datetime.datetime, end_date: datetime.datetime):
-        """
-        Returns an count of build_error per hour for the last 30 days.
-        -> Dict[Self, Dict[datetime, int]]
-        """
-        assert self, 'Method does not work if called with empty recordset.'
-        result = defaultdict(dict)
-        if not self._origin.ids:
-            return result
-        self.env.cr.execute("""
-            SELECT error.id as error_id, date_trunc('hour', link.log_date) as time, count(*) as count
-              FROM runbot_build_error AS error
-              JOIN runbot_build_error_content AS content ON content.error_id = error.id
-              JOIN runbot_build_error_link AS link ON link.error_content_id = content.id
-             WHERE error.id IN %s AND link.log_date BETWEEN %s AND %s
-          GROUP BY error.id, date_trunc('hour', link.log_date)
-        """, (tuple(self.ids), start_date, end_date))
-        data = self.env.cr.dictfetchall()
-        for d in data:
-            result[self.browse(d['error_id'])][d['time']] = d['count']
-        return result
-
-    @api.depends('build_error_link_ids')
-    def _compute_graph(self):
-        end_date = fields.Date.today() + relativedelta(days=1)
-        start_date = end_date - relativedelta(days=30)
-        log_date_per_error = self._get_log_dates(start_date, end_date)
-        for error in self:
-            dates = log_date_per_error[error]
-            daily_freq = [
-                sum(
-                    count
-                    for hour, count in dates.items() if hour.date() == date.date()
-                )
-                for date in rrule.rrule(rrule.DAILY, dtstart=start_date, until=end_date)
-            ]
-            error.graph_history = draw_svg(daily_freq, max_value=max(daily_freq))
-            hourly_freq = [
-                sum(
-                    count
-                    for hour, count in dates.items() if hour.hour == h
-                )
-                for h in range(24)
-            ]
-            error.graph_hourly_recurence = draw_svg(hourly_freq)
-            day_of_week_freq = [
-                sum(
-                    count
-                    for hour, count in dates.items() if hour.isoweekday() -1 == day
-                )
-                for day in range(7)
-            ]
-            error.graph_day_of_week_recurence = draw_svg(day_of_week_freq)
-            day_of_month_recurrence = [
-                sum(
-                    count
-                    for hour, count in dates.items() if hour.day - 1 == day
-                )
-                for day in range(31)
-            ]
-            error.graph_day_of_month_recurence = draw_svg(day_of_month_recurrence)
-
     @api.constrains('test_tags')
     def _check_test_tags(self):
         for build_error in self:
@@ -380,6 +388,12 @@ class BuildError(models.Model):
                     if not vals['active'] and build_error.active and build_error.last_seen_date and build_error.last_seen_date + relativedelta(days=1) > fields.Datetime.now():
                         raise UserError("This error broke less than one day ago can only be deactivated by admin")
         return super().write(vals)
+
+    def get_log_dates_from_clause(self):
+        return """
+              FROM runbot_build_error AS record
+              JOIN runbot_build_error_content AS content ON content.error_id = record.id
+        """, 'content'
 
     def _merge(self, others):
         # TODO xdo split the error id change and other params merge in order to avoid the merge in write and write in merge recursion
@@ -794,6 +808,11 @@ class BuildErrorContent(models.Model):
                 record.similar_ids = self.env['runbot.build.error.content'].browse([rec[0] for rec in self.env.cr.fetchall()])
             else:
                 record.similar_ids = False
+
+    def get_log_dates_from_clause(self):
+        return """
+              FROM runbot_build_error_content AS record
+        """, 'record'
 
     @api.model
     def _digest(self, s):

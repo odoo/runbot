@@ -400,6 +400,8 @@
                 <field name="fixing_pr_alive" optional="hide"/>
                 <field name="fixing_pr_url" widget="url" text="view PR" readonly="1" invisible="not fixing_pr_url"/>
                 <field name="fingerprint" optional="hide"/>
+                <field name="graph_history" optional="show"/>
+                <field name="seen_hash" optional="hide"/>
             </list>
         </field>
     </record>
