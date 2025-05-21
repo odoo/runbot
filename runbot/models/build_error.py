@@ -933,8 +933,8 @@ class BuildErrorContent(models.Model):
         to_merge = []
         for fingerprint in changed_fingerprints:
             errors_with_fingerprint = errors_content_by_fingerprint.filtered(lambda error_content: error_content.fingerprint == fingerprint)
-            for canonical_tag in sorted(set(errors_with_fingerprint.mapped('canonical_tag'))):
-                to_merge.append(errors_with_fingerprint.filtered(lambda error_content: error_content.canonical_tag == canonical_tag))
+            for canonical_tag in sorted({e.canonical_tag or '' for e in errors_with_fingerprint}):
+                to_merge.append(errors_with_fingerprint.filtered(lambda error_content: (error_content.canonical_tag or '') == canonical_tag))
         # this must be done in other iteration since filtered may fail because of unlinked records from _merge
         for errors_content_to_merge in to_merge:
             errors_content_to_merge._relink()
