@@ -192,11 +192,9 @@
                 <page string="Frequency graphs">
                   <group>
                     <group>
-                      <field name="graph_history"/>
-                      <field name="graph_hourly_recurence"/>
+                      <field name="graph_day_of_week_recurence"/>
                     </group>
                     <group>
-                      <field name="graph_day_of_week_recurence"/>
                       <field name="graph_day_of_month_recurence"/>
                     </group>
                   </group>
@@ -361,7 +359,6 @@
               <field name="fixing_pr_alive" optional="hide"/>
               <field name="fixing_pr_url" widget="pull_request_url" text="view PR" readonly="1" invisible="not fixing_pr_url"/>
               <field name="graph_history" optional="show"/>
-              <field name="graph_hourly_recurence" optional="hide"/>
               <field name="graph_day_of_week_recurence" optional="hide"/>
               <field name="graph_day_of_month_recurence" optional="hide"/>
           </list>

@@ -66,7 +66,6 @@ class BuildErrorSeenMixin(models.AbstractModel):
     seen_hash = fields.Char(string='Seen hash', compute='_compute_seen_hash', store=True)
 
     graph_history = fields.Html('30 days history', compute='_compute_graph', sanitize=False)
-    graph_hourly_recurence = fields.Html('Hourly recurence', compute='_compute_graph', sanitize=False)
     graph_day_of_week_recurence = fields.Html('Weekly recurence', compute='_compute_graph', sanitize=False)
     graph_day_of_month_recurence = fields.Html('Monthly recurence', compute='_compute_graph', sanitize=False)
 
@@ -96,7 +95,7 @@ class BuildErrorSeenMixin(models.AbstractModel):
 
     @api.depends('build_error_link_ids')
     def _compute_graph(self):
-        end_date = fields.Date.today() + relativedelta(days=1)
+        end_date = fields.Date.today()
         start_date = end_date - relativedelta(days=30)
         log_date_per_error = self._get_log_dates(start_date, end_date)
         for error in self:
@@ -109,14 +108,6 @@ class BuildErrorSeenMixin(models.AbstractModel):
                 for date in rrule.rrule(rrule.DAILY, dtstart=start_date, until=end_date)
             ]
             error.graph_history = draw_svg(daily_freq, max_value=max(daily_freq))
-            hourly_freq = [
-                sum(
-                    count
-                    for hour, count in dates.items() if hour.hour == h
-                )
-                for h in range(24)
-            ]
-            error.graph_hourly_recurence = draw_svg(hourly_freq)
             day_of_week_freq = [
                 sum(
                     count
@@ -145,11 +136,13 @@ class BuildErrorSeenMixin(models.AbstractModel):
             return result
         from_clause, content_field = self.get_log_dates_from_clause()
         self.env.cr.execute(f"""
-            SELECT record.id as record_id, date_trunc('hour', link.log_date) as time, count(*) as count
+            SELECT record.id as record_id, date_trunc('day', batch.create_date) as time, count(*) as count
               {from_clause}
               JOIN runbot_build_error_link AS link ON link.error_content_id = {content_field}.id
-             WHERE record.id IN %s AND link.log_date BETWEEN %s AND %s
-          GROUP BY record.id, date_trunc('hour', link.log_date)
+              JOIN runbot_build AS build ON link.build_id = build.id
+              JOIN runbot_batch AS batch ON build.create_batch_id = batch.id
+             WHERE record.id IN %s AND batch.create_date BETWEEN %s AND %s
+          GROUP BY record.id, date_trunc('day', batch.create_date)
         """, (tuple(self.ids), start_date, end_date))
         data = self.env.cr.dictfetchall()
         for d in data:
