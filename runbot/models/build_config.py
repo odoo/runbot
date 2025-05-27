@@ -854,6 +854,8 @@ class ConfigStep(models.Model):
             'mv filestore/* /data/build/datadir/filestore/%s' % restore_db_name,
             'echo "### restoring db"',
             'psql -q %s < dump.sql' % (restore_db_name),
+            'echo "### performing an analyze"',
+            'psql -q -d %s -c "ANALYZE;"' % restore_db_name,
             'cd /data/build',
             'echo "### cleaning"',
             'rm -r restore',
