@@ -225,7 +225,7 @@
                   <field name="module_name" readonly="1"/>
                   <field name="function" readonly="1"/>
                   <field name="file_path" readonly="1"/>
-                  <field name="qualifiers" readonly="1"/>
+                  <field name="qualifiers" readonly="1" widget="runbotjsonb"/>
                 </group>
                 <group name="infos" string="" col="2">
                   <group>
