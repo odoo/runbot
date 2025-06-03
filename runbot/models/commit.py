@@ -120,7 +120,7 @@ class Commit(models.Model):
         export_commit = self
         if self.rebase_on_id:
             export_commit = self.rebase_on_id
-            self.rebase_on_id.repo_id._fetch(export_commit)
+            self.rebase_on_id.repo_id._fetch(export_commit.name)
 
         export_sha = export_commit.tree_hash
 
