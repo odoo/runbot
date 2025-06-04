@@ -168,6 +168,7 @@ class Branch(models.Model):
                 values = {
                     'name': name,
                     'project_id': project.id,
+                    'is_staging': name.startswith('staging.') and branch._match_is_base(name.removeprefix('staging.')),
                 }
                 if is_base:
                     values['is_base'] = True
