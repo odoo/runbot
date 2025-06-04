@@ -443,7 +443,6 @@ class Batch(models.Model):
             if force_trigger or (should_start and not skip_trigger):
                 slot.link_type, slot.build_id = self._create_build(slot.params_id)
 
-
     def _update_commits_infos(self, base_head_per_repo):
         for link_commit in self.commit_link_ids:
             commit = link_commit.commit_id
@@ -460,6 +459,8 @@ class Batch(models.Model):
                 if commit.name == base_head.name:
                     continue
                 merge_base_sha = commit.repo_id._git(['merge-base', commit.name, base_head.name]).strip()
+                if self.bundle_id.is_base or self.bundle_id.is_staging:
+
                 merge_base_commit = self.env['runbot.commit']._get(merge_base_sha, commit.repo_id.id)
                 link_commit.merge_base_commit_id = merge_base_commit.id
 
