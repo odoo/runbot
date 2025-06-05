@@ -54,9 +54,14 @@ class Bundle(models.Model):
     commit_limit = fields.Integer("Commit limit")
     file_limit = fields.Integer("File limit")
     disable_codeowner = fields.Boolean("Disable codeowners", tracking=True)
+    frontend_url = fields.Char("Frontend URL", compute="_compute_frontend_url")
 
     # extra_info
     for_next_freeze = fields.Boolean('Should be in next freeze')
+
+    def _compute_frontend_url(self):
+        for bundle in self:
+            bundle.frontend_url = f'/runbot/bundle/{bundle.id}'
 
     @api.depends('name')
     def _compute_host_id(self):

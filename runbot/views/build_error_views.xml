@@ -34,11 +34,15 @@
               </group>
               <group>
                 <group name="fixer_info" string="Fixing" col="2">
+                  <field name="breaking_pr_id"/>
+                  <field name="breaking_pr_url"  widget="pull_request_url" invisible="not breaking_pr_id"/>
+                  <field name="breaking_bundle_url" invisible="not breaking_pr_id"/>
                   <field name="responsible"/>
                   <field name="customer"/>
                   <field name="team_id"/>
                   <field name="fixing_pr_id"/>
-                  <field name="fixing_pr_url" widget="pull_request_url"/>
+                  <field name="fixing_pr_url" widget="pull_request_url" invisible="not fixing_pr_id"/>
+                  <field name="fixing_bundle_url" invisible="not fixing_pr_id"/>
                   <field name="active"/>
                 </group>
                 <group name="appearance_info" string="Appearance" col="2">
