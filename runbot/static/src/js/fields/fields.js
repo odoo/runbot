@@ -10,14 +10,33 @@ import { useDynamicPlaceholder } from "@web/views/fields/dynamic_placeholder_hoo
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
 import { useInputField } from "@web/views/fields/input_field_hook";
 
-import { useRef, xml, Component } from "@odoo/owl";
+import { useRef, xml, Component, markup } from "@odoo/owl";
 import { useAutoresize } from "@web/core/utils/autoresize";
 import { getFormattedValue } from "@web/views/utils";
 
 import { UrlField } from "@web/views/fields/url/url_field";
 
+// https://stackoverflow.com/questions/4810841/pretty-print-json-using-javascript
+function colorizeJson(json) {
+    if (typeof json != 'string') {
+         json = JSON.stringify(json, null, '\t');
+    }
+    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+        var cls = '';
+        if (/^"/.test(match)) {
+            if (/:$/.test(match)) {
+                cls = 'o_runbot_json_key';
+            } else {
+                cls = 'o_runbot_json_value';
+            }
+        }
+        return markup('<span class="' + cls + '">' + match + '</span>');
+    });
+}
+
 function stringify(obj) {
-    return JSON.stringify(obj, null, '\t')
+   return markup(colorizeJson(obj));
 }
 
 

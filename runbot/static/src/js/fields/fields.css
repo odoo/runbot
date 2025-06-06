@@ -2,3 +2,11 @@
     width: 100%;
     white-space: pre-wrap;
 }
+
+.o_runbot_json_key {
+    color:green;
+}
+
+.o_runbot_json_value {
+    color:darkslateblue;
+}
