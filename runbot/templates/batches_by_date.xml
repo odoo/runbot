@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <template id="runbot.batches_by_date">
+            <t t-call='runbot.layout'>
+                <div class="container-fluid">
+                    <div class="row">
+                        <h5>
+                            <t t-esc="category.name"/> batches on <t t-esc="batches_date"/>
+                            <div class="btn-group" role="group">
+                                <a t-att-href="previous_date_url" class="btn btn-sm text-start" title="Previous date"><i class="fa fa-chevron-left"/></a>
+                                <a t-att-href="next_date_url" class="btn btn-sm text-start" title="Next date"><i class="fa fa-chevron-right"/></a>
+                            </div>
+                        </h5>
+                        <t t-foreach="batches" t-as="batch">
+                            <div class="col-md-1">
+                                <t t-esc="batch.bundle_id.name" />
+                            </div>
+                            <div class="col-md-11">
+                                <div class="batch_row" >
+                                    <t t-call="runbot.batch_tile">
+                                        <t t-set="batch_builds" t-value="builds_by_batch_id and builds_by_batch_id[batch.id]"/>
+                                    </t>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+            </t>
+        </template>
+    </data>
+</odoo>

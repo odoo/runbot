@@ -100,10 +100,24 @@
             <span><i class="fa fa-cog fa-spin fa-fw"/> preparing</span>
           </t>
           <div class="batch_slots">
-            <t t-foreach="batch.slot_ids" t-as="slot">
-              <t t-if="slot.build_id">
-                <div t-if="((not slot.trigger_id.hide and trigger_display is None) or (trigger_display and slot.trigger_id.id in trigger_display)) or slot.build_id.global_result != 'ok'"
-                  t-call="runbot.slot_button" class="slot_container"/>
+            <t t-if="batch_builds is not None">
+              <t t-foreach="batch_builds" t-as="build">
+                <div class="slot_container">
+                  <div class="btn-group btn-group-ssm slot_button_group">
+                    <span t-attf-class="btn btn-{{build._get_color_class()}}" t-out="build.id"/>
+                    <a t-attf-href="/runbot/build/{{build.id}}" class="btn btn-default slot_name" target="new" t-att-title="build.trigger_id.name">
+                        <span t-out="build.trigger_id.name"/>
+                    </a>
+                  </div>
+                </div>
+              </t>
+            </t>
+            <t t-else="">
+              <t t-foreach="batch.slot_ids" t-as="slot">
+                <t t-if="slot.build_id">
+                  <div t-if="((not slot.trigger_id.hide and trigger_display is None) or (trigger_display and slot.trigger_id.id in trigger_display)) or slot.build_id.global_result != 'ok'"
+                    t-call="runbot.slot_button" class="slot_container"/>
+                </t>
               </t>
             </t>
             <div class="slot_filler" t-foreach="range(10)" t-as="x"/>

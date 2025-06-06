@@ -8,8 +8,10 @@ import werkzeug.utils
 import werkzeug.urls
 
 from collections import defaultdict, OrderedDict
+from dateutil.relativedelta import relativedelta
 from werkzeug.exceptions import NotFound, Forbidden
 
+from odoo import fields
 from odoo.addons.website.controllers.main import QueryURL
 
 from odoo.http import Controller, Response, request, route as o_route
@@ -749,4 +751,40 @@ class Runbot(Controller):
             'dockerfile': dockerfile,
             'future_result': dockerfile._get_last_successful_result_for_ident(dockerfile.image_future_identifier),
             'current_result': dockerfile._get_last_successful_result_for_ident(dockerfile.image_identifier),
+        })
+
+    @route([
+        '/runbot/batches/<int:project_id>/<int:category_id>/<batches_date>',
+        '/runbot/batches/<int:project_id>/<int:category_id>/<batches_date>/<model("runbot.build.error"):build_error>'
+        ], type='http', auth="public", website=True, sitemap=False)
+    def batches_by_date(self, project_id=None, category_id=None, batches_date=None, build_error=None, **kwargs):
+        limit = int(kwargs.get('limit', 25)) if int(kwargs.get('limit', 25)) < 100 else 25
+        try:
+            start_date = fields.Date.from_string(batches_date)
+        except ValueError:
+            raise NotFound
+
+        end_date = start_date + relativedelta(days=1)
+        next_date_url = f'/runbot/batches/{project_id}/{category_id}/{end_date}/{build_error.id if build_error else ""}'
+        previous_date_url = f'/runbot/batches/{project_id}/{category_id}/{start_date - relativedelta(days=1)}/{build_error.id if build_error else ""}'
+        batches = request.env["runbot.batch"].search([
+            ("category_id", "=", category_id),
+            ("bundle_id.project_id", "=", project_id),
+            ("create_date", ">=", start_date),
+            ("create_date", "<", end_date),
+        ], limit=limit)
+
+        builds_by_batch_id = None
+        if build_error:
+            builds_by_batch_id = {}
+            for batch in batches:
+                builds_by_batch_id[batch.id] = build_error.build_ids.filtered_domain([('id', 'child_of', batch.slot_ids.build_id.ids)])
+
+        return request.render("runbot.batches_by_date", {
+            'batches_date': batches_date,
+            'batches': batches,
+            'next_date_url': next_date_url,
+            'previous_date_url': previous_date_url,
+            'builds_by_batch_id': builds_by_batch_id,
+            'category': request.env['runbot.category'].browse(category_id),
         })

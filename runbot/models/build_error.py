@@ -30,9 +30,13 @@ def get_color(value: int):
         return 'orange'
     return 'green'
 
-def draw_svg(values: list[int], max_value: int = 10, height: int = 30):
+
+def draw_svg(values: list[int], max_value: int = 10, height: int = 30, batch_dates: list[datetime.date] = [], error_id: int = 0, category_id=1, project_id=1):
     lines = ''.join(f'<line x1="0" x2="{len(values) * 10}" y1="{v * 10}" y2="{v * 10}" stroke="gray" stroke_width="1"/>' for v in range(0, max_value, 2))
-    rects = ''.join(f'<rect fill="{get_color(value)}" width="9" height="{min(value, max_value) * 10}" x="{idx * 10 + 0.5}" y="{(max_value - min(value, max_value)) * 10}"/>' for idx, value in enumerate(values))
+    if batch_dates:
+        rects = ''.join(f'<a href="/runbot/batches/{project_id}/{category_id}/{batch_date}/{error_id if error_id else ""}"><rect fill="{get_color(value)}" width="9" height="{min(value, max_value) * 10}" x="{idx * 10 + 0.5}" y="{(max_value - min(value, max_value)) * 10}"/></a>' for idx, (value, batch_date) in enumerate(zip(values, batch_dates)))
+    else:
+        rects = ''.join(f'<rect fill="{get_color(value)}" width="9" height="{min(value, max_value) * 10}" x="{idx * 10 + 0.5}" y="{(max_value - min(value, max_value)) * 10}"/>' for idx, value in enumerate(values))
     return f'<div style="height: {height}px"><svg xmlns="https://www.w3.org/2000/svg" viewbox="0 0 {len(values) * 10} {max_value * 10}" style="border: 1px solid black; height: 100%; width: 100%;" preserveAspectRatio="none" shape-rendering="cripsEdges">{lines}{rects}</svg></div>'
 
 class BuildErrorLink(models.Model):
@@ -100,18 +104,23 @@ class BuildErrorSeenMixin(models.AbstractModel):
         log_date_per_error = self._get_log_dates(start_date, end_date)
         for error in self:
             dates = log_date_per_error[error]
-            daily_freq = [
-                sum(
+            daily_freq_with_dates = [
+                (date.date(), sum(
                     count
                     for hour, count in dates.items() if hour.date() == date.date()
-                )
+                ))
                 for date in rrule.rrule(rrule.DAILY, dtstart=start_date, until=end_date)
             ]
-            error.graph_history = draw_svg(daily_freq, max_value=max(daily_freq))
+            daily_freq_dates, daily_freq = zip(*daily_freq_with_dates)
+            error.graph_history = draw_svg(
+                daily_freq, max_value=max(daily_freq), batch_dates=daily_freq_dates, error_id=error.id,
+                category_id=error.first_seen_build_id.create_batch_id.category_id.id if error.first_seen_build_id else 1,
+                project_id=error.first_seen_build_id.params_id.project_id.id if error.first_seen_build_id else 1,
+            )
             day_of_week_freq = [
                 sum(
                     count
-                    for hour, count in dates.items() if hour.isoweekday() - 1 == day
+                    for date, count in dates.items() if date.isoweekday() - 1 == day
                 )
                 for day in range(7)
             ]
