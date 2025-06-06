@@ -14,6 +14,7 @@
                 <field name="name"/>
                 <field name="image_identifier"/>
                 <field name="image_future_identifier"/>
+                <field name="auto_sync"/>
                 <field name="image_tag"/>
                 <field name="to_build"/>
                 <field name="in_error"/>
