@@ -407,6 +407,11 @@ class ConfigStep(models.Model):
             if smtp_host:
                 cmd += ['--smtp', smtp_host]
 
+        if "--db-template" in available_options:
+            icp = self.env['ir.config_parameter']
+            db_template = icp.get_param('runbot.runbot_db_template', default='template0')
+            cmd += ['--db-template', db_template]
+
         extra_params = self.extra_params or ''
         if extra_params:
             cmd.extend(shlex.split(extra_params))
@@ -486,6 +491,11 @@ class ConfigStep(models.Model):
 
         if "--screenshots" in available_options:
             cmd.add_config_tuple('screenshots', '/data/build/tests')
+
+        if "--db-template" in available_options:
+            icp = self.env['ir.config_parameter']
+            db_template = icp.get_param('runbot.runbot_db_template', default='template0')
+            cmd.add_config_tuple('db_template', db_template)
 
         if "--screencasts" in available_options and self.env['ir.config_parameter'].sudo().get_param('runbot.enable_screencast', False):
             cmd.add_config_tuple('screencasts', '/data/build/tests')
