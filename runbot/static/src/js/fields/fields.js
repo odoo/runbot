@@ -18,9 +18,6 @@ import { UrlField } from "@web/views/fields/url/url_field";
 
 // https://stackoverflow.com/questions/4810841/pretty-print-json-using-javascript
 function colorizeJson(json) {
-    if (typeof json != 'string') {
-         json = JSON.stringify(json, null, '\t');
-    }
     json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
         var cls = '';
@@ -31,19 +28,17 @@ function colorizeJson(json) {
                 cls = 'o_runbot_json_value';
             }
         }
-        return markup('<span class="' + cls + '">' + match + '</span>');
+        return '<span class="' + cls + '">' + match + '</span>';
     });
 }
 
 function stringify(obj) {
-   return markup(colorizeJson(obj));
-}
-
-
+        return JSON.stringify(obj, null, '\t');
+    }
 export class JsonField extends TextField {
     static template = xml`
     <t t-if="props.readonly">
-            <span t-out="value"/>
+            <span t-out="colorizedValue"/>
         </t>
         <t t-else="">
             <div t-ref="div">
@@ -72,8 +67,13 @@ export class JsonField extends TextField {
         });
         useAutoresize(this.textareaRef, { minimumHeight: 50 });
     }
+
     get value() {
         return stringify(this.props.record.data[this.props.name] || "");
+    }
+
+    get colorizedValue() {
+        return markup(colorizeJson(stringify(this.props.record.data[this.props.name] || "")));
     }
 }
 
