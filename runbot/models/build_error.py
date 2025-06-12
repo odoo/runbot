@@ -18,7 +18,7 @@ from odoo.tools import SQL, lazy
 from odoo.osv import expression
 
 from ..fields import JsonDictField
-from ..common import transactioncache
+from ..common import transactioncache, TestTagsParser
 
 _logger = logging.getLogger(__name__)
 
@@ -197,6 +197,7 @@ class BuildError(models.Model):
 
     test_tags = fields.Char(string='Test tags', help="Comma separated list of test_tags to use to reproduce/remove this error", tracking=True)
     canonical_tags = fields.Char('Canonical tag', compute='_compute_canonical_tags', store=True)
+    tags_match_count = fields.Integer('Nb errors matching the test_tags', compute='_compute_tags_match_count')
     tags_min_version_excluded_id = fields.Many2one('runbot.version', 'Tag min version (excluded)')
     tags_min_version_id = fields.Many2one('runbot.version', 'Tags Min version', compute="_compute_tags_min_version_id", inverse="_inverse_tags_min_version_id", help="Minimal version where the test tags will be applied.", tracking=True)
     tags_max_version_id = fields.Many2one('runbot.version', 'Tags Max version', help="Maximal version where the test tags will be applied.", tracking=True)
@@ -358,6 +359,29 @@ class BuildError(models.Model):
                 record.analogous_content_ids = self.env['runbot.build.error.content'].browse([rec[0] for rec in self.env.cr.fetchall()])
             else:
                 record.analogous_content_ids = False
+
+    @api.depends('test_tags')
+    def _compute_tags_match_count(self):
+        for record in self:
+            record.tags_match_count = 0
+            if record.test_tags:
+                tags_parser = TestTagsParser(record.test_tags)
+                search_domain = tags_parser.test_tags_to_search_domain(exclude_error_id=record.id)
+                if search_domain:
+                    record.tags_match_count = self.env['runbot.build.error'].search_count(search_domain)
+
+    def action_view_impacted_by_tag(self):
+        self.ensure_one()
+        if not self.test_tags:
+            return
+        tags_parser = TestTagsParser(self.test_tags)
+        return {
+            'type': 'ir.actions.act_window',
+            'views': [(False, 'list'), (False, 'form')],
+            'res_model': 'runbot.build.error',
+            'domain': tags_parser.test_tags_to_search_domain(exclude_error_id=self.id),
+            'name': 'Other Errors impacted by test-tag'
+        }
 
     @api.constrains('test_tags')
     def _check_test_tags(self):

@@ -16,7 +16,8 @@ from collections import OrderedDict
 from datetime import timedelta
 from markupsafe import Markup
 
-from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT, file_open, html_escape
+from odoo.osv import expression
+from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT, file_open, html_escape, OrderedSet
 
 _logger = logging.getLogger(__name__)
 
@@ -287,3 +288,70 @@ class ReProxy():
 
     VERBOSE = re.VERBOSE
     MULTILINE = re.MULTILINE
+
+
+# Based on Odoo TagsSelector from master on 2025-06-13
+class TestTagsParser:
+    filter_spec_re = re.compile(r'''
+                                ^
+                                ([+-]?)                     # operator_re
+                                (\*|\w*)                    # tag_re
+                                (\/[\w\/\.-]+.py)?           # file_re
+                                (?:\/(\w+))?                # module_re
+                                (?::(\w*))?                 # test_class_re
+                                (?:\.(\w*))?                # test_method_re
+                                (?:\[(.*)\])?               # parameters
+                                $''', re.VERBOSE)  # [-][tag][/module][:class][.method][[params]]
+
+    def __init__(self, test_tags):
+        parts = re.split(r',(?![^\[]*\])', test_tags)  # split on all comma not inside [] (not followed by ])
+        filter_specs = [t.strip() for t in parts if t.strip()]
+        self.exclude = set()
+        self.include = set()
+        self.parameters = OrderedSet()
+
+        for filter_spec in filter_specs:
+            match = self.filter_spec_re.match(filter_spec)
+            if not match:
+                _logger.error('Invalid tag %s', filter_spec)
+                continue
+
+            sign, tag, file_path, module, klass, method, parameters = match.groups()
+            is_include = sign != '-'
+            is_exclude = not is_include
+
+            if not tag and is_include:
+                # including /module:class.method implicitly requires 'standard'
+                tag = 'standard'
+            elif not tag or tag == '*':
+                # '*' indicates all tests (instead of 'standard' tests only)
+                tag = None
+            test_filter = (tag, module, klass, method, file_path)
+
+            if parameters:
+                # we could check here that test supports negated parameters
+                self.parameters.add((test_filter, ('-' if is_exclude else '+', parameters)))
+                is_exclude = False
+
+            if is_include:
+                self.include.add(test_filter)
+            if is_exclude:
+                self.exclude.add(test_filter)
+
+        if (self.exclude or self.parameters) and not self.include:
+            self.include.add(('standard', None, None, None, None))
+
+    def test_tags_to_search_domain(self, exclude_error_id=None):
+        search_domains = []
+        for include in self.include:
+            _, test_module, test_class, test_method, file_path = include
+            module_path = file_path or ((test_module or '') + '%')
+            test_class = test_class or '%'
+            test_method = test_method or '%'
+            search_pattern = f'{module_path}:{test_class}.{test_method}'
+            tag_domain = [('canonical_tags', 'like', f'{search_pattern}')]
+            if exclude_error_id:
+                tag_domain.append(('id', '!=', exclude_error_id))
+            search_domains.append(tag_domain)
+        search_domain = expression.OR(search_domains)
+        return search_domain
