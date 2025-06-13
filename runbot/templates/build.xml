@@ -53,6 +53,7 @@
                    t-attf-class="{{'' if prev_ko else 'disabled '}}btn btn-default fa fa-angle-double-left"></a>
                 <a t-att-href="prev_bu.build_url" role="button" t-attf-title="Previous {{prev_bu.display_name}}"
                    t-attf-class="{{'' if prev_bu else 'disabled '}}btn btn-default fa fa-chevron-left"></a>
+                <a role="button" class="btn btn-default fa fa-compress" onclick="document.documentElement.classList.toggle('hide-success');"/>
                 <a t-att-href="next_bu.build_url" role="button" t-attf-title="Next {{next_bu.display_name}}"
                    t-attf-class="{{'' if next_bu else 'disabled '}}btn btn-default fa fa-chevron-right"></a>
                 <a t-att-href="next_ko.build_url" role="button" t-attf-title="Next ko {{next_ko.display_name}}"

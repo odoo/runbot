@@ -422,3 +422,7 @@ code {
 .d-empty-none:empty {
     display: none !important;
 }
+
+.hide-success tr.bg-success-subtle {
+    display: none;
+}
