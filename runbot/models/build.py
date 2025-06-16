@@ -1116,12 +1116,16 @@ class BuildResult(models.Model):
                     requirement_path = os.sep.join([repo_dir, 'requirements.txt'])
                     pres.append([f'python{py_version}', '-m', 'pip', 'install', '--progress-bar', 'off', '-r', f'{requirement_path}'])
 
+        faketime = []
+        if faketime_params := self.params_id.config_data.get('faketime'):
+            faketime = ['faketime', faketime_params]
+
         addons_paths = self._get_addons_path()
         (server_commit, server_file) = self._get_server_info()
         server_dir = self._docker_source_folder(server_commit)
 
         # commandline
-        cmd = ['python%s' % py_version] + python_params + [os.sep.join([server_dir, server_file])]
+        cmd = faketime + ['python%s' % py_version] + python_params + [os.sep.join([server_dir, server_file])]
         if sub_command:
             cmd += [sub_command]
 

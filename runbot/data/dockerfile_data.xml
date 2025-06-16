@@ -62,7 +62,7 @@
         <field name="dockerfile_id" ref="runbot.docker_default"/>
         <field name="layer_type">reference_layer</field>
         <field name="name">Install base debian packages</field>
-        <field name="packages">apt-transport-https build-essential ca-certificates curl file fonts-freefont-ttf fonts-noto-cjk gawk gnupg gsfonts libldap2-dev libjpeg9-dev libsasl2-dev libxslt1-dev lsb-release npm ocrmypdf sed sudo unzip xfonts-75dpi zip zlib1g-dev</field>
+        <field name="packages">apt-transport-https build-essential ca-certificates curl faketime file fonts-freefont-ttf fonts-noto-cjk gawk gnupg gsfonts libldap2-dev libjpeg9-dev libsasl2-dev libxslt1-dev lsb-release npm ocrmypdf sed sudo unzip xfonts-75dpi zip zlib1g-dev</field>
         <field name="reference_docker_layer_id" ref="runbot.docker_layer_debian_packages_template"/>
     </record>
 

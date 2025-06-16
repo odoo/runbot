@@ -680,6 +680,20 @@ class TestBuildResult(RunbotCase):
         self.assertEqual('done', build1_1_1.global_state)
         self.assertEqual('done', rebuild1_1_1.global_state)
 
+    def test_build_cmd_faketime(self):
+        """ test that the faketime command is properly added"""
+        self.server_params.config_data = {
+            'skip_requirements': True,
+            'faketime': '2024-02-04 02:42 UTC',
+        }
+        self.env.flush_all()
+        build = self.Build.create({
+            'params_id': self.server_params.id,
+        })
+        cmd = build._cmd(py_version=3)
+        self.assertIn('faketime "2024-02-04 02:42 UTC" python3 server/server.py', str(cmd))
+
+
 class TestGc(RunbotCaseMinimalSetup):
 
     def test_repo_gc_testing(self):
