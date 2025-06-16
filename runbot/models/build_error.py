@@ -368,7 +368,7 @@ class BuildError(models.Model):
                 tags_parser = TestTagsParser(record.test_tags)
                 search_domain = tags_parser.test_tags_to_search_domain(exclude_error_id=record.id)
                 if search_domain:
-                    record.tags_match_count = self.env['runbot.build.error'].search_count(search_domain)
+                    record.tags_match_count = self.env['runbot.build.error'].with_context(active_test=True).search_count(search_domain)
 
     def action_view_impacted_by_tag(self):
         self.ensure_one()
@@ -379,8 +379,9 @@ class BuildError(models.Model):
             'type': 'ir.actions.act_window',
             'views': [(False, 'list'), (False, 'form')],
             'res_model': 'runbot.build.error',
-            'domain': tags_parser.test_tags_to_search_domain(exclude_error_id=self.id),
-            'name': 'Other Errors impacted by test-tag'
+            'domain': tags_parser.test_tags_to_search_domain(),
+            'name': 'Other Errors impacted by test-tag',
+            'context': {'active_test': True}
         }
 
     @api.constrains('test_tags')
