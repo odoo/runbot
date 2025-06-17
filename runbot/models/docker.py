@@ -147,6 +147,8 @@ class Dockerfile(models.Model):
     build_results = fields.One2many('runbot.docker_build_result', 'dockerfile_id', string='Build results')
     last_successful_result = fields.Many2one('runbot.docker_build_result', compute='_compute_last_successful_result')
     layer_ids = fields.One2many('runbot.docker_layer', 'dockerfile_id', string='Layers', copy=True)
+    default_values = JsonDictField()
+
     referencing_dockerlayer_ids = fields.One2many('runbot.docker_layer', 'reference_dockerfile_id', string='Layers referencing this one')
     use_count = fields.Integer('Used count', compute="_compute_use_count", store=True)
     # maybe we should have global values here? branch version, chrome version, ... then use a os layer when possible (jammy, ...)
@@ -209,10 +211,12 @@ class Dockerfile(models.Model):
     def action_create_missing_variants(self):
         """Create missing variants for this dockerfile"""
         if not self.parent_id:
-            raise exceptions.UserError('This dockerfile is not a variant, cannot create missing variants.')
+            msg = 'This dockerfile is not a variant, cannot create missing variants.'
+            raise exceptions.UserError(msg)
         missing_variants = self.get_missing_variants()
         if not missing_variants:
-            raise exceptions.UserError('No missing variants to create.')
+            msg = 'No missing variants to create.'
+            raise exceptions.UserError(msg)
 
         for missing_variant in missing_variants:
             variant = self.copy(default={
@@ -221,7 +225,7 @@ class Dockerfile(models.Model):
                 'to_build': self.to_build,
                 'always_pull': self.always_pull,
             })
-            _logger.info(f'Created missing variant {variant.image_tag}({variant.id}) for dockerfile {self.name}')
+            _logger.info('Created missing variant %s(%s) for dockerfile %s', variant.image_tag, variant.id, self.name)
 
     def _compute_last_successful_result(self):
         rg = self.env['runbot.docker_build_result']._read_group(
@@ -247,13 +251,15 @@ class Dockerfile(models.Model):
         for rec in self:
             content = ''
             layers = rec.layer_ids
+            values = dict(rec.default_values)
             if rec.parent_id:
                 layers = self.env['runbot.docker_layer'].new({
                     'name': 'TEMP LAYER',
                     'layer_type': 'reference_file',
                     'reference_dockerfile_id': rec.parent_id.id,
                 }) + layers
-            content = layers.render_layers()
+                values.update(rec.parent_id.default_values)
+            content = layers.render_layers(values)
             switch_user = f"\nUSER {USERNAME}\n"
             if not content.endswith(switch_user):
                 content = content + switch_user

@@ -26,10 +26,12 @@
                 <field name="version_ids" widget="many2many_tags"/>
                 <field name="project_ids" widget="many2many_tags"/>
                 <field name="public_visibility"/>
-              </group>
-              <group>
                 <field name="description"/>
               </group>
+              <group>
+                <field name="default_values" widget="runbotjsonb"/>
+              </group>
+
               <notebook>
                 <page string="Layers">
                   <field name="layer_ids">
