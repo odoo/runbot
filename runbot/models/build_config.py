@@ -417,6 +417,8 @@ class ConfigStep(models.Model):
         if extra_params:
             cmd.extend(shlex.split(extra_params))
         env_variables = self.additionnal_env.split(';') if self.additionnal_env else []
+        if config_env_variables := build.params_id.config_data.get('env_variables', False):
+            env_variables += config_env_variables.split(';')
 
         build_port = build.port
         try:
@@ -809,6 +811,8 @@ class ConfigStep(models.Model):
         exception_env = self.env['runbot.upgrade.exception']._generate()
         if exception_env:
             env_variables.append(exception_env)
+        if config_env_variables := build.params_id.config_data.get('env_variables', False):
+            env_variables += config_env_variables.split(';')
         return dict(cmd=migrate_cmd, ro_volumes=exports, env_variables=env_variables, image_tag=target.params_id.dockerfile_id.image_tag)
 
     def _run_restore(self, build):
