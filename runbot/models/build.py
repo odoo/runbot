@@ -874,6 +874,10 @@ class BuildResult(models.Model):
 
         self._log('Preparing', 'Using Dockerfile Tag [%s](/runbot/dockerfile_result/%s/%s)', kwargs['image_tag'], kwargs['image_tag'], image_id, log_type='markdown')
 
+        if not kwargs.get('network_enabled', False):
+            # we don't check config data if we explicitely enable the network (e.g.: restore step)
+            kwargs['network_enabled'] = self.params_id.config_data.get('network_enabled', kwargs.get('network_enabled', True))
+
         containers_memory_limit = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_containers_memory', 0)
         if containers_memory_limit and 'memory' not in kwargs:
             kwargs['memory'] = int(float(containers_memory_limit) * 1024 ** 3)

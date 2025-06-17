@@ -880,7 +880,7 @@ class ConfigStep(models.Model):
 
             ])
 
-        return dict(cmd=cmd)
+        return dict(cmd=cmd, network_enabled=True)
 
     def _reference_builds(self, batch, trigger):
         upgrade_dumps_trigger_id = trigger.upgrade_dumps_trigger_id

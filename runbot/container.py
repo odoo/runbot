@@ -234,7 +234,7 @@ def docker_run(*args, **kwargs):
     return _docker_run(*args, **kwargs)
 
 
-def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False, image_tag=False, exposed_ports=None, cpu_limit=None, cpu_period=100000, cpus=0, memory=None, preexec_fn=None, ro_volumes=None, env_variables=None):
+def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False, image_tag=False, exposed_ports=None, cpu_limit=None, cpu_period=100000, cpus=0, memory=None, preexec_fn=None, ro_volumes=None, env_variables=None, network_enabled=True):
     """Run tests in a docker container
     :param run_cmd: command string to run in container
     :param log_path: path to the logfile that will contain odoo stdout and stderr
@@ -248,6 +248,7 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
     :param memory: memory limit in bytes for the container
     :params ro_volumes: dict of dest:source volumes to mount readonly in builddir
     :params env_variables: list of environment variables
+    :params network_enabled: enable network boolean.
     """
     assert cmd and log_path and build_dir and container_name
     image_tag = image_tag or 'odoo:DockerDefault'
@@ -306,6 +307,7 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
         auto_remove=True,
         detach=True,
         user=USERNAME,
+        network_disabled=not network_enabled,
     )
     if container.status not in ('running', 'created') :
         _logger.error('Container %s started but status is not running or created:  %s', container_name, container.status)

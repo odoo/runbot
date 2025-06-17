@@ -779,6 +779,49 @@ def run():
         self.assertNotIn('--with-demo', cmd)
         self.assertIn('--without-demo', cmd)
 
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
+    def test_network_can_be_disabled(self, mock_checkout):
+        """ test that network can be disabled with config_data """
+        config_step = self.ConfigStep.create({
+            'name': 'default',
+            'job_type': 'install_odoo',
+        })
+
+        # by default, network is enabled (will be changed in a near future)
+        def first_docker_run(cmd, log_path, *args, **kwargs):
+            self.assertTrue(kwargs['network_enabled'])
+
+        self.patchers['docker_run'].side_effect = first_docker_run
+        config_step._run_step(self.parent_build)()
+
+        def second_docker_run(cmd, log_path, *args, **kwargs):
+            self.assertFalse(kwargs['network_enabled'])
+
+        self.patchers['docker_run'].side_effect = second_docker_run
+
+        parent_build_params = self.parent_build.params_id.copy({'config_data': {'network_enabled': False}})
+        parent_build = self.parent_build.copy({'params_id': parent_build_params.id})
+        config_step._run_step(parent_build)()
+
+
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
+    def test_run_python_networkcan_be_disabled(self, mock_checkout):
+        """test that docker network can be disabled from python step"""
+        test_code = """cmd = build._cmd()
+docker_params = dict(cmd=cmd, network_enabled=False)
+        """
+        config_step = self.ConfigStep.create({
+            'name': 'default',
+            'job_type': 'python',
+            'python_code': test_code,
+        })
+
+        def docker_run(cmd, *args, **kwargs):
+            self.assertFalse(kwargs['network_enabled'])
+
+        self.patchers['docker_run'].side_effect = docker_run
+        config_step._run_step(self.parent_build)()
+
 class TestMakeResult(RunbotCase):
 
     def setUp(self):
