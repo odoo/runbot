@@ -426,7 +426,7 @@ class ConfigStep(models.Model):
         except Exception:
             _logger.exception('An error occured while reloading nginx')
             build._log('', "An error occured while reloading nginx, skipping")
-        return dict(cmd=cmd, exposed_ports=[build_port, build_port + 1], ro_volumes=exports, env_variables=env_variables, cpu_limit=None)
+        return dict(cmd=cmd, exposed_ports=[build_port, build_port + 1], ro_volumes=exports, env_variables=env_variables, cpu_limit=None, network_enabled=True)
 
     def _run_install_odoo(self, build):
         exports = build._checkout()
