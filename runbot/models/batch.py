@@ -499,6 +499,36 @@ class Batch(models.Model):
             'level': level,
         })
 
+    def _add_missing_slots(self):
+        missing_trigger_ids = self.env['runbot.trigger'].search([
+            ('project_id', '=', self.bundle_id.project_id.id),
+            ('category_id', '=', self.category_id.id),
+            ('id', 'not in', self.slot_ids.trigger_id.ids)
+        ]).filtered(
+            lambda t: not t.version_domain or
+            self.bundle_id.version_id.filtered_domain(t._get_version_domain())
+        )
+        bundle = self.bundle_id
+        dockerfile_id = bundle.dockerfile_id or bundle.base_id.dockerfile_id or bundle.project_id.dockerfile_id or bundle.version_id.dockerfile_id
+        for trigger in missing_trigger_ids:
+            params_value = {
+                'version_id': self.bundle_id.version_id.id,
+                'project_id': self.bundle_id.project_id.id,
+                'create_batch_id': self.id,
+                'config_id': trigger.config_id.id,
+                'trigger_id': trigger.id,
+                'config_data': dict(trigger.config_data or {}),
+                'modules': bundle.modules,
+                'dockerfile_id': dockerfile_id.id,
+                'commit_link_ids': [(6, 0, self.commit_link_ids.ids)],
+            }
+            params = self.env['runbot.build.params'].create(params_value)
+            self.env['runbot.batch.slot'].create({
+                'batch_id': self.id,
+                'trigger_id': trigger.id,
+                'params_id': params.id,
+                'link_type': 'created',
+            })
 
 class BatchLog(models.Model):
     _name = 'runbot.batch.log'
