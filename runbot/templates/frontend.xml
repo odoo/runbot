@@ -87,7 +87,7 @@
 
       <div t-attf-class="batch_tile if more">
         <div t-attf-class="card bg-{{klass}}-subtle">
-          <a t-attf-href="/runbot/batch/#{batch.id}" title="View Batch">
+          <a t-attf-href="/runbot/batch/#{batch.id}" t-att-title="batch.create_date.strftime('%Y-%m-%d %H:%M:%S')">
             <div class="batch_header">
               <span t-attf-class="badge text-bg-{{'warning' if batch.has_warning else 'default'}}">
                 <t t-out="batch._get_formated_age()"/>

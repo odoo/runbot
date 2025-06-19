@@ -173,7 +173,7 @@
                 <b title='Total time '>
                   Load time:
                 </b>
-                <t t-att-tile='build.load_time' t-out="s2human(build.load_time)"/>
+                <t t-att-tile='build.load_time' t-out="precise_s2human(build.load_time)"/>
                 <i t-if='more'>(<t t-out="build.load_time"/>s)</i>
               </div>
               <div>

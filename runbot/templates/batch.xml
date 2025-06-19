@@ -30,13 +30,23 @@
                             <td>Create date</td>
                             <td t-out="batch.create_date"/>
                         </tr>
-                        <tr t-if="more">
-                            <td>Last update</td>
-                            <td>
-                                <t t-out="batch.last_update"/>
-                                <span class="badge text-bg-info" t-out="s2human(batch.last_update - batch.create_date)"/>
-                            </td>
-                        </tr>
+                        <t t-if="more">
+                            <tr>
+                                <td>Last update</td>
+                                <td>
+                                    <t t-out="batch.last_update"/>
+                                    <span class="badge text-bg-info" t-out="s2human(batch.last_update - batch.create_date)"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Load time</td>
+                                <td>
+                                    <t t-set="load_time" t-value="sum(build.load_time for build in batch.slot_ids.build_id)"/>
+                                    <t t-out="precise_s2human(load_time)"/>
+                                    <i>(<t t-out="load_time"/>s)</i>
+                                </td>
+                            </tr>
+                        </t>
                         <tr>
                             <td t-att-class="batch_class" >Commits</td>
                             <td t-att-class="batch_class" >

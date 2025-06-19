@@ -166,6 +166,19 @@ def s2human_long(time):
     )
 
 
+def precise_s2human(time):
+    hours, remainder = divmod(time, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    parts = []
+    if hours > 0:
+        parts.append(f"{hours}h")
+    if minutes > 0:
+        parts.append(f"{minutes}m")
+    if not hours and (seconds > 0 or not parts):
+        parts.append(f"{seconds}s")
+    return ''.join(parts)
+
+
 @contextlib.contextmanager
 def local_pgadmin_cursor():
     cnx = None
