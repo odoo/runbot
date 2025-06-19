@@ -209,11 +209,12 @@ class BuildResult(models.Model):
     build_type = fields.Selection([('scheduled', 'This build was automatically scheduled'),
                                    ('rebuild', 'This build is a rebuild'),
                                    ('normal', 'normal build'),
-                                   ('indirect', 'Automatic rebuild'), # TODO cleanup remove
-                                   ('priority', 'Priority'),
+                                   ('indirect', 'Automatic rebuild'),  # TODO cleanup remove
                                    ],
                                   default='normal',
                                   string='Build type')
+
+    priority = fields.Integer('Priority', help='Priority of the build, used to sort builds in the queue')
 
     parent_id = fields.Many2one('runbot.build', 'Parent Build', index=True)
     parent_path = fields.Char('Parent path', index=True)

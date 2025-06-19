@@ -212,6 +212,7 @@ class Bundle(models.Model):
 
     def create(self, values_list):
         records = super().create(values_list)
+        custom_trigger_vals = []
         for record in records:
             if records.is_base:
                 model = self.browse()
@@ -224,6 +225,16 @@ class Bundle(models.Model):
                 record['build_all'] = True
                 if base:
                     record['defined_base_id'] = base
+            if not record.is_base:
+                for trigger in record.project_id.trigger_ids:
+                    if trigger.custom_default_start_mode:
+                        custom_trigger_vals.append({
+                            'bundle_id': record.id,
+                            'trigger_id': trigger.id,
+                            'start_mode': trigger.custom_default_start_mode,
+                            'config_data': trigger.config_data or {},
+                        })
+        self.env['runbot.bundle.trigger.custom'].create(custom_trigger_vals)
         return records
 
     def write(self, values):

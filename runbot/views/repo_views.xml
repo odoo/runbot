@@ -18,7 +18,9 @@
                   <field name="project_id" default=""/>
                   <field name="config_id"/>
                   <field name="config_data" widget="runbotjsonb"/>
+                  <field name="custom_default_start_mode"/>
                   <field name="report_view_id"/>
+                  
                 </group>
                 <group>
                   <field name="description"/>

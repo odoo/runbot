@@ -70,8 +70,6 @@ class Runbot(models.AbstractModel):
         self._commit()
         processed += self._assign_pending_builds(host, host.nb_worker - 1 or host.nb_worker)
         self._commit()
-        processed += self._assign_pending_builds(host, host.nb_worker and host.nb_worker + 1, [('build_type', '=', 'priority')])
-        self._commit()
         self._gc_running(host)
         self._commit()
         self._reload_nginx()
@@ -97,8 +95,6 @@ class Runbot(models.AbstractModel):
         build_to_init = self.env['runbot.build']
         if available_slots > 0:
             build_to_init |= self.env['runbot.build'].search(domain_host + [('local_state', '=', 'pending')], limit=available_slots)
-        if available_slots + 1 > 0:
-            build_to_init |= self.env['runbot.build'].search(domain_host + [('local_state', '=', 'pending'), ('build_type', '=', 'priority')], limit=1)
         return build_to_init
 
     def _gc_running(self, host):
@@ -140,7 +136,7 @@ class Runbot(models.AbstractModel):
             non_allocated_domain = expression.AND([non_allocated_domain, domain])
         e = expression.expression(non_allocated_domain, self.env['runbot.build'])
         query = e.query
-        query.order = 'runbot_build.create_batch_id'
+        query.order = 'runbot_build.priority desc, runbot_build.create_batch_id'
         select_query, select_params = query.select()
         # self-assign to be sure that another runbot batch cannot self assign the same builds
         query = """UPDATE

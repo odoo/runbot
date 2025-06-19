@@ -91,6 +91,7 @@ class Trigger(models.Model):
 
     team_ids = fields.Many2many('runbot.team', string="Runbot Teams", help="Teams responsible of this trigger, mainly usefull for nightly")
     active = fields.Boolean("Active", default=True)
+    custom_default_start_mode = fields.Selection([('disabled', 'Disabled'), ('auto', 'Auto'), ('force', 'Force')])
 
     report_view_id = fields.Many2one('ir.ui.view',
                                   help="custom view to render result",
