@@ -5,7 +5,7 @@
             <t t-call='runbot.layout'>
                 <div class="container-fluid">
                     <div class="row">
-                        <div class='col-md-12'>
+                        <div class="col-md-6">
                             <div class="navbar navbar-default">
                                 <span class="text-center" style="font-size: 18px;">
                                     <t t-out="bundle.name"/>
@@ -96,12 +96,31 @@
                                             <i t-attf-class="fa fa-{{'times' if bundle.no_build else 'check'}}"/>
                                         </td>
                                     </tr>
-                                    <tr t-if="more">
-                                        <td>Modules</td>
-                                        <td t-out="bundle.modules or '/'"/>
-                                    </tr>
                                 </table>
                             </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <t t-if="bundle.trigger_custom_ids">
+                                <h5>Triggers start rules</h5>
+                                <form>
+                                <t t-foreach="bundle.trigger_custom_ids" t-as="custom_trigger">
+                                    <div class="form-group form-row">
+                                        <label class="form-label col-auto col-form-label-sm" t-attf-for="trigger_sart_mode_{{custom_trigger.id}}">
+                                            <t t-esc="custom_trigger.trigger_id.name"/>
+                                        </label>
+                                        <select class="form-control col-auto form-control-sm" t-attf-id="trigger_sart_mode_{{custom_trigger.id}}">
+                                            <t t-foreach="['auto', 'disable', 'force']" t-as="mode">
+                                                <option value="mode" t-att-selected="custom_trigger.start_mode==mode"><t t-esc="mode"/></option>
+                                            </t>
+                                        </select>
+                                    </div>
+                                </t>
+                            </form>
+                            </t>
+                        </div>
+                        <div class="col-md-12">
+                            
                             <div t-foreach="bundle._consistency_warning()" t-as="warning" t-out="warning[1]" t-attf-class="alert alert-{{warning[0]}}"/>
                             <div class="batch_row" t-foreach="batchs" t-as="batch">
                                 <t t-call="runbot.batch_tile"/>
