@@ -307,7 +307,7 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
         auto_remove=True,
         detach=True,
         user=USERNAME,
-        network_disabled=not network_enabled,
+        network_mode=None if network_enabled else 'none'
     )
     if container.status not in ('running', 'created') :
         _logger.error('Container %s started but status is not running or created:  %s', container_name, container.status)
