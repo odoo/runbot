@@ -23,21 +23,40 @@ from ..common import transactioncache, TestTagsParser
 _logger = logging.getLogger(__name__)
 
 
-def get_color(value: int):
+def get_color(value: int, opacity='1'):
     if value >= 10:
-        return 'red'
+        return f'rgba(255, 0, 0, {opacity})'  # red
     elif value >= 5:
-        return 'orange'
-    return 'green'
+        return f'rgba(255, 165, 0, {opacity})'  # orange
+    return f'rgba(0, 170, 0, {opacity})'  # green
 
 
-def draw_svg(values: list[int], max_value: int = 10, height: int = 30, batch_dates: list[datetime.date] = [], error_id: int = 0, category_id=1, project_id=1):
-    lines = ''.join(f'<line x1="0" x2="{len(values) * 10}" y1="{v * 10}" y2="{v * 10}" stroke="gray" stroke_width="1"/>' for v in range(0, max_value, 2))
-    if batch_dates:
-        rects = ''.join(f'<a href="/runbot/batches/{project_id}/{category_id}/{batch_date}/{error_id if error_id else ""}"><rect fill="{get_color(value)}" width="9" height="{min(value, max_value) * 10}" x="{idx * 10 + 0.5}" y="{(max_value - min(value, max_value)) * 10}"/></a>' for idx, (value, batch_date) in enumerate(zip(values, batch_dates)))
-    else:
-        rects = ''.join(f'<rect fill="{get_color(value)}" width="9" height="{min(value, max_value) * 10}" x="{idx * 10 + 0.5}" y="{(max_value - min(value, max_value)) * 10}"/>' for idx, value in enumerate(values))
-    return f'<div style="height: {height}px"><svg xmlns="https://www.w3.org/2000/svg" viewbox="0 0 {len(values) * 10} {max_value * 10}" style="border: 1px solid black; height: 100%; width: 100%;" preserveAspectRatio="none" shape-rendering="cripsEdges">{lines}{rects}</svg></div>'
+def draw_svg(daily_version_freq, y_labels=None, max_value: int = 10, error_id: int = 0, category_id=1, project_id=1):
+
+    rects = []
+    x_keys = sorted(daily_version_freq.keys())
+    height = 40
+    for idx, (x_key) in enumerate(x_keys):
+        batch_date = x_key.strftime('%Y-%m-%d')
+        for idy, (y_key, y_label) in enumerate(y_labels.items()):
+            value = daily_version_freq[x_key].get(y_key, 0)
+            if not value:
+                continue
+            if value > max_value:
+                value = max_value
+            cell_opacity = ((max_value * 0.3 + value) / (max_value * 0.3 + max_value))
+            cell_color = get_color(value, cell_opacity)
+            pos_y = idy * 10 + 0.5
+            pos_x = idx * 10 + 0.5
+            rects.append(
+                f''''
+                <a href="/runbot/batches/{project_id}/{category_id}/{batch_date}/{error_id if error_id else ""}">
+                <title>{batch_date} {y_label} ({value})</title>
+                <rect fill="{cell_color}" width="9" height="9" x="{pos_x}" y="{pos_y}"/>
+                </a>'''
+            )
+    rects = ''.join(rects)
+    return f'<div style="height: {height}px"><svg xmlns="https://www.w3.org/2000/svg" viewbox="0 0 {len(x_keys) * 10} {len(y_labels) * 10}" style="border: 1px solid black; height: 100%; width: 100%;" preserveAspectRatio="none" shape-rendering="cripsEdges">{rects}</svg></div>'
 
 class BuildErrorLink(models.Model):
     _name = 'runbot.build.error.link'
@@ -88,7 +107,6 @@ class BuildErrorSeenMixin(models.AbstractModel):
                 record.first_seen_build_id = first_error_link.build_id
                 record.last_seen_build_id = last_error_link.build_id
                 record.build_count = len(error_link_ids.build_id)
-                record.seen_hash = hashlib.sha256(str(sorted(error_link_ids.build_id.ids)).encode()).hexdigest()
 
     @api.depends('build_error_link_ids')
     def _compute_seen_hash(self):
@@ -103,36 +121,29 @@ class BuildErrorSeenMixin(models.AbstractModel):
         start_date = end_date - relativedelta(days=30)
         log_date_per_error = self._get_log_dates(start_date, end_date)
         for error in self:
+            project_id = error.first_seen_build_id.params_id.project_id.id
             dates = log_date_per_error[error]
-            daily_freq_with_dates = [
-                (date.date(), sum(
-                    count
-                    for hour, count in dates.items() if hour.date() == date.date()
-                ))
-                for date in rrule.rrule(rrule.DAILY, dtstart=start_date, until=end_date)
-            ]
-            daily_freq_dates, daily_freq = zip(*daily_freq_with_dates)
+            versions = self.env['runbot.bundle'].search([('project_id', '=', project_id), ('sticky', '=', True)]).version_id.sorted(lambda v: (v.sequence, v.number), reverse=True)
+            versions_ids = versions.ids
+            y_labels = {version.id: version.number for version in versions}
+            daily_version_freq = dict.fromkeys([date.date() for date in rrule.rrule(rrule.DAILY, dtstart=start_date, until=end_date)])
+            for date in daily_version_freq:
+                daily_version_freq[date] = {version: 0 for version in versions_ids}
+            max_count = 0
+            for (date, version), count in dates.items():
+                d = date.date()
+                if d in daily_version_freq:
+                    c = daily_version_freq[d][version] + count
+                    daily_version_freq[d][version] = c
+                    max_count = max(max_count, c)
+
             error.graph_history = draw_svg(
-                daily_freq, max_value=max(daily_freq), batch_dates=daily_freq_dates, error_id=error.id,
+                daily_version_freq, y_labels=y_labels, max_value=max_count, error_id=error.id,
                 category_id=error.first_seen_build_id.create_batch_id.category_id.id if error.first_seen_build_id else 1,
-                project_id=error.first_seen_build_id.params_id.project_id.id if error.first_seen_build_id else 1,
+                project_id=project_id if error.first_seen_build_id else 1,
             )
-            day_of_week_freq = [
-                sum(
-                    count
-                    for date, count in dates.items() if date.isoweekday() - 1 == day
-                )
-                for day in range(7)
-            ]
-            error.graph_day_of_week_recurence = draw_svg(day_of_week_freq)
-            day_of_month_recurrence = [
-                sum(
-                    count
-                    for hour, count in dates.items() if hour.day - 1 == day
-                )
-                for day in range(31)
-            ]
-            error.graph_day_of_month_recurence = draw_svg(day_of_month_recurrence)
+            error.graph_day_of_week_recurence = False
+            error.graph_day_of_month_recurence = False
 
     def _get_log_dates(self, start_date: datetime.datetime, end_date: datetime.datetime):
         """
@@ -145,17 +156,17 @@ class BuildErrorSeenMixin(models.AbstractModel):
             return result
         from_clause, content_field = self.get_log_dates_from_clause()
         self.env.cr.execute(f"""
-            SELECT record.id as record_id, date_trunc('day', batch.create_date) as time, count(*) as count
+            SELECT record.id as record_id, date_trunc('day', batch.create_date) as time, build.version_id as version_id, count(*) as count
               {from_clause}
               JOIN runbot_build_error_link AS link ON link.error_content_id = {content_field}.id
               JOIN runbot_build AS build ON link.build_id = build.id
               JOIN runbot_batch AS batch ON build.create_batch_id = batch.id
              WHERE record.id IN %s AND batch.create_date BETWEEN %s AND %s
-          GROUP BY record.id, date_trunc('day', batch.create_date)
+          GROUP BY record.id, date_trunc('day', batch.create_date), build.version_id
         """, (tuple(self.ids), start_date, end_date))
         data = self.env.cr.dictfetchall()
         for d in data:
-            result[self.browse(d['record_id'])][d['time']] = d['count']
+            result[self.browse(d['record_id'])][d['time'], d['version_id']] = d['count']
         return result
 
 def _compute_related_error_content_ids(field_name):
@@ -802,8 +813,22 @@ class BuildErrorContent(models.Model):
 
     @api.depends('build_ids')
     def _compute_version_ids(self):
-        for build_error in self:
-            build_error.version_ids = build_error.build_ids.version_id
+        self.env['runbot.build'].flush_model()
+        self.env['runbot.build.error.link'].flush_model()
+        self.env.cr.execute(
+            """
+            SELECT error_content_id, array_agg(distinct runbot_build.version_id)
+            FROM runbot_build
+            JOIN runbot_build_error_link ON runbot_build_error_link.build_id = runbot_build.id
+            WHERE error_content_id IN %s
+            GROUP BY error_content_id
+            """,
+            (tuple(self.ids),),
+        )
+        res = dict(self.env.cr.fetchall())
+
+        for build_error_content in self:
+            build_error_content.version_ids = self.env['runbot.version'].browse(res.get(build_error_content.id, []))
 
     @api.depends('build_ids')
     def _compute_trigger_ids(self):

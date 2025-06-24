@@ -74,9 +74,6 @@
                 <page string="Builds">
                   <field name="unique_build_error_link_ids" widget="one2many" context="{'hide_linked_error': 'True'}"/>
                 </page>
-                <page string="All links">
-                  <field name="build_error_link_ids" widget="one2many"/>
-                </page>
                 <page string="Similary qualified Errors" groups="runbot.group_runbot_admin,runbot.group_runbot_error_manager" invisible="not common_qualifiers">
                   <div class="btn-group">
                     <button class="btn btn-sm btn-primary" type="object" name="action_view_similary_qualified">
@@ -194,16 +191,6 @@
                         <field name="fingerprint" optional="hide"/>
                       </list>
                   </field>
-                </page>
-                <page string="Frequency graphs">
-                  <group>
-                    <group>
-                      <field name="graph_day_of_week_recurence"/>
-                    </group>
-                    <group>
-                      <field name="graph_day_of_month_recurence"/>
-                    </group>
-                  </group>
                 </page>
               </notebook>
           </sheet>
@@ -364,9 +351,7 @@
               <field name="fixing_pr_id" optional="hide"/>
               <field name="fixing_pr_alive" optional="hide"/>
               <field name="fixing_pr_url" widget="pull_request_url" text="view PR" readonly="1" invisible="not fixing_pr_url"/>
-              <field name="graph_history" optional="show"/>
-              <field name="graph_day_of_week_recurence" optional="hide"/>
-              <field name="graph_day_of_month_recurence" optional="hide"/>
+              <field name="graph_history" optional="show" width="210px"/>
           </list>
       </field>
   </record>
@@ -403,7 +388,7 @@
                 <field name="fixing_pr_alive" optional="hide"/>
                 <field name="fixing_pr_url" widget="url" text="view PR" readonly="1" invisible="not fixing_pr_url"/>
                 <field name="fingerprint" optional="hide"/>
-                <field name="graph_history" optional="show"/>
+                <field name="graph_history" optional="show" width="210px"/>
                 <field name="seen_hash" optional="hide"/>
             </list>
         </field>
@@ -440,9 +425,9 @@
           <separator/>
           <filter string="Not seen in one month" name="not_seen_one_month" domain="[('last_seen_date','&lt;', (context_today() - datetime.timedelta(days=30)).strftime('%Y-%m-%d'))]"/>
           <searchpanel>
-            <field name="team_id" select="multi" string="Assigned Team" icon="fa-users" enable_counters="1"/>
-            <field name="customer" select="multi" string="Customer" icon="fa-address-card" enable_counters="1"/>
-            <field name="trigger_ids" select="multi" string="Triggers" icon="fa-bullseye" enable_counters="1"/>
+            <field name="team_id" select="multi" string="Assigned Team" icon="fa-users" enable_counters="0"/>
+            <field name="customer" select="multi" string="Customer" icon="fa-address-card" enable_counters="0"/>
+            <field name="trigger_ids" select="multi" string="Triggers" icon="fa-bullseye" enable_counters="0"/>
           </searchpanel>
         </search>
       </field>
