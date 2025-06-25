@@ -477,9 +477,9 @@ class ConfigStep(models.Model):
             test_tags = []
             custom_tags = build.params_id.config_data.get('test_tags')
             if custom_tags:
-                test_tags += custom_tags.replace(' ', '').split(',')
+                test_tags += [t.strip() for t in custom_tags.split(',')]
             if self.test_tags:
-                test_tags += self.test_tags.replace(' ', '').split(',')
+                test_tags += [t.strip() for t in self.test_tags.split(',')]
             if self.enable_auto_tags and not build.params_id.config_data.get('disable_auto_tags', False):
                 if grep(config_path, "[/module][:class]"):
                     auto_tags = self.env['runbot.build.error']._disabling_tags(build)

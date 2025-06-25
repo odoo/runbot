@@ -486,7 +486,7 @@ class TestBuildConfigStep(TestBuildConfigStepCommon):
     def get_test_tags(self, params):
         cmds = params['cmd'].build().split(' && ')
         self.assertEqual(cmds[1].split(' server/server.py')[0], 'python3')
-        return cmds[1].split('--test-tags ')[1].split(' ')[0]
+        return cmds[1].split('--test-tags ')[1].split(' --')[0]
 
     def get_odoo_cmd(self, params):
         cmds = params['cmd'].build().split(' && ')
@@ -821,6 +821,29 @@ docker_params = dict(cmd=cmd, network_enabled=False)
 
         self.patchers['docker_run'].side_effect = docker_run
         config_step._run_step(self.parent_build)()
+
+    @patch('odoo.addons.runbot.models.build.BuildResult._parse_config')
+    @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
+    def test_install_custom_parametric_tags(self, mock_checkout, parse_config):
+        parse_config.return_value = {'--test-enable', '--test-tags'}
+        config_step = self.ConfigStep.create({
+            'name': 'all',
+            'job_type': 'install_odoo',
+            'enable_auto_tags': True,
+        })
+        self.env['runbot.build.error'].create({
+            'content': 'foo',
+            'random': True,
+            'test_tags': '/web/bar.py[@snafu/other test with spaces]'
+        })
+
+        self.assertIn('-/web/bar.py[@snafu/other test with spaces]', self.env['runbot.build.error']._disabling_tags(), 'Parametric disabling test-tag should be returned by _disabling_tags')
+
+        child = self.parent_build._add_child({'config_data': {'test_tags': '-at_install, /web/foo.py:WebSuite.test_unit_desktop[@bar/test with spaces]'}})
+
+        params = config_step._run_install_odoo(child)
+        tags = self.get_test_tags(params)
+        self.assertEqual(tags, '"-at_install,/web/foo.py:WebSuite.test_unit_desktop[@bar/test with spaces],-/web/bar.py[@snafu/other test with spaces]"')
 
 class TestMakeResult(RunbotCase):
 
