@@ -862,7 +862,7 @@ class ConfigStep(models.Model):
         cmd = ' && '.join([
             'mkdir /data/build/restore',
             'cd /data/build/restore',
-            'wget %s' % dump_url,
+            'wget --retry-on-host-error %s' % dump_url,
             'unzip -q %s' % zip_name,
             'echo "### restoring filestore"',
             'mkdir -p /data/build/datadir/filestore/%s' % restore_db_name,
