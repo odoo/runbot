@@ -196,6 +196,15 @@ class BuildError(models.Model):
     error_count = fields.Integer("Error count", store=True, compute='_compute_count')
     previous_error_id = fields.Many2one('runbot.build.error', string="Already seen error")
 
+    state = fields.Selection([
+        ('new', 'New/Unsolved'),
+        ('solved', 'Solved'),
+        ('disabled', 'Disabled'),
+    ], default='new', tracking=True, group_expand=True,
+    help="New: Error is new and not yet solved.\n"
+         "Solved: Error should be solved.\n"
+         "Disabled: Error is disabled (generally set with test tags).")
+    )
     responsible = fields.Many2one('res.users', 'Assigned fixer', tracking=True)
     customer = fields.Many2one('res.users', 'Customer', tracking=True)
     team_id = fields.Many2one('runbot.team', 'Assigned team', compute='_compute_team_id', inverse='_inverse_team_id', store=True, tracking=True)
