@@ -68,6 +68,7 @@ class Config(models.Model):
         # remove protection on copy
         copy = super(Config, self).copy()
         copy.sudo().write({'protected': False})
+        copy.name = f'{self.name} (copy)'
         return copy
 
     @api.depends('step_order_ids.sequence', 'step_order_ids.step_id')
