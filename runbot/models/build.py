@@ -11,6 +11,7 @@ import time
 import uuid
 
 from collections import defaultdict
+from dateutil import parser
 from pathlib import Path
 from psycopg2 import sql
 from psycopg2.extensions import TransactionRollbackError
@@ -1125,6 +1126,9 @@ class BuildResult(models.Model):
 
         faketime = []
         if faketime_params := self.params_id.config_data.get('faketime'):
+            if self.parent_id:
+                parent_time_offset = (self.parent_id.build_end or self.create_date) - self.parent_id.build_start
+                faketime_params = (parser.parse(faketime_params) + parent_time_offset).strftime('%Y-%m-%d %H:%M %Z')
             faketime = ['faketime', faketime_params]
 
         addons_paths = self._get_addons_path()
