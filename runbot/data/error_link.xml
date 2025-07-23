@@ -51,16 +51,7 @@
             records.action_assign()
         </field>
     </record>
-    <record model="ir.actions.server" id="action_deduplicate">
-        <field name="name">Deduplicate Error Contents</field>
-        <field name="model_id" ref="runbot.model_runbot_build_error_content" />
-        <field name="binding_model_id" ref="runbot.model_runbot_build_error_content" />
-        <field name="type">ir.actions.server</field>
-        <field name="state">code</field>
-        <field name="code">
-            records.action_deduplicate()
-        </field>
-    </record>
+
     <record model="ir.actions.server" id="action_view_build_errors">
         <field name="name">View build errors</field>
         <field name="model_id" ref="runbot.model_runbot_build"/>

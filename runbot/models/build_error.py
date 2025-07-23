@@ -890,11 +890,6 @@ class BuildErrorContent(models.Model):
             if not error.error_content_ids:
                 base_error._merge(error)
 
-    def _get_duplicates(self):
-        """ returns a list of lists of duplicates"""
-        domain = [('id', 'in', self.ids)] if self else []
-        return [r[1] for r in self._read_group(domain, ('fingerprint', 'canonical_tag'), ('id:array_agg'), [('id:count', '>', 1)])]
-
     def _qualify(self, vals=None):
         if vals is None:
             vals = self
@@ -965,26 +960,6 @@ class BuildErrorContent(models.Model):
         # this must be done in other iteration since filtered may fail because of unlinked records from _merge
         for errors_content_to_merge in to_merge:
             errors_content_to_merge._relink()
-
-    def action_deduplicate(self):
-        rg = self._get_duplicates()
-        for ids_list in rg:
-            self.env['runbot.build.error.content'].browse(ids_list)._relink()
-
-    def action_find_duplicates(self):
-        rg = self._get_duplicates()
-        duplicate_ids = []
-        for ids_lists in rg:
-            duplicate_ids += ids_lists
-
-        return {
-            "type": "ir.actions.act_window",
-            "res_model": "runbot.build.error.content",
-            "domain": [('id', 'in', duplicate_ids)],
-            "context": {"create": False, 'group_by': ['fingerprint', 'canonical_tag']},
-            "name": "Duplicate Error contents",
-            'view_mode': 'list,form',
-        }
 
     def action_qualify(self):
         self._qualify()
