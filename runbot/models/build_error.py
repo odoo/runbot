@@ -132,7 +132,7 @@ class BuildErrorSeenMixin(models.AbstractModel):
             max_count = 0
             for (date, version), count in dates.items():
                 d = date.date()
-                if d in daily_version_freq:
+                if d in daily_version_freq and version in daily_version_freq[d]:
                     c = daily_version_freq[d][version] + count
                     daily_version_freq[d][version] = c
                     max_count = max(max_count, c)
