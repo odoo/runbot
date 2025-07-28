@@ -172,10 +172,6 @@ class Commit(models.Model):
             export_name = '%s_%s' % (self.name, self.rebase_on_id.name)
         return self.repo_id._source_path(export_name, *paths)
 
-    def _old_source_path(self):
-        # TODO remove this method when all code will be migrated to _source_path
-        return self.repo_id._source_path(self.name)
-
     @api.depends('name', 'repo_id.name')
     def _compute_dname(self):
         for commit in self:
