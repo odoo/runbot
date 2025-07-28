@@ -198,6 +198,15 @@ class Commit(models.Model):
             'to_process': True,
         })
 
+    def _get_last_statuses(self):
+        status_list = self.env['runbot.commit.status'].search([('commit_id', '=', self.id)], order='id desc')
+        last_status_by_context = {}
+        for status in status_list:
+            if status.context in last_status_by_context:
+                continue
+            last_status_by_context[status.context] = status
+        return status_list, last_status_by_context
+
 
 class CommitLink(models.Model):
     _name = 'runbot.commit.link'

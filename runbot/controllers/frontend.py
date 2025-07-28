@@ -237,12 +237,7 @@ class Runbot(Controller):
                 raise NotFound()
             slug = request.env['ir.http']._slug
             return request.redirect(f"/runbot/commit/{slug(commit)}")
-        status_list = request.env['runbot.commit.status'].search([('commit_id', '=', commit.id)], order='id desc')
-        last_status_by_context = dict()
-        for status in status_list:
-            if status.context in last_status_by_context:
-                continue
-            last_status_by_context[status.context] = status
+        status_list, last_status_by_context = commit._get_last_statuses()
         context = {
             'commit': commit,
             'project': commit.repo_id.project_id,
