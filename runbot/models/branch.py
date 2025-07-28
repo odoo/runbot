@@ -157,14 +157,19 @@ class Branch(models.Model):
             project.ensure_one()
             bundle = self.env['runbot.bundle'].search([('name', '=', name), ('project_id', '=', project.id)])
             is_base = bundle.is_base if bundle else branch._match_is_base(name)
-            if is_base and branch.remote_id != branch.remote_id.repo_id.main_remote_id:
-                _logger.warning('Trying to add a dev branch to base bundle, falling back on dummy bundle')
+            is_staging = bundle.is_staging if bundle else branch.name.startswith('staging.')
+            if (is_base or is_staging) and branch.remote_id != branch.remote_id.repo_id.main_remote_id:
+                _logger.warning('Trying to add a dev branch to base/staging bundle, falling back on dummy bundle')
                 bundle = dummy
             elif name and branch.remote_id and branch.remote_id.repo_id._is_branch_forbidden(name):
                 _logger.warning('Trying to add a forbidden branch, falling back on dummy bundle')
                 bundle = dummy
-            elif bundle.is_base and branch.is_pr:
+            elif (is_base or is_staging) and branch.is_pr:
                 _logger.warning('Trying to add pr to base bundle, falling back on dummy bundle')
+                bundle = dummy
+            elif is_staging and not self.env['runbot.bundle'].search(
+                    [('name', '=', name.removeprefix('staging.')), ('project_id', '=', project.id), ('is_base', '=', True)], limit=1):
+                _logger.warning('Trying to add a staging. branch for a version that do not exist')
                 bundle = dummy
             elif not bundle:
                 values = {
@@ -173,12 +178,14 @@ class Branch(models.Model):
                 }
                 if is_base:
                     values['is_base'] = True
+                if is_staging:
+                    values['is_staging'] = True
 
                 if branch.is_pr and branch.target_branch_name:  # most likely external_pr, use target as version
                     base = self.env['runbot.bundle'].search([
                         ('name', '=', branch.target_branch_name),
                         ('is_base', '=', True),
-                        ('project_id', '=', project.id)
+                        ('project_id', '=', project.id),
                     ])
                     if base:
                         values['defined_base_id'] = base.id

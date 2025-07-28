@@ -214,8 +214,7 @@ class TestBranchIsBase(RunbotCaseMinimalSetup):
             'name': 'staging.saas-13.4',
             'is_pr': False,
         })
-        self.assertEqual(staging.bundle_id.base_id, branch.bundle_id, 'The staging branch should have the correct nase bundle')
-
+        self.assertEqual(staging.bundle_id.base_id, branch.bundle_id, 'The staging branch should have the correct base bundle')
 
     def test_host(self):
         r10 = self.env['runbot.host'].create({'name': 'runbot10.odoo.com'})

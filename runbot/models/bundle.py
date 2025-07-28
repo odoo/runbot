@@ -31,6 +31,7 @@ class Bundle(models.Model):
 
     sticky = fields.Boolean('Sticky', compute='_compute_sticky', store=True, index=True)
     is_base = fields.Boolean('Is base', index=True)
+    is_staging = fields.Boolean('Is staging', index=True)
     defined_base_id = fields.Many2one('runbot.bundle', 'Forced base bundle', domain="[('project_id', '=', project_id), ('is_base', '=', True)]")
     base_id = fields.Many2one('runbot.bundle', 'Base bundle', compute='_compute_base_id', store=True)
     to_upgrade = fields.Boolean('To upgrade To', compute='_compute_to_upgrade', store=True, index=False)
