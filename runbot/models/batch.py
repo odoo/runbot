@@ -137,7 +137,7 @@ class Batch(models.Model):
                     processed |= batch
         return processed
 
-    def _create_build(self, params):
+    def _create_build(self, params, slot):
         """
         Create a build with given params_id if it does not already exists.
         In the case that a very same build already exists that build is returned
@@ -171,8 +171,9 @@ class Batch(models.Model):
                 build.host = self.bundle_id.host_id.name
                 build.keep_host = True
 
-            build._github_status()
-        return link_type, build
+        slot.link_type = link_type
+        slot.build_id = build
+        build._github_status()
 
     def _prepare(self, auto_rebase=False, use_base_commits=False):
         _logger.info('Preparing batch %s', self.id)
@@ -441,7 +442,7 @@ class Batch(models.Model):
             skip_trigger = (trigger_custom and trigger_custom.start_mode == 'disabled') or trigger.manual
             should_start = ((trigger.repo_ids & bundle_repos) or bundle.build_all or bundle.sticky)
             if force_trigger or (should_start and not skip_trigger):
-                slot.link_type, slot.build_id = self._create_build(slot.params_id)
+                self._create_build(slot.params_id, slot)
 
 
     def _update_commits_infos(self, base_head_per_repo):
@@ -551,5 +552,5 @@ class BatchSlot(models.Model):
         if self.build_id:
             return self.build_id
         self.batch_id._log(f'Trigger {self.trigger_id.name} was started by {self.env.user.name}')
-        self.link_type, self.build_id = self.batch_id._create_build(self.params_id)
+        self.batch_id._create_build(self.params_id, self)
         return self.build_id
