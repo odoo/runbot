@@ -46,7 +46,7 @@ config.options.onClick = function(event, activeElements) {
       config.searchParams['center_build_id'] = build_id;
       fetchUpdateChart();
     } else {
-      window.open('/runbot/build/stats/' + build_id);
+      window.open('/runbot/build/' + build_id);
     }
 
 };

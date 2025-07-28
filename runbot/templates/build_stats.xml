@@ -1,67 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
   <data>
-    <template id="runbot.build_stats">
-      <t t-call='runbot.layout'>
-          <t t-set="bundles" t-value="build.slot_ids.mapped('batch_id.bundle_id')"/>
-          <div>
-            <div class="row g-0">
-              <div class="col-md-4">
-                <div class="bg-success-subtle">
-                  <b>Build: </b><a t-attf-href="/runbot/build/{{build.id}}"><t t-out="build.id"/></a><br/>
-                  <t t-if="build.description">
-                    <b>Description:</b>
-                    <t t-out="build.md_description"/>
-                    <br/>
-                  </t>
-                  <b>Date: </b><t t-out="build.create_date" /><br/>
-                  <b>Config: </b><t t-out="build.params_id.config_id.name" /><br/>
-                  <b>Bundle(s): </b>
-                  <t t-foreach="bundles" t-as="bundle">
-                    <a t-attf-href="/runbot/bundle/{{bundle.id}}"><t t-out="bundle.name" /></a>
-                  </t><br/>
-                  <t t-foreach="build.params_id.sudo().commit_link_ids" t-as="build_commit">
-                    <b>Commit:</b>
-                    <a t-attf-href="/runbot/commit/{{build_commit.commit_id.id}}">
-                      <t t-out="build_commit.commit_id.dname"/>
-                    </a>
-                    <a t-att-href="'https://%s/commit/%s' % (build_commit.branch_id.remote_id.base_url, build_commit.commit_id.name)" class="btn btn-sm text-start" title="View Commit on Github"><i class="fa fa-github"/></a>
-                    <t t-if="build_commit.match_type in ('default', 'pr_target', 'prefix') ">
-                      from base branch
-                      <br/>
-                    </t>
-                    <div t-else="" class="ms-3">
-                      <b>Subject:</b>
-                      <t t-out="build_commit.commit_id.subject"/>
-                      <br/>
-                      <b>Author:</b>
-                      <t t-out="build_commit.commit_id.author"/>
-                      <br/>
-                      <b>Committer:</b>
-                      <t t-out="build_commit.commit_id.committer"/>
-                      <br/>
-                    </div>
-                  </t>
-                  <b>Version:</b>
-                  <t t-out="build.params_id.version_id.name"/>
-                  <br/>
-                </div>
-              </div>
-              <div t-foreach="sorted(build_stats.keys())" t-as="category" class="col-md-4">
-                <h3><t t-out="category.title().replace('_', ' ')"/></h3>
-                <table class="table table-condensed table-responsive table-stripped">
-                  <tr t-foreach="build_stats[category].keys()" t-as="module">
-                    <td><t t-out="module"/></td>
-                    <td><t t-out="build_stats[category][module]"/></td>
-                  </tr>
-                </table>
-              </div>
-              <div t-if="not build_stats" class="col-md-12 alert alert-warning">No stats records found for this build</div>
-            </div>
-          </div>
-      </t>
-    </template>
-
     <template id="runbot.modules_stats">
       <t t-call='runbot.layout'>
         <input type="hidden" id="bundle_id" t-att-value="bundle.id"/>

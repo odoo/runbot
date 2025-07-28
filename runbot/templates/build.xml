@@ -176,13 +176,6 @@
                 <t t-att-tile='build.load_time' t-out="precise_s2human(build.load_time)"/>
                 <i t-if='more'>(<t t-out="build.load_time"/>s)</i>
               </div>
-              <div>
-                <t t-if="build.stat_ids">
-                  <b>Stats:</b>
-                    <a t-attf-href="/runbot/build/stats/{{build.id}}">Build <t t-out="build.id"/></a>
-                  <br/>
-                </t>
-              </div>
             </div>
           </div>
           <div class="col-md-6" t-if="build.children_ids">
