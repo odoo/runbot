@@ -88,7 +88,7 @@ class BuildParameters(models.Model):
     # @api.depends('version_id', 'project_id', 'extra_params', 'config_id', 'config_data', 'modules', 'commit_link_ids', 'builds_reference_ids')
     def _compute_fingerprint(self):
         for param in self:
-            commit_ident = sorted(param.commit_link_ids.commit_id.mapped('tree_hash'))
+            commit_ident = sorted([c.tree_hash or '' for c in param.commit_link_ids.commit_id])
             if param.trigger_id.batch_dependent:
                 commit_ident = sorted(param.commit_link_ids.commit_id.ids)
             cleaned_vals = {

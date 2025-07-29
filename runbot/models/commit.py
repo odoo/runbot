@@ -8,6 +8,7 @@ import shutil
 
 from odoo import models, fields, api, registry
 from odoo.tools import file_open
+from odoo.exceptions import ValidationError
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -167,6 +168,8 @@ class Commit(models.Model):
             return False
 
     def _source_path(self, *paths):
+        if not self.tree_hash:
+            raise ValidationError("Commit %s has no tree hash, cannot export" % self.name)
         export_name = self.tree_hash
         if self.rebase_on_id:
             export_name = '%s_%s' % (self.name, self.rebase_on_id.name)
