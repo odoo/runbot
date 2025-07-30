@@ -572,6 +572,8 @@ class BuildError(models.Model):
         # TODO xdo split the error id change and other params merge in order to avoid the merge in write and write in merge recursion
         self.ensure_one
         error = self
+        fields_to_merge = ['responsible', 'fixing_pr_id']
+        fields_to_copy = ['manual_team_id']
         for previous_error in others:
             # todo, check that all relevant fields are checked and transfered/logged
             if previous_error.test_tags and error.test_tags != previous_error.test_tags:
@@ -586,14 +588,12 @@ class BuildError(models.Model):
                             test_tags.append(tag)
                     error.test_tags = ','.join(test_tags)
                     previous_error.test_tags = False
-            if previous_error.responsible:
-                if error.responsible and error.responsible != previous_error.responsible and not self.env.su:
-                    raise UserError(f"error {error.id} as already a responsible ({error.responsible}) cannot assign {previous_error.responsible}")
-                if not error.responsible:
-                    error.responsible = previous_error.responsible
-            if previous_error.team_id:
-                if not error.team_id:
-                    error.team_id = previous_error.team_id
+            for field in fields_to_merge + fields_to_copy:
+                if previous_error[field]:
+                    if field in fields_to_merge and error[field] and error[field] != previous_error[field] and not self.env.su:
+                        raise UserError(f"error {error.id} as already a {field} ({error[field]}) cannot assign {previous_error[field]}")
+                    if not error[field]:
+                        error[field] = previous_error[field]
             previous_error.error_content_ids.with_context(merging=True).write({'error_id': self})
             previous_error.common_qualifiers = dict()
             previous_error.unique_qualifiers = dict()
@@ -819,6 +819,7 @@ class BuildErrorContent(models.Model):
 
     error_active = fields.Boolean('Active', related='error_id.active')
     error_id = fields.Many2one('runbot.build.error', 'Linked to', index=True, required=True, tracking=True, ondelete='cascade')
+    create_error_id = fields.Many2one('runbot.build.error', 'Original error', index=True)
     error_display_id = fields.Integer(compute='_compute_error_display_id', string="Error id")
     content = fields.Text('Error message', required=True)
     cleaned_content = fields.Text('Cleaned error message')
@@ -895,6 +896,7 @@ class BuildErrorContent(models.Model):
                         'name': name,
                     })
                     vals['error_id'] = error.id
+            vals['create_error_id'] = vals['error_id']
             content = vals.get('content')
             cleaned_content = cleaners._r_sub(content)
             vals.update({
