@@ -434,6 +434,17 @@ class BuildError(models.Model):
                         raise UserError("This error as a test-tag and can only be (de)activated by admin")
                     if not vals['active'] and build_error.active and build_error.last_seen_date and build_error.last_seen_date + relativedelta(days=1) > fields.Datetime.now():
                         raise UserError("This error broke less than one day ago can only be deactivated by admin")
+
+        if (responsible_id := vals.get('responsible')) and responsible_id != self.env.user.id:
+            responsible = self.env['res.users'].browse(responsible_id)
+            for build_error in self:
+                build_error.message_notify(
+                    body=f'Error {build_error.id} was assigned to you by {self.env.user.name}',
+                    partner_ids=responsible.partner_id.ids,
+                    email_layout_xmlid='mail.mail_notification_layout',
+                    record_name=build_error.display_name,
+               )
+
         return super().write(vals)
 
     def get_log_dates_from_clause(self):
