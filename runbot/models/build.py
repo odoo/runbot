@@ -1306,7 +1306,6 @@ class BuildResult(models.Model):
                 batch_per_commit = {}
                 for commit_link in build.params_id.commit_link_ids:
                     commit = commit_link.commit_id
-                    batch_per_commit[commit] = None
                     if (trigger.ci_send_all or (commit.repo_id in trigger.repo_ids)):
                         repo_ids_to_notify[commit.repo_id.id] = commit.tree_hash
 
