@@ -87,5 +87,5 @@ class TestBatch(RunbotCase):
         self.assertEqual(list(assert_status_info(commit_1).values()), [batch_1.id, build_1.id, 'success'])
         build_2.local_result = 'ko'
         build_2.local_state = 'done'
-        self.assertEqual(list(assert_status_info(commit_2).values()), [batch_2.id, build_2.id, 'failure'])  # batch_2 or batch_3 could make sense
-        self.assertEqual(list(assert_status_info(commit_4).values()), [batch_4.id, build_2.id, 'failure'])
+        self.assertEqual(list(assert_status_info(commit_2).values()), [batch_2.id, build_2.id, 'error'])  # batch_2 or batch_3 could make sense
+        self.assertEqual(list(assert_status_info(commit_4).values()), [batch_4.id, build_2.id, 'error'])

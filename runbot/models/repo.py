@@ -87,6 +87,11 @@ class Trigger(models.Model):
     ci_url = fields.Char("CI url")
     ci_description = fields.Char("CI description")
     ci_send_all = fields.Boolean('Send ci on dependencies', default=False)
+    ci_startegy = fields.Selection([
+        ('all', 'All'),
+        ('no_pending', 'No pending'),
+        ('errors', 'Only errors'),
+    ], string="CI startegy", default='all', help="Strategy to use when sending CI status to github")
     has_stats = fields.Boolean('Has a make_stats config step', compute="_compute_has_stats", store=True)
 
     team_ids = fields.Many2many('runbot.team', string="Runbot Teams", help="Teams responsible of this trigger, mainly usefull for nightly")

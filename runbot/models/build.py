@@ -1291,7 +1291,7 @@ class BuildResult(models.Model):
                     state = 'error'
                     desc = "This build used custom config. Remove custom trigger to restore default ci"
                 elif build.global_result in ('ko', 'warn'):
-                    state = 'failure'
+                    state = 'error'
                 elif build.global_state in ('pending', 'testing'):
                     state = 'pending'
                 elif build.global_state in ('running', 'done'):
@@ -1344,7 +1344,7 @@ class BuildResult(models.Model):
                     else:
                         target_url = f"{self.get_base_url()}/runbot/build/{build.id}"
 
-                    commit._github_status(build, trigger.ci_context, state, target_url, desc)
+                    commit._github_status(build, trigger.ci_context, state, target_url, desc, ci_startegy=trigger.ci_startegy)
 
     def _parse_config(self):
         return set(findall(self._server("tools/config.py"), r'--[\w-]+', ))
