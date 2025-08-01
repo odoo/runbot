@@ -196,7 +196,7 @@ class BuildError(models.Model):
     error_count = fields.Integer("Error count", store=True, compute='_compute_count')
     previous_error_id = fields.Many2one('runbot.build.error', string="Already seen error")
 
-    responsible = fields.Many2one('res.users', 'Assigned fixer', tracking=True)
+    responsible = fields.Many2one('res.users', 'Assigned fixer', tracking=True, domain="[('active', '=', True)]")
     customer = fields.Many2one('res.users', 'Customer', tracking=True)
     team_id = fields.Many2one('runbot.team', 'Assigned team', compute='_compute_team_id', inverse='_inverse_team_id', store=True, tracking=True)
     manual_team_id = fields.Many2one('runbot.team', 'Manually assigned team')
@@ -435,17 +435,29 @@ class BuildError(models.Model):
                     if not vals['active'] and build_error.active and build_error.last_seen_date and build_error.last_seen_date + relativedelta(days=1) > fields.Datetime.now():
                         raise UserError("This error broke less than one day ago can only be deactivated by admin")
 
-        if (responsible_id := vals.get('responsible')) and responsible_id != self.env.user.id:
+        if (responsible_id := vals.get('responsible')):
             responsible = self.env['res.users'].browse(responsible_id)
             for build_error in self:
-                build_error.message_notify(
-                    body=f'Error {build_error.id} was assigned to you by {self.env.user.name}',
-                    partner_ids=responsible.partner_id.ids,
-                    email_layout_xmlid='mail.mail_notification_layout',
-                    record_name=build_error.display_name,
-               )
+                if responsible != self.env.user:
+                    _logger.info('Notifying responsible %s of build error %s', responsible.name, build_error.id)
+                    build_error.message_notify(
+                        body=f'Error {build_error.id} was assigned to you by {self.env.user.name}',
+                        partner_ids=responsible.partner_id.ids,
+                        email_layout_xmlid='mail.mail_notification_layout',
+                        record_name=build_error.display_name,
+                    )
+                build_error.message_subscribe(
+                    partner_ids=(responsible.partner_id | self.env.user.partner_id).ids,
+                )
 
         return super().write(vals)
+
+    def unlink(self):
+        if any(build_error.test_tags for build_error in self):
+            raise UserError("Cannot delete errors with test_tags")
+        if any((len(build_error.error_content_ids) > 5) for build_error in self):
+            raise UserError("Warning: deleting errors with more than 5 contents, please delete them first")
+        return super().unlink()
 
     def get_log_dates_from_clause(self):
         return """
@@ -650,7 +662,7 @@ class BuildError(models.Model):
                         error.metadata = log.metadata
                     continue
                 fingerprint, canonical_tag = key
-                new_build_error_content = self.env['runbot.build.error.content'].create({
+                new_build_error_content = self.env['runbot.build.error.content'].with_context(mail_create_nosubscribe=True).create({
                     'error_id': None,
                     'content': log.message,
                     'module_name': log.name.removeprefix('odoo.').removeprefix('addons.'),
@@ -667,7 +679,7 @@ class BuildError(models.Model):
             logs = logs_by_key.get((build_error_content.fingerprint, build_error_content.canonical_tag), [])
             for rec in logs:
                 if rec.build_id not in build_error_content.build_ids:
-                    self.env['runbot.build.error.link'].create({
+                    self.env['runbot.build.error.link'].with_context(mail_create_nosubscribe=True).create({
                         'build_id': rec.build_id.id,
                         'error_content_id': build_error_content.id,
                         'log_date': rec.create_date,
@@ -703,7 +715,7 @@ class BuildErrorContent(models.Model):
     _rec_name = "id"
 
     error_active = fields.Boolean('Active', related='error_id.active')
-    error_id = fields.Many2one('runbot.build.error', 'Linked to', index=True, required=True, tracking=True)
+    error_id = fields.Many2one('runbot.build.error', 'Linked to', index=True, required=True, tracking=True, ondelete='cascade')
     error_display_id = fields.Integer(compute='_compute_error_display_id', string="Error id")
     content = fields.Text('Error message', required=True)
     cleaned_content = fields.Text('Cleaned error message')
@@ -749,7 +761,7 @@ class BuildErrorContent(models.Model):
                     ('id', '!=', error_content.id or False),
                 ], order="id desc", limit=1)
                 if previous_error_content:
-                    error_content.error_id.message_post(body=f"An historical error was found for error {error_content.id}: {previous_error_content.id}")
+                    error_content.error_id.with_context(mail_create_nosubscribe=True).message_post(body=f"An historical error was found for error {error_content.id}: {previous_error_content.id}")
                     error_content.error_id.previous_error_id = previous_error_content.error_id
 
     @transactioncache
@@ -1183,7 +1195,7 @@ class QualifyErrorTest(models.Model):
     _name = 'runbot.error.qualify.test'
     _description = 'Extended Relation between a qualify regex and a build error taken as sample'
 
-    qualify_regex_id = fields.Many2one('runbot.error.qualify.regex', required=True)
+    qualify_regex_id = fields.Many2one('runbot.error.qualify.regex', required=True, ondelete='cascade')
     error_content_id = fields.Many2one('runbot.build.error.content', string='Content Id', required=True)
     build_error_summary = fields.Char(compute='_compute_summary')
     build_error_content = fields.Text(compute='_compute_content')
