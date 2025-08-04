@@ -2,6 +2,7 @@ import datetime
 import functools
 import logging
 from collections import OrderedDict
+from subprocess import CalledProcessError
 from urllib.parse import urlsplit
 
 import werkzeug
@@ -11,10 +12,11 @@ from dateutil.relativedelta import relativedelta
 from werkzeug.exceptions import Forbidden, NotFound
 
 from odoo import fields
-from odoo.addons.website.controllers.main import QueryURL
 from odoo.http import Controller, Response, request
 from odoo.http import route as o_route
 from odoo.osv import expression
+
+from odoo.addons.website.controllers.main import QueryURL
 
 _logger = logging.getLogger(__name__)
 
@@ -752,11 +754,49 @@ class Runbot(Controller):
             for batch in batches:
                 builds_by_batch_id[batch.id] = build_error.build_ids.filtered_domain([('id', 'child_of', batch.slot_ids.build_id.ids)])
 
+        build_error = build_error if build_error else self.env['runbot.build.error']
+        diff_versions_filter = build_error.version_ids
+        diff_repos_filter = build_error.trigger_ids.dependency_ids
+        commit_link_details_url = f'/runbot/commit_link/details/{",".join(map(str, batches.commit_link_ids.ids))}'
+
         return request.render("runbot.batches_by_date", {
             'batches_date': batches_date,
             'batches': batches,
             'next_date_url': next_date_url,
             'previous_date_url': previous_date_url,
+            'commit_link_details_url': commit_link_details_url,
             'builds_by_batch_id': builds_by_batch_id,
             'category': request.env['runbot.category'].browse(category_id),
+            'diff_versions_filter': diff_versions_filter,
+            'diff_repos_filter': diff_repos_filter,
+        })
+
+    @route([
+        "/runbot/commit_link/details/<string:commit_link_ids>",
+        ], type="http", auth="user", website=True, sitemap=False)
+    def commit_links_diffs(self, commit_link_ids=None, versions_filter_ids=None, repos_filter_ids=None, **kwargs):
+        commit_links = request.env['runbot.commit.link'].browse([int(id) for id in commit_link_ids.split(',')])
+        if versions_filter_ids:
+            vids = [int(v) for v in versions_filter_ids.split(',')]
+            commit_links = commit_links.filtered_domain([('branch_id.bundle_id.version_id.id', 'in', vids)])
+        if repos_filter_ids:
+            rids = [int(r) for r in repos_filter_ids.split(',')]
+            commit_links = commit_links.filtered_domain([('branch_id.repo_id.id', 'in', rids)])
+        diff_by_commit_link_ids = {}
+        popot_filter = ":!*.po :!*.pot"
+        git_show_filter = ["--", "."] + popot_filter.split()
+        selected_commit_links = request.env['runbot.commit.link']
+        for commit_link in commit_links:
+            if commit_link.merge_base_commit_id:
+                git_show_argument = f"{commit_link.merge_base_commit_id.name}..{commit_link.commit_id.name}"
+                try:
+                    diff = commit_link.commit_id.repo_id.sudo()._git(['show', git_show_argument] + git_show_filter, errors='ignore').removeprefix('commit ')
+                except CalledProcessError as e:
+                    diff = f'Error with command git command:\n{e.cmd}\n{e.stdout}'
+                diff_by_commit_link_ids[commit_link.id] = diff
+                selected_commit_links |= commit_link
+
+        return request.render("runbot.commit_link_details", {
+            'commit_links': selected_commit_links,
+            'diff_by_commit_link_ids': diff_by_commit_link_ids,
         })

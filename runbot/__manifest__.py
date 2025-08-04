@@ -37,6 +37,7 @@
         'templates/nginx.xml',
         'templates/build_error.xml',
         'templates/batches_by_date.xml',
+        'templates/commit_link_details.xml',
 
         'views/branch_views.xml',
         'views/build_error_link_views.xml',

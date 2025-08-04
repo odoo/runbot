@@ -37,26 +37,29 @@ def draw_svg(daily_version_freq, y_labels=None, max_value: int = 10, error_id: i
     x_keys = sorted(daily_version_freq.keys())
     height = 40
     for idx, (x_key) in enumerate(x_keys):
-        batch_date = x_key.strftime('%Y-%m-%d')
+        batch_date = x_key.strftime("%Y-%m-%d")
         for idy, (y_key, y_label) in enumerate(y_labels.items()):
             value = daily_version_freq[x_key].get(y_key, 0)
             if not value:
-                continue
-            if value > max_value:
-                value = max_value
-            cell_opacity = ((max_value * 0.3 + value) / (max_value * 0.3 + max_value))
-            cell_color = get_color(value, cell_opacity)
+                cell_color = "white"
+                cell_opacity = 0
+            else:
+                value = min(value, max_value)
+                cell_opacity = ((max_value * 0.3 + value) / (max_value * 0.3 + max_value))
+                cell_color = get_color(value, cell_opacity)
+            href = f'/runbot/batches/{project_id}/{category_id}/{batch_date}/{error_id or ""}'
             pos_y = idy * 10 + 0.5
             pos_x = idx * 10 + 0.5
             rects.append(
-                f''''
-                <a href="/runbot/batches/{project_id}/{category_id}/{batch_date}/{error_id if error_id else ""}">
+                f'''
+                <a href="{href}">
                 <title>{batch_date} {y_label} ({value})</title>
                 <rect fill="{cell_color}" width="9" height="9" x="{pos_x}" y="{pos_y}"/>
-                </a>'''
+                </a>''',
             )
     rects = ''.join(rects)
     return f'<div style="height: {height}px"><svg xmlns="https://www.w3.org/2000/svg" viewbox="0 0 {len(x_keys) * 10} {len(y_labels) * 10}" style="border: 1px solid black; height: 100%; width: 100%;" preserveAspectRatio="none" shape-rendering="cripsEdges">{rects}</svg></div>'
+
 
 class BuildErrorLink(models.Model):
     _name = 'runbot.build.error.link'

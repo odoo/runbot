@@ -10,11 +10,26 @@
                             <div class="btn-group" role="group">
                                 <a t-att-href="previous_date_url" class="btn btn-sm text-start" title="Previous date"><i class="fa fa-chevron-left"/></a>
                                 <a t-att-href="next_date_url" class="btn btn-sm text-start" title="Next date"><i class="fa fa-chevron-right"/></a>
+                                <t t-set="repo_url_separator" t-value="'?'"/>
+                                <t t-if="diff_versions_filter">
+                                    <t t-set="commit_link_details_url" t-value="commit_link_details_url + '?versions_filter_ids=' + ','.join(map(str, diff_versions_filter.ids))"/>
+                                    <t t-set="repo_url_separator" t-value="'&amp;'"/>
+                                </t>
+                                <t t-if="diff_repos_filter">
+                                    <t t-set="commit_link_details_url" t-value="commit_link_details_url + repo_url_separator + 'repos_filter_ids=' + ','.join(map(str, diff_repos_filter.ids))"/>
+                                </t>
+                                <a t-att-href="commit_link_details_url" class="btn btn-sm text-start" title="Compare all batches with their bases" groups="runbot.group_runbot_advanced_user">
+                                    <i class="fa fa-arrows-v"/>
+                                </a>
                             </div>
                         </h5>
                         <t t-foreach="batches" t-as="batch">
                             <div class="col-md-1">
                                 <t t-esc="batch.bundle_id.name" />
+                                <t t-set="batch_diff_url" t-value="'/runbot/commit_link/details/' + ','.join(map(str, batch.commit_link_ids.ids))"/>
+                                <a t-att-href="batch_diff_url" class="btn btn-sm text-start" title="Compare batch with its base" groups="runbot.group_runbot_advanced_user">
+                                    <i class="fa fa-arrows-v"/>
+                                </a>
                             </div>
                             <div class="col-md-11">
                                 <div class="batch_row" >
