@@ -180,7 +180,7 @@ class Commit(models.Model):
         for commit in self:
             commit.dname = '%s:%s' % (commit.repo_id.name, commit.name[:8])
 
-    def _github_status(self, build, context, state, target_url, description=None, ci_startegy="all"):
+    def _github_status(self, build, context, state, target_url, description=None, ci_strategy="all"):
         if state == 'failure':
             state = 'error'  # github does not make a big difference between error and failure, lets simplify
         self.ensure_one()
@@ -191,12 +191,12 @@ class Commit(models.Model):
             _logger.info('Skipping already sent status %s:%s for %s', context, state, self.name)
             return
 
-        if ci_startegy != 'all' and state == 'pending':
+        if ci_strategy != 'all' and state == 'pending':
             _logger.info("skipping github pending status for build %s and ci %s", build_id, context)
             return
 
-        if ci_startegy == 'errors' and state != 'error' and last_status.state != 'error':
-            _logger.info("skipping github status for build %s, ci_startegy is failures", build_id)
+        if ci_strategy == 'errors' and state != 'error' and last_status.state not in ('error', 'failure'):
+            _logger.info("skipping github status for build %s, ci_strategy is failures", build_id)
             return
 
         last_status = Status.create({

@@ -87,7 +87,7 @@ class Trigger(models.Model):
     ci_url = fields.Char("CI url")
     ci_description = fields.Char("CI description")
     ci_send_all = fields.Boolean('Send ci on dependencies', default=False)
-    ci_startegy = fields.Selection([
+    ci_strategy = fields.Selection([
         ('all', 'All'),
         ('no_pending', 'No pending'),
         ('errors', 'Only errors'),

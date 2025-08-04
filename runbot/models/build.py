@@ -1343,7 +1343,7 @@ class BuildResult(models.Model):
                     else:
                         target_url = f"{self.get_base_url()}/runbot/build/{build.id}"
 
-                    commit._github_status(build, trigger.ci_context, state, target_url, desc, ci_startegy=trigger.ci_startegy)
+                    commit._github_status(build, trigger.ci_context, state, target_url, desc, ci_strategy=trigger.ci_strategy)
 
     def _parse_config(self):
         return set(findall(self._server("tools/config.py"), r'--[\w-]+', ))
