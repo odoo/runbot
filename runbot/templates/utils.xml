@@ -388,7 +388,7 @@
                         Find similar builds
                     </a>
                     <a class="dropdown-item"
-                        t-attf-href="/odoo/runbot.build/{{bu['id']}}?menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" target="_blank">
+                        t-attf-href="/odoo/runbot.build/{{bu['id']}}?menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}">
                         <i class="fa fa-list"/>
                         View in backend
                     </a>

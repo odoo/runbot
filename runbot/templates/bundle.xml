@@ -12,7 +12,7 @@
                                     <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e" />
                                     <div class="btn-group" role="group">
                                         <a groups="runbot.group_runbot_advanced_user"
-                                            t-attf-href="/odoo/runbot.bundle/{{bundle.id}}?menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" class="btn btn-default" target="_blank" title="View in Backend">
+                                            t-attf-href="/odoo/runbot.bundle/{{bundle.id}}?menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" class="btn btn-default" title="View in Backend">
                                           <i class="fa fa-list"/>
                                         </a>
                                         <a groups="runbot.group_runbot_advanced_user" class="btn btn-default" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Force A New Batch">

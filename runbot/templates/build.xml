@@ -321,7 +321,7 @@
                       <!--a groups="runbot.group_user" t-attf-href="/web#id={{error_content.id}}&amp;view_type=form&amp;model=runbot.build.error.content&amp;menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" title="View in Backend" target="_blank">
                         <i t-attf-class="fa fa-search"/>
                       </a-->
-                      <a groups="runbot.group_user" t-attf-href="/web#id={{error.id}}&amp;view_type=form&amp;model=runbot.build.error&amp;menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" title="View in Backend" target="_blank">
+                      <a groups="runbot.group_user" t-attf-href="/web#id={{error.id}}&amp;view_type=form&amp;model=runbot.build.error&amp;menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" title="View in Backend">
                         <i t-attf-class="fa fa-list"/>
                       </a>
                       <span t-if="error.responsible and (env.user.has_group('runbot.group_runbot_error_manager') or error.responsible.id == uid)">(<i t-out="error.responsible.name"/>)</span>
