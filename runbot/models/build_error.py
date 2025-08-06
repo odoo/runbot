@@ -865,7 +865,7 @@ class BuildErrorContent(models.Model):
     @api.depends('build_ids')
     def _compute_trigger_ids(self):
         for build_error in self:
-            build_error.trigger_ids = build_error.build_ids.trigger_id
+            build_error.trigger_ids = build_error.build_ids.top_parent.trigger_id
 
     @api.depends('content')
     def _compute_summary(self):
