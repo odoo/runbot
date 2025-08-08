@@ -234,7 +234,7 @@ def docker_run(*args, **kwargs):
     return _docker_run(*args, **kwargs)
 
 
-def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False, image_tag=False, exposed_ports=None, cpu_limit=None, cpu_period=100000, cpus=0, memory=None, preexec_fn=None, ro_volumes=None, env_variables=None, network_enabled=True):
+def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False, image_tag=False, exposed_ports=None, cpu_limit=None, cpu_period=100000, cpus=0, memory=None, preexec_fn=None, ro_volumes=None, env_variables=None, network_enabled=False):
     """Run tests in a docker container
     :param run_cmd: command string to run in container
     :param log_path: path to the logfile that will contain odoo stdout and stderr
