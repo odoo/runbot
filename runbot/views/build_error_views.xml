@@ -83,7 +83,6 @@
                 </page>
                 <page string="Qualifiers" groups="runbot.group_runbot_admin,runbot.group_runbot_error_manager" invisible="not common_qualifiers">
                   <field name="common_qualifiers" widget="runbotjsonb"/>
-
                     <button class="btn btn-sm btn-primary" type="object" name="action_view_similary_qualified">
                       View similary qualified errors
                     </button>

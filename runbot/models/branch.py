@@ -305,9 +305,6 @@ class Branch(models.Model):
     def action_recompute_infos(self):
         return self._recompute_infos()
 
-    def action_update_bundle_id(self):
-        return self._update_bundle_ids()
-
 
 class RefLog(models.Model):
     _name = 'runbot.ref.log'
