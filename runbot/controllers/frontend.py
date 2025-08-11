@@ -728,25 +728,34 @@ class Runbot(Controller):
         })
 
     @route([
+        '/runbot/batches/ids/<string:batch_ids>',
+        '/runbot/batches/ids/<string:batch_ids>/<model("runbot.build.error"):build_error>',
         '/runbot/batches/<int:project_id>/<int:category_id>/<batches_date>',
         '/runbot/batches/<int:project_id>/<int:category_id>/<batches_date>/<model("runbot.build.error"):build_error>',
         ], type='http', auth="public", website=True, sitemap=False)
-    def batches_by_date(self, project_id=None, category_id=None, batches_date=None, build_error=None, **kwargs):
+    def batches_by_date(self, batch_ids=None, project_id=None, category_id=None, batches_date=None, build_error=None, title=None, **kwargs):
         limit = int(kwargs.get('limit', 25)) if int(kwargs.get('limit', 25)) < 100 else 25
         try:
             start_date = fields.Date.from_string(batches_date)
         except ValueError:
             raise NotFound
-
-        end_date = start_date + relativedelta(days=1)
-        next_date_url = f'/runbot/batches/{project_id}/{category_id}/{end_date}/{build_error.id if build_error else ""}'
-        previous_date_url = f'/runbot/batches/{project_id}/{category_id}/{start_date - relativedelta(days=1)}/{build_error.id if build_error else ""}'
-        batches = request.env["runbot.batch"].search([
-            ("category_id", "=", category_id),
-            ("bundle_id.project_id", "=", project_id),
-            ("create_date", ">=", start_date),
-            ("create_date", "<", end_date),
-        ], limit=limit)
+        if batch_ids:
+            batch_ids = [int(bid) for bid in batch_ids.split(',')]
+            batches = request.env['runbot.batch'].browse(batch_ids).exists().sorted(lambda b: b.bundle_id.version_id.number, reverse=True)
+            if not batches:
+                raise NotFound
+            next_date_url = None
+            previous_date_url = None
+        else:
+            end_date = start_date + relativedelta(days=1)
+            next_date_url = f'/runbot/batches/{project_id}/{category_id}/{end_date}/{build_error.id if build_error else ""}'
+            previous_date_url = f'/runbot/batches/{project_id}/{category_id}/{start_date - relativedelta(days=1)}/{build_error.id if build_error else ""}'
+            batches = request.env["runbot.batch"].search([
+                ("category_id", "=", category_id),
+                ("bundle_id.project_id", "=", project_id),
+                ("create_date", ">=", start_date),
+                ("create_date", "<", end_date),
+            ], limit=limit)
 
         builds_by_batch_id = None
         if build_error:
@@ -754,12 +763,14 @@ class Runbot(Controller):
             for batch in batches:
                 builds_by_batch_id[batch.id] = build_error.build_ids.filtered_domain([('id', 'child_of', batch.slot_ids.build_id.ids)])
 
-        build_error = build_error if build_error else self.env['runbot.build.error']
+        build_error = build_error if build_error else request.env['runbot.build.error']
         diff_versions_filter = build_error.version_ids
         diff_repos_filter = build_error.trigger_ids.dependency_ids
         commit_link_details_url = f'/runbot/commit_link/details/{",".join(map(str, batches.commit_link_ids.ids))}'
 
         return request.render("runbot.batches_by_date", {
+            'build_error': build_error,
+            'title': title,
             'batches_date': batches_date,
             'batches': batches,
             'next_date_url': next_date_url,

@@ -14,7 +14,7 @@ from werkzeug.urls import url_join
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
-from odoo.tools import SQL, lazy
+from odoo.tools import SQL, lazy, ormcache
 from odoo.osv import expression
 
 from ..fields import JsonDictField
@@ -32,7 +32,6 @@ def get_color(value: int, opacity='1'):
 
 
 def draw_svg(daily_version_freq, y_labels=None, max_value: int = 10, error_id: int = 0, category_id=1, project_id=1):
-
     rects = []
     x_keys = sorted(daily_version_freq.keys())
     height = 40
@@ -90,10 +89,10 @@ class BuildErrorSeenMixin(models.AbstractModel):
     last_seen_date = fields.Datetime(string='Last Seen Date', compute='_compute_seen', store=True)
     build_count = fields.Integer(string='Nb Seen', compute='_compute_seen', store=True)
     seen_hash = fields.Char(string='Seen hash', compute='_compute_seen_hash', store=True)
+    first_seen_batch_ids = fields.Many2many('runbot.batch', compute='_compute_seen_batch', string='First Seen Batches')
+    last_seen_batch_ids = fields.Many2many('runbot.batch', compute='_compute_seen_batch', string='Last Seen Batches')
 
-    graph_history = fields.Html('30 days history', compute='_compute_graph', sanitize=False)
-    graph_day_of_week_recurence = fields.Html('Weekly recurence', compute='_compute_graph', sanitize=False)
-    graph_day_of_month_recurence = fields.Html('Monthly recurence', compute='_compute_graph', sanitize=False)
+    history_data = fields.Json('30 days history', compute='_compute_graph')
 
     @api.depends('build_error_link_ids')
     def _compute_seen(self):
@@ -101,7 +100,7 @@ class BuildErrorSeenMixin(models.AbstractModel):
             record.first_seen_date = False
             record.last_seen_date = False
             record.build_count = 0
-            error_link_ids = record.build_error_link_ids.sorted('log_date')
+            error_link_ids = record.build_error_link_ids.sorted(lambda bel: bel.build_id.top_parent.create_batch_id.id)
             if error_link_ids:
                 first_error_link = error_link_ids[0]
                 last_error_link = error_link_ids[-1]
@@ -110,6 +109,32 @@ class BuildErrorSeenMixin(models.AbstractModel):
                 record.first_seen_build_id = first_error_link.build_id
                 record.last_seen_build_id = last_error_link.build_id
                 record.build_count = len(error_link_ids.build_id)
+
+    @api.depends('build_error_link_ids')
+    def _compute_seen_batch(self):
+        from_clause, content_table = self.get_log_dates_from_clause()
+        query = f"""
+            SELECT record.id, bundle.version_id, MIN(batch.id) AS first_batch_id, MAX(batch.id) AS last_batch_id
+            {from_clause}
+            JOIN runbot_build_error_link AS link ON link.error_content_id = {content_table}.id
+            JOIN runbot_build AS build ON link.build_id = build.id
+            JOIN runbot_build_params AS params ON params.id = build.params_id
+            JOIN runbot_batch AS batch ON build.create_batch_id = batch.id
+            JOIN runbot_bundle AS bundle ON bundle.id = batch.bundle_id
+            WHERE record.id IN %s
+            GROUP BY record.id, bundle.version_id
+        """
+        self.env.cr.execute(query, (tuple(self.ids),))
+        first_batch_ids_by_record_id = {}
+        last_batch_ids_by_record_id = {}
+        res = self.env.cr.fetchall()
+        for row in res:
+            record_id, _version_id, first_batch_id, last_batch_id = row
+            first_batch_ids_by_record_id.setdefault(record_id, []).append(first_batch_id)
+            last_batch_ids_by_record_id.setdefault(record_id, []).append(last_batch_id)
+        for record in self:
+            record.first_seen_batch_ids = self.env['runbot.batch'].browse(sorted(first_batch_ids_by_record_id.get(record.id, [])))
+            record.last_seen_batch_ids = self.env['runbot.batch'].browse(sorted(last_batch_ids_by_record_id.get(record.id, [])))
 
     @api.depends('build_error_link_ids')
     def _compute_seen_hash(self):
@@ -128,26 +153,37 @@ class BuildErrorSeenMixin(models.AbstractModel):
             dates = log_date_per_error[error]
             versions = self.env['runbot.bundle'].search([('project_id', '=', project_id), ('sticky', '=', True)]).version_id.sorted(lambda v: (v.sequence, v.number), reverse=True)
             versions_ids = versions.ids
-            y_labels = {version.id: version.number for version in versions}
-            daily_version_freq = dict.fromkeys([date.date() for date in rrule.rrule(rrule.DAILY, dtstart=start_date, until=end_date)])
-            for date in daily_version_freq:
-                daily_version_freq[date] = {version: 0 for version in versions_ids}
+            x_labels = [date.strftime("%Y-%m-%d") for date in rrule.rrule(rrule.DAILY, dtstart=start_date, until=end_date)]
+            y_labels = [version.number for version in versions]
+            x_indexes = {date: idx for idx, date in enumerate(x_labels)}
+            y_indexes = {version_id: idx for idx, version_id in enumerate(versions_ids)}
+            daily_version_freq = []
+            for date in x_labels:
+                daily_version_freq.append([0] * len(y_labels))
             max_count = 0
-            for (date, version), count in dates.items():
-                d = date.date()
-                if d in daily_version_freq and version in daily_version_freq[d]:
-                    c = daily_version_freq[d][version] + count
-                    daily_version_freq[d][version] = c
+            for (date, version_id), count in dates.items():
+                date_str = date.date().strftime("%Y-%m-%d")
+                x_index = x_indexes.get(date_str)
+                y_index = y_indexes.get(version_id)
+                if x_index and y_index:
+                    c = daily_version_freq[x_index][y_index] + count
+                    daily_version_freq[x_index][y_index] = c
                     max_count = max(max_count, c)
 
-            error.graph_history = draw_svg(
-                daily_version_freq, y_labels=y_labels, max_value=max_count, error_id=error.id,
-                category_id=error.first_seen_build_id.create_batch_id.category_id.id if error.first_seen_build_id else 1,
-                project_id=project_id if error.first_seen_build_id else 1,
-            )
-            error.graph_day_of_week_recurence = False
-            error.graph_day_of_month_recurence = False
+            error.history_data = {
+                'versions_ids': versions_ids,
+                'x_labels': x_labels,
+                'y_labels': y_labels,
+                'start_date': start_date.strftime("%Y-%m-%d"),
+                'end_date': end_date.strftime("%Y-%m-%d"),
+                'daily_version_freq': daily_version_freq,
+                'max_count': max_count,
+                'error_id': error.id,
+                'category_id': error.first_seen_build_id.top_parent.params_id.create_batch_id.category_id.id if error.first_seen_build_id else 1,
+                'project_id': project_id if error.first_seen_build_id else 1,
+            }
 
+    @ormcache('tuple(self.ids)', 'start_date', 'end_date')  # not sure that this is a good idea. Could be a stored field recomputed after scanning the errors?
     def _get_log_dates(self, start_date: datetime.datetime, end_date: datetime.datetime):
         """
         Returns an count of build_error per hour for the last 30 days.
@@ -157,11 +193,11 @@ class BuildErrorSeenMixin(models.AbstractModel):
         result = defaultdict(dict)
         if not self._origin.ids:
             return result
-        from_clause, content_field = self.get_log_dates_from_clause()
+        from_clause, content_table = self.get_log_dates_from_clause()
         self.env.cr.execute(f"""
             SELECT record.id as record_id, date_trunc('day', batch.create_date) as time, build.version_id as version_id, count(*) as count
               {from_clause}
-              JOIN runbot_build_error_link AS link ON link.error_content_id = {content_field}.id
+              JOIN runbot_build_error_link AS link ON link.error_content_id = {content_table}.id
               JOIN runbot_build AS build ON link.build_id = build.id
               JOIN runbot_batch AS batch ON build.create_batch_id = batch.id
              WHERE record.id IN %s AND batch.create_date BETWEEN %s AND %s
@@ -241,8 +277,9 @@ class BuildError(models.Model):
     version_ids = fields.Many2many('runbot.version', string='Versions', compute=_compute_related_error_content_ids('version_ids'), search=_search_related_error_content_ids('version_ids'))
     trigger_ids = fields.Many2many('runbot.trigger', string='Triggers', compute=_compute_related_error_content_ids('trigger_ids'), store=True)
     tag_ids = fields.Many2many('runbot.build.error.tag', string='Tags', compute=_compute_related_error_content_ids('tag_ids'), search=_search_related_error_content_ids('tag_ids'))
-
     random = fields.Boolean('Random', compute="_compute_random", store=True)
+
+    disappearing_batch_ids = fields.Many2many('runbot.batch', compute='_compute_disappearing_batch_ids', string='Fixing batches')
 
     @api.constrains('tags_min_version_id', 'tags_max_version_id')
     def _check_min_max_version(self):
@@ -288,6 +325,44 @@ class BuildError(models.Model):
             record.description = record.name
             if record.error_content_ids:
                 record.description = record.error_content_ids[0].content
+
+    def _compute_disappearing_batch_ids(self):
+        # this is really inefficient but should only be used in form view
+        # One search per version where it appeared
+        # an alternative solution could be to do it using a table, fetching all batches after the minimal
+        # last_seen_batches, but it could scale verry bad on old errors
+        for record in self:
+            disappearing_batches_ids = []
+            last_seen_batches = record.last_seen_batch_ids
+            for batch in last_seen_batches:
+                disappearing_batch = self.env['runbot.batch'].search([
+                    ('bundle_id', '=', batch.bundle_id.id),
+                    ('id', '>', batch.id),
+                    ('category_id', '=', batch.category_id.id),
+                    ('state', '=', 'done')], order='id', limit=1)
+                if disappearing_batch:
+                    disappearing_batches_ids.append(disappearing_batch.id)
+            record.disappearing_batch_ids = self.env['runbot.batch'].browse(disappearing_batches_ids)
+
+    def action_appearing_batches(self):
+        self.ensure_one()
+        if not self.first_seen_batch_ids:
+            return
+        ids = ','.join(str(i) for i in self.first_seen_batch_ids.ids)
+        return {
+            'type': 'ir.actions.act_url',
+            'url': f'/runbot/batches/ids/{ids}/{self.id}?title=First%20seen%20batches'
+            }
+
+    def action_disappearing_batches(self):
+        self.ensure_one()
+        if not self.disappearing_batch_ids:
+            return
+        ids = ','.join(str(i) for i in self.disappearing_batch_ids.ids)
+        return {
+            'type': 'ir.actions.act_url',
+            'url': f'/runbot/batches/ids/{ids}/{self.id}?title=Disappearing%20batches',
+        }
 
     def _compute_content(self):
         for record in self:

@@ -6,23 +6,31 @@
                 <div class="container-fluid">
                     <div class="row">
                         <h5>
-                            <t t-esc="category.name"/> batches on <t t-esc="batches_date"/>
-                            <div class="btn-group" role="group">
-                                <a t-att-href="previous_date_url" class="btn btn-sm text-start" title="Previous date"><i class="fa fa-chevron-left"/></a>
-                                <a t-att-href="next_date_url" class="btn btn-sm text-start" title="Next date"><i class="fa fa-chevron-right"/></a>
-                                <t t-set="repo_url_separator" t-value="'?'"/>
-                                <t t-if="diff_versions_filter">
-                                    <t t-set="commit_link_details_url" t-value="commit_link_details_url + '?versions_filter_ids=' + ','.join(map(str, diff_versions_filter.ids))"/>
-                                    <t t-set="repo_url_separator" t-value="'&amp;'"/>
-                                </t>
-                                <t t-if="diff_repos_filter">
-                                    <t t-set="commit_link_details_url" t-value="commit_link_details_url + repo_url_separator + 'repos_filter_ids=' + ','.join(map(str, diff_repos_filter.ids))"/>
-                                </t>
-                                <a t-att-href="commit_link_details_url" class="btn btn-sm text-start" title="Compare all batches with their bases" groups="runbot.group_runbot_advanced_user">
-                                    <i class="fa fa-arrows-v"/>
-                                </a>
-                            </div>
+                            <t t-if="batches_date">
+                                <t t-esc="category.name"/>Batches on <t t-esc="batches_date"/>
+                            </t>
+                            <t t-if="title">
+                                <t t-esc="title"/>
+                            </t>
+                            <t t-if="build_error">
+                                <em>Error <a t-attf-href="/odoo/error/{build_error.id}" t-esc="build_error.id"/></em>
+                            </t>
                         </h5>
+                        <div>
+                            <a t-if="previous_date_url" t-att-href="previous_date_url" class="btn btn-sm text-start" title="Previous date"><i class="fa fa-chevron-left"/></a>
+                            <a t-if="next_date_url" t-att-href="next_date_url" class="btn btn-sm text-start" title="Next date"><i class="fa fa-chevron-right"/></a>
+                            <t t-set="repo_url_separator" t-value="'?'"/>
+                            <t t-if="diff_versions_filter">
+                                <t t-set="commit_link_details_url" t-value="commit_link_details_url + '?versions_filter_ids=' + ','.join(map(str, diff_versions_filter.ids))"/>
+                                <t t-set="repo_url_separator" t-value="'&amp;'"/>
+                            </t>
+                            <t t-if="diff_repos_filter">
+                                <t t-set="commit_link_details_url" t-value="commit_link_details_url + repo_url_separator + 'repos_filter_ids=' + ','.join(map(str, diff_repos_filter.ids))"/>
+                            </t>
+                            <a t-att-href="commit_link_details_url" title="Compare all batches with their bases" groups="runbot.group_runbot_advanced_user">
+                                See diffs <i class="fa fa-arrows-v"/>
+                            </a>
+                        </div>
                         <t t-foreach="batches" t-as="batch">
                             <div class="col-md-1">
                                 <t t-esc="batch.bundle_id.name" />

@@ -34,8 +34,6 @@
               </group>
               <group>
                 <group name="fixer_info" string="Fixing" col="2">
-                  <field name="breaking_pr_id"/>
-                  <field name="breaking_pr_url"  widget="pull_request_url" invisible="not breaking_pr_id"/>
                   <field name="breaking_bundle_url" invisible="not breaking_pr_id"/>
                   <field name="responsible"/>
                   <field name="customer"/>
@@ -50,11 +48,15 @@
                   <field name="trigger_ids" widget="many2many_tags"/>
                   <field name="tag_ids" widget="many2many_tags"/>
                   <field name="random"/>
+                  <field name="breaking_pr_id"/>
+                  <field name="breaking_pr_url"  widget="pull_request_url" invisible="not breaking_pr_id"/>
                   <field name="first_seen_date" widget="frontend_url" options="{'link_field': 'first_seen_build_id'}"/>
                   <field name="last_seen_date" widget="frontend_url" options="{'link_field': 'last_seen_build_id'}"/>
-                  <field name="graph_history"/>
                   <field name="first_seen_build_id" invisible="True"/>
                   <field name="last_seen_build_id" invisible="True"/>
+                  <field name="history_data" widget="history_graph" options="{'cell_size': 13, 'mouse_actions': True}"/>
+                  <button name="action_appearing_batches" string="Appearing Batches" type="object" class="btn btn-primary" invisible="not first_seen_batch_ids"/>
+                  <button name="action_disappearing_batches" string="Disappearing Batches" type="object" class="btn btn-primary" invisible="not disappearing_batch_ids"/>
                 </group>
               </group>
               <group name="test_tags_group" string="Disabling">
@@ -254,7 +256,7 @@
               <field name="fixing_pr_id" optional="hide"/>
               <field name="fixing_pr_alive" optional="hide"/>
               <field name="fixing_pr_url" widget="pull_request_url" text="view PR" readonly="1" invisible="not fixing_pr_url"/>
-              <field name="graph_history" optional="show" width="210px"/>
+              <field name="history_data" widget="history_graph" optional="show" width="210px"/>
           </list>
       </field>
   </record>
@@ -290,7 +292,7 @@
                 <field name="fixing_pr_alive" optional="hide"/>
                 <field name="fixing_pr_url" widget="url" text="view PR" readonly="1" invisible="not fixing_pr_url"/>
                 <field name="fingerprint" optional="hide"/>
-                <field name="graph_history" optional="show" width="210px"/>
+                <field name="history_data" widget="history_graph" optional="show" width="210px"/>
                 <field name="seen_hash" optional="hide"/>
             </list>
         </field>

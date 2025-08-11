@@ -10,7 +10,7 @@ import { useDynamicPlaceholder } from "@web/views/fields/dynamic_placeholder_hoo
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
 import { useInputField } from "@web/views/fields/input_field_hook";
 
-import { useRef, xml, Component, markup } from "@odoo/owl";
+import { useRef, xml, Component, markup, useEffect } from "@odoo/owl";
 import { useAutoresize } from "@web/core/utils/autoresize";
 import { getFormattedValue } from "@web/views/utils";
 
@@ -110,7 +110,7 @@ export class FrontendUrl extends Component {
     _route(fieldName) {
         const model = this.props.record.fields[fieldName].relation || "runbot.unknown";
         const id = this.props.record.data[fieldName][0];
-        if (model.startsWith('runbot.') ) {
+        if (model.startsWith('runbot.')){
             return '/runbot/' + model.split('.')[1] + '/' + id;
         } else {
             return false;
@@ -142,7 +142,7 @@ export class FieldCharFrontendUrl extends Component {
     get route() {
         const model = this.props.record.resModel;
         const id = this.props.record.resId;
-        if (model.startsWith('runbot.') ) {
+        if (model.startsWith('runbot.')) {
             return '/runbot/' + model.split('.')[1] + '/' + id;
         } else {
             return false;
@@ -164,7 +164,7 @@ class PullRequestUrlField extends UrlField {
     `;
     static components = { UrlField }
     get fieldProps() {
-        const props = {...this.props};
+        const props = {...this.props };
         const parts = pullRequestRegex.exec(this.props.record.data[props.name])
         if (parts) {
             props.text = `${parts[1]}#${parts[2]}`;
@@ -180,12 +180,3 @@ registry.category("fields").add("pull_request_url", {
     supportedTypes: ["char"],
     component: PullRequestUrlField,
 });
-
-
-//export class GithubTeamWidget extends CharField {
-
-//this.value.split(',').forEach((value) => {
-//    const href = 'https://github.com/orgs/' + organisation + '/teams/' + value.trim() + '/members';
-//}
-//
-//registry.category("fields").add("github_team", GithubTeamWidget);
