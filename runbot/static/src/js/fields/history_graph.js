@@ -15,6 +15,10 @@ export class HistoryGraph extends Component {
         this.errorId = this.data.error_id;
         this.projectId = this.data.project_id;
         this.categoryId = this.data.category_id;
+        this.breaking_pr_close_date = this.data.breaking_pr_close_date;
+        this.fixing_pr_close_date = this.data.fixing_pr_close_date;
+        this.breaking_pr_version_label = this.data.breaking_pr_version_label;
+        this.fixing_pr_version_label = this.data.fixing_pr_version_label;
         useEffect(() => this.renderErrorGraph());
     }
 
@@ -70,6 +74,21 @@ export class HistoryGraph extends Component {
                     ctx.lineWidth = 2;
                     ctx.strokeRect(posX, posY, cellWidth, cellHeight);
                 }
+
+
+                if (this.fixing_pr_close_date == xLabel && this.fixing_pr_version_label == yLabel) {
+                    console.log(this.fixing_pr_version_label, yLabel)
+                    ctx.fillStyle = "black";
+                    ctx.font = "12px Arial";
+                    ctx.fillText("✓", posX + cellWidth / 2 - 4, posY + cellHeight / 2 + 4);
+                }
+                if (this.breaking_pr_close_date == xLabel && this.breaking_pr_version_label == yLabel) {
+                    ctx.fillStyle = "black";
+                    ctx.font = "12px Arial";
+                    ctx.fillText("✗", posX + cellWidth / 2 - 4, posY + cellHeight / 2 + 4);
+                }
+
+
             });
         });
         console.log(mouseActions)

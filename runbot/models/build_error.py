@@ -149,7 +149,11 @@ class BuildErrorSeenMixin(models.AbstractModel):
         start_date = end_date - relativedelta(days=30)
         log_date_per_error = self._get_log_dates(start_date, end_date)
         for error in self:
+
             project_id = error.first_seen_build_id.params_id.project_id.id
+            breaking_pr_close_date = error.breaking_pr_id.close_date.strftime("%Y-%m-%d") if error.breaking_pr_id.close_date else None
+            fixing_pr_close_date = error.fixing_pr_id.close_date.strftime("%Y-%m-%d") if error.fixing_pr_id.close_date else None
+
             dates = log_date_per_error[error]
             versions = self.env['runbot.bundle'].search([('project_id', '=', project_id), ('sticky', '=', True)]).version_id.sorted(lambda v: (v.sequence, v.number), reverse=True)
             versions_ids = versions.ids
@@ -161,8 +165,16 @@ class BuildErrorSeenMixin(models.AbstractModel):
             for date in x_labels:
                 daily_version_freq.append([0] * len(y_labels))
             max_count = 0
-            for (date, version_id), count in dates.items():
-                date_str = date.date().strftime("%Y-%m-%d")
+            for (bundle_create_date, version_id), count in dates.items():
+                date_str = bundle_create_date.strftime("%Y-%m-%d")
+                # check if the pr close time is after the batch date and move it one day if needed
+                # this should be replaced by checking if the pr is in the batch a more reliable way in, the future
+                if fixing_pr_close_date == date_str and version_id == error.fixing_pr_id.bundle_id.version_id.id and bundle_create_date < error.fixing_pr_id.close_date:
+                    fixing_pr_close_date = (error.fixing_pr_id.close_date + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+                if error.breaking_pr_id.close_date:
+                    breaking_next_day = (error.breaking_pr_id.close_date + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+                    if breaking_next_day == date_str and version_id == error.breaking_pr_id.bundle_id.version_id.id and bundle_create_date < (error.breaking_pr_id.close_date + datetime.timedelta(days=1)):
+                        breaking_pr_close_date = (error.breaking_pr_id.close_date + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
                 x_index = x_indexes.get(date_str)
                 y_index = y_indexes.get(version_id)
                 if x_index is not None and y_index is not None:
@@ -171,6 +183,10 @@ class BuildErrorSeenMixin(models.AbstractModel):
                     max_count = max(max_count, c)
 
             error.history_data = {
+                'breaking_pr_close_date': breaking_pr_close_date,
+                'fixing_pr_close_date': fixing_pr_close_date,
+                'breaking_pr_version_label': error.breaking_pr_id.bundle_id.version_id.number if error.breaking_pr_id else None,
+                'fixing_pr_version_label': error.fixing_pr_id.bundle_id.version_id.number if error.fixing_pr_id else None,
                 'versions_ids': versions_ids,
                 'x_labels': x_labels,
                 'y_labels': y_labels,
@@ -195,7 +211,7 @@ class BuildErrorSeenMixin(models.AbstractModel):
             return result
         from_clause, content_table = self.get_log_dates_from_clause()
         self.env.cr.execute(f"""
-            SELECT record.id as record_id, date_trunc('day', batch.create_date) as time, build.version_id as version_id, count(*) as count
+            SELECT record.id as record_id, max(batch.create_date) as bundle_create_date, build.version_id as version_id, count(*) as count
               {from_clause}
               JOIN runbot_build_error_link AS link ON link.error_content_id = {content_table}.id
               JOIN runbot_build AS build ON link.build_id = build.id
@@ -205,7 +221,7 @@ class BuildErrorSeenMixin(models.AbstractModel):
         """, (tuple(self.ids), start_date, end_date))
         data = self.env.cr.dictfetchall()
         for d in data:
-            result[self.browse(d['record_id'])][d['time'], d['version_id']] = d['count']
+            result[self.browse(d['record_id'])][d['bundle_create_date'], d['version_id']] = d['count']
         return result
 
 def _compute_related_error_content_ids(field_name):
@@ -815,7 +831,8 @@ class BuildErrorContent(models.Model):
     tag_ids = fields.Many2many('runbot.build.error.tag', string='Tags')
     qualifiers = JsonDictField('Qualifiers', index=True)
     similar_ids = fields.One2many('runbot.build.error.content', compute='_compute_similar_ids')
-
+    breaking_pr_id = fields.Many2one('runbot.branch', related='error_id.breaking_pr_id', string='Breaking PR')
+    fixing_pr_id = fields.Many2one('runbot.branch', related='error_id.fixing_pr_id', string='Fixing PR')
     responsible = fields.Many2one(related='error_id.responsible')
     customer = fields.Many2one(related='error_id.customer')
     team_id = fields.Many2one(related='error_id.team_id')
