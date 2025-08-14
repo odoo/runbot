@@ -15,10 +15,8 @@ export class HistoryGraph extends Component {
         this.errorId = this.data.error_id;
         this.projectId = this.data.project_id;
         this.categoryId = this.data.category_id;
-        this.breaking_pr_close_date = this.data.breaking_pr_close_date;
-        this.fixing_pr_close_date = this.data.fixing_pr_close_date;
-        this.breaking_pr_version_label = this.data.breaking_pr_version_label;
-        this.fixing_pr_version_label = this.data.fixing_pr_version_label;
+        this.breaking_pr_close_dates = this.data.breaking_pr_close_dates;
+        this.fixing_pr_close_dates = this.data.fixing_pr_close_dates;
         useEffect(() => this.renderErrorGraph());
     }
 
@@ -32,8 +30,8 @@ export class HistoryGraph extends Component {
         const mouseActions = this.props.mouseActions;
         const cellWidth = cellSize - cellBorder * 2;
         const cellHeight = cellSize - cellBorder * 2;
-        const canvasWidth = this.data.x_labels.length * cellSize + canvasBorder * 2;
-        const canvasHeight = this.data.y_labels.length * cellSize + canvasBorder * 2;
+        const canvasWidth = this.data.date_labels.length * cellSize + canvasBorder * 2;
+        const canvasHeight = this.data.version_labels.length * cellSize + canvasBorder * 2;
         canvas.width = canvasWidth;
         canvas.height = canvasHeight;
 
@@ -54,8 +52,9 @@ export class HistoryGraph extends Component {
         ctx.lineWidth = canvasBorder * 2; // * 2 to account for each side, not only inner width 
         ctx.strokeRect(0, 0, canvasWidth, canvasHeight,);
 
-        this.data.x_labels.forEach((xLabel, idx) => {
-            this.data.y_labels.forEach((yLabel, idy) => {
+        this.data.date_labels.forEach((dateLabel, idx) => {
+            this.data.version_labels.forEach((versionLabel, idy) => {
+                let version_id = this.data.versions_ids[idy]
                 let value = this.data.daily_version_freq[idx][idy] || 0;
                 let cellColor = "white";
                 let cellOpacity = 0;
@@ -76,13 +75,12 @@ export class HistoryGraph extends Component {
                 }
 
 
-                if (this.fixing_pr_close_date == xLabel && this.fixing_pr_version_label == yLabel) {
-                    console.log(this.fixing_pr_version_label, yLabel)
+                if (this.fixing_pr_close_dates[version_id] == dateLabel) {
                     ctx.fillStyle = "black";
                     ctx.font = "12px Arial";
                     ctx.fillText("✓", posX + cellWidth / 2 - 4, posY + cellHeight / 2 + 4);
                 }
-                if (this.breaking_pr_close_date == xLabel && this.breaking_pr_version_label == yLabel) {
+                if (this.breaking_pr_close_dates[version_id] == dateLabel) {
                     ctx.fillStyle = "black";
                     ctx.font = "12px Arial";
                     ctx.fillText("✗", posX + cellWidth / 2 - 4, posY + cellHeight / 2 + 4);
@@ -99,7 +97,7 @@ export class HistoryGraph extends Component {
                     tooltip.remove();
                 }
 
-                const { col, row, value, xLabel, yLabel } = this.getCellFromEvent(event);
+                const { col, row, value, dateLabel, versionLabel } = this.getCellFromEvent(event);
 
                 if ( col >= 0 && row >= 0) {
                     tooltip = document.createElement('div');
@@ -114,8 +112,8 @@ export class HistoryGraph extends Component {
                     tooltip.style.pointerEvents = 'none';
                     tooltip.style.zIndex = 1000;
                     tooltip.innerHTML = `
-                        Date: ${xLabel}
-                        Version: ${yLabel}
+                        Date: ${dateLabel}
+                        Version: ${versionLabel}
                         Value: ${value}
                     `;
                     canvas.parentElement.appendChild(tooltip);
@@ -134,9 +132,9 @@ export class HistoryGraph extends Component {
             };
 
             canvas.onclick = (event) => {
-                const { col, row, value, xLabel, yLabel } = this.getCellFromEvent(event);
+                const { col, row, value, dateLabel, versionLabel } = this.getCellFromEvent(event);
                 if (col >= 0 && row >= 0) {
-                    const url = `/runbot/batches/${this.projectId}/${this.categoryId}/${xLabel}/${this.errorId}`;
+                    const url = `/runbot/batches/${this.projectId}/${this.categoryId}/${dateLabel}/${this.errorId}`;
                     window.open(url, '_blank');
                 }
             }
@@ -149,13 +147,13 @@ export class HistoryGraph extends Component {
         const y = event.clientY - rect.top - 1; // Adjust for canvas border
         const col = Math.floor(x / this.props.cellSize);
         const row = Math.floor(y / this.props.cellSize);
-         if ( col >= 0 && col < this.data.x_labels.length && row >= 0 && row < this.data.y_labels.length) {
+         if ( col >= 0 && col < this.data.date_labels.length && row >= 0 && row < this.data.version_labels.length) {
             const value = this.data.daily_version_freq[col][row] || 0;
-            const xLabel = this.data.x_labels[col];
-            const yLabel = this.data.y_labels[row];
-            return { col, row, value, xLabel, yLabel };
+            const dateLabel = this.data.date_labels[col];
+            const versionLabel = this.data.version_labels[row];
+            return { col, row, value, dateLabel, versionLabel };
         } else {
-            return { col: -1, row: -1, value: 0, xLabel: '', yLabel: '' };
+            return { col: -1, row: -1, value: 0, dateLabel: '', versionLabel: '' };
         }
     }
 }

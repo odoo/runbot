@@ -45,6 +45,9 @@ class Branch(models.Model):
     draft = fields.Boolean('Draft', store=True)
     close_date = fields.Datetime('Close date')
 
+    forwardport_of_id = fields.Many2one('runbot.branch', compute='_compute_forwardport_of_id', string='Forwardport of', store=True, index=True)
+    forwardport_ids = fields.One2many('runbot.branch', 'forwardport_of_id', string='Forwardports')
+
     @api.depends('name', 'remote_id.short_name')
     def _compute_dname(self):
         for branch in self:
@@ -88,6 +91,25 @@ class Branch(models.Model):
             if forced_version and not reference_name.startswith(f'{forced_version.name}-'):
                 reference_name = f'{forced_version.name}---{reference_name}'
             branch.reference_name = reference_name
+
+    @api.depends('pr_body')
+    def _compute_forwardport_of_id(self):
+        r = re.compile(r'Forward-Port-Of: (?:.+/.+)?#(\d+)')
+        base_candidates = {}
+        for branch in self:
+            branch.forwardport_of_id = False
+        for fowardport in self.filtered(lambda b: b.is_pr and (b.pull_head_name or '').endswith('-fw') and 'Forward-Port-Of:' in (b.pr_body or '')):
+            for name in r.findall(fowardport.pr_body):
+                base_candidates.setdefault(name, []).append(fowardport)
+        base_candidates_pr = self.search([('is_pr', '=', True), ('name', 'in', tuple(base_candidates.keys())), ('pull_head_name', '!=', False)])
+        if base_candidates:
+            assert base_candidates_pr
+
+        for pr in base_candidates_pr:
+            for forwardport in base_candidates[pr.name]:
+                rname = re.escape(pr.pull_head_name.split(':')[1])
+                if pr.remote_id == forwardport.remote_id and re.match(rf'^.*-{rname}-\w+-fw$', forwardport.pull_head_name.split(':')[1]):
+                    forwardport.forwardport_of_id = pr
 
     def _update_branch_infos(self, pull_info=None):
         """compute branch_url, pull_head_name and target_branch_name based on name"""

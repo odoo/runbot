@@ -20,8 +20,10 @@
                 <field name="target_branch_name"/>
                 <field name="head"/>
                 <field name="alive"/>
-                <field name="pr_title"/>
-                <field name="pr_body"/>
+                <field name="pr_title" invisible="not is_pr"/>
+                <field name="pr_body" invisible="not is_pr"/>
+                <field name="forwardport_of_id" invisible="not is_pr"/>
+                <field name="forwardport_ids" invisible="not is_pr"/>
               </group>
             </sheet>
           </form>
