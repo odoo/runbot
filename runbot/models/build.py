@@ -968,7 +968,7 @@ class BuildResult(models.Model):
                 build._log("run", message, level='ERROR')
                 build._kill(result='ko')
 
-    def _docker_run(self, step, cmd=None, ro_volumes=None, **kwargs):
+    def _docker_run(self, step, cmd=None, ro_volumes=None, env_variables=None, **kwargs):
         self.ensure_one()
         _ro_volumes = ro_volumes or {}
         ro_volumes = {}
@@ -1024,12 +1024,15 @@ class BuildResult(models.Model):
         build_dir = self._path()
         container_name = self._get_docker_name()
         self.env.flush_all()
+        env_variables = env_variables or []
+        env_variables.append('ODOO_RUNBOT=1')
         def start_docker():
             docker_run(
                 cmd=cmd,
                 container_name=container_name,
                 build_dir=build_dir,
                 log_path=log_path,
+                env_variables=env_variables,
                 ro_volumes=ro_volumes, **kwargs)
         return start_docker
 
