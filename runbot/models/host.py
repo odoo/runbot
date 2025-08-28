@@ -287,8 +287,9 @@ class Host(models.Model):
                     for line in f.readlines():
                         try:
                             json_log = json.loads(line)
+                            faketime_offset = build._get_faketime_offset() or datetime.timedelta()
                             log_data = {
-                                'create_date': datetime.datetime.fromtimestamp(float(json_log['created'])) if json_log.get('created') else datetime.datetime.now(),
+                                'create_date': datetime.datetime.fromtimestamp(float(json_log['created'])) - faketime_offset if json_log.get('created') else datetime.datetime.now(),
                                 'level': str(json_log.get('levelname', 'INFO')),
                                 'name': str(json_log.get('name', '')),
                                 'dbname': str(json_log.get('dbname', '')),
