@@ -583,6 +583,17 @@ class BuildResult(models.Model):
         if reference_parent:
             param_values['reference_build_id'] = self.id
 
+        config_data = param_values.get('config_data', self.params_id.config_data)
+        if "faketime" in config_data:
+            current_offset = config_data.get('faketime_offset', 0)
+            new_offest = current_offset + self.build_time
+            new_config_data = {
+                **config_data,
+                'faketime_offset': new_offest,
+                'faketime': config_data['faketime'],
+            }
+            param_values['config_data'] = new_config_data
+
         return self.create({
             'params_id': self.params_id.copy(param_values).id,
             'parent_id': self.id,
@@ -1444,6 +1455,21 @@ class BuildResult(models.Model):
                     pres.append([f'python{py_version}', '-m', 'pip', 'install', '--progress-bar', 'off', '-r', f'{requirement_path}'])
         return pres
 
+    def _get_faketime_time_datetime(self, step_start_offset=0):
+        self.ensure_one()
+        if faketime_params := self.params_id.config_data.get('faketime'):
+            faketime_offset = self.params_id.config_data.get('faketime_offset', 0)
+            faketime_offset += step_start_offset
+            time_offset = datetime.timedelta(seconds=faketime_offset)
+            return parser.parse(faketime_params, ignoretz=True) + time_offset
+        return None
+
+    def _get_faketime_offset(self):
+        if fake_clock_at_start := self._get_faketime_time_datetime():
+            build_start = self.build_start or self.create_date
+            return fake_clock_at_start - build_start
+        return None
+
     def _cmd(self, python_params=None, py_version=None, local_only=True, sub_command=None, enable_log_db=True):
         """Return a list describing the command to start the build
         """
@@ -1454,20 +1480,16 @@ class BuildResult(models.Model):
 
         pres = self._make_pip_command(py_version)
 
-        faketime = []
-        if faketime_params := self.params_id.config_data.get('faketime'):
-            reference_build = self.params_id.reference_build_id or self.parent_id  # TODO cleanup parent_id
-            if reference_build:
-                parent_time_offset = (reference_build.build_end or self.create_date) - reference_build.build_start
-                faketime_params = (parser.parse(faketime_params) + parent_time_offset).strftime('%Y-%m-%d %H:%M %Z')
-            faketime = ['faketime', faketime_params]
+        command_wrapper = []
+        if faketime_datetime := self._get_faketime_time_datetime(self.build_time):
+            command_wrapper = ['faketime', faketime_datetime.strftime('%Y-%m-%d %H:%M:%S UTC')]
 
         addons_paths = self._get_addons_path()
         (server_commit, server_file) = self._get_server_info()
         server_dir = self._docker_source_folder(server_commit)
 
         # commandline
-        cmd = faketime + ['python%s' % py_version] + python_params + [os.sep.join([server_dir, server_file])]
+        cmd = command_wrapper + ['python%s' % py_version] + python_params + [os.sep.join([server_dir, server_file])]
         if sub_command:
             cmd += [sub_command]
 

@@ -706,26 +706,27 @@ class TestBuildResult(RunbotCase):
         """ test that the faketime command is properly added"""
         self.server_params.config_data = {
             'skip_requirements': True,
-            'faketime': '2024-02-04 02:42 UTC',
+            'faketime': '2024-02-04 02:42:00 UTC',
         }
         self.env.flush_all()
         build = self.Build.create({
             'params_id': self.server_params.id,
         })
         cmd = build._cmd(py_version=3)
-        self.assertIn('faketime "2024-02-04 02:42 UTC" python3 odoo/server.py', str(cmd))
+        self.assertIn('faketime "2024-02-04 02:42:00 UTC" python3 odoo/server.py', str(cmd))
 
         # let's ensure that a time offset is added to a child build
         build.build_start = datetime.datetime(2025, 1, 1, 12, 00)
-        child_build = build._add_child({})
-        child_build.create_date = datetime.datetime(2025, 1, 1, 13, 00)
+        with patch('odoo.addons.runbot.models.build.time') as mock_time:  # ensure build_time has the expected value
+            mock_time.time.return_value = datetime.datetime(2025, 1, 1, 13, 00).timestamp()
+            child_build = build._add_child({})
         child_cmd = child_build._cmd(py_version=3)
-        self.assertIn('faketime "2024-02-04 03:42 UTC" python3 odoo/server.py', str(child_cmd))
+        self.assertIn('faketime "2024-02-04 03:42:00 UTC" python3 odoo/server.py', str(child_cmd))
 
         build.build_end = datetime.datetime(2025, 1, 1, 14, 00)
         second_child = build._add_child({})
         second_child_cmd = second_child._cmd(py_version=3)
-        self.assertIn('faketime "2024-02-04 04:42 UTC" python3 odoo/server.py', str(second_child_cmd))
+        self.assertIn('faketime "2024-02-04 04:42:00 UTC" python3 odoo/server.py', str(second_child_cmd))
 
     def test_format_message(self):
         def get_log(message):
