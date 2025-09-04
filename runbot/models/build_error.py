@@ -232,7 +232,7 @@ class BuildError(models.Model):
     fixing_pr_id = fields.Many2one('runbot.branch', 'Fixing PR', tracking=True, domain=[('is_pr', '=', True)])
     fixing_pr_alive = fields.Boolean('Fixing PR alive', related='fixing_pr_id.alive')
     fixing_pr_url = fields.Char('Fixing PR url', related='fixing_pr_id.branch_url')
-    fixing_bundle_id = fields.Many2one('runbot.bundle', 'Fixing bundle', related='fixing_pr_id.bundle_id', store=True, tracking=True)
+    fixing_bundle_id = fields.Many2one('runbot.bundle', 'Fixing bundle', compute='_compute_fixing_bundle_id', store=True, tracking=True)
     fixing_bundle_url = fields.Char('Fixing bundle url', related='fixing_bundle_id.frontend_url')
     fixing_pr_date = fields.Datetime('Fixing date', related="fixing_pr_id.close_date", help="Date of the merge of the first pr")
 
@@ -312,6 +312,11 @@ class BuildError(models.Model):
             record.description = record.name
             if record.error_content_ids:
                 record.description = record.error_content_ids[0].content
+
+    @api.depends('fixing_pr_id')
+    def _compute_fixing_bundle_id(self):
+        for record in self:
+            record.fixing_bundle_id = record.fixing_pr_id.bundle_id if record.fixing_pr_id else False
 
     def _compute_disappearing_batch_ids(self):
         # this is really inefficient but should only be used in form view
