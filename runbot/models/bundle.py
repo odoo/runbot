@@ -155,7 +155,7 @@ class Bundle(models.Model):
         if self.ids:
             category_id = self.env.context.get('category_id', self.env['ir.model.data']._xmlid_to_res_id('runbot.default_category'))
             self.env.cr.execute("""
-                SELECT bundle.id, ARRAY_AGG(batch.id)
+                SELECT bundle.id, ARRAY_AGG(batch.id ORDER BY batch.id DESC)
                   FROM runbot_bundle bundle
           JOIN LATERAL (
                         SELECT b.id
