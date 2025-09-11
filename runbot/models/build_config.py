@@ -1100,10 +1100,12 @@ class ConfigStep(models.Model):
             return 'ko'
         return 'ok'
 
+
     def _check_module_loaded(self, build):
         log_path = build._path('logs', '%s.txt' % self.name)
         if not grep(log_path, ".modules.loading: Modules loaded."):
-            build._log('_make_tests_results', "Modules loaded not found in logs", level="ERROR")
+            details = build._get_error_tail_message(log_path)
+            build._log('_make_tests_results', f"Modules loaded not found in logs{details}", level="ERROR")
             return 'ko'
         return 'ok'
 
@@ -1127,15 +1129,16 @@ class ConfigStep(models.Model):
     def _check_warning(self, build, regex=None):
         log_path = build._path('logs', '%s.txt' % self.name)
         regex = regex or _re_warning
-        if rfind(log_path, regex):
-            build._log('_make_tests_results', 'Warning found in logs', level="WARNING")
+        if result := rfind(log_path, regex):
+            build._log('_make_tests_results', 'Warning found in logs:\n%s' % '\n'.join(result), level="WARNING")
             return 'warn'
         return 'ok'
 
     def _check_build_ended(self, build):
         log_path = build._path('logs', '%s.txt' % self.name)
         if not grep(log_path, "Initiating shutdown"):
-            build._log('_make_tests_results', 'No "Initiating shutdown" found in logs, maybe because of cpu limit.', level="ERROR")
+            details = build._get_error_tail_message(log_path)
+            build._log('_make_tests_results', f'No "Initiating shutdown" found in logs.{details}', level="ERROR")
             return 'ko'
         return 'ok'
 

@@ -892,8 +892,12 @@ Some post install stuff
         self.assertEqual(self.build.local_result, 'ko')
         self.assertEqual(self.logs, [
             ('INFO', 'Getting results for build %s' % self.build.dest),
-            ('ERROR', 'No "Initiating shutdown" found in logs, maybe because of cpu limit.'),
-        ])
+            ('ERROR', 'No "Initiating shutdown" found in logs.\n'
+   '\n'
+   'Loading stuff\n'
+   'odoo.stuff.modules.loading: Modules loaded.\n'
+   'Some post install stuff\n'
+   '        ')])
 
     def test_make_result_no_loaded(self):
         file_content = """
@@ -905,7 +909,7 @@ Loading stuff
         self.assertEqual(self.build.local_result, 'ko')
         self.assertEqual(self.logs, [
             ('INFO', 'Getting results for build %s' % self.build.dest),
-            ('ERROR', 'Modules loaded not found in logs'),
+            ('ERROR', 'Modules loaded not found in logs\n\nLoading stuff\n'),
         ])
 
     def test_make_result_traceback(self):
@@ -986,7 +990,7 @@ Initiating shutdown
         self.assertEqual(self.build.local_result, 'warn')
         self.assertEqual(self.logs, [
             ('INFO', 'Getting results for build %s' % self.build.dest),
-            ('WARNING', 'Warning found in logs')
+            ('WARNING', 'Warning found in logs:\n2019-12-17 17:34:37,692 17 WARNING ')
         ])
 
         # no log file

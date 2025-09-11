@@ -16,7 +16,7 @@ from pathlib import Path
 from psycopg2 import sql
 from psycopg2.extensions import TransactionRollbackError
 
-from ..common import dt2time, now, grep, local_pgadmin_cursor, s2human, dest_reg, os, list_local_dbs, pseudo_markdown, RunbotException, findall, sanitize, markdown_escape
+from ..common import dt2time, now, grep, local_pgadmin_cursor, dest_reg, os, list_local_dbs, pseudo_markdown, RunbotException, findall, sanitize, markdown_escape, tail
 from ..container import docker_stop, docker_state, Command, docker_run, docker_pull
 from ..fields import JsonDictField
 
@@ -678,6 +678,12 @@ class BuildResult(models.Model):
         self.ensure_one()
         return '%s_%s' % (self.dest, self.active_step.name)
 
+    def _get_error_tail_message(self, log_path):
+        lines = tail(log_path)
+        if not lines:
+            return ''
+        return '\n' + ''.join(lines)
+
     def _init_pendings(self):
         self.ensure_one()
         build = self
@@ -767,7 +773,11 @@ class BuildResult(models.Model):
                     _logger.info('container "%s" seems too take a while to start :%s' % (build._get_docker_name(), build.job_time))
                     return False
                 else:
-                    build._log('_schedule', 'Docker with state %s not started after 60 seconds, skipping' % _docker_state, level='ERROR')
+                    details = build._get_error_tail_message(build._path('logs', '%s.txt' % build.active_step.name))
+                    if not details:
+                        build._log('_schedule', 'Docker with state %s not started after 60 seconds, skipping' % _docker_state, level='ERROR')
+                    else:
+                        build._log('_schedule', 'Docker was likely killed, skipping%s' % details, level='ERROR')
             if self.env['runbot.host']._fetch_local_logs(build_ids=build.ids):
                 return True  # avoid to make results with remaining logs
             # No job running, make result and select next job

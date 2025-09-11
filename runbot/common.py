@@ -65,6 +65,12 @@ def findall(filename, pattern):
     return set(re.findall(pattern, file_open(filename).read()))
 
 
+def tail(filename, n=10):
+    if os.path.isfile(filename):
+        return file_open(filename).readlines()[-n:]
+    return ''
+
+
 def grep(filename, string):
     if os.path.isfile(filename):
         return find(filename, string) != -1

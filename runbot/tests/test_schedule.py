@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import datetime
-from unittest.mock import patch
+from unittest.mock import mock_open, patch
+
 from .common import RunbotCase
 
 
@@ -39,6 +40,8 @@ class TestSchedule(RunbotCase):
 
         self.start_patcher('fetch_local_logs', 'odoo.addons.runbot.models.host.Host._fetch_local_logs', [])  # the local logs have to be empty
         build.write({'docker_start': datetime.datetime.now() - datetime.timedelta(seconds=70)})  # docker never started
-        build._schedule()
+
+        with patch('odoo.addons.runbot.common.file_open', mock_open(read_data='')):
+            build._schedule()
         self.assertEqual(build.local_state, 'done')
         self.assertEqual(build.local_result, 'ko')
