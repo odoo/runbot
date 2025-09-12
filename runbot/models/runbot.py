@@ -1,24 +1,24 @@
-import docker
-import time
-import logging
 import glob
+import logging
 import random
 import re
+import shutil
 import signal
 import subprocess
-import shutil
-
+import time
 from contextlib import contextmanager
+from datetime import datetime
+
+import docker
 from requests.exceptions import HTTPError
-from subprocess import CalledProcessError
+
+from odoo import fields, models
+from odoo.exceptions import UserError
+from odoo.fields import Domain
+from odoo.tools import config, file_open, SQL
 
 from ..common import dest_reg, os, sanitize
 from ..container import docker_ps, docker_stop
-
-from odoo import models, fields
-from odoo.exceptions import UserError
-from odoo.osv import expression
-from odoo.tools import config, file_open
 
 _logger = logging.getLogger(__name__)
 
@@ -137,24 +137,20 @@ class Runbot(models.AbstractModel):
             return []
         non_allocated_domain = [('local_state', '=', 'pending'), ('host', '=', False)]
         if domain:
-            non_allocated_domain = expression.AND([non_allocated_domain, domain])
-        e = expression.expression(non_allocated_domain, self.env['runbot.build'])
-        query = e.query
+            non_allocated_domain = Domain.AND([non_allocated_domain, domain])
+        query = self.env['runbot.build']._search(non_allocated_domain)
         query.order = 'runbot_build.create_batch_id'
-        select_query, select_params = query.select()
-        # self-assign to be sure that another runbot batch cannot self assign the same builds
-        query = """UPDATE
+        self.env.execute_query(SQL("""UPDATE
                         runbot_build
                     SET
-                        host = %%s
+                        host = %s
                     WHERE
                         runbot_build.id IN (
                             %s
                             FOR UPDATE OF runbot_build SKIP LOCKED
-                            LIMIT %%s
+                            LIMIT %s
                         )
-                    RETURNING id""" % select_query
-        self.env.cr.execute(query, [host.name] + select_params + [nb_slots])
+                    RETURNING id""", host.name, query.select(), nb_slots))
         return self.env.cr.fetchall()
 
     def _reload_nginx(self):
@@ -219,7 +215,7 @@ class Runbot(models.AbstractModel):
         runbot_do_schedule = get_param('runbot.runbot_do_schedule')
         host = self.env['runbot.host']._get_current()
         host._set_psql_conn_count()
-        host.last_start_loop = fields.Datetime.now()
+        host.last_start_loop = datetime.now()
         self._commit()
         # Bootstrap
         host._bootstrap()
@@ -240,7 +236,7 @@ class Runbot(models.AbstractModel):
                     time.sleep(update_frequency)
                 self._commit()
 
-            host.last_end_loop = fields.Datetime.now()
+            host.last_end_loop = datetime.now()
 
 
     def _fetch_loop_turn(self, host, pull_info_failures, default_sleep=1):
@@ -299,7 +295,7 @@ class Runbot(models.AbstractModel):
         res = {}
         try:
             yield res
-            host.last_success = fields.Datetime.now()
+            host.last_success = datetime.now()
             self._commit()
         except Exception as e:
             self.env.cr.rollback()

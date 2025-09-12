@@ -27,7 +27,7 @@ import requests
 
 from odoo import models, fields, api
 from odoo.exceptions import UserError
-from odoo.osv import expression
+from odoo.fields import Domain
 from odoo.tools.misc import topological_sort, groupby
 from odoo.addons.base.models.res_partner import Partner
 from odoo.addons.runbot_merge import git, utils
@@ -92,7 +92,7 @@ class Project(models.Model):
         if not ported:
             return
 
-        for feedback in self.env['runbot_merge.pull_requests.feedback'].search(expression.OR(
+        for feedback in self.env['runbot_merge.pull_requests.feedback'].search(Domain.OR(
             [('repository', '=', p.repository.id), ('pull_request', '=', p.number)]
             for p in ported
         )):

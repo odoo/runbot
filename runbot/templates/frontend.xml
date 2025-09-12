@@ -22,7 +22,9 @@
         <div class="container-fluid frontend">
           <div class="row">
             <div class='col-md-12'>
-              <span class="pull-right" t-call="runbot.slots_infos"/>
+              <span  class="pull-right" >
+                <t t-call="runbot.slots_infos"/>
+              </span>
             </div>
             <div class='col-md-12'>
               <div t-if="message" class="alert alert-warning" role="alert">
@@ -116,7 +118,9 @@
               <t t-foreach="batch.slot_ids" t-as="slot">
                 <t t-if="slot.build_id">
                   <div t-if="((not slot.trigger_id.hide and trigger_display is None) or (trigger_display and slot.trigger_id.id in trigger_display)) or slot.build_id.global_result != 'ok'"
-                    t-call="runbot.slot_button" class="slot_container"/>
+                     class="slot_container">
+                    <t t-call="runbot.slot_button"/>  
+                  </div>
                 </t>
               </t>
             </t>

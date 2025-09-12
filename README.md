@@ -94,16 +94,16 @@ You may [add valid ssh key linked to a github account](https://docs.github.com/e
 It is important to clone the repo with the runbot user:
 
 ```bash
-git clone --depth=1 --branch=15.0 git@github.com:odoo/odoo.git
+git clone --depth=1 --branch=19.0 git@github.com:odoo/odoo.git
 git clone git@github.com:odoo/runbot.git
 
-git -C odoo checkout 15.0
-git -C runbot checkout 15.0
+git -C odoo checkout 19.0
+git -C runbot checkout 19.0
 
 mkdir logs
 ```
 
-Note: `--depth=1 --branch=15.0 ` is optionnal but will help to reduce the disc usage for the odoo repo.
+Note: `--depth=1 --branch=19.0 ` is optionnal but will help to reduce the disc usage for the odoo repo.
 
 Finally, check that you have acess to docker, listing the dockers should work without error (but will be empty).
 

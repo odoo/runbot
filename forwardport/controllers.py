@@ -5,7 +5,7 @@ import pathlib
 import werkzeug.urls
 
 from odoo.http import route, request
-from odoo.osv import expression
+from odoo.fields import Domain
 from odoo.addons.runbot_merge.controllers.dashboard import MergebotDashboard
 
 DEFAULT_DELTA = datetime.timedelta(days=7)
@@ -60,7 +60,7 @@ class Dashboard(MergebotDashboard):
             if reviewers:
                 partner_filter.append([(f'reviewed_by{suffix}', '=', arg)])
 
-            source_filter.extend(expression.OR(partner_filter))
+            source_filter.extend(Domain.OR(partner_filter))
 
         outstanding = PullRequests.search([
             ('state', 'in', ['opened', 'validated', 'approved', 'ready', 'error']),

@@ -4,7 +4,7 @@ from markupsafe import Markup
 
 from odoo import api, fields, models
 from odoo.exceptions import AccessError
-from odoo.osv import expression
+from odoo.fields import Domain
 
 _logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class BuildErrorMerge(models.Model):
     def _get_read_group_params(self):
         domain = [('error_active', '=', True)]
         for filter in self.merge_filter_ids:
-            domain = expression.AND([domain, [(filter.field_name, '!=', False)]])
+            domain = Domain.AND([domain, [(filter.field_name, '!=', False)]])
         groups = [merge_filter.field_name for merge_filter in self.merge_filter_ids]
         assert groups
 
@@ -70,7 +70,7 @@ class BuildErrorMerge(models.Model):
         for record in self:
             if all(error_content[f.field_name] for f in record.merge_filter_ids):
                 merge_domain = [(f.field_name, '=', error_content[f.field_name]) for f in record.merge_filter_ids]
-                result = expression.OR([result, merge_domain])
+                result = Domain.OR([result, merge_domain])
         return result
 
     def action_summary(self):

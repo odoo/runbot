@@ -637,7 +637,7 @@ class Repo(models.Model):
 
                 if bundle.last_batch.state != 'preparing':
                     preparing = self.env['runbot.batch'].create({
-                        'last_update': fields.Datetime.now(),
+                        'last_update': datetime.datetime.now(),
                         'bundle_id': bundle.id,
                         'state': 'preparing',
                     })

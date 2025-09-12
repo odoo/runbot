@@ -9,29 +9,24 @@ patch(Message.prototype, {
         this.kept = false;
     },
     isMultiline(trackingValue) {
-        const oldValue = trackingValue.oldValue.value;
-        const newValue = trackingValue.newValue.value;
+        const oldValue = trackingValue.oldValue;
+        const newValue = trackingValue.newValue;
         return ((oldValue && typeof oldValue=== 'string' && oldValue.includes('\n')) && (newValue && typeof oldValue=== 'string' && newValue.includes('\n')))
     },
-    formatTracking(trackingType, trackingValue) {
-        return super.formatTracking(trackingType, trackingValue) 
+    formatTracking(trackingFieldInfo, trackingValue) {
+        return super.formatTracking(trackingFieldInfo, trackingValue) 
     },
     toggleKept() {
         this.kept = !this.kept;
     },
-    copyOldToClipboard(trackingValue) {
+    copyToClipboard(trackingValue) {
         return function () {
-            navigator.clipboard.writeText(trackingValue.oldValue.value);
-        };
-    },
-    copyNewToClipboard(trackingValue) {
-        return function () {
-            navigator.clipboard.writeText(trackingValue.newValue.value);
+            navigator.clipboard.writeText(trackingValue);
         };
     },
     lines(trackingValue) {
-        const oldValue = trackingValue.oldValue.value;
-        const newValue = trackingValue.newValue.value;
+        const oldValue = trackingValue.oldValue;
+        const newValue = trackingValue.newValue;
         const diff = this.makeDiff(oldValue, newValue);
         const lines = this.prepareForRendering(diff);
         return lines;

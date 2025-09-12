@@ -161,7 +161,6 @@ export class HistoryGraph extends Component {
 }
 
 registry.category("fields").add("history_graph", {
-    supportedTypes: ["jsonb"],
     component: HistoryGraph,
     extractProps({ attrs, options }, dynamicInfo) {
         return {

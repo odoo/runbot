@@ -31,13 +31,12 @@
               <separator/>
               <filter string="Single App builds" name="filter_single_app" domain="[('description', '=like', 'Testing module %')]"/>
 
-              <group expand="0" string="Group By">
-                  <filter string="Description" name="group_by_description" context="{'group_by': 'description'}"/>
-                  <filter string="Version" name="group_by_version_id" context="{'group_by': 'version_id'}"/>
-                  <filter string="Trigger" name="group_by_trigger_id" context="{'group_by': 'trigger_id'}"/>
-                  <separator/>
-                  <filter string="Log Date" name="group_by_log_date" context="{'group_by': 'log_date'}"/>
-              </group>
+              <filter string="Description" name="group_by_description" context="{'group_by': 'description'}"/>
+              <filter string="Version" name="group_by_version_id" context="{'group_by': 'version_id'}"/>
+              <filter string="Trigger" name="group_by_trigger_id" context="{'group_by': 'trigger_id'}"/>
+              <separator/>
+              <filter string="Log Date" name="group_by_log_date" context="{'group_by': 'log_date'}"/>
+
           </search>
       </field>
   </record>

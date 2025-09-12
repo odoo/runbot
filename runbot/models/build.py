@@ -49,7 +49,7 @@ def make_selection(array):
 
 class BuildParameters(models.Model):
     _name = 'runbot.build.params'
-    _description = "All information used by a build to run, should be unique and set on create only"
+    _description = "Build parameters"
 
     # on param or on build?
     # execution parametter
@@ -169,7 +169,7 @@ class BuildResult(models.Model):
     # -> commit corresponding to repo of trigger_id5
     # -> display all?
 
-    params_id = fields.Many2one('runbot.build.params', required=True, index=True, auto_join=True)
+    params_id = fields.Many2one('runbot.build.params', required=True, index=True)
     no_auto_run = fields.Boolean('No run')
     # could be a default value, but possible to change it to allow duplicate accros branches
 
@@ -292,7 +292,7 @@ class BuildResult(models.Model):
         max_days_main = int(icp.get_param('runbot.db_gc_days', default=30))
         max_days_child = int(icp.get_param('runbot.db_gc_days_child', default=15))
         for build in self:
-            ref_date = fields.Datetime.from_string(build.job_end or build.create_date or fields.Datetime.now())
+            ref_date = fields.Datetime.from_string(build.job_end or build.create_date or datetime.datetime.now())
             max_days = max_days_main if not build.parent_id else max_days_child
             max_days += int(build.gc_delay if build.gc_delay else 0)
             build.gc_date = ref_date + datetime.timedelta(days=(max_days))
@@ -582,7 +582,7 @@ class BuildResult(models.Model):
             dest_list = [dest for sublist in [dest_by_builds_ids[rem_id] for rem_id in remaining.ids] for dest in sublist]
             _logger.info('(%s) (%s) not deleted because no corresponding build found', label, " ".join(dest_list))
         for build in existing:
-            if build.gc_date < fields.datetime.now():
+            if build.gc_date < datetime.datetime.now():
                 if build.local_state == 'done':
                     for db in dest_by_builds_ids[build.id]:
                         yield db

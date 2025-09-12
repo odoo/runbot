@@ -6,10 +6,14 @@
     'author': "Odoo SA",
     'website': "http://runbot.odoo.com",
     'category': 'Website',
-    'version': '5.12',
+    'version': '5.13',
     'application': True,
     'depends': ['base', 'base_automation', 'website'],
     'data': [
+        'security/runbot_security.xml',
+        'security/ir.model.access.csv',
+        'security/ir.rule.csv',
+
         'data/dockerfile_data.xml',
         'data/build_parse.xml',
         'data/error_link.xml',
@@ -18,9 +22,6 @@
         'data/runbot_error_regex_data.xml',
         'data/website_data.xml',
 
-        'security/runbot_security.xml',
-        'security/ir.model.access.csv',
-        'security/ir.rule.csv',
 
         'templates/utils.xml',
         'templates/badge.xml',

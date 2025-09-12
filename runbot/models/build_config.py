@@ -350,7 +350,7 @@ class ConfigStep(models.Model):
         eval_ctx = self._make_python_ctx(build)
         eval_ctx['force'] = force
         try:
-            safe_eval(self.python_code.strip(), eval_ctx, mode="exec", nocopy=True)
+            safe_eval(self.python_code.strip(), eval_ctx, mode="exec")
             run = eval_ctx.get('run')
             if run and callable(run):
                 return run()
@@ -1044,7 +1044,7 @@ class ConfigStep(models.Model):
 
     def _make_python_results(self, build):
         eval_ctx = self._make_python_ctx(build)
-        safe_eval(self.python_result_code.strip(), eval_ctx, mode="exec", nocopy=True)
+        safe_eval(self.python_result_code.strip(), eval_ctx, mode="exec")
         return_value = eval_ctx.get('return_value', {})
         # todo check return_value or write in try except. Example: local result setted to wrong value
         if not isinstance(return_value, dict):

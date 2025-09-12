@@ -244,7 +244,7 @@ class Bundle(models.Model):
         if self.last_batch.state == 'preparing':
             return
         values = {
-            'last_update': fields.Datetime.now(),
+            'last_update': datetime.datetime.now(),
             'bundle_id': self.id,
             'state': 'preparing',
         }

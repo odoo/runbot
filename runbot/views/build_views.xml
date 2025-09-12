@@ -134,13 +134,12 @@
                 <filter string="Running" name='running' domain="[('global_state','=', 'running')]"/>
                 <filter string="Done" name='done' domain="[('global_state','=','done')]"/>
                 <filter string="Duplicate" name='duplicate' domain="[('local_state','=', 'duplicate')]"/>
-                <group expand="0" string="Group By...">
-                    <filter string="Status" name='status' domain="[]" context="{'group_by':'global_state'}"/>
-                    <filter string="Result" name='result' domain="[]" context="{'group_by':'global_result'}"/>
-                    <filter string="Start" name='start' domain="[]" context="{'group_by':'job_start'}"/>
-                    <filter string="Host" name='host' domain="[]" context="{'group_by':'host'}"/>
-                    <filter string="Create Date" name='create_date' domain="[]" context="{'group_by':'create_date'}"/>
-                </group>
+                <filter string="Status" name='status' domain="[]" context="{'group_by':'global_state'}"/>
+                <filter string="Result" name='result' domain="[]" context="{'group_by':'global_result'}"/>
+                <filter string="Start" name='start' domain="[]" context="{'group_by':'job_start'}"/>
+                <filter string="Host" name='host' domain="[]" context="{'group_by':'host'}"/>
+                <filter string="Create Date" name='create_date' domain="[]" context="{'group_by':'create_date'}"/>
+
             </search>
         </field>
     </record>
