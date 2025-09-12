@@ -78,7 +78,6 @@ export class JsonField extends TextField {
 }
 
 registry.category("fields").add("runbotjsonb", {
-    supportedTypes: ["jsonb"],
     component: JsonField,
 });
 

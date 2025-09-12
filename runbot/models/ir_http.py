@@ -4,7 +4,7 @@ import threading
 
 
 class IrHttp(models.AbstractModel):
-    _inherit = ["ir.http"]
+    _inherit = "ir.http"
 
     @classmethod
     def _dispatch(cls, endpoint):

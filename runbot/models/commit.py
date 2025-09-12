@@ -6,7 +6,7 @@ from ..common import os, RunbotException, make_github_session
 import glob
 import shutil
 
-from odoo import models, fields, api, registry
+from odoo import models, fields, api
 from odoo.tools import file_open
 from odoo.exceptions import ValidationError
 import logging
@@ -38,7 +38,7 @@ class Commit(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if 'date' not in vals:
-                vals['date'] = fields.Datetime.now()
+                vals['date'] = datetime.datetime.now()
         return super().create(vals_list)
 
     def _get_commit_infos(self, sha, repo):
@@ -285,7 +285,7 @@ class CommitStatus(models.Model):
                             ignore_errors=True,
                             session=session
                         )
-                commit_status.sent_date = fields.Datetime.now()
+                commit_status.sent_date = datetime.datetime.now()
             else:
                 _logger.info('Skipping outdated status for %s %s', commit_status.context, commit_status.commit_id.name)
 

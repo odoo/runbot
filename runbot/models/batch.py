@@ -76,7 +76,7 @@ class Batch(models.Model):
     def _new_commit(self, branch, match_type='new'):
         # if not the same hash for repo:
         commit = branch.head
-        self.last_update = fields.Datetime.now()
+        self.last_update = datetime.datetime.now()
         for commit_link in self.commit_link_ids:
             # case 1: a commit already exists for the repo (pr+branch, or fast push)
             if commit_link.commit_id.repo_id == commit.repo_id:
@@ -124,7 +124,7 @@ class Batch(models.Model):
             process_delay = batch.bundle_id.project_id.process_delay
             if batch.state == 'preparing' and (
                 process_delay == 0 or
-                batch.last_update <= fields.Datetime.now() - datetime.timedelta(seconds=process_delay)
+                batch.last_update <= datetime.datetime.now() - datetime.timedelta(seconds=process_delay)
             ):
                 batch._prepare()
                 processed |= batch

@@ -22,7 +22,7 @@ from markupsafe import Markup
 
 from odoo import api, fields, models, tools, Command
 from odoo.exceptions import AccessError, UserError
-from odoo.osv import expression
+from odoo.fields import Domain
 from odoo.tools import html_escape, Reverse, mute_logger
 from . import commands
 from .utils import enum, readonly, dfm
@@ -576,9 +576,9 @@ class PullRequests(models.Model):
             bits.append(['&', ('repository.name', 'ilike', repo), ('number', '=', int(num))])
         else:
             bits.append([('repository.name', 'ilike', name)])
-        domain = expression.OR(bits)
+        domain = Domain.OR(bits)
         if args:
-            domain = expression.AND([args, domain])
+            domain = Domain.AND([args, domain])
         return self.search(domain, limit=limit).sudo().mapped(lambda r: (r.id, r.display_name))
 
     @property

@@ -16,7 +16,7 @@ from collections import OrderedDict
 from datetime import timedelta
 from markupsafe import Markup
 
-from odoo.osv import expression
+from odoo.fields import Domain
 from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT, file_open, html_escape, OrderedSet
 
 _logger = logging.getLogger(__name__)
@@ -372,5 +372,5 @@ class TestTagsParser:
             if exclude_error_id:
                 tag_domain.append(('id', '!=', exclude_error_id))
             search_domains.append(tag_domain)
-        search_domain = expression.OR(search_domains)
+        search_domain = Domain.OR(search_domains)
         return search_domain

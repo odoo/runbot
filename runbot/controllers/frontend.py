@@ -14,7 +14,7 @@ from werkzeug.exceptions import Forbidden, NotFound
 from odoo import fields
 from odoo.http import Controller, Response, request
 from odoo.http import route as o_route
-from odoo.osv import expression
+from odoo.fields import Domain
 
 from odoo.addons.website.controllers.main import QueryURL
 
@@ -30,9 +30,9 @@ def route(routes, **kw):
             more = request.httprequest.cookies.get('more', False) == '1'
             filter_mode = request.httprequest.cookies.get('filter_mode', 'default')
             refresh = kwargs.get('refresh', False)
-            nb_build_errors = request.env['runbot.build.error'].search_count([])
-            nb_assigned_errors = request.env['runbot.build.error'].search_count([('responsible', '=', request.env.user.id)])
-            nb_team_errors = request.env['runbot.build.error'].search_count([('responsible', '=', False), ('team_id', 'in', request.env.user.runbot_team_ids.ids)])
+            nb_build_errors = request.env['runbot.build.error'].sudo().search_count([])
+            nb_assigned_errors = request.env['runbot.build.error'].sudo().search_count([('responsible', '=', request.env.user.id)])
+            nb_team_errors = request.env['runbot.build.error'].sudo().search_count([('responsible', '=', False), ('team_id', 'in', request.env.user.runbot_team_ids.ids)])
             kwargs['more'] = more
             kwargs['projects'] = projects
 
@@ -129,11 +129,10 @@ class Runbot(Controller):
                     res = request.env['runbot.branch'].search([('name', 'in', pr_numbers)])
                     if res:
                         search_domains.append([('id', 'in', res.mapped('bundle_id').ids)])
-                search_domain = expression.OR(search_domains)
-                domain = expression.AND([domain, search_domain])
+                search_domain = Domain.OR(search_domains)
+                domain = Domain.AND([domain, search_domain])
 
-            e = expression.expression(domain, request.env['runbot.bundle'])
-            query = e.query
+            query = request.env['runbot.bundle']._search(domain)
             query.order = """
              (case when "runbot_bundle".sticky then 1 when "runbot_bundle".sticky is null then 2 else 2 end),
                     case when "runbot_bundle".sticky then "runbot_bundle".version_number end collate "C" desc,
@@ -506,7 +505,7 @@ class Runbot(Controller):
         filterby = kwargs.get('filterby', 'not_one')
         if filterby not in searchbar_filters:
             filterby = 'not_one'
-        domain = expression.AND([domain, searchbar_filters[filterby]['domain']])
+        domain = Domain.AND([domain, searchbar_filters[filterby]['domain']])
 
         qctx = {
             'team': team,
@@ -552,9 +551,9 @@ class Runbot(Controller):
         builds = request.env['runbot.build'].with_context(active_test=False)
         if center_build_id:
             builds = builds.search(
-                expression.AND([builds_domain, [('id', '>=', center_build_id)]]),
+                Domain.AND([builds_domain, [('id', '>=', center_build_id)]]),
                 order='id', limit=limit / 2)
-            builds_domain = expression.AND([builds_domain, [('id', '<=', center_build_id)]])
+            builds_domain = Domain.AND([builds_domain, [('id', '<=', center_build_id)]])
             limit -= len(builds)
 
         builds |= builds.search(builds_domain, order='id desc', limit=limit)

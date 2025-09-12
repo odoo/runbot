@@ -175,7 +175,6 @@ class Dockerfile(models.Model):
         if self.parent_id.parent_id:
             raise exceptions.ValidationError('Variants cannot be variants of other variants.')
 
-    @api.returns('self', lambda value: value.id)
     def copy(self, default=None):
         if not default:
             default = {}

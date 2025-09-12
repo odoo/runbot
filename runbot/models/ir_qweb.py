@@ -4,7 +4,7 @@ from odoo.http import request
 
 
 class IrQweb(models.AbstractModel):
-    _inherit = ["ir.qweb"]
+    _inherit = "ir.qweb"
 
     def _prepare_frontend_environment(self, values):
         response = super()._prepare_frontend_environment(values)

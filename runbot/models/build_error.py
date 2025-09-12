@@ -15,7 +15,7 @@ from werkzeug.urls import url_join
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import SQL, lazy, ormcache
-from odoo.osv import expression
+from odoo.fields import Domain
 
 from ..fields import JsonDictField
 from ..common import transactioncache, TestTagsParser
@@ -504,7 +504,7 @@ class BuildError(models.Model):
                 if not (self.env.su or self.env.user.has_groups('runbot.group_runbot_admin')):
                     if build_error.test_tags:
                         raise UserError("This error as a test-tag and can only be (de)activated by admin")
-                    if not vals['active'] and build_error.active and build_error.last_seen_date and build_error.last_seen_date + relativedelta(days=1) > fields.Datetime.now():
+                    if not vals['active'] and build_error.active and build_error.last_seen_date and build_error.last_seen_date + relativedelta(days=1) > datetime.now():
                         raise UserError("This error broke less than one day ago can only be deactivated by admin")
 
         if (responsible_id := vals.get('responsible')):
@@ -854,7 +854,7 @@ class BuildErrorContent(models.Model):
             if not vals.get('error_id'):
                 temp = self.new(vals)  # _get_similar_domain could use any field of the record
                 similar_domain = auto_merge._get_similar_domain(temp)
-                similar_domain = expression.AND([similar_domain, [('error_id.active', '=', True)]])
+                similar_domain = Domain.AND([similar_domain, [('error_id.active', '=', True)]])
                 error_candidates = self.env['runbot.build.error.content'].search(similar_domain, order="id", limit=1)
                 if error_candidates:
                     vals['error_id'] = error_candidates[0].error_id.id

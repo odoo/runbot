@@ -1,5 +1,6 @@
 {
     'name': 'merge bot',
+    'author': "Odoo SA",
     'version': '1.15',
     'depends': ['contacts', 'mail', 'website'],
     'data': [

@@ -56,20 +56,26 @@ class Branch(models.Model):
         for branch in self:
             branch.dname = '%s:%s' % (branch.remote_id.short_name, branch.name)
 
-    def _search_dname(self, operator, value):
+    def _search_dname(self, operator, values):
         # Match format (owner?, repo, branch)
-        owner = repo = branch = None
-        if (m := re.match(r'(?:([\w-]+)/)?([\w-]+)[:#]([\w\.-]+)', value)):
-            owner, repo, branch = m.groups()
-        # Match PR url format
-        if (m := re.search(r'/([\w-]+)/([\w-]+)/pull/(\d+)', value)):
-            owner, repo, branch = m.groups()
-        if repo and branch:
-            domain = [('name', operator, branch), ('remote_id.repo_name', '=', repo)]
-            if owner:
-                domain.append(('remote_id.owner', '=', owner))
-            return domain
-        return [('name', operator, value)]
+        if operator != 'in':
+            return [('name', operator, values)]
+        domains = []
+        for value in values:
+            owner = repo = branch = None
+            if (m := re.match(r'(?:([\w-]+)/)?([\w-]+)[:#]([\w\.-]+)', value)):
+                owner, repo, branch = m.groups()
+            # Match PR url format
+            if (m := re.search(r'/([\w-]+)/([\w-]+)/pull/(\d+)', value)):
+                owner, repo, branch = m.groups()
+            if repo and branch:
+                domain = [('name', operator, branch), ('remote_id.repo_name', '=', repo)]
+                if owner:
+                    domain.append(('remote_id.owner', '=', owner))
+                domains.append(domain)
+            else:
+                domains.append([('name', operator, value)])
+        return fields.Domain.OR(domains)
 
     @api.depends('name', 'is_pr', 'target_branch_name', 'pull_head_name', 'pull_head_remote_id')
     def _compute_reference_name(self):

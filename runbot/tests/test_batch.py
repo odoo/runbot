@@ -1,6 +1,4 @@
-from datetime import timedelta
-
-from odoo import fields
+from datetime import datetime, timedelta
 
 from .common import RunbotCase
 
@@ -15,7 +13,7 @@ class TestBatch(RunbotCase):
         batch._process()
         self.assertEqual(batch.state, 'preparing')
 
-        batch.last_update = fields.Datetime.now() - timedelta(seconds=120)
+        batch.last_update = datetime.now() - timedelta(seconds=120)
         batch._process()
         self.assertEqual(batch.state, 'ready')
 
@@ -29,7 +27,7 @@ class TestBatch(RunbotCase):
             })
             branch.head = commit
             batch = self.env['runbot.batch'].create({
-                'last_update': fields.Datetime.now(),
+                'last_update': datetime.now(),
                 'bundle_id': branch.bundle_id.id,
                 'state': 'preparing',
             })
