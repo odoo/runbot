@@ -10,13 +10,10 @@ class ResUsers(models.Model):
     runbot_team_ids = fields.Many2many('runbot.team', string="Runbot Teams")
     github_login = fields.Char('Github account')
 
-    _sql_constraints = [
-        (
-            "github_login_unique",
-            "unique (github_login)",
-            "Github login can only belong to one user",
-        )
-    ]
+    _github_login_unique = models.Constraint(
+        'unique (github_login)',
+        "Github login can only belong to one user",
+    )
 
     @property
     def SELF_WRITEABLE_FIELDS(self):

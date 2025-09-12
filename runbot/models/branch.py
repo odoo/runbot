@@ -14,7 +14,10 @@ class Branch(models.Model):
     _order = 'name'
     _rec_name = 'dname'
 
-    _sql_constraints = [('branch_repo_uniq', 'unique (name,remote_id)', 'The branch must be unique per repository !')]
+    _branch_repo_uniq = models.Constraint(
+        'unique (name,remote_id)',
+        "The branch must be unique per repository !",
+    )
 
     name = fields.Char('Name', required=True)
     remote_id = fields.Many2one('runbot.remote', 'Remote', required=True, ondelete='cascade', index=True)

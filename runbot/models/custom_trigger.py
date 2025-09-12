@@ -15,13 +15,10 @@ class BundleTriggerCustomization(models.Model):
     extra_params = fields.Char("Custom parameters")
     config_data = JsonDictField("Config data")
 
-    _sql_constraints = [
-        (
-            "bundle_custom_trigger_unique",
-            "unique (bundle_id, trigger_id)",
-            "Only one custom trigger per trigger per bundle is allowed",
-        )
-    ]
+    _bundle_custom_trigger_unique = models.Constraint(
+        'unique (bundle_id, trigger_id)',
+        "Only one custom trigger per trigger per bundle is allowed",
+    )
 
 class CustomTriggerWizard(models.TransientModel):
     _name = 'runbot.trigger.custom.wizard'

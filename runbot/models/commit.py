@@ -18,13 +18,10 @@ class Commit(models.Model):
     _name = 'runbot.commit'
     _description = "Commit"
 
-    _sql_constraints = [
-        (
-            "commit_unique",
-            "unique (name, repo_id, rebase_on_id)",
-            "Commit must be unique to ensure correct duplicate matching",
-        )
-    ]
+    _commit_unique = models.Constraint(
+        'unique (name, repo_id, rebase_on_id)',
+        "Commit must be unique to ensure correct duplicate matching",
+    )
     name = fields.Char('SHA')
     tree_hash = fields.Char('Tree hash', readonly=True)
     repo_id = fields.Many2one('runbot.repo', string='Repo group')

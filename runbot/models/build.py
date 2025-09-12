@@ -81,9 +81,10 @@ class BuildParameters(models.Model):
 
     slot_ids = fields.One2many('runbot.batch.slot', 'params_id')
 
-    _sql_constraints = [
-        ('unique_fingerprint', 'unique (fingerprint)', 'avoid duplicate params'),
-    ]
+    _unique_fingerprint = models.Constraint(
+        'unique (fingerprint)',
+        "avoid duplicate params",
+    )
 
     # @api.depends('version_id', 'project_id', 'extra_params', 'config_id', 'config_data', 'modules', 'commit_link_ids', 'builds_reference_ids')
     def _compute_fingerprint(self):

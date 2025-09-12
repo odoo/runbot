@@ -529,7 +529,7 @@ class Runbot(Controller):
         }
         return request.render('runbot.dashboard_page', qctx)
 
-    @route(['/runbot/stats/'], type='json', auth="public", website=False, sitemap=False)
+    @route(['/runbot/stats/'], type='jsonrpc', auth="public", website=False, sitemap=False)
     def stats_json(self, bundle_id=False, trigger_id=False, key_category='', center_build_id=False, ok_only=False, limit=100, search=None, **post):
         """ Json stats """
         trigger_id = trigger_id and int(trigger_id)
