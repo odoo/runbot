@@ -1,7 +1,7 @@
 import datetime
 import functools
 import logging
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from urllib.parse import urlsplit
 
 import werkzeug
@@ -760,3 +760,25 @@ class Runbot(Controller):
             'builds_by_batch_id': builds_by_batch_id,
             'category': request.env['runbot.category'].browse(category_id),
         })
+
+    @route([
+        '/runbot/commitmatch/<model("runbot.commit"):commit>',
+        '/runbot/commitmatch/<string(minlength=6, maxlength=40):commit_hash>',
+        '/runbot/commitmatch/<model("runbot.project"):project>/<model("runbot.commit"):commit>',
+        '/runbot/commitmatch/<model("runbot.project"):project>/<string(minlength=6, maxlength=40):commit_hash>',
+        ], type='http', auth="public", website=False, sitemap=False)
+    def matching_commits(self, commit=None, commit_hash=None, project=False, projects=False, **kwargs):
+        project = project if project else projects[0]
+        if commit_hash:
+            commit = request.env['runbot.commit'].search([('name', '=like', f'{commit_hash}%')], limit=1)
+            if not commit.exists():
+                raise NotFound()
+        commit_links = request.env['runbot.commit.link'].search([('commit_id', '=', commit.id)])
+        if not commit_links:
+            raise NotFound()
+        batches = request.env['runbot.batch'].search([('commit_link_ids', 'in', commit_links.ids), ('bundle_id.project_id', '=', project.id)], order='id desc')
+        res = defaultdict(dict)
+        for batch in batches:
+            for commit_link in batch.commit_link_ids:
+                res[batch.id].update({commit_link.commit_id.repo_id.name: commit_link.commit_id.name})
+        return request.make_json_response(res)
