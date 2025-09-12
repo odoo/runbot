@@ -46,9 +46,10 @@ class BuildErrorLink(models.Model):
     description = fields.Char(related='build_id.description')
     build_url = fields.Char(related='build_id.build_url')
 
-    _sql_constraints = [
-        ('error_build_rel_unique', 'UNIQUE (build_id, error_content_id)', 'A link between a build and an error must be unique'),
-    ]
+    _error_build_rel_unique = models.Constraint(
+        'UNIQUE (build_id, error_content_id)',
+        "A link between a build and an error must be unique",
+    )
 
 class BuildErrorSeenMixin(models.AbstractModel):
     _name = 'runbot.build.error.seen.mixin'

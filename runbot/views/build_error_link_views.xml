@@ -25,9 +25,9 @@
               <field name="version_id"/>
               <field name="trigger_id"/>
 
-              <filter string="Today" name="filter_today" domain="[('log_date', '&gt;', (context_today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d'))]"/>
-              <filter string="Last 7 days" name="filter_week" domain="[('log_date', '&gt;', (context_today() - datetime.timedelta(days=7)).strftime('%Y-%m-%d'))]"/>
-              <filter string="Last 15 days" name="filter_2weeks" domain="[('log_date', '&gt;', (context_today() - datetime.timedelta(days=15)).strftime('%Y-%m-%d'))]"/>
+              <filter string="Today" name="filter_today" domain="[('log_date', '&gt;', 'today -1d')]"/>
+              <filter string="Last 7 days" name="filter_week" domain="[('log_date', '&gt;', 'today -7d')]"/>
+              <filter string="Last 15 days" name="filter_2weeks" domain="[('log_date', '&gt;', 'today -15d')]"/>
               <separator/>
               <filter string="Single App builds" name="filter_single_app" domain="[('description', '=like', 'Testing module %')]"/>
 

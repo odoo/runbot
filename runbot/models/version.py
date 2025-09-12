@@ -26,10 +26,14 @@ class Version(models.Model):
 
     dockerfile_id = fields.Many2one('runbot.dockerfile', default=lambda self: self.env['runbot.version'].search([('name', '=', 'master')], limit=1).dockerfile_id or self.env.ref('runbot.docker_default', raise_if_not_found=False))
 
-    _sql_constraints = [
-        ('unique_name', 'unique (name)', 'avoid duplicate name'),
-        ('unique_number', 'unique (number)', 'avoid duplicate number'),
-    ]
+    _unique_name = models.Constraint(
+        'unique (name)',
+        "avoid duplicate name",
+    )
+    _unique_number = models.Constraint(
+        'unique (number)',
+        "avoid duplicate number",
+    )
 
     @api.constrains("name")
     def _check_match_is_base(self):
