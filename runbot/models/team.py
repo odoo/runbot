@@ -22,6 +22,7 @@ class RunbotTeam(models.Model):
     _inherit = 'mail.thread'
 
     name = fields.Char('Team', required=True)
+    active = fields.Boolean('Active', default=True)
     project_id = fields.Many2one('runbot.project', 'Project', help='Project to monitor', required=True,
                                  default=lambda self: self.env.ref('runbot.main_project'))
     organisation = fields.Char('organisation', related="project_id.organisation")

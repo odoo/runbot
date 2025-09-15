@@ -288,9 +288,6 @@ class Branch(models.Model):
 
         if was_alive and not self.alive:
             self.close_date = self.env.cr.now()
-            if self.bundle_id.for_next_freeze:
-                if not any(branch.alive and branch.is_pr for branch in self.bundle_id.branch_ids):
-                    self.bundle_id.for_next_freeze = False
 
         if (not self.draft and was_draft) or (self.alive and not was_alive) or (self.target_branch_name != init_target_branch_name and self.alive):
             self.bundle_id._force()

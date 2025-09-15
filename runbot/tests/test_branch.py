@@ -1,5 +1,6 @@
-# -*- coding: utf-8 -*-
+from odoo.tests.common import new_test_user
 from odoo.tools import mute_logger
+
 from .common import RunbotCase, RunbotCaseMinimalSetup
 
 
@@ -300,3 +301,43 @@ class TestBranchIsBase(RunbotCaseMinimalSetup):
             'head': mistaken_commit.id
         })
         self.assertEqual(branch_mistake_dev.bundle_id, dummy_bundle, "A branch matching the is_base_regex should on a secondary repo should goes in dummy bundle")
+
+
+class TestBundleTeam(RunbotCase):
+
+    def test_bundle_team_attribution(self):
+        self.stop_patcher('isfile')
+        self.stop_patcher('isdir')  # needed to create the user avatar
+        create_context = {'no_reset_password': True, 'mail_create_nolog': True, 'mail_create_nosubscribe': True, 'mail_notrack': True}
+        test_user = new_test_user(self.env, login='testrunbot', name='testrunbot (tru)', context=create_context)
+
+        team = self.env['runbot.team'].create({
+            'name': 'Test Team',
+            'project_id': self.project.id,
+        })
+
+        team.user_ids += test_user
+
+        branch = self.Branch.create({
+            'remote_id': self.remote_server_dev.id,
+            'name': 'saas-19.1-test-tru',
+            'is_pr': False,
+        })
+
+        module = self.env['runbot.module'].create({'name': 'test_module'})
+        self.env['runbot.module.ownership'].create({
+            'module_id': module.id,
+            'team_id': team.id,
+        })
+
+        bundle = self.env['runbot.bundle'].search([('name', '=', branch.name)])
+        self.assertEqual(bundle.team_id, team)
+
+        # now test that a team can be manually set on a bundle
+        other_team = self.env['runbot.team'].create({
+            'name': 'Another Test Team',
+            'project_id': self.project.id,
+        })
+
+        bundle.team_id = other_team
+        self.assertEqual(bundle.team_id, other_team)

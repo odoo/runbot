@@ -1,7 +1,7 @@
 import datetime
 import functools
 import logging
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from subprocess import CalledProcessError
 from urllib.parse import urlsplit
 
@@ -79,7 +79,7 @@ class Runbot(Controller):
             '/runbot',
             '/runbot/<model("runbot.project"):project>',
             '/runbot/<model("runbot.project"):project>/search/<search>'], website=True, auth='public', type='http')
-    def bundles(self, project=None, search='', refresh=False, for_next_freeze=False, limit=40, has_pr=None, **kwargs):
+    def bundles(self, project=None, search='', refresh=False, limit=40, has_pr=None, **kwargs):
         search = search if len(search) < 60 else search[:60]
         env = request.env
         categories = env['runbot.category'].search([])
@@ -113,9 +113,6 @@ class Runbot(Controller):
                 domain.append(('sticky', '=', False))
             elif filter_mode == 'default' and not search:
                 domain.append(('sticky', '=', True))
-
-            if for_next_freeze:
-                domain.append(('for_next_freeze', '=', True))
 
             if search:
                 search_domains = []
@@ -871,3 +868,29 @@ class Runbot(Controller):
             for bundle in bundles
         }
         return request.make_json_response(last_batches_infos)
+
+    @route([
+        '/runbot/bundle/tag/<model("runbot.bundle.tag"):bundle_tag_id>',
+        '/runbot/<model("runbot.project"):project>/bundle/tag/<model("runbot.bundle.tag"):bundle_tag_id>',
+        ], type="http", auth="user", website=True, sitemap=False)
+    def bundles_by_tag(self, bundle_tag_id=None, project=None, **kwargs):
+        projects = self.env['runbot.project'].search([('hidden', '=', False)])
+        if not project and projects:
+            project = projects[0]
+        bundles_by_team = defaultdict(list)
+        nb_bundles = 0
+        nb_bundles_done = 0
+        for bundle in self.env['runbot.bundle'].search([('tag_ids', 'in', bundle_tag_id.id)]):
+            bundles_by_team[bundle.team_id.name or 'No Team Defined'].append(bundle)
+            nb_bundles += 1
+            bundle_prs = bundle.branch_ids.filtered(lambda rec: rec.is_pr)
+            if any(bundle_prs) and not any(bundle_prs.mapped('alive')):
+                nb_bundles_done += 1
+
+        qctx = {
+            'tag': bundle_tag_id,
+            'bundles_by_team': bundles_by_team,
+            'nb_bundles': nb_bundles,
+            'nb_bundles_done': nb_bundles_done,
+        }
+        return request.render('runbot.bundles_by_tag', qctx)

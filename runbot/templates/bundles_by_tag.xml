@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <template id="runbot.bundle_tag_slot">
+            <t t-set="link_class" t-value="'link-primary'"/>
+            <t t-set="link_title" t-value="bundle.name"/>
+            <t t-if="not any(bundle.branch_ids.filtered(lambda rec: rec.is_pr))">
+                <t t-set="link_class" t-value="'link-danger'"/>
+                <t t-set="link_title" t-value="'No PR yet'"/>
+            </t>
+            <t t-elif="not any(bundle.branch_ids.filtered(lambda rec: rec.is_pr).mapped('alive'))">
+                <t t-set="link_class" t-value="'link-success text-decoration-line-through'"/>
+                <t t-set="link_title" t-value="'All PR are closed'"/>
+                <t t-set="done" t-value="True"/>
+            </t>
+            <t t-call="runbot.branch_github_menu">
+                <t t-set="btn_classes" t-value="'btn btn-link btn-ssm'"/>
+            </t>
+            <a t-out="bundle.description or bundle.name" t-attf-href="/runbot/bundle/{{bundle.id}}" t-att-class="link_class" t-att-title="link_title" target="_blank"/>
+            <t t-set="other_tags" t-value="bundle.tag_ids.filtered(lambda rec: rec != tag)"/>
+            <t t-foreach="other_tags" t-as="other_tag">
+                <span class="badge rounded-pill text-bg-success"><t t-out="other_tag.name"/></span>
+            </t>
+            <t t-if="not done">
+                <span t-attf-class="badge text-bg-info" data-toggle="tooltip" title="Last batch age">
+                    <t t-out="bundle.last_batch._get_formated_age()"/>
+                </span>
+            </t>
+        </template>
+        <template id="runbot.bundles_by_tag">
+            <t t-call='runbot.layout'>
+                <div class="container-fluid">
+                    <h1 class="text-capitalize">
+                        <t t-out="tag.name"/>
+                        <button type="button" class="btn btn-primary btn-ssm disabled"><t t-out="nb_bundles_done"/> / <t t-out="nb_bundles"/></button>
+                    </h1>
+                    <t t-foreach="sorted(bundles_by_team.keys())" t-as="team">
+                        <t t-set="team_bundles" t-value="bundles_by_team.get(team)"/>
+                        <details t-att-open="bool(team_bundles) and ''"><summary t-out="team"/>
+                            <ul>
+                                <t t-foreach="team_bundles" t-as="bundle">
+                                    <li><t t-call="runbot.bundle_tag_slot"/></li>
+                                </t>
+                            </ul>
+                        </details>
+                    </t>
+                </div>
+            </t>
+        </template>
+    </data>
+</odoo>

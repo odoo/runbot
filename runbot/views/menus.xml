@@ -11,6 +11,7 @@
     <menuitem name="Commits" id="runbot_menu_commit_tree" parent="menu_objects" sequence="50" action="open_view_commit_tree"/>
     <menuitem name="Commit Links" id="runbot_menu_commit_link_tree" parent="menu_objects" sequence="55" action="open_view_commit_links_tree"/>
     <menuitem  id="runbot_menu_bundle_custom_trigger" parent="menu_objects" sequence="70" action="action_bundle_custom_trigger"/>
+    <menuitem name="Bundle Tags" id="menu_bundle_tag" action="action_bundle_tag" parent="menu_objects" sequence="80"/>
 
     <menuitem name="Hosts" id="runbot_menu_host_tree" parent="runbot_menu_root" sequence="300" action="open_view_host_tree" groups="runbot.group_runbot_admin"/>
 

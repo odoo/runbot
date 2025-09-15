@@ -5,6 +5,10 @@
         <field name="model">runbot.team</field>
         <field name="arch" type="xml">
           <form>
+            <header>
+              <button name="action_unarchive" string="Unarchive" type="object" invisible="active"/>
+              <button name="action_archive" string="Archive" type="object" invisible="not active"/>
+            </header>
             <sheet>
               <group name="team_group">
                 <field name="name"/>

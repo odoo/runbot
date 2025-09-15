@@ -1,11 +1,8 @@
-import time
-import logging
 import datetime
-import subprocess
+import re
 
 from collections import defaultdict
 from odoo import models, fields, api, tools
-from ..common import dt2time, s2human_long
 
 
 class Bundle(models.Model):
@@ -58,7 +55,9 @@ class Bundle(models.Model):
     frontend_url = fields.Char("Frontend URL", compute="_compute_frontend_url")
 
     # extra_info
-    for_next_freeze = fields.Boolean('Should be in next freeze')
+    description = fields.Char('Description', compute='_compute_description', store=True, readonly=False)
+    tag_ids = fields.Many2many('runbot.bundle.tag', string='Tags')
+    team_id = fields.Many2one('runbot.team', compute='_compute_team_id', store=True, readonly=False)
 
     def _compute_frontend_url(self):
         for bundle in self:
@@ -212,6 +211,23 @@ class Bundle(models.Model):
                 parent_bundle = self.env['runbot.bundle'].search([('name', '=', targets.pop())])
                 bundle.all_trigger_custom_ids = parent_bundle.all_trigger_custom_ids
 
+    @api.depends('name')
+    def _compute_team_id(self):
+        ngram_re = re.compile(r'.+\((?P<ngram>[a-z]{2,4})\)$')
+        team_by_ngram_project = dict()
+        for team in self.env['runbot.team'].search([('module_ownership_ids', '!=', False)]):
+            for user in team.user_ids:
+                if m := ngram_re.match(user.name.lower()):
+                    team_by_ngram_project[m.group('ngram'), team.project_id] = team
+        for bundle in self.filtered_domain([('is_base', '=', False)]):
+            bundle_ngram = bundle.name.split('-')[-1].lower()
+            bundle.team_id = team_by_ngram_project.get((bundle_ngram, bundle.project_id))
+
+    @api.depends('branch_ids')
+    def _compute_description(self):
+        for bundle in self:
+            bundle.description = ' / '.join(set(bundle.branch_ids.filtered(lambda rec: rec.is_pr and rec.pr_title).mapped('pr_title')))
+
     def _url(self):
         self.ensure_one()
         return "/runbot/bundle/%s" % self.id
@@ -310,3 +326,12 @@ class Bundle(models.Model):
             'default_number_build': 0,
         }
         return self._generate_custom_trigger_action(context)
+
+
+class BundleTag(models.Model):
+
+    _name = "runbot.bundle.tag"
+    _description = "Bundle tag"
+
+    name = fields.Char(string='Bundle Tag')
+    bundle_ids = fields.Many2many('runbot.bundle', string='Bundles')
