@@ -2304,6 +2304,37 @@ class Stagings(models.Model):
         })
         return True
 
+    def recombine_remaining_after_culprit(self, culprit_pr):
+        """Regroup remaining active batches on the target into a single split,
+        excluding the culprit batch (single-batch path).
+        """
+        self.ensure_one()
+        culprit_batch = self.batch_ids[:1]
+
+        Split = self.env['runbot_merge.split']
+        extant_splits = Split.search([
+            ('target', '=', self.target.id),
+        ])
+        if not extant_splits:
+            _logger.info("No extant splits on target %s; skipping recombine", self.target.name)
+            return False
+
+        candidate_batches = extant_splits.mapped('batch_ids').filtered(lambda b: b.id != culprit_batch.id and b.active)
+        if len(candidate_batches) <= 1:
+            _logger.info("Nothing to recombine (remaining=%s) on %s after culprit %s",
+                         len(candidate_batches), self.target.name, culprit_pr.display_name)
+            return False
+        extant_splits.unlink()
+        new_split = Split.create({
+            'target': self.target.id,
+            'source_id': (self.parent_id or self).id,
+            'batch_ids': [Command.link(b.id) for b in candidate_batches],
+        })
+        _logger.info(
+            "Recombined %d batches after culprit %s into split %s (target=%s)",
+            len(candidate_batches), culprit_pr.display_name, new_split, self.target.name
+        )
+
     def try_splitting(self):
         batches = len(self.batch_ids)
         if batches > 1:
@@ -2357,11 +2388,12 @@ class Stagings(models.Model):
                 viewmore = ' (view more at %(target_url)s)' % status
             if pr:
                 self.fail("%s%s" % (reason, viewmore), pr)
+                self.recombine_remaining_after_culprit(pr)
             else:
                 self.fail('%s on %s%s' % (reason, head.commit_id.sha, viewmore))
             return False
 
-        # the staging failed but we don't have a specific culprit, fail
+        # the staging failed, but we don't have a specific culprit, fail
         # everything
         self.fail("unknown reason")
 
@@ -2527,6 +2559,7 @@ class Stagings(models.Model):
 
 class Split(models.Model):
     _name = _description = 'runbot_merge.split'
+    _order = 'id desc'
 
     target = fields.Many2one('runbot_merge.branch', required=True)
     source_id = fields.Many2one('runbot_merge.stagings', required=True)
