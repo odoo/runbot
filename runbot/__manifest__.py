@@ -50,7 +50,6 @@
         'views/config_views.xml',
         'views/dashboard_views.xml',
         'views/dockerfile_views.xml',
-        'views/error_log_views.xml',
         'views/host_views.xml',
         'views/repo_views.xml',
         'views/res_config_settings_views.xml',
