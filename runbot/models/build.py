@@ -1181,6 +1181,9 @@ class BuildResult(models.Model):
                 command.add_config_tuple("http_interface", "127.0.0.1")
             elif grep(config_path, "--xmlrpc-interface"):
                 command.add_config_tuple("xmlrpc_interface", "127.0.0.1")
+        else:
+            if grep(config_path, "--http-interface"):
+                command.add_config_tuple("http_interface", "0.0.0.0")
 
         if enable_log_db:
             log_db = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
