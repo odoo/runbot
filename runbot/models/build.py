@@ -712,7 +712,10 @@ class BuildResult(models.Model):
                 gcstamp = build_dir / '.gcstamp'
                 for bdir_file in build_dir.iterdir():
                     if bdir_file.is_dir() and bdir_file.name not in ('logs', 'tests'):
-                        shutil.rmtree(bdir_file)
+                        try:
+                            shutil.rmtree(bdir_file)
+                        except Exception:
+                            _logger.exception('Failed to remove %s', bdir_file)
                     elif bdir_file.name == 'logs':
                         for log_file_path in bdir_file.iterdir():
                             if log_file_path.is_dir():
