@@ -44,6 +44,20 @@ COPY_WHITELIST = [
 USERUID = os.getuid()
 USERNAME = getpass.getuser()
 
+
+def remove_readonly(func, path_str, exinfo):
+    if isinstance(exinfo, PermissionError):
+        f = Path(path_str)
+        perm = f.stat().st_mode | 0o00600
+        f.chmod(perm)
+        try:
+            pperm = f.parent.stat().st_mode | 0o00700
+            f.parent.chmod(pperm)
+        except PermissionError:
+            _logger.warning("Cannot change permission on parent dir: %s", f.parent)
+        func(path_str)
+
+
 def make_selection(array):
     return [(elem, elem.replace('_', ' ').capitalize()) if isinstance(elem, str) else elem for elem in array]
 
@@ -713,13 +727,16 @@ class BuildResult(models.Model):
                 for bdir_file in build_dir.iterdir():
                     if bdir_file.is_dir() and bdir_file.name not in ('logs', 'tests'):
                         try:
-                            shutil.rmtree(bdir_file)
+                            shutil.rmtree(bdir_file, onexc=remove_readonly)
                         except Exception:
                             _logger.exception('Failed to remove %s', bdir_file)
                     elif bdir_file.name == 'logs':
                         for log_file_path in bdir_file.iterdir():
                             if log_file_path.is_dir():
-                                shutil.rmtree(log_file_path)
+                                try:
+                                    shutil.rmtree(log_file_path, onexc=remove_readonly)
+                                except Exception:
+                                    _logger.exception('Failed to remove %s', log_file_path)
                             elif log_file_path.name in ('run.txt', 'wake_up.txt'):
                                 log_file_path.unlink()
                             elif log_file_path.name.endswith('.zip'):
