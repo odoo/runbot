@@ -35,7 +35,7 @@ _SAFE_OPCODES |= set(to_opcodes(['LOAD_DEREF', 'STORE_DEREF', 'LOAD_CLOSURE', 'M
 
 _logger = logging.getLogger(__name__)
 
-_re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING '
+_re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING .*'
 
 PYTHON_DEFAULT = "# type python code here\n\n\n\n\n\n"
 
