@@ -58,10 +58,7 @@ class Branch(models.Model):
 
     def _search_dname(self, operator, values):
         # Match format (owner?, repo, branch)
-        if operator != 'in':
-            return [('name', operator, values)]
-        domains = []
-        for value in values:
+        def make_domain(value):
             owner = repo = branch = None
             if (m := re.match(r'(?:([\w-]+)/)?([\w-]+)[:#]([\w\.-]+)', value)):
                 owner, repo, branch = m.groups()
@@ -69,13 +66,21 @@ class Branch(models.Model):
             if (m := re.search(r'/([\w-]+)/([\w-]+)/pull/(\d+)', value)):
                 owner, repo, branch = m.groups()
             if repo and branch:
-                domain = [('name', operator, branch), ('remote_id.repo_name', '=', repo)]
+                domain = [('name', '=', branch), ('remote_id.repo_name', '=', repo)]
                 if owner:
                     domain.append(('remote_id.owner', '=', owner))
-                domains.append(domain)
-            else:
-                domains.append([('name', operator, value)])
-        return fields.Domain.OR(domains)
+                return domain
+
+        if operator == 'in':
+            domains = [make_domain(value) for value in values]
+            if all(domains):
+                return fields.Domain.OR(domains)
+
+        if operator in ('=', 'ilike'):
+            if (domain := make_domain(values)):
+                return domain
+
+        return [('name', operator, values)]
 
     @api.depends('name', 'is_pr', 'target_branch_name', 'pull_head_name', 'pull_head_remote_id')
     def _compute_reference_name(self):
