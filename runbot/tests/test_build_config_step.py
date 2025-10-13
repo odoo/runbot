@@ -990,7 +990,7 @@ Initiating shutdown
         self.assertEqual(self.build.local_result, 'warn')
         self.assertEqual(self.logs, [
             ('INFO', 'Getting results for build %s' % self.build.dest),
-            ('WARNING', 'Warning found in logs:\n2019-12-17 17:34:37,692 17 WARNING ')
+            ('WARNING', 'Warning found in logs:\n2019-12-17 17:34:37,692 17 WARNING dbname path.to.test: timeout exceded')
         ])
 
         # no log file
