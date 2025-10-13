@@ -516,7 +516,6 @@ class BuildError(models.Model):
                         body=f'Error {build_error.id} was assigned to you by {self.env.user.name}',
                         partner_ids=responsible.partner_id.ids,
                         email_layout_xmlid='mail.mail_notification_layout',
-                        record_name=build_error.display_name,
                     )
                 build_error.message_subscribe(
                     partner_ids=(responsible.partner_id | self.env.user.partner_id).ids,
