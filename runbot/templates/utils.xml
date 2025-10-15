@@ -151,8 +151,8 @@
                             <input type="hidden" name="redirect" t-att-value="current_path"/>
                             <div>
                                 <div class="form-check form-switch">
+                                <label for="more" class="form-check-label" >More info</label>
                                 <input onclick="document.getElementById('preferences_form').submit()" class="form-check-input" type="checkbox" role="switch" id="more" name="more" t-att-checked="more"/>
-                                <label class="form-check-label" >More info</label>
                             </div></div>
                             <div> 
                                 <label for="theme_selection" style="min-width: 80px">Theme:</label>

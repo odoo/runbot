@@ -267,7 +267,7 @@ class Runbot(Controller):
             _logger.info('github status %s resent by %s', status_id, request.env.user.name)
         return werkzeug.utils.redirect('/runbot/commit/%s' % status.commit_id.id)
 
-    @route([
+    @o_route([
         '/runbot/build/<int:build_id>/<operation>',
     ], type='http', auth="user", methods=['POST'], csrf=False)
     def build_operations(self, build_id, operation, **post):
@@ -402,7 +402,7 @@ class Runbot(Controller):
         }
         return request.render(view_id if view_id else "runbot.monitoring", qctx)
 
-    @route([
+    @o_route([
         '/runbot/submit',
     ], type='http', auth="public", methods=['GET', 'POST'], csrf=False)
     def submit(self, more=False, redirect='/', update_triggers=False, **kwargs):
