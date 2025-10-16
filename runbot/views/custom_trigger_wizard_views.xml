@@ -12,11 +12,11 @@
                         <field name="warnings" decoration-warning="warnings"/>
                     </group>
                     <group string="Base options">
-                        <field name="trigger_id"/>
-                        <field name="config_id"/>
+                        <field name="trigger_id" options="{'no_create_edit': True, 'no_create': True}"/>
+                        <field name="config_id" options="{'no_create_edit': True, 'no_create': True}"/>
                         <field name="number_build"/>
                         <field name="extra_params"/>
-                        <field name="child_config_id"/>
+                        <field name="child_config_id" options="{'no_create_edit': True, 'no_create': True}"/>
                     </group>
                     <group string="Restore options">
                         <field name="restore_mode"/>
