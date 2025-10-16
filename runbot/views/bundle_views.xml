@@ -96,7 +96,7 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Last batchs">
+                        <page string="Last batches">
                             <field name="last_batchs" nolabel="1">
                                 <list>
                                     <field name="id" widget="char_frontend_url"/>

@@ -150,7 +150,7 @@ export class FieldCharFrontendUrl extends Component {
 }
 
 registry.category("fields").add("char_frontend_url", {
-    supportedTypes: ["char"],
+    supportedTypes: ["char", "integer"],
     component: FieldCharFrontendUrl,
 });
 
