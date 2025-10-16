@@ -5,7 +5,7 @@
       <field name="model">runbot.warning</field>
       <field name="arch" type="xml">
         <list string="Runbot Warnings">
-          <field name="write_date"/>
+          <field name="write_date" options="{'numeric': true}"/>
           <field name="message"/>
           <field name="count"/>
         </list>

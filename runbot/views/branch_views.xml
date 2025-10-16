@@ -36,7 +36,7 @@
         <field name="model">runbot.branch</field>
         <field name="arch" type="xml">
             <list string="Branches">
-                <field name="create_date"/>
+                <field name="create_date" options="{'numeric': true}"/>
                 <field name="remote_id"/>
                 <field name="name"/>
             </list>

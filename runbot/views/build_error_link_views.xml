@@ -4,7 +4,7 @@
       <field name="model">runbot.build.error.link</field>
       <field name="arch" type="xml">
           <list default_order="log_date desc,id desc" create="false" delete="false" edit="false">
-            <field name="log_date"/>
+            <field name="log_date" options="{'numeric': true}"/>
             <field name="host" groups="base.group_no_one" optional="hide"/>
             <field name="dest" optional="hide"/>
             <field name="version_id"/>

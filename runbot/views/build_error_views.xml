@@ -25,8 +25,8 @@
                       <field name="trigger_ids" widget="many2many_tags" optional="hide"/>
                       <field name="tag_ids" widget="many2many_tags" readonly="1" optional="hide"/>
                       <field name="random" optional="hide"/>
-                      <field name="first_seen_date" widget="frontend_url" options="{'link_field': 'first_seen_build_id'}"/>
-                      <field name="last_seen_date" widget="frontend_url" options="{'link_field': 'last_seen_build_id'}"/>
+                      <field name="first_seen_date" widget="frontend_url" options="{'link_field': 'first_seen_build_id', 'numeric': True}"/>
+                      <field name="last_seen_date" widget="frontend_url" options="{'link_field': 'last_seen_build_id', 'numeric': True}"/>
                       <field name="first_seen_build_id" column_invisible="True"/>
                       <field name="last_seen_build_id" column_invisible="True"/>
                     </list>
@@ -51,8 +51,8 @@
                   <field name="breaking_pr_id"/>
                   <field name="breaking_pr_url"  widget="pull_request_url" invisible="not breaking_pr_id"/>
                   <field name="breaking_bundle_url" invisible="not breaking_pr_id"/>
-                  <field name="first_seen_date" widget="frontend_url" options="{'link_field': 'first_seen_build_id'}"/>
-                  <field name="last_seen_date" widget="frontend_url" options="{'link_field': 'last_seen_build_id'}"/>
+                  <field name="first_seen_date" widget="frontend_url" options="{'link_field': 'first_seen_build_id', 'numeric': True}"/>
+                  <field name="last_seen_date" widget="frontend_url" options="{'link_field': 'last_seen_build_id', 'numeric': True}"/>
                   <field name="first_seen_build_id" invisible="True"/>
                   <field name="last_seen_build_id" invisible="True"/>
                   <field name="history_data" widget="history_graph" options="{'cell_size': 13, 'mouse_actions': True}"/>
@@ -136,19 +136,19 @@
                 <group name="fixer_info" string="More info" col="2">
                   <group>
                     <field name="random"/>
-                    <field name="first_seen_date"/>
+                    <field name="first_seen_date" options="{'numeric': True}"/>
                     <field name="first_seen_build_id" widget="frontend_url"/>
                   </group>
                   <group>
-                    <field name="last_seen_date"/>
+                    <field name="last_seen_date" options="{'numeric': True}"/>
                     <field name="last_seen_build_id" widget="frontend_url"/>
                   </group>
-                </group>               
+                </group>
                 <notebook>
                   <page string="Builds">
                     <field name="build_error_link_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
                       <list>
-                        <field name="log_date"/>
+                        <field name="log_date" options="{'numeric': True}"/>
                         <field name="host" groups="base.group_no_one"/>
                         <field name="dest"/>
                         <field name="version_id"/>
@@ -162,7 +162,7 @@
                   <page string="Similary qualified">
                     <field name="similar_ids" widget="one2many" options="{'not_delete': True, 'no_create': True}" readonly="1">
                       <list>
-                        <field name="create_date"/>
+                        <field name="create_date" options="{'numeric': True}"/>
                         <field name="module_name"/>
                         <field name="summary"/>
                         <field name="random"/>
@@ -244,8 +244,8 @@
               <field name="canonical_tags" optional="hide" readonly="1"/>
               <field name="description" optional="hide" readonly="1"/>
               <field name="random" string="Random"/>
-              <field name="first_seen_date" string="First Seen" optional="hide" readonly="1"/>
-              <field name="last_seen_date" string="Last Seen" readonly="1" options="{'link_field': 'last_seen_build_id'}"/>
+              <field name="first_seen_date" string="First Seen" optional="hide" readonly="1" options="{'numeric': True}"/>
+              <field name="last_seen_date" string="Last Seen" readonly="1" options="{'link_field': 'last_seen_build_id', 'numeric': True}"/>
               <field name="last_seen_build_id" column_invisible="True"/>
               <field name="error_count" readonly="1"/>
               <field name="build_count" readonly="1"/>
@@ -282,8 +282,8 @@
                 <field name="module_name" optional="hide" readonly="1"/>
                 <field name="summary" optional="show" readonly="1"/>
                 <field name="random" string="Random"/>
-                <field name="first_seen_date" string="First Seen" optional="hide" readonly="1"/>
-                <field name="last_seen_date" string="Last Seen" readonly="1"/>
+                <field name="first_seen_date" string="First Seen" optional="hide" readonly="1" options="{'numeric': True}"/>
+                <field name="last_seen_date" string="Last Seen" readonly="1" options="{'numeric': True}"/>
                 <field name="build_count" readonly="1"/>
                 <field name="team_id"/>
                 <field name="test_tags" optional="hide"/>

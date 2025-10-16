@@ -81,7 +81,7 @@
                       <field name="duration"/>
                       <field name="result" decoration-bg-danger="result != 'success'" decoration-bg-success="result == 'success'"/>
                       <field name="identifier"/>
-                      <field name="create_date"/>
+                      <field name="create_date" options="{'numeric': true}"/>
                       <field name="summary"/>
                     </list>
                   </field>

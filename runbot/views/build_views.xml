@@ -69,11 +69,11 @@
                         <field name="host"/>
                         <field name="keep_host"/>
                         <field name="host_id"/>
-                        <field name="job_start" groups="base.group_no_one"/>
-                        <field name="job_end" groups="base.group_no_one"/>
+                        <field name="job_start" groups="base.group_no_one" options="{'numeric': true}"/>
+                        <field name="job_end" groups="base.group_no_one" options="{'numeric': true}"/>
                         <field name="job_time" groups="base.group_no_one"/>
-                        <field name="build_start" groups="base.group_no_one"/>
-                        <field name="build_end" groups="base.group_no_one"/>
+                        <field name="build_start" groups="base.group_no_one" options="{'numeric': true}"/>
+                        <field name="build_end" groups="base.group_no_one" options="{'numeric': true}"/>
                         <field name="build_time" groups="base.group_no_one"/>
                         <field name="build_age" groups="base.group_no_one"/>
                         <field name="build_type"/>
@@ -81,7 +81,7 @@
                         <field name="orphan_result"/>
                         <field name="build_url" widget="url" readonly="1"/>
                         <field name="keep_running"/>
-                        <field name="gc_date" readonly="1"/>
+                        <field name="gc_date" readonly="1" options="{'numeric': true}"/>
                         <field name="gc_delay"/>
                     </group>
                 </sheet>

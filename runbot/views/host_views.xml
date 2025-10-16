@@ -16,9 +16,9 @@
                         <field name="is_builder"/>
                         <field name="is_registry"/>
                         <field name="docker_registry_url"/>
-                        <field name="last_start_loop" readonly='1'/>
-                        <field name="last_end_loop" readonly='1'/>
-                        <field name="last_success" readonly='1'/>
+                        <field name="last_start_loop" readonly='1' options="{'numeric': true}"/>
+                        <field name="last_end_loop" readonly='1' options="{'numeric': true}"/>
+                        <field name="last_success" readonly='1' options="{'numeric': true}"/>
                         <field name="assigned_only"/>
                         <field name="nb_worker"/>
                         <field name="nb_run_slot"/>
@@ -32,7 +32,7 @@
                         <page string="Builds">
                             <field name="build_ids" widget="many2many" options="{'not_delete': True, 'no_create_edit': True}" readonly='1'>
                                 <list string="Builds">
-                                    <field name="create_date"/>
+                                    <field name="create_date" options="{'numeric': true}"/>
                                     <field name="global_state"/>
                                     <field name="global_result"/>
                                     <field name="job"/>

@@ -185,7 +185,7 @@
         <field name="arch" type="xml">
             <form string="Batch">
                 <group>
-                    <field name="last_update"/>
+                    <field name="last_update" options="{'numeric': true}"/>
                     <field name="bundle_id"/>
                     <field name="state"/>
                     <field name="commit_link_ids">

@@ -11,7 +11,7 @@
                         <field name="tree_hash"/>
                         <field name="dname"/>
                         <field name="repo_id"/>
-                        <field name="date"/>
+                        <field name="date" options="{'numeric': true}"/>
                         <field name="author"/>
                         <field name="author_email"/>
                         <field name="committer"/>
@@ -31,7 +31,7 @@
             <list string="Commits">
                 <field name="name" widget="char_frontend_url"/>
                 <field name="tree_hash"/>
-                <field name="date"/>
+                <field name="date" options="{'numeric': true}"/>
                 <field name="repo_id"/>
                 <field name="author_email"/>
                 <field name="committer_email"/>
@@ -45,7 +45,7 @@
       <field name="arch" type="xml">
         <search string="Search commit">
           <field name="name"/>
-          <field name="date"/>
+          <field name="date" options="{'numeric': true}"/>
           <field name="author"/>
           <field name="author_email"/>
           <field name="committer"/>
