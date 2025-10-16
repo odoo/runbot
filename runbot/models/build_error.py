@@ -504,7 +504,7 @@ class BuildError(models.Model):
                 if not (self.env.su or self.env.user.has_groups('runbot.group_runbot_admin')):
                     if build_error.test_tags:
                         raise UserError("This error as a test-tag and can only be (de)activated by admin")
-                    if not vals['active'] and build_error.active and build_error.last_seen_date and build_error.last_seen_date + relativedelta(days=1) > datetime.now():
+                    if not vals['active'] and build_error.active and build_error.last_seen_date and build_error.last_seen_date + relativedelta(days=1) > datetime.datetime.now():
                         raise UserError("This error broke less than one day ago can only be deactivated by admin")
 
         if (responsible_id := vals.get('responsible')):
