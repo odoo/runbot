@@ -302,7 +302,7 @@ class Batch(models.Model):
                 if batches:
                     self.base_reference_batch_id = batches[0]
 
-            if missing_repos and bundle.always_use_foreign and foreign_projects:
+            if missing_repos and (bundle.always_use_foreign or project.always_use_foreign) and foreign_projects:
                 self._log('Starting by filling foreign repo')
                 foreign_bundles = bundle.search([('name', '=', bundle.name), ('project_id', 'in', foreign_projects.ids)])
                 used_branches = _fill_missing({branch: branch.head for branch in foreign_bundles.mapped('branch_ids').sorted('is_pr', reverse=True)}, 'head')
