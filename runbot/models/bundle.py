@@ -329,6 +329,28 @@ class Bundle(models.Model):
         }
         return self._generate_custom_trigger_action(context)
 
+    def action_disable_all_triggers(self):
+        triggers_to_disable = (
+            self.env["runbot.trigger"]
+            .search([
+                ("id", "not in", self.trigger_custom_ids.trigger_id.ids),
+                ("project_id", "=", self.project_id.id),
+                ("manual", "=", False),
+                ("category_id", "=", 1),
+            ])
+            .filtered(
+                lambda rec: not rec.version_domain or self.version_id.filtered_domain(rec._get_version_domain()),
+            )
+        )
+        vals = []
+        for trigger in triggers_to_disable:
+            vals.append({
+                'bundle_id': self.id,
+                'trigger_id': trigger.id,
+                'start_mode': 'disabled',
+            })
+        self.env['runbot.bundle.trigger.custom'].create(vals)
+
 
 class BundleTag(models.Model):
 
