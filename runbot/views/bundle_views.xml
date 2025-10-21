@@ -83,7 +83,7 @@
                                 <list editable="bottom">
                                     <field name="start_mode"/>
                                     <field name="use_base_commits"/>
-                                    <field name="trigger_id" domain="[('project_id', '=', parent.project_id)]"/>
+                                    <field name="trigger_id" domain="[('project_id', '=', parent.project_id), ('category_id.name', '=', 'Default')]"/>
                                     <field name="config_id"/>
                                     <field name="extra_params"/>
                                     <field name="config_data" widget="runbotjsonb"/>
