@@ -34,12 +34,12 @@
               </group>
               <group>
                 <group name="fixer_info" string="Fixing" col="2">
-                  <field name="responsible"/>
-                  <field name="customer"/>
-                  <field name="team_id"/>
-                  <field name="fixing_pr_id"/>
+                  <field name="responsible" options="{'no_create': True}"/>
+                  <field name="customer" options="{'no_create': True}"/>
+                  <field name="team_id" options="{'no_create': True}"/>
+                  <field name="fixing_pr_id" options="{'no_create': True}"/>
                   <field name="fixing_pr_url" widget="pull_request_url" invisible="not fixing_pr_id"/>
-                  <field name="fixing_bundle_id" readonly="fixing_pr_id"/>
+                  <field name="fixing_bundle_id" options="{'no_create': True}" readonly="fixing_pr_id"/>
                   <field name="fixing_bundle_url" invisible="not fixing_pr_id"/>
                   <field name="active"/>
                 </group>
@@ -48,7 +48,7 @@
                   <field name="trigger_ids" widget="many2many_tags"/>
                   <field name="tag_ids" widget="many2many_tags"/>
                   <field name="random"/>
-                  <field name="breaking_pr_id"/>
+                  <field name="breaking_pr_id" options="{'no_create': True}"/>
                   <field name="breaking_pr_url"  widget="pull_request_url" invisible="not breaking_pr_id"/>
                   <field name="breaking_bundle_url" invisible="not breaking_pr_id"/>
                   <field name="first_seen_date" widget="frontend_url" options="{'link_field': 'first_seen_build_id', 'numeric': True}"/>
