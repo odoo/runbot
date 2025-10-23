@@ -505,7 +505,6 @@ class Batch(models.Model):
             'level': level,
         })
 
-
 class BatchLog(models.Model):
     _name = 'runbot.batch.log'
     _description = 'Batch log'

@@ -58,7 +58,7 @@ It is also advised to adapt this config to work in `https`.
 
 ### Requirements
 
-Runbot is an addon for odoo, meaning that both odoo and runbot code are needed to run. Some tips to configure odoo are available in [odoo setup documentation](https://www.odoo.com/documentation/18.0/setup/install.html#setup-install-source) (requirements, postgres, ...) This page will mainly focus on runbot specificities.
+Runbot is an addon for odoo, meaning that both odoo and runbot code are needed to run. Some tips to configure odoo are available in [odoo setup documentation](https://www.odoo.com/documentation/19.0/setup/install.html#setup-install-source) (requirements, postgres, ...) This page will mainly focus on runbot specificities.
 
 You will also need to install docker and other requirements before running runbot.
 
@@ -164,11 +164,11 @@ You can now connect to your backend and preconfigure runbot.
 - Connect as admin (default password: admin).
 
 Check odoo documentation for other needed security configuration (master password). This is mainly needed for production purpose.
-You can check that in the `/web/database/manager` page. ([more info here](https://www.odoo.com/documentation/18.0/administration/on_premise/deploy.html#reset-the-master-password)) \
+You can check that in the `/web/database/manager` page. ([more info here](https://www.odoo.com/documentation/19.0/administration/on_premise/deploy.html#reset-the-master-password)) \
 Change your admin user login and password
 You may want to check the runbot settings (`Runbot > Setting > setting`):
 - Default number of workers should be the max number of parallel build, consider having max `#cpu - 1`
-- Modify `Default odoorc for builds` to change the running build master password to something unique ([ideally a hashed one](https://github.com/odoo/odoo/blob/18.0/odoo/tools/config.py#L787)).
+- Modify `Default odoorc for builds` to change the running build master password to something unique ([ideally a hashed one](https://github.com/odoo/odoo/blob/19.0/odoo/tools/config.py#L787)).
 - Tweak the garbage collection settings, if you have limited disk space.
 - The `number of running build` is the number of parallel running builds.
 - `Max commit age (in days)` will limt the max age of commit to detect. Increase this limit to detect older branches.
@@ -315,3 +315,8 @@ Or by providing a plain Dockerfile in the template.
 Once the Dockerfile is created and the `to_build` field is checked, the Dockerfile will be built (pay attention that no other operations will occur during the build).
 
 A version or a bundle can be assigned a specific Dockerfile.
+
+
+## User documentation
+
+ You can find a more detailed user documentation [here](./runbot/documentation/readme.md)

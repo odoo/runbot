@@ -1,0 +1,40 @@
+{
+    "name": "L10n Standalone",
+    "steps": [
+        {
+            "name": "Install test_l10n database",
+            "db_name": "l10n",
+            "job_type": "odoo",
+            "install_modules": "test_l10n"
+        },
+        {
+            "name": "Running standalone",
+            "db_name": "l10n",
+            "job_type": "command",
+            "command": "odoo/odoo/tests/test_module_operations.py -d {{db_name}} --data-dir {{data_dir}} --addons-path {{addons_path}} --standalone all_l10n"
+        },
+        {
+            "name": "Create post install",
+            "job_type": "create_build",
+            "for_each_vars": [
+                {"test_module_filter": "-*,*hr*"},
+                {"test_module_filter": "-*,*edi*"},
+                {"test_module_filter": "-*,*reports*"},
+                {"test_module_filter": "*,-*hr*,-*edi*,-*reports*"}
+            ],
+            "children": [{
+                "name": "Test Post Install",
+                "description": "Post install tests for **{{test_module_filter}}**",
+                "steps": [
+                    {"name": "restore", "job_type": "restore", "db_name": "l10n"},
+                    {
+                        "name": "Start post install tests",
+                        "job_type": "odoo",
+                        "test_tags": "-external,-external_l10n,{{test_module_filter|filter_all_modules|make_module_test_tags|prepend('post_install_l10n')}}",
+                        "db_name": "l10n"
+                    }
+                ]
+            }]
+        }
+    ]
+}

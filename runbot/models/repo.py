@@ -140,20 +140,40 @@ class Trigger(models.Model):
         return []
 
     def _filter_modules_to_test(self, modules, module_patterns=None):
+        if module_patterns == '-*':
+            return []
         repo_module_patterns = {}
         for module_filter in self.module_filters:
             repo_module_patterns.setdefault(module_filter.repo_id, [])
             repo_module_patterns[module_filter.repo_id] += module_filter.modules.split(',')
         module_patterns = module_patterns or []
 
+        def _parse_filter(pat):
+            e1, e2 = pat.split('->', 1)
+            exclude = []
+            if e1.startswith('!'):
+                e1 = e1[1:]
+                exclude.append(e1)
+            if e2.startswith('!'):
+                e2 = e2[1:]
+                exclude.append(e2)
+            return lambda mod: ((not e1 or mod >= e1) and (not e2 or mod <= e2) and mod not in exclude)
+
         def _filter_patterns(patterns_list, default, all):
             current = set(default)
             for pat in patterns_list:
-                pat = pat.strip()
+                pat = pat.replace(' ', '')
                 if not pat:
                     continue
-                if pat.startswith('-'):
-                    pat = pat.strip('- ')
+                if pat == '-*':
+                    current = set()
+                elif pat == '*':
+                    current = set(all)
+                elif '->' in pat:
+                    mod_filter = _parse_filter(pat)
+                    current = {mod for mod in current if mod_filter(mod)}
+                elif pat.startswith(('-', '!')):
+                    pat = pat[1:]
                     current -= {mod for mod in current if fnmatch.fnmatch(mod, pat)}
                 elif pat:
                     current |= {mod for mod in all if fnmatch.fnmatch(mod, pat)}

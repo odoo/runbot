@@ -325,12 +325,11 @@ class Dockerfile(models.Model):
         return metadata
 
     def _build(self, host=None):
-        docker_build_path = self.env['runbot.runbot']._path('docker', self.image_tag)
+        tag_dir = re.sub(r'[^\w]', '_', self.image_tag)
+        docker_build_path = self.env['runbot.runbot']._path('docker', tag_dir)
         os.makedirs(docker_build_path, exist_ok=True)
-
         content = self.dockerfile
-
-        with open(self.env['runbot.runbot']._path('docker', self.image_tag, 'Dockerfile'), 'w') as Dockerfile:
+        with open(self.env['runbot.runbot']._path('docker', tag_dir, 'Dockerfile'), 'w') as Dockerfile:
             Dockerfile.write(content)
         result = docker_build(docker_build_path, self.image_future_tag, self.pull_on_build)
         duration = result['duration']

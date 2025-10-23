@@ -68,7 +68,7 @@ class Command():
 
     def __repr__(self):
         return self.build().replace('&& ', '&&\n').replace('|| ', '||\n\t').replace(';', ';\n')
-        
+
     def shell_join(self, elems):
         return ' '.join([self.escape(elem) for elem in elems])
 
@@ -349,6 +349,7 @@ def _docker_stop(container_name, build_dir):
 
 
 def docker_state(container_name, build_dir):
+    build_dir = file_path(build_dir)
     container_name = sanitize_container_name(container_name)
     exist = os.path.exists(os.path.join(build_dir, 'exist-%s' % container_name))
     started = os.path.exists(os.path.join(build_dir, 'start-%s' % container_name))

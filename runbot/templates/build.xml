@@ -126,9 +126,20 @@
                 <b>Trigger:</b>
                 <t t-out="build.params_id.trigger_id.name"/>
                 <br/>
-                <b>Config data:</b>
-                <t t-out="build.params_id.config_data.dict"/>
-                <br/>
+                <t t-if="build.params_id.dynamic_config.dict">
+                    <b>Dynamic config:</b>
+                    <details>
+                        <summary><t t-out="str(build.params_id.dynamic_config.dict.get('name', '&lt;unnamed&gt;'))"></t></summary>
+                        <span style="white-space: pre-wrap;"><t t-out="json.dumps(build.params_id.dynamic_config.dict, indent=4).encode('utf8').decode()"/></span>
+                    </details>
+                </t>
+                <t t-if="build.params_id.config_data.dict">
+                    <b>Config data:</b>
+                    <details>
+                        <summary><t t-out="', '.join(list(build.params_id.config_data.dict.keys()))"></t></summary>
+                        <span style="white-space: pre-wrap;"><t t-out="json.dumps(build.params_id.config_data.dict, indent=4).encode('utf8').decode()"/></span>
+                    </details>
+                </t>
                 <b>Modules:</b>
                 <t t-out="build.params_id.modules"/>
                 <br/>

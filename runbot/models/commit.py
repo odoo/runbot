@@ -164,6 +164,14 @@ class Commit(models.Model):
         except:
             return False
 
+    def _git_show_file(self, file):
+        self.ensure_one()
+        self.repo_id._fetch(self.name)
+        try:
+            return self.repo_id._git(['show', '%s:%s' % (self.name, file)])
+        except subprocess.CalledProcessError:
+            return False
+
     def _source_path(self, *paths):
         if not self.tree_hash:
             vals = self._get_commit_infos(self.name, self.repo_id)

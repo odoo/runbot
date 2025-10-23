@@ -474,10 +474,10 @@ class TestUpgradeFlow(RunbotCase):
                         'echo "### restore" "successful"'
                     ]
                 )
-            self.patchers['docker_run'].side_effect = docker_run_restore
-            #current_build.host = host.name
             current_build._schedule()()
-            self.patchers['docker_run'].assert_called()
+            self.assertEqual(len(self.docker_run_calls), 1)
+            docker_run_restore(*self.docker_run_calls[0][:2], **self.docker_run_calls[0][3])
+            self.docker_run_calls.clear()
 
             def docker_run_upgrade(cmd, *args, ro_volumes=False, **kwargs):
                 user = getpass.getuser()
@@ -496,17 +496,19 @@ class TestUpgradeFlow(RunbotCase):
                         addons_path='--addons-path addons,server/addons,server/core/addons',
                         db_name=f'{current_build.dest}-{suffix}')
                 )
-            self.patchers['docker_run'].side_effect = docker_run_upgrade
             current_build._schedule()()
+            self.assertEqual(len(self.docker_run_calls), 1)
+            docker_run_upgrade(*self.docker_run_calls[0][:2], **self.docker_run_calls[0][3])
+            self.docker_run_calls.clear()
 
             with patch('builtins.open', mock_open(read_data='')):
                 current_build._schedule()
+
             self.assertEqual(current_build.local_state, 'done')
 
             self.assertEqual(current_build.global_state, 'done')
             # self.assertEqual(current_build.global_result, 'ok')
 
-        self.assertEqual(self.patchers['docker_run'].call_count, 3 * 7 * 2)
 
         self.assertEqual(from_version_builds.mapped('global_state'), ['done'] * 7)
 
@@ -526,7 +528,7 @@ class TestUpgradeFlow(RunbotCase):
 
         def _run_install_odoo(build):
             self.env['runbot.database'].create({
-                'name': f'{build.dest}-{build.active_step.name}',
+                'name': f'{build.dest}-{build.active_step.sanitized_name(build)}',
                 'build_id': build.id,
             })
 

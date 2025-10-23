@@ -3,6 +3,7 @@
 import datetime
 import getpass
 import hashlib
+import json
 import logging
 import pwd
 import re
@@ -67,6 +68,8 @@ class BuildParameters(models.Model):
     config_id = fields.Many2one('runbot.build.config', 'Run Config', required=True,
                                 default=lambda self: self.env.ref('runbot.runbot_build_config_default', raise_if_not_found=False), index=True)
     config_data = JsonDictField('Config Data')
+    dynamic_config_position = fields.Char('Position of this build in the dynamic config')
+    dynamic_config = JsonDictField('Dynamic Config', compute='_compute_dynamic_config', store=True)
     used_custom_trigger = fields.Boolean('Custom trigger was used to generate this build')
 
     build_ids = fields.One2many('runbot.build', 'params_id')
@@ -112,8 +115,66 @@ class BuildParameters(models.Model):
                 cleaned_vals['create_batch_id'] = param.create_batch_id.id
             if param.used_custom_trigger:
                 cleaned_vals['used_custom_trigger'] = True
+            if param.dynamic_config_position:
+                cleaned_vals['dynamic_config_position'] = param.dynamic_config_position
+            if param.dynamic_config.dict:
+                cleaned_vals['dynamic_config'] = param.dynamic_config.dict
 
             param.fingerprint = hashlib.sha256(str(cleaned_vals).encode('utf8')).hexdigest()
+
+    @api.depends('config_id', 'dynamic_config_position')
+    def _compute_dynamic_config(self):
+        for build_param in self:
+            dynamic_config = {}
+            default_config = json.loads(build_param.config_id.default_dynamic_config or '{}')
+            default_config_extension = json.loads(build_param.config_id.dynamic_config_extension or '{}')
+            file_path = build_param.config_data.get('dynamic_config_file_path', build_param.config_id.dynamic_config_file_path)
+            if file_path:
+                base_config = default_config
+                extensions = []
+                for commit in build_param.commit_ids.sorted(key=lambda c: (c.repo_id.sequence, c.repo_id.id)):
+                    for path in file_path.split(','):
+                        try:
+                            if content := commit._git_show_file(path):
+                                file_dynamic_config = json.loads(content)
+                                if file_dynamic_config.get('extension'):
+                                    extensions.append(file_dynamic_config)
+                                else:
+                                    base_config = file_dynamic_config
+                                break
+                        except Exception as e:
+                            build_param.create_batch_id._log(f'Failed to load dynamic config from {file_path} in commit {commit.repo_id.name}: {e}', level='ERROR')
+                extensions.append(default_config_extension)
+                config = base_config
+                for extension in extensions:
+                    try:
+                        config = build_param.config_id._apply_dynamic_config_extension(config, extension)
+                    except Exception as e:
+                        build_param.create_batch_id._log(f'Failed to apply dynamic config extension from {file_path} in commit {commit.repo_id.name}: {e}', level='ERROR')
+                try:
+                    build_param.config_id._validate_dynamic_config(config)
+                    dynamic_config = config
+                except ValidationError as e:
+                    msg = f'Failed to validate dynamic config from {file_path} in commit {commit.repo_id.name}: {e}'
+                    build_param.create_batch_id._log(msg, level='ERROR')
+                    _logger.warning(msg)
+                    dynamic_config = {}
+
+            try:
+                if not dynamic_config and default_config:
+                    dynamic_config = build_param.config_id._apply_dynamic_config_extension(default_config, default_config_extension)
+            except Exception as e:
+                build_param.create_batch_id._log(f'Failed to load dynamic config from config {build_param.config_id.id}: {e}', level='ERROR')
+            if dynamic_config and build_param.dynamic_config_position:
+                positions = build_param.dynamic_config_position.strip('/').split('/')
+                try:
+                    for pos in positions:
+                        step, child = pos.split('.')
+                        dynamic_config = dynamic_config['steps'][int(step)]['children'][int(child)]
+                except (KeyError, IndexError):
+                    _logger.warning('Failed to get dynamic config at position %s for build_param %s', build_param.dynamic_config_position, build_param.id)
+                    dynamic_config = {}
+            build_param.dynamic_config = dynamic_config
 
     def _get_batch_commit_link_ids(self, batch):
         if not batch:
@@ -183,6 +244,7 @@ class BuildResult(models.Model):
     trigger_id = fields.Many2one('runbot.trigger', related='params_id.trigger_id', store=True, index=True)
     create_batch_id = fields.Many2one('runbot.batch', related='params_id.create_batch_id', store=True, index=True)
     create_bundle_id = fields.Many2one('runbot.bundle', related='params_id.create_batch_id.bundle_id', index=True)
+    dynamic_config = JsonDictField('Dynamic Config', related='params_id.dynamic_config')
 
     # state machine
     global_state = fields.Selection(make_selection(state_order), string='Status', compute='_compute_global_state', store=True, recursive=True)
@@ -207,6 +269,8 @@ class BuildResult(models.Model):
 
     active_step = fields.Many2one('runbot.build.config.step', 'Active step')
     job = fields.Char('Active step display name', compute='_compute_job')
+    dynamic_active_step_index = fields.Integer('Dynamic active step index')
+
     job_start = fields.Datetime('Job start')
     job_end = fields.Datetime('Job end')
     build_start = fields.Datetime('Build start')
@@ -411,6 +475,8 @@ class BuildResult(models.Model):
         return res
 
     def _add_child(self, param_values, orphan=False, description=False, additionnal_commit_links=False):
+        build_values = {key: value for key, value in param_values.items() if key not in self.params_id._fields}
+        param_values = {key: value for key, value in param_values.items() if key in self.params_id._fields}
 
         if len(self.parent_path.split('/')) > 8:
             self._log('_run_create_build', 'This is too deep, skipping create')
@@ -429,6 +495,7 @@ class BuildResult(models.Model):
             'orphan_result': orphan,
             'keep_host': self.keep_host,
             'host': self.host if self.keep_host else False,
+            **build_values,
         })
 
     def _result_multi(self):
@@ -650,7 +717,12 @@ class BuildResult(models.Model):
                         for log_file_path in bdir_file.iterdir():
                             if log_file_path.is_dir():
                                 shutil.rmtree(log_file_path)
-                            elif log_file_path.name in ('run.txt', 'wake_up.txt') or not log_file_path.name.endswith('.txt'):
+                            elif log_file_path.name in ('run.txt', 'wake_up.txt'):
+                                log_file_path.unlink()
+                            elif log_file_path.name.endswith('.zip'):
+                                if not self.children_ids:
+                                    log_file_path.unlink()
+                            elif not log_file_path.name.endswith('.txt'):
                                 log_file_path.unlink()
                     gcstamp.write_text(f'gc date: {datetime.datetime.now()}')
 
@@ -677,7 +749,7 @@ class BuildResult(models.Model):
 
     def _get_docker_name(self):
         self.ensure_one()
-        return '%s_%s' % (self.dest, self.active_step.name)
+        return '%s_%s' % (self.dest, self.active_step.sanitized_name(self))
 
     def _get_error_tail_message(self, log_path):
         lines = tail(log_path)
@@ -722,8 +794,6 @@ class BuildResult(models.Model):
                 build._log('wake_up', 'Waking up failed, **docker is already running**', log_type='markdown', level='SEPARATOR')
             else:
                 try:
-                    log_path = build._path('logs', 'wake_up.txt')
-
                     port = self._find_port()
                     build.write({
                         'job_start': now(),
@@ -763,7 +833,7 @@ class BuildResult(models.Model):
                 timeout = min(build.active_step.cpu_limit, int(icp.get_param('runbot.runbot_timeout', default=10000)))
                 if build.local_state != 'running' and build.job_time > timeout:
                     build.active_step._make_stats(build)
-                    build._log('_schedule', '%s time exceeded (%ss)' % (build.active_step.name if build.active_step else "?", build.job_time))
+                    build._log('_schedule', '%s time exceeded (%ss)' % (build.active_step._get_display_name(self) if build.active_step else "?", build.job_time))
                     build._kill(result='killed')
                 return False
             elif _docker_state in ('UNKNOWN', 'GHOST') and build.docker_start:
@@ -774,7 +844,7 @@ class BuildResult(models.Model):
                     _logger.info('container "%s" seems too take a while to start :%s' % (build._get_docker_name(), build.job_time))
                     return False
                 else:
-                    details = build._get_error_tail_message(build._path('logs', '%s.txt' % build.active_step.name))
+                    details = build._get_error_tail_message(build._path('logs', '%s.txt' % build.active_step.sanitized_name(build)))
                     if not details:
                         build._log('_schedule', 'Docker with state %s not started after 60 seconds, skipping' % _docker_state, level='ERROR')
                     else:
@@ -823,7 +893,11 @@ class BuildResult(models.Model):
                 self.local_state = 'done'
                 self.local_result = 'ko'
                 return False
-            next_index = list(step_ids).index(self.active_step) + 1
+            current_index = list(step_ids).index(self.active_step)
+            if self.active_step.consume_remaining_tasks(build):
+                next_index = current_index
+            else:
+                next_index = current_index + 1
 
         while True:
             if next_index >= len(step_ids):  # final job, build is done
@@ -832,19 +906,19 @@ class BuildResult(models.Model):
                 return False
             new_step = step_ids[next_index]  # job to do, state is job_state (testing or running)
             if new_step.domain_filter and not self.filtered_domain(safe_eval(new_step.domain_filter)):
-                self._log('run', '**Skipping** step ~~%s~~ from config **%s**', new_step.name, self.params_id.config_id.name, log_type='markdown', level='SEPARATOR')
+                self._log('run', '**Skipping** step ~~%s~~ from config **%s**', new_step._get_display_name(build), self.params_id.config_id.name, log_type='markdown', level='SEPARATOR')
                 next_index += 1
                 continue
             break
 
         if self.local_result == 'ko':
             if self.active_step and self.active_step.break_after_if_ko:
-                self._log('break_on_ko', f'Build is in failure, stopping after {self.active_step.name}')
+                self._log('break_on_ko', f'Build is in failure, stopping after {self.active_step._get_display_name(self)}')
                 self.local_state = 'done'
                 self.active_step = False
                 return
             if new_step.break_before_if_ko:
-                self._log('break_on_ko', f'Build is in failure, stopping before {new_step.name}')
+                self._log('break_on_ko', f'Build is in failure, stopping before {new_step._get_display_name(self)}')
                 self.local_state = 'done'
                 self.active_step = False
                 return
@@ -858,7 +932,7 @@ class BuildResult(models.Model):
         self.ensure_one()
         build = self
         if build.local_state != 'done':
-            build._logger('running %s', build.active_step.name)
+            build._logger('running %s', build.active_step._get_display_name(build))
             os.makedirs(build._path('logs'), exist_ok=True)
             os.makedirs(build._path('datadir'), exist_ok=True)
             try:
@@ -926,7 +1000,7 @@ class BuildResult(models.Model):
         kwargs.pop('build_dir', False)
         kwargs.pop('log_path', False)
         kwargs.pop('container_name', False)
-        log_path = self._path('logs', '%s.txt' % step.name)
+        log_path = self._path('logs', '%s.txt' % step.sanitized_name(self))
         build_dir = self._path()
         container_name = self._get_docker_name()
         self.env.flush_all()
@@ -988,7 +1062,7 @@ class BuildResult(models.Model):
                             module,
                             commit._source_path(addons_path, module, manifest_file_name),
                             all_modules[module]._source_path(addons_path, module, manifest_file_name)),
-                        level='WARNING'
+                        level='WARNING',
                     )
                 else:
                     available_modules[commit.repo_id].append(module)
@@ -1136,13 +1210,9 @@ class BuildResult(models.Model):
         _logger.error('None of %s found in commit, actual commit content:\n %s' % (commit.repo_id.server_files, os.listdir(commit._source_path())))
         raise RunbotException('No server found in %s' % commit.dname)
 
-    def _cmd(self, python_params=None, py_version=None, local_only=True, sub_command=None, enable_log_db=True):
-        """Return a list describing the command to start the build
-        """
-        self.ensure_one()
-        build = self
-        python_params = python_params or []
-        py_version = py_version if py_version is not None else build._get_py_version()
+    def _make_pip_command(self, py_version=None):
+        if not py_version:
+            py_version = self._get_py_version()
         pres = []
         if not self.params_id.skip_requirements and not self.params_id.config_data.get('skip_requirements'):
             for commit_id in self.env.context.get('defined_commit_ids') or self.params_id.commit_ids.sorted(lambda c: (c.repo_id.sequence, c.repo_id.id)):
@@ -1150,6 +1220,17 @@ class BuildResult(models.Model):
                     repo_dir = self._docker_source_folder(commit_id)
                     requirement_path = os.sep.join([repo_dir, 'requirements.txt'])
                     pres.append([f'python{py_version}', '-m', 'pip', 'install', '--progress-bar', 'off', '-r', f'{requirement_path}'])
+        return pres
+
+    def _cmd(self, python_params=None, py_version=None, local_only=True, sub_command=None, enable_log_db=True):
+        """Return a list describing the command to start the build
+        """
+        self.ensure_one()
+        build = self
+        python_params = python_params or []
+        py_version = py_version if py_version is not None else build._get_py_version()
+
+        pres = self._make_pip_command(py_version)
 
         faketime = []
         if faketime_params := self.params_id.config_data.get('faketime'):

@@ -39,6 +39,34 @@ _re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING .*'
 
 PYTHON_DEFAULT = "# type python code here\n\n\n\n\n\n"
 
+
+def filter_all_modules(selector, build, dynamic_vars):
+    if selector.split(',', 1)[0] != '*':
+        selector = f'*,{selector}'
+    return filter_default_modules(selector, build, dynamic_vars)
+
+
+def filter_default_modules(selector, build, dynamic_vars):
+    build._checkout()  # we need to ensure source are exported before _get_modules_to_test
+    modules = build._get_modules_to_test(selector)
+    return ','.join(modules)
+
+
+def make_module_test_tags(modules, build, dynamic_vars):
+    return ','.join([f'/{module}' for module in modules.split(',')])
+
+
+def prepend_string(modules, build, dynamic_vars, element):
+    if re.match(r'^[\'"].*[\'"]$', element):
+        element = element[1:-1]
+    else:
+        element = dynamic_vars.get(element, element)
+    return ','.join([f'{element}{module}' for module in modules.split(',')])
+
+
+def append_string(modules, build, element):
+    return ','.join([f'{module}{element}' for module in modules.split(',')])
+
 class Config(models.Model):
     _name = 'runbot.build.config'
     _description = "Build config"
@@ -52,6 +80,185 @@ class Config(models.Model):
     group = fields.Many2one('runbot.build.config', 'Configuration group', help="Group of config's and config steps")
     group_name = fields.Char('Group name', related='group.name')
     step_ids = fields.Many2many('runbot.build.config.step', compute='_compute_step_ids')
+
+    dynamic_config_file_path = fields.Char('Dynamic Config File Path', tracking=True)
+    default_dynamic_config = fields.Text('Default Dynamic Config File', tracking=True)
+    dynamic_config_extension = fields.Text('Dynamic Config Extend File', tracking=True)
+
+    @api.constrains('default_dynamic_config', 'dynamic_config_extension')
+    def _check_dynamic_config(self):
+        for record in self:
+            try:
+                base_config = json.loads(record.default_dynamic_config or '{}')
+            except json.JSONDecodeError as e:
+                msg = f'Invalid json in field default_dynamic_config: {e.msg} at line {e.lineno} column {e.colno}'
+                raise ValidationError(f'Error in field default_dynamic_config: {msg}') from None
+            try:
+                config_extension = json.loads(record.dynamic_config_extension or '{}')
+            except json.JSONDecodeError as e:
+                msg = f'Invalid json in field dynamic_config_extension: {e.msg} at line {e.lineno} column {e.colno}'
+                raise ValidationError(f'Error in field dynamic_config_extension: {msg}') from None
+
+            extended_config = record._apply_dynamic_config_extension(base_config, config_extension)
+            for config in [base_config, extended_config]:
+                if config:
+                    self._validate_dynamic_config(config)
+
+    def _apply_dynamic_config_extension(self, base_config, extension):
+        if not extension:
+            return base_config
+        for key, extension_value in extension.items():
+            base_value = base_config.get(key)
+            if isinstance(extension_value, dict) and isinstance(base_value, dict):
+                if base_value is not None:
+                    base_config[key] = self._apply_dynamic_config_extension(base_value, extension_value)
+                continue
+            if isinstance(extension_value, list) and len(extension_value) == 2:
+                action, action_value = extension_value
+                if isinstance(action, str):
+                    if action == 'APPEND' and key in base_config:
+                        base_config[key] += action_value
+                    if action == 'SET':
+                        base_config[key] = action_value
+                    continue
+                    _logger.warning('Unknown action %s for key %s in dynamic config extension', action, key)
+            if isinstance(extension_value, list) and isinstance(base_value, list):
+                for _extension_value in extension_value:
+                    extension_filters = {k[1:]: v for k, v in _extension_value.items() if k.startswith('@')}
+                    new_values = {k: v for k, v in _extension_value.items() if not k.startswith('@')}
+                    for _base_value in base_value:
+                        for filter_key, filter_val in extension_filters.items():
+                            if _base_value.get(filter_key) != filter_val:
+                                break
+                        else:
+                            self._apply_dynamic_config_extension(_base_value, new_values)
+        return base_config
+
+    def _validate_dynamic_config(self, config):
+        def validate(schema, value, path):
+            for key, validator in schema.items():
+                val = value.get(key)
+                if callable(validator):
+                    validator(val, f'{path}.{key}')
+                else:
+                    if val != validator:
+                        raise ValidationError(f'{path}.{key} should be {validator}, got {val}')
+            for key in value:
+                if key not in schema:
+                    raise ValidationError(f'Unexpected key {key} in {path}')
+
+        def str_checker(regex):
+            def wrapper(modules, path):
+                if not isinstance(modules, str):
+                    raise ValidationError(f'{path} ({modules}) should be a string')
+                if not re.match(regex, modules):
+                    raise ValidationError(f'{path} ({modules}) contains invalid characters ({regex})')
+            return wrapper
+
+        def REQUIRED(validator):
+            def wrapper(value, path):
+                if not value:
+                    raise ValidationError(f'{path} is required')
+                return validator(value, path)
+            return wrapper
+
+        def OPTIONAL(validator):
+            def wrapper(value, path):
+                if value is not None:
+                    return validator(value, path)
+            return wrapper
+
+        def CONFIG(child, path):
+            validate(config_schema, child, path + '[]')
+
+        valid_steps = {}
+
+        def STEP(step, path):
+            if (job_type := step.get('job_type')) not in valid_steps:
+                raise ValidationError(f'Unknown job_type "{job_type}" in {path}[]')
+            step_schema = valid_steps[step.get('job_type')]
+            validate(step_schema, step, f'{path}[]')
+
+        def IN(options):
+            def wrapper(value, path):
+                if value not in options:
+                    raise ValidationError(f'{path} should be one of {options}, got {value}')
+            return wrapper
+
+        def type_checker(expected_type):
+            def wrapper(value, path):
+                if not isinstance(value, expected_type):
+                    raise ValidationError(f'{path} should be of type {expected_type.__name__}, got {type(value).__name__}')
+            return wrapper
+
+        def LIST(validator):
+            def wrapper(value, path):
+                if not isinstance(value, list):
+                    raise ValidationError(f'{path} should be a list')
+                for index, item in enumerate(value):
+                    validator(item, f'{path}[{index}]')
+            return wrapper
+
+        def VARS(vars, path):
+            if not isinstance(vars, dict):
+                raise ValidationError(f'{path} ({vars}) should be a dict')
+            for key, val in vars.items():
+                TECHNICAL_NAME(key, f'{path}.{key}')
+                STR(val, f'{path}.{key}')
+
+        NAME = str_checker(r'^[\w \-]+$')
+        STR = str_checker(r'.+')
+        DYNAMIC_VALUE = STR
+        TECHNICAL_NAME = str_checker(r'^[a-z0-9_\-]+$')
+        BOOL = type_checker(bool)
+        INT = type_checker(int)
+        COMMAND = str_checker(r'^.*$')
+
+        config_schema = {
+            'name': REQUIRED(NAME),
+            'vars': OPTIONAL(VARS),
+            'steps': REQUIRED(LIST(STEP)),
+            'description': OPTIONAL(DYNAMIC_VALUE),
+        }
+        valid_steps['odoo'] = {
+            'name': REQUIRED(NAME),
+            'job_type': 'odoo',
+            'db_name': OPTIONAL(TECHNICAL_NAME),
+            'install_modules': OPTIONAL(DYNAMIC_VALUE),
+            'install_default_modules': OPTIONAL(DYNAMIC_VALUE),
+            'test_tags': OPTIONAL(DYNAMIC_VALUE),
+            'demo_mode': OPTIONAL(IN(['default', 'with_demo', 'without_demo'])),
+            'enable_auto_tags': OPTIONAL(BOOL),
+            'cpu_limit': OPTIONAL(INT),
+            'export_database': OPTIONAL(BOOL),
+        }
+        valid_steps['create_build'] = {
+            'name': REQUIRED(NAME),
+            'job_type': 'create_build',
+            'children': REQUIRED(LIST(CONFIG)),
+            'for_each_vars': OPTIONAL(LIST(VARS)),
+        }
+        valid_steps['restore'] = {
+            'name': REQUIRED(NAME),
+            'job_type': 'restore',
+            'db_name': REQUIRED(TECHNICAL_NAME),
+            'build_id': OPTIONAL(INT),
+            'trigger_id': OPTIONAL(INT),
+            'use_current_batch': OPTIONAL(BOOL),
+            'zip_url': OPTIONAL(STR),
+        }
+        valid_steps['command'] = {
+            'name': REQUIRED(NAME),
+            'job_type': 'command',
+            'db_name': OPTIONAL(TECHNICAL_NAME),
+            'command': REQUIRED(COMMAND),
+            'cpu_limit': OPTIONAL(INT),
+            'install_requirements': OPTIONAL(BOOL),
+            'export_database': OPTIONAL(BOOL),
+            'check_logs': OPTIONAL(LIST(STR)),
+            'expected_logs': OPTIONAL(LIST(STR)),
+        }
+        validate(config_schema, config, 'config')
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -123,6 +330,7 @@ TYPES = [
         ('configure_upgrade_complement', 'Configure Upgrade Complement'),
         ('test_upgrade', 'Test Upgrade'),
         ('restore', 'Restore'),
+        ('dynamic', 'Dynamic'),
     ]
 
 
@@ -157,7 +365,7 @@ class ConfigStep(models.Model):
     flamegraph = fields.Boolean('Allow Flamegraph', default=False, tracking=True)
     test_enable = fields.Boolean('Test enable', default=True, tracking=True)
     test_tags = fields.Char('Test tags', help="comma separated list of test tags", tracking=True)
-    enable_auto_tags = fields.Boolean('Allow auto tag', default=False, tracking=True)
+    enable_auto_tags = fields.Boolean('Allow auto tag', default=True, tracking=True)
     sub_command = fields.Char('Subcommand', tracking=True)
     extra_params = fields.Char('Extra cmd args', tracking=True)
     additionnal_env = fields.Char('Extra env', help='Example: foo="bar";bar="foo". Cannot contains \' ', tracking=True)
@@ -204,6 +412,7 @@ class ConfigStep(models.Model):
     break_before_if_ko = fields.Boolean('Break before this step if build is ko')
     break_after_if_ko = fields.Boolean('Break after this step if build is ko')
 
+
     @api.constrains('python_code')
     def _check_python_code(self):
         return self._check_python_field('python_code')
@@ -230,6 +439,14 @@ class ConfigStep(models.Model):
         for step in self:
             step.db_name = step.custom_db_name or step.name
 
+    def _get_db_name(self, build):
+        db_name = self.custom_db_name or self.name
+        return re.sub(r'[^a-z0-9\-_]', '_', db_name.lower())
+
+    def sanitized_name(self, build):
+        name = self._get_display_name(build) or self.name or ''
+        return re.sub(r'[^a-z0-9\-_]', '_', name.lower())
+
     def _inverse_db_name(self):
         for step in self:
             step.custom_db_name = step.db_name
@@ -255,6 +472,14 @@ class ConfigStep(models.Model):
             raise UserError('Protected step')
         super(ConfigStep, self).unlink()
 
+    def _get_display_name(self, build):
+        if self.job_type == 'dynamic':
+            steps = build.dynamic_config.get('steps', [])
+            index = build.dynamic_active_step_index
+            if index < len(steps):
+                return steps[index].get('name', self.name)
+        return self.name
+
     def _check(self, values):
         if 'name' in values:
             name_reg = r'^[a-zA-Z0-9\-_]*$'
@@ -268,20 +493,20 @@ class ConfigStep(models.Model):
             if (values.get('extra_params')):
                 reg = r'^[a-zA-Z0-9\-_ "]*$'
                 if not re.match(reg, values.get('extra_params')):
-                    _logger.log('%s tried to create an non supported test_param %s' % (self.env.user.name, values.get('extra_params')))
+                    _logger.log('%s tried to create an non supported test_param %s' % self.env.user.name, values.get('extra_params'))
                     raise UserError('Invalid extra_params on config step')
 
     def _run(self, build):
         build.write({'job_start': now(), 'job_end': False})  # state, ...
-        log = build._log('run', f'Starting step **{self.name}** from config **{build.params_id.config_id.name}**', log_type='markdown', level='SEPARATOR')
+        log = build._log('run', f'Starting step **{self._get_display_name(build)}** from config **{build.params_id.config_id.name}**', log_type='markdown', level='SEPARATOR')
         result = self._run_step(build)
         if callable(result):  # docker step, should have text logs
             if build.log_list:
-                build.log_list = f'{build.log_list},{self.name}'
+                build.log_list = f'{build.log_list},{self.sanitized_name(build)}'
             else:
-                build.log_list = self.name
+                build.log_list = self.sanitized_name(build)
             log_url = f'http://{build.host}'
-            url = f"{log_url}/runbot/static/build/{build.dest}/logs/{self.name}.txt"
+            url = f"{log_url}/runbot/static/build/{build.dest}/logs/{self.sanitized_name(build)}.txt"
             log_link = f'[@icon-file-text]({url})'
             log.message = f'{log.message}  {log_link}'
         return result
@@ -303,9 +528,12 @@ class ConfigStep(models.Model):
             return build._docker_run(self, **docker_params)
         return True
 
-    def _run_create_build(self, build):
+    def _run_create_build(self, build, config_data=None):
+        if config_data:
+            config_data = {**config_data, **build.params_id.config_data}
+        else:
+            config_data = build.params_id.config_data
         count = 0
-        config_data = build.params_id.config_data
         config_ids = config_data.get('create_config_ids', self.create_config_ids)
 
         child_data_list = config_data.get('child_data', [{}])
@@ -313,15 +541,18 @@ class ConfigStep(models.Model):
             child_data_list = [child_data_list]
 
         for child_data in child_data_list:
+            config_name = child_data.pop('config_name', {})
+            description = child_data.pop('description', {})
             for create_config in self.env['runbot.build.config'].browse(child_data.get('config_id', config_ids.ids)):
-                _child_data = {'config_data': {}, **child_data, 'config_id': create_config}
+                child_data_values = {'config_data': {}, **child_data, 'config_id': create_config}
                 for _ in range(config_data.get('number_build', self.number_builds)):
                     count += 1
                     if count > 200:
                         build._logger('Too much build created')
                         break
-                    child = build._add_child(_child_data, orphan=self.make_orphan)
-                    build._log('create_build', 'created with config %s' % create_config.name, log_type='subbuild', path=str(child.id))
+                    config_name = config_name or create_config.name
+                    child = build._add_child(child_data_values, orphan=self.make_orphan, description=description or config_name)
+                    build._log('create_build', 'created with config %s' % config_name, log_type='subbuild', path=str(child.id))
 
     def _make_python_ctx(self, build):
         return {
@@ -335,7 +566,7 @@ class ConfigStep(models.Model):
             # 'models': models,
             'build': build,
             '_logger': _logger,
-            'log_path': build._path('logs', '%s.txt' % self.name),
+            'log_path': build._path('logs', '%s.txt' % self.sanitized_name(build)),
             'glob': glob.glob,
             'Command': Command,
             're': ReProxy,
@@ -429,10 +660,15 @@ class ConfigStep(models.Model):
             build._log('', "An error occured while reloading nginx, skipping")
         return dict(cmd=cmd, exposed_ports=[build_port, build_port + 1], ro_volumes=exports, env_variables=env_variables, cpu_limit=None, network_enabled=True)
 
-    def _run_install_odoo(self, build):
-        exports = build._checkout()
+    def _run_install_odoo(self, build, config_data=None):
 
-        modules_to_install = self._modules_to_install(build)
+        if config_data:
+            config_data = {**config_data, **build.params_id.config_data}
+        else:
+            config_data = build.params_id.config_data
+        exports = build._checkout()
+        install_module_pattern = config_data.get('install_module_pattern', self.install_modules)
+        modules_to_install = build._get_modules_to_test(install_module_pattern)
         mods = ",".join(modules_to_install)
         python_params = []
         py_version = build._get_py_version()
@@ -441,12 +677,13 @@ class ConfigStep(models.Model):
             coverage_extra_params = self._coverage_params(build, modules_to_install)
             python_params = ['-m', 'coverage', 'run', '--branch', '--source', '/data/build'] + coverage_extra_params
         elif self.flamegraph:
-            python_params = ['-m', 'flamegraph', '-o', self._perfs_data_path()]
+            python_params = ['-m', 'flamegraph', '-o', self._perfs_data_path(build)]
         cmd = build._cmd(python_params, py_version, sub_command=self.sub_command, enable_log_db=self.enable_log_db)
         # create db if needed
-        db_suffix = build.params_id.config_data.get('db_name') or (build.params_id.dump_db.db_suffix if not self.create_db else False) or self.db_name
+        db_suffix = config_data.get('db_name') or (build.params_id.dump_db.db_suffix if not self.create_db else False) or self._get_db_name(build)
+        db_suffix = re.sub(r'[^a-z0-9\-_]', '_', db_suffix.lower())
         db_name = '%s-%s' % (build.dest, db_suffix)
-        if self.create_db:
+        if modules_to_install and self.create_db:
             build._local_pg_createdb(db_name)
         cmd += ['-d', db_name]
 
@@ -454,7 +691,7 @@ class ConfigStep(models.Model):
         available_options = build._parse_config()
         # True if build has demo data by default
         demo_installed_by_default = '--with-demo' not in available_options
-        demo_mode = build.params_id.config_data.get('demo_mode', self.demo_mode)
+        demo_mode = config_data.get('demo_mode', self.demo_mode)
         if demo_mode == 'with_demo' and not demo_installed_by_default:
             cmd.append('--with-demo')
         elif demo_mode == 'without_demo' and demo_installed_by_default:
@@ -466,22 +703,17 @@ class ConfigStep(models.Model):
             cmd += ['-i', mods]
         config_path = build._server("tools/config.py")
 
-        if self.test_enable:
-            if "--test-enable" in available_options:
-                cmd.extend(['--test-enable'])
-            else:
-                build._log('test_all', 'Installing modules without testing', level='WARNING')
+        test_enable = config_data.get('test_enable', self.test_enable)
+        test_tags = config_data.get('test_tags', self.test_tags)
+        enable_auto_tags = config_data.get('enable_auto_tags', self.enable_auto_tags)
+        if test_enable:
+            cmd.extend(['--test-enable'])
 
         test_tags_in_extra = '--test-tags' in extra_params
 
-        if (self.test_enable or self.test_tags) and "--test-tags" in available_options and not test_tags_in_extra:
-            test_tags = []
-            custom_tags = build.params_id.config_data.get('test_tags')
-            if custom_tags:
-                test_tags += [t.strip() for t in custom_tags.split(',')]
-            if self.test_tags:
-                test_tags += [t.strip() for t in self.test_tags.split(',')]
-            if self.enable_auto_tags and not build.params_id.config_data.get('disable_auto_tags', False):
+        if (test_enable or test_tags) and "--test-tags" in available_options and not test_tags_in_extra:
+            test_tags = [t.strip() for t in (test_tags or '').split(',')]
+            if enable_auto_tags and not config_data.get('disable_auto_tags', False):
                 if grep(config_path, "[/module][:class]"):
                     auto_tags = self.env['runbot.build.error']._disabling_tags(build)
                     if auto_tags:
@@ -501,7 +733,7 @@ class ConfigStep(models.Model):
             db_template = icp.get_param('runbot.runbot_db_template', default='template0')
             cmd.add_config_tuple('db_template', db_template)
 
-        if "--screencasts" in available_options and self.env['ir.config_parameter'].sudo().get_param('runbot.enable_screencast', False):
+        if "--screencasts" in available_options and (self.env['ir.config_parameter'].sudo().get_param('runbot.enable_screencast', False) or config_data.get('screencast', False)):
             cmd.add_config_tuple('screencasts', '/data/build/tests')
 
         cmd.append('--stop-after-init')  # install job should always finish
@@ -513,6 +745,24 @@ class ConfigStep(models.Model):
             cmd.extend(shlex.split(extra_params))
 
         cmd.finals.extend(self._post_install_commands(build, modules_to_install, py_version))  # coverage post, extra-checks, ...
+
+        if config_data.get('export_database', True):
+            self._add_zip_generation(build, cmd, db_name)
+
+        if self.flamegraph:
+            cmd.finals.append(['flamegraph.pl', '--title', 'Flamegraph %s for build %s' % (self.sanitized_name(build), build.id), self._perfs_data_path(build), '>', self._perfs_data_path(ext='svg')])
+            cmd.finals.append(['gzip', '-f', self._perfs_data_path(build)])  # keep data but gz them to save disc space
+        env_variables = self.additionnal_env.split(';') if self.additionnal_env else []
+        if config_env_variables := config_data.get('env_variables', False):
+            env_variables += config_env_variables.split(';')
+
+        cpu_limit = None
+        if config_data.get('cpu_limit'):
+            cpu_limit = min(self.cpu_limit, int(config_data['cpu_limit']))
+
+        return dict(cmd=cmd, ro_volumes=exports, cpu_limit=cpu_limit, env_variables=env_variables)
+
+    def _add_zip_generation(self, build, cmd, db_name):
         dump_dir = '/data/build/logs/%s/' % db_name
         sql_dest = '%s/dump.sql' % dump_dir
         filestore_path = '/data/build/datadir/filestore/%s' % db_name
@@ -523,14 +773,6 @@ class ConfigStep(models.Model):
         cmd.finals.append(['cd', dump_dir, '&&', 'zip', '-rmq9', zip_path, '*'])
         infos = '{\n    "db_name": "%s",\n    "build_id": %s,\n    "shas": [%s]\n}' % (db_name, build.id, ', '.join(['"%s"' % build_commit.commit_id.dname for build_commit in build.params_id.commit_link_ids]))
         build._write_file('logs/%s/info.json' % db_name, infos)
-
-        if self.flamegraph:
-            cmd.finals.append(['flamegraph.pl', '--title', 'Flamegraph %s for build %s' % (self.name, build.id), self._perfs_data_path(), '>', self._perfs_data_path(ext='svg')])
-            cmd.finals.append(['gzip', '-f', self._perfs_data_path()])  # keep data but gz them to save disc space
-        env_variables = self.additionnal_env.split(';') if self.additionnal_env else []
-        if config_env_variables := build.params_id.config_data.get('env_variables', False):
-            env_variables += config_env_variables.split(';')
-        return dict(cmd=cmd, ro_volumes=exports, env_variables=env_variables)
 
     def _upgrade_create_childs(self):
         pass
@@ -816,25 +1058,34 @@ class ConfigStep(models.Model):
             env_variables += config_env_variables.split(';')
         return dict(cmd=migrate_cmd, ro_volumes=exports, env_variables=env_variables, image_tag=target.params_id.dockerfile_id.image_tag)
 
-    def _run_restore(self, build):
+    def _run_restore(self, build, config_data=None):
         # exports = build._checkout()
         params = build.params_id
+        if config_data:
+            config_data = {**config_data, **params.config_data}
+        else:
+            config_data = params.config_data
         dump_db = params.dump_db
-        if 'dump_url' in params.config_data:
-            dump_url = params.config_data['dump_url']
+        if dump_url := config_data.get('dump_url'):
             zip_name = dump_url.split('/')[-1]
             build._log('_run_restore', f'Restoring db [{zip_name}]({dump_url})', log_type='markdown')
-            suffix = 'all'
         else:
-            if 'dump_trigger_id' in params.config_data:
-                dump_trigger = self.env['runbot.trigger'].browse(params.config_data['dump_trigger_id'])
-                dump_suffix = params.config_data.get('dump_suffix', 'all')
-
-                if params.config_data.get('dump_from_current_batch'):
+            reference_build = None
+            if restore_build_id := config_data.get('restore_build_id'):
+                reference_build = self.env['runbot.build'].browse(int(restore_build_id)).exists()
+                if not reference_build:
+                    build._log('_run_restore', f'Reference build id {restore_build_id} not found', log_type='markdown', level='ERROR')
+                    build._kill(result='ko')
+                    return
+            elif (dump_trigger_id := config_data.get('dump_trigger_id')):
+                dump_trigger = self.env['runbot.trigger'].browse(int(dump_trigger_id))
+                if config_data.get('dump_from_current_batch'):
                     reference_batch = build.params_id.create_batch_id
                 else:
                     reference_batch = build.params_id.create_batch_id.base_reference_batch_id
-
+                reference_build = reference_batch.slot_ids.filtered(lambda s: s.trigger_id == dump_trigger).mapped('build_id')
+            if reference_build:
+                dump_suffix = config_data.get('dump_suffix', 'all')
                 reference_build = reference_batch.slot_ids.filtered(lambda s: s.trigger_id == dump_trigger).mapped('build_id')
                 if not reference_build:
                     build._log('_run_restore', f'No reference build found in batch {reference_batch.id} for trigger {dump_trigger.name}', log_type='markdown', level='ERROR')
@@ -847,17 +1098,19 @@ class ConfigStep(models.Model):
                     build._log('_run_restore', f'No dump with suffix {dump_suffix} found in build [{reference_build.id}]({reference_build.build_url})', log_type='markdown', level='ERROR')
                     build._kill(result='ko')
                     return
-
-            download_db_suffix = dump_db.db_suffix or self.restore_download_db_suffix
-            dump_build = dump_db.build_id or build.parent_id
+            if dump_db:
+                download_db_suffix = dump_db.db_suffix
+                dump_build = dump_db.build_id
+            else:
+                download_db_suffix = config_data.get('dump_suffix', self.restore_download_db_suffix or 'all')
+                dump_build = build.parent_id
             assert download_db_suffix and dump_build
             download_db_name = '%s-%s' % (dump_build.dest, download_db_suffix)
             zip_name = '%s.zip' % download_db_name
             dump_url = '%s%s' % (dump_build._http_log_url(), zip_name)
             build._log('test-migration', 'Restoring dump [%s](%s) from build [%s](%s)', zip_name, dump_url, dump_build.id, dump_build.build_url, log_type='markdown')
-        restore_suffix = self.restore_rename_db_suffix or dump_db.db_suffix or suffix
-        assert restore_suffix
-        restore_db_name = '%s-%s' % (build.dest, restore_suffix)
+        target_suffix = config_data.get('target_suffix', self.restore_rename_db_suffix or download_db_suffix)
+        restore_db_name = '%s-%s' % (build.dest, target_suffix)
 
         build._local_pg_createdb(restore_db_name)
         cmd = ' && '.join([
@@ -877,8 +1130,7 @@ class ConfigStep(models.Model):
             'rm -r restore',
             'echo "### listing modules"',
             """psql %s -c "select name from ir_module_module where state = 'installed'" -t -A > /data/build/logs/restore_modules_installed.txt""" % restore_db_name,
-            'echo "### restore" "successful"', # two part string to avoid miss grep
-
+            'echo "### restore" "successful"',  # two part string to avoid miss grep
             ])
 
         return dict(cmd=cmd, network_enabled=True)
@@ -965,15 +1217,33 @@ class ConfigStep(models.Model):
         return base_batch.reference_batch_ids.filtered(lambda batch: batch.bundle_id in ref_bundles and batch.category_id.id == category_id)
 
     def _log_end(self, build):
-        if self.job_type == 'create_build':
-            build._logger('Step %s finished in %s' % (self.name, s2human(build.job_time)))
+        # TODO fixme config data are not the same as the run part in dynamic steps
+        job_type = self.job_type
+        # in dynamic step, get the real job type
+        database_exported = job_type == 'install_odoo'
+        config_data = {**build.params_id.config_data}
+        if job_type == 'dynamic':
+            dynamic_config = build.dynamic_config
+            dynamic_active_step_index = build.dynamic_active_step_index
+            if dynamic_config and dynamic_config.get("steps", []):
+                current_step = dynamic_config["steps"][dynamic_active_step_index]
+                job_type = current_step.get('job_type')
+                database_exported = current_step.get('export_database', job_type == 'odoo')
+                if db_name := current_step.get('db_name'):
+                    config_data['db_name'] = db_name
+                if job_type == 'odoo':
+                    job_type = 'install_odoo'
+
+        if job_type == 'create_build':
+            build._logger('Step %s finished in %s' % (self._get_display_name(build), s2human(build.job_time)))
             return
 
         message = 'Step %s finished in %s'
-        args = [self.name, s2human(build.job_time)]
+        args = [self._get_display_name(build), s2human(build.job_time)]
         log_type = 'runbot'
-        if self.job_type == 'install_odoo':
-            db_suffix = build.params_id.config_data.get('db_name') or (build.params_id.dump_db.db_suffix if not self.create_db else False) or self.db_name
+        if database_exported:
+            db_suffix = config_data.get('db_name') or (build.params_id.dump_db.db_suffix if not self.create_db else False) or self._get_db_name(build)
+            db_suffix = re.sub(r'[^a-z0-9\-_]', '_', db_suffix.lower())
             message += ' [@icon-download](%s%s-%s.zip)'
             args += [build._http_log_url(), build.dest, db_suffix]
             log_type = 'markdown'
@@ -986,13 +1256,10 @@ class ConfigStep(models.Model):
             build._log('end_job', message, xml_url, html_url, log_type='markdown')
 
         if self.flamegraph:
-            dat_url = '%sflame_%s.%s' % (build._http_log_url(), self.name, 'log.gz')
-            svg_url = '%sflame_%s.%s' % (build._http_log_url(), self.name, 'svg')
+            dat_url = '%sflame_%s.%s' % (build._http_log_url(), self.sanitized_name(build), 'log.gz')
+            svg_url = '%sflame_%s.%s' % (build._http_log_url(), self.sanitized_name(build), 'svg')
             message = 'Flamegraph report: [data @icon-download](%s), [svg @icon-eye](%s)'
             build._log('end_job', message, dat_url, svg_url, log_type='markdown')
-
-    def _modules_to_install(self, build):
-        return set(build._get_modules_to_test(modules_patterns=self.install_modules))
 
     def _post_install_commands(self, build, modules_to_install, py_version=None):
         cmds = []
@@ -1005,8 +1272,8 @@ class ConfigStep(models.Model):
             cmds.append(['python%s' % py_version, "-m", "coverage", "xml", "-o", "/data/build/logs/coverage.xml", "--ignore-errors"])
         return cmds
 
-    def _perfs_data_path(self, ext='log'):
-        return '/data/build/logs/flame_%s.%s' % (self.name, ext)
+    def _perfs_data_path(self, build, ext='log'):
+        return '/data/build/logs/flame_%s.%s' % (self.sanitized_name(build), ext)
 
     def _coverage_params(self, build, modules_to_install):
         pattern_to_omit = set()
@@ -1021,25 +1288,52 @@ class ConfigStep(models.Model):
                     # we want to omit docker_source_folder/[addons/path/]module/*
                     module_path_in_docker = os.sep.join([docker_source_folder, addons_path, module])
                     pattern_to_omit.add('%s/*' % (module_path_in_docker))
-        return ['--omit', ','.join(pattern_to_omit)]
+        return ['--omit', ','.join(sorted(pattern_to_omit))]
 
     def _make_results(self, build):
+        # TODO fixme config data are not the same as the run part in dynamic steps
+        active_job_type = self.job_type
+        check_logs = None
+        expected_logs = None
+        if self.job_type == 'dynamic':
+            dynamic_config = build.dynamic_config
+            dynamic_active_step_index = build.dynamic_active_step_index
+            if not dynamic_config or not (steps := dynamic_config.get("steps", [])):
+                build._log('', 'No dynamic config or steps found, skipping', level="WARNING")
+                return
+            current_step = steps[dynamic_active_step_index]
+            if current_step['job_type'] == 'odoo':
+                active_job_type = 'install_odoo'
+            else:
+                active_job_type = current_step['job_type']
+
+            check_logs = current_step.get('check_logs')
+            expected_logs = current_step.get('expected_logs')
+            if current_step['job_type'] == 'script':
+                if check_logs is None:
+                    check_logs = ['ERROR', 'WARNING']
+                if expected_logs is None:
+                    expected_logs = ['scripts executed in']
+
         log_time = self._get_log_last_write(build)
         if log_time:
             build.job_end = log_time
-        if self.job_type == 'python':
+
+        if check_logs or expected_logs:
+            self._make_custom_result(build, check_logs, expected_logs)
+        elif active_job_type == 'python':
             if self.python_result_code and self.python_result_code != PYTHON_DEFAULT:
                 self._make_python_results(build)
             elif self.test_enable or self.test_tags:
                 self._make_odoo_results(build)
-        elif self.job_type == 'install_odoo':
+        elif active_job_type == 'install_odoo':
             if self.coverage:
                 build.write(self._make_coverage_results(build))
             if not self.sub_command:
                 self._make_odoo_results(build)
-        elif self.job_type == 'test_upgrade':
+        elif active_job_type == 'test_upgrade':
             self._make_upgrade_results(build)
-        elif self.job_type == 'restore':
+        elif active_job_type == 'restore':
             self._make_restore_results(build)
 
     def _make_python_results(self, build):
@@ -1078,8 +1372,9 @@ class ConfigStep(models.Model):
                 self._check_module_loaded,
                 self._check_module_states,
                 self._check_build_ended,
-                self._check_warning,
             ]
+            if build.local_result != 'warn':
+                checkers.append(self._check_warning)
             build.local_result = self._get_checkers_result(build, checkers)
 
     def _check_module_states(self, build):
@@ -1094,15 +1389,14 @@ class ConfigStep(models.Model):
         return 'ok'
 
     def _check_log(self, build):
-        log_path = build._path('logs', '%s.txt' % self.name)
+        log_path = build._path('logs', '%s.txt' % self.sanitized_name(build))
         if not os.path.isfile(log_path):
             build._log('_make_tests_results', "Log file not found at the end of test job", level="ERROR")
             return 'ko'
         return 'ok'
 
-
     def _check_module_loaded(self, build):
-        log_path = build._path('logs', '%s.txt' % self.name)
+        log_path = build._path('logs', '%s.txt' % self.sanitized_name(build))
         if not grep(log_path, ".modules.loading: Modules loaded."):
             details = build._get_error_tail_message(log_path)
             build._log('_make_tests_results', f"Modules loaded not found in logs{details}", level="ERROR")
@@ -1110,7 +1404,7 @@ class ConfigStep(models.Model):
         return 'ok'
 
     def _check_error(self, build, regex=None):
-        log_path = build._path('logs', '%s.txt' % self.name)
+        log_path = build._path('logs', '%s.txt' % self.sanitized_name(build))
         re_error = regex or r'^(?:\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ (?:ERROR|CRITICAL) .*)$'
 
         if result := rfind(log_path, re_error):
@@ -1127,7 +1421,7 @@ class ConfigStep(models.Model):
         return 'ok'
 
     def _check_warning(self, build, regex=None):
-        log_path = build._path('logs', '%s.txt' % self.name)
+        log_path = build._path('logs', '%s.txt' % self.sanitized_name(build))
         regex = regex or _re_warning
         if result := rfind(log_path, regex):
             build._log('_make_tests_results', 'Warning found in logs:\n%s' % '\n'.join(result), level="WARNING")
@@ -1135,7 +1429,7 @@ class ConfigStep(models.Model):
         return 'ok'
 
     def _check_build_ended(self, build):
-        log_path = build._path('logs', '%s.txt' % self.name)
+        log_path = build._path('logs', '%s.txt' % self.sanitized_name(build))
         if not grep(log_path, "Initiating shutdown"):
             details = build._get_error_tail_message(log_path)
             build._log('_make_tests_results', f'No "Initiating shutdown" found in logs.{details}', level="ERROR")
@@ -1143,14 +1437,22 @@ class ConfigStep(models.Model):
         return 'ok'
 
     def _check_restore_ended(self, build):
-        log_path = build._path('logs', '%s.txt' % self.name)
+        log_path = build._path('logs', '%s.txt' % self.sanitized_name(build))
         if not grep(log_path, "### restore successful"):
             build._log('_make_tests_results', 'Restore failed, check text logs for more info', level="ERROR")
             return 'ko'
         return 'ok'
 
+    def _check_expected_log(self, build, expected_log):
+        log_path = build._path('logs', '%s.txt' % self.sanitized_name(build))
+        if not grep(log_path, expected_log):
+            details = build._get_error_tail_message(log_path)
+            build._log('_make_tests_results', f'No "{expected_log}" found in logs.{details}', level="ERROR")
+            return 'ko'
+        return 'ok'
+
     def _get_log_last_write(self, build):
-        log_path = build._path('logs', '%s.txt' % self.name)
+        log_path = build._path('logs', '%s.txt' % self.sanitized_name(build))
         if os.path.isfile(log_path):
             return time2str(time.localtime(os.path.getmtime(log_path)))
 
@@ -1160,6 +1462,23 @@ class ConfigStep(models.Model):
             if result != 'ok':
                 return result
         return 'ok'
+
+    def _make_custom_result(self, build, enabled_checkers=None, expected_logs=None):
+        build._log('run', 'Getting results for build %s' % build.dest)
+        if build.local_result != 'ko':
+            checkers = [self._check_log]
+            if enabled_checkers is None or "ERROR" in enabled_checkers:
+                checkers.append(self._check_error)
+            if expected_logs is None:
+                expected_logs = [".modules.loading: Modules loaded.", "Initiating shutdown"]
+            for expected_log in (expected_logs or []):
+                if expected_log:
+                    checkers.append(lambda b: self._check_expected_log(b, expected_log))
+
+            if build.local_result != 'warn' and (enabled_checkers is None or "WARNING" in enabled_checkers):
+                checkers.append(self._check_warning)
+
+            build.local_result = self._get_checkers_result(build, checkers)
 
     def _make_odoo_results(self, build):
         build._log('run', 'Getting results for build %s' % build.dest)
@@ -1180,7 +1499,7 @@ class ConfigStep(models.Model):
         if build.local_result != 'warn':
             checkers = [
                 self._check_log,
-                self._check_restore_ended
+                self._check_restore_ended,
             ]
             build.local_result = self._get_checkers_result(build, checkers)
 
@@ -1188,9 +1507,9 @@ class ConfigStep(models.Model):
         if not self.make_stats:  # TODO garbage collect non sticky stat
             return
         build._log('make_stats', 'Getting stats from log file')
-        log_path = build._path('logs', '%s.txt' % self.name)
+        log_path = build._path('logs', '%s.txt' % self.sanitized_name(build))
         if not os.path.exists(log_path):
-            build._log('make_stats', 'Log **%s.txt** file not found', self.name, level='INFO', log_type='markdown')
+            build._log('make_stats', 'Log **%s.txt** file not found', self.sanitized_name(build), level='INFO', log_type='markdown')
             return
         try:
             regex_ids = self.build_stat_regex_ids
@@ -1246,6 +1565,157 @@ class ConfigStep(models.Model):
                 files = [os.sep.join([build._docker_source_folder(commit), file]) for file in modified.split('\n') if file]
                 modified_files[commit_link] = files
         return modified_files
+
+    def _run_dynamic(self, build):
+        if len(build.ancestors) > 6:
+            raise RunbotException('Too many ancestors builds, possible cyclic dynamic build creation')
+        if build.parent_id and build.dynamic_config == build.parent_id.dynamic_config:
+            raise RunbotException('A child build cannot load the same dynamic config if parent, recursion detected')
+
+        dynamic_config = build.dynamic_config
+        dynamic_active_step_index = build.dynamic_active_step_index
+        if not dynamic_config:
+            build._log('', 'No dynamic config found, skipping', level="WARNING")
+            return
+        steps = dynamic_config.get("steps", [])
+        if not steps:
+            build._log('', 'Dynamic config has no steps, skipping', level="WARNING")
+            return
+        current_step = steps[dynamic_active_step_index]
+        if current_step['job_type'] == 'create_build':
+            for_each_vars_list = current_step.get('for_each_vars', [{}])
+            parent_vars = {**dynamic_config.get('vars', {}), **build.params_id.config_data.get('dynamic_vars', {})}
+            child_data_list = []
+            for child_index, child in enumerate(current_step.get('children', [])):
+                child_vars = child.get('vars', {})
+                for for_each_vars in for_each_vars_list:
+                    config_name = child.get('name', build.params_id.config_id.name)
+                    dynamic_vars = {**parent_vars, **child_vars, **for_each_vars}
+                    if 'description' in child:
+                        description = self._parse_dynamic_entry(child['description'], build, additional_dynamic_vars=dynamic_vars)
+                        # note: we mainly need to provide additional_dynamic_vars because the child is not created yet at this point
+                    else:
+                        description = config_name
+                    child_data = {
+                        'config_data': {**build.params_id.config_data.dict, "dynamic_vars": dynamic_vars},
+                        'config_id': build.params_id.config_id.id,
+                        'dynamic_active_step_index': 0,
+                        'dynamic_config_position': f'{build.params_id.dynamic_config_position or ""}/{build.dynamic_active_step_index}.{child_index}',
+                        'config_name': config_name,
+                        'description': description,
+                    }
+                    child_data_list.append(child_data)
+            return self._run_create_build(build, {'child_data': child_data_list, 'number_build': current_step.get('number_builds', 1)})
+
+        if current_step['job_type'] == 'restore':
+            config_data = {
+                'dump_suffix': self._get_dynamic_db_suffix(current_step),
+                'restore_build_id': current_step.get('build_id'),
+                'dump_trigger_id': current_step.get('trigger_id'),
+                'dump_from_current_batch': current_step.get('use_current_batch'),
+                'dump_url': current_step.get('zip_url'),
+            }
+            return self._run_restore(build, config_data)
+
+        if current_step['job_type'] == 'odoo':
+            config_data = {}
+            install_modules_pattern = current_step.get('install_default_modules')
+            if install_modules_pattern is None:
+                install_modules_pattern = current_step.get('install_modules', '')
+                if install_modules_pattern.split(',', 1)[0] not in ('*', '-*'):
+                    install_modules_pattern = '-*,' + install_modules_pattern
+            config_data['install_module_pattern'] = self._parse_dynamic_entry(install_modules_pattern, build)
+
+            if 'test_tags' in current_step:
+                config_data['test_tags'] = self._parse_dynamic_entry(current_step.get('test_tags'), build)
+            config_data['test_enable'] = bool(current_step.get('test_enable') or current_step.get('test_tags'))
+
+            for key in ('screencast', 'demo_mode', 'enable_auto_tags'):
+                if key in current_step:
+                    value = current_step[key]
+                    config_data[key] = value
+            db_suffix = self._get_dynamic_db_suffix(current_step)
+            config_data['db_name'] = db_suffix
+            return self._run_install_odoo(build, config_data)
+
+        if current_step['job_type'] == 'command':
+            exports = build._checkout()
+            command_str = current_step.get('command', '')
+            db_suffix = self._get_dynamic_db_suffix(current_step)
+            db_name = '%s-%s' % (build.dest, db_suffix)
+            command = command_str.split(' ')
+            values = {
+                'db_name': db_name,
+                'data_dir': '/data/build/datadir/',
+                'addons_path': ",".join(build._get_addons_path()),
+                'exports': ",".join(exports.keys()),
+                'exports_paths': ",".join(exports.values()),
+            }
+            command = [shlex.quote(self._parse_dynamic_entry(part, build, values)) for part in command]
+            pres = []
+            if current_step.get('install_requirements', False):
+                pres = build._make_pip_command()
+            cmd = Command(pres, command, [])
+            if current_step.get('export_database'):
+                self._add_zip_generation(build, cmd, db_name)
+            cpu_limit = self.cpu_limit
+            if current_step.get('cpu_limit'):
+                cpu_limit = min(self.cpu_limit, int(current_step['cpu_limit']))
+
+            return dict(cmd=cmd, ro_volumes=exports, cpu_limit=cpu_limit)
+
+        build._log('Dynamic Step', f'Unknown job_type {current_step["job_type"]} in dynamic config', level="ERROR")
+
+    def _get_dynamic_db_suffix(self, step):
+        db_suffix = step.get('db_name') or 'all'
+        db_suffix = re.sub(r'[^a-z0-9_\-]', '_', db_suffix.lower())
+        return db_suffix
+
+    def _parse_dynamic_entry(self, entry, build, additional_dynamic_vars=None):
+        """
+        transforms a module/test-tags entry dynamically
+        """
+        dynamic_config = build.dynamic_config
+
+        expression_filters = {
+            'filter_all_modules': filter_all_modules,
+            'filter_default_modules': filter_default_modules,
+            'make_module_test_tags': make_module_test_tags,
+            'prepend': prepend_string,
+            'append': append_string,
+        }
+        dynamic_vars = {**dynamic_config.get('vars', {}), **build.params_id.config_data.get('dynamic_vars', {}), **(additional_dynamic_vars or {})}
+
+        def parse_expression(match):
+            # inspired by jinja but with limited features
+            expression = match.group(0)[2:-2]  # remove {{ }}
+            parts = expression.split('|')
+            value = parts[0]
+            if value in dynamic_vars:
+                value = dynamic_vars[parts[0]]
+            elif value == 'default_modules':
+                value = filter_default_modules('', build, dynamic_vars)
+            for processor in parts[1:]:
+                args = []
+                if match := re.match(r'(\w+)\((.+)\)', processor):
+                    processor = match.group(1)
+                    args = match.group(2).split(',')
+                expression_filter = expression_filters.get(processor, *args)
+                if not processor:
+                    build._log('Dynamic Config', f'Unknown processor {processor} in dynamic config entry {entry}', level="ERROR")
+                    return expression
+                value = expression_filter(value, build, dynamic_vars, *args)
+            return value
+
+        return re.sub(r"\{\{[^}]*\}\}", parse_expression, entry)
+
+    def consume_remaining_tasks(self, build):
+        if self.job_type == 'dynamic':
+            next_index = build.dynamic_active_step_index + 1
+            build.dynamic_active_step_index = next_index
+            steps = build.dynamic_config.get('steps', [])
+            return next_index < len(steps)
+        return False
 
 
 class ConfigStepOrder(models.Model):

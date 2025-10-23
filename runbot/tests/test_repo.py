@@ -372,16 +372,13 @@ class TestFetch(RunbotCase):
         self.fetch_count = 0
         self.force_failure = False
 
-    def mock_git_helper(self):
-        """Helper that returns a mock for repo._git()"""
-        def mock_git(repo, cmd):
-            self.assertIn('fetch', cmd)
-            self.fetch_count += 1
-            if self.fetch_count < 3 or self.force_failure:
-                raise CalledProcessError(128, cmd, 'Dummy Error'.encode('utf-8'))
-            else:
-                return True
-        return mock_git
+    def mock_git_helper(self, repo, cmd):
+        self.assertIn('fetch', cmd)
+        self.fetch_count += 1
+        if self.fetch_count < 3 or self.force_failure:
+            raise CalledProcessError(128, cmd, 'Dummy Error'.encode('utf-8'))
+        else:
+            return True
 
     @patch('time.sleep', return_value=None)
     def test_update_fetch_cmd(self, mock_time):
@@ -487,13 +484,10 @@ class TestGetRefs(RunbotCase):
         super().setUp()
         self.test_refs = []
 
-    def mock_git_helper(self):
-        """Helper that returns a mock for repo._git()"""
-        def mock_git(repo, cmd):
-            self.assertIn('for-each-ref', cmd)
-            self.assertIn('refs/*/pull/*', cmd)
-            return '\n'.join(['\x00'.join(ref_data) for ref_data in self.test_refs])
-        return mock_git
+    def mock_git_helper(self, repo, cmd):
+        self.assertIn('for-each-ref', cmd)
+        self.assertIn('refs/*/pull/*', cmd)
+        return '\n'.join(['\x00'.join(ref_data) for ref_data in self.test_refs])
 
     def test_get_refs(self):
         current = time.time()

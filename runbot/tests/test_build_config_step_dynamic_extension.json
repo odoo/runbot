@@ -1,0 +1,12 @@
+{
+    "extension": true,
+    "vars": {
+        "module_filter": ["APPEND", ",-l10n_*"]
+    },
+    "steps": [
+        {
+            "@name": "install all",
+            "cpu_limit": ["SET", 6500]
+        }
+    ]
+}

@@ -20,6 +20,9 @@
                         </field>
                         <field name="protected"/>
                         <field name="group" groups="base.group_no_one"/>
+                        <field name="dynamic_config_file_path"/>
+                        <field name="default_dynamic_config" widget="ace" options="{'mode': 'json'}"/>
+                        <field name="dynamic_config_extension" widget="ace" options="{'mode': 'json'}"/>
                     </group>
                 </sheet>
                 <chatter/>
@@ -62,7 +65,7 @@
                         <field name="python_result_code" widget="ace" options="{'mode': 'python'}"/>
                         <field name="running_job"/>
                     </group>
-                    <group string="Test settings" invisible="job_type not in ('python', 'install_odoo')">
+                    <group string="Test settings" invisible="job_type not in ('python', 'install_odoo', 'dynamic')">
                         <field name="create_db" groups="base.group_no_one"/>
                         <field name="install_modules"/>
                         <field name="demo_mode"/>
@@ -76,17 +79,17 @@
                         <field name="enable_auto_tags"/>
                         <field name="sub_command"/>
                     </group>
-                    <group string="Extra Parameters" invisible="job_type not in ('python', 'install_odoo', 'test_upgrade', 'run_odoo')">
+                    <group string="Extra Parameters" invisible="job_type not in ('python', 'install_odoo', 'test_upgrade', 'run_odoo', 'dynamic')">
                         <field name="extra_params"/>
                         <field name="additionnal_env"/>
                         <field name="enable_log_db"/>
                     </group>
-                    <group string="Create settings" invisible="job_type not in ('python', 'create_build')">
+                    <group string="Create settings" invisible="job_type not in ('python', 'create_build', 'dynamic')">
                         <field name="create_config_ids" widget="many2many_tags" options="{'no_create': True}" />
                         <field name="number_builds"/>
                         <field name="make_orphan"/>
                     </group>
-                    <group invisible="job_type not in ('python', 'configure_upgrade')">
+                    <group invisible="job_type not in ('python', 'configure_upgrade', 'dynamic')">
                       <group class="col" string="Target version settings">
                         <field string="Current" name="upgrade_to_current"/>
                         <field string="Master" name="upgrade_to_master"/>
@@ -117,7 +120,7 @@
                         <field name="restore_rename_db_suffix"/>
                     </group>
 
-                    <group string="Codeowner settings" invisible="job_type not in ('codeowner', 'python')">
+                    <group string="Codeowner settings" invisible="job_type not in ('codeowner', 'python', 'dynamic')">
                         <field name="fallback_reviewer"/>
                     </group>
                     <group>

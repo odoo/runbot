@@ -1,0 +1,62 @@
+{
+    "name": "Parallel testing",
+    "vars": {
+        "module_filter": "*,-hw_*"
+    },
+    "steps": [
+        {
+            "name": "create_at_install",
+            "job_type": "create_build",
+            "children": [
+                {
+                    "name": "Test at install",
+                    "steps":[{
+                        "name": "test_at_install",
+                        "job_type": "odoo",
+                        "install_modules": "{{module_filter}}",
+                        "test_tags": "-post_install,-/test_lint"
+                    }]
+                },
+                {
+                    "name": "Test pylint",
+                    "steps":[{
+                        "name": "test_pylint",
+                        "job_type": "odoo",
+                        "install_modules": "test_lint",
+                        "test_tags": "-post_install,/test_lint",
+                        "enable_auto_tags": false
+                    }]
+                }
+            ]
+        },
+        {
+            "name": "install all",
+            "job_type": "odoo",
+            "db_name": "all",
+            "install_modules": "{{module_filter}}"
+        },
+        {
+            "name": "create_post_install",
+            "job_type": "create_build",
+            "for_each_vars": [
+                {"test_module_filter": "-> !mail"},
+                {"test_module_filter": "mail -> !web"},
+                {"test_module_filter": "web -> web"},
+                {"test_module_filter": "!web ->"}
+            ],
+            "children": [{
+                "name": "Test Post Install",
+                "description": "Post install tests for **{{test_module_filter}}**",
+                "steps": [
+                    {"name": "restore", "job_type": "restore", "db_name": "all"},
+                    {
+                        "name": "test_post_install",
+                        "job_type": "odoo",
+                        "test_tags": "-at_install,{{test_module_filter|filter_all_modules|make_module_test_tags}}",
+                        "db_name": "all"
+                    }
+                ]
+            }]
+        }
+    ]
+}
