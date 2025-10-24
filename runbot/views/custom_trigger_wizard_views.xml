@@ -26,7 +26,7 @@
                     </group>
                     <group colspan="4">
                         <field name="child_extra_params"/>
-                        <field name="config_data"  widget="runbotjsonb" readonly="1"/>
+                        <field name="config_data"  widget="runbotjsonb"/>
                     </group>
                 </group>
                 <footer>
