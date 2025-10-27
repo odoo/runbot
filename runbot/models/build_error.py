@@ -1232,7 +1232,7 @@ for error_content in self:
             except re.error as e:
                 raise ValidationError("Unable to compile regular expression: %s" % e)
             # verify that a named group exist in the pattern
-            if not re.search(r'\(\?P<\w+>.+\)', r.pattern):
+            if not r.groupindex:
                 raise ValidationError(
                     "The regular expresion should contain at least one named group pattern e.g: '(?P<module>.+)'"
                 )
