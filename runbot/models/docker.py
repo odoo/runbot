@@ -399,3 +399,20 @@ class DockerBuildOutput(models.Model):
                     summary = line
                     break
             record.summary = summary
+
+    def _getdocker_metadata_diff(self, other_build_result_id):
+        build_result_b = self.env['runbot.docker_build_result'].browse(other_build_result_id)
+        diff_dict = {}
+        if build_result_b:
+            meta_a = self.metadata
+            meta_b = build_result_b.metadata
+            for k, va in meta_a.items():
+                if isinstance(va, str) and (vb := meta_b.get(k, '')) != va:
+                    diff_dict[k] = f'{va} --> {vb}'
+                elif isinstance(va, list):
+                    vb = meta_b.get(k, [])
+                    negativ_diff = set(va) - set(vb)
+                    positiv_diff = set(vb) - set(va)
+                    if negativ_diff or positiv_diff:
+                        diff_dict[k] = [f'- {s}' for s in negativ_diff] + [f'+ {s}' for s in positiv_diff]
+        return diff_dict

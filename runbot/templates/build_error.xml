@@ -172,6 +172,10 @@
                   <t t-if="dockerfile.image_identifier == dockerfile_result.identifier">
                     <div class="alert alert-info">
                       This is the latest stable version of the docker image, but <a t-attf-href="/runbot/dockerfile_result/{{future_result.id}}">another future version</a> exists
+                      <details>
+                        <summary>Diff</summary>
+                        <t t-out="future_diff"/>
+                      </details>
                     </div>
                   </t>
                   <t t-else="">

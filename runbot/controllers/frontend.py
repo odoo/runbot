@@ -720,11 +720,15 @@ class Runbot(Controller):
         if not (dockerfile_result.dockerfile_id.public_visibility or request.env.user.has_group('runbot.group_runbot_admin')):
             raise NotFound
 
+        future_result = dockerfile._get_last_successful_result_for_ident(dockerfile.image_future_identifier)
+        current_result = dockerfile._get_last_successful_result_for_ident(dockerfile.image_identifier)
+
         return request.render("runbot.docker_result_template", {
             'dockerfile_result': dockerfile_result,
             'dockerfile': dockerfile,
-            'future_result': dockerfile._get_last_successful_result_for_ident(dockerfile.image_future_identifier),
-            'current_result': dockerfile._get_last_successful_result_for_ident(dockerfile.image_identifier),
+            'future_result': future_result,
+            'current_result': current_result,
+            'future_diff': current_result._getdocker_metadata_diff(future_result.id),
         })
 
     @route([
