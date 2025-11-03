@@ -192,13 +192,13 @@
             </group>
             <notebook>
               <page string="Output">
-                <field name="output"/>
+                <field name="output"  readonly="1"/>
               </page>
               <page string="Content">
-                <field name="content"/>
+                <field name="content"  readonly="1"/>
               </page>
               <page string="Metadata">
-                <field name="metadata"/>
+                <field name="metadata" widget="runbotjsonb" readonly="1"/>
               </page>
             </notebook>
           </sheet>
