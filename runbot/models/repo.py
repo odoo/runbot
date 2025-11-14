@@ -199,6 +199,13 @@ class Trigger(models.Model):
                         output += markupsafe.Markup(f'''<h4>{commit.repo_id.name}</h4> Failed to get modules for {commit.repo_id.name}:{commit.name} {e}''')
         self.message_post(body=output)
 
+    def action_fill_batches_missing_slots(self):
+        sticky_bundles = self.env['runbot.bundle'].search([('project_id', '=', self.project_id.id), ('sticky', '=', True)])
+        for bundle in sticky_bundles:
+            last_batch_in_category = bundle.with_context(category_id=self.category_id.id).last_done_batch
+            if last_batch_in_category:
+                last_batch_in_category._add_missing_slots()
+
 
 class Remote(models.Model):
     """

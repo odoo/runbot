@@ -228,6 +228,13 @@ class Runbot(Controller):
         build = slot.sudo()._create_missing_build()
         return werkzeug.utils.redirect('/runbot/build/%s' % build.id)
 
+    @o_route(['/runbot/batch/fill_missing_slots/<model("runbot.batch"):batch>'], auth='user', type='http')
+    def batch_fill_missing_slots(self, batch=None, **kwargs):
+        if not request.env.user.has_group('runbot.group_runbot_admin'):
+            raise NotFound
+        batch._add_missing_slots()
+        return werkzeug.utils.redirect(f'/runbot/batch/{batch.id}')
+
     @route([
         '/runbot/commit/<model("runbot.commit"):commit>',
         '/runbot/commit/<string(minlength=6, maxlength=40):commit_hash>',
