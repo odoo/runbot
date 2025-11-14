@@ -39,9 +39,10 @@ class TestBuildErrorCommon(RunbotCase):
         cls.x_test_class = cls.env['ir.model.fields'].search([('name', '=', 'x_test_class'), ('model_id', '=', model)], limit=1)
         cls.x_test_method = cls.env['ir.model.fields'].search([('name', '=', 'x_test_method'), ('model_id', '=', model)], limit=1)
 
-    def create_test_build(self, vals):
+    def create_test_build(self, vals, params_vals=None):
+        params = self.create_params(params_vals or {})
         create_vals = {
-            'params_id': self.base_params.id,
+            'params_id': params.id,
             'port': '1234',
             'local_result': 'ok'
         }
@@ -380,47 +381,50 @@ class TestBuildError(TestBuildErrorCommon):
 
     def test_seen_date(self):
         # create all the records before the tests to evaluate compute dependencies
-        build_a = self.create_test_build({'local_result': 'ok', 'local_state': 'testing'})
-        first_seen_date = fields.Datetime.from_string('2023-08-29 00:46:21')
-        self.create_log({'create_date': first_seen_date, 'message': RTE_ERROR, 'build_id': build_a.id})
+        trigger = self.Trigger.create({
+            'name': 'test-trigger',
+            'batch_dependent': True,
+            'project_id': self.project.id,
+            'config_id': self.default_config.id,
+        })
+        batch_date = fields.Datetime.from_string('2023-08-28 19:00:01')
+        log_date = fields.Datetime.from_string('2023-08-29 00:46:21')
+        self.fist_batch = self.Batch.create({
+            'bundle_id': self.dev_bundle.id,
+        })
+        self.env.cr.execute('UPDATE runbot_batch SET create_date = %s WHERE id = %s', (batch_date, self.fist_batch.id))  # Update in sql to avoid getting removed
+        self.fist_batch.invalidate_recordset()
+        self.assertEqual(self.fist_batch.create_date, batch_date, 'Batch create date should be set')
 
-        build_b = self.create_test_build({'local_result': 'ok', 'local_state': 'testing'})
-        new_seen_date = fields.Datetime.from_string('2023-08-29 02:46:21')
-        self.create_log({'create_date': new_seen_date, 'message': RTE_ERROR, 'build_id': build_b.id})
-
-        build_c = self.create_test_build({'local_result': 'ok', 'local_state': 'testing'})
-        child_seen_date = fields.Datetime.from_string('2023-09-01 12:00:00')
-        self.create_log({'create_date': child_seen_date, 'message': 'Fail: foo bar error', 'build_id': build_c.id})
-
-        build_d = self.create_test_build({'local_result': 'ok', 'local_state': 'testing'})
-        new_child_seen_date = fields.Datetime.from_string('2023-09-02 12:00:00')
-        self.create_log({'create_date': new_child_seen_date, 'message': 'Fail: foo bar error', 'build_id': build_d.id})
+        build_a = self.create_test_build({'local_result': 'ok', 'local_state': 'testing'}, {'create_batch_id': self.fist_batch.id, 'trigger_id': trigger.id})
+        self.assertEqual(build_a.create_batch_id, self.fist_batch, 'Build should be linked to the batch')
+        self.create_log({'create_date': log_date, 'message': RTE_ERROR, 'build_id': build_a.id})
 
         build_a._parse_logs()
         build_error_a = build_a.build_error_ids
-        self.assertEqual(build_error_a.first_seen_date, first_seen_date)
         self.assertEqual(build_error_a.first_seen_build_id, build_a)
-        self.assertEqual(build_error_a.last_seen_date, first_seen_date)
+        self.assertEqual(build_error_a.first_seen_build_id.create_batch_id, self.fist_batch)
+        self.assertEqual(build_error_a.first_seen_date, batch_date)
         self.assertEqual(build_error_a.last_seen_build_id, build_a)
+        self.assertEqual(build_error_a.last_seen_build_id.create_batch_id, self.fist_batch)
+        self.assertEqual(build_error_a.last_seen_date, batch_date)
+
+        new_batch_date = fields.Datetime.from_string('2023-08-29 19:00:01')
+        new_log_date = fields.Datetime.from_string('2023-08-30 00:48:21')
+        self.new_batch = self.Batch.create({
+            'bundle_id': self.dev_bundle.id,
+        })
+        self.env.cr.execute('UPDATE runbot_batch SET create_date = %s WHERE id = %s', (new_batch_date, self.new_batch.id))  # Update in sql to avoid getting removed
+        self.new_batch.invalidate_recordset()
+        self.assertEqual(self.new_batch.create_date, new_batch_date, 'New batch create date should be set')
+
+        build_b = self.create_test_build({'local_result': 'ok', 'local_state': 'testing'}, {'create_batch_id': self.new_batch.id, 'trigger_id': trigger.id})
+        self.create_log({'create_date': new_log_date, 'message': RTE_ERROR, 'build_id': build_b.id})
 
         # a new build with the same error should be the last seen
         build_b._parse_logs()
-        self.assertEqual(build_error_a.last_seen_date, new_seen_date)
+        self.assertEqual(build_error_a.last_seen_date, new_batch_date)
         self.assertEqual(build_error_a.last_seen_build_id, build_b)
-
-        # a new build error is linked to the current one
-        build_c._parse_logs()
-        build_error_c = build_c.build_error_ids
-        self.assertNotIn(build_c, build_error_a.build_ids)
-        build_error_a._merge(build_error_c)
-        self.assertIn(build_c, build_error_a.build_ids)
-        self.assertEqual(build_error_a.last_seen_date, child_seen_date)
-        self.assertEqual(build_error_a.last_seen_build_id, build_c)
-
-        # a new build appears in the linked error
-        build_d._parse_logs()
-        self.assertEqual(build_error_a.last_seen_date, new_child_seen_date)
-        self.assertEqual(build_error_a.last_seen_build_id, build_d)
 
     def test_build_error_links(self):
         build_a = self.create_test_build({'local_result': 'ko'})

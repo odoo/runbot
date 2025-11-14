@@ -39,6 +39,8 @@ class BuildErrorLink(models.Model):
     build_id = fields.Many2one('runbot.build', required=True, index=True)
     error_content_id = fields.Many2one('runbot.build.error.content', required=True, index=True, ondelete='cascade')
     log_date = fields.Datetime(string='Log date')
+    batch_id = fields.Many2one('runbot.batch', related='build_id.create_batch_id', string='Batch', store=True, readonly=True)
+    batch_date = fields.Datetime(related='batch_id.create_date', string='Batch date', store=True, readonly=True)
     host = fields.Char(related='build_id.host')
     dest = fields.Char(related='build_id.dest')
     version_id = fields.Many2one(related='build_id.version_id')
@@ -75,8 +77,8 @@ class BuildErrorSeenMixin(models.AbstractModel):
             if error_link_ids:
                 first_error_link = error_link_ids[0]
                 last_error_link = error_link_ids[-1]
-                record.first_seen_date = first_error_link.log_date
-                record.last_seen_date = last_error_link.log_date
+                record.first_seen_date = first_error_link.batch_date
+                record.last_seen_date = last_error_link.batch_date
                 record.first_seen_build_id = first_error_link.build_id
                 record.last_seen_build_id = last_error_link.build_id
                 record.build_count = len(error_link_ids.build_id)
