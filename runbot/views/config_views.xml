@@ -20,6 +20,7 @@
                         </field>
                         <field name="protected"/>
                         <field name="group" groups="base.group_no_one"/>
+                        <field name="warning"/>
                     </group>
                 </sheet>
                 <chatter/>

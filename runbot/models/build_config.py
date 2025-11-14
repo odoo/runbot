@@ -52,6 +52,7 @@ class Config(models.Model):
     group = fields.Many2one('runbot.build.config', 'Configuration group', help="Group of config's and config steps")
     group_name = fields.Char('Group name', related='group.name')
     step_ids = fields.Many2many('runbot.build.config.step', compute='_compute_step_ids')
+    warning = fields.Html('Warning message', help="Warning message to display on build page")
 
     @api.model_create_multi
     def create(self, vals_list):
