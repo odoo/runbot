@@ -70,6 +70,7 @@ The config steps are mainly defined by their `job_type`. The `name` key is also 
     'demo_mode': OPTIONAL(IN(['default', 'with_demo', 'without_demo'])),
     'enable_auto_tags': OPTIONAL(BOOL),
     'cpu_limit': OPTIONAL(INT),
+    'make_stats': OPTIONAL(BOOL),
 }
 ```
 The `db_name` is optionnal, usually set to all as a convention on runbot for databases that contains *almost* all modules. If not defined the sanitized version of the name will be used.
@@ -231,6 +232,7 @@ A `trigger_id` can be provided to restore from the build created by a specific t
     'cpu_limit': OPTIONAL(INT),
     'install_requirements': OPTIONAL(BOOL),
     'export_database': OPTIONAL(BOOL),
+    'make_stats': OPTIONAL(BOOL),
 }
 ```
 

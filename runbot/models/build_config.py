@@ -231,6 +231,7 @@ class Config(models.Model):
             'enable_auto_tags': OPTIONAL(BOOL),
             'cpu_limit': OPTIONAL(INT),
             'export_database': OPTIONAL(BOOL),
+            'make_stats': OPTIONAL(BOOL),
         }
         valid_steps['create_build'] = {
             'name': REQUIRED(NAME),
@@ -257,6 +258,7 @@ class Config(models.Model):
             'export_database': OPTIONAL(BOOL),
             'check_logs': OPTIONAL(LIST(STR)),
             'expected_logs': OPTIONAL(LIST(STR)),
+            'make_stats': OPTIONAL(BOOL),
         }
         validate(config_schema, config, 'config')
 
@@ -1504,7 +1506,11 @@ class ConfigStep(models.Model):
             build.local_result = self._get_checkers_result(build, checkers)
 
     def _make_stats(self, build):
-        if not self.make_stats:  # TODO garbage collect non sticky stat
+        make_stats = self.make_stats
+        current_dynamic_step = self._get_dynamic_step(build) or {}
+        if current_dynamic_step and 'make_stats' in current_dynamic_step:
+            make_stats = current_dynamic_step['make_stats']
+        if not make_stats:  # TODO garbage collect non sticky stat
             return
         build._log('make_stats', 'Getting stats from log file')
         log_path = build._path('logs', '%s.txt' % self.sanitized_name(build))
@@ -1520,6 +1526,7 @@ class ConfigStep(models.Model):
                 build_stats = [
                     {
                         'config_step_id': self.id,
+                        'dynamic_step_name': current_dynamic_step.get('name', ''),
                         'build_id': build.id,
                         'category': category,
                         'values': values,
@@ -1566,25 +1573,33 @@ class ConfigStep(models.Model):
                 modified_files[commit_link] = files
         return modified_files
 
+    def _get_dynamic_step(self, build):
+        if self.job_type != 'dynamic':
+            return None
+        dynamic_config = build.dynamic_config
+        if not dynamic_config:
+            return None
+        steps = dynamic_config.get("steps", [])
+        if not steps:
+            return None
+        if len(steps) <= build.dynamic_active_step_index:
+            _logger.error('Invalid dynamic_active_step_index %s, only %s steps defined', build.dynamic_active_step_index, len(steps))
+            return None
+        current_step = steps[build.dynamic_active_step_index]
+        return current_step
+
     def _run_dynamic(self, build):
         if len(build.ancestors) > 6:
             raise RunbotException('Too many ancestors builds, possible cyclic dynamic build creation')
         if build.parent_id and build.dynamic_config == build.parent_id.dynamic_config:
             raise RunbotException('A child build cannot load the same dynamic config if parent, recursion detected')
-
-        dynamic_config = build.dynamic_config
-        dynamic_active_step_index = build.dynamic_active_step_index
-        if not dynamic_config:
-            build._log('', 'No dynamic config found, skipping', level="WARNING")
+        current_step = self._get_dynamic_step(build)
+        if not current_step:
+            build._log('Dynamic Step', 'No dynamic config or steps found, skipping', level="WARNING")
             return
-        steps = dynamic_config.get("steps", [])
-        if not steps:
-            build._log('', 'Dynamic config has no steps, skipping', level="WARNING")
-            return
-        current_step = steps[dynamic_active_step_index]
         if current_step['job_type'] == 'create_build':
             for_each_vars_list = current_step.get('for_each_vars', [{}])
-            parent_vars = {**dynamic_config.get('vars', {}), **build.params_id.config_data.get('dynamic_vars', {})}
+            parent_vars = {**build.dynamic_config.get('vars', {}), **build.params_id.config_data.get('dynamic_vars', {})}
             child_data_list = []
             for child_index, child in enumerate(current_step.get('children', [])):
                 child_vars = child.get('vars', {})

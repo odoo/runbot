@@ -20,6 +20,7 @@
                   <field name="network_enabled"/>
                   <field name="config_data" widget="runbotjsonb"/>
                   <field name="report_view_id"/>
+                  <field name="has_stats"/>
                 </group>
                 <group>
                   <field name="description"/>

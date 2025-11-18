@@ -72,12 +72,12 @@ nothing to see here
             with mute_logger("odoo.sql_db"):
                 with self.cr.savepoint():  # needed to continue tests
                     self.env["runbot.build.stat"].create({
-                        'build_id': self.build.id, 
+                        'build_id': self.build.id,
+                        'dynamic_step_name': '',
                         'config_step_id': self.config_step.id,
                         'category': 'query_count',
                         'values': {'website_event.tests.test_ui': 2435},
                         }
-
                     )
 
     def test_build_stat_regex_generic(self):

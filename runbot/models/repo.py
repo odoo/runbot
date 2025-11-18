@@ -93,7 +93,7 @@ class Trigger(models.Model):
         ('no_pending', 'No pending'),
         ('errors', 'Only errors'),
     ], string="CI startegy", default='all', help="Strategy to use when sending CI status to github")
-    has_stats = fields.Boolean('Has a make_stats config step', compute="_compute_has_stats", store=True)
+    has_stats = fields.Boolean('Has a make_stats config step', compute="_compute_has_stats", store=True, readonly=False)
 
     team_ids = fields.Many2many('runbot.team', string="Runbot Teams", help="Teams responsible of this trigger, mainly usefull for nightly")
     active = fields.Boolean("Active", default=True)
