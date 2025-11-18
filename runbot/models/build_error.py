@@ -507,10 +507,10 @@ class BuildError(models.Model):
                     if not vals['active'] and build_error.active and build_error.last_seen_date and build_error.last_seen_date + relativedelta(days=1) > datetime.datetime.now():
                         raise UserError("This error broke less than one day ago can only be deactivated by admin")
 
-        if (responsible_id := vals.get('responsible')):
+        if (responsible_id := vals.get('responsible')) and vals.get('active', True):
             responsible = self.env['res.users'].browse(responsible_id)
             for build_error in self:
-                if responsible != self.env.user:
+                if build_error.active and responsible != self.env.user:
                     _logger.info('Notifying responsible %s of build error %s', responsible.name, build_error.id)
                     build_error.message_notify(
                         body=f'Error {build_error.id} was assigned to you by {self.env.user.name}',

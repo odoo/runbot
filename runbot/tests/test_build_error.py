@@ -1,7 +1,10 @@
 import hashlib
+from unittest.mock import patch
 
 from odoo import fields
 from odoo.exceptions import ValidationError
+from odoo.tests import new_test_user
+
 from .common import RunbotCase
 
 RTE_ERROR = """FAIL: TestUiTranslate.test_admin_tour_rte_translator
@@ -683,6 +686,31 @@ class TestBuildError(TestBuildErrorCommon):
         })
 
         self.assertEqual(dashboard.build_ids, failed_build)
+
+    def test_build_error_notification(self):
+        self.stop_patcher('isfile')  # prevent user creation
+        responsible = new_test_user(self.env, login='fixman', name='fixman', password='fixpass')
+
+        # check that a message is sent when an error is assigned to someone
+        error = self.BuildError.create({})
+        with patch.object(self.env.registry['runbot.build.error'], 'message_notify') as message_notify:
+            error.responsible = responsible
+            message_notify.assert_called()
+
+        # check that a message is NOT sent when an error disabled AND assigned to someone
+        fixed_error = self.BuildError.create({})
+        with patch.object(self.env.registry['runbot.build.error'], 'message_notify') as message_notify:
+            fixed_error.write({
+                'responsible': responsible.id,
+                'active': False,
+            })
+            message_notify.assert_not_called()
+
+        # Finally check that a message is not sent when adding a responsible on an already fixed error
+        innactive_error = self.BuildError.create({'active': False})
+        with patch.object(self.env.registry['runbot.build.error'], 'message_notify') as message_notify:
+            innactive_error.responsible = responsible
+            message_notify.assert_not_called()
 
 
 class TestErrorMerge(TestBuildErrorCommon):
