@@ -815,3 +815,32 @@ class Runbot(Controller):
             'commit_links': selected_commit_links,
             'diff_by_commit_link_ids': diff_by_commit_link_ids,
         })
+
+    @route([
+        '/runbot/json/last_batches_infos',
+        '/runbot/json/last_batches_infos/<int:project_id>',
+        ], type='http', auth='public', website=True, sitemap=False)
+    def repos_heads(self, project_id=None, bundle_name=None, **kwargs):
+        project_id = project_id or request.env.ref('runbot.main_project').id
+        domain = [('project_id', '=', project_id)]
+        if bundle_name:
+            domain = Domain.AND([domain, [('name', '=', bundle_name)]])
+        else:
+            domain = Domain.AND([domain, [('sticky', '=', True)]])
+        bundles = request.env['runbot.bundle'].search(domain, order='id desc, name')
+
+        last_batches_infos = {
+            bundle.name: {
+                "commits": [
+                    {
+                        "repo": commit_link.commit_id.repo_id.name,
+                        "head": commit_link.commit_id.name,
+                        "match_type": commit_link.match_type,
+                    }
+                    for commit_link in bundle.last_batch.commit_link_ids
+                ],
+                "autotags": request.env["runbot.build.error"].sudo()._disabling_tags(build_id=bundle.last_batch.slot_ids.build_id[0]),
+            }
+            for bundle in bundles
+        }
+        return request.make_json_response(last_batches_infos)
