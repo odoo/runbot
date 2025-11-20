@@ -93,7 +93,7 @@ class Trigger(models.Model):
         ('no_pending', 'No pending'),
         ('errors', 'Only errors'),
     ], string="CI startegy", default='all', help="Strategy to use when sending CI status to github")
-    has_stats = fields.Boolean('Has a make_stats config step', compute="_compute_has_stats", store=True, readonly=False)
+    has_stats = fields.Boolean('Should display stats')
 
     team_ids = fields.Many2many('runbot.team', string="Runbot Teams", help="Teams responsible of this trigger, mainly usefull for nightly")
     active = fields.Boolean("Active", default=True)
@@ -104,11 +104,6 @@ class Trigger(models.Model):
                                   domain=[('type', '=', 'qweb')],
                                   context={'default_type': 'qweb', 'default_arch_base': '<t></t>'},
     )
-
-    @api.depends('config_id.step_order_ids.step_id.make_stats')
-    def _compute_has_stats(self):
-        for trigger in self:
-            trigger.has_stats = any(trigger.config_id.step_order_ids.step_id.mapped('make_stats'))
 
     @api.depends('upgrade_dumps_trigger_id', 'config_id', 'config_id.step_order_ids.step_id.job_type')
     def _compute_upgrade_step_id(self):

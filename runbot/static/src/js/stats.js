@@ -41,7 +41,7 @@ config.options.onClick = function(event, activeElements) {
     if (activeElements.length === 0){
       return
     }
-    const build_id = config.data.labels[activeElements[0].index];
+    const build_id = config.data.builds[activeElements[0].index];
     if (shifted){ 
       config.searchParams['center_build_id'] = build_id;
       fetchUpdateChart();
@@ -154,7 +154,8 @@ function process_chart_data(){
     }
 
     config.data = {
-      labels: builds,
+      builds: builds,
+      labels: builds.map(build => config.dates[build]),
       datasets: keys.map(function (key){
           return {
               label: key,
@@ -174,10 +175,13 @@ function fetchUpdateChart() {
   fetch_params = compute_fetch_params();
   console.log('fetch')
   fetch('/runbot/stats/', fetch_params, function(result) {
-    config.result = result;
-    Object.values(config.result).forEach(v => v['Aggregate Sum'] = Object.values(v).reduce((a, b) => a + b, 0))
-    Object.values(config.result).forEach(v => v['Aggregate Average'] = Object.values(v).reduce((a, b) => a + b, 0)/Object.values(v).length)
     chart_spinner.style.visibility = 'hidden';
+    if (result) {
+      config.result = result['stats'];
+      config.dates = result['dates'];
+      Object.values(config.result).forEach(v => v['Aggregate Sum'] = Object.values(v).reduce((a, b) => a + b, 0))
+      Object.values(config.result).forEach(v => v['Aggregate Average'] = Object.values(v).reduce((a, b) => a + b, 0)/Object.values(v).length)
+    }
     updateChart()
   });
 }
@@ -210,7 +214,7 @@ function updateForm() {
       selector.value = value;
       selector.onchange = function(){
         var id = this.id.replace('_selector', '');
-        config.searchParams[this.id.replace('_selector', '')] = this.value;
+        config.searchParams[id] = this.value;
         if (localParams.indexOf(id) == -1){
           fetchUpdateChart();
         } else {
@@ -243,7 +247,6 @@ function compute_fetch_params(){
   return {
     ...config.searchParams,
     bundle_id: document.getElementById('bundle_id').value,
-    trigger_id: document.getElementById('trigger_id').value,
   }
 };
 
@@ -267,6 +270,8 @@ async function waitForChart() {
 
 window.onload = function() {
     config.searchParams = {
+      trigger_id: main_trigger,
+      key_step: '',
       limit: 25,
       center_build_id: 0,
       key_category: 'module_loading_queries',

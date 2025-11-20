@@ -529,8 +529,8 @@ class Runbot(Controller):
         }
         return request.render('runbot.dashboard_page', qctx)
 
-    @route(['/runbot/stats/'], type='jsonrpc', auth="public", website=False, sitemap=False)
-    def stats_json(self, bundle_id=False, trigger_id=False, key_category='', center_build_id=False, ok_only=False, limit=100, search=None, **post):
+    @route(['/runbot/stats/'], type='jsonrpc', auth="user", website=False, sitemap=False)
+    def stats_json(self, bundle_id=False, trigger_id=False, key_category='', key_step=None, center_build_id=False, limit=100, **post):
         """ Json stats """
         trigger_id = trigger_id and int(trigger_id)
         bundle_id = bundle_id and int(bundle_id)
@@ -542,61 +542,88 @@ class Runbot(Controller):
         if not trigger_id or not bundle_id or not trigger.exists() or not bundle.exists():
             return request.not_found()
 
-        builds_domain = [
-            ('global_state', 'in', ('running', 'done')),
-            ('slot_ids.batch_id.bundle_id', '=', bundle_id),
-            ('params_id.trigger_id', '=', trigger.id),
+        batch_domain = [
+            ('state', '=', 'done'),
+            ('bundle_id', '=', bundle_id),
         ]
-        if ok_only:
-            builds_domain += ('global_result', '=', 'ok')
-        builds = request.env['runbot.build'].with_context(active_test=False)
+        batches = request.env['runbot.batch'].with_context(category_id=trigger.category_id.id)
         if center_build_id:
-            builds = builds.search(
-                Domain.AND([builds_domain, [('id', '>=', center_build_id)]]),
-                order='id', limit=limit / 2)
-            builds_domain = Domain.AND([builds_domain, [('id', '<=', center_build_id)]])
-            limit -= len(builds)
-
-        builds |= builds.search(builds_domain, order='id desc', limit=limit)
+            center_batch = request.env['runbot.build'].browse(center_build_id).slot_ids.batch_id.filtered(lambda b: b.bundle_id == bundle)
+            if center_batch:
+                center_batch_id = center_batch[0].id
+                batches = batches.search(
+                    Domain.AND([batch_domain, [('id', '>=', center_batch_id)]]),
+                    order='id', limit=limit / 2)
+                batch_domain = Domain.AND([batch_domain, [('id', '<=', center_batch_id)]])
+                limit -= len(batches)
+        batches |= batches.search(batch_domain, order='id desc', limit=limit)
+        builds = batches.slot_ids.build_id.filtered(lambda b: b.params_id.trigger_id == trigger)
         if not builds:
             return {}
 
         builds = builds.search([('id', 'child_of', builds.ids)])
 
         parents = {b.id: b.top_parent.id for b in builds.with_context(prefetch_fields=False)}
-        request.env.cr.execute("SELECT build_id, values FROM runbot_build_stat WHERE build_id IN %s AND category = %s", [tuple(builds.ids), key_category])  # read manually is way faster than using orm
+        dates = {b.top_parent.id: b.create_date for b in builds.with_context(prefetch_fields=False)}
+        query = "SELECT build_id, values FROM runbot_build_stat WHERE build_id IN %s AND category = %s"
+        values = [tuple(builds.ids), key_category]
+        if key_step:
+            query += " AND dynamic_step_name LIKE %s"
+            values.append(key_step)
+            if config_steps := request.env['runbot.build.config.step'].search([('name', '=like', key_step)]):
+                query += " AND config_step_id in %s"
+                values.append(tuple(config_steps.ids))
+
+        request.env.cr.execute(query, values)  # read manually is way faster than using orm
         res = {}
+
         for (build_id, values) in request.env.cr.fetchall():
             if values:
-                res.setdefault(parents[build_id], {}).update(values)
+                current_values = res.get(parents[build_id], {})
+                for key, value in values.items():
+                    if key in current_values:
+                        current_values[key] += value
+                    else:
+                        current_values[key] = value
+                res[parents[build_id]] = current_values
             # we need to update here to manage the post install case: we want to combine stats from all post_install childrens.
-        return res
-
-    @route(['/runbot/stats/<model("runbot.bundle"):bundle>/<model("runbot.trigger"):trigger>'], type='http', auth="public", website=True, sitemap=False)
-    def modules_stats(self, bundle, trigger, search=None, **post):
-        """Modules statistics"""
-        categories = set()
-
-        def list_config_categories(config):
-            nonlocal categories
-            for config_step in config.step_ids:
-                regex_ids = config_step.build_stat_regex_ids
-                if not regex_ids:
-                    regex_ids = regex_ids.search([('generic', '=', True)])
-                categories |= set(regex_ids.mapped('name'))
-                for config in config_step.create_config_ids:
-                    list_config_categories(config)
-
-        list_config_categories(trigger.config_id)
-
-        categories = sorted(categories)
-
-        context = {
-            'stats_categories': categories,
-            'bundle': bundle,
-            'trigger': trigger,
+        return {
+            'stats': res,
+            'dates': dates,
         }
 
+    @route(['/runbot/stats/<model("runbot.bundle"):bundle>'], type='http', auth="public", website=True, sitemap=False)
+    def modules_stats(self, bundle, search=None, **post):
+        """Modules statistics"""
+        all_builds = bundle.last_done_batch.slot_ids.build_id
+        all_builds |= bundle.with_context(category_id=request.env.ref('runbot.nightly_category').id).last_done_batch.slot_ids.build_id
+        all_builds = request.env['runbot.build'].search([('id', 'child_of', all_builds.ids)])
+        all_stats = all_builds.sudo().stat_ids
+        category_per_trigger = {}
+        step_per_trigger_category = {}
+        all_categories = set()
+        all_steps = set()
+        all_triggers = set()
+        for stat in all_stats:
+            stat_trigger = stat.build_id.params_id.trigger_id
+            if not stat_trigger.has_stats:  # skip, most likely a multi build or other noisy trigger
+                continue
+            all_categories.add(stat.category)
+            all_steps.add(stat.dynamic_step_name or stat.config_step_id.name)
+            all_triggers.add(stat_trigger)
+            category_per_trigger.setdefault(stat_trigger, set()).add(stat.category)
+            step_per_trigger_category.setdefault((stat_trigger, stat.category), set()).add(stat.dynamic_step_name or stat.config_step_id.name)
+        all_triggers = sorted(all_triggers, key=lambda t: (t.category_id.id, t.sequence, t.id))
+        main_trigger = all_triggers[0] if all_triggers else None
+        context = {
+            'category_per_trigger': category_per_trigger,
+            'step_per_trigger_category': step_per_trigger_category,
+            'bundle': bundle,
+            'main_trigger': main_trigger,
+            'all_categories': sorted(all_categories),
+            'all_steps': sorted(all_steps),
+            'all_triggers': all_triggers,
+        }
         return request.render("runbot.modules_stats", context)
 
     @route(['/runbot/load_info'], type='http', auth="user", website=True, sitemap=False)

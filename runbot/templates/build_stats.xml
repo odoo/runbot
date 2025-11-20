@@ -3,34 +3,46 @@
   <data>
     <template id="runbot.modules_stats">
       <t t-call='runbot.layout'>
+        <script>
+          let main_trigger = <t t-esc="main_trigger.id or 'undefined'"/>;
+        </script>
         <input type="hidden" id="bundle_id" t-att-value="bundle.id"/>
-        <input type="hidden" id="trigger_id" t-att-value="trigger.id"/>
         <div class="container-fluid">
           <nav class="navbar navbar-light">
             <div class="container">
-              <b>Bundle:</b><t t-out="bundle.name"/>
-              <b>Trigger:</b><t t-out="trigger.name"/>
-              <b>Stat Category:</b>
-              <select id="key_category_selector" class="form-select" aria-label="Stat Category">
-                <option t-foreach="stats_categories" t-as="category" t-attf-value="{{category}}"><t t-out="category.replace('_',' ').title()"/></option>
-              </select>
-              <b>Nb of builds:</b>
-              <select id="limit_selector" class="form-select" aria-label="Number Of Builds">
-                <option value="10">10</option>
-                <option value="25">25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-                <option value="250">250</option>
-              </select>
-              <button id="backward_button" class="btn btn-default" title="Previous Builds" aria-label="Previous Builds">
-                <i t-attf-class="fa fa-backward"/>
-              </button>
-              <button id="forward_button" class="btn btn-default" title="Previous Builds" aria-label="Previous Builds">
-                <i t-attf-class="fa fa-forward"/>
-              </button>
-              <button id="fast_forward_button" class="btn btn-default" title="Previous Builds" aria-label="Previous Builds">
-                <i t-attf-class="fa fa-fast-forward"/>
-              </button>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                <b>Bundle:</b><t t-out="bundle.name"/>
+                <b>Trigger:</b>
+                <select id="trigger_id_selector" class="form-select form-select-sm d-inline-block w-auto" aria-label="Trigger">
+                  <option t-foreach="all_triggers" t-as="trig" t-attf-value="{{trig.id}}" t-att-selected="trig.id==main_trigger.id"><t t-out="trig.name"/></option>
+                </select>
+                <b>Stat Category:</b>
+                <select id="key_category_selector" class="form-select form-select-sm d-inline-block w-auto" aria-label="Stat Category">
+                  <option t-foreach="all_categories" t-as="category" t-attf-value="{{category}}"><t t-out="category.replace('_',' ').title()"/></option>
+                </select>
+                <b>Stat Step:</b>
+                <select id="key_step_selector" class="form-select form-select-sm d-inline-block w-auto" aria-label="Stat Step">
+                  <!-- TODO improve me step should be dependant on selected category-->
+                  <option t-foreach="[''] + all_steps" t-as="step" t-attf-value="{{step}}"><t t-out="step.replace('_',' ').title()"/></option>
+                </select>
+                <b>Nb of builds:</b>
+                <select id="limit_selector" class="form-select form-select-sm d-inline-block w-auto" aria-label="Number Of Builds">
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="250">250</option>
+                </select>
+                <button id="backward_button" class="btn btn-default btn-sm" title="Previous Builds" aria-label="Previous Builds">
+                  <i t-attf-class="fa fa-backward"/>
+                </button>
+                <button id="forward_button" class="btn btn-default btn-sm" title="Previous Builds" aria-label="Previous Builds">
+                  <i t-attf-class="fa fa-forward"/>
+                </button>
+                <button id="fast_forward_button" class="btn btn-default btn-sm" title="Previous Builds" aria-label="Previous Builds">
+                  <i t-attf-class="fa fa-fast-forward"/>
+                </button>
+                </div>
               <p>Tips: click a bullet to see corresponding build stats, shift+click to center the graph on this build</p>
               <i id="chart_spinner" class="fa fa-2x fa-circle-o-notch fa-spin"/>
             </div>

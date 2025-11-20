@@ -27,7 +27,9 @@
                                         <t t-call="runbot.branch_copy_button">
                                             <t t-set="btn_size" t-value="'btn'"/>
                                         </t>
-                                        <t t-call="runbot.bundle_stats_dropdown"/>
+                                         <a groups="base.group_user" class="btn btn-default" t-attf-href="/runbot/stats/{{bundle.id}}">
+                                            <i class="fa fa-bar-chart"/>
+                                        </a>
                                     </div>
                                 </span>
                                 <span class="pull-right">
