@@ -1194,6 +1194,27 @@ class BuildResult(models.Model):
                 if os.path.isdir(commit._source_path(addons_path)):
                     yield os.sep.join([repo_folder, addons_path]).strip(os.sep)
 
+    def _modified_files(self, commit_link_links=None):
+        modified_files = {}
+        if commit_link_links is None:
+            commit_link_links = self.params_id.commit_link_ids
+        for commit_link in commit_link_links:
+            commit = commit_link.commit_id
+            modified = commit.repo_id._git(['diff', '--name-only', '%s..%s' % (commit_link.merge_base_commit_id.name, commit.name)])
+            if modified:
+                files = [os.sep.join([self._docker_source_folder(commit), file]) for file in modified.split('\n') if file]
+                modified_files[commit_link] = files
+        return modified_files
+
+    def _modified_modules(self, commit_link_links=None):
+        modified_files = self._modified_files(commit_link_links)
+        modified_modules = set()
+        for commit_link, files in modified_files.items():
+            commit = commit_link.commit_id
+            for file in files:
+                modified_modules.add(commit.repo_id._get_module(file))
+        return modified_modules
+
     def _get_upgrade_path(self):
         for commit in (self.env.context.get('defined_commit_ids') or self.params_id.commit_ids):
             if not commit.repo_id.upgrade_paths:

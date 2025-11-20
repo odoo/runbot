@@ -134,7 +134,7 @@ class Trigger(models.Model):
             return safe_eval(self.version_domain)
         return []
 
-    def _filter_modules_to_test(self, modules, module_patterns=None):
+    def _filter_modules_to_test(self, modules_per_repo, module_patterns=None):
         if module_patterns == '-*':
             return []
         repo_module_patterns = {}
@@ -154,34 +154,48 @@ class Trigger(models.Model):
                 exclude.append(e2)
             return lambda mod: ((not e1 or mod >= e1) and (not e2 or mod <= e2) and mod not in exclude)
 
-        def _filter_patterns(patterns_list, default, all):
+        def _filter_patterns(patterns_list, default, all_modules):
             current = set(default)
             for pat in patterns_list:
                 pat = pat.replace(' ', '')
                 if not pat:
                     continue
-                if pat == '-*':
-                    current = set()
-                elif pat == '*':
-                    current = set(all)
-                elif '->' in pat:
+
+                if '->' in pat:
                     mod_filter = _parse_filter(pat)
                     current = {mod for mod in current if mod_filter(mod)}
-                elif pat.startswith(('-', '!')):
+                    continue
+
+                negate = False
+                repo = None
+                if pat.startswith(('-', '!')) and '->' not in pat:
+                    negate = True
                     pat = pat[1:]
-                    current -= {mod for mod in current if fnmatch.fnmatch(mod, pat)}
-                elif pat:
-                    current |= {mod for mod in all if fnmatch.fnmatch(mod, pat)}
+                available_modules = all_modules
+                if '/' in pat:
+                    repo, pat = pat.split('/', 1)
+                    available_modules = {mod: r for mod, r in all_modules.items() if r.name == repo}
+
+                if pat == '*' and not repo:  # optimisation when matchin all
+                    if negate:
+                        current = set()
+                    else:
+                        current = set(available_modules)
+                else:
+                    selection = {mod for mod in available_modules if fnmatch.fnmatch(mod, pat)}
+                    if negate:
+                        current -= selection
+                    else:
+                        current |= selection
             return current
 
-        available_modules = []
+        available_modules = {}
         modules_to_install = set()
-        for repo, repo_available_modules in modules.items():
-            available_modules += repo_available_modules
 
-        # repo specific filters
-        for repo, repo_available_modules in modules.items():
-            repo_modules = set(repo_available_modules)
+        for repo, repo_modules in modules_per_repo.items():
+            repo_available_modules = {module: repo for module in repo_modules}
+            available_modules.update(repo_available_modules)
+            repo_modules = set(repo_available_modules.keys())
             if repo.modules:
                 repo_modules = _filter_patterns(repo.modules.split(','), repo_modules, repo_available_modules)
             module_pattern = repo_module_patterns.get(repo)

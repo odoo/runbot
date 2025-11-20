@@ -66,7 +66,7 @@ class TestBuildErrorCommon(RunbotCase):
             'level': 'ERROR',
             'type': 'server',
             'name': 'test-build-error-name',
-            'path': '/data/build/server/addons/web_studio/tests/test_ui.py',
+            'path': '/data/build/odoo/addons/web_studio/tests/test_ui.py',
             'func': 'test-build-error-func',
             'line': 1,
         }
@@ -354,7 +354,7 @@ class TestBuildError(TestBuildErrorCommon):
         self.assertEqual(error_link.log_date, fields.Datetime.from_string('2023-08-29 00:46:21'))
         self.assertIn(ko_build, error_content.build_ids, 'The parsed build should be added to the runbot.build.error')
         self.assertFalse(self.BuildErrorLink.search([('build_id', '=', ok_build.id)]), 'A successful build should not be associated to a runbot.build.error')
-        self.assertEqual(error_content.file_path, '/data/build/server/addons/web_studio/tests/test_ui.py')
+        self.assertEqual(error_content.file_path, '/data/build/odoo/addons/web_studio/tests/test_ui.py')
         self.assertEqual(build_error.team_id, error_team)
 
         # Test that build with same error is added to the errors
@@ -550,11 +550,11 @@ class TestBuildError(TestBuildErrorCommon):
     def test_build_error_test_tags_fixing_pr(self):
         fix_commit = self.env['runbot.commit'].create({
             'name': 'dfdfcfcf0000ffffffffffffffffffffffffffff',
-            'repo_id': self.repo_server.id
+            'repo_id': self.repo_odoo.id
         })
         branch_pr = self.Branch.create({
             'name': '1337',
-            'remote_id': self.remote_server.id,
+            'remote_id': self.remote_odoo.id,
             'is_pr': True,
             'head': fix_commit.id,
         })
@@ -660,8 +660,8 @@ class TestBuildError(TestBuildErrorCommon):
         self.env['runbot.module.ownership'].create({'module_id': module_sale.id, 'team_id': sale_team.id, 'is_fallback': False})
         self.env['runbot.module.ownership'].create({'module_id': module_sale.id, 'team_id': website_team.id, 'is_fallback': True})
 
-        self.repo_server.name = 'odoo'
-        self.repo_addons.name = 'enterprise'
+        self.repo_odoo.name = 'odoo'
+        self.repo_enterprise.name = 'enterprise'
         teams = self.env['runbot.team'].search(['|', ('path_glob', '!=', False), ('module_ownership_ids', '!=', False)])
         self.assertFalse(teams._get_team('/data/build/odoo/addons/web_studio/tests/test_ui.py'))
         self.assertEqual(website_team, teams._get_team('/data/build/odoo/addons/website_crm/tests/test_website_crm'))

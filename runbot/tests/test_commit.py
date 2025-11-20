@@ -14,7 +14,7 @@ class TestCommitDate(RunbotCaseMinimalSetup):
         commit = self.Commit.create({
             'name': 'caca00caca00ffffffffffffffffffffffffffff',
             'tree_hash': '0caca00caca00fffffffffffffffffffffffffff',
-            'repo_id': self.repo_server.id
+            'repo_id': self.repo_odoo.id
         })
 
         self.assertNotEqual(commit.date, False, "A commit should always have a date")
@@ -25,7 +25,7 @@ class TestCommitStatus(HttpCase):
     def setUp(self):
         super(TestCommitStatus, self).setUp()
         self.project = self.env['runbot.project'].create({'name': 'Tests'})
-        self.repo_server = self.env['runbot.repo'].create({
+        self.repo_odoo = self.env['runbot.repo'].create({
             'name': 'server',
             'project_id': self.project.id,
             'server_files': 'server.py',
@@ -34,7 +34,7 @@ class TestCommitStatus(HttpCase):
 
         self.server_commit = self.env['runbot.commit'].create({
             'name': 'dfdfcfcf0000ffffffffffffffffffffffffffff',
-            'repo_id': self.repo_server.id
+            'repo_id': self.repo_odoo.id
         })
 
         create_context = {'no_reset_password': True, 'mail_create_nolog': True, 'mail_create_nosubscribe': True, 'mail_notrack': True}

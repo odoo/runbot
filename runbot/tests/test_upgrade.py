@@ -20,7 +20,7 @@ class TestUpgradeFlow(RunbotCase):
         self.start_patcher('find_patcher', 'odoo.addons.runbot.common.find', 0)
         self.additionnal_setup()
 
-        self.master_bundle = self.branch_server.bundle_id
+        self.master_bundle = self.branch_odoo.bundle_id
         self.config_test = self.env['runbot.build.config'].create({'name': 'Test'})
         #################
         # upgrade branch
@@ -107,7 +107,7 @@ class TestUpgradeFlow(RunbotCase):
         })
         self.trigger_template = self.env['runbot.trigger'].create({
             'name': 'Template',
-            'dependency_ids': [(4, self.repo_server.id), (4, self.repo_addons.id)],
+            'dependency_ids': [(4, self.repo_odoo.id), (4, self.repo_enterprise.id)],
             'config_id': self.config_template.id,
             'project_id': self.project.id,
             'category_id': self.default_category.id,
@@ -134,7 +134,7 @@ class TestUpgradeFlow(RunbotCase):
         })
         self.trigger_upgrade_to_current = self.env['runbot.trigger'].create({
             'name': 'Server upgrade',
-            'repo_ids': [(4, self.repo_upgrade.id), (4, self.repo_server.id), (4, self.repo_addons.id)],
+            'repo_ids': [(4, self.repo_upgrade.id), (4, self.repo_odoo.id), (4, self.repo_enterprise.id)],
             'config_id': self.config_upgrade_to_current.id,
             'project_id': self.project.id,
             'upgrade_dumps_trigger_id': self.trigger_template.id,
@@ -163,7 +163,7 @@ class TestUpgradeFlow(RunbotCase):
         self.trigger_upgrade_stable = self.env['runbot.trigger'].create({
             'name': 'Server upgrade',
             'repo_ids': [(4, self.repo_upgrade.id)],
-            'dependency_ids': [(4, self.repo_server.id), (4, self.repo_addons.id)],
+            'dependency_ids': [(4, self.repo_odoo.id), (4, self.repo_enterprise.id)],
             'config_id': self.config_upgrade_stable.id,
             'project_id': self.project.id,
             'upgrade_dumps_trigger_id': self.trigger_template.id,
@@ -178,7 +178,7 @@ class TestUpgradeFlow(RunbotCase):
         self.config_single_module = self.env['runbot.build.config'].create({'name': 'Single'})
         self.trigger_single_nightly = self.env['runbot.trigger'].create({
             'name': 'Nighly server',
-            'dependency_ids': [(4, self.repo_server.id), (4, self.repo_addons.id)],
+            'dependency_ids': [(4, self.repo_odoo.id), (4, self.repo_enterprise.id)],
             'config_id': self.config_single_module.id,
             'project_id': self.project.id,
             'category_id': self.nightly_category.id,
@@ -228,34 +228,34 @@ class TestUpgradeFlow(RunbotCase):
     def create_version(self, name):
         intname = int(''.join(c for c in name if c.isdigit())) if name != 'master' else 0
         if name != 'master':
-            branch_server = self.Branch.create({
+            branch_odoo = self.Branch.create({
                 'name': name,
-                'remote_id': self.remote_server.id,
+                'remote_id': self.remote_odoo.id,
                 'is_pr': False,
                 'head': self.Commit.create({
                     'name': f'server{intname}',
                     'tree_hash': f'0server{intname}',
-                    'repo_id': self.repo_server.id,
+                    'repo_id': self.repo_odoo.id,
                 }).id,
             })
             branch_addons = self.Branch.create({
                 'name': name,
-                'remote_id': self.remote_addons.id,
+                'remote_id': self.remote_enterprise.id,
                 'is_pr': False,
                 'head': self.Commit.create({
                     'name': f'addons{intname}',
                     'tree_hash': f'0addons{intname}',
-                    'repo_id': self.repo_addons.id,
+                    'repo_id': self.repo_enterprise.id,
                 }).id,
             })
         else:
-            branch_server = self.branch_server
+            branch_odoo = self.branch_odoo
             branch_addons = self.branch_addons
 
         host = self.env['runbot.host']._get_current()
 
-        self.assertEqual(branch_server.bundle_id, branch_addons.bundle_id)
-        bundle = branch_server.bundle_id
+        self.assertEqual(branch_odoo.bundle_id, branch_addons.bundle_id)
+        bundle = branch_odoo.bundle_id
         self.assertEqual(bundle.name, name)
         bundle.is_base = True
         batch = bundle._force()
@@ -292,7 +292,7 @@ class TestUpgradeFlow(RunbotCase):
     @patch('odoo.addons.runbot.models.build.BuildResult._parse_config')
     def test_all(self, *_):
         # Test setup
-        self.assertEqual(self.branch_server.bundle_id, self.branch_upgrade.bundle_id)
+        self.assertEqual(self.branch_odoo.bundle_id, self.branch_upgrade.bundle_id)
         self.assertTrue(self.branch_upgrade.bundle_id.is_base)
         self.assertTrue(self.branch_upgrade.bundle_id.version_id)
         self.assertEqual(self.trigger_upgrade_to_current.upgrade_step_id, self.step_upgrade_to_current)
@@ -326,7 +326,7 @@ class TestUpgradeFlow(RunbotCase):
         assertOk(b_173_master_demo, self.template_per_version['saas-17.3'], master_upgrade_build, 'all')
         assertOk(b_173_master_no_demo, self.template_per_version['saas-17.3'], master_upgrade_build, 'no-demo-all')
 
-        self.assertEqual(b_17_master_demo.params_id.commit_ids.repo_id, self.repo_server | self.repo_upgrade | self.repo_addons)
+        self.assertEqual(b_17_master_demo.params_id.commit_ids.repo_id, self.repo_odoo | self.repo_upgrade | self.repo_enterprise)
 
         # upgrade repos tests
         upgrade_stable_build = master_batch.slot_ids.filtered(lambda slot: slot.trigger_id == self.trigger_upgrade_stable).build_id
@@ -484,16 +484,16 @@ class TestUpgradeFlow(RunbotCase):
                 self.assertTrue(ro_volumes.pop(f'/home/{user}/.odoorc').startswith(self.env['runbot.runbot']._path('build')))
                 self.assertEqual(
                     list(ro_volumes.keys()), [
-                        '/data/build/addons',
-                        '/data/build/server',
+                        '/data/build/enterprise',
+                        '/data/build/odoo',
                         '/data/build/upgrade',
                     ],
                     "other commit should have been added automaticaly"
                 )
                 self.assertEqual(
                     str(cmd),
-                    'python3 server/server.py {addons_path} --no-xmlrpcs --no-netrpc -u all -d {db_name} --stop-after-init --max-cron-threads=0'.format(
-                        addons_path='--addons-path addons,server/addons,server/core/addons',
+                    'python3 odoo/server.py {addons_path} --no-xmlrpcs --no-netrpc -u all -d {db_name} --stop-after-init --max-cron-threads=0'.format(
+                        addons_path='--addons-path enterprise,odoo/addons,odoo/core/addons',
                         db_name=f'{current_build.dest}-{suffix}')
                 )
             current_build._schedule()()

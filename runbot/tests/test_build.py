@@ -31,7 +31,7 @@ class TestBuildParams(RunbotCaseMinimalSetup):
         server_commit = self.Commit.create({
             'name': 'dfdfcfcf0000ffffffffffffffffffffffffffff',
             'tree_hash': '0dfdfcfcf0000fffffffffffffffffffffffffff',
-            'repo_id': self.repo_server.id
+            'repo_id': self.repo_odoo.id
         })
 
         params = self.BuildParameters.create({
@@ -66,7 +66,7 @@ class TestBuildParams(RunbotCaseMinimalSetup):
         other_commit = self.Commit.create({
             'name': 'deadbeef0000ffffffffffffffffffffffffffff',
             'tree_hash': '0',
-            'repo_id': self.repo_server.id
+            'repo_id': self.repo_odoo.id
         })
 
         copied_params = params.copy({
@@ -85,10 +85,10 @@ class TestBuildParams(RunbotCaseMinimalSetup):
 
         # A commit is found on the dev remote
         branch_a_name = 'master-test-something'
-        self.push_commit(self.remote_server_dev, branch_a_name, 'nice subject', sha='d0d0caca')
+        self.push_commit(self.remote_odoo_dev, branch_a_name, 'nice subject', sha='d0d0caca')
 
         # batch preparation
-        self.repo_server._update_batches()
+        self.repo_odoo._update_batches()
 
         # prepare last_batch
         bundle = self.env['runbot.bundle'].search([('name', '=', branch_a_name), ('project_id', '=', self.project.id)])
@@ -104,10 +104,10 @@ class TestBuildParams(RunbotCaseMinimalSetup):
 
         # A commit is found on the dev remote
         branch_a_name = 'master-test-something'
-        self.push_commit(self.remote_server_dev, branch_a_name, 'nice subject', sha='d0d0caca')
+        self.push_commit(self.remote_odoo_dev, branch_a_name, 'nice subject', sha='d0d0caca')
         # batch preparation
-        self.repo_server.project_id.process_delay = 10
-        self.repo_server._update_batches()
+        self.repo_odoo.project_id.process_delay = 10
+        self.repo_odoo._update_batches()
 
         # create a custom config and a new trigger
         custom_config = self.env['runbot.build.config'].create({'name': 'A Custom Config'})
@@ -122,29 +122,29 @@ class TestBuildParams(RunbotCaseMinimalSetup):
             'config_id': custom_config.id
         })
 
-        self.repo_server.project_id.process_delay = 0
+        self.repo_odoo.project_id.process_delay = 0
         bundle.last_batch._process()
         build_slot = bundle.last_batch.slot_ids.filtered(lambda rec: rec.trigger_id == self.trigger_server)
         self.assertEqual(build_slot.build_id.params_id.config_id, custom_config)
 
         # Test custom trigger if targetting non base bundle
         branch_b_name = 'master-test-something-other-thing'
-        self.push_commit(self.remote_server_dev, branch_b_name, 'Subject', sha='d0d0abab')
-        self.repo_server.project_id.process_delay = 10
-        self.repo_server._update_batches()
+        self.push_commit(self.remote_odoo_dev, branch_b_name, 'Subject', sha='d0d0abab')
+        self.repo_odoo.project_id.process_delay = 10
+        self.repo_odoo._update_batches()
         bundle_b = self.Bundle.search([('name', '=', branch_b_name), ('project_id', '=', self.project.id)])
         bundle_b.write({
             'branch_ids': [(0, 0, {
                 'name': '1',
                 'is_pr': True,
-                'pull_head_remote_id': self.remote_server.id,
+                'pull_head_remote_id': self.remote_odoo.id,
                 'pull_head_name': f'remote:{branch_b_name}',
                 'target_branch_name': bundle.name,
-                'remote_id': self.remote_server.id,
+                'remote_id': self.remote_odoo.id,
             })]
         })
         self.assertEqual(bundle.all_trigger_custom_ids, bundle_b.all_trigger_custom_ids)
-        self.repo_server.project_id.process_delay = 0
+        self.repo_odoo.project_id.process_delay = 0
         bundle_b.last_batch._process()
         build_slot = bundle_b.last_batch.slot_ids.filtered(lambda rec: rec.trigger_id == self.trigger_server)
         self.assertEqual(build_slot.build_id.params_id.config_id, custom_config)
@@ -159,7 +159,7 @@ class TestBuildParams(RunbotCaseMinimalSetup):
         trigger_minimal_check = self.Trigger.create({
             'sequence': 0,
             'name': 'minimal_check',
-            'repo_ids': [(4, self.repo_addons.id), (4, self.repo_server.id)],
+            'repo_ids': [(4, self.repo_enterprise.id), (4, self.repo_odoo.id)],
             'config_id': minimal_config.id,
             'project_id': self.project.id,
             'starts_before_ids': other_triggers.ids,
@@ -168,8 +168,8 @@ class TestBuildParams(RunbotCaseMinimalSetup):
         self.assertEqual(self.trigger_addons.starts_after_ids, trigger_minimal_check)
 
         branch_a_name = 'master-test-something'
-        self.push_commit(self.remote_server_dev, branch_a_name, 'nice subject', sha='d0d0caca')
-        self.repo_server._update_batches()
+        self.push_commit(self.remote_odoo_dev, branch_a_name, 'nice subject', sha='d0d0caca')
+        self.repo_odoo._update_batches()
         bundle = self.Bundle.search([('name', '=', branch_a_name), ('project_id', '=', self.project.id)])
         batch = bundle.last_batch
         batch._process()
@@ -212,10 +212,10 @@ class TestBuildParams(RunbotCaseMinimalSetup):
 
         # A commit is found on the dev remote
         branch_a_name = 'master-test-something'
-        self.push_commit(self.remote_server_dev, branch_a_name, 'nice subject', sha='d0d0caca')
+        self.push_commit(self.remote_odoo_dev, branch_a_name, 'nice subject', sha='d0d0caca')
         # batch preparation
-        self.repo_server.project_id.process_delay = 10
-        self.repo_server._update_batches()
+        self.repo_odoo.project_id.process_delay = 10
+        self.repo_odoo._update_batches()
 
         # set config data on the trigger
         self.trigger_server.config_data = {'moc_var': 'bar'}
@@ -223,7 +223,7 @@ class TestBuildParams(RunbotCaseMinimalSetup):
         # create a custom trigger for the bundle
         bundle = self.Bundle.search([('name', '=', branch_a_name), ('project_id', '=', self.project.id)])
 
-        self.repo_server.project_id.process_delay = 0
+        self.repo_odoo.project_id.process_delay = 0
         bundle.last_batch._process()
         build_slot = bundle.last_batch.slot_ids.filtered(lambda rec: rec.trigger_id == self.trigger_server)
         self.assertIn(
@@ -238,10 +238,10 @@ class TestBuildParams(RunbotCaseMinimalSetup):
 
         # A commit is found on the dev remote
         branch_a_name = 'master-test-something'
-        self.push_commit(self.remote_server_dev, branch_a_name, 'nice subject', sha='d0d0caca')
+        self.push_commit(self.remote_odoo_dev, branch_a_name, 'nice subject', sha='d0d0caca')
         # batch preparation
-        self.repo_server.project_id.process_delay = 10
-        self.repo_server._update_batches()
+        self.repo_odoo.project_id.process_delay = 10
+        self.repo_odoo._update_batches()
 
         # set config data on the trigger
         self.trigger_server.config_data = {'moc_var': 'bar'}
@@ -256,7 +256,7 @@ class TestBuildParams(RunbotCaseMinimalSetup):
             'config_data': {'moc_var': 'foo'},
         })
 
-        self.repo_server.project_id.process_delay = 0
+        self.repo_odoo.project_id.process_delay = 0
         bundle.last_batch._process()
         build_slot = bundle.last_batch.slot_ids.filtered(lambda rec: rec.trigger_id == self.trigger_server)
         self.assertIn(
@@ -272,13 +272,13 @@ class TestBuildResult(RunbotCase):
         self.server_commit = self.Commit.create({
             'name': 'dfdfcfcf0000ffffffffffffffffffffffffffff',
             'tree_hash': '0dfdfcfcf0000fffffffffffffffffffffffffff',
-            'repo_id': self.repo_server.id
+            'repo_id': self.repo_odoo.id
         })
 
         self.addons_commit = self.Commit.create({
             'name': 'd0d0caca0000ffffffffffffffffffffffffffff',
             'tree_hash': '0d0d0caca0000fffffffffffffffffffffffffff',
-            'repo_id': self.repo_addons.id,
+            'repo_id': self.repo_enterprise.id,
         })
 
         self.server_params = self.base_params.copy({'commit_link_ids': [
@@ -338,18 +338,18 @@ class TestBuildResult(RunbotCase):
         })
 
         mock_get_available_modules.return_value = {
-            self.repo_server: ['good_module', 'bad_module', 'other_good', 'l10n_be', 'hw_foo', 'hwgood', 'hw_explicit'],
-            self.repo_addons: ['other_mod_1', 'other_mod_2'],
+            self.repo_odoo: ['good_module', 'bad_module', 'other_good', 'l10n_be', 'hw_foo', 'hwgood', 'hw_explicit'],
+            self.repo_enterprise: ['other_mod_1', 'other_mod_2'],
         }
 
-        self.repo_server.modules = '-bad_module,-hw_*,hw_explicit,-l10n_*'
+        self.repo_odoo.modules = '-bad_module,-hw_*,hw_explicit,-l10n_*'
 
-        self.repo_addons.modules = False  # no filter, should not crash
+        self.repo_enterprise.modules = False  # no filter, should not crash
 
         modules_to_test = build._get_modules_to_test(modules_patterns='')
         self.assertEqual(modules_to_test, sorted(['good_module', 'hwgood', 'other_good', 'hw_explicit', 'other_mod_1', 'other_mod_2']))
 
-        self.repo_addons.modules = '-*'
+        self.repo_enterprise.modules = '-*'
 
         modules_to_test = build._get_modules_to_test(modules_patterns='')
         self.assertEqual(modules_to_test, sorted(['good_module', 'hwgood', 'other_good', 'hw_explicit']))
@@ -364,15 +364,15 @@ class TestBuildResult(RunbotCase):
 
         self.env['runbot.module.filter'].create([{
             'trigger_id': self.trigger_addons.id,
-            'repo_id': self.repo_server.id,
+            'repo_id': self.repo_odoo.id,
             'modules': '-*',
         }, {
             'trigger_id': self.trigger_addons.id,
-            'repo_id': self.repo_addons.id,
+            'repo_id': self.repo_enterprise.id,
             'modules': '*',
         }, {
             'trigger_id': self.trigger_addons.id,
-            'repo_id': self.repo_addons.id,
+            'repo_id': self.repo_enterprise.id,
             'modules': '-other_mod_1',
         }])
         modules_to_test = build._get_modules_to_test(modules_patterns='')
@@ -401,7 +401,7 @@ class TestBuildResult(RunbotCase):
             'params_id': self.server_params.id,
         })
         cmd = build._cmd(py_version=3)
-        self.assertIn('python3 -m pip install --progress-bar off -r server/requirements.txt'.split(), cmd.pres)
+        self.assertIn(['python3', '-m', 'pip', 'install', '--progress-bar', 'off', '-r', 'odoo/requirements.txt'], cmd.pres)
         self.assertIn(custom_pre, cmd.pres)
         self.assertIn(custom_post, cmd.posts)
 
@@ -413,7 +413,7 @@ class TestBuildResult(RunbotCase):
         })
         cmd = build._cmd(py_version=3)
         self.assertEqual('python3', cmd[0])
-        self.assertEqual('server/server.py', cmd[1])
+        self.assertEqual('odoo/server.py', cmd[1])
         self.assertIn('--addons-path', cmd)
         # TODO fix the _get_addons_path and/or _docker_source_folder
         # addons_path_pos = cmd.index('--addons-path') + 1
@@ -424,19 +424,19 @@ class TestBuildResult(RunbotCase):
 
         def is_file(file):
             self.assertIn(file, [
-                self.env['runbot.runbot']._path('sources/addons/0d0d0caca0000fffffffffffffffffffffffffff/requirements.txt'),
-                self.env['runbot.runbot']._path('sources/server/0dfdfcfcf0000fffffffffffffffffffffffffff/requirements.txt'),
-                self.env['runbot.runbot']._path('sources/server/0dfdfcfcf0000fffffffffffffffffffffffffff/server.py'),
-                self.env['runbot.runbot']._path('sources/server/0dfdfcfcf0000fffffffffffffffffffffffffff/odoo/tools/config.py'),
-                self.env['runbot.runbot']._path('sources/server/0dfdfcfcf0000fffffffffffffffffffffffffff/odoo/sql_db.py')
+                self.env['runbot.runbot']._path('sources/enterprise/0d0d0caca0000fffffffffffffffffffffffffff/requirements.txt'),
+                self.env['runbot.runbot']._path('sources/odoo/0dfdfcfcf0000fffffffffffffffffffffffffff/requirements.txt'),
+                self.env['runbot.runbot']._path('sources/odoo/0dfdfcfcf0000fffffffffffffffffffffffffff/server.py'),
+                self.env['runbot.runbot']._path('sources/odoo/0dfdfcfcf0000fffffffffffffffffffffffffff/odoo/tools/config.py'),
+                self.env['runbot.runbot']._path('sources/odoo/0dfdfcfcf0000fffffffffffffffffffffffffff/odoo/sql_db.py'),
             ])
-            return file != self.env['runbot.runbot']._path('static/sources/addons/0d0d0caca0000fffffffffffffffffffffffffff/requirements.txt')
+            return file != self.env['runbot.runbot']._path('static/sources/enterprise/0d0d0caca0000fffffffffffffffffffffffffff/requirements.txt')
 
         def is_dir(file):
             paths = [
-                'sources/server/0dfdfcfcf0000fffffffffffffffffffffffffff/addons',
-                'sources/server/0dfdfcfcf0000fffffffffffffffffffffffffff/core/addons',
-                'sources/addons/0d0d0caca0000fffffffffffffffffffffffffff'
+                'sources/odoo/0dfdfcfcf0000fffffffffffffffffffffffffff/addons',
+                'sources/odoo/0dfdfcfcf0000fffffffffffffffffffffffffff/core/addons',
+                'sources/enterprise/0d0d0caca0000fffffffffffffffffffffffffff'
             ]
             self.assertTrue(any([path in file for path in paths]))  # checking that addons path existence check looks ok
             return True
@@ -451,8 +451,8 @@ class TestBuildResult(RunbotCase):
         cmd = build._cmd(py_version=3)
         self.assertIn('--addons-path', cmd)
         addons_path_pos = cmd.index('--addons-path') + 1
-        self.assertEqual(cmd[addons_path_pos], 'server/addons,server/core/addons,addons')
-        self.assertEqual('server/server.py', cmd[1])
+        self.assertEqual(cmd[addons_path_pos], 'odoo/addons,odoo/core/addons,enterprise')
+        self.assertEqual('odoo/server.py', cmd[1])
         self.assertEqual('python3', cmd[0])
 
     def test_build_gc_date(self):
@@ -465,7 +465,7 @@ class TestBuildResult(RunbotCase):
         child_build = self.Build.create({
             'params_id': self.server_params.id,
             'parent_id': build.id,
-            'local_state': 'done'
+            'local_state': 'done',
         })
 
         # verify that the gc_day is set 30 days later (29 days since we should be a few microseconds later)
@@ -691,19 +691,19 @@ class TestBuildResult(RunbotCase):
             'params_id': self.server_params.id,
         })
         cmd = build._cmd(py_version=3)
-        self.assertIn('faketime "2024-02-04 02:42 UTC" python3 server/server.py', str(cmd))
+        self.assertIn('faketime "2024-02-04 02:42 UTC" python3 odoo/server.py', str(cmd))
 
         # let's ensure that a time offset is added to a child build
         build.build_start = datetime.datetime(2025, 1, 1, 12, 00)
         child_build = build._add_child({})
         child_build.create_date = datetime.datetime(2025, 1, 1, 13, 00)
         child_cmd = child_build._cmd(py_version=3)
-        self.assertIn('faketime "2024-02-04 03:42 UTC" python3 server/server.py', str(child_cmd))
+        self.assertIn('faketime "2024-02-04 03:42 UTC" python3 odoo/server.py', str(child_cmd))
 
         build.build_end = datetime.datetime(2025, 1, 1, 14, 00)
         second_child = build._add_child({})
         second_child_cmd = second_child._cmd(py_version=3)
-        self.assertIn('faketime "2024-02-04 04:42 UTC" python3 server/server.py', str(second_child_cmd))
+        self.assertIn('faketime "2024-02-04 04:42 UTC" python3 odoo/server.py', str(second_child_cmd))
 
 class TestGc(RunbotCaseMinimalSetup):
 
@@ -721,10 +721,10 @@ class TestGc(RunbotCaseMinimalSetup):
 
         # A commit is found on the dev remote
         branch_a_name = 'master-test-something'
-        self.push_commit(self.remote_server_dev, branch_a_name, 'nice subject', sha='d0d0caca')
+        self.push_commit(self.remote_odoo_dev, branch_a_name, 'nice subject', sha='d0d0caca')
 
         # batch preparation
-        self.repo_server._update_batches()
+        self.repo_odoo._update_batches()
 
         # prepare last_batch
         bundle_a = self.env['runbot.bundle'].search([('name', '=', branch_a_name)])
@@ -739,8 +739,8 @@ class TestGc(RunbotCaseMinimalSetup):
 
         # now another commit is found in another branch
         branch_b_name = 'master-test-other-thing'
-        self.push_commit(self.remote_server_dev, branch_b_name, 'other subject', sha='cacad0d0')
-        self.repo_server._update_batches()
+        self.push_commit(self.remote_odoo_dev, branch_b_name, 'other subject', sha='cacad0d0')
+        self.repo_odoo._update_batches()
         bundle_b = self.env['runbot.bundle'].search([('name', '=', branch_b_name)])
         bundle_b.last_batch._process()
 
@@ -758,8 +758,8 @@ class TestGc(RunbotCaseMinimalSetup):
         self.assertFalse(build_b.requested_action)
 
         # a new commit is pushed on branch_a
-        self.push_commit(self.remote_server_dev, branch_a_name, 'new subject', sha='d0cad0ca')
-        self.repo_server._update_batches()
+        self.push_commit(self.remote_odoo_dev, branch_a_name, 'new subject', sha='d0cad0ca')
+        self.repo_odoo._update_batches()
         bundle_a = self.env['runbot.bundle'].search([('name', '=', branch_a_name)])
         bundle_a.last_batch._process()
         build_a_last = bundle_a.last_batch.slot_ids[0].build_id

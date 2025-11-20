@@ -7,7 +7,7 @@ from .common import RunbotCase, RunbotCaseMinimalSetup
 class TestBranch(RunbotCase):
 
     def test_base_fields(self):
-        self.assertEqual(self.branch_server.branch_url, 'https://example.com/base/server/tree/master')
+        self.assertEqual(self.branch_odoo.branch_url, 'https://example.com/base/odoo/tree/master')
 
     def test_pull_request(self):
         mock_github = self.patchers['github_patcher']
@@ -21,24 +21,24 @@ class TestBranch(RunbotCase):
             },
         }
         pr = self.Branch.create({
-            'remote_id': self.remote_server.id,
+            'remote_id': self.remote_odoo.id,
             'name': '12345',
             'is_pr': True,
         })
         self.assertEqual(pr.name, '12345')
-        self.assertEqual(pr.branch_url, 'https://example.com/base/server/pull/12345')
+        self.assertEqual(pr.branch_url, 'https://example.com/base/odoo/pull/12345')
         self.assertEqual(pr.target_branch_name, 'master')
         self.assertEqual(pr.pull_head_name, 'foo-dev:bar_branch')
 
     def test_branch_dname_search(self):
         # Basic branch
         self.assertEqual(
-            self.branch_server,
-            self.Branch.search([('dname', '=', self.branch_server.dname)]),
+            self.branch_odoo,
+            self.Branch.search([('dname', '=', self.branch_odoo.dname)]),
         )
         self.assertEqual(
-            self.branch_server,
-            self.Branch.search([('dname', '=', self.branch_server.dname.replace(':', '#'))]),
+            self.branch_odoo,
+            self.Branch.search([('dname', '=', self.branch_odoo.dname.replace(':', '#'))]),
         )
         # Basic pr
         self.assertEqual(
@@ -58,7 +58,7 @@ class TestBranch(RunbotCase):
         # Branch with a . inside of it
         branch = self.Branch.create({
             'name': '18.0-test',
-            'remote_id': self.remote_server.id,
+            'remote_id': self.remote_odoo.id,
             'is_pr': False,
         })
         self.assertEqual(
@@ -73,13 +73,13 @@ class TestBranchRelations(RunbotCase):
 
         def create_base(name):
             branch = self.Branch.create({
-                'remote_id': self.remote_server.id,
+                'remote_id': self.remote_odoo.id,
                 'name': name,
                 'is_pr': False,
             })
             branch.bundle_id.is_base = True
             return branch
-        self.master = self.branch_server
+        self.master = self.branch_odoo
         create_base('11.0')
         create_base('saas-11.1')
         create_base('12.0')
@@ -92,7 +92,7 @@ class TestBranchRelations(RunbotCase):
 
     def test_relations_master_dev(self):
         b = self.Branch.create({
-                'remote_id': self.remote_server_dev.id,
+                'remote_id': self.remote_odoo_dev.id,
                 'name': 'master-test-tri',
                 'is_pr': False,
             })
@@ -108,7 +108,7 @@ class TestBranchRelations(RunbotCase):
 
     def test_relations_no_intermediate(self):
         b = self.Branch.create({
-                'remote_id': self.remote_server_dev.id,
+                'remote_id': self.remote_odoo_dev.id,
                 'name': 'saas-13.1-test-tri',
                 'is_pr': False,
             })
@@ -118,7 +118,7 @@ class TestBranchRelations(RunbotCase):
 
     def test_relations_old_branch(self):
         b = self.Branch.create({
-                'remote_id': self.remote_server_dev.id,
+                'remote_id': self.remote_odoo_dev.id,
                 'name': '11.0-test-tri',
                 'is_pr': False,
             })
@@ -128,7 +128,7 @@ class TestBranchRelations(RunbotCase):
 
     def test_relations_closest_forced(self):
         b = self.Branch.create({
-                'remote_id': self.remote_server_dev.id,
+                'remote_id': self.remote_odoo_dev.id,
                 'name': 'master-test-tri',
                 'is_pr': False,
             })
@@ -144,7 +144,7 @@ class TestBranchRelations(RunbotCase):
 
     def test_relations_no_match(self):
         b = self.Branch.create({
-                'remote_id': self.remote_server_dev.id,
+                'remote_id': self.remote_odoo_dev.id,
                 'name': 'icantnamemybranches',
                 'is_pr': False,
             })
@@ -153,14 +153,14 @@ class TestBranchRelations(RunbotCase):
 
     def test_relations_pr(self):
         self.Branch.create({
-                'remote_id': self.remote_server_dev.id,
+                'remote_id': self.remote_odoo_dev.id,
                 'name': 'master-test-tri',
                 'is_pr': False,
             })
 
         self.patchers['github_patcher'].return_value = {
             'base': {'ref': 'master-test-tri'},
-            'head': {'label': 'dev:master-test-tri-imp', 'repo': {'full_name': 'dev/server'}},
+            'head': {'label': 'dev:master-test-tri-imp', 'repo': {'full_name': 'dev/odoo'}},
             'title': '[IMP] Title',
             'body': 'Body',
             'user': {
@@ -168,7 +168,7 @@ class TestBranchRelations(RunbotCase):
             },
         }
         b = self.Branch.create({
-                'remote_id': self.remote_server_dev.id,
+                'remote_id': self.remote_odoo_dev.id,
                 'name': '100',
                 'is_pr': True,
             })
@@ -183,11 +183,11 @@ class TestBranchForbidden(RunbotCase):
     """Test that a branch matching the repo forbidden regex, goes to dummy bundle"""
 
     def test_forbidden(self):
-        dummy_bundle = self.remote_server_dev.repo_id.project_id.dummy_bundle_id
-        self.remote_server_dev.repo_id.forbidden_regex = '^bad_name.+'
+        dummy_bundle = self.remote_odoo_dev.repo_id.project_id.dummy_bundle_id
+        self.remote_odoo_dev.repo_id.forbidden_regex = '^bad_name.+'
         with mute_logger("odoo.addons.runbot.models.branch"):
             branch = self.Branch.create({
-                    'remote_id': self.remote_server_dev.id,
+                    'remote_id': self.remote_odoo_dev.id,
                     'name': 'bad_name-evil',
                     'is_pr': False,
                 })
@@ -203,7 +203,7 @@ class TestBranchIsBase(RunbotCaseMinimalSetup):
 
     def test_is_base_regex_on_main_remote(self):
         branch = self.Branch.create({
-                'remote_id': self.remote_server.id,
+                'remote_id': self.remote_odoo.id,
                 'name': 'saas-13.4',
                 'is_pr': False,
             })
@@ -211,7 +211,7 @@ class TestBranchIsBase(RunbotCaseMinimalSetup):
         self.assertTrue(branch.bundle_id.sticky, "A branch matching the is_base_regex parameter should create sticky bundle")
 
         staging = self.Branch.create({
-            'remote_id': self.remote_server.id,
+            'remote_id': self.remote_odoo.id,
             'name': 'staging.saas-13.4',
             'is_pr': False,
         })
@@ -222,19 +222,19 @@ class TestBranchIsBase(RunbotCaseMinimalSetup):
         r12 = self.env['runbot.host'].create({'name': 'runbot12.odoo.com', 'assigned_only': True})
 
         branch = self.Branch.create({
-                'remote_id': self.remote_server.id,
+                'remote_id': self.remote_odoo.id,
                 'name': 'saas-13.4-runbotinexist-test',
                 'is_pr': False,
             })
         self.assertFalse(branch.bundle_id.host_id)
         branch = self.Branch.create({
-                'remote_id': self.remote_server.id,
+                'remote_id': self.remote_odoo.id,
                 'name': 'saas-13.4-runbot10-test',
                 'is_pr': False,
         })
         self.assertEqual(branch.bundle_id.host_id, r10)
         branch = self.Branch.create({
-                'remote_id': self.remote_server.id,
+                'remote_id': self.remote_odoo.id,
                 'name': 'saas-13.4-runbot_x-test',
                 'is_pr': False,
         })
@@ -243,13 +243,13 @@ class TestBranchIsBase(RunbotCaseMinimalSetup):
     @mute_logger("odoo.addons.runbot.models.branch")
     def test_is_base_regex_on_dev_remote(self):
         """Test that a branch matching the is_base regex on a secondary remote goes to the dummy bundles."""
-        dummy_bundle = self.repo_addons.project_id.dummy_bundle_id
+        dummy_bundle = self.repo_enterprise.project_id.dummy_bundle_id
 
         # master branch on dev remote
         initial_addons_dev_commit = self.Commit.create({
             'name': 'dddddd',
             'tree_hash': '0dddddd',
-            'repo_id': self.repo_addons.id,
+            'repo_id': self.repo_enterprise.id,
             'date': '2015-09-30',
             'subject': 'Please use the right repo',
             'author': 'oxo',
@@ -258,7 +258,7 @@ class TestBranchIsBase(RunbotCaseMinimalSetup):
 
         branch_addons_dev = self.Branch.create({
             'name': 'master',
-            'remote_id': self.remote_addons_dev.id,
+            'remote_id': self.remote_enterprise_dev.id,
             'is_pr': False,
             'head': initial_addons_dev_commit.id
         })
@@ -268,26 +268,26 @@ class TestBranchIsBase(RunbotCaseMinimalSetup):
         initial_server_dev_commit = self.Commit.create({
             'name': 'bbbbbb',
             'tree_hash': '0bbbbbb',
-            'repo_id': self.repo_server.id,
+            'repo_id': self.repo_odoo.id,
             'date': '2014-05-26',
             'subject': 'Please use the right repo',
             'author': 'oxo',
             'author_email': 'oxo@somewhere.com'
         })
 
-        branch_server_dev = self.Branch.create({
+        branch_odoo_dev = self.Branch.create({
             'name': 'saas-12.3',
-            'remote_id': self.remote_server_dev.id,
+            'remote_id': self.remote_odoo_dev.id,
             'is_pr': False,
             'head': initial_server_dev_commit.id
         })
-        self.assertEqual(branch_server_dev.bundle_id, dummy_bundle, "A branch matching the is_base_regex should on a secondary repo should goes in dummy bundle")
+        self.assertEqual(branch_odoo_dev.bundle_id, dummy_bundle, "A branch matching the is_base_regex should on a secondary repo should goes in dummy bundle")
 
         # 12.0 branch on dev remote
         mistaken_commit = self.Commit.create({
             'name': 'eeeeee',
             'tree_hash': '0eeeeee',
-            'repo_id': self.repo_server.id,
+            'repo_id': self.repo_odoo.id,
             'date': '2015-06-27',
             'subject': 'dummy commit',
             'author': 'brol',
@@ -296,7 +296,7 @@ class TestBranchIsBase(RunbotCaseMinimalSetup):
 
         branch_mistake_dev = self.Branch.create({
             'name': '12.0',
-            'remote_id': self.remote_server_dev.id,
+            'remote_id': self.remote_odoo_dev.id,
             'is_pr': False,
             'head': mistaken_commit.id
         })
@@ -319,7 +319,7 @@ class TestBundleTeam(RunbotCase):
         team.user_ids += test_user
 
         branch = self.Branch.create({
-            'remote_id': self.remote_server_dev.id,
+            'remote_id': self.remote_odoo_dev.id,
             'name': 'saas-19.1-test-tru',
             'is_pr': False,
         })

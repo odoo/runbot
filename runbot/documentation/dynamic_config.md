@@ -109,6 +109,8 @@ test_tags is also a dynamic value and can use variables, as well as [filter](#fi
     'job_type': 'create_build',
     'children': REQUIRED(LIST(CONFIG)),
     'for_each_vars': OPTIONAL(LIST(VARS)),
+    'for_each_module': OPTIONAL(DYNAMIC_VALUE),
+    'max_builds': OPTIONAL(INT),
 }
 ```
 
@@ -198,6 +200,24 @@ This is how the runbot post install builds are created, using [filters](#filters
     }]
 }
 ```
+
+`for_each_module` allow to create one child per selected module (comma separated list, can be a dynamic value)
+
+```json
+ {
+    "job_type": "create_build",
+    "for_each_module": "base,web,mail"
+}
+```
+``` json
+{
+    "job_type": "create_build",
+    "for_each_module": "{{*|filter_all_modules|modified_modules}}",
+    "max_builds": 20,
+}
+```
+
+
 
 ### Restore steps
 
@@ -322,7 +342,7 @@ Note that using `web` instead of `web->web` would include web, but also all modu
 
 Filters are a way to transform dynamic values before using them. They are defined by appending `|filter_name` to the dynamic value.
 
-Filters are currently only used to transform module filters into test tags.
+For example, to transform a module filter into test tags:
 
 ```json
     {"test_tags": "-at_install,{{test_module_filter|filter_all_modules|make_module_test_tags}}",
@@ -333,3 +353,12 @@ In this example, the `filter_all_modules` filters will first transform the `test
 Note that `filter_all_modules` is actually equivalent to `filter_default_modules`, but prepending a `*` at the begining of the filter.
 
 `*,mail -> !web|filter_default_modules` is the same as `mail -> !web|filter_all_modules`
+
+In some case we also want to combine the test-tags module with another tag or test method, this can be done using prepend and append
+
+`"{{-*,web*|filter_all_modules|make_module_test_tags|append('.test_method')}}`
+`{{-*,web*|filter_all_modules|make_module_test_tags|prepend('custom_tag')}}`
+
+
+It is also possible to filter modules based on the one modified in the current bundle.
+`{{*|filter_all_modules|modified_modules}}"`

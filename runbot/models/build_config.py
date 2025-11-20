@@ -52,6 +52,22 @@ def filter_default_modules(selector, build, dynamic_vars):
     return ','.join(modules)
 
 
+def keep_modified_modules(modules, build, dynamic_vars):
+    if build.params_id.config_data.get('skip_modified_modules_filter', False):
+        return modules
+    modified_modules = build._modified_modules()
+    modules = modules.split(',')
+    filtered_modules = [module for module in modules if module in modified_modules]
+    return ','.join(filtered_modules)
+
+
+def keep_modified_modules_or_base(modules, build, dynamic_vars):
+    bundle = build.params_id.create_batch_id.bundle_id
+    if bundle.is_base or bundle.is_staging:
+        return modules
+    return keep_modified_modules(modules, build, dynamic_vars)
+
+
 def make_module_test_tags(modules, build, dynamic_vars):
     return ','.join([f'/{module}' for module in modules.split(',')])
 
@@ -64,7 +80,11 @@ def prepend_string(modules, build, dynamic_vars, element):
     return ','.join([f'{element}{module}' for module in modules.split(',')])
 
 
-def append_string(modules, build, element):
+def append_string(modules, build, dynamic_vars, element):
+    if re.match(r'^[\'"].*[\'"]$', element):
+        element = element[1:-1]
+    else:
+        element = dynamic_vars.get(element, element)
     return ','.join([f'{module}{element}' for module in modules.split(',')])
 
 
@@ -240,6 +260,8 @@ class Config(models.Model):
             'job_type': 'create_build',
             'children': REQUIRED(LIST(CONFIG)),
             'for_each_vars': OPTIONAL(LIST(VARS)),
+            'for_each_module': OPTIONAL(DYNAMIC_VALUE),
+            'max_builds': OPTIONAL(INT),
         }
         valid_steps['restore'] = {
             'name': REQUIRED(NAME),
@@ -533,7 +555,7 @@ class ConfigStep(models.Model):
             return build._docker_run(self, **docker_params)
         return True
 
-    def _run_create_build(self, build, config_data=None):
+    def _run_create_build(self, build, config_data=None, max_build=200):
         if config_data:
             config_data = {**config_data, **build.params_id.config_data}
         else:
@@ -552,9 +574,10 @@ class ConfigStep(models.Model):
                 child_data_values = {'config_data': {}, **child_data, 'config_id': create_config}
                 for _ in range(config_data.get('number_build', self.number_builds)):
                     count += 1
-                    if count > 200:
+                    if count > max_build:
                         build._logger('Too much build created')
-                        break
+                        build._log('create_build', f'More than {max_build} build created, stopping', level='WARNING')
+                        return
                     config_name = config_name or create_config.name
                     child = build._add_child(child_data_values, orphan=self.make_orphan, description=description or config_name)
                     build._log('create_build', 'created with config %s' % config_name, log_type='subbuild', path=str(child.id))
@@ -1565,16 +1588,7 @@ class ConfigStep(models.Model):
         return success
 
     def _modified_files(self, build, commit_link_links=None):
-        modified_files = {}
-        if commit_link_links is None:
-            commit_link_links = build.params_id.commit_link_ids
-        for commit_link in commit_link_links:
-            commit = commit_link.commit_id
-            modified = commit.repo_id._git(['diff', '--name-only', '%s..%s' % (commit_link.merge_base_commit_id.name, commit.name)])
-            if modified:
-                files = [os.sep.join([build._docker_source_folder(commit), file]) for file in modified.split('\n') if file]
-                modified_files[commit_link] = files
-        return modified_files
+        return build._modified_files(commit_link_links=commit_link_links)
 
     def _get_dynamic_step(self, build):
         if self.job_type != 'dynamic':
@@ -1602,6 +1616,15 @@ class ConfigStep(models.Model):
             return
         if current_step['job_type'] == 'create_build':
             for_each_vars_list = current_step.get('for_each_vars', [{}])
+            if 'for_each_module' in current_step:
+                modules_vars = []
+                for for_each_vars in for_each_vars_list:
+                    modules_entry = self._parse_dynamic_entry(current_step['for_each_module'], build, additional_dynamic_vars=for_each_vars)
+                    modules = [m.strip() for m in modules_entry.split(',') if m.strip()]
+                    for module in modules:
+                        module_vars = {**for_each_vars, 'module': module}
+                        modules_vars.append(module_vars)
+                for_each_vars_list = modules_vars
             parent_vars = {**build.dynamic_config.get('vars', {}), **build.params_id.config_data.get('dynamic_vars', {})}
             child_data_list = []
             for child_index, child in enumerate(current_step.get('children', [])):
@@ -1623,7 +1646,11 @@ class ConfigStep(models.Model):
                         'description': description,
                     }
                     child_data_list.append(child_data)
-            return self._run_create_build(build, {'child_data': child_data_list, 'number_build': current_step.get('number_builds', 1)})
+            return self._run_create_build(
+                build,
+                {'child_data': child_data_list, 'number_build': current_step.get('number_builds', 1)},
+                max_build=min(current_step.get('max_builds', 20), 200),
+            )
 
         if current_step['job_type'] == 'restore':
             config_data = {
@@ -1701,6 +1728,8 @@ class ConfigStep(models.Model):
             'make_module_test_tags': make_module_test_tags,
             'prepend': prepend_string,
             'append': append_string,
+            'modified_modules': keep_modified_modules,
+            'modified_modules_or_base': keep_modified_modules_or_base,
         }
         dynamic_vars = {**dynamic_config.get('vars', {}), **build.params_id.config_data.get('dynamic_vars', {}), **(additional_dynamic_vars or {})}
 
@@ -1718,8 +1747,8 @@ class ConfigStep(models.Model):
                 if match := re.match(r'(\w+)\((.+)\)', processor):
                     processor = match.group(1)
                     args = match.group(2).split(',')
-                expression_filter = expression_filters.get(processor, *args)
-                if not processor:
+                expression_filter = expression_filters.get(processor)
+                if not expression_filter:
                     build._log('Dynamic Config', f'Unknown processor {processor} in dynamic config entry {entry}', level="ERROR")
                     return expression
                 value = expression_filter(value, build, dynamic_vars, *args)
