@@ -69,6 +69,7 @@
             'runbot/static/src/libs/diff_match_patch/diff_match_patch.js',
             'runbot/static/src/js/views/**/*',
             'runbot/static/src/js/fields/*',
+            'runbot/static/src/js/components/*',
         ],
         'runbot.assets_frontend': [
             '/web/static/lib/bootstrap/dist/css/bootstrap.css',
