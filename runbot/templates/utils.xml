@@ -8,6 +8,7 @@
                     <title t-out="title or 'Runbot'"/>
                     <link rel="stylesheet" type="text/css" href="/runbot/static/src/libs/bootstrap/css/bootstrap.css"/>
                     <link rel="stylesheet" type="text/css" href="/runbot/static/src/libs/fontawesome/css/font-awesome.css"/>
+                    <link rel="stylesheet" type="text/css" href="/web/static/lib/odoo_ui_icons/style.css"/>
                     <link rel="stylesheet" type="text/css" href="/runbot/static/src/css/runbot.css"/>
 
                     <script src="/runbot/static/src/libs/jquery/jquery.js" type="text/javascript"/>
