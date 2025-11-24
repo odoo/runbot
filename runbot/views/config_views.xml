@@ -6,8 +6,8 @@
         <field name="arch" type="xml">
             <form string="Build config">
                 <sheet>
-                    <div invisible="not protected">
-                        <i class="fa fa-warning text-warning"/>This record is protected and can only be edited by config administrator.
+                    <div class="alert alert-warning" role="alert" invisible="not protected">
+                        This record is protected and can only be edited by config administrator.
                     </div>
                     <group>
                         <field name="name"/>
@@ -35,7 +35,7 @@
         <field name="arch" type="xml">
             <form string="Build config step">
                 <sheet>
-                    <div class="label label-warning" invisible="not protected">
+                    <div class="alert alert-warning" role="alert" invisible="not protected">
                         This record is protected and can only be edited by config administrator.
                     </div>
                     <group string="General settings">
