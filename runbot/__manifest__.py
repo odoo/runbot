@@ -78,7 +78,6 @@
             'runbot/static/src/css/runbot.css',
 
             'runbot/static/lib/jquery/jquery.js',
-            'runbot/static/lib/popper/popper.js',
             'runbot/static/lib/bootstrap/js/bootstrap.bundle.js',
             'runbot/static/src/js/runbot.js',
         ],
