@@ -6,14 +6,14 @@
             <html t-att-data-bs-theme="theme">
                 <head>
                     <title t-out="title or 'Runbot'"/>
-                    <link rel="stylesheet" type="text/css" href="/runbot/static/src/libs/bootstrap/css/bootstrap.css"/>
-                    <link rel="stylesheet" type="text/css" href="/runbot/static/src/libs/fontawesome/css/font-awesome.css"/>
+                    <link rel="stylesheet" type="text/css" href="/runbot/static/lib/bootstrap/css/bootstrap.css"/>
+                    <link rel="stylesheet" type="text/css" href="/runbot/static/lib/fontawesome/css/font-awesome.css"/>
                     <link rel="stylesheet" type="text/css" href="/web/static/lib/odoo_ui_icons/style.css"/>
                     <link rel="stylesheet" type="text/css" href="/runbot/static/src/css/runbot.css"/>
 
-                    <script src="/runbot/static/src/libs/jquery/jquery.js" type="text/javascript"/>
-                    <script type="text/javascript" src="/runbot/static/src/libs/popper/popper.js"/>
-                    <script type="text/javascript" src="/runbot/static/src/libs/bootstrap/js/bootstrap.bundle.js"/>
+                    <script src="/runbot/static/lib/jquery/jquery.js" type="text/javascript"/>
+                    <script type="text/javascript" src="/runbot/static/lib/popper/popper.js"/>
+                    <script type="text/javascript" src="/runbot/static/lib/bootstrap/js/bootstrap.bundle.js"/>
                     <script type="text/javascript" src="/runbot/static/src/js/runbot.js"/>
 
                     <t t-if="refresh">

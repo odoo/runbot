@@ -1,7 +1,6 @@
 /** @odoo-module **/
 import { patch } from "@web/core/utils/patch";
 import { Message } from "@mail/core/common/message";
-import { diff_match_patch } from "@runbot/libs/diff_match_patch/diff_match_patch";
 
 patch(Message.prototype, {
     setup() {

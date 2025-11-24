@@ -66,14 +66,14 @@
 
     'assets': {
         'web.assets_backend': [
-            'runbot/static/src/libs/diff_match_patch/diff_match_patch.js',
+            'runbot/static/lib/diff_match_patch/diff_match_patch.js',
             'runbot/static/src/js/views/**/*',
             'runbot/static/src/js/fields/*',
             'runbot/static/src/js/components/*',
         ],
         'runbot.assets_frontend': [
             '/web/static/lib/bootstrap/dist/css/bootstrap.css',
-            '/web/static/src/libs/fontawesome/css/font-awesome.css',
+            '/web/static/lib/fontawesome/css/font-awesome.css',
             '/runbot/static/src/css/runbot.css',
 
             '/web/static/lib/jquery/jquery.js',
