@@ -182,7 +182,7 @@ class Runbot(Controller):
             url='/runbot/bundle/%s' % bundle.id,
             total=batch_count,
             page=page,
-            step=50,
+            step=int(limit),
         )
         batchs = request.env['runbot.batch'].search(domain, limit=limit, offset=pager.get('offset', 0), order='id desc')
 
@@ -464,7 +464,7 @@ class Runbot(Controller):
         build_errors_count = request.env['runbot.build.error'].search_count(domain)
         url_args = {}
         url_args['sort'] = sort
-        pager = request.website.pager(url='/runbot/errors/', url_args=url_args, total=build_errors_count, page=page, step=limit)
+        pager = request.website.pager(url='/runbot/errors/', url_args=url_args, total=build_errors_count, page=page, step=int(limit))
 
         build_errors = request.env['runbot.build.error'].search(domain, order=sort_order, limit=limit, offset=pager.get('offset', 0))
 
