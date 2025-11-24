@@ -1,29 +1,43 @@
-.code_diff {
-    white-space: nowrap;
-    overflow-x: auto;
-    font: 12px/normal 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+.code-diff {
+    .table {
+        > tbody {
+            font-family: var(--font-monospace);
+            font-size: 0.75rem;
+            line-height: 1;
+            white-space: nowrap;
+        }
 
-    .col_number {
-        background-color: #EEE;
+        > :not(caption) > * {
+            border-width: 0 var(--border-width);
+
+            &:first-child {
+                border-top-width: var(--border-width);
+            }
+
+            &:last-child {
+                border-bottom-width: var(--border-width);
+            }
+
+            > * {
+                border-width: 0;
+                padding: 0.3rem;
+
+                &.diff-line-sign {
+                    border-left-width: var(--border-width);
+                }
+            }
+        }
     }
 
-    .added {
-        background:#a1f1a1;
+    .diff-line-number {
+        width: 4ch;
     }
-    
-    .removed {
-        background:#f3a3a3;
+
+    .diff-line-sign {
+        width: 2ch;
     }
-    
-    .code {
+
+    .diff-line-code {
         white-space: pre-wrap;
     }
-    .diff_line {
-        background-color: #FFF;
-    }
-
-    .diff_line:hover {
-        filter: brightness(92%);
-    }
-    
 }

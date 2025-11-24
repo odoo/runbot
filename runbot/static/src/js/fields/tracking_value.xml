@@ -4,21 +4,30 @@
         <xpath expr="//li[hasclass('o-mail-Message-tracking')]" position="replace">
             <li class="o-mail-Message-tracking mb-1" role="group">
                 <t t-if="isMultiline(trackingValue)">
-                    <div class="btn-group btn-group-toggle mb-1">
-                        <button class="btn btn-sm btn-outline-primary" t-on-click="copyToClipboard(trackingValue.oldValue)">Copy old value to clipboard</button>
-                        <button class="btn btn-sm btn-outline-primary" t-on-click="toggleKept">Toggle context</button>
-                        <button class="btn btn-sm btn-outline-primary" t-on-click="copyToClipboard(trackingValue.newValue)">Copy new value to clipboard</button>
+                    <div class="btn-group btn-group-sm">
+                        <CopyButton copyText="'Copy old value'" content="trackingValue.oldValue" successText="'Old value copied'" className="'btn-outline-primary'"/>
+                        <button class="btn btn-outline-primary" t-on-click="toggleKept">
+                            <i class="fa fa-arrows-v mx-1"/>
+                            Toggle context
+                        </button>
+                        <CopyButton copyText="'Copy new value'" content="trackingValue.newValue" successText="'New value copied'" className="'btn-outline-primary'"/>
                     </div>
-                    <div class="o-mail-Message-trackingField ms-1 fst-italic text-muted">(<t t-out="trackingValue.fieldInfo.changedField"/>)</div>
-                    <div class="code_diff">
-                        <table>
-                            <t t-foreach="lines(trackingValue)" t-as="line" t-key="line_index">
-                                <tr t-if="kept or line.type!=='kept'">
-                                    <td class="col_number" t-out="line.pre_line_counter"/>
-                                    <td class="col_number" t-out="line.post_line_counter"/>
-                                    <td class="code" t-att-class="line.type" t-out="line.line"/>
-                                </tr>
-                            </t>
+                    <div class="code-diff table-responsive">
+                        <table class="table table-sm table-hover caption-top">
+                            <caption class="o-mail-Message-trackingField fst-italic">(<t t-out="trackingValue.fieldInfo.changedField"/>)</caption>
+                            <tbody>
+                                <t t-foreach="lines(trackingValue)" t-as="line" t-key="line_index" t-if="state.showKept or line.type !== 'kept'">
+                                    <tr t-att-class="{'table-success': line.type === 'added', 'table-danger': line.type === 'removed'}">
+                                        <td class="diff-line-number text-muted"><t t-if="['removed','kept'].includes(line.type)" t-out="line.preLineCounter"/></td>
+                                        <td class="diff-line-number text-muted"><t t-if="['added','kept'].includes(line.type)" t-out="line.postLineCounter"/></td>
+                                        <td class="diff-line-sign text-muted">
+                                            <t t-if="line.type === 'removed'">-</t>
+                                            <t t-elif="line.type === 'added'">+</t>
+                                        </td>
+                                        <td class="diff-line-code" t-att-class="line.type" t-out="line.line"/>
+                                    </tr>
+                                </t>
+                            </tbody>
                         </table>
                     </div>
                 </t>
