@@ -8,7 +8,8 @@
                     <meta charset="utf-8"/>
                     <title t-out="title or 'Runbot'"/>
 
-                    <t t-call-assets="runbot.assets_frontend"/>
+                    <t t-call-assets="runbot.assets_frontend" t-js="False"/>
+                    <t t-call-assets="runbot.assets_frontend" t-css="False" defer_load="True"/>
 
                     <t t-if="refresh">
                         <meta http-equiv="refresh" t-att-content="refresh"/>
