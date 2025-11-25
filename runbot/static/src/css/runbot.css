@@ -426,9 +426,3 @@ code {
 .hide-success tr.bg-success-subtle {
     display: none;
 }
-
-/* .pagination */
-.page-link:has(.oi:only-child) {
-	--bs-pagination-padding-x: 0.625rem;
-	--bs-pagination-padding-y: 0.625rem;
-}
