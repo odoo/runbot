@@ -240,7 +240,7 @@ class BuildError(models.Model):
     breaking_pr_id = fields.Many2one('runbot.branch', 'Breaking pr', tracking=True, help="Pr that introduced the error")
     breaking_pr_url = fields.Char('Breaking PR url', related='breaking_pr_id.branch_url')
     breaking_bundle_id = fields.Many2one('runbot.bundle', 'Breaking bundle', tracking=True, help="Bundle that introduced the error", related='breaking_pr_id.bundle_id')
-    breaking_bundle_url = fields.Char('Breaking bundle url', related='fixing_bundle_id.frontend_url')
+    breaking_bundle_url = fields.Char('Breaking bundle url', related='breaking_bundle_id.frontend_url')
     breaking_pr_date = fields.Datetime('Breaking date', related="breaking_pr_id.close_date", help="Date of the merge of the first pr")
 
     test_tags = fields.Char(string='Test tags', help="Comma separated list of test_tags to use to reproduce/remove this error", tracking=True)
