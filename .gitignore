@@ -12,3 +12,6 @@ runbot/static/nginx
 runbot/static/databases
 runbot/static/docker
 runbot/static/docker-registry
+# npm files
+node_modules
+package-lock.json
