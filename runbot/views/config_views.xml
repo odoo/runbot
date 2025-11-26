@@ -6,6 +6,7 @@
         <field name="arch" type="xml">
             <form string="Build config">
                 <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
                     <div class="alert alert-warning" role="alert" invisible="not protected">
                         This record is protected and can only be edited by config administrator.
                     </div>
@@ -35,6 +36,7 @@
         <field name="arch" type="xml">
             <form string="Build config step">
                 <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
                     <div class="alert alert-warning" role="alert" invisible="not protected">
                         This record is protected and can only be edited by config administrator.
                     </div>
@@ -166,6 +168,7 @@
         <search string="Search config">
           <field name="name"/>
           <field name="group_name"/>
+          <filter string="Archived" name='is_archived' domain="[('active', '=', False)]"/>
           <filter string="Is in a group" name='is_in_group' domain="[(['group', '!=', False])]"/>
           <filter string="No step's defined" name="no_step" domain="[(['step_order_ids', '=', False])]"/>
         </search>
@@ -185,6 +188,7 @@
               ('python_result_code', 'ilike', self),
           ]">
         </field>
+          <filter string="Archived" name='is_archived' domain="[('active', '=', False)]"/>
           <filter string="Install job" name='install_job' domain="[(['job_type', '=', 'install_odoo'])]"/>
           <filter string="Run job" name='run_job' domain="[(['job_type', '=', 'run_odoo'])]"/>
           <filter string="Python job" name='python_job' domain="[(['job_type', '=', 'python'])]"/>

@@ -67,12 +67,14 @@ def prepend_string(modules, build, dynamic_vars, element):
 def append_string(modules, build, element):
     return ','.join([f'{module}{element}' for module in modules.split(',')])
 
+
 class Config(models.Model):
     _name = 'runbot.build.config'
     _description = "Build config"
     _inherit = "mail.thread"
 
     name = fields.Char('Config name', required=True, tracking=True, help="Unique name for config please use trigram as postfix for custom configs")
+    active = fields.Boolean('Active', default=True, tracking=True)
 
     description = fields.Char('Config description')
     step_order_ids = fields.One2many('runbot.build.config.step.order', 'config_id', copy=True)
@@ -343,6 +345,7 @@ class ConfigStep(models.Model):
 
     # general info
     name = fields.Char('Step name', required=True, tracking=True, help="Unique name for step please use trigram as postfix for custom step_ids")
+    active = fields.Boolean('Active', default=True, tracking=True)
     domain_filter = fields.Char('Domain filter', tracking=True)
     description = fields.Char('Config step description')
 
