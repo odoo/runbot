@@ -219,7 +219,9 @@ class Bundle(models.Model):
             for user in team.user_ids:
                 if m := ngram_re.match(user.name.lower()):
                     team_by_ngram_project[m.group('ngram'), team.project_id] = team
-        for bundle in self.filtered_domain([('is_base', '=', False)]):
+        for bundle in self:
+            if bundle.is_base or not bundle.name:
+                continue
             bundle_ngram = bundle.name.split('-')[-1].lower()
             bundle.team_id = team_by_ngram_project.get((bundle_ngram, bundle.project_id))
 
