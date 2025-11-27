@@ -19,6 +19,7 @@ from . import ir_http
 from . import ir_model_fields_converter
 from . import ir_qweb
 from . import ir_logging
+from . import oauth_provider
 from . import project
 from . import repo
 from . import res_config_settings

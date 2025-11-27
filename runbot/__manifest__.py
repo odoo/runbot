@@ -8,7 +8,7 @@
     'category': 'Website',
     'version': '5.14',
     'application': True,
-    'depends': ['base', 'base_automation', 'website'],
+    'depends': ['base', 'base_automation', 'website', 'auth_oauth'],
     'data': [
         'security/runbot_security.xml',
         'security/ir.model.access.csv',
@@ -53,6 +53,7 @@
         'views/dashboard_views.xml',
         'views/dockerfile_views.xml',
         'views/host_views.xml',
+        'views/oauth_provider_views.xml',
         'views/repo_views.xml',
         'views/res_config_settings_views.xml',
         'views/stat_views.xml',
