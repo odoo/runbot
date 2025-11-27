@@ -894,3 +894,17 @@ class Runbot(Controller):
             'nb_bundles_done': nb_bundles_done,
         }
         return request.render('runbot.bundles_by_tag', qctx)
+
+    @route([
+        '/runbot/versions',
+        ], website=True, auth='public', type='http', sitemap=False)
+    def versions(self, **kwargs):
+        project = self.env.ref('runbot.main_project')
+        bundles = self.env['runbot.bundle'].sudo().search([('is_base', '=', True), ('project_id', '=', project.id), ('sticky', '=', True)])
+        qctx = {
+            'category': self.env.ref('runbot.nightly_category'),
+            'project': project,
+            'bundles': bundles,
+            'keys': ['os_version', 'python_version', 'chrome_version', 'psql_version', 'pip_freeze', 'packages'],
+        }
+        return request.render('runbot.versions', qctx)

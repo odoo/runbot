@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+<data>
+    <template id="runbot.versions">
+        <t t-call='runbot.layout'>
+            <t t-set="title">Docker versions</t>
+            <table class="table">
+                <thead>
+                <tr>
+                    <th>Version</th>
+                    <th>Docker file</th>
+                    <th>Host</th>
+                    <th scope="col" t-foreach="keys" t-as="key" t-esc="key"/>
+                </tr>
+                </thead>
+                <tr t-foreach="bundles.sorted(lambda b: b.version_id.number, reverse=True)" t-as="bundle">
+                <td>
+                    <t t-esc="bundle.name"/>
+                </td>
+                <t t-set="build" t-value="bundle.with_context({'category_id': category.id}).last_done_batch.slot_ids.filtered(lambda s: s.trigger_id.id==33).build_id"/>
+                <t t-if="build and build.host">
+                    <td><a t-att-class="'text-warning' if not build.params_id.dockerfile_id.to_build else ''" t-attf-href="/runbot/dockerfile?id={{build.params_id.dockerfile_id.id}}" t-esc="build.params_id.dockerfile_id.name"/></td>
+                    <td t-esc="build.host.replace('.odoo.com', '').replace('runbot', '')"/>
+                    <t t-set="values" t-value="{log.func:log.message for log in build.log_ids}"/>
+                    <td t-foreach="keys" t-as="key">
+                    <t t-if="key in values">
+                        <t t-if="'\n' not in values[key].strip('\n')" t-esc="values[key].replace('Python ', '').replace('Google Chrome ', '').replace('Google Chrome ', '').replace('psql (PostgreSQL)', '')"/>
+                        <t t-else="">
+                        <details>
+                            <summary>Show</summary>
+                            <pre t-out="values[key]"/>
+                        </details>
+                        </t>
+                    </t>
+                    </td>
+                </t>
+                <td t-else="">
+                    <a t-att-class="'text-warning' if not bundle.version_id.dockerfile_id.to_build else ''" t-attf-href="/runbot/dockerfile?id={{bundle.version_id.dockerfile_id.id}}" t-esc="bundle.version_id.dockerfile_id.name"/>
+                </td>
+                </tr>
+            </table>
+        </t>
+    </template>
+</data>
+</odoo>

@@ -40,6 +40,7 @@
         'templates/batches_by_date.xml',
         'templates/commit_link_details.xml',
         'templates/bundles_by_tag.xml',
+        'templates/versions.xml',
 
         'views/branch_views.xml',
         'views/build_error_link_views.xml',
