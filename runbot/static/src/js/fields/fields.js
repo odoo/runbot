@@ -106,7 +106,7 @@ export class FrontendUrl extends Component {
 
     _route(fieldName) {
         const model = this.props.record.fields[fieldName].relation || "runbot.unknown";
-        const id = this.props.record.data[fieldName][0];
+        const { id } = this.props.record.data[fieldName];
         if (model.startsWith('runbot.')){
             return '/runbot/' + model.split('.')[1] + '/' + id;
         } else {
