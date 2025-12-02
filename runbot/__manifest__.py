@@ -82,7 +82,11 @@
 
             'runbot/static/lib/jquery/jquery.js',
             'runbot/static/lib/bootstrap/js/bootstrap.bundle.js',
+
             'runbot/static/src/js/runbot.js',
+
+            'web/static/src/module_loader.js',
+            'runbot/static/src/public/**/*',
         ],
     },
     'post_load': 'runbot_post_load',
