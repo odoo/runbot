@@ -134,7 +134,7 @@ class ConfigStep(models.Model):
                 pr = pr_by_commit[commit_link]
                 new_reviewers = reviewers - set((pr.reviewers or '').split(','))
                 if new_reviewers:
-                    author_skippable_teams = skippable_teams.filtered(lambda team: team.skip_team_pr and team.github_team in new_reviewers and pr.pr_author in team._get_members_logins())
+                    author_skippable_teams = skippable_teams.filtered(lambda team: team.skip_team_pr and team.github_team in new_reviewers and pr.pr_author and pr.pr_author.lower() in team._get_members_logins())
                     author_skipped_teams = set(author_skippable_teams.mapped('github_team'))
                     if author_skipped_teams:
                         new_reviewers = new_reviewers - author_skipped_teams

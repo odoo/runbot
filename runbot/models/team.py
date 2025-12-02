@@ -94,7 +94,7 @@ class RunbotTeam(models.Model):
         if self.github_logins:
             team_loggins = set(self.github_logins.split(','))
         team_loggins |= set(self.user_ids.filtered(lambda user: user.github_login).mapped('github_login'))
-        return team_loggins
+        return [login.lower() for login in team_loggins]
 
     def _fetch_members(self):
         self.check_access_rights('write')
