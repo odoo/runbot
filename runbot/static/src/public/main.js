@@ -1,4 +1,6 @@
-const Interactions = [];
+import { Runbot } from "./runbot";
+
+const Interactions = [Runbot];
 
 async function start() {
     for (const I of Interactions) {
