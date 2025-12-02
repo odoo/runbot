@@ -5,6 +5,9 @@ export class Runbot extends DelegatedInteractionLite {
         "[data-runbot]": {
             "t-on-click.prevent": this.onDataRunbotClick,
         },
+        "[data-clipboard-copy]": {
+            "t-on-click": this.onClipboardCopy,
+        },
     };
 
     async onDataRunbotClick({ delegatedTarget }) {
@@ -33,5 +36,13 @@ export class Runbot extends DelegatedInteractionLite {
             default:
                 window.location.reload();
         }
+    }
+
+    onClipboardCopy({ delegatedTarget }) {
+        if (!navigator.clipboard) {
+            console.warn("Clipboard not supported");
+            return;
+        }
+        navigator.clipboard.writeText(delegatedTarget.dataset.clipboardCopy);
     }
 }
