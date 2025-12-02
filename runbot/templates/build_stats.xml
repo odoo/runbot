@@ -3,86 +3,101 @@
   <data>
     <template id="runbot.modules_stats">
       <t t-call='runbot.layout'>
-        <script>
-          let main_trigger = <t t-esc="main_trigger.id or 'undefined'"/>;
-        </script>
-        <input type="hidden" id="bundle_id" t-att-value="bundle.id"/>
-        <div class="container-fluid">
-          <nav class="navbar navbar-light">
-            <div class="container">
-                <div class="d-flex flex-wrap align-items-center gap-2">
-                <b>Bundle:</b><t t-out="bundle.name"/>
-                <b>Trigger:</b>
-                <select id="trigger_id_selector" class="form-select form-select-sm d-inline-block w-auto" aria-label="Trigger">
-                  <option t-foreach="all_triggers" t-as="trig" t-attf-value="{{trig.id}}" t-att-selected="trig.id==main_trigger.id"><t t-out="trig.name"/></option>
+        <div class="runbot-stats container-fluid py-4">
+          <script id="triggers_data" type="application/json" t-out="json.dumps(triggers_data, indent=4)"/>
+          <nav class="row row-cols-auto mb-4">
+            <h1 class="h2" t-out="bundle.name"/>
+            <div class="d-flex gap-3 ms-auto">
+              <fieldset>
+                <select id="trigger_id_selector" class="form-select" title="Trigger" aria-label="Trigger">
+                  <option/>
+                  <optgroup t-if="all_triggers" label="Triggers">
+                    <option t-foreach="all_triggers" t-as="trig" t-att-value="trig.id" t-out="trig.name"/>
+                  </optgroup>
                 </select>
-                <b>Stat Category:</b>
-                <select id="key_category_selector" class="form-select form-select-sm d-inline-block w-auto" aria-label="Stat Category">
-                  <option t-foreach="all_categories" t-as="category" t-attf-value="{{category}}"><t t-out="category.replace('_',' ').title()"/></option>
+              </fieldset>
+              <fieldset>
+                <select id="key_category_selector" class="form-select" title="Category" aria-label="Category">
+                  <option/>
+                  <optgroup t-if="all_categories" label="Categories">
+                    <option t-foreach="all_categories" t-as="category" t-att-value="category" t-out="category.replace('_',' ').title()"/>
+                  </optgroup>
                 </select>
-                <b>Stat Step:</b>
-                <select id="key_step_selector" class="form-select form-select-sm d-inline-block w-auto" aria-label="Stat Step">
-                  <!-- TODO improve me step should be dependant on selected category-->
-                  <option t-foreach="[''] + all_steps" t-as="step" t-attf-value="{{step}}"><t t-out="step.replace('_',' ').title()"/></option>
+              </fieldset>
+              <fieldset>
+                <select id="key_step_selector" class="form-select" title="Steps" aria-label="Steps">
+                  <option/>
+                  <optgroup t-if="all_steps" label="Steps">
+                    <option t-foreach="all_steps" t-as="step" t-att-value="step" t-out="step.replace('_',' ').title()"/>
+                  </optgroup>
                 </select>
-                <b>Nb of builds:</b>
-                <select id="limit_selector" class="form-select form-select-sm d-inline-block w-auto" aria-label="Number Of Builds">
+              </fieldset>
+            </div>
+          </nav>
+          <div class="row">
+            <div class="col-12 col-md-8 col-lg-9 col-xl-10">
+              <div class="chart-container position-relative">
+                <canvas id="chart_canvas"/>
+                <div id="chart_loader" class="position-absolute top-0 bottom-100 start-0 end-100 h-100 w-100 bg-white bg-opacity-75">
+                  <i class="position-absolute top-50 start-50 fa fa-2x fa-fw fa-circle-o-notch fa-spin"/>
+                </div>
+              </div>
+              <p class="text-center text-secondary my-3">Tips: click a bullet to see corresponding build stats, shift+click to center the graph on this build</p>
+            </div>
+            <div class="col-12 col-md-4 col-lg-3 col-xl-2">
+              <div class="btn-group my-3">
+                <button id="backward_button" class="btn btn-default" title="Previous Builds" aria-label="Previous Builds">
+                  <i class="fa fa-fw fa-backward"/>
+                </button>
+                <button id="forward_button" class="btn btn-default" title="Next Builds" aria-label="Next Builds">
+                  <i class="fa fa-fw fa-forward"/>
+                </button>
+                <button id="fast_forward_button" class="btn btn-default" title="Last Builds" aria-label="Last Builds">
+                  <i class="fa fa-fw fa-fast-forward"/>
+                </button>
+              </div>
+              <fieldset class="mb-3">
+                <label for="limit_selector" class="form-label fw-bold">Number Of Builds</label>
+                <select id="limit_selector" class="form-select">
                   <option value="10">10</option>
                   <option value="25">25</option>
                   <option value="50">50</option>
                   <option value="100">100</option>
                   <option value="250">250</option>
                 </select>
-                <button id="backward_button" class="btn btn-default btn-sm" title="Previous Builds" aria-label="Previous Builds">
-                  <i t-attf-class="fa fa-backward"/>
-                </button>
-                <button id="forward_button" class="btn btn-default btn-sm" title="Previous Builds" aria-label="Previous Builds">
-                  <i t-attf-class="fa fa-forward"/>
-                </button>
-                <button id="fast_forward_button" class="btn btn-default btn-sm" title="Previous Builds" aria-label="Previous Builds">
-                  <i t-attf-class="fa fa-fast-forward"/>
-                </button>
-                </div>
-              <p>Tips: click a bullet to see corresponding build stats, shift+click to center the graph on this build</p>
-              <i id="chart_spinner" class="fa fa-2x fa-circle-o-notch fa-spin"/>
-            </div>
-          </nav>
-          <div class="row">
-            <div class="col-xs-9 col-md-10"><canvas id="canvas"></canvas></div>
-            <div class="col-xs-3 col-md-2">
-                <b>Mode:</b>
-                <select id="mode_selector" class="form-select" aria-label="Display mode">
-                  <option title="Real Values ordered by value" selected="selected" value="normal">Value</option>
-                  <option title="Real Values ordered by name" selected="selected" value="alpha">Alphabetical</option>
+              </fieldset>
+              <fieldset class="mb-3">
+                <label for="mode_selector" class="form-label fw-bold">Mode</label>
+                <select id="mode_selector" class="form-select">
+                  <option title="Real Values ordered by value" value="normal">Value</option>
+                  <option title="Real Values ordered by name" value="alpha">Alphabetical</option>
                   <option title="Delta With Reference Build Values" value="difference">Difference</option>
                   <option title="Bigger # of datapoint varying from previous one" value="change_count">Noisy</option>
-                </select><br/>
-
-                <b>Display:</b>
-                <select id="nb_dataset_selector" class="form-select" aria-label="Number Of Builds">
+                </select>
+              </fieldset>
+              <fieldset class="mb-3">
+                <label for="nb_dataset_selector" class="form-label fw-bold">Display</label>
+                <select id="nb_dataset_selector" class="form-select">
                   <option value="-1">Custom</option>
                   <option value="0">0</option>
                   <option value="10">Top 10</option>
                   <option value="20">Top 20</option>
                   <option value="50">Top 50</option>
-                </select><br/>
-
-                <b>Display aggregate:</b>
-                <select id="display_aggregate_selector" class="form-select" aria-label="Display sum">
-                  <option selected="selected" value="none">No</option>
+                </select>
+              </fieldset>
+              <fieldset class="mb-3">
+                <label for="display_aggregate_selector" class="form-label fw-bold">Aggregates</label>
+                <select id="display_aggregate_selector" class="form-select">
+                  <option value="none">No</option>
                   <option value="sum">Sum</option>
                   <option value="average">Average</option>
-                </select><br/>
-                <div id="js-legend" class="chart-legend">
-                
-                </div>
-            
+                </select>
+              </fieldset>
+              <div id="js-legend"/>
             </div>
           </div>
         </div>
       </t>
-      <script type="text/javascript" src="/web/static/lib/Chart/Chart.js"></script>
-      <script type="text/javascript" src="/runbot/static/src/js/stats.js"></script>
     </template>
   </data>
 </odoo>

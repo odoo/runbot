@@ -611,12 +611,15 @@ class Runbot(Controller):
             category_per_trigger.setdefault(stat_trigger, set()).add(stat.category)
             step_per_trigger_category.setdefault((stat_trigger, stat.category), set()).add(stat.dynamic_step_name or stat.config_step_id.name)
         all_triggers = sorted(all_triggers, key=lambda t: (t.category_id.id, t.sequence, t.id))
-        main_trigger = all_triggers[0] if all_triggers else None
         context = {
             'category_per_trigger': category_per_trigger,
             'step_per_trigger_category': step_per_trigger_category,
             'bundle': bundle,
-            'main_trigger': main_trigger,
+            'project': bundle.project_id,
+            'triggers_data': {
+                'bundle_id': bundle.id,
+                'trigger_id': all_triggers[0].id if all_triggers else None,
+            },
             'all_categories': sorted(all_categories),
             'all_steps': sorted(all_steps),
             'all_triggers': all_triggers,
