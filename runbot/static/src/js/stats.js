@@ -32,6 +32,8 @@ const config = {
     },
 };
 
+const localParams = ["display_aggregate", "mode", "nb_dataset", "visible_keys"];
+
 let shifted = false;
 $(document).on("keyup keydown", function (e) {
     shifted = e.shiftKey;
@@ -70,7 +72,7 @@ function random_color(name) {
         sum += name.charCodeAt(i);
     }
     sum = sum % colors.length;
-    color = colors[sum];
+    const color = colors[sum];
     return color;
 }
 
@@ -84,7 +86,6 @@ function process_chart_data() {
     }
 
     const aggregate = document.getElementById("display_aggregate_selector").value;
-    const aggregates = {};
     const builds = Object.keys(config.result);
     const newer_build_stats = config.result[builds.slice(-1)[0]];
     const older_build_stats = config.result[builds[0]];
@@ -98,18 +99,18 @@ function process_chart_data() {
     const mode = document.getElementById("mode_selector").value;
 
     const sort_values = {};
-    for (key of keys) {
-        sort_value = NaN;
+    for (const key of keys) {
+        let sort_value = NaN;
         if (mode == "normal") {
             sort_value = newer_build_stats[key];
         } else if (mode == "alpha") {
             sort_value = key;
         } else if (mode == "change_count") {
             sort_value = 0;
-            previous = undefined;
-            for (build of builds) {
-                res = config.result[build];
-                value = res[key];
+            let previous = undefined;
+            for (const build of builds) {
+                const res = config.result[build];
+                const value = res[key];
                 if (previous !== undefined && value !== undefined && previous != value) {
                     sort_value += 1;
                 }
@@ -128,12 +129,12 @@ function process_chart_data() {
     }
     keys.sort((m1, m2) => sort_values[m2] - sort_values[m1]);
 
+    let visible_keys;
     if (config.searchParams.nb_dataset != -1) {
         visible_keys = new Set(keys.slice(0, config.searchParams.nb_dataset));
     } else {
         visible_keys = new Set(config.searchParams.visible_keys.split("-"));
     }
-    console.log(visible_keys);
 
     function display_value(key, build_stats) {
         if (build_stats[key] === undefined) {
@@ -168,8 +169,7 @@ function process_chart_data() {
 function fetchUpdateChart() {
     const chart_spinner = document.getElementById("chart_spinner");
     chart_spinner.style.visibility = "visible";
-    fetch_params = compute_fetch_params();
-    console.log("fetch");
+    const fetch_params = compute_fetch_params();
     fetch("/runbot/stats/", fetch_params, function (result) {
         chart_spinner.style.visibility = "hidden";
         if (result) {
@@ -184,7 +184,7 @@ function fetchUpdateChart() {
 
 function generateLegend() {
     const legend = $("<ul></ul>");
-    for (data of config.data.datasets) {
+    for (const data of config.data.datasets) {
         const legendElement = $(`<li><span class="color" style="border: 2px solid ${data.borderColor};"></span><span class="label" title="${data.label}">${data.label}<span></li>`);
         if (data.hidden) {
             legendElement.addClass("disabled");
@@ -204,7 +204,7 @@ function generateLegend() {
 }
 
 function updateForm() {
-    for ([key, value] of Object.entries(config.searchParams)) {
+    for (const [key, value] of Object.entries(config.searchParams)) {
         const selector = document.getElementById(key + "_selector");
         if (selector != null) {
             selector.value = value;
@@ -265,6 +265,7 @@ async function waitForChart() {
 
 window.onload = function () {
     config.searchParams = {
+        // eslint-disable-next-line no-undef
         trigger_id: main_trigger,
         key_step: "",
         limit: 25,
@@ -275,9 +276,8 @@ window.onload = function () {
         display_aggregate: "none",
         visible_keys: "",
     };
-    localParams = ["display_aggregate", "mode", "nb_dataset", "visible_keys"];
 
-    for ([key, value] of new URLSearchParams(window.location.hash.replace("#", "?"))) {
+    for (const [key, value] of new URLSearchParams(window.location.hash.replace("#", "?"))) {
         config.searchParams[key] = value;
     }
 
