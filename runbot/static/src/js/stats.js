@@ -52,17 +52,14 @@ config.options.onClick = function (event, activeElements) {
     }
 };
 
-function fetch(path, data, then) {
-    const xhttp = new XMLHttpRequest();
-    xhttp.onreadystatechange = function () {
-        if (this.readyState == 4 && this.status == 200) {
-            const res = JSON.parse(this.responseText);
-            then(res.result);
-        }
-    };
-    xhttp.open("POST", path);
-    xhttp.setRequestHeader("Content-Type", "application/json");
-    xhttp.send(JSON.stringify({ params: data }));
+async function fetchStats(path, data) {
+    const response = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ params: data }),
+    });
+    const { result } = await response.json();
+    return result;
 }
 
 function random_color(name) {
@@ -166,20 +163,19 @@ function process_chart_data() {
     };
 }
 
-function fetchUpdateChart() {
+async function fetchUpdateChart() {
     const chart_spinner = document.getElementById("chart_spinner");
     chart_spinner.style.visibility = "visible";
     const fetch_params = compute_fetch_params();
-    fetch("/runbot/stats/", fetch_params, function (result) {
-        chart_spinner.style.visibility = "hidden";
-        if (result) {
-            config.result = result["stats"];
-            config.dates = result["dates"];
-            Object.values(config.result).forEach((v) => v["Aggregate Sum"] = Object.values(v).reduce((a, b) => a + b, 0));
-            Object.values(config.result).forEach((v) => v["Aggregate Average"] = Object.values(v).reduce((a, b) => a + b, 0) / Object.values(v).length);
-        }
-        updateChart();
-    });
+    const result = await fetchStats("/runbot/stats/", fetch_params);
+    chart_spinner.style.visibility = "hidden";
+    if (result) {
+        config.result = result["stats"];
+        config.dates = result["dates"];
+        Object.values(config.result).forEach((v) => v["Aggregate Sum"] = Object.values(v).reduce((a, b) => a + b, 0));
+        Object.values(config.result).forEach((v) => v["Aggregate Average"] = Object.values(v).reduce((a, b) => a + b, 0) / Object.values(v).length);
+    }
+    updateChart();
 }
 
 function generateLegend() {
