@@ -34,17 +34,12 @@ const config = {
 
 const localParams = ["display_aggregate", "mode", "nb_dataset", "visible_keys"];
 
-let shifted = false;
-$(document).on("keyup keydown", function (e) {
-    shifted = e.shiftKey;
-});
-
 config.options.onClick = function (event, activeElements) {
     if (activeElements.length === 0) {
         return;
     }
     const build_id = config.data.builds[activeElements[0].index];
-    if (shifted) {
+    if (event.native.shiftKey) {
         config.searchParams["center_build_id"] = build_id;
         fetchUpdateChart();
     } else {
