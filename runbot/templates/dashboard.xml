@@ -187,7 +187,7 @@
     <template id="runbot.default_dashboard_tile_view">
       <div class="col-md-3 col-lg-2 p-2">
         <div class="card">
-          <div class="card-header limited-height-toggle" t-attf-onclick="$('#tile_{{tile.id}}').toggleClass('limited-height')">
+          <div class="card-header limited-height-toggle" onclick="event.target.nextElementSibling.classList.toggle('limited-height')">
             <t t-out="tile.display_name"/> <t t-if="tile.build_ids"> (<t t-out="len(tile.build_ids)"/>)</t>
           </div>
           <div class="card-body limited-height" t-attf-id="tile_{{tile.id}}">

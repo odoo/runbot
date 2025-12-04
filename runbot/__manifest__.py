@@ -80,7 +80,6 @@
             'runbot/static/lib/fontawesome/css/font-awesome.css',
             'runbot/static/src/css/runbot.css',
 
-            'runbot/static/lib/jquery/jquery.js',
             'runbot/static/lib/bootstrap/js/bootstrap.bundle.js',
 
             'web/static/src/module_loader.js',
