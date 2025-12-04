@@ -249,49 +249,34 @@ function updateUrl() {
     window.location.hash = new URLSearchParams(config.searchParams).toString();
 }
 
-async function waitForChart() {
-    function loop(resolve) {
-        if (window.Chart) {
-            resolve();
-        } else {
-            setTimeout(loop.bind(null, resolve), 10);
-        }
-    }
-    return new Promise((resolve) => {
-        loop(resolve);
-    });
+config.searchParams = {
+    // eslint-disable-next-line no-undef
+    trigger_id: main_trigger,
+    key_step: "",
+    limit: 25,
+    center_build_id: 0,
+    key_category: "module_loading_queries",
+    mode: "normal",
+    nb_dataset: 20,
+    display_aggregate: "none",
+    visible_keys: "",
+};
+
+for (const [key, value] of new URLSearchParams(window.location.hash.replace("#", "?"))) {
+    config.searchParams[key] = value;
 }
 
-window.onload = function () {
-    config.searchParams = {
-        // eslint-disable-next-line no-undef
-        trigger_id: main_trigger,
-        key_step: "",
-        limit: 25,
-        center_build_id: 0,
-        key_category: "module_loading_queries",
-        mode: "normal",
-        nb_dataset: 20,
-        display_aggregate: "none",
-        visible_keys: "",
-    };
-
-    for (const [key, value] of new URLSearchParams(window.location.hash.replace("#", "?"))) {
-        config.searchParams[key] = value;
-    }
-
-    document.getElementById("backward_button").onclick = function () {
-        config.searchParams["center_build_id"] = Object.keys(config.result)[0];
-        fetchUpdateChart();
-    };
-    document.getElementById("forward_button").onclick = function () {
-        config.searchParams["center_build_id"] = Object.keys(config.result).slice(-1)[0];
-        fetchUpdateChart();
-    };
-    document.getElementById("fast_forward_button").onclick = function () {
-        config.searchParams["center_build_id"] = 0;
-        fetchUpdateChart();
-    };
-
-    waitForChart().then(fetchUpdateChart);
+document.getElementById("backward_button").onclick = function () {
+    config.searchParams["center_build_id"] = Object.keys(config.result)[0];
+    fetchUpdateChart();
 };
+document.getElementById("forward_button").onclick = function () {
+    config.searchParams["center_build_id"] = Object.keys(config.result).slice(-1)[0];
+    fetchUpdateChart();
+};
+document.getElementById("fast_forward_button").onclick = function () {
+    config.searchParams["center_build_id"] = 0;
+    fetchUpdateChart();
+};
+
+fetchUpdateChart();
