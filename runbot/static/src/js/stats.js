@@ -29,12 +29,13 @@ const config = {
                 },
             },
         },
+        onClick: onClickChart,
     },
 };
 
 const localParams = ["display_aggregate", "mode", "nb_dataset", "visible_keys"];
 
-config.options.onClick = function (event, activeElements) {
+function onClickChart(event, activeElements) {
     if (activeElements.length === 0) {
         return;
     }
@@ -45,7 +46,7 @@ config.options.onClick = function (event, activeElements) {
     } else {
         window.open("/runbot/build/" + build_id);
     }
-};
+}
 
 async function fetchStats(path, data) {
     const response = await fetch(path, {
