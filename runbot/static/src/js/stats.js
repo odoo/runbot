@@ -173,25 +173,32 @@ async function fetchUpdateChart() {
     updateChart();
 }
 
-function generateLegend() {
-    const legend = $("<ul></ul>");
-    for (const data of config.data.datasets) {
-        const legendElement = $(`<li><span class="color" style="border: 2px solid ${data.borderColor};"></span><span class="label" title="${data.label}">${data.label}<span></li>`);
-        if (data.hidden) {
-            legendElement.addClass("disabled");
-        }
-        legend.append(legendElement);
-    }
-    $("#js-legend").html(legend);
-    $("#js-legend > ul > li").on("click", function (e) {
-        const index = $(this).index();
-        //$(this).toggleClass("disabled")
-        const curr = window.statsChart.data.datasets[index];
-        curr.hidden = !curr.hidden;
+function onClickLegendItem(data) {
+    return () => {
+        data.hidden = !data.hidden;
         config.searchParams.nb_dataset = -1;
         config.searchParams.visible_keys = window.statsChart.data.datasets.filter((dataset) => !dataset.hidden).map((dataset) => dataset.label).join("-");
         updateChart();
-    });
+    };
+}
+
+function renderLegend() {
+    const legendContainer = document.querySelector("#js-legend");
+    const legend = document.createElement("ul");
+    legend.classList.add("list-unstyled");
+    const items = [];
+    for (const data of config.data.datasets) {
+        const legendItem = document.createElement("li");
+        legendItem.classList.add("chart-legend-item", "ps-1", "fw-bold", "text-truncate");
+        legendItem.classList.toggle("disabled", data.hidden);
+        legendItem.style.setProperty("--chart-legend-item-accent", data.borderColor);
+        legendItem.title = data.label;
+        legendItem.append(data.label);
+        legendItem.addEventListener("click", onClickLegendItem(data));
+        items.push(legendItem);
+    }
+    legend.append(...items);
+    legendContainer.replaceChildren(legend);
 }
 
 function updateForm() {
@@ -227,7 +234,7 @@ function updateChart() {
     } else {
         window.statsChart.update();
     }
-    generateLegend();
+    renderLegend();
 }
 
 function compute_fetch_params() {

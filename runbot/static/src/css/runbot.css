@@ -353,32 +353,21 @@ body, .table {
 }*/
 
 .chart-legend {
-	max-height: calc(100vh - 160px);
-	overflow-y: scroll;
-	overflow-x: hidden;
-	cursor: pointer;
-	padding: 5px;
+    max-height: calc(100vh - 160px);
+    overflow-y: auto;
 }
 
-.chart-legend .label {
-	margin-left: 5px;
-	font-weight: bold;
+.chart-legend-item {
+    border-inline-start: 4px solid var(--chart-legend-item-accent, transparent);
+    cursor: pointer;
+    margin-bottom: 1px;
 }
 
-.chart-legend .disabled .color {
-	visibility: hidden;
-}
-
-.chart-legend .disabled .label {
-	font-weight: normal;
-	text-decoration: line-through;
-	margin-left: 5px;
-}
-
-.chart-legend ul {
-	list-style-type: none;
-	margin: 0;
-	padding: 0;
+.chart-legend-item.disabled {
+    --chart-legend-item-accent: var(--bs-gray-300) !important;
+    color: var(--bs-gray-600);
+    font-weight: normal !important;
+    text-decoration: line-through;
 }
 
 .limited-height {
