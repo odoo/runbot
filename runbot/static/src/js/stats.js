@@ -249,9 +249,10 @@ function updateUrl() {
     window.location.hash = new URLSearchParams(config.searchParams).toString();
 }
 
+const trigger_id = document.getElementById("trigger_id_selector").value;
+
 config.searchParams = {
-    // eslint-disable-next-line no-undef
-    trigger_id: main_trigger,
+    trigger_id,
     key_step: "",
     limit: 25,
     center_build_id: 0,

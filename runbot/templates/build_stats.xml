@@ -3,9 +3,6 @@
   <data>
     <template id="runbot.modules_stats">
       <t t-call='runbot.layout'>
-        <script>
-          let main_trigger = <t t-esc="main_trigger.id or 'undefined'"/>;
-        </script>
         <input type="hidden" id="bundle_id" t-att-value="bundle.id"/>
         <div class="container-fluid">
           <nav class="navbar navbar-light">
