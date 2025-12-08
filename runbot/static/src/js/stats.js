@@ -1,3 +1,71 @@
+class StatsSearchState {
+    static defaultParams = {
+        key_step: "",
+        limit: 25,
+        center_build_id: 0,
+        key_category: "module_loading_queries",
+        mode: "normal",
+        nb_dataset: 20,
+        display_aggregate: "none",
+        visible_keys: "",
+    };
+    static localParams = ["display_aggregate", "mode", "nb_dataset", "visible_keys"];
+    static numberParams = ["limit", "center_build_id", "nb_dataset"];
+
+    options = {};
+    params = null;
+    fetchController = null;
+    fetchDelay = 250;
+    _params = { ...this.constructor.defaultParams };
+
+    constructor(options = {}) {
+        this.options = options;
+        this.params = new Proxy(this._params, {
+            set: this.setParam.bind(this),
+        });
+        this.fetchDataDebounced = debounce(this.fetchData, this.fetchDelay);
+        window.addEventListener("hashchange", this.loadFromHash.bind(this));
+    }
+
+    async setParam(obj, prop, newVal) {
+        if (this.constructor.numberParams.includes(prop)) {
+            const num = Number(newVal);
+            newVal = num ? num : 0;
+        }
+        if (String(obj[prop]) !== String(newVal)) {
+            console.debug("params#set", {prop, oldVal: obj[prop], newVal});
+            obj[prop] = newVal;
+            window.location.hash = new URLSearchParams(obj).toString();
+            if (!this.constructor.localParams.includes(prop)) {
+                await this.fetchDataDebounced();
+            }
+            this.options.onParamChanged?.(prop, newVal);
+        }
+        return true;
+    }
+
+    loadFromHash(ev = undefined) {
+        const { hash } = new URL(ev ? ev.newURL : window.location.href);
+        const params = hash.slice(1);
+        console.debug("loadFromHash", params);
+        for (const [key, value] of new URLSearchParams(params).entries()) {
+            this.params[key] = value;
+        }
+    }
+
+    fetchData() {
+        try {
+            this.fetchController?.abort("Search parameters updated");
+            this.fetchController = new AbortController();
+            return fetchChartData({ signal: this.fetchController.signal });
+        } catch (e) {
+            if (e.name !== "AbortError") {
+                throw e;
+            }
+        }
+    }
+}
+
 const config = {
     type: "line",
     options: {
@@ -33,7 +101,54 @@ const config = {
     },
 };
 
-const localParams = ["display_aggregate", "mode", "nb_dataset", "visible_keys"];
+const searchState = new StatsSearchState({
+    async onParamChanged(param, val) {
+        updateChart();
+        updateFilterSelector(param, val);
+    },
+});
+searchState.loadFromHash();
+
+/**
+ * Creates and returns a new debounced version of the passed function (func)
+ * which will postpone its execution until after 'delay' milliseconds
+ * have elapsed since the last time it was invoked. The debounced function
+ * will return a Promise that will be resolved when the function (func)
+ * has been fully executed.
+ *
+ * @template {Function} T the return type of the original function
+ * @param {T} func the function to debounce
+ * @param {number} delay how long should elapse before the function is called.
+ * @returns {T & { cancel: () => void }} the debounced function
+ */
+function debounce(func, delay) {
+    const funcName = func.name ? `${func.name} (debounce)` : "debounce";
+    let handle;
+    let lastArgs;
+    return Object.assign(
+        {
+            /** @type {any} */
+            [funcName](...args) {
+                const { promise, resolve } = Promise.withResolvers();
+                lastArgs = args;
+                clearTimeout(handle);
+                handle = setTimeout(async () => {
+                    handle = null;
+                    if (lastArgs) {
+                        Promise.resolve(func.apply(this, lastArgs)).then(resolve);
+                        lastArgs = null;
+                    }
+                }, delay);
+                return promise;
+            },
+        }[funcName],
+        {
+            cancel() {
+                clearTimeout(handle);
+            },
+        },
+    );
+}
 
 function onClickChart(event, activeElements) {
     if (activeElements.length === 0) {
@@ -41,18 +156,29 @@ function onClickChart(event, activeElements) {
     }
     const build_id = config.data.builds[activeElements[0].index];
     if (event.native.shiftKey) {
-        config.searchParams["center_build_id"] = build_id;
-        fetchUpdateChart();
+        searchState.params.center_build_id = build_id;
     } else {
         window.open("/runbot/build/" + build_id);
     }
 }
 
-async function fetchStats(path, data) {
+function updateFilterSelector(filterName, val) {
+    const select = document.getElementById(`${filterName}_selector`);
+    if (!select) {
+        return;
+    }
+    console.debug("updateFilterSelector", { prop: filterName, oldVal: select.value, newVal: val });
+    if (select.value !== String(val)) {
+        select.value = val;
+    }
+}
+
+async function fetchStats(path, data, opts = {}) {
     const response = await fetch(path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ params: data }),
+        ...opts,
     });
     const { result } = await response.json();
     return result;
@@ -123,10 +249,10 @@ function process_chart_data() {
     keys.sort((m1, m2) => sort_values[m2] - sort_values[m1]);
 
     let visible_keys;
-    if (config.searchParams.nb_dataset != -1) {
-        visible_keys = new Set(keys.slice(0, config.searchParams.nb_dataset));
+    if (searchState.params.nb_dataset != -1) {
+        visible_keys = new Set(keys.slice(0, searchState.params.nb_dataset));
     } else {
-        visible_keys = new Set(config.searchParams.visible_keys.split("-"));
+        visible_keys = new Set(searchState.params.visible_keys.split("-"));
     }
 
     function display_value(key, build_stats) {
@@ -159,11 +285,13 @@ function process_chart_data() {
     };
 }
 
-async function fetchUpdateChart() {
+async function fetchChartData({ signal }) {
     const chart_spinner = document.getElementById("chart_spinner");
     chart_spinner.style.visibility = "visible";
     const fetch_params = compute_fetch_params();
-    const result = await fetchStats("/runbot/stats/", fetch_params);
+    console.debug("fetchChartData", fetch_params);
+    const result = await fetchStats("/runbot/stats/", fetch_params, { signal });
+    console.debug("fetchChartData", result);
     chart_spinner.style.visibility = "hidden";
     if (result) {
         config.result = result["stats"];
@@ -171,15 +299,14 @@ async function fetchUpdateChart() {
         Object.values(config.result).forEach((v) => v["Aggregate Sum"] = Object.values(v).reduce((a, b) => a + b, 0));
         Object.values(config.result).forEach((v) => v["Aggregate Average"] = Object.values(v).reduce((a, b) => a + b, 0) / Object.values(v).length);
     }
-    updateChart();
 }
 
 function onClickLegendItem(data) {
     return () => {
         data.hidden = !data.hidden;
-        config.searchParams.nb_dataset = -1;
-        config.searchParams.visible_keys = window.statsChart.data.datasets.filter((dataset) => !dataset.hidden).map((dataset) => dataset.label).join("-");
-        updateChart();
+        console.debug("onClickLegendItem", data, window.statsChart.data.datasets);
+        searchState.params.visible_keys = window.statsChart.data.datasets.filter((dataset) => !dataset.hidden).map((dataset) => dataset.label).join("-");
+        searchState.params.nb_dataset = -1;
     };
 }
 
@@ -188,7 +315,7 @@ function renderLegend() {
     const legend = document.createElement("ul");
     legend.classList.add("list-unstyled");
     const items = [];
-    for (const data of config.data.datasets) {
+    for (const data of window.statsChart.data.datasets) {
         const legendItem = document.createElement("li");
         legendItem.classList.add("chart-legend-item", "ps-1", "fw-bold", "text-truncate");
         legendItem.classList.toggle("disabled", data.hidden);
@@ -203,31 +330,15 @@ function renderLegend() {
 }
 
 function updateForm() {
-    for (const [key, value] of Object.entries(config.searchParams)) {
-        const selector = document.getElementById(key + "_selector");
-        if (selector != null) {
-            selector.value = value;
-            selector.onchange = function () {
-                const id = this.id.replace("_selector", "");
-                config.searchParams[id] = this.value;
-                if (localParams.indexOf(id) == -1) {
-                    fetchUpdateChart();
-                } else {
-                    updateChart();
-                }
-            };
-        }
-    }
-    const display_forward = config.result && config.searchParams.center_build_id != 0 && (config.searchParams.center_build_id !== Object.keys(config.result).slice(-1)[0]);
+    const display_forward = config.result && searchState.params.center_build_id != 0 && (searchState.params.center_build_id !== Object.keys(config.result).slice(-1)[0]);
     document.getElementById("forward_button").style.visibility = display_forward ? "visible" : "hidden";
     document.getElementById("fast_forward_button").style.visibility = display_forward ? "visible" : "hidden";
-    const display_backward = config.result && (config.searchParams.center_build_id !== Object.keys(config.result)[0]);
+    const display_backward = config.result && (searchState.params.center_build_id !== Object.keys(config.result)[0]);
     document.getElementById("backward_button").style.visibility = display_backward ? "visible" : "hidden";
 }
 
 function updateChart() {
     updateForm();
-    updateUrl();
     process_chart_data();
     if (!window.statsChart) {
         const ctx = document.getElementById("canvas").getContext("2d");
@@ -240,44 +351,27 @@ function updateChart() {
 
 function compute_fetch_params() {
     return {
-        ...config.searchParams,
+        ...searchState.params,
         bundle_id: document.getElementById("bundle_id").value,
     };
 }
 
-function updateUrl() {
-    window.location.hash = new URLSearchParams(config.searchParams).toString();
-}
+searchState.params.trigger_id = document.getElementById("trigger_id_selector").value;
 
-const trigger_id = document.getElementById("trigger_id_selector").value;
-
-config.searchParams = {
-    trigger_id,
-    key_step: "",
-    limit: 25,
-    center_build_id: 0,
-    key_category: "module_loading_queries",
-    mode: "normal",
-    nb_dataset: 20,
-    display_aggregate: "none",
-    visible_keys: "",
-};
-
-for (const [key, value] of new URLSearchParams(window.location.hash.replace("#", "?"))) {
-    config.searchParams[key] = value;
+for (const select of [...document.querySelectorAll("select[id$='_selector']")]) {
+    const filterName = select.id.replace("_selector", "");
+    updateFilterSelector(filterName, searchState.params[filterName]);
+    select.addEventListener("change", (ev) => {
+        searchState.params[filterName] = select.value;
+    });
 }
 
 document.getElementById("backward_button").onclick = function () {
-    config.searchParams["center_build_id"] = Object.keys(config.result)[0];
-    fetchUpdateChart();
+    searchState.params["center_build_id"] = Object.keys(config.result)[0];
 };
 document.getElementById("forward_button").onclick = function () {
-    config.searchParams["center_build_id"] = Object.keys(config.result).slice(-1)[0];
-    fetchUpdateChart();
+    searchState.params["center_build_id"] = Object.keys(config.result).slice(-1)[0];
 };
 document.getElementById("fast_forward_button").onclick = function () {
-    config.searchParams["center_build_id"] = 0;
-    fetchUpdateChart();
+    searchState.params["center_build_id"] = 0;
 };
-
-fetchUpdateChart();
