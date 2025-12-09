@@ -36,7 +36,7 @@ class StatsSearchState {
         if (String(obj[prop]) !== String(newVal)) {
             console.debug("params#set", {prop, oldVal: obj[prop], newVal});
             obj[prop] = newVal;
-            window.location.hash = new URLSearchParams(obj).toString();
+            this.updateHash();
             if (!this.constructor.localParams.includes(prop)) {
                 await this.fetchDataDebounced();
             }
@@ -52,6 +52,10 @@ class StatsSearchState {
         for (const [key, value] of new URLSearchParams(params).entries()) {
             this.params[key] = value;
         }
+    }
+
+    updateHash() {
+        window.location.hash = new URLSearchParams(this.params).toString();
     }
 
     fetchData() {
@@ -108,8 +112,30 @@ const searchState = new StatsSearchState({
         updateFilterSelector(param, val);
     },
 });
+
 searchState.bundleId = document.getElementById("bundle_id").value;
 searchState.params.trigger_id = document.getElementById("trigger_id_selector").value;
+
+for (const select of [...document.querySelectorAll("select[id$='_selector']")]) {
+    const filterName = select.id.replace("_selector", "");
+    updateFilterSelector(filterName, searchState.params[filterName]);
+    select.addEventListener("change", () => {
+        searchState.params[filterName] = select.value;
+    });
+}
+
+document.getElementById("backward_button").addEventListener("click", () => {
+    searchState.params.center_build_id = Object.keys(config.result)[0];
+});
+
+document.getElementById("forward_button").addEventListener("click", () => {
+    searchState.params.center_build_id = Object.keys(config.result).slice(-1)[0];
+});
+
+document.getElementById("fast_forward_button").addEventListener(() => {
+    searchState.params.center_build_id = 0;
+});
+
 searchState.loadFromHash();
 
 /**
@@ -241,10 +267,10 @@ function process_chart_data() {
     keys.sort((m1, m2) => sort_values[m2] - sort_values[m1]);
 
     let visible_keys;
-    if (searchState.params.nb_dataset != -1) {
-        visible_keys = new Set(keys.slice(0, searchState.params.nb_dataset));
-    } else {
+    if (searchState.params.visible_keys) {
         visible_keys = new Set(searchState.params.visible_keys.split("-"));
+    } else {
+        visible_keys = new Set(keys.slice(0, searchState.params.nb_dataset));
     }
 
     function display_value(key, build_stats) {
@@ -307,7 +333,6 @@ function onClickLegendItem(data) {
         data.hidden = !data.hidden;
         console.debug("onClickLegendItem", data, window.statsChart.data.datasets);
         searchState.params.visible_keys = window.statsChart.data.datasets.filter((dataset) => !dataset.hidden).map((dataset) => dataset.label).join("-");
-        searchState.params.nb_dataset = -1;
     };
 }
 
@@ -349,21 +374,3 @@ function updateChart() {
     }
     renderLegend();
 }
-
-for (const select of [...document.querySelectorAll("select[id$='_selector']")]) {
-    const filterName = select.id.replace("_selector", "");
-    updateFilterSelector(filterName, searchState.params[filterName]);
-    select.addEventListener("change", (ev) => {
-        searchState.params[filterName] = select.value;
-    });
-}
-
-document.getElementById("backward_button").onclick = function () {
-    searchState.params["center_build_id"] = Object.keys(config.result)[0];
-};
-document.getElementById("forward_button").onclick = function () {
-    searchState.params["center_build_id"] = Object.keys(config.result).slice(-1)[0];
-};
-document.getElementById("fast_forward_button").onclick = function () {
-    searchState.params["center_build_id"] = 0;
-};
