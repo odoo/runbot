@@ -152,9 +152,9 @@ class TestBranchRelations(RunbotCase):
         self.assertEqual(b.bundle_id.base_id.name, 'master')
 
     def test_relations_pr(self):
-        self.Branch.create({
+        dev_branch = self.Branch.create({
                 'remote_id': self.remote_odoo_dev.id,
-                'name': 'master-test-tri',
+                'name': 'master-test-tri-imp',
                 'is_pr': False,
             })
 
@@ -167,17 +167,19 @@ class TestBranchRelations(RunbotCase):
                 'login': 'Pr author'
             },
         }
-        b = self.Branch.create({
+        pr_branch = self.Branch.create({
                 'remote_id': self.remote_odoo_dev.id,
                 'name': '100',
                 'is_pr': True,
             })
 
-        self.assertEqual(b.bundle_id.name, 'master-test-tri-imp')
-        self.assertEqual(b.bundle_id.base_id.name, 'master')
-        self.assertEqual(b.bundle_id.previous_major_version_base_id.name, '13.0')
-        self.assertEqual(sorted(b.bundle_id.intermediate_version_base_ids.mapped('name')), ['saas-13.1', 'saas-13.2'])
+        bundle = pr_branch.bundle_id
 
+        self.assertEqual(bundle.name, 'master-test-tri-imp')
+        self.assertEqual(bundle.base_id.name, 'master')
+        self.assertEqual(bundle.previous_major_version_base_id.name, '13.0')
+        self.assertEqual(sorted(bundle.intermediate_version_base_ids.mapped('name')), ['saas-13.1', 'saas-13.2'])
+        self.assertIn(dev_branch, bundle.branch_ids)
 
 class TestBranchForbidden(RunbotCase):
     """Test that a branch matching the repo forbidden regex, goes to dummy bundle"""
@@ -309,14 +311,16 @@ class TestBundleTeam(RunbotCase):
         self.stop_patcher('isfile')
         self.stop_patcher('isdir')  # needed to create the user avatar
         create_context = {'no_reset_password': True, 'mail_create_nolog': True, 'mail_create_nosubscribe': True, 'mail_notrack': True}
-        test_user = new_test_user(self.env, login='testrunbot', name='testrunbot (tru)', context=create_context)
+        committer_user = new_test_user(self.env, login='testrunbot', name='testrunbot (tru)', email='trut@somewhere.com', context=create_context)
+        github_user = new_test_user(self.env, login='github_author', name='github author (gaut)', email='gaut@somewhere.com', context=create_context)
+        github_user.github_login = 'gaut_github'
 
         team = self.env['runbot.team'].create({
             'name': 'Test Team',
             'project_id': self.project.id,
         })
 
-        team.user_ids += test_user
+        team.user_ids += committer_user
 
         branch = self.Branch.create({
             'remote_id': self.remote_odoo_dev.id,
@@ -332,6 +336,7 @@ class TestBundleTeam(RunbotCase):
 
         bundle = self.env['runbot.bundle'].search([('name', '=', branch.name)])
         self.assertEqual(bundle.team_id, team)
+        self.assertEqual(bundle.author_ids, committer_user, 'The only involved author should be the one based on bundle ngram')
 
         # now test that a team can be manually set on a bundle
         other_team = self.env['runbot.team'].create({
@@ -341,3 +346,21 @@ class TestBundleTeam(RunbotCase):
 
         bundle.team_id = other_team
         self.assertEqual(bundle.team_id, other_team)
+
+        self.patchers['github_patcher'].return_value = {
+            'base': {'ref': 'saas-19.1'},
+            'head': {'label': 'dev:saas-19.1-test-tru', 'repo': {'full_name': 'dev/odoo'}},
+            'title': '[IMP] Title',
+            'body': 'Body',
+            'user': {
+                'login': github_user.github_login,
+            },
+        }
+        pr_branch = self.Branch.create({
+                'remote_id': self.remote_odoo_dev.id,
+                'name': '100',
+                'is_pr': True,
+            })
+
+        self.assertIn(pr_branch, bundle.branch_ids)
+        self.assertIn(github_user, bundle.author_ids)

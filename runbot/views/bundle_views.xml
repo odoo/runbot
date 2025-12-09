@@ -52,12 +52,14 @@
                         <field name="name" widget="char_frontend_url"/>
                         <field name="description"/>
                         <field name="tag_ids" widget="many2many_tags" options="{'not_delete': True, 'no_create': True}"/>
+                        <field name="project_id"/>
+                        <field name="team_id" string="Owning Team"/>
+                        <field name="team_ids" widget="many2many_tags"/>
+                        <field name="author_ids" widget="many2many_tags"/>
                     </group>
                     <group>
                         <group string="Base options">
-                            <field name="project_id"/>
                             <field name="priority_offset"/>
-                            <field name="team_id"/>
                             <field name="sticky" readonly="0"/>
                             <field name="is_base" readonly="1"/>
                             <field name="is_staging" readonly="1"/>

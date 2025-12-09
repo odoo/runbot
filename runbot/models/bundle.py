@@ -1,8 +1,14 @@
 import datetime
 import re
-
 from collections import defaultdict
-from odoo import models, fields, api, tools
+from itertools import chain
+
+from odoo import api, fields, models, tools
+from odoo.fields import Domain
+
+
+VALID_BUNDLE_NAME_RE = re.compile(r'^.{3,6}-.*-.{2,5}$')
+NGRAM_RE = re.compile(r'.+\(([a-z]{2,5})\)$')
 
 
 class Bundle(models.Model):
@@ -55,7 +61,11 @@ class Bundle(models.Model):
     # extra_info
     description = fields.Char('Description', compute='_compute_description', store=True, readonly=False)
     tag_ids = fields.Many2many('runbot.bundle.tag', string='Tags')
-    team_id = fields.Many2one('runbot.team', compute='_compute_team_id', store=True, readonly=False)
+    author_ids = fields.Many2many('res.users', string='Involved Users', compute='_compute_author_ids', domain=[('share', '=', False)])
+    team_ids = fields.Many2many('runbot.team', string='Involved Teams', compute='_compute_team_ids')
+    team_id = fields.Many2one('runbot.team', string='Owning Team', compute='_compute_team_id', inverse='_inverse_team_id', store=True, tracking=True)
+    manual_team_id = fields.Many2one('runbot.team', 'Manually set team')
+    auto_team_id = fields.Many2one('runbot.team', 'Automatically set team', compute='_compute_auto_team_id', readonly=True)
 
     priority_offset = fields.Integer("Priority offset", help="Offset in seconds to remove from the create date of a batch to define priority, positive value means higher priority, negative value means lower priority.")
 
@@ -201,19 +211,68 @@ class Bundle(models.Model):
                 parent_bundle = self.env['runbot.bundle'].search([('name', '=', targets.pop())])
                 bundle.all_trigger_custom_ids = parent_bundle.all_trigger_custom_ids
 
-    @api.depends('name')
-    def _compute_team_id(self):
-        ngram_re = re.compile(r'.+\((?P<ngram>[a-z]{2,4})\)$')
-        team_by_ngram_project = dict()
-        for team in self.env['runbot.team'].search([('module_ownership_ids', '!=', False)]):
-            for user in team.user_ids:
-                if m := ngram_re.match(user.name.lower()):
-                    team_by_ngram_project[m.group('ngram'), team.project_id] = team
+    @api.depends('name', 'branch_ids.pr_author', 'branch_ids.forwardport_of_id', 'branch_ids.forwardport_of_id.pr_author', 'branch_ids.is_pr')
+    def _compute_author_ids(self):
+        self.author_ids = self.env['res.users'].browse()
+        bundles = self.filtered(lambda b: not b.is_base and not b.is_staging)
+
+        github_logins_by_bundle = {}
+        ngram_by_bundle = {}
+        for bundle in bundles:
+            github_logins = []
+            for pr in bundle.branch_ids.filtered('is_pr'):
+                author = (pr.forwardport_of_id.pr_author if pr.forwardport_of_id else pr.pr_author)
+                if author not in github_logins:
+                    github_logins.append(author)
+            github_logins_by_bundle[bundle] = github_logins
+            if VALID_BUNDLE_NAME_RE.match(bundle.name):
+                ngram = bundle.name.split('-')[-1].lower()
+                ngram_by_bundle[bundle] = ngram
+
+        user_domains = [[('github_login', '=', author)] for author in set(chain.from_iterable(github_logins_by_bundle.values()))]
+        user_domains += [[('name', 'ilike', f'% ({ngram})')] for ngram in set(ngram_by_bundle.values())]
+
+        user_domain = Domain.OR(user_domains)
+        user_domain = Domain.AND([user_domain, [('share', '=', False)]])
+        users = self.env['res.users'].search(user_domain)
+        user_ids_by_github_login = {u.github_login: u.id for u in users if u.github_login}
+        user_ids_by_ngram = {}
+        for user in users:
+            ngrams = NGRAM_RE.findall(user.complete_name or '')
+            if ngrams:
+                user_ids_by_ngram[ngrams[0]] = user.id
+
+        for bundle in bundles:
+            user_ids = []
+            for github_logins in github_logins_by_bundle[bundle]:
+                user_id = user_ids_by_github_login.get(github_logins)
+                if user_id:
+                    user_ids.append(user_id)
+            ngram = ngram_by_bundle.get(bundle)
+            if ngram:
+                user_id = user_ids_by_ngram.get(ngram)
+                if user_id:
+                    user_ids.append(user_id)
+
+            bundle.author_ids = user_ids
+
+    @api.depends('author_ids')
+    def _compute_team_ids(self):
         for bundle in self:
-            if bundle.is_base or not bundle.name:
-                continue
-            bundle_ngram = bundle.name.split('-')[-1].lower()
-            bundle.team_id = team_by_ngram_project.get((bundle_ngram, bundle.project_id))
+            bundle.team_ids = bundle.author_ids.runbot_team_ids.filtered(lambda rec: rec.module_ownership_ids).sorted('id')
+
+    @api.depends('manual_team_id', 'auto_team_id')
+    def _compute_team_id(self):
+        for bundle in self:
+            bundle.team_id = bundle.manual_team_id or bundle.auto_team_id
+
+    @api.depends('name', 'team_ids', 'author_ids')
+    def _compute_auto_team_id(self):
+        for bundle in self:
+            bundle.auto_team_id = bundle.team_ids and bundle.team_ids[0]
+
+    def _inverse_team_id(self):
+        self.manual_team_id = self.team_id
 
     @api.depends('branch_ids')
     def _compute_description(self):
@@ -348,6 +407,7 @@ class BundleTag(models.Model):
 
     _name = "runbot.bundle.tag"
     _description = "Bundle tag"
+    _order = "id desc, name"
 
     name = fields.Char(string='Bundle Tag')
     bundle_ids = fields.Many2many('runbot.bundle', string='Bundles')
