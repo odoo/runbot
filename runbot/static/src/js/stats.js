@@ -16,6 +16,7 @@ class StatsSearchState {
     params = null;
     fetchController = null;
     fetchDelay = 250;
+    bundleId = null;
     _params = { ...this.constructor.defaultParams };
 
     constructor(options = {}) {
@@ -57,7 +58,7 @@ class StatsSearchState {
         try {
             this.fetchController?.abort("Search parameters updated");
             this.fetchController = new AbortController();
-            return fetchChartData({ signal: this.fetchController.signal });
+            return fetchChartData({ bundleId: this.bundleId, signal: this.fetchController.signal });
         } catch (e) {
             if (e.name !== "AbortError") {
                 throw e;
@@ -107,6 +108,8 @@ const searchState = new StatsSearchState({
         updateFilterSelector(param, val);
     },
 });
+searchState.bundleId = document.getElementById("bundle_id").value;
+searchState.params.trigger_id = document.getElementById("trigger_id_selector").value;
 searchState.loadFromHash();
 
 /**
@@ -171,17 +174,6 @@ function updateFilterSelector(filterName, val) {
     if (select.value !== String(val)) {
         select.value = val;
     }
-}
-
-async function fetchStats(path, data, opts = {}) {
-    const response = await fetch(path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ params: data }),
-        ...opts,
-    });
-    const { result } = await response.json();
-    return result;
 }
 
 function random_color(name) {
@@ -285,12 +277,21 @@ function process_chart_data() {
     };
 }
 
-async function fetchChartData({ signal }) {
+async function fetchChartData({ bundleId, signal }) {
     const chart_spinner = document.getElementById("chart_spinner");
     chart_spinner.style.visibility = "visible";
-    const fetch_params = compute_fetch_params();
-    console.debug("fetchChartData", fetch_params);
-    const result = await fetchStats("/runbot/stats/", fetch_params, { signal });
+    const params = {
+        ...searchState.params,
+        bundle_id: bundleId,
+    };
+    console.debug("fetchChartData", params);
+    const response = await fetch("/runbot/stats/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ params }),
+        signal,
+    });
+    const { result } = await response.json();
     console.debug("fetchChartData", result);
     chart_spinner.style.visibility = "hidden";
     if (result) {
@@ -348,15 +349,6 @@ function updateChart() {
     }
     renderLegend();
 }
-
-function compute_fetch_params() {
-    return {
-        ...searchState.params,
-        bundle_id: document.getElementById("bundle_id").value,
-    };
-}
-
-searchState.params.trigger_id = document.getElementById("trigger_id_selector").value;
 
 for (const select of [...document.querySelectorAll("select[id$='_selector']")]) {
     const filterName = select.id.replace("_selector", "");
