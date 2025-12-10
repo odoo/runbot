@@ -201,13 +201,15 @@ class Batch(models.Model):
         dockerfile_id = bundle.dockerfile_id or bundle.base_id.dockerfile_id or bundle.project_id.dockerfile_id or bundle.version_id.dockerfile_id
         if not dockerfile_id:
             _logger.error('No dockerfile found !')
-
+        is_dev = not bundle.is_staging and not bundle.is_base
         triggers = self.env['runbot.trigger'].search([  # could be optimised for multiple batches. Ormcached method?
             ('project_id', '=', project.id),
             ('category_id', '=', self.category_id.id)
         ]).filtered(
             lambda t: not t.version_domain or \
             self.bundle_id.version_id.filtered_domain(t._get_version_domain())
+        ).filtered(
+            lambda t: (t.on_staging and bundle.is_staging) or (t.on_base and bundle.is_base) or (t.on_dev and is_dev),
         )
 
         pushed_repo = self.commit_link_ids.mapped('commit_id.repo_id')
