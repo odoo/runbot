@@ -3,11 +3,11 @@
   <data>
     <template id="runbot.modules_stats">
       <t t-call='runbot.layout'>
-        <input type="hidden" id="bundle_id" t-att-value="bundle.id"/>
-        <div class="container-fluid">
+        <div class="runbot-stats container-fluid">
           <nav class="navbar navbar-light">
             <div class="container">
                 <div class="d-flex flex-wrap align-items-center gap-2">
+                <input type="hidden" id="bundle_id" t-att-value="bundle.id"/>
                 <b>Bundle:</b><t t-out="bundle.name"/>
                 <b>Trigger:</b>
                 <select id="trigger_id_selector" class="form-select form-select-sm d-inline-block w-auto" aria-label="Trigger">
@@ -78,8 +78,6 @@
           </div>
         </div>
       </t>
-      <script type="text/javascript" src="/web/static/lib/Chart/Chart.js"></script>
-      <script type="text/javascript" src="/runbot/static/src/js/stats.js"></script>
     </template>
   </data>
 </odoo>

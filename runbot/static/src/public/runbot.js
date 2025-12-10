@@ -1,6 +1,9 @@
-import { DelegatedInteractionLite } from "./delegated_interaction_lite";
+import { Interaction } from "@web/public/interaction";
+import { registry } from "@web/core/registry";
 
-export class Runbot extends DelegatedInteractionLite {
+export class Runbot extends Interaction {
+    static selector = "body";
+
     dynamicContent = {
         "[data-runbot]": {
             "t-on-click.prevent": this.onDataRunbotClick,
@@ -10,12 +13,12 @@ export class Runbot extends DelegatedInteractionLite {
         },
     };
 
-    async onDataRunbotClick({ delegatedTarget }) {
-        const { runbot: operation, runbotBuild } = delegatedTarget.dataset;
+    async onDataRunbotClick({ currentTarget }) {
+        const { runbot: operation, runbotBuild } = currentTarget.dataset;
         if (!operation) {
             return;
         }
-        let { href: url} = delegatedTarget;
+        let { href: url} = currentTarget;
         if (runbotBuild) {
             url = `/runbot/build/${runbotBuild}/${operation}`;
         }
@@ -31,18 +34,21 @@ export class Runbot extends DelegatedInteractionLite {
                 }
                 break;
             case "action":
-                delegatedTarget.parentElement.innerText = responseText;
+                currentTarget.parentElement.innerText = responseText;
                 break;
             default:
                 window.location.reload();
         }
     }
 
-    onClipboardCopy({ delegatedTarget }) {
+    onClipboardCopy({ currentTarget }) {
         if (!navigator.clipboard) {
+            // eslint-disable-next-line no-console
             console.warn("Clipboard not supported");
             return;
         }
-        navigator.clipboard.writeText(delegatedTarget.dataset.clipboardCopy);
+        navigator.clipboard.writeText(currentTarget.dataset.clipboardCopy);
     }
 }
+
+registry.category("public.interactions").add("runbot", Runbot);

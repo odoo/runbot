@@ -1,12 +1,11 @@
-import { Runbot } from "./runbot";
+import { whenReady } from "@odoo/owl";
+import { makeEnv, startServices } from "@web/env";
 
-const Interactions = [Runbot];
+export async function start() {
+    await whenReady();
 
-async function start() {
-    for (const I of Interactions) {
-        const interaction = new I();
-        await interaction.whenReady;
-    }
+    const env = makeEnv();
+    await startServices(env);
 }
 
 start();
