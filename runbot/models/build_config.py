@@ -657,6 +657,9 @@ class ConfigStep(models.Model):
         # we need to have at least one job of type install_odoo to run odoo, take the last one for db_name.
         cmd += ['-d', '%s-%s' % (build.dest, db_name)]
 
+        if "--db-system" in available_options:
+            cmd += ['--db-system', '%s-%s' % (build.dest, db_name)]
+
         if "--proxy-mode" in available_options:
             cmd += ["--proxy-mode"]
 
@@ -715,8 +718,10 @@ class ConfigStep(models.Model):
             build._local_pg_createdb(db_name)
         cmd += ['-d', db_name]
 
-        # Demo data behavior changed in 18.1 -> demo data became opt-in instead of opt-out
         available_options = build._parse_config()
+        if "--db-system" in available_options:
+            cmd += ['--db-system', db_name]
+        # Demo data behavior changed in 18.1 -> demo data became opt-in instead of opt-out
         # True if build has demo data by default
         demo_installed_by_default = '--with-demo' not in available_options
         demo_mode = config_data.get('demo_mode', self.demo_mode)
@@ -1062,12 +1067,16 @@ class ConfigStep(models.Model):
         build = build.with_context(defined_commit_ids=target_commit_ids)
         exports = build._checkout()
 
+        available_options = build._parse_config()
         db_suffix = build.params_id.config_data.get('db_name') or build.params_id.dump_db.db_suffix
         migrate_db_name = '%s-%s' % (build.dest, db_suffix)  # only ok if restore does not force db_suffix
 
         migrate_cmd = build._cmd(enable_log_db=self.enable_log_db)
         migrate_cmd += ['-u', 'all']
         migrate_cmd += ['-d', migrate_db_name]
+        if "--db-system" in available_options:
+            migrate_cmd += ['--db-system', migrate_db_name]
+
         migrate_cmd += ['--stop-after-init']
         migrate_cmd += ['--max-cron-threads=0']
         upgrade_paths = list(build._get_upgrade_path())
