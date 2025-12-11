@@ -269,6 +269,9 @@ class BuildError(models.Model):
 
     disappearing_batch_ids = fields.Many2many('runbot.batch', compute='_compute_disappearing_batch_ids', string='Fixing batches')
 
+    only_trigger_ids = fields.Many2one('runbot.trigger', string='Only Triggers', compute='_compute_only_trigger_ids', search='_search_only_trigger_ids')
+    only_version_ids = fields.Many2one('runbot.version', string='Only Versions', compute='_compute_only_version_ids', search='_search_only_version_ids')
+
     @api.constrains('tags_min_version_id', 'tags_max_version_id')
     def _check_min_max_version(self):
         for build_error in self:
@@ -336,6 +339,30 @@ class BuildError(models.Model):
                 if disappearing_batch:
                     disappearing_batches_ids.append(disappearing_batch.id)
             record.disappearing_batch_ids = self.env['runbot.batch'].browse(disappearing_batches_ids)
+
+    def _compute_only_trigger_ids(self):
+        for record in self:
+            record.only_trigger_ids = record.trigger_ids[0] if record.trigger_ids else False
+
+    def _search_only_trigger_ids(self, operator, value):
+        if operator == 'any':
+            operator = 'in'
+            value = self.env['runbot.trigger'].search(value).ids
+        if operator == 'in':
+            return ["!", ("trigger_ids", "any", [("id", "not in", value)])]
+        raise UserError("Operator %s is not supported for only_trigger_ids search" % operator)
+
+    def _compute_only_version_ids(self):
+        for record in self:
+            record.only_version_ids = record.version_ids[0] if record.version_ids else False
+
+    def _search_only_version_ids(self, operator, value):
+        if operator == 'any':
+            operator = 'in'
+            value = self.env['runbot.version'].search(value).ids
+        if operator == 'in':
+            return ["!", ("version_ids", "any", [("id", "not in", value)])]
+        raise UserError("Operator %s is not supported for only_version_ids search" % operator)
 
     def action_appearing_batches(self):
         self.ensure_one()
@@ -931,7 +958,7 @@ class BuildErrorContent(models.Model):
         res = dict(self.env.cr.fetchall())
 
         for build_error_content in self:
-            build_error_content.version_ids = self.env['runbot.version'].browse(res.get(build_error_content.id, []))
+            build_error_content.version_ids = self.env['runbot.version'].browse([v for v in res.get(build_error_content.id, []) if v])
 
     @api.depends('build_ids')
     def _compute_trigger_ids(self):

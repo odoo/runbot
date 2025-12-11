@@ -305,10 +305,14 @@
       <field name="arch" type="xml">
         <search string="Search errors">
           <field name="content"/>
+          <field name="name"/>
           <field name="canonical_tags"/>
-          <field name="version_ids"/>
           <field name="responsible"/>
           <field name="team_id"/>
+          <!--field name="only_version_ids"/--><!--to uncomment once version_ids is stored-->
+          <field name="version_ids"/>
+          <field name="only_trigger_ids"/>
+          <field name="trigger_ids"/>
           <filter string="Assigned to me" name="my_errors" domain="[('responsible', '=', uid)]"/>
           <separator/>
           <filter string="Customer is me" name="my_errors_customer" domain="[('customer', '=', uid)]"/>
