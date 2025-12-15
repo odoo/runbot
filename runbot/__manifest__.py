@@ -80,13 +80,13 @@
             'runbot/static/lib/fontawesome/css/font-awesome.css',
             'runbot/static/src/css/runbot.css',
 
+            # module loader
             'web/static/src/module_loader.js',
 
+            # requirements for Interaction/InteractionService
             'web/static/lib/owl/owl.js',
             'web/static/lib/owl/odoo_module.js',
             'web/static/lib/luxon/luxon.js',
-            'runbot/static/lib/bootstrap/js/bootstrap.bundle.js',
-
             'web/static/src/env.js',
             'web/static/src/session.js',
             'web/static/src/core/assets.js',
@@ -124,6 +124,7 @@
             'web/static/src/public/interaction.js',
             'web/static/src/public/interaction_service.js',
 
+            'runbot/static/lib/bootstrap/js/bootstrap.bundle.js',
             'runbot/static/src/public/**/*',
         ],
     },

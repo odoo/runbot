@@ -18,7 +18,7 @@ export class Runbot extends Interaction {
         if (!operation) {
             return;
         }
-        let { href: url} = currentTarget;
+        let { href: url } = currentTarget;
         if (runbotBuild) {
             url = `/runbot/build/${runbotBuild}/${operation}`;
         }

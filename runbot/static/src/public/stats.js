@@ -69,6 +69,7 @@ export class Stats extends Interaction {
     fetchDelay = 250;
     state = reactive({ isLoading: false }, () => this.updateContent());
     data = reactive({ dates: {}, stats: {} }, () => this.renderChart());
+    triggersData = reactive({}, () => console.debug("triggersData", this.triggersData));
     _params = { ...this.constructor.defaultParams };
 
     dynamicContent = {
@@ -77,25 +78,29 @@ export class Stats extends Interaction {
         },
         "#backward_button": {
             "t-on-click": this.onClickBackward,
-            "t-att-class": () => ({ invisible: !this.hasBackwardBuilds }),
+            "t-att-disabled": () => !this.hasBackwardBuilds,
         },
         "#forward_button": {
             "t-on-click": this.onClickForward,
-            "t-att-class": () => ({ invisible: !this.hasForwardBuilds }),
+            "t-att-disabled": () => !this.hasForwardBuilds,
         },
         "#fast_forward_button": {
             "t-on-click": this.onClickFastForward,
-            "t-att-class": () => ({ invisible: !this.hasForwardBuilds }),
+            "t-att-disabled": () => !this.hasForwardBuilds,
         },
-        "#chart_spinner": {
+        "#refresh_button": {
+            "t-on-click": this.fetchData,
+            "t-att-disabled": () => this.state.isLoading,
+        },
+        "#chart_loader": {
             "t-att-class": () => ({ invisible: !this.state.isLoading }),
         },
         "select[id$='_selector']": {
             "t-on-change": this.onChangeFilterSelector,
         },
-        "select[id$='_selector'] > option": {
+        "select[id$='_selector'] option": {
             "t-att-selected": (el) => {
-                const filterName = el.parentElement.id.replace("_selector", "");
+                const filterName = el.closest("select").id.replace("_selector", "");
                 return String(el.value) === String(this.params[filterName]) ? "selected" : undefined;
             },
         },
@@ -106,7 +111,8 @@ export class Stats extends Interaction {
             set: this.setParam.bind(this),
         });
         this.loadFromHash();
-        this.params.trigger_id = this.triggerId;
+        Object.assign(this.triggersData, { ...JSON.parse(document.getElementById("triggers_data").text) });
+        this.params.trigger_id = this.triggersData.trigger_id;
     }
 
     start() {
@@ -121,14 +127,6 @@ export class Stats extends Interaction {
 
     destroy() {
         this.chart.destroy();
-    }
-
-    get bundleId() {
-        return document.getElementById("bundle_id").value;
-    }
-
-    get triggerId() {
-        return document.getElementById("trigger_id_selector").value;
     }
 
     get chartConfig() {
@@ -234,11 +232,11 @@ export class Stats extends Interaction {
     }
 
     get canvas() {
-        return document.querySelector("canvas");
+        return document.getElementById("chart_canvas");
     }
 
     get legendContainer() {
-        return document.querySelector("#js-legend");
+        return document.getElementById("js-legend");
     }
 
     async setParam(obj, prop, newVal) {
@@ -277,7 +275,7 @@ export class Stats extends Interaction {
         this.state.isLoading = true;
         const params = {
             ...this.params,
-            bundle_id: this.bundleId,
+            bundle_id: this.triggersData.bundle_id,
         };
         this.fetchController = new AbortController();
         try {
