@@ -104,6 +104,19 @@ export class Stats extends Interaction {
                 return String(el.value) === String(this.params[filterName]) ? "selected" : undefined;
             },
         },
+        "select#key_category_selector option": {
+            "t-att-disabled": (el) => {
+                const trigger = this.triggersData.relations[String(this.params.trigger_id)] || {};
+                return !Object.keys(trigger).includes(el.value);
+            },
+        },
+        "select#key_step_selector option": {
+            "t-att-disabled": (el) => {
+                const trigger = this.triggersData.relations[String(this.params.trigger_id)] || {};
+                const steps = trigger[this.params.key_category] || [];
+                return !steps.includes(el.value);
+            },
+        },
     };
 
     setup() {
