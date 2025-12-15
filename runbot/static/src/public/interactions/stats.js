@@ -99,6 +99,25 @@ export class Stats extends Interaction {
                 return String(el.value) === String(this.params[filterName]) ? "selected" : undefined;
             },
         },
+        "select#trigger_id_selector option": {
+            "t-att-class": (el) => {
+                const categories = Object.keys(this.triggersData.relations[el.value] || {});
+                return { "text-secondary": !categories.find((category) => category === this.params.key_category) };
+            },
+        },
+        "select#key_category_selector option": {
+            "t-att-class": (el) => {
+                const trigger = this.triggersData.relations[String(this.params.trigger_id)] || {};
+                return { "text-secondary": !Object.keys(trigger).includes(el.value) };
+            },
+        },
+        "select#key_step_selector option": {
+            "t-att-class": (el) => {
+                const trigger = this.triggersData.relations[String(this.params.trigger_id)] || {};
+                const steps = trigger[this.params.key_category] || [];
+                return { "text-secondary": !steps.includes(el.value) };
+            },
+        },
         "#js-chart": {
             "t-component": () => [StatsChart, { config: this.chartConfig, data: this.chartData, loader: this.loader }],
         },
