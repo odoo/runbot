@@ -4,7 +4,7 @@
     <template id="runbot.modules_stats">
       <t t-call='runbot.layout'>
         <div class="runbot-stats container-fluid py-4">
-          <script id="triggers_data" type="application/json" t-out="json.dumps(triggers_data, indent=4)"/>
+          <script id="triggers_data" type="application/json" t-out="json.dumps(triggers_data, indent=4, default=json_default)"/>
           <nav class="row row-cols-auto mb-4">
             <h1 class="h2" t-out="bundle.name"/>
             <div class="d-flex gap-3 ms-auto">
