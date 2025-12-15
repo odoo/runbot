@@ -25,7 +25,6 @@ class ResConfigSettings(models.TransientModel):
     runbot_is_base_regex = fields.Char('Regex is_base')
     runbot_forwardport_author = fields.Char('Forwardbot author')
     runbot_organisation = fields.Char('Organisation')
-    runbot_disable_host_on_fetch_failure = fields.Boolean('Disable host on fetch failure')
     runbot_dockerfile_public_by_default = fields.Boolean('Docker files are public by default')
     runbot_use_ssl = fields.Boolean('Use ssl for workers', help="select if worker ressources (log, dump, ...) uses ssl or not.", config_parameter="runbot.use_ssl")
 
@@ -73,7 +72,6 @@ class ResConfigSettings(models.TransientModel):
                    runbot_is_base_regex=get_param('runbot.runbot_is_base_regex', default=''),
                    runbot_forwardport_author=get_param('runbot.runbot_forwardport_author', default=''),
                    runbot_organisation=get_param('runbot.runbot_organisation', default=''),
-                   runbot_disable_host_on_fetch_failure=get_param('runbot.runbot_disable_host_on_fetch_failure', default=False),
                    runbot_dockerfile_public_by_default=get_param('runbot.runbot_dockerfile_public_by_default', default=False),
                    )
         return res
@@ -95,7 +93,6 @@ class ResConfigSettings(models.TransientModel):
         set_param('runbot.runbot_is_base_regex', self.runbot_is_base_regex)
         set_param('runbot.runbot_forwardport_author', self.runbot_forwardport_author)
         set_param('runbot.runbot_organisation', self.runbot_organisation)
-        set_param('runbot.runbot_disable_host_on_fetch_failure', self.runbot_disable_host_on_fetch_failure)
         set_param('runbot.runbot_dockerfile_public_by_default', self.runbot_dockerfile_public_by_default)
 
     @api.onchange('runbot_is_base_regex')

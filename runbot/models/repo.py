@@ -759,11 +759,6 @@ class Repo(models.Model):
                     message = 'Failed to fetch repo %s: %s' % (self.name, e.output.decode())
                     host = self.env['runbot.host']._get_current()
                     host.message_post(body=message)
-                    icp = self.env['ir.config_parameter'].sudo()
-                    if icp.get_param('runbot.runbot_disable_host_on_fetch_failure'):
-                        self.env['runbot.runbot']._warning('Host %s got reserved because of fetch failure' % host.name)
-                        _logger.exception(message)
-                        host._disable()
         return success
 
     def _update(self, force=False, poll_delay=5*60):

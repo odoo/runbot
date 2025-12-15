@@ -36,12 +36,6 @@ admin_passwd=running_master_password</field>
         </record>
 
     </data>
-
-    <record model="ir.config_parameter" id="runbot.runbot_disable_host_on_fetch_failure">
-        <field name="key">runbot.runbot_disable_host_on_fetch_failure</field>
-        <field name="value"></field>
-    </record>
-
     <record model="ir.config_parameter" id="runbot.runbot_dockerfile_public_by_default">
         <field name="key">runbot.runbot_dockerfile_public_by_default</field>
         <field name="value"></field>

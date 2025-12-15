@@ -380,33 +380,6 @@ class TestFetch(RunbotCase):
         else:
             return True
 
-    @patch('time.sleep', return_value=None)
-    def test_update_fetch_cmd(self, mock_time):
-        """ Test that git fetch is tried multiple times before disabling host """
-
-        host = self.env['runbot.host']._get_current()
-
-        self.assertFalse(host.assigned_only)
-        # Ensure that Host is not disabled if fetch succeeds after 3 tries
-        with mute_logger("odoo.addons.runbot.models.repo"):
-            self.repo_odoo._update_fetch_cmd()
-
-        self.assertFalse(host.assigned_only, "Host should not be disabled when fetch succeeds")
-        self.assertEqual(self.fetch_count, 3)
-
-        self.force_failure = True
-
-        with mute_logger("odoo.addons.runbot.models.repo"):
-            self.repo_odoo._update_fetch_cmd()
-        self.assertFalse(host.assigned_only, "Host should not be disabled when fetch fails by default")
-
-        self.fetch_count = 0
-        self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_disable_host_on_fetch_failure', True)
-        with mute_logger("odoo.addons.runbot.models.repo"):
-            self.repo_odoo._update_fetch_cmd()
-        self.assertTrue(host.assigned_only, "Host should be disabled when fetch fails and runbot_disable_host_on_fetch_failure is set")
-        self.assertEqual(self.fetch_count, 5)
-
 
 class TestIdentityFile(RunbotCase):
 
