@@ -353,7 +353,7 @@ body, .table {
 }*/
 
 .chart-legend {
-    max-height: calc(100vh - 160px);
+    max-height: calc(100vh - 22rem);
     overflow-y: auto;
 }
 
