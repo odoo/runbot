@@ -133,16 +133,16 @@
                     <span t-out="end_time"/>
                   </span>
 
-                  <t t-set="cron_time" t-value="end_time-start_time"/>
+                  <t t-set="loop_time" t-value="end_time-start_time"/>
                   <t t-set="klass">success</t>
-                  <t t-if="abs(cron_time) > 10">
+                  <t t-if="abs(loop_time) > 10">
                     <t t-set="klass">info</t>
                   </t>
-                  <t t-if="abs(cron_time) > 60">
+                  <t t-if="abs(loop_time) > 60">
                     <t t-set="klass">danger</t>
                   </t>
                   <span t-attf-class="badge text-bg-{{klass}}">
-                    <span t-out="cron_time"/>
+                    <span t-out="loop_time"/>
                   </span>
 
                 </div>
