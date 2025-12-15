@@ -262,7 +262,7 @@ class CommitStatus(models.Model):
     to_process = fields.Boolean('Status was not processed yet', index=True)
 
     def _send_to_process(self):
-        commits_status = self.search([('to_process', '=', True)], order='create_date DESC, id DESC')
+        commits_status = self.search([('to_process', '=', True), ('build_id.create_date', '<', datetime.datetime.now() - datetime.timedelta(minutes=2))], order='create_date DESC, id DESC')
         if commits_status:
             _logger.info('Sending %s commit status', len(commits_status))
             commits_status._send()

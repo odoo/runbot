@@ -271,8 +271,6 @@ class Runbot(models.AbstractModel):
                         self._commit()
             self._commit()
 
-            self.env['runbot.commit.status']._send_to_process()
-            self._commit()
 
             # cleanup old pull_info_failures
             for pr_number, t in pull_info_failures.copy().items():

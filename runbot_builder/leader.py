@@ -27,6 +27,11 @@ class LeaderClient(RunbotClient):  # Conductor, Director, Main, Maestro, Lead
             self.env.cr.commit()
             self.git_gc()
             self.env.cr.commit()
+
+        if self.host.send_status:
+            self.env['runbot.commit.status']._send_to_process()
+            self.env.cr.commit()
+
         return self.env['runbot.runbot']._fetch_loop_turn(self.host, self.pull_info_failures)
 
 

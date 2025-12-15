@@ -49,6 +49,7 @@ class Host(models.Model):
     is_leader = fields.Boolean('Is leader', help='This host is the leader of the cluster', default=False)
     is_builder = fields.Boolean('Is builder', help='This host is a builder of the cluster', default=True)
     is_registry = fields.Boolean('Is docker registry', help='This host is a docker regisrty', default=False)
+    send_status = fields.Boolean('Send status', help='If leader, this host will send status updates, disable to use the status service', default=True)
 
     use_remote_docker_registry = fields.Boolean('Use remote Docker Registry', default=False, help="Use docker registry for pulling images")
     docker_registry_url = fields.Char('Registry Url', help="Override global registry URL for this host.")
