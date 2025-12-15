@@ -18,13 +18,10 @@ class ResConfigSettings(models.TransientModel):
     runbot_starting_port = fields.Integer('Starting port for running builds')
     runbot_max_age = fields.Integer('Max commit age (in days)')
     runbot_logdb_name = fields.Char('Local Logs DB name', default='runbot_logs', config_parameter='runbot.logdb_name')
-    runbot_update_frequency = fields.Integer('Update frequency (in seconds)')
     runbot_template = fields.Char('Postgresql template', help="Postgresql template to use when creating DB's")
     runbot_message = fields.Text('Frontend warning message', help="Will be displayed on the frontend when not empty")
     runbot_default_odoorc = fields.Text('Default odoorc for builds')
     runbot_upgrade_exception_message = fields.Text('Upgrade exception message', help='Template to auto-generate a github message when creating an upgrade exception')
-    runbot_do_fetch = fields.Boolean('Discover new commits')
-    runbot_do_schedule = fields.Boolean('Schedule builds')
     runbot_is_base_regex = fields.Char('Regex is_base')
     runbot_forwardport_author = fields.Char('Forwardbot author')
     runbot_organisation = fields.Char('Organisation')
@@ -69,13 +66,10 @@ class ResConfigSettings(models.TransientModel):
                    runbot_timeout=int(get_param('runbot.runbot_timeout', default=10000)),
                    runbot_starting_port=int(get_param('runbot.runbot_starting_port', default=2000)),
                    runbot_max_age=int(get_param('runbot.runbot_max_age', default=30)),
-                   runbot_update_frequency=int(get_param('runbot.runbot_update_frequency', default=10)),
                    runbot_template=get_param('runbot.runbot_db_template'),
                    runbot_message=get_param('runbot.runbot_message', default=''),
                    runbot_default_odoorc=get_param('runbot.runbot_default_odoorc'),
                    runbot_upgrade_exception_message=get_param('runbot.runbot_upgrade_exception_message'),
-                   runbot_do_fetch=get_param('runbot.runbot_do_fetch', default=False),
-                   runbot_do_schedule=get_param('runbot.runbot_do_schedule', default=False),
                    runbot_is_base_regex=get_param('runbot.runbot_is_base_regex', default=''),
                    runbot_forwardport_author=get_param('runbot.runbot_forwardport_author', default=''),
                    runbot_organisation=get_param('runbot.runbot_organisation', default=''),
@@ -94,13 +88,10 @@ class ResConfigSettings(models.TransientModel):
         set_param("runbot.runbot_timeout", self.runbot_timeout)
         set_param("runbot.runbot_starting_port", self.runbot_starting_port)
         set_param("runbot.runbot_max_age", self.runbot_max_age)
-        set_param('runbot.runbot_update_frequency', self.runbot_update_frequency)
         set_param('runbot.runbot_db_template', self.runbot_template)
         set_param('runbot.runbot_message', self.runbot_message)
         set_param('runbot.runbot_default_odoorc', self.runbot_default_odoorc)
         set_param('runbot.runbot_upgrade_exception_message', self.runbot_upgrade_exception_message)
-        set_param('runbot.runbot_do_fetch', self.runbot_do_fetch)
-        set_param('runbot.runbot_do_schedule', self.runbot_do_schedule)
         set_param('runbot.runbot_is_base_regex', self.runbot_is_base_regex)
         set_param('runbot.runbot_forwardport_author', self.runbot_forwardport_author)
         set_param('runbot.runbot_organisation', self.runbot_organisation)

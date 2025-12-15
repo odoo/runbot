@@ -11,13 +11,6 @@ class LeaderClient(RunbotClient):  # Conductor, Director, Main, Maestro, Lead
         self.pull_info_failures = {}
         super().__init__(env)
 
-    def on_start(self):
-        if self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_do_fetch'):
-            _logger.info('Updating all repos')
-            for repo in self.env['runbot.repo'].search([('mode', '!=', 'disabled')]):
-                repo._update(force=True)
-            _logger.info('update finished')
-
     def loop_turn(self):
         if not self.host.is_leader:
             _logger.warning('Leader client is not a leader host, skipping loop_turn')

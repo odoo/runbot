@@ -18,9 +18,6 @@ class BuilderClient(RunbotClient):
             builds_path = self.env['runbot.runbot']._path('build')
             monitoring_thread = threading.Thread(target=docker_monitoring_loop, args=(builds_path,), daemon=True)
             monitoring_thread.start()
-            if self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_do_fetch'):
-                for repo in self.env['runbot.repo'].search([('mode', '!=', 'disabled')]):
-                    repo._update(force=True)
 
     def loop_turn(self):
         if self.host.is_registry:
