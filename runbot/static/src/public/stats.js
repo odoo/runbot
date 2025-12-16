@@ -69,7 +69,7 @@ export class Stats extends Interaction {
     fetchDelay = 250;
     state = reactive({ isLoading: false }, () => this.updateContent());
     data = reactive({ dates: {}, stats: {} }, () => this.renderChart());
-    triggersData = reactive({}, () => console.debug("triggersData", this.triggersData));
+    triggersData = reactive({});
     _params = { ...this.constructor.defaultParams };
 
     dynamicContent = {
@@ -129,6 +129,7 @@ export class Stats extends Interaction {
     }
 
     start() {
+        this.renderChart();
         this.fetchData();
     }
 
@@ -298,7 +299,10 @@ export class Stats extends Interaction {
                 body: JSON.stringify({ params }),
                 signal: this.fetchController.signal,
             });
-            const { result } = await response.json();
+            const { result, error } = await response.json();
+            if (error) {
+                throw new Error(error.message);
+            }
             const { stats, dates } = result;
             for (const val of Object.values(stats)) {
                 val[LABEL_AGGREGATE_SUM] = Object.values(val).reduce((a, b) => a + b, 0);
@@ -308,12 +312,12 @@ export class Stats extends Interaction {
                 stats,
                 dates,
             });
+            this.state.isLoading = false;
         } catch (e) {
             if (e.name !== "AbortError") {
+                this.state.isLoading = false;
                 throw e;
             }
-        } finally {
-            this.state.isLoading = false;
         }
     }
 
