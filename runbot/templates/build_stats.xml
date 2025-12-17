@@ -36,12 +36,7 @@
           </nav>
           <div class="row">
             <div class="col-12 col-md-8 col-lg-9 col-xl-10">
-              <div class="chart-container position-relative">
-                <canvas id="chart_canvas"/>
-                <div id="chart_loader" class="position-absolute top-0 bottom-100 start-0 end-100 h-100 w-100 bg-white bg-opacity-75">
-                  <i class="position-absolute top-50 start-50 fa fa-2x fa-fw fa-circle-o-notch fa-spin"/>
-                </div>
-              </div>
+              <div id="js-chart"/>
               <p class="text-center text-secondary my-3">Tips: click a bullet to see corresponding build stats, shift+click to center the graph on this build</p>
             </div>
             <div class="col-12 col-md-4 col-lg-3 col-xl-2">

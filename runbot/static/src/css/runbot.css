@@ -352,23 +352,6 @@ body, .table {
 	margin-left: -1px;
 }*/
 
-.chart-legend {
-    max-height: calc(100vh - 22rem);
-}
-
-.chart-legend-item {
-    border-inline-start: 4px solid var(--chart-legend-item-accent, transparent);
-    cursor: pointer;
-    margin-bottom: 1px;
-}
-
-.chart-legend-item.disabled {
-    --chart-legend-item-accent: var(--bs-gray-300) !important;
-    color: var(--bs-gray-600);
-    font-weight: normal !important;
-    text-decoration: line-through;
-}
-
 .limited-height {
 	max-height: 180px;
 	overflow: scroll;

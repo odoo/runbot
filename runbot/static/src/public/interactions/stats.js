@@ -1,7 +1,8 @@
 import { Interaction } from "@web/public/interaction";
 import { registry } from "@web/core/registry";
-import { loadJS } from "@web/core/assets";
 import { reactive } from "@odoo/owl";
+import { StatsChart } from "../components/stats_chart";
+import { StatsChartLegend } from "../components/stats_chart_legend";
 
 const LABEL_AGGREGATE_SUM = "Aggregate Sum";
 const LABEL_AGGREGATE_AVERAGE = "Aggregate Average";
@@ -67,8 +68,7 @@ export class Stats extends Interaction {
     params = null;
     fetchController = null;
     fetchDelay = 250;
-    state = reactive({ isLoading: false }, () => this.updateContent());
-    data = reactive({ dates: {}, stats: {} }, () => this.renderChart());
+    state = reactive({ isLoading: false, data: { dates: {}, stats: {} } }, () => this.updateContent());
     triggersData = reactive({});
     _params = { ...this.constructor.defaultParams };
 
@@ -87,9 +87,6 @@ export class Stats extends Interaction {
         "#fast_forward_button": {
             "t-on-click": this.onClickFastForward,
             "t-att-disabled": () => !this.hasForwardBuilds,
-        },
-        "#chart_loader": {
-            "t-att-class": () => ({ invisible: !this.state.isLoading }),
         },
         "select[id$='_selector']": {
             "t-on-change": this.onChangeFilterSelector,
@@ -119,6 +116,12 @@ export class Stats extends Interaction {
                 return { "text-secondary": !steps.includes(el.value) };
             },
         },
+        "#js-chart": {
+            "t-component": () => [StatsChart, { config: this.chartConfig, data: this.chartData, isLoading: this.state.isLoading }],
+        },
+        "#js-legend": {
+            "t-component": () => [StatsChartLegend, { items: this.chartData.datasets, onClickItem: this.onClickLegendItem }],
+        },
     };
 
     setup() {
@@ -131,18 +134,11 @@ export class Stats extends Interaction {
     }
 
     start() {
-        this.renderChart();
         this.fetchData();
     }
 
-    async willStart() {
-        if (!("Chart" in window)) {
-            await loadJS("/web/static/lib/Chart/Chart.js");
-        }
-    }
-
-    destroy() {
-        this.chart.destroy();
+    get data() {
+        return this.state.data;
     }
 
     get chartConfig() {
@@ -247,14 +243,6 @@ export class Stats extends Interaction {
         return stats && (this.params.center_build_id !== Object.keys(stats)[0]);
     }
 
-    get canvas() {
-        return document.getElementById("chart_canvas");
-    }
-
-    get legendContainer() {
-        return document.getElementById("js-legend");
-    }
-
     async setParam(obj, prop, newVal) {
         if (this.constructor.numberParams.includes(prop)) {
             const num = Number(newVal);
@@ -268,7 +256,6 @@ export class Stats extends Interaction {
                     await this.debounced(this.fetchData, this.fetchDelay)();
                 }
                 this.updateContent();
-                this.renderChart();
             }
         }
         return true;
@@ -321,34 +308,6 @@ export class Stats extends Interaction {
                 throw e;
             }
         }
-    }
-
-    renderChart() {
-        if (!this.chart) {
-            this.chart = new Chart(this.canvas, this.chartConfig);
-        } else {
-            this.chart.data = this.chartData;
-            this.chart.update();
-        }
-        this.renderLegend();
-    }
-
-    renderLegend() {
-        const legend = document.createElement("ul");
-        legend.classList.add("chart-legend", "list-unstyled", "overflow-y-auto");
-        const items = [];
-        for (const data of this.chart.data.datasets) {
-            const legendItem = document.createElement("li");
-            legendItem.classList.add("chart-legend-item", "ps-1", "fw-bold", "text-truncate");
-            legendItem.classList.toggle("disabled", data.hidden);
-            legendItem.style.setProperty("--chart-legend-item-accent", data.borderColor);
-            legendItem.title = data.label;
-            legendItem.append(data.label);
-            legendItem.addEventListener("click", this.onClickLegendItem(data).bind(this));
-            items.push(legendItem);
-        }
-        legend.append(...items);
-        this.legendContainer.replaceChildren(legend);
     }
 
     onClickLegendItem(data) {
