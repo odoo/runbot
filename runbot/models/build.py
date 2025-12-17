@@ -148,16 +148,18 @@ class BuildParameters(models.Model):
                 extensions = []
                 for commit in build_param.commit_ids.sorted(key=lambda c: (c.repo_id.sequence, c.repo_id.id)):
                     for path in file_path.split(','):
-                        try:
-                            if content := commit._git_show_file(path):
-                                file_dynamic_config = json.loads(content)
-                                if file_dynamic_config.get('extension'):
-                                    extensions.append(file_dynamic_config)
-                                else:
-                                    base_config = file_dynamic_config
-                                break
-                        except Exception as e:
-                            build_param.create_batch_id._log(f'Failed to load dynamic config from {file_path} in commit {commit.repo_id.name}: {e}', level='ERROR')
+                        repo, path = path.split(':', 1) if ':' in path else (None, path)
+                        if not repo or commit.repo_id.name == repo:
+                            try:
+                                if content := commit._git_show_file(path):
+                                    file_dynamic_config = json.loads(content)
+                                    if file_dynamic_config.get('extension'):
+                                        extensions.append(file_dynamic_config)
+                                    else:
+                                        base_config = file_dynamic_config
+                                    break
+                            except Exception as e:
+                                build_param.create_batch_id._log(f'Failed to load dynamic config from {file_path} in commit {commit.repo_id.name}: {e}', level='ERROR')
                 extensions.append(default_config_extension)
                 config = base_config
                 for extension in extensions:

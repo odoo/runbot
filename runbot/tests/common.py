@@ -194,7 +194,7 @@ class RunbotCase(TransactionCase):
         self.docker_run_calls = []
         self.diff = ''
 
-        def mock_git(repo, cmd):
+        def mock_git(repo, cmd, quiet=False):
             return self.mock_git_helper(repo, cmd)
 
         self.start_patcher('git_patcher', 'odoo.addons.runbot.models.repo.Repo._git', new=mock_git)

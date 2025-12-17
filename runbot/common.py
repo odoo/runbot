@@ -27,10 +27,10 @@ dest_reg = re.compile(r'^\d{5,}-.+$')
 def transactioncache(method):
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):
-        assert not self.ids
+        assert not self.ids or len(self.ids) == 1, "transactioncache only works on singletons or empty recordsets"
         cache = self.env.cr.cache
         method_key = method
-        params_key = (args, frozenset(kwargs.items()))
+        params_key = (tuple(self.ids), args, frozenset(kwargs.items()))
         # should check id key is serializable
         if method_key not in cache:
             cache[method_key] = {}

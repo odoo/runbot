@@ -2,7 +2,7 @@
 import datetime
 import subprocess
 
-from ..common import os, RunbotException, make_github_session
+from ..common import os, RunbotException, make_github_session, transactioncache
 import glob
 import shutil
 
@@ -164,6 +164,7 @@ class Commit(models.Model):
         except:
             return False
 
+    @transactioncache
     def _git_show_file(self, file):
         self.ensure_one()
         self.repo_id._fetch(self.name)
@@ -201,7 +202,7 @@ class Commit(models.Model):
             return
 
         if ci_strategy != 'all' and state == 'pending':
-            _logger.info("skipping github pending status for build %s and ci %s", build_id, context)
+            _logger.debug("skipping github pending status for build %s and ci %s", build_id, context)
             return
 
         if ci_strategy == 'errors' and state != 'error' and last_status.state not in ('error', 'failure'):
