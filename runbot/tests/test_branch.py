@@ -72,9 +72,9 @@ class TestBranch(RunbotCase):
         error = self.env['runbot.build.error'].create([{}])
         branch = self.Branch.create({
             'name': '989898',
-            'remote_id': self.remote_server.id,
+            'remote_id': self.remote_odoo.id,
             'is_pr': True,
-            'pull_head_remote_id': self.remote_server.id,
+            'pull_head_remote_id': self.remote_odoo.id,
         })
         # Does not crash without pr_body or nothing on pr_body
         branch._match_errors_from_body()
@@ -119,7 +119,7 @@ class TestBranch(RunbotCase):
         branch.pr_body = f'Runbot error {error.id}'
         other_branch = self.Branch.create({
             'name': 'other-branch',
-            'remote_id': self.remote_server.id,
+            'remote_id': self.remote_odoo.id,
             'is_pr': True,
         })
         error.fixing_pr_id = other_branch
