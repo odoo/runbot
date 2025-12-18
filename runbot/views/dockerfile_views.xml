@@ -1,16 +1,16 @@
 <odoo>
   <data>
-    <record id="dockerfile_form" model="ir.ui.view">
+    <record id="dockerfile_form" model="ir.ui.view" >
         <field name="name">runbot.dockerfile.form</field>
         <field name="model">runbot.dockerfile</field>
         <field name="arch" type="xml">
-          <form string="Dockerfile">
+          <form string="Dockerfile" delete="0">
             <sheet>
               <widget name="web_ribbon" title="Empty" bg_color="bg-warning" invisible="dockerfile != ''"/>
-              <widget name="web_ribbon" title="Newer identifier" bg_color="bg-danger" invisible="image_identifier == image_future_identifier"/>
+              <widget name="web_ribbon" title="Newer identifier" bg_color="bg-danger" invisible="has_future != True"/>
               <widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
               <group>
-                <field name="message" invisible="not message" class="text-danger"/> 
+                <field name="message" invisible="not message" class="text-danger"/>
                 <field name="active" invisible="1"/>
                 <field name="name" invisible="parent_id" required="not parent_id"/>
                 <field name="name" invisible="not parent_id" required="parent_id" label="Variant Name"/>
@@ -97,7 +97,7 @@
         <field name="name">runbot.dockerfile.list</field>
         <field name="model">runbot.dockerfile</field>
         <field name="arch" type="xml">
-          <list string="Dockerfile" decoration-danger="dockerfile == '' or in_error == True" decoration-warning="image_identifier != image_future_identifier">
+          <list string="Dockerfile" decoration-danger="dockerfile == '' or in_error == True" decoration-warning="has_future == True" delete="0">
             <field name="image_tag"/>
             <field name="name"/>
             <field name="parent_id"/>
@@ -124,6 +124,19 @@
         <field name="arch" type="xml">
           <search>
             <field name="image_tag"/>
+            <filter string="Hide Variants" name="hide_variants" domain="[('parent_id', '=', False)]"/>
+            <separator/>
+            <filter string="Variants Only" name="variants_only" domain="[('parent_id', '!=', False)]"/>
+            <separator/>
+            <filter string="To Build" name="to_build" domain="[('to_build', '=', True)]"/>
+            <separator/>
+            <filter string="Not To Build" name="not_to_build" domain="[('to_build', '=', False)]"/>
+            <separator/>
+            <filter string="Newer Identifier" name="newer_identifier" domain="[('has_future', '=', True)]"/>
+            <separator/>
+            <filter string="In Error" name="in_error" domain="[('in_error', '=', True)]"/>
+            <separator/>
+            <filter string="Versions Depend" name="version_depends" domain="[('version_ids', '!=', False)]"/>
           </search>
         </field>
     </record>
@@ -248,6 +261,7 @@
     <field name="res_model">runbot.dockerfile</field>
     <field name="view_mode">list,form</field>
     <field name="path">docker</field>
+    <field name="context">{'search_default_hide_variants': True, 'search_default_to_build': True}</field>
   </record>
 
   <record id="open_view_docker_result_tree" model="ir.actions.act_window">

@@ -133,6 +133,7 @@ class Dockerfile(models.Model):
     image_identifier = fields.Char('Identifier', tracking=True)
     image_future_identifier = fields.Char('Future Identifier', tracking=True)
     image_previous_identifier = fields.Char('Previous Identifier', tracking=True)
+    has_future = fields.Boolean(compute='_compute_has_future', store=True)
     image_tag = fields.Char(compute='_compute_image_tag', recursive=True, store=True)
     image_future_tag = fields.Char(compute='_compute_image_helper_tags')
     image_previous_tag = fields.Char(compute='_compute_image_helper_tags')
@@ -283,6 +284,11 @@ class Dockerfile(models.Model):
         for rec in self:
             rec.image_future_tag = f'{rec.image_tag}.future'
             rec.image_previous_tag = f'{rec.image_tag}.previous'
+
+    @api.depends('image_identifier', 'image_future_identifier')
+    def _compute_has_future(self):
+        for record in self:
+            record.has_future = record.image_identifier != record.image_future_identifier
 
     def write(self, values):
         if 'image_identifier' in values and not 'image_previous_identifier' in values and self.image_identifier != values['image_identifier']:
