@@ -1293,31 +1293,7 @@ Loading stuff
             ('ERROR', 'Modules loaded not found in logs\n\nLoading stuff\n'),
         ])
 
-    def test_make_result_traceback(self):
-        file_content = """
-Loading stuff
-Traceback (most recent call last):
-  File "/data/build/odoo/odoo-bin", line 5, in <module>
-    import odoo
-  File "/data/build/odoo/odoo/__init__.py", line 134, in <module>
-    from . import modules
-  File "/data/build/odoo/odoo/modules/__init__.py", line 8, in <module>
-    from . import db, graph, loading, migration, module, registry, neutralize
-  File "/data/build/odoo/odoo/modules/graph.py", line 11, in <module>
-    import odoo.tools as tools
-  File "/data/build/odoo/odoo/tools/__init__.py", line 25, in <module>
-    from .mail import *
-  File "/data/build/odoo/odoo/tools/mail.py", line 32, in <module>
-    safe_attrs = clean.defs.safe_attrs | frozenset(
-AttributeError: module 'lxml.html.clean' has no attribute 'defs'
-2024-05-14 09:54:22,692 17 INFO dbname path.to.test: aaa
-"""
-        with patch('builtins.open', mock_open(read_data=file_content)):
-            self.config_step._make_results(self.build)
-        self.assertEqual(str(self.build.job_end), '1970-01-01 02:00:00')
-        self.assertEqual(self.build.local_result, 'ko')
-        expected = """Traceback found in logs:
-Traceback (most recent call last):
+    traceback_example = """Traceback (most recent call last):
   File "/data/build/odoo/odoo-bin", line 5, in <module>
     import odoo
   File "/data/build/odoo/odoo/__init__.py", line 134, in <module>
@@ -1331,10 +1307,61 @@ Traceback (most recent call last):
   File "/data/build/odoo/odoo/tools/mail.py", line 32, in <module>
     safe_attrs = clean.defs.safe_attrs | frozenset(
 AttributeError: module 'lxml.html.clean' has no attribute 'defs'"""
+
+    def test_make_result_traceback(self):
+        self.maxDiff = None
+        file_content = f"""
+2025-05-04 08:39:00,000 42 INFO other info
+2025-05-04 08:40:00,000 42 INFO test_runbot odoo.addons.runbot.tests.test_build_config_step: FAIL: TestMakeResult.test_make_result_traceback
+{self.traceback_example}
+2024-05-14 09:54:22,692 17 INFO dbname path.to.test: aaa
+"""
+        with patch('builtins.open', mock_open(read_data=file_content)):
+            self.config_step._make_results(self.build)
+        self.assertEqual(str(self.build.job_end), '1970-01-01 02:00:00')
+        self.assertEqual(self.build.local_result, 'ko')
+        expected = f"""Traceback found in logs:
+2025-05-04 08:40:00,000 42 INFO test_runbot odoo.addons.runbot.tests.test_build_config_step: FAIL: TestMakeResult.test_make_result_traceback
+{self.traceback_example}"""
         self.assertEqual(self.logs, [
             ('INFO', 'Getting results for build %s' % self.build.dest),
             ('ERROR', expected),
         ])
+
+    def test_make_result_traceback_alone(self):
+        self.maxDiff = None
+        file_content = f"""{self.traceback_example}
+2024-05-14 09:54:22,692 17 INFO dbname path.to.test: aaa
+"""
+        with patch('builtins.open', mock_open(read_data=file_content)):
+            self.config_step._make_results(self.build)
+        self.assertEqual(str(self.build.job_end), '1970-01-01 02:00:00')
+        self.assertEqual(self.build.local_result, 'ko')
+        expected = f"""Traceback found in logs:
+{self.traceback_example}"""
+        self.assertEqual(self.logs, [
+            ('INFO', 'Getting results for build %s' % self.build.dest),
+            ('ERROR', expected),
+        ])
+
+    def test_make_result_traceback_retry(self):
+        self.maxDiff = None
+        file_content = f"""
+2025-05-04 08:39:00,000 42 INFO other info
+2025-05-04 08:40:00,000 42 _ERROR test_runbot odoo.addons.runbot.tests.test_build_config_step: FAIL: TestMakeResult.test_make_result_traceback
+{self.traceback_example}
+2024-05-14 09:54:22,692 17 INFO dbname path.to.test: aaa
+2024-05-14 09:54:22,692 17 INFO dbname odoo.modules.loading: Modules loaded.
+Some post install stuff
+Initiating shutdown
+"""
+        with patch('builtins.open', mock_open(read_data=file_content)):
+            self.config_step._make_results(self.build)
+        self.assertEqual(str(self.build.job_end), '1970-01-01 02:00:00')
+        self.assertEqual(self.logs, [
+            ('INFO', 'Getting results for build %s' % self.build.dest),
+        ])
+        self.assertEqual(self.build.local_result, 'ok')
 
     def test_make_result_error(self):
         file_content = """

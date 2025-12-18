@@ -1439,12 +1439,24 @@ class ConfigStep(models.Model):
             build._log('_make_tests_results', 'Error found in logs:\n%s' % '\n'.join(result), level="ERROR")
             return 'ko'
 
+        if build.local_result == 'warn':
+            return 'warn'  # don't check traceback for build in waning since the traceback could come from a warning message
+
         re_traceback = r'^(?:Traceback \(most recent call last\):)$'
         if result := rfind(log_path, re_traceback):
             # find Traceback, all following indented lines and one last non indented line
-            complete_traceback = rfind(log_path, r'^(?:Traceback \(most recent call last\):(?:\n .*)*(?:\n.*)?)')[:10000]
-            complete_traceback = complete_traceback or result
-            build._log('_make_tests_results', 'Traceback found in logs:\n%s' % '\n'.join(complete_traceback), level="ERROR")
+            complete_traceback = rfind(log_path, r'^(?:.+\n)?(?:Traceback \(most recent call last\):(?:\n .*)*(?:\n.*)?)')
+            if complete_traceback:
+                def is_lower_level(tb):
+                    first_line = tb.split('\n')[0]
+                    for level in ('_WARNING', '_ERROR', '_CRITICAL'):
+                        if level in first_line:
+                            return True
+                    return False
+                result = [tb for tb in complete_traceback if not is_lower_level(tb)]
+                if not result:
+                    return 'ok'  # all tracebacks were in a lower login level, ignore them
+            build._log('_make_tests_results', 'Traceback found in logs:\n%s' % ('\n'.join(result))[:10000], level="ERROR")
             return 'ko'
         return 'ok'
 
