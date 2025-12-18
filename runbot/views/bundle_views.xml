@@ -10,6 +10,7 @@
                     <field name="keep_sticky_running"/>
                     <field name="always_use_foreign"/>
                     <field name="dockerfile_id"/>
+                    <field name="next_freeze_tag_id"/>
                     <field name="group_ids"/>
                     <field name="trigger_ids"/>
                     <field name="sequence"/>
@@ -29,6 +30,7 @@
                 <field name="name"/>
                 <field name="keep_sticky_running"/>
                 <field name="dockerfile_id"/>
+                <field name="next_freeze_tag_id"/>
                 <field name="group_ids"/>
                 <field name="trigger_ids"/>
                 <field name="sequence"/>

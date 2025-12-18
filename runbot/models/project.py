@@ -24,6 +24,7 @@ class Project(models.Model):
     hidden = fields.Boolean('Hidden', help='Hide this project from the main page')
     active = fields.Boolean("Active", default=True)
     process_delay = fields.Integer('Process delay', default=60, required=True, help="Delay between a push and a batch starting its process.")
+    next_freeze_tag_id = fields.Many2one('runbot.bundle.tag', string="Next freeze tag")
 
     @api.constrains('process_delay')
     def _constraint_process_delay(self):

@@ -91,6 +91,11 @@
                                                 </a>
                                             </li>
                                         </t>
+                                        <li t-if="project and project.next_freeze_tag_id" class="nav-item" title="Freeze">
+                                            <a class="nav-link" t-attf-href="/runbot/{{slug(project)}}/bundle/tag/{{slug(project.next_freeze_tag_id)}}">
+                                                <i class="fa fa-snowflake-o"/>
+                                            </a>
+                                        </li>
                                         <t t-call="runbot.build_errors_link"/>
                                         <li class="nav-item dropdown" t-ignore="true">
                                             <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">
