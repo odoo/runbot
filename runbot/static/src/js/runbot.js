@@ -38,3 +38,17 @@ function copyToClipboard(text) {
     }
     navigator.clipboard.writeText(text);
 }
+
+document.addEventListener("DOMContentLoaded", function letItSnow() {
+    const NB_SNOWFLAKES = 25;
+    for (let i = 0; i < NB_SNOWFLAKES; i++) {
+        const snowflake = document.createElement("div");
+        snowflake.classList.add("snowflake");
+        snowflake.style.setProperty("--snowflake-seed", Math.floor(Math.random() * NB_SNOWFLAKES));
+        snowflake.style.setProperty("--snowflake-count", NB_SNOWFLAKES);
+        const icon = document.createElement("i");
+        icon.classList.add("inner", "fa", "fa-snowflake-o");
+        snowflake.appendChild(icon);
+        document.body.appendChild(snowflake);
+    }
+});
