@@ -6,6 +6,7 @@
          <field name="binding_model_id" ref="runbot.model_runbot_build" />
         <field name="type">ir.actions.server</field>
         <field name="state">code</field>
+        <field name="group_ids" eval="[Command.link(ref('runbot.group_runbot_upgrade_exception_manager'))]"/>
         <field name="code">
             action = records._parse_upgrade_errors()
         </field>
