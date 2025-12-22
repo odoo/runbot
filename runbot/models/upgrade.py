@@ -19,16 +19,18 @@ class UpgradeExceptions(models.Model):
     message = fields.Text('Upgrade exception message', compute="_compute_message", store=True)
 
     def action_post_message(self):
-        if not self.env.user.has_group('runbot.group_runbot_admin'):
+        if not self.env.user.has_group('runbot.group_runbot_upgrade_exception_manager'):
             raise UserError('You are not allowed to send messages')
         for pr in self.pr_ids:
-            pr.remote_id._github('/repos/:owner/:repo/issues/%s/comments' % pr.name, {'body': self.message})
+            pr.remote_id.sudo()._github('/repos/:owner/:repo/issues/%s/comments' % pr.name, {'body': self.message})
 
     def action_auto_rebuild(self):
+        if not self.env.user.has_group('runbot.group_runbot_upgrade_exception_manager'):
+            raise UserError('You are not allowed to rebuild templates')
         builds = self.create_build_id.parent_id.children_ids if self.create_build_id.parent_id else self.create_build_id
         for build in builds:
             if not build.orphan_result and build.local_result != 'ok':
-                build._rebuild()
+                build.sudo()._rebuild()
 
     @api.depends('create_date')
     def _compute_message(self):
