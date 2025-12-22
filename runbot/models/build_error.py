@@ -832,7 +832,7 @@ class BuildErrorContent(models.Model):
     version_ids = fields.One2many('runbot.version', compute='_compute_version_ids', string='Versions', search='_search_version')
     trigger_ids = fields.Many2many('runbot.trigger', compute='_compute_trigger_ids', string='Triggers', search='_search_trigger_ids')
     tag_ids = fields.Many2many('runbot.build.error.tag', string='Tags')
-    qualifiers = JsonDictField('Qualifiers', index=True)
+    qualifiers = JsonDictField('Qualifiers')
     similar_ids = fields.One2many('runbot.build.error.content', compute='_compute_similar_ids')
     responsible = fields.Many2one(related='error_id.responsible')
     customer = fields.Many2one(related='error_id.customer')
