@@ -29,6 +29,7 @@ class TestUpgradeFlow(RunbotCase):
             'name': 'upgrade',
             'project_id': self.project.id,
             'manifest_files': False,
+            'upgrade_paths': 'migrations',
         })
         self.remote_upgrade = self.env['runbot.remote'].create({
             'name': 'bla@example.com:base/upgrade',
@@ -326,7 +327,7 @@ class TestUpgradeFlow(RunbotCase):
         assertOk(b_173_master_demo, self.template_per_version['saas-17.3'], master_upgrade_build, 'all')
         assertOk(b_173_master_no_demo, self.template_per_version['saas-17.3'], master_upgrade_build, 'no-demo-all')
 
-        self.assertEqual(b_17_master_demo.params_id.commit_ids.repo_id, self.repo_odoo | self.repo_upgrade | self.repo_enterprise)
+        self.assertEqual(b_17_master_demo.params_id.commit_ids.repo_id, self.repo_upgrade)
 
         # upgrade repos tests
         upgrade_stable_build = master_batch.slot_ids.filtered(lambda slot: slot.trigger_id == self.trigger_upgrade_stable).build_id
@@ -492,7 +493,7 @@ class TestUpgradeFlow(RunbotCase):
                 )
                 self.assertEqual(
                     str(cmd),
-                    'python3 odoo/server.py {addons_path} --no-xmlrpcs --no-netrpc -u all -d {db_name} --stop-after-init --max-cron-threads=0'.format(
+                    'python3 odoo/server.py {addons_path} --no-xmlrpcs --no-netrpc -u all -d {db_name} --stop-after-init --max-cron-threads=0 --upgrade-path upgrade/migrations'.format(
                         addons_path='--addons-path enterprise,odoo/addons,odoo/core/addons',
                         db_name=f'{current_build.dest}-{suffix}')
                 )

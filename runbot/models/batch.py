@@ -400,8 +400,12 @@ class Batch(models.Model):
                 'create_batch_id': self.id,
                 'used_custom_trigger': bool(trigger_custom),
             }
-
-            params_value['builds_reference_ids'] = trigger._reference_builds(self)
+            if not (trigger.upgrade_step_id.upgrade_matrix_id or trigger.upgrade_dumps_trigger_id.upgrade_step_id.upgrade_matrix_id):
+                # when set the build dynamicaly gets upgrade reference builds,
+                # and needs to be batch dependant since the potentially tested build
+                # could come from the current batch
+                # TODO remove upgrade cleanup
+                params_value['builds_reference_ids'] = trigger._reference_builds(self)
 
             params = self.env['runbot.build.params'].create(params_value)
 

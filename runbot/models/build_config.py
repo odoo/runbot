@@ -825,12 +825,22 @@ class ConfigStep(models.Model):
         A complement aims to test the exact oposite of an upgrade trigger.
         Ignore configs an categories: only focus on versions.
         """
+        trigger = build.params_id.trigger_id
+        upgrade_complement_step = trigger.upgrade_dumps_trigger_id.upgrade_step_id
+        if build.params_id.used_custom_trigger:
+            batch = build.params_id.create_batch_id
+            custom_config = next((trigger_custom.config_id for trigger_custom in batch.bundle_id.trigger_custom_ids if trigger_custom.trigger_id == trigger.upgrade_dumps_trigger_id), False)
+            if custom_config:
+                upgrade_complement_step = trigger._upgrade_step_from_config(custom_config)
+        if upgrade_complement_step.upgrade_matrix_id:
+            return upgrade_complement_step._run_configure_upgrade(build, complement=True)
 
         base = build.params_id.create_batch_id.bundle_id.base_id
         if not base.to_upgrade_from:
             build._log('_run_configure_upgrade', f'Upgrade from {base.name} is disabled')
             return
 
+        # TODO remove upgrade cleanup
         param = build.params_id
         version = param.version_id
         builds_references = param.builds_reference_ids
@@ -875,7 +885,7 @@ class ConfigStep(models.Model):
                         )
                         child._log('', 'This build tests change of schema in stable version testing upgrade to %s' % target.params_id.version_id.name)
 
-    def _run_configure_upgrade(self, build):
+    def _run_configure_upgrade(self, build, complement=False):
         """
         Source/target parameters:
             - upgrade_to_current | (upgrade_to_master + (upgrade_to_major_versions | upgrade_to_all_versions))
@@ -907,14 +917,40 @@ class ConfigStep(models.Model):
         end = False
         target_builds = False
         source_builds_by_target = {}
-        builds_references = param.builds_reference_ids
+        if self.upgrade_matrix_id:
+            # experimental: compute on the fly to remove the dependency on a build
+            # this will allow to test upgrade from a non existing build when the params are created
+            # 1. to test templates in a separated build
+            # 2. to test upgrade from a build comming from another batch created at the same time
+            # Note: we cannot use the step directly (self) since this can be called from a complement step
+            builds_references = param._upgrade_builds_references()
+        else:  # TODO remove upgrade cleanup
+            builds_references = param.builds_reference_ids
         builds_references_by_version_id = {b.params_id.version_id.id: b for b in builds_references}
 
         target_builds = build.browse()
+        use_current = self.upgrade_current
+        upgrade_from_bellow = self.upgrade_from_bellow ^ complement
+        upgrade_to_above = self.upgrade_to_above ^ complement
+
         if param.upgrade_to_build_id:
             target_builds = param.upgrade_to_build_id
         else:
-            if self.upgrade_to_current:
+            if self.upgrade_matrix_id:
+                valid_target_versions = self.upgrade_matrix_id._get_target_versions()
+                if use_current:
+                    if upgrade_from_bellow or self.upgrade_from_base:
+                        if param.version_id in valid_target_versions:
+                            target_builds |= build
+                    if upgrade_to_above:
+                        for version in self.upgrade_matrix_id._get_target_versions_from(param.version_id):
+                            target_builds |= builds_references_by_version_id.get(version.id) or build.browse()
+                else:
+                    for version in valid_target_versions:
+                        target_builds |= builds_references_by_version_id.get(version.id) or build.browse()
+
+            # TODO remove upgrade cleanup
+            elif self.upgrade_to_current:
                 target_builds = build
             else:
                 target_builds = build.browse()
@@ -932,20 +968,22 @@ class ConfigStep(models.Model):
                         target_builds |= base_builds
                 target_builds = target_builds.sorted(lambda b: b.params_id.version_id.number)
 
-        # filter target that are not to_upgrade
-        filtered_target_builds = build.browse()
-        for target_build in target_builds:
-            base = target_build.params_id.create_batch_id.bundle_id.base_id
-            if base.to_upgrade:
-                filtered_target_builds |= target_build
-            else:
-                build._log('_run_configure_upgrade', f'Upgrade to {base.name} is disabled')
-        target_builds = filtered_target_builds
+        # TODO remove upgrade cleanup
+        if not self.upgrade_matrix_id:
+            # filter target that are not to_upgrade
+            filtered_target_builds = build.browse()
+            for target_build in target_builds:
+                base = target_build.params_id.create_batch_id.bundle_id.base_id
+                if base.to_upgrade:
+                    filtered_target_builds |= target_build
+                else:
+                    build._log('_run_configure_upgrade', f'Upgrade to {base.name} is disabled')
+            target_builds = filtered_target_builds
 
         if target_builds:
             build._log('', 'Testing upgrade targeting %s' % ', '.join(target_builds.mapped('params_id.version_id.name')))
         if not target_builds:
-            build._log('_run_configure_upgrade', 'No reference build found with correct target in availables references, skipping. %s' % builds_references.mapped('params_id.version_id.name'))
+            build._log('_run_configure_upgrade', 'No reference build found with correct target in availables references, skipping. %s' % builds_references.mapped('params_id.version_id.name'), level='WARNING')
             end = True
         elif len(target_builds) > 1 and not self.upgrade_flat:
             for target_build in target_builds:
@@ -955,43 +993,80 @@ class ConfigStep(models.Model):
                 )
             end = True
         if end:
-            return  # replace this by a python job friendly solution
+            return
 
         for target_build in target_builds:
             if param.upgrade_from_build_id:
                 source_builds_by_target[target_build] = param.upgrade_from_build_id
             else:
-                if self.upgrade_from_current:
-                    from_builds = build
-                else:
-                    target_version = target_build.params_id.version_id
-                    from_builds = self._get_upgrade_source_builds(target_version, builds_references_by_version_id)
+                target_version = target_build.params_id.version_id
+                if self.upgrade_matrix_id:
+                    source_builds = build.browse()
+                    valid_source_versions = self.upgrade_matrix_id._get_source_versions_to(target_version)
 
-                # filter source that are not to_upgrade_from
-                filtered_from_builds = build.browse()
-                for from_build in from_builds:
-                    base = from_build.params_id.create_batch_id.bundle_id.base_id
-                    if base.to_upgrade_from:
-                        filtered_from_builds |= from_build
+                    if use_current:
+                        # we expect target_build to be a valid source for "current"
+                        if param.version_id in valid_source_versions:
+                            if upgrade_to_above:
+                                if complement:
+                                    source_builds |= build
+                                else:
+                                    current_batch = build.params_id.create_batch_id
+                                    trigger = build.params_id.trigger_id
+                                    upgrade_dumps_trigger_id = trigger.upgrade_dumps_trigger_id
+                                    refs_build = current_batch.mapped('slot_ids').filtered(
+                                        lambda slot: slot.trigger_id == upgrade_dumps_trigger_id,
+                                        ).mapped('build_id')
+                                    if not refs_build:
+                                        build._log('', f'No build linked to trigger %s found in batch [{current_batch.id}](/runbot/batch/{current_batch.id})', upgrade_dumps_trigger_id.name, level='WARNING', log_type='markdown')
+                                    source_builds |= refs_build  # most likely current build for now but not in the future
+                            if self.upgrade_from_base:
+                                source_builds |= builds_references_by_version_id.get(param.version_id) or build.browse()
+                        if upgrade_from_bellow and target_build.params_id.version_id == param.version_id:
+                            for version in valid_source_versions:
+                                source_builds |= builds_references_by_version_id.get(version.id) or build.browse()
                     else:
-                        build._log('_run_configure_upgrade', f'Upgrade from {base.name} is disabled')
-                from_builds = filtered_from_builds
-                source_builds_by_target[target_build] = from_builds
+                        for version in valid_source_versions:
+                            source_builds |= builds_references_by_version_id.get(version.id) or build.browse()
+                # TODO remove upgrade cleanup
+                elif self.upgrade_from_current:
+                    source_builds = build
+                else:
+                    source_builds = self._get_upgrade_source_builds(target_version, builds_references_by_version_id)
 
-                if from_builds:
-                    build._log('', 'Defining source version(s) for %s: %s' % (target_build.params_id.version_id.name, ', '.join(source_builds_by_target[target_build].mapped('params_id.version_id.name'))))
-                if not from_builds:
-                    build._log('_run_configure_upgrade', 'No source version found for %s, skipping' % target_version.name, level='INFO')
+                # TODO remove upgrade cleanup
+                if not self.upgrade_matrix_id:
+                    # filter source that are not to_upgrade_from
+                    filtered_source_builds = build.browse()
+                    for source_build in source_builds:
+                        base = source_build.params_id.create_batch_id.bundle_id.base_id
+                        if base.to_upgrade_from:
+                            filtered_source_builds |= source_build
+                        else:
+                            build._log('_run_configure_upgrade', f'Upgrade from {base.name} is disabled')
+                    source_builds = filtered_source_builds
+                source_builds_by_target[target_build] = source_builds
+
+                if source_builds:
+                    build._log('', 'Defining source version(s) for %s: %s' % (target_version.name, ', '.join(source_builds.mapped('params_id.version_id.name'))))
+                if not source_builds:
+                    build._log('_run_configure_upgrade', 'No source version found for %s, skipping' % target_version.name, level='WARNING')
                 elif not self.upgrade_flat:
-                    for from_build in from_builds:
+                    for source_build in source_builds:
+                        source_description = source_build.params_id.version_id.name
+                        target_description = target_build.params_id.version_id.name
+                        if source_build.create_batch_id == build.create_batch_id:
+                            source_description += f'current ({source_description})'
+                        if target_build.create_batch_id == build.create_batch_id:
+                            target_description += f'current ({target_description})'
                         build._add_child(
-                            {'upgrade_to_build_id': target_build.id, 'upgrade_from_build_id': from_build.id},
-                            description="Testing migration from %s to %s" % (from_build.params_id.version_id.name, target_build.params_id.version_id.name)
+                            {'upgrade_to_build_id': target_build.id, 'upgrade_from_build_id': source_build.id},
+                            description="Testing migration from %s to %s" % (source_description, target_description)
                         )
                     end = True
 
         if end:
-            return  # replace this by a python job friendly solution
+            return
 
         assert not param.dump_db
         for target, sources in source_builds_by_target.items():
@@ -1005,34 +1080,42 @@ class ConfigStep(models.Model):
                         dump_builds = build.search([('id', 'child_of', source.id), ('params_id.config_id', '=', config_id.id), ('orphan_result', '=', False)])
                         # this search is not optimal
                         if not dump_builds:
-                            build._log('_run_configure_upgrade', 'No child build found with config %s in %s' % (config_id.name, source.id), level='ERROR')
+                            build._log('_run_configure_upgrade', 'No build found with config %s in %s' % (config_id.name, source.id), level='ERROR')
                         dbs = dump_builds.database_ids.sorted('db_suffix')
                         valid_databases += list(self._filter_upgrade_database(dbs, upgrade_db.db_pattern))
                         if not valid_databases:
                             build._log('_run_configure_upgrade', 'No database found for pattern %s' % (upgrade_db.db_pattern), level='ERROR')
                 for db in valid_databases:
-                    #commit_ids = build.params_id.commit_ids
-                    #if commit_ids != target.params_id.commit_ids:
-                    #    repo_ids = commit_ids.mapped('repo_id')
-                    #    for commit_link in target.params_id.commit_link_ids:
-                    #        if commit_link.commit_id.repo_id not in repo_ids:
-                    #            additionnal_commit_links |= commit_link
-                    #    build._log('', 'Adding sources from build [%s](%s)', target.id, target.build_url, log_type='markdown')
-
                     child = build._add_child({
                         'upgrade_to_build_id': target.id,
-                        'upgrade_from_build_id': source,
+                        'upgrade_from_build_id': source.id,
                         'dump_db': db.id,
                         'config_id': self.upgrade_config_id,
+                        'builds_reference_ids': False,  # remove builds_reference_ids since now upgrade_to_build_id and upgrade_from_build_id are set
+                        'commit_link_ids': build.params_id.commit_link_ids.filtered(lambda cl: cl.commit_id.repo_id.upgrade_paths).ids,
+                        'version_id': target.params_id.version_id.id,
+                        'trigger_id': None,
+                        'dockerfile_id': target.params_id.dockerfile_id.id,
                     })
-
-                    child.description = 'Testing migration from %s to %s using db %s (%s)' % (
-                        source.params_id.version_id.name,
-                        target.params_id.version_id.name,
+                    source_description = source.params_id.version_id.name
+                    target_description = target.params_id.version_id.name
+                    if source.create_batch_id == build.create_batch_id:
+                        source_description += ' (current)'
+                    if target.create_batch_id == build.create_batch_id:
+                        target_description += ' (current)'
+                    child.description = 'Testing migration from **%s** to **%s** using db %s (%s)' % (
+                        source_description,
+                        target_description,
                         db.name,
-                        config_id.name
+                        config_id.name,
                     )
-                # TODO log somewhere if no db at all is found for a db_suffix
+
+                    if self.allow_similar_build_quick_result:
+                        existing_done_build = next((build for build in child.params_id.build_ids.sorted('id') if build.global_state == 'done' and build.local_result not in ('skipped', 'killed', 'manually_killed')), None)
+                        if existing_done_build:
+                            child._log('', 'A similar [build](%s) has been found, marking as done directly', existing_done_build.build_url, log_type='markdown')
+                            child.local_state = 'done'
+                            child.local_result = existing_done_build.local_result
 
     def _get_upgrade_source_versions(self, target_version):
         if self.upgrade_from_version_ids:
@@ -1175,7 +1258,7 @@ class ConfigStep(models.Model):
 
         return dict(cmd=cmd, network_enabled=True)
 
-    def _reference_builds(self, batch, trigger):
+    def _reference_builds(self, batch, trigger, complement=False):
         upgrade_dumps_trigger_id = trigger.upgrade_dumps_trigger_id
         refs_batches = self._reference_batches(batch, trigger)
         refs_builds = refs_batches.mapped('slot_ids').filtered(
@@ -1186,29 +1269,22 @@ class ConfigStep(models.Model):
     def _is_upgrade_step(self):
         return self.job_type in ('configure_upgrade', 'configure_upgrade_complement')
 
-    def _reference_batches(self, batch, trigger):
-        # upgrade_current_source
-        # upgrade_current_target
-
-        if self.upgrade_matrix_id:
-            batches = self.env['runbot.batch']
-            base_batch = batch if batch.reference_batch_ids else batch.base_reference_batch_id
-            reference_batch_ids = base_batch.reference_batch_ids
-            if self.upgrade_from_bellow:
-                from_versions = self.upgrade_matrix_id._get_versions_to(batch.version_id)
-                batches |= reference_batch_ids.filtered(lambda batch: batch.bundle_id.version_id in from_versions)
-
-            if self.upgrade_to_above:
-                to_versions = self.upgrade_matrix_id._get_versions_from(batch.version_id)
-                batches |= reference_batch_ids.filtered(lambda batch: batch.bundle_id.version_id in to_versions)
-            return batches
-
-        elif self.job_type == 'configure_upgrade_complement':
+    def _reference_batches(self, batch, trigger, complement=False):
+        if self.job_type == 'configure_upgrade_complement' or complement:
             return self._reference_batches_complement(batch, trigger)
         else:
             return self._reference_batches_upgrade(batch, trigger.upgrade_dumps_trigger_id.category_id.id)
 
     def _reference_batches_complement(self, batch, trigger):
+        upgrade_complement_step = trigger.upgrade_dumps_trigger_id.upgrade_step_id
+        custom_config = next((trigger_custom.config_id for trigger_custom in batch.bundle_id.trigger_custom_ids if trigger_custom.trigger_id == trigger.upgrade_dumps_trigger_id), False)
+        if custom_config:
+            upgrade_complement_step = trigger._upgrade_step_from_config(custom_config)
+
+        if upgrade_complement_step.upgrade_matrix_id:
+            return upgrade_complement_step._reference_batches_upgrade(batch, trigger.upgrade_dumps_trigger_id.category_id.id, complement=True)
+
+        # TODO remove upgrade cleanup
         bundle = batch.bundle_id
         if not bundle.base_id.to_upgrade_from:
             return self.env['runbot.batch']
@@ -1216,8 +1292,6 @@ class ConfigStep(models.Model):
         version = bundle.version_id
         next_versions = version.next_major_version_id | version.next_intermediate_version_ids  # TODO filter on trigger version
         target_versions = version.browse()
-
-        upgrade_complement_step = trigger.upgrade_dumps_trigger_id.upgrade_step_id
 
         if next_versions:
             for next_version in next_versions:
@@ -1227,7 +1301,26 @@ class ConfigStep(models.Model):
         base_batch = batch if batch.reference_batch_ids else batch.base_reference_batch_id
         return base_batch.reference_batch_ids.filtered(lambda batch: batch.bundle_id.version_id in target_versions and batch.category_id.id == category_id)
 
-    def _reference_batches_upgrade(self, batch, category_id):
+    def _reference_batches_upgrade(self, batch, category_id, complement=False):
+        if self.upgrade_matrix_id:
+            batches = self.env['runbot.batch']
+            base_batch = batch if batch.reference_batch_ids else batch.base_reference_batch_id
+            reference_batch_ids = base_batch.reference_batch_ids
+            if self.upgrade_from_bellow ^ complement:
+                from_versions = self.upgrade_matrix_id._get_source_versions_to(batch.bundle_id.version_id)
+                batches |= reference_batch_ids.filtered(lambda batch: batch.bundle_id.version_id in from_versions)
+
+            if self.upgrade_to_above ^ complement:
+                to_versions = self.upgrade_matrix_id._get_target_versions_from(batch.bundle_id.version_id)
+                batches |= reference_batch_ids.filtered(lambda batch: batch.bundle_id.version_id in to_versions)
+
+            if self.upgrade_from_base:
+                base_version = batch.bundle_id.version_id
+                batches |= reference_batch_ids.filtered(lambda batch: batch.bundle_id.version_id == base_version)
+
+            return batches
+
+        # TODO remove upgrade cleanup
         if not batch.bundle_id.base_id.to_upgrade:
             return self.env['runbot.batch']
         bundle = batch.bundle_id

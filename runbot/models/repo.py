@@ -123,6 +123,7 @@ class Trigger(models.Model):
             raise UserError('Upgrade trigger should have a config with step of type Configure Upgrade')
         return upgrade_step
 
+    # TODO remove upgrade cleanup
     def _reference_builds(self, batch):
         self.ensure_one()
         if self.upgrade_step_id:  # this is an upgrade trigger, add corresponding builds

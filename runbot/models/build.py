@@ -103,6 +103,14 @@ class BuildParameters(models.Model):
         "avoid duplicate params",
     )
 
+    def _upgrade_builds_references(self):
+        self.ensure_one()
+        trigger = self.trigger_id
+        batch = self.create_batch_id
+        trigger_config = next((trigger_custom.config_id for trigger_custom in batch.bundle_id.trigger_custom_ids if trigger_custom.trigger_id == trigger), trigger.config_id)
+        step = trigger._upgrade_step_from_config(trigger_config)
+        return step._reference_builds(batch, trigger)
+
     # @api.depends('version_id', 'project_id', 'extra_params', 'config_id', 'config_data', 'modules', 'commit_link_ids', 'builds_reference_ids')
     def _compute_fingerprint(self):
         for param in self:
@@ -127,7 +135,7 @@ class BuildParameters(models.Model):
                 cleaned_vals['upgrade_to_build_dockerfile_id'] = param.upgrade_to_build_id.params_id.dockerfile_id.id
                 cleaned_vals['upgrade_to_build_commits'] = sorted([c.tree_hash or c.id for c in param.upgrade_to_build_id.params_id.commit_link_ids.commit_id])
             if param.upgrade_from_build_id:
-                cleaned_vals['upgrade_from_build_commits'] = param.upgrade_from_build_id.id
+                cleaned_vals['upgrade_from_build_id'] = param.upgrade_from_build_id.id
             if param.trigger_id.batch_dependent:
                 cleaned_vals['create_batch_id'] = param.create_batch_id.id
             if param.trigger_id.upgrade_step_id.upgrade_matrix_id:

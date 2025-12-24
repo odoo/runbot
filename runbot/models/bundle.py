@@ -31,6 +31,8 @@ class Bundle(models.Model):
     is_staging = fields.Boolean('Is staging', index=True)
     defined_base_id = fields.Many2one('runbot.bundle', 'Forced base bundle', domain="[('project_id', '=', project_id), ('is_base', '=', True)]")
     base_id = fields.Many2one('runbot.bundle', 'Base bundle', compute='_compute_base_id', store=True)
+
+    # TODO remove upgrade cleanup
     to_upgrade = fields.Boolean('To upgrade To', compute='_compute_to_upgrade', store=True, index=False)
     to_upgrade_from = fields.Boolean('To upgrade From', compute='_compute_to_upgrade_from', store=True, index=False)
 

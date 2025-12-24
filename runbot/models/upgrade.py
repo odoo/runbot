@@ -161,11 +161,14 @@ class UpgradeMatrix(models.Model):
         for matrix in self:
             matrix.entry_ids._update_enabled(force=True)
 
-    def _get_versions_from(self, from_version):
-        return self.entries.filtered(lambda e: e.enabled and e.from_version_id == from_version).mapped('to_version_id')
+    def _get_target_versions(self):
+        return self.entry_ids.filtered(lambda e: e.enabled).mapped('to_version_id')
 
-    def _get_versions_to(self, to_version):
-        return self.entries.filtered(lambda e: e.enabled and e.to_version_id == to_version).mapped('from_version_id')
+    def _get_target_versions_from(self, from_version):
+        return self.entry_ids.filtered(lambda e: e.enabled and e.from_version_id == from_version).mapped('to_version_id')
+
+    def _get_source_versions_to(self, to_version):
+        return self.entry_ids.filtered(lambda e: e.enabled and e.to_version_id == to_version).mapped('from_version_id')
 
 
 class UpgradeMatrixEntry(models.Model):
