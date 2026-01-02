@@ -119,13 +119,22 @@ class BuildParameters(models.Model):
                 'modules': param.modules or '',
                 'commit_link_ids': commit_ident,
                 'builds_reference_ids': sorted(param.builds_reference_ids.ids),
-                'upgrade_from_build_id': param.upgrade_from_build_id.id,
-                'upgrade_to_build_id': param.upgrade_to_build_id.id,
                 'dump_db': param.dump_db.id,
                 'dockerfile_id': param.dockerfile_id.id,
                 'skip_requirements': param.skip_requirements,
             }
+            if param.upgrade_to_build_id:
+                cleaned_vals['upgrade_to_build_dockerfile_id'] = param.upgrade_to_build_id.params_id.dockerfile_id.id
+                cleaned_vals['upgrade_to_build_commits'] = sorted([c.tree_hash or c.id for c in param.upgrade_to_build_id.params_id.commit_link_ids.commit_id])
+            if param.upgrade_from_build_id:
+                cleaned_vals['upgrade_from_build_commits'] = param.upgrade_from_build_id.id
             if param.trigger_id.batch_dependent:
+                cleaned_vals['create_batch_id'] = param.create_batch_id.id
+            if param.trigger_id.upgrade_step_id.upgrade_matrix_id:
+                # when using new matrix, the build references are not set on the build (removing uniquification)
+                # but a build could come from the current batch (testing template)
+                # so the build bust be considered as if build was batch_dependent
+                # Thanks to allow_similar_build_quick_result (when enabled) it should'nt cause any additional load.
                 cleaned_vals['create_batch_id'] = param.create_batch_id.id
             if param.used_custom_trigger:
                 cleaned_vals['used_custom_trigger'] = True

@@ -10,23 +10,24 @@
                 <button name="update_matrix_entries" string="Create missing entries" type="object" class="oe_highlight"/>
                 <button name="reset_matrix_enabled" string="Reset matrix entries default enabled state" type="object" class="oe_highlight"/>
               </header>
-              <group >
-                <group >
+              <group>
+                <group>
                   <field name="name"/>
                   <field name="project_id"/>
                   <field name="auto_update"/>
-                </group >
-                <group >
+                </group>
+                <group>
                   <field name="upgrade_to_major_versions"/>
                   <field name="upgrade_to_all_versions"/>
                   <field name="upgrade_from_previous_major_version"/>
                   <field name="upgrade_from_last_intermediate_version"/>
                   <field name="upgrade_from_all_intermediate_version"/>
-
-                </group >
+                </group>
               </group >
+              <group>
+                <field name="step_ids" widget="many2many_tags"/>
+              </group>
               <group >
-
                 <field name="entry_ids" widget="version_matrix">
                     <list>
                       <field name="from_version_id"/>

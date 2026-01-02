@@ -428,11 +428,15 @@ class ConfigStep(models.Model):
 
     # wip replace previous field by matrix
     upgrade_matrix_id = fields.Many2one('runbot.upgrade.matrix', 'Upgrade matrix', tracking=True)
-    upgrade_current_source = fields.Boolean('Upgrade Curent source', help='Use current build as Source if version match', default=True, tracking=True)
-    upgrade_current_target = fields.Boolean('Upgrade Curent target', help='Use current build as target if version match', default=True, tracking=True)
-    # TODO maybe remove this field in the future, should all work in the same build
+    upgrade_current = fields.Boolean('Upgrade Current', help='Use current build as Source and Target if version match', default=True, tracking=True)
+    # TODO remove upgrade cleanup
+    upgrade_current_source = fields.Boolean('Upgrade Current source', help='Use current build as Source if version match', default=True, tracking=True)
+    upgrade_current_target = fields.Boolean('Upgrade Current target', help='Use current build as target if version match', default=True, tracking=True)
+    # TODO maybe remove this fields in the future, should all work in the same build
     upgrade_from_bellow = fields.Boolean('Upgrade from bellow', help="Standard upgrade behaviour", default=True, tracking=True)
     upgrade_to_above = fields.Boolean('Upgrade to above', help="Will behave as a complement", default=True, tracking=True)
+    upgrade_from_base = fields.Boolean('Upgrade from base', help="Allow upgrade from base version to current", default=False, tracking=True)
+    allow_similar_build_quick_result = fields.Boolean('Allow similar build quick result', help="Allow to find result on a similar build with the same parameters, and mark the result and state when creating the child build", default=False, tracking=True)
 
     upgrade_flat = fields.Boolean("Flat", help="Take all decisions in on build")
 

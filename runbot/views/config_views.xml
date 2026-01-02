@@ -101,14 +101,15 @@
                             <field name="min_target_version_id"/>
                         </list>
                       </field>
+                      <field name="allow_similar_build_quick_result"/>
                       <field name="upgrade_matrix_id"/>
                     </group>
                     <group invisible="job_type not in ('python', 'configure_upgrade', 'dynamic')">
                       <group class="col" string="Upgrade matrix settings"  invisible="not upgrade_matrix_id">
-                        <field name="upgrade_current_source"/>
-                        <field name="upgrade_current_target"/>
-                        <field name="upgrade_from_bellow"/>
-                        <field name="upgrade_to_above"/>
+                        <field name="upgrade_current"/>
+                        <field name="upgrade_from_bellow" invisible="not upgrade_current"/>
+                        <field name="upgrade_to_above" invisible="not upgrade_current"/>
+                        <field name="upgrade_from_base" invisible="not upgrade_current"/>
                       </group>
                       <group class="col" string="Target version settings" invisible="upgrade_matrix_id">
                         <field string="Current" name="upgrade_to_current"/>

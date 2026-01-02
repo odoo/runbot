@@ -111,6 +111,7 @@ class UpgradeMatrix(models.Model):
     upgrade_from_previous_major_version = fields.Boolean()
     upgrade_from_last_intermediate_version = fields.Boolean()
     upgrade_from_all_intermediate_version = fields.Boolean()
+    step_ids = fields.One2many('runbot.build.config.step', 'upgrade_matrix_id', 'Upgrade steps', readonly=True)
 
     matrix_summary = fields.Text('Matrix summary', compute='_compute_matrix_summary', store=True, tracking=True)
 
