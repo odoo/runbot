@@ -84,7 +84,7 @@ registry.category("fields").add("runbotjsonb", {
 
 export class FrontendUrl extends Component {
     static template = xml`
-        <div><a t-att-href="route" target="_blank"><t t-out="displayValue"/></a></div>
+        <div><a t-att-href="route" t-on-click.stop="" t-on-auxclick.stop="" target="_blank"><t t-out="displayValue"/></a></div>
     `;
 
     static components = { Many2OneField };
