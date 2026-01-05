@@ -232,7 +232,9 @@ class RunbotCase(TransactionCase):
         self.start_patcher('_write_file', 'odoo.addons.runbot.models.build.BuildResult._write_file', None)
         self.start_patcher('_parse_config', 'odoo.addons.runbot.models.build.BuildResult._parse_config', {'--test-enable', '--test-tags', '--with-demo'})
 
-        def get_available_modules(self_commit):
+        def get_available_modules(self_commit, addons_paths=None):
+            if addons_paths:
+                raise NotImplementedError("This test mock does not support filtering by addons_paths yet")
             return self.addons_per_repo.get(self_commit.repo_id, [])
 
         self.start_patcher('_get_available_modules', 'odoo.addons.runbot.models.commit.Commit._get_available_modules', new=get_available_modules)

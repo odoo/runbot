@@ -1091,12 +1091,12 @@ class BuildResult(models.Model):
 
         return exports
 
-    def _get_available_modules(self):
+    def _get_available_modules(self, addons_paths=None):
         all_modules = dict()
         available_modules = defaultdict(list)
         # repo_modules = []
         for commit in self.env.context.get('defined_commit_ids') or self.params_id.commit_ids:
-            for (addons_path, module, manifest_file_name) in commit._get_available_modules():
+            for (addons_path, module, manifest_file_name) in commit._get_available_modules(addons_paths=addons_paths):
                 if module in all_modules:
                     self._log(
                         'Building environment',
@@ -1112,10 +1112,10 @@ class BuildResult(models.Model):
         # return repo_modules, available_modules
         return available_modules
 
-    def _get_modules_to_test(self, modules_patterns=''):
+    def _get_modules_to_test(self, modules_patterns='', addons_paths=None):
         self.ensure_one()
         trigger = self.params_id.trigger_id
-        modules = self._get_available_modules()
+        modules = self._get_available_modules(addons_paths=addons_paths)
         params_patterns = (self.params_id.modules or '').split(',')
         modules_patterns = (modules_patterns or '').split(',')
         return trigger._filter_modules_to_test(modules, params_patterns + modules_patterns)  # we may switch params_patterns and modules_patterns order

@@ -46,6 +46,12 @@ def filter_all_modules(selector, build, dynamic_vars):
     return filter_default_modules(selector, build, dynamic_vars)
 
 
+def filter_addons_paths(selector, build, dynamic_vars, addons_paths):
+    build._checkout()  # we need to ensure source are exported before _get_modules_to_test
+    modules = build._get_modules_to_test(selector, addons_paths=addons_paths)
+    return ','.join(modules)
+
+
 def filter_default_modules(selector, build, dynamic_vars):
     build._checkout()  # we need to ensure source are exported before _get_modules_to_test
     modules = build._get_modules_to_test(selector)
@@ -1854,6 +1860,7 @@ class ConfigStep(models.Model):
 
         expression_filters = {
             'filter_all_modules': filter_all_modules,
+            'filter_addons_paths': filter_addons_paths,
             'filter_default_modules': filter_default_modules,
             'make_module_test_tags': make_module_test_tags,
             'prepend': prepend_string,
@@ -1876,7 +1883,7 @@ class ConfigStep(models.Model):
                 args = []
                 if match := re.match(r'(\w+)\((.+)\)', processor):
                     processor = match.group(1)
-                    args = match.group(2).split(',')
+                    args = match.group(2)
                 expression_filter = expression_filters.get(processor)
                 if not expression_filter:
                     build._log('Dynamic Config', f'Unknown processor {processor} in dynamic config entry {entry}', level="ERROR")

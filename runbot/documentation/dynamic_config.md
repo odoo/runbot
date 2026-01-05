@@ -362,3 +362,7 @@ In some case we also want to combine the test-tags module with another tag or te
 
 It is also possible to filter modules based on the one modified in the current bundle.
 `{{*|filter_all_modules|modified_modules}}"`
+
+
+`filter_addons_paths` allow to specify a specific directory or list of directories to search for modules instead of the default addons paths defined on the repo.
+`{{*|filter_addons_paths('addons,custom_addons')}}"`

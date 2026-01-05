@@ -66,9 +66,9 @@ class Commit(models.Model):
             return self
         return self._get(self.name, self.repo_id.id, self.read()[0], commit.id)
 
-    def _get_available_modules(self):
+    def _get_available_modules(self, addons_paths=None):
         for manifest_file_name in self.repo_id.manifest_files.split(','):  # '__manifest__.py' '__openerp__.py'
-            for addons_path in (self.repo_id.addons_paths or '').split(','):  # '' 'addons' 'odoo/addons'
+            for addons_path in (addons_paths or self.repo_id.addons_paths or '').split(','):  # '' 'addons' 'odoo/addons'
                 sep = os.path.join(addons_path, '*')
                 for manifest_path in glob.glob(self._source_path(sep, manifest_file_name)):
                     module = os.path.basename(os.path.dirname(manifest_path))
