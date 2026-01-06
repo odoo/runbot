@@ -116,7 +116,7 @@ def _docker_build(build_dir, image_tag, pull=False):
     """Build the docker image
     :param build_dir: the build directory that contains Dockerfile.
     :param image_tag: name used to tag the resulting docker image
-    :return: tuple(success, msg) where success is a boolean and msg is the error message or None
+    :return: dict
     """
 
     with DockerManager(image_tag) as dm:

@@ -2,8 +2,13 @@ import getpass
 import logging
 import os
 import re
+import time
+from pathlib import Path
+
 import docker
-from odoo import api, fields, models, exceptions
+import requests
+
+from odoo import api, exceptions, fields, models
 
 from ..container import docker_build
 from ..fields import JsonDictField
@@ -330,11 +335,47 @@ class Dockerfile(models.Model):
                 return {'error': str(e)}
         return metadata
 
+    def _get_cached_content(self, docker_build_path):
+        self.ensure_one()
+        cache_dir = Path(self.env['runbot.runbot']._path('docker', 'cache'))
+        cache_dir.mkdir(exist_ok=True)
+        cache_re = re.compile(r'^#\s?CACHE\s(?P<duration>\d+)$')
+        add_re = re.compile(r'^ADD\s(?P<url>http.+)\s(?P<destination>.+)$')
+        lines = self.dockerfile.split('\n')
+        for i, line in enumerate(lines):
+            if cache_match := cache_re.match(line):
+                if add_match := add_re.match(lines[i + 1]):
+                    cache_duration = int(cache_match.group('duration'))
+                    url = add_match.group('url')
+                    filename = re.sub(r'[^a-zA-Z0-9]', '_', url)[:255]
+                    destination = add_match.group('destination')
+                    # Use the destination name as hardlink name to avoid rebuild if file content is the same but not the url
+                    hardlink_name = re.sub(r'[^a-zA-Z0-9]', '_', destination)
+                    lines[i + 1] = f'COPY {hardlink_name} {destination}'
+                    cache_file_path = cache_dir / filename
+                    if not cache_file_path.exists() or time.time() - cache_file_path.lstat().st_mtime > cache_duration:
+                        try:
+                            with requests.get(url, stream=True) as response:
+                                response.raise_for_status()
+                                with cache_file_path.open('wb') as cache_file:
+                                    for chunk in response.iter_content(chunk_size=8192):
+                                        cache_file.write(chunk)
+                        except (requests.exceptions.HTTPError, requests.exceptions.RequestException):
+                            if cache_file_path.exists():
+                                cache_file_path.touch()  # to avoid spamming in case of failures
+                                self.env['runbot.runbot']._warning(f'Dockerfile {self.name} failed to fetch "{url}"')
+                            else:
+                                raise
+                    hardlink_path = Path(docker_build_path) / hardlink_name
+                    hardlink_path.unlink(missing_ok=True)
+                    hardlink_path.hardlink_to(cache_file_path)
+        return '\n'.join(lines)
+
     def _build(self, host=None):
         tag_dir = re.sub(r'[^\w]', '_', self.image_tag)
         docker_build_path = self.env['runbot.runbot']._path('docker', tag_dir)
         os.makedirs(docker_build_path, exist_ok=True)
-        content = self.dockerfile
+        content = self._get_cached_content(docker_build_path)
         with open(self.env['runbot.runbot']._path('docker', tag_dir, 'Dockerfile'), 'w') as Dockerfile:
             Dockerfile.write(content)
         result = docker_build(docker_build_path, self.image_future_tag, self.pull_on_build)

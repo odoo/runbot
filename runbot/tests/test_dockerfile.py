@@ -3,10 +3,12 @@ import getpass
 import logging
 import os
 import re
+import time
 from psycopg2.errors import UniqueViolation
+from requests.exceptions import HTTPError
 
 from odoo import Command, exceptions
-from unittest.mock import patch, mock_open
+from unittest.mock import patch, mock_open, MagicMock
 
 from odoo.tests.common import tagged, HttpCase, mute_logger
 from .common import RunbotCase
@@ -149,3 +151,154 @@ USER TestUser""", docker_render)
             'name': 'Documentation2',
             'parent_id': default_dockerfile.id,
         })
+
+
+@tagged('-at_install', 'post_install')
+class TestDockerfileCache(RunbotCase, HttpCase):
+    def test_dockerfile_get_cached_content(self):
+        dockerfile = self.env['runbot.dockerfile'].create({
+            'name': 'TestsAddCache',
+            'to_build': True,
+            'layer_ids': [
+                Command.create({
+                    'name': 'CacheAddTest',
+                    'layer_type': 'raw',
+                    'content': 'some useless content',
+                }),
+            ],
+        })
+
+        self.start_patcher('docker_username', 'odoo.addons.runbot.models.docker.USERNAME', new='TestUser')
+
+        expected_content = """# CacheAddTest
+some useless content
+
+USER TestUser
+"""
+
+        self.start_patcher('hardlink_to', 'odoo.addons.runbot.models.docker.Path.hardlink_to')
+        self.start_patcher('path_unlink', 'odoo.addons.runbot.models.docker.Path.unlink')
+        content = dockerfile._get_cached_content('/tmp/fake_build_path')
+        self.assertEqual(content, expected_content, 'Dockerfile without "ADD" should be left unchanged')
+
+        raw_layer = """FROM ubuntu:noble
+ADD https://nowhere.example.org/nothing.txt /data/nothing.txt
+"""
+
+        expected_content = """# CacheAddTest
+FROM ubuntu:noble
+ADD https://nowhere.example.org/nothing.txt /data/nothing.txt
+
+
+USER TestUser
+"""
+        dockerfile.layer_ids[0].content = raw_layer
+        content = dockerfile._get_cached_content('/tmp/fake_build_path')
+        self.assertEqual(content, expected_content, 'Dockerfile without "#CACHE" directive should be left unchanged')
+
+        # Here we start the useful cache tests
+        raw_layer = """FROM ubuntu:noble
+# CACHE 60
+ADD https://nowhere.example.org/nothing.txt /data/nothing.txt
+"""
+
+        expected_content = """# CacheAddTest
+FROM ubuntu:noble
+# CACHE 60
+COPY _data_nothing_txt /data/nothing.txt
+
+
+USER TestUser
+"""
+        mock_response = MagicMock()
+        mock_response.iter_content.return_value = [b'small file content']
+        self.start_patcher('docker_requests_get', 'odoo.addons.runbot.models.docker.requests.get', return_value=mock_response)
+
+        # 1 - The cache file does not exists yet
+        self.start_patcher('docker_path_exists', 'odoo.addons.runbot.models.docker.Path.exists', return_value=False)
+        dockerfile.layer_ids[0].content = raw_layer
+        with patch('odoo.addons.runbot.models.docker.Path.open', mock_open()) as cache_file_mock:
+            content = dockerfile._get_cached_content('/tmp/fake_build_path')
+            cache_file_mock.assert_called_once_with('wb')
+        self.assertEqual(content, expected_content, 'Dockerfile with "#CACHE" should change the ADD directive to COPY')
+
+        # 2 - The cache file exists but the cache duration is expired
+        self.patchers['docker_path_exists'].return_value = True
+        self.start_patcher('docker_path_lstat', 'odoo.addons.runbot.models.docker.Path.lstat')
+        self.patchers['docker_path_lstat'].return_value.st_mtime = time.time() - 100
+        with patch('odoo.addons.runbot.models.docker.Path.open', mock_open()) as cache_file_mock:
+            content = dockerfile._get_cached_content('/tmp/fake_build_path')
+            cache_file_mock.assert_called_once_with('wb')
+        self.assertEqual(content, expected_content, 'Dockerfile with "#CACHE" should change the ADD directive to COPY')
+
+        # 3 - The cache file exists but the cache duration is not expired
+        self.start_patcher('docker_path_touch', 'odoo.addons.runbot.models.docker.Path.touch', return_value=True)
+        self.patchers['docker_path_lstat'].return_value.st_mtime = time.time() - 2
+        with patch('odoo.addons.runbot.models.docker.Path.open', mock_open()) as cache_file_mock:
+            content = dockerfile._get_cached_content('/tmp/fake_build_path')
+            cache_file_mock.assert_not_called()
+        self.assertEqual(content, expected_content, 'Dockerfile with "#CACHE" should change the ADD directive to COPY')
+        self.patchers['docker_path_touch'].assert_not_called()
+
+        # 4 - The cache file does not exists yet but the there is an error while downloading
+        self.patchers['docker_path_exists'].return_value = False
+        self.patchers['docker_requests_get'].side_effect = HTTPError
+
+        dockerfile.layer_ids[0].content = raw_layer
+        with patch('odoo.addons.runbot.models.docker.Path.open', mock_open()) as cache_file_mock:
+            with self.assertRaises(HTTPError, msg='HTTPError Exception should be reraised during cache download'):
+                content = dockerfile._get_cached_content('/tmp/fake_build_path')
+
+    def test_dockerfile_build_with_cached_content(self):
+        dockerfile = self.env['runbot.dockerfile'].create({
+            'name': 'TestsAddCache',
+            'to_build': True,
+            'layer_ids': [
+                Command.create({
+                    'name': 'CacheAddTest',
+                    'layer_type': 'raw',
+                    'content': 'some useless content',
+                }),
+            ],
+        })
+
+        dockerfile.layer_ids[0].content = """# Cache Test
+FROM ubuntu:noble
+# CACHE 60
+ADD https://nowhere.example.org/nothing.txt /data/nothing.txt
+"""
+
+        expected_content = """# Cache Test
+FROM ubuntu:noble
+# CACHE 60
+COPY _data_nothing_txt /data/nothing.txt
+
+
+USER TestUser
+"""
+
+        self.start_patcher('docker_username', 'odoo.addons.runbot.models.docker.USERNAME', new='TestUser')
+        self.start_patcher('docker_path_exists', 'odoo.addons.runbot.models.docker.Path.exists', return_value=False)
+        self.start_patcher('docker_path_hardlink_to', 'odoo.addons.runbot.models.docker.Path.hardlink_to')
+        self.start_patcher('docker_get_docker_metadata', 'odoo.addons.runbot.models.docker.Dockerfile._get_docker_metadata')
+
+        mock_response = MagicMock()
+        mock_response.iter_content.return_value = [b'small file content']
+        self.start_patcher('docker_requests_get', 'odoo.addons.runbot.models.docker.requests.get', return_value=mock_response)
+
+        self.patchers['docker_build'].return_value = {
+            'image_id': 'xxx',
+            'success': True,
+            'duration': 69,
+            'image': 'd0d0caca',
+            'msg': '',
+        }
+
+        with patch('odoo.addons.runbot.models.docker.Path.open', mock_open()) as cache_file_mock:
+            with patch('builtins.open', mock_open()) as dockerfile_file:
+                dockerfile._build()
+        cache_file_mock.assert_called_once_with('wb')
+        dockerfile_file_handle = dockerfile_file()
+        dockerfile_file_handle.write.assert_called_once_with(expected_content)
+        self.patchers['docker_path_hardlink_to'].assert_called()
+        self.patchers['docker_get_docker_metadata'].assert_called()
