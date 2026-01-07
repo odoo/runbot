@@ -279,7 +279,17 @@
                 <a t-if="bu.static_run" t-att-href="bu.static_run" class="fa fa-sign-in btn btn-info"/>
                 <t t-if="bu" t-call="runbot.build_menu"/>
                 <a t-if="not bu" groups="base.group_user" class="btn btn-default" title="Create build" t-attf-href="/runbot/batch/slot/{{slot.id}}/build">
-                    <i class="fa fa-play fa-fw"/>
+                    <t t-set="required_triggers" t-value="slot.trigger_id.starts_after_ids"/>
+                    <t t-if="required_triggers">
+                        <t t-set="success_trigger" t-value="slot.batch_id.slot_ids.filtered(lambda s: s.build_id.global_state in ('running', 'done') and s.build_id.global_result == 'ok').trigger_id"/>
+                        <t t-set="required_triggers" t-value="required_triggers - success_trigger"/>
+                    </t>
+                    <t t-if="required_triggers">
+                        <i class="fa fa-hourglass fa-fw" t-attf-title="Waiting for trigger(s) {{required_triggers.mapped('name').join(', ')}} (click to start anyway)"/>
+                    </t>
+                    <t t-else="">
+                        <i class="fa fa-play fa-fw"/>
+                    </t>
                 </a>
             </div>
         </template>
