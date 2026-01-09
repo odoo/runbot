@@ -142,9 +142,11 @@ class UpgradeMatrix(models.Model):
 
         # get all versions
         versions = self.env['runbot.bundle'].search([('project_id', '=', self.project_id.id), ('is_base', '=', True), ('sticky', '=', True)]).mapped('version_id').sorted('number')
+        valid_transitions = []
         for target_version in versions:
             compatible_versions = target_version.intermediate_version_ids | target_version.previous_major_version_id
             for source_version in compatible_versions:
+                valid_transitions.append((source_version, target_version))
                 if (source_version.id, target_version.id) not in entries_per_versions:
                     if target_version == source_version:
                         continue
@@ -153,6 +155,12 @@ class UpgradeMatrix(models.Model):
                         'from_version_id': source_version.id,
                         'to_version_id': target_version.id,
                     })
+
+        for existing_entry in existing_entries:
+            if (existing_entry.from_version_id, existing_entry.to_version_id) not in valid_transitions:
+                self.message_post(body=f'Removed upgrade matrix entry from {existing_entry.from_version_id.number} to {existing_entry.to_version_id.number} as no longer valid transition')
+                existing_entry.unlink()
+                existing_entries -= existing_entry
 
         if self.auto_update:
             existing_entries._update_enabled()

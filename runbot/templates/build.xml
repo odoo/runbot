@@ -100,29 +100,27 @@
                 </a>
                 &amp;nbsp;
                 <a t-att-href="'https://%s/commit/%s' % (build_commit.branch_id.remote_id.base_url, build_commit.commit_id.name)" title="View Commit on Github"><i class="fa fa-github"/></a>
-                <t t-if="build_commit.match_type in ('default', 'pr_target', 'prefix') ">
-                  from base branch
-                  <br/>
-                </t>
-                <div t-else="" class="ms-3">
+                <div class="ms-3">
                   <b>Subject:</b>
                   <t t-out="build_commit.commit_id.subject"/>
                   <br/>
                   <b>Author:</b>
                   <t t-out="build_commit.commit_id.author"/>
                   <br/>
-                  <b>Committer:</b>
-                  <t t-out="build_commit.commit_id.committer"/>
-                  <br/>
+                  <t t-if="build_commit.commit_id.author != build_commit.commit_id.committer">
+                    <b>Committer:</b>
+                    <t t-out="build_commit.commit_id.committer"/>
+                    <br/>
+                  </t>
                 </div>
               </t>
-              <b>Version:</b>
-              <t t-out="build.params_id.version_id.name"/>
-              <br/>
-              <b>Config:</b>
-              <t t-out="build.params_id.config_id.name"/>
-              <br/>
               <t t-if='more'>
+                <b>Version:</b>
+                <t t-out="build.params_id.version_id.name"/>
+                <br/>
+                <b>Config:</b>
+                <t t-out="build.params_id.config_id.name"/>
+                <br/>
                 <b>Trigger:</b>
                 <t t-out="build.params_id.trigger_id.name"/>
                 <br/>
@@ -140,12 +138,16 @@
                         <span style="white-space: pre-wrap;"><t t-out="json.dumps(build.params_id.config_data.dict, indent=4).encode('utf8').decode()"/></span>
                     </details>
                 </t>
-                <b>Modules:</b>
-                <t t-out="build.params_id.modules"/>
-                <br/>
-                <b>Extra params:</b>
-                <t t-out="build.params_id.extra_params"/>
-                <br/>
+                <t t-if="build.params_id.modules">
+                  <b>Modules:</b>
+                  <t t-out="build.params_id.modules"/>
+                  <br/>
+                </t>
+                <t t-if="build.params_id.extra_params">
+                    <b>Extra params:</b>
+                    <t t-out="build.params_id.extra_params"/>
+                    <br/>
+                </t>
                 <t t-if="build.params_id.builds_reference_ids">
                   <b>Reference builds:</b>
                   <div t-foreach="build.params_id.builds_reference_ids" t-as="reference">

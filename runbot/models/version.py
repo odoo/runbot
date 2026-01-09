@@ -57,9 +57,10 @@ class Version(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        model = self.browse()
-        model.env.registry.clear_cache()
-        return super().create(vals_list)
+        res = super().create(vals_list)
+        self.invalidate_model()
+        self.env.registry.clear_cache()
+        return res
 
     def _get(self, name):
         return self.browse(self._get_id(name))

@@ -32,10 +32,6 @@ class Bundle(models.Model):
     defined_base_id = fields.Many2one('runbot.bundle', 'Forced base bundle', domain="[('project_id', '=', project_id), ('is_base', '=', True)]")
     base_id = fields.Many2one('runbot.bundle', 'Base bundle', compute='_compute_base_id', store=True)
 
-    # TODO remove upgrade cleanup
-    to_upgrade = fields.Boolean('To upgrade To', compute='_compute_to_upgrade', store=True, index=False)
-    to_upgrade_from = fields.Boolean('To upgrade From', compute='_compute_to_upgrade_from', store=True, index=False)
-
     has_pr = fields.Boolean('Has PR', compute='_compute_has_pr', store=True)
 
     version_id = fields.Many2one('runbot.version', 'Version', compute='_compute_version_id', store=True, recursive=True)
@@ -92,16 +88,6 @@ class Bundle(models.Model):
     def _compute_sticky(self):
         for bundle in self:
             bundle.sticky = bundle.is_base
-
-    @api.depends('is_base')
-    def _compute_to_upgrade(self):
-        for bundle in self:
-            bundle.to_upgrade = bundle.is_base
-
-    @api.depends('is_base')
-    def _compute_to_upgrade_from(self):
-        for bundle in self:
-            bundle.to_upgrade_from = bundle.is_base
 
     @api.depends('name', 'is_base', 'defined_base_id', 'base_id.is_base', 'project_id')
     def _compute_base_id(self):
@@ -242,7 +228,7 @@ class Bundle(models.Model):
             if records.is_base:
                 model = self.browse()
                 model.env.registry.clear_cache()
-                for matrix in self.env['runbot.upgrade.matrix'].search([('project_id', '=', record.project_id.id)], limit=1):
+                for matrix in self.env['runbot.upgrade.matrix'].search([('project_id', '=', record.project_id.id)]):
                     matrix._update_matrix_entries()
             elif record.project_id.tmp_prefix and record.name.startswith(record.project_id.tmp_prefix):
                 record['no_build'] = True

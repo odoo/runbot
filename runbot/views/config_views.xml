@@ -98,7 +98,6 @@
                         <list editable="bottom">
                             <field name="config_id"/>
                             <field name="db_pattern"/>
-                            <field name="min_target_version_id"/>
                         </list>
                       </field>
                       <field name="allow_similar_build_quick_result"/>
@@ -107,26 +106,12 @@
                     <group invisible="job_type not in ('python', 'configure_upgrade', 'dynamic')">
                       <group class="col" string="Upgrade matrix settings"  invisible="not upgrade_matrix_id">
                         <field name="upgrade_current"/>
+                        <field name="skip_current"/>
                         <field name="upgrade_from_bellow" invisible="not upgrade_current"/>
                         <field name="upgrade_to_above" invisible="not upgrade_current"/>
                         <field name="upgrade_from_base" invisible="not upgrade_current"/>
                       </group>
-                      <group class="col" string="Target version settings" invisible="upgrade_matrix_id">
-                        <field string="Current" name="upgrade_to_current"/>
-                        <field string="Master" name="upgrade_to_master"/>
-                        <field string="Major" name="upgrade_to_major_versions"/>
-                        <field string="All saas" name="upgrade_to_all_versions"/>
-                        <field string="Explicit list" name="upgrade_to_version_ids" widget="many2many_tags"/>
-                      </group>
-                      <group class="col" string="Source version settings" invisible="upgrade_matrix_id">
-                        <field string="Major" name="upgrade_from_previous_major_version"/>
-                        <field string="Last saas" name="upgrade_from_last_intermediate_version"/>
-                        <field string="All saas" name="upgrade_from_all_intermediate_version"/>
-                        <field string="Explicit list" name="upgrade_from_version_ids" widget="many2many_tags"/>
-                      </group>
                     </group>
-
-
                     <group string="Restore settings" invisible="job_type != 'restore'">
                         <field name="restore_download_db_suffix"/>
                         <field name="restore_rename_db_suffix"/>

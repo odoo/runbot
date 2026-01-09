@@ -102,7 +102,7 @@ class Branch(models.Model):
             else:
                 reference_name = branch.name
             forced_version = branch.remote_id.repo_id.single_version  # we don't add a depend on repo.single_version to avoid mass recompute of existing branches
-            if forced_version and not reference_name.startswith(f'{forced_version.name}-'):
+            if forced_version and not (reference_name.startswith(f'{forced_version.name}-') or reference_name == forced_version.name):
                 reference_name = f'{forced_version.name}---{reference_name}'
             branch.reference_name = reference_name
 
