@@ -103,13 +103,24 @@ class BuildParameters(models.Model):
         "avoid duplicate params",
     )
 
-    def _upgrade_builds_references(self):
+    def _upgrade_builds_references(self, refs_batches=None):
         self.ensure_one()
         trigger = self.trigger_id
         batch = self.create_batch_id
-        trigger_config = next((trigger_custom.config_id for trigger_custom in batch.bundle_id.trigger_custom_ids if trigger_custom.trigger_id == trigger), trigger.config_id)
-        step = trigger._upgrade_step_from_config(trigger_config)
-        return step._reference_builds(batch, trigger)
+        upgrade_dumps_trigger_id = trigger.upgrade_dumps_trigger_id
+        if refs_batches is None:
+            refs_batches = batch.reference_batch_ids or batch.base_reference_batch_id.reference_batch_ids
+        refs_builds = refs_batches.mapped('slot_ids').filtered(
+            lambda slot: slot.trigger_id == upgrade_dumps_trigger_id
+            ).mapped('build_id')
+        return refs_builds
+
+    def get_current_batch_template(self):
+        current_batch = self.create_batch_id
+        ref_build = self._upgrade_builds_references(current_batch)
+        if not ref_build:
+            self._log('', f'No build template found in batch [{current_batch.id}](/runbot/batch/{current_batch.id})', level='WARNING', log_type='markdown')
+        return ref_build
 
     # @api.depends('version_id', 'project_id', 'extra_params', 'config_id', 'config_data', 'modules', 'commit_link_ids', 'builds_reference_ids')
     def _compute_fingerprint(self):
