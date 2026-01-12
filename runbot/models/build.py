@@ -106,21 +106,17 @@ class BuildParameters(models.Model):
     def _upgrade_builds_references(self, refs_batches=None):
         self.ensure_one()
         trigger = self.trigger_id
+        template_trigger_id = trigger.upgrade_dumps_trigger_id
         batch = self.create_batch_id
-        upgrade_dumps_trigger_id = trigger.upgrade_dumps_trigger_id
         if refs_batches is None:
             refs_batches = batch.reference_batch_ids or batch.base_reference_batch_id.reference_batch_ids
-        refs_builds = refs_batches.mapped('slot_ids').filtered(
-            lambda slot: slot.trigger_id == upgrade_dumps_trigger_id
+        upgrade_builds = refs_batches.mapped('slot_ids').filtered(
+            lambda slot: slot.trigger_id == trigger
             ).mapped('build_id')
-        return refs_builds
-
-    def get_current_batch_template(self):
-        current_batch = self.create_batch_id
-        ref_build = self._upgrade_builds_references(current_batch)
-        if not ref_build:
-            self._log('', f'No build template found in batch [{current_batch.id}](/runbot/batch/{current_batch.id})', level='WARNING', log_type='markdown')
-        return ref_build
+        template_builds = refs_batches.mapped('slot_ids').filtered(
+            lambda slot: slot.trigger_id == template_trigger_id
+            ).mapped('build_id')
+        return upgrade_builds, template_builds
 
     # @api.depends('version_id', 'project_id', 'extra_params', 'config_id', 'config_data', 'modules', 'commit_link_ids', 'builds_reference_ids')
     def _compute_fingerprint(self):
@@ -1276,6 +1272,13 @@ class BuildResult(models.Model):
             for upgrade_path in commit.repo_id.upgrade_paths.split(','):
                 if os.path.isdir(commit._source_path(upgrade_path)):
                     yield os.sep.join([repo_folder, upgrade_path]).strip(os.sep)
+
+    def get_current_batch_template(self):
+        current_batch = self.params_id.create_batch_id
+        _upgrade_builds, template_builds = self.params_id._upgrade_builds_references(current_batch)
+        if not template_builds:
+            self._log('', f'No build template found in batch [{current_batch.id}](/runbot/batch/{current_batch.id})', level='WARNING', log_type='markdown')
+        return template_builds
 
     def _get_server_info(self, commit=None):
         commit = commit or self._get_server_commit()

@@ -437,19 +437,27 @@ class Batch(models.Model):
         trigger_customs = {}
         for trigger_custom in self.bundle_id.all_trigger_custom_ids:
             trigger_customs[trigger_custom.trigger_id] = trigger_custom
+
+        should_start_triggers_ids = set()
+        is_dev = not bundle.is_staging and not bundle.is_base
+        for trigger in self.slot_ids.trigger_id:
+            enable_on_bundle = (trigger.on_staging and bundle.is_staging) or (trigger.on_base and bundle.is_base) or (trigger.on_dev and is_dev)
+            if ((trigger.repo_ids & bundle_repos) or bundle.build_all or bundle.sticky) and enable_on_bundle:
+                should_start_triggers_ids.add(trigger.id)
+
         for slot in self.slot_ids:
             if slot.build_id:
                 continue
             trigger = slot.trigger_id
             if trigger.starts_after_ids - success_trigger:  # some required triggers are missing
                 continue
-
             trigger_custom = trigger_customs.get(trigger, self.env['runbot.bundle.trigger.custom'])
             force_trigger = trigger_custom and trigger_custom.start_mode == 'force'
             skip_trigger = (trigger_custom and trigger_custom.start_mode == 'disabled') or trigger.manual
-            is_dev = not bundle.is_staging and not bundle.is_base
-            enable_on_bundle = (trigger.on_staging and bundle.is_staging) or (trigger.on_base and bundle.is_base) or (trigger.on_dev and is_dev)
-            should_start = ((trigger.repo_ids & bundle_repos) or bundle.build_all or bundle.sticky) and enable_on_bundle
+            should_start = slot.trigger_id.id in should_start_triggers_ids
+            if not should_start and trigger.starts_before_ids:
+                if any(t.id in should_start_triggers_ids for t in trigger.starts_before_ids):
+                    should_start = True
             if force_trigger or (should_start and not skip_trigger):
                 self._create_build(slot.params_id, slot)
 

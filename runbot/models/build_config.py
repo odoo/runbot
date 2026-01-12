@@ -924,18 +924,26 @@ class ConfigStep(models.Model):
             # 1. to test templates in a separated build
             # 2. to test upgrade from a build comming from another batch created at the same time
             # Note: we cannot use the step directly (self) since this can be called from a complement step
-            builds_references = param._upgrade_builds_references()
+            upgrade_builds, template_builds = param._upgrade_builds_references()
+
         else:  # TODO remove upgrade cleanup
-            builds_references = param.builds_reference_ids
-        builds_references_by_version_id = {b.params_id.version_id.id: b for b in builds_references}
+            upgrade_builds = template_builds = param.builds_reference_ids
+        upgrade_builds_by_version_id = {b.params_id.version_id.id: b for b in upgrade_builds}
+        template_builds_by_version_id = {b.params_id.version_id.id: b for b in template_builds}
 
         target_builds = build.browse()
         only_current = self.upgrade_current
         upgrade_from_bellow = self.upgrade_from_bellow ^ complement
         upgrade_to_above = self.upgrade_to_above ^ complement
 
-        def get_reference_builds_for_versions(versions):
+        def get_reference_builds_for_versions(versions, target=False):
             refs = self.env['runbot.build'].browse()
+            if target:
+                builds_references = upgrade_builds
+                builds_references_by_version_id = upgrade_builds_by_version_id
+            else:
+                builds_references = template_builds
+                builds_references_by_version_id = template_builds_by_version_id
             for version in versions:
                 ref_build = builds_references_by_version_id.get(version.id)
                 if ref_build:
@@ -955,7 +963,8 @@ class ConfigStep(models.Model):
                             target_builds |= build
                     if upgrade_to_above:
                         target_versions = self.upgrade_matrix_id._get_target_versions_from(param.version_id)
-                        target_build = get_reference_builds_for_versions(target_versions)
+                        # for target version, we don't want a template build, but an upgrade one
+                        target_builds |= get_reference_builds_for_versions(target_versions, target=True)
                 else:
                     for version in valid_target_versions:
                         if self.skip_current and version == param.version_id:
@@ -963,6 +972,17 @@ class ConfigStep(models.Model):
                         if version == param.version_id:
                             target_builds |= build
                         else:
+                            # todo cleanup: we should use target=True
+                            # it is not done to keep compatibility with previous behaviour but we should have a more explicit way to define the targets commits.
+                            # we have two cases about the upgrade commits when the target is not the current build:
+                            # 1. in master stable (skip_current), we want to use the upgrade commits of the batch, so the one from builds for all targets
+                            # 2. in stable, we want to use the upgrade scripts of the target, maily for master target but it was the case for all before
+                            # the current logic use by default the one from target and fill the missing one from the build, so for the 1 case the target must be a template build
+                            # for the 2 case, the target lust be an upgrade build (complement) so target=True. 
+                            # in the future, to simplify, all target builds should be upgrade builds and source should be template builds. 
+                            # target should not be added to the build, but we should replace the commit of the build with the one of the target,
+                            # using the upgrade one from target when "only current" or maybe "not skip_current" or maybe depending on target version and build version.
+                            # this will be should be done in the next iteration once the matrix is applied to all builds to simplify
                             target_builds |= get_reference_builds_for_versions([version])
 
             # TODO remove upgrade cleanup
@@ -972,10 +992,10 @@ class ConfigStep(models.Model):
                 target_builds = build.browse()
                 if self.upgrade_to_version_ids:
                     for version in self.upgrade_to_version_ids:
-                        target_builds |= builds_references_by_version_id.get(version.id) or build.browse()
+                        target_builds |= upgrade_builds_by_version_id.get(version.id) or build.browse()
                 else:
-                    master_build = builds_references.filtered(lambda b: b.params_id.version_id.name == 'master')
-                    base_builds = (builds_references - master_build)
+                    master_build = upgrade_builds.filtered(lambda b: b.params_id.version_id.name == 'master')
+                    base_builds = (upgrade_builds - master_build)
                     if self.upgrade_to_master:
                         target_builds = master_build
                     if self.upgrade_to_major_versions:
@@ -999,7 +1019,7 @@ class ConfigStep(models.Model):
         if target_builds:
             build._log('', 'Testing upgrade targeting %s' % ', '.join(target_builds.mapped('params_id.version_id.name')))
         if not target_builds:
-            build._log('_run_configure_upgrade', 'No reference build found with correct target in availables references, skipping. %s' % builds_references.mapped('params_id.version_id.name'))
+            build._log('_run_configure_upgrade', 'No reference build found with correct target in availables references, skipping. %s' % upgrade_builds.mapped('params_id.version_id.name'))
             end = True
         elif len(target_builds) > 1 and not self.upgrade_flat:
             for target_build in target_builds:
@@ -1026,7 +1046,7 @@ class ConfigStep(models.Model):
                                 if complement:
                                     source_builds |= build
                                 else:
-                                    source_builds |= build.params_id.get_current_batch_template()
+                                    source_builds |= build.get_current_batch_template()
                             if self.upgrade_from_base:
                                 source_builds |= get_reference_builds_for_versions(param.version_id)
                         if upgrade_from_bellow and target_build.params_id.version_id == param.version_id:
@@ -1036,14 +1056,14 @@ class ConfigStep(models.Model):
                             if self.skip_current and version == param.version_id:
                                 continue
                             if version == param.version_id:
-                                source_builds |= build.params_id.get_current_batch_template()
+                                source_builds |= build.get_current_batch_template()
                             else:
                                 source_builds |= get_reference_builds_for_versions([version])
                 # TODO remove upgrade cleanup
                 elif self.upgrade_from_current:
                     source_builds = build
                 else:
-                    source_builds = self._get_upgrade_source_builds(target_version, builds_references_by_version_id)
+                    source_builds = self._get_upgrade_source_builds(target_version, template_builds_by_version_id)
 
                 # TODO remove upgrade cleanup
                 if not self.upgrade_matrix_id:
