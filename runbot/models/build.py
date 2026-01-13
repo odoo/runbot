@@ -145,11 +145,7 @@ class BuildParameters(models.Model):
                 cleaned_vals['upgrade_from_build_id'] = param.upgrade_from_build_id.id
             if param.trigger_id.batch_dependent:
                 cleaned_vals['create_batch_id'] = param.create_batch_id.id
-            if param.trigger_id.upgrade_step_id.upgrade_matrix_id:
-                # when using new matrix, the build references are not set on the build (removing uniquification)
-                # but a build could come from the current batch (testing template)
-                # so the build bust be considered as if build was batch_dependent
-                # Thanks to allow_similar_build_quick_result (when enabled) it should'nt cause any additional load.
+            if param.trigger_id.upgrade_dumps_trigger_id:  # is an upgrade step, so depends on the batch to get upgrade builds
                 cleaned_vals['create_batch_id'] = param.create_batch_id.id
             if param.used_custom_trigger:
                 cleaned_vals['used_custom_trigger'] = True

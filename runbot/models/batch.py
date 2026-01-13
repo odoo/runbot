@@ -265,16 +265,15 @@ class Batch(models.Model):
 
         # 2. FIND missing commit in a compatible base bundle
         if bundle.is_base or auto_rebase:
+            upgrade_matrix_entries = self.env['runbot.matrix'].search([('project_id', '=', bundle.project_id.id)]).entry_ids.filtered('enabled')
+            versions = upgrade_matrix_entries.mapped('from_version_id') | upgrade_matrix_entries.mapped('to_version_id')
             self.reference_batch_ids = self.env['runbot.batch'].browse(result[1] for result in self.env['runbot.batch']._read_group(
                 domain=[
-                    ('state', '=', 'done'),
+                    ('state', '=', 'done'),  # TODO upgrade next reference any ready batch once we have a mecanism to wait for trigegr cross project
                     ('bundle_id.project_id', '=', bundle.project_id.id),
-                    '|',
-                    ('bundle_id.to_upgrade', '=', True),
-                    ('bundle_id.to_upgrade_from', '=', True),
-                    ('bundle_id.is_base', '=', True),
-                    ('category_id', '=', self.category_id.id),  # not 100% correct since it should match upgrade_dumps_trigger_id,
-                                                                # but all trigger should have upgrade_dumps_trigger_id in the same category
+                    ('bundle_id.is_base', '=', True),  # TODO upgrade next allow to reference a batch from an bundle group instead
+                    ('category_id', '=', self.category_id.id),
+                    ('bundle_id.version_id', 'in', versions.ids),
                 ],
                 groupby=['bundle_id'],
                 aggregates=['id:max'],
@@ -400,12 +399,6 @@ class Batch(models.Model):
                 'create_batch_id': self.id,
                 'used_custom_trigger': bool(trigger_custom),
             }
-            if not (trigger.upgrade_step_id.upgrade_matrix_id or trigger.upgrade_dumps_trigger_id.upgrade_step_id.upgrade_matrix_id):
-                # when set the build dynamicaly gets upgrade reference builds,
-                # and needs to be batch dependant since the potentially tested build
-                # could come from the current batch
-                # TODO remove upgrade cleanup
-                params_value['builds_reference_ids'] = trigger._reference_builds(self)
 
             params = self.env['runbot.build.params'].create(params_value)
 

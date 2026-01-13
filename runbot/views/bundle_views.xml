@@ -56,8 +56,6 @@
                             <field name="project_id"/>
                             <field name="team_id"/>
                             <field name="sticky" readonly="0"/>
-                            <field name="to_upgrade" readonly="0"/>
-                            <field name="to_upgrade_from" readonly="0"/>
                             <field name="is_base" readonly="1"/>
                             <field name="is_staging" readonly="1"/>
                             <field name="base_id"/>
@@ -155,8 +153,6 @@
                 <field name="version_number"/>
                 <field name="is_base"/>
                 <field name="sticky"/>
-                <field name="to_upgrade"/>
-                <field name="to_upgrade_from"/>
                 <field name="no_build"/>
                 <field name="branch_ids"/>
                 <field name="version_id"/>

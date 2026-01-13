@@ -87,7 +87,6 @@ class Trigger(models.Model):
     restore_trigger_id = fields.Many2one('runbot.trigger', string='Restore Trigger ID for custom triggers', help="Mainly usefull to automatically define where to find a reference database when creating a custom trigger", tracking=True)
 
     upgrade_dumps_trigger_id = fields.Many2one('runbot.trigger', string='Template/complement trigger', tracking=True, domain="[('category_id', '=', category_id), ('project_id', '=', project_id)]")
-    upgrade_step_id = fields.Many2one('runbot.build.config.step', compute="_compute_upgrade_step_id", store=True)
     ci_url = fields.Char("CI url")
     ci_description = fields.Char("CI description")
     ci_send_all = fields.Boolean('Send ci on dependencies', default=False)
@@ -107,31 +106,6 @@ class Trigger(models.Model):
                                   domain=[('type', '=', 'qweb')],
                                   context={'default_type': 'qweb', 'default_arch_base': '<t></t>'},
     )
-
-    @api.depends('upgrade_dumps_trigger_id', 'config_id', 'config_id.step_order_ids.step_id.job_type')
-    def _compute_upgrade_step_id(self):
-        for trigger in self:
-            trigger.upgrade_step_id = False
-            if trigger.upgrade_dumps_trigger_id:
-                trigger.upgrade_step_id = self._upgrade_step_from_config(trigger.config_id)
-
-    def _upgrade_step_from_config(self, config):
-        upgrade_step = next((step_order.step_id for step_order in config.step_order_ids if step_order.step_id._is_upgrade_step()), False)
-        if not upgrade_step:
-            upgrade_step = next((step_order.step_id for step_order in config.step_order_ids if step_order.step_id.job_type == 'python'), False)
-        if not upgrade_step:
-            raise UserError('Upgrade trigger should have a config with step of type Configure Upgrade')
-        return upgrade_step
-
-    # TODO remove upgrade cleanup
-    def _reference_builds(self, batch):
-        self.ensure_one()
-        if self.upgrade_step_id:  # this is an upgrade trigger, add corresponding builds
-            custom_config = next((trigger_custom.config_id for trigger_custom in batch.bundle_id.trigger_custom_ids if trigger_custom.trigger_id == self), False)
-            step = self._upgrade_step_from_config(custom_config) if custom_config else self.upgrade_step_id
-            refs_builds = step._reference_builds(batch, self)
-            return [(4, b.id) for b in refs_builds]
-        return []
 
     def _get_version_domain(self):
         if self.version_domain:

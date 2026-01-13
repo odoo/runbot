@@ -92,11 +92,11 @@ class TestUpgradeFlow(RunbotCase):
             'name': 'no-demo-all',
             'job_type': 'install_odoo',
         })
-        self.config_step_upgrade_complement = self.env['runbot.build.config.step'].create({
-            'name': 'upgrade_complement',
-            'job_type': 'configure_upgrade_complement',
-            'upgrade_config_id': self.test_upgrade_config.id,
-        })
+        #self.config_step_upgrade_complement = self.env['runbot.build.config.step'].create({
+        #    'name': 'upgrade_complement',
+        #    'job_type': 'configure_upgrade_complement',
+        #    'upgrade_config_id': self.test_upgrade_config.id,
+        #})
 
         self.config_template = self.env['runbot.build.config'].create({
             'name': 'Template config',
@@ -125,7 +125,6 @@ class TestUpgradeFlow(RunbotCase):
             'upgrade_flat': True,
             'upgrade_config_id': self.test_upgrade_config.id,
             'upgrade_dbs': [
-                (0, 0, {'config_id': self.config_template.id, 'db_pattern': 'all', 'min_target_version_id': self.master_bundle.version_id.id}),
                 (0, 0, {'config_id': self.config_template.id, 'db_pattern': 'no-demo-all'}),
             ],
         })
@@ -296,11 +295,6 @@ class TestUpgradeFlow(RunbotCase):
         self.assertEqual(self.branch_odoo.bundle_id, self.branch_upgrade.bundle_id)
         self.assertTrue(self.branch_upgrade.bundle_id.is_base)
         self.assertTrue(self.branch_upgrade.bundle_id.version_id)
-        self.assertEqual(self.trigger_upgrade_to_current.upgrade_step_id, self.step_upgrade_to_current)
-
-        with self.assertRaises(UserError):
-            self.step_upgrade_to_current.job_type = 'install_odoo'
-            self.trigger_upgrade_to_current.flush_recordset(['upgrade_step_id'])
 
         master_batch = self.master_bundle._force()
         master_batch._process()
@@ -344,7 +338,6 @@ class TestUpgradeFlow(RunbotCase):
         nightly_batch._process()
         nightly_batches = self.env['runbot.batch'].browse([b.id for b in self.nightly_batches_per_version.values()])
 
-        self.assertEqual(self.trigger_upgrade_nightly.upgrade_step_id, self.step_upgrade_all)
         self.assertEqual(nightly_batch.reference_batch_ids, nightly_batches)
         upgrade_nightly = nightly_batch.slot_ids.filtered(lambda slot: slot.trigger_id == self.trigger_upgrade_nightly).build_id
 

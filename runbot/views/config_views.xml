@@ -98,7 +98,6 @@
                         <list editable="bottom">
                             <field name="config_id"/>
                             <field name="db_pattern"/>
-                            <field name="min_target_version_id"/>
                         </list>
                       </field>
                       <field name="allow_similar_build_quick_result"/>
