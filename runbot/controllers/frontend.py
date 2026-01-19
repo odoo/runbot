@@ -316,9 +316,11 @@ class Runbot(Controller):
     ], type='http', auth="public", website=True, sitemap=False)
     def build(self, build_id, search=None, from_batch=None, **post):
         build = request.env['runbot.build'].browse(build_id)
+        route = None
         if from_batch:
             from_batch = request.env['runbot.batch'].browse(int(from_batch))
-            if build.top_parent not in from_batch.with_context(active_test=False).slot_ids.build_id and build.create_batch_id != from_batch:
+            route = build._get_route_from_batch(from_batch)
+            if not route:
                 # the url may have been forged replacing the build id, redirect to hide the batch
                 return werkzeug.utils.redirect('/runbot/build/%s' % build_id)
 
@@ -328,7 +330,11 @@ class Runbot(Controller):
         build = Build.browse(build_id)
         if not build.exists():
             return request.not_found()
-        siblings = (build.parent_id.children_ids if build.parent_id else from_batch.slot_ids.build_id if from_batch else build).sorted('id')
+        parent = route and (route[-2] if len(route) > 1 else build.parent_id)
+        if parent:
+            siblings = (parent.children_ids | parent.linked_children_build_ids).sorted('id')
+        else:
+            siblings = (from_batch.slot_ids.build_id if from_batch else build).sorted('id')
         context = {
             'build': build,
             'from_batch': from_batch,
@@ -371,6 +377,17 @@ class Runbot(Controller):
         }
 
         return request.render('runbot.build_search', context)
+
+    @route(['/runbot/build/<int:build_id>/routes'], type='http', auth='public', website=True, sitemap=False)
+    def build_routes(self, build_id, limit=200, **post):
+        build = request.env['runbot.build'].browse(build_id)
+        if not build.exists():
+            return request.not_found()
+        return request.render('runbot.build_routes', {
+            'build': build,
+            'routes': build._get_routes(limit=int(limit)),
+            'title': 'Routes to build %s' % build.id,
+        })
 
     @route([
         '/runbot/branch/<model("runbot.branch"):branch>',

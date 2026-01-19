@@ -108,6 +108,7 @@
                         </list>
                       </field>
                       <field name="allow_similar_build_quick_result"/>
+                      <field name="allow_build_link"/>
                       <field name="upgrade_matrix_id"/>
                     </group>
                     <group invisible="job_type not in ('python', 'configure_upgrade', 'dynamic')">

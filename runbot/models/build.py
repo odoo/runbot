@@ -331,6 +331,7 @@ class BuildResult(models.Model):
     build_time = fields.Integer(compute='_compute_build_time', string='Build time')
     wait_time = fields.Integer(compute='_compute_wait_time', string='Wait time')
     load_time = fields.Integer(compute='_compute_load_time', string='Load time')
+    real_load_time = fields.Integer(compute='_compute_real_load_time', string='Real Load time')
     last_update = fields.Datetime(compute='_compute_last_update', string='Last update')
 
     gc_date = fields.Datetime('Local cleanup date', compute='_compute_gc_date')
@@ -350,10 +351,16 @@ class BuildResult(models.Model):
                                   string='Build type')
 
     parent_id = fields.Many2one('runbot.build', 'Parent Build', index=True)
+    parent_link_ids = fields.One2many('runbot.build.link', 'child_id', string='Used in links')
+    linked_parent_build_ids = fields.Many2many('runbot.build', compute='_compute_linked_parent_build_ids', string='All parent builds')
+
+    child_link_ids = fields.One2many('runbot.build.link', 'parent_id', string='Child links')
+    linked_children_build_ids = fields.Many2many('runbot.build', compute='_compute_linked_children_build_ids', string='All child builds')
+
     parent_path = fields.Char('Parent path', index=True)
     top_parent = fields.Many2one('runbot.build', compute='_compute_top_parent')
+    top_parents_ids = fields.Many2many('runbot.build', compute='_compute_top_parent_ids')
     ancestors = fields.Many2many('runbot.build', compute='_compute_ancestors')
-    # should we add a has children stored boolean?
     children_ids = fields.One2many('runbot.build', 'parent_id')
     all_children_ids = fields.One2many('runbot.build', compute='_compute_all_children_ids')
 
@@ -390,12 +397,24 @@ class BuildResult(models.Model):
         for record in self:
             record.host_id = get_host(record.host)
 
+    @api.depends('parent_link_ids')
+    def _compute_linked_parent_build_ids(self):
+        for build in self:
+            build.linked_parent_build_ids = build.parent_link_ids.parent_id
+
+    @api.depends('child_link_ids')
+    def _compute_linked_children_build_ids(self):
+        for build in self:
+            build.linked_children_build_ids = build.child_link_ids.child_id
+
     def _update_globals(self):
         for record in self:
             waiting_score = record._get_state_score('waiting')
-            children_ids = [child for child in record.children_ids if not child.orphan_result]
-            if record._get_state_score(record.local_state) > waiting_score and children_ids:  # if finish, check children
-                children_state = record._get_youngest_state([child.global_state for child in children_ids])
+            children_ids = [child.id for child in record.children_ids if not child.orphan_result]
+            children_ids += [link.child_id.id for link in record.child_link_ids if not link.orphan_result and not link.child_id.orphan_result]
+            children = self.browse(children_ids)
+            if record._get_state_score(record.local_state) > waiting_score and children:  # if finish, check children
+                children_state = record._get_youngest_state([child.global_state for child in children])
                 if record._get_state_score(children_state) > waiting_score:
                     record.global_state = record.local_state
                 else:
@@ -406,9 +425,11 @@ class BuildResult(models.Model):
             if record.local_result and record._get_result_score(record.local_result) >= record._get_result_score('ko'):
                 record.global_result = record.local_result
             else:
-                children_ids = [child for child in record.children_ids if not child.orphan_result]
-                if children_ids:
-                    children_result = record._get_worst_result([child.global_result for child in children_ids], max_res='ko')
+                children_ids = [child.id for child in record.children_ids if not child.orphan_result]
+                children_ids += [link.child_id.id for link in record.child_link_ids if not link.orphan_result and not link.child_id.orphan_result]
+                children = self.browse(children_ids)
+                if children:
+                    children_result = record._get_worst_result([child.global_result for child in children], max_res='ko')
                     if record.local_result:
                         record.global_result = record._get_worst_result([record.local_result, children_result])
                     else:
@@ -428,7 +449,7 @@ class BuildResult(models.Model):
         max_days_child = int(icp.get_param('runbot.db_gc_days_child', default=15))
         for build in self:
             ref_date = fields.Datetime.from_string(build.job_end or build.create_date or datetime.datetime.now())
-            max_days = max_days_main if not build.parent_id else max_days_child
+            max_days = max_days_main if not (build.parent_id or build.parent_link_ids) else max_days_child
             max_days += int(build.gc_delay if build.gc_delay else 0)
             build.gc_date = ref_date + datetime.timedelta(days=(max_days))
 
@@ -445,7 +466,37 @@ class BuildResult(models.Model):
         for build in self:
             build.ancestors = self.browse([int(b) for b in build.parent_path.split('/') if b])
 
+    def _compute_top_parent_ids(self):
+        for build in self:
+            build.top_parents_ids = build.browse([route[0].id for route in build._get_routes()])
+
+    def _get_routes(self, limit=200):
+        self.ensure_one()
+        routes = []
+
+        def walk(build, tail, rebuilt, seen):
+            if len(routes) >= limit or build.id in seen:
+                return
+            edges = [(build.orphan_result, build.parent_id)] if build.parent_id else []
+            edges += [(link.orphan_result, link.parent_id) for link in build.parent_link_ids]
+            if not edges:
+                routes.append((rebuilt, self.browse([build.id] + tail)))
+                return
+            for orphan, parent in edges:
+                walk(parent, [build.id] + tail, rebuilt + int(orphan), seen | {build.id})
+
+        walk(self, [], 0, set())
+        routes.sort(key=lambda route: (route[0], [-id_ for id_ in route[1].ids]))
+        return [builds for _rebuilt, builds in routes]
+
+    def _get_route_from_batch(self, batch):
+        for route in self._get_routes():
+            if batch in route.with_context(active_test=False).slot_ids.batch_id:
+                return route
+        return self.browse()
+
     def _compute_all_children_ids(self):
+        # does not take links into account (yet)
         for build in self:
             build.all_children_ids = self.search([('parent_path', '=like', build.parent_path + '%')])
 
@@ -555,7 +606,7 @@ class BuildResult(models.Model):
 
         return res
 
-    def _add_child(self, param_values, orphan=False, description=False, additionnal_commit_links=False, reference_parent=...):
+    def _add_child(self, param_values, orphan=False, description=False, additionnal_commit_links=False, reference_parent=..., link=False):
         build_values = {key: value for key, value in param_values.items() if key not in self.params_id._fields}
         param_values = {key: value for key, value in param_values.items() if key in self.params_id._fields}
 
@@ -588,17 +639,67 @@ class BuildResult(models.Model):
             }
             param_values['config_data'] = new_config_data
 
-        return self.create({
-            'params_id': self.params_id.copy(param_values).id,
-            'parent_id': self.id,
-            'build_type': self.build_type,
+        params = self.params_id.copy(param_values)
+
+        build_values = {
+            'params_id': params.id,
+            'build_type': self.build_type if self.build_type != 'priority' else 'normal',
             'priority_level': self.priority_level,
             'description': description,
             'orphan_result': orphan,
             'keep_host': self.keep_host,
             'host': self.host if self.keep_host else False,
             **build_values,
-        })
+        }
+
+        if link:
+            build = self._get_link_candidate(params, orphan)
+            link_type = 'matched'
+            if not build:
+                build = self.create(build_values)
+                link_type = 'created'
+
+            link = self.env['runbot.build.link'].create({
+                'parent_id': self.id,
+                'child_id': build.id,
+                'link_type': link_type,
+            })
+            return build.with_context(link_id=link.id)
+        else:
+            return self.create({
+                'parent_id': self.id,
+                **build_values,
+            })
+
+    def _get_link_candidate(self, params, orphan=False):
+        self.ensure_one()
+        candidates = params.build_ids.filtered(
+            lambda b: b != self  # a build linking itself would wait for itself forever
+            and not b.parent_id  # never mix the two mechanisms
+            and b.orphan_result == orphan
+            and not (b.parent_link_ids and all(link.orphan_result for link in b.parent_link_ids))  # unsure
+            and b.local_result not in ('skipped', 'killed')
+        )
+        if not orphan:
+            candidates = candidates.filtered(lambda b: not b.orphan_result)
+        if self.keep_host:
+            candidates = candidates.filtered(lambda b: b.host == self.host)
+
+        done_ok = candidates.filtered(lambda b: b.global_state == 'done' and b.global_result == 'ok')
+        if done_ok:
+            return done_ok.sorted('id')[-1]
+
+        unfinished_ok = candidates.filtered(lambda b: b.global_result == 'ok')
+        if unfinished_ok:
+            return unfinished_ok.sorted('id')[-1]
+
+        if self.create_batch_id.bundle_id.is_staging:
+            # a merge decision only reuses a result that is already green
+            return None
+
+        if candidates:
+            return candidates.sorted('id')[-1]
+        return None
 
     @api.depends('params_id.version_id.name')
     def _compute_dest(self):
@@ -655,12 +756,16 @@ class BuildResult(models.Model):
             if not build.build_end:
                 build.last_update = datetime.datetime.now()
             else:
-                build.last_update = max([child.last_update for child in build.children_ids] + [build.build_end])
+                build.last_update = max([child.last_update for child in (build.children_ids | build.linked_children_build_ids)] + [build.build_end])
 
     #@api.depends('build_time', 'children_ids.load_time')
     def _compute_load_time(self):
         for build in self:
-            build.load_time = sum([build.build_time] + [child.load_time for child in build.children_ids])
+            build.load_time = sum([build.build_time] + [child.load_time for child in (build.children_ids | build.child_link_ids.filtered(lambda link: link.link_type != 'rebuild').child_id)])
+
+    def _compute_real_load_time(self):
+        for build in self:
+            build.real_load_time = sum([build.build_time] + [child.real_load_time for child in (build.children_ids | build.child_link_ids.filtered(lambda link: link.link_type != 'matched').child_id)])
 
     @api.depends('job_start')
     def _compute_build_age(self):
@@ -682,13 +787,28 @@ class BuildResult(models.Model):
         if self.keep_host:
             values['host'] = self.host
             values['keep_host'] = True
+        if self.description:
+            values['description'] = self.description
         if self.parent_id:
-            values.update({
-                'parent_id': self.parent_id.id,
-                'description': self.description,
-            })
-        
+            values['parent_id'] = self.parent_id.id
+
         new_build = self.create(values)
+
+        if self.parent_link_ids:
+            active_parent_links = self.parent_link_ids.filtered(lambda link: not link.orphan_result)
+            # Note: if a rebuild is made on a child that was already rebuild, the new build won't be attached to any link or slot.
+            if active_parent_links:  # TODO check, should we forbid rebuild in some cases if we have multiple parents? Or just link to an active parent?
+                for link in active_parent_links:
+                    link.orphan_result = True
+                    self.env['runbot.build.link'].create({
+                        'parent_id': link.parent_id.id,
+                        'child_id': new_build.id,
+                        'link_type': 'rebuild',
+                    })
+            else:
+                msg = 'This build is not linked to any non orphan parent, cannot rebuild it'
+                raise ValidationError(msg)
+
         if self.parent_id:
             self.orphan_result = True
 
@@ -1797,3 +1917,36 @@ class BuildResult(models.Model):
             "name": "Build errors",
             "view_mode": "list,form"
         }
+
+
+class BuildLink(models.Model):
+    _name = 'runbot.build.link'
+    _description = 'Runbot Build Link'
+    _order = 'id desc'
+
+    parent_id = fields.Many2one('runbot.build', string='Parent Build', required=True, ondelete='cascade')
+    child_id = fields.Many2one('runbot.build', string='Child Build', required=True, ondelete='cascade')
+    params_id = fields.Many2one('runbot.build.params', string='Params', related='child_id.params_id', store=True)
+    orphan_result = fields.Boolean(string='Orphan Result', help='If set, the result of the child build will not be taken into account for the parent build result')
+    link_type = fields.Selection([('created', 'Build created'), ('matched', 'Existing build matched'), ('rebuild', 'Rebuild')], required=True, default="created")
+
+    _no_self_link = models.Constraint('check (parent_id != child_id)', "a build cannot link itself")
+    _unique_link = models.Constraint('unique (parent_id, child_id)', "duplicate build link")
+
+    @api.constrains('parent_id', 'child_id')
+    def _check_single_link_level(self):
+        for link in self:
+            if link.parent_id.top_parent.parent_link_ids:
+                raise ValidationError('The parent of a link cannot itself be linked')
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        links = super().create(vals_list)
+        links.mapped('parent_id')._update_globals()
+        return links
+
+    def write(self, values):
+        res = super().write(values)
+        if 'orphan_result' in values or 'child_id' in values:
+            self.parent_id._update_globals()
+        return res

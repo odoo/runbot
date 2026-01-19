@@ -56,11 +56,19 @@
                                 </td>
                             </tr>
                             <tr>
-                                <td>Load time</td>
+                                <td>Estimated total load time (with matched)</td>
                                 <td>
-                                    <t t-set="load_time" t-value="sum(build.load_time for build in batch.slot_ids.build_id)"/>
+                                    <t t-set="load_time" t-value="sum(build.load_time for build in batch.slot_ids.filtered(lambda s: s.link_type != 'rebuild').build_id)"/>
                                     <t t-out="precise_s2human(load_time)"/>
                                     <i>(<t t-out="load_time"/>s)</i>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Real load time</td>
+                                <td>
+                                    <t t-set="real_load_time" t-value="sum(build.real_load_time for build in batch.slot_ids.filtered(lambda s: s.link_type != 'matched').build_id)"/>
+                                    <t t-out="precise_s2human(real_load_time)"/>
+                                    <i>(<t t-out="real_load_time"/>s)</i>
                                 </td>
                             </tr>
                         </t>

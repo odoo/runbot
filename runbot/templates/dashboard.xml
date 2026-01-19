@@ -167,11 +167,6 @@
                               <i t-attf-class="fa fa-{{category.icon}}"/>
                             </span>
                           </td>
-                          <td t-foreach="build.children_ids" t-as="child">
-                            <span t-attf-class="badge text-bg-{{slot.build_id._get_color_class()}}">
-                              <t t-out="child.params_id.config_id.name[:4]"/>
-                            </span>
-                          </td>
                         </tr>
                       </t>
                     </table>

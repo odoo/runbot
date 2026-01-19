@@ -2,9 +2,15 @@
 	--gray:  #6c757d; /* used for batch limitation */
 	--btn-default-color: var(--bs-body-color);
 	--btn-default-bg: var(--bs-body-bg);
+	--btn-default-hover-bg: color-mix(in lab, var(--btn-default-bg), black 15%);
 	--btn-default-border: #ccc;
 	--active-project-color: #777;
 	--text-color-link: #507279;
+	/* FIXME: style all links, should be theme based */
+	--bs-link-color: #00A09D;
+	--bs-link-color-rgb: 0, 160, 157;
+	--bs-link-hover-color: #005452;
+	--bs-link-hover-color-rgb: 0, 84, 82;
 }
 
 /*
@@ -29,6 +35,7 @@
 
 :root[data-bs-theme=dark] {
 	--btn-default-border: #333;
+	--btn-default-hover-bg: color-mix(in lab, var(--btn-default-bg), white 15%);
 	--active-project-color: #CCC;
 	--text-color-link: #97d4e0;
 }
@@ -179,27 +186,40 @@ dialog.modal {
 	line-height: inherit; /* reset fa icon line height to body height*/
 }
 
-a {
-	color: #00A09D;
+a, .btn-link {
     text-decoration: none;
-}
-
-a:hover {
-    color: #005452;
-}
-
-a.slots_infos:hover {
-    text-decoration: none;
-}
-
-
-.breadcrumb-item.active a {
-	color: #6c757d;
 }
 
 .breadcrumb {
-	background-color: inherit;
-	margin-bottom: 0;
+	--bs-body-font-size: 0.875rem;
+	--bs-breadcrumb-font-size: calc(var(--bs-body-font-size) * 1.15);
+	--bs-breadcrumb-item-active-color: var(--gray);
+	--bs-breadcrumb-margin-bottom: 0;
+
+	.btn {
+		--bs-btn-font-size: var(--bs-body-font-size);
+		--bs-btn-padding-y: 0;
+		--bs-btn-padding-x: 0;
+	}
+
+	.breadcrumb-item.active {
+		--bs-link-color: var(--bs-breadcrumb-item-active-color);
+	}
+
+	--breadcrumb-dropdown-toggle-padding-x: 0.25rem; /* Same as .btn-sm */
+	.btn.dropdown-toggle {
+		--bs-btn-color: var(--bs-breadcrumb-item-active-color);
+		--bs-btn-padding-x: var(--breadcrumb-dropdown-toggle-padding-x);
+	}
+
+	.dropdown-item { /* Align with parent's text */
+		--bs-dropdown-item-padding-x: calc(var(--breadcrumb-dropdown-toggle-padding-x) * 2 + 1em);
+	}
+}
+
+.dropdown-menu {
+	--bs-dropdown-link-active-color: var(--btn-default-color);
+	--bs-dropdown-link-active-bg: var(--btn-default-hover-bg);
 }
 
 .build_details {
