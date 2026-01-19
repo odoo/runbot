@@ -82,7 +82,7 @@ class Runbot(models.AbstractModel):
         non_allocated_domain = [('local_state', '=', 'pending'), ('host', '=', False)]
 
         build_to_assign = self.env['runbot.build'].search(non_allocated_domain, order='priority_level')
-        priority_builds = build_to_assign.filtered(lambda b: b.build_type == 'priority')
+        priority_builds = build_to_assign.filtered(lambda b: b.build_type == 'priority' or b.config_id.use_extra_slot)
         scheduled_builds = build_to_assign.filtered(lambda b: b.build_type == 'scheduled')
         normal_builds = build_to_assign.filtered(lambda b: b.build_type not in ('priority', 'scheduled'))
 
@@ -161,9 +161,30 @@ class Runbot(models.AbstractModel):
         if available_slots > 0 or nb_pending == 0:
             return
 
+        killable_build = []
+
         for build in testing_builds:
             if build.top_parent.killable:
-                build.top_parent._ask_kill(message='Build automatically killed, new build found.')
+                killable_build.append(build.top_parent)
+                continue
+            # a build can have multiple parents but no direct parent id
+            # in this cas we can kill under two conditions:
+            # - the build is not linked to any parent non killable build (or the link are orphan_result)
+            # - the build won't be linked again to any
+            if not build.parent_id and build.parent_link_ids:
+                has_alive_parent = not all(l.orphan_result or l.parent_id.top_parent.killable for l in build.parent_link_ids)
+                if not has_alive_parent:
+                    top_parents = build.linked_parent_build_ids.top_parent
+                    candidate_batches = top_parents.slot_ids.batch_id.bundle_id.last_batch.filtered(lambda b: b.state in ['preparing', 'ready'])
+                    if any(candidate_batche.state == 'preparing' for candidate_batche in candidate_batches):
+                        continue
+                    if any(batch.slot_ids.filtered(lambda s: s.trigger_id in top_parents.trigger_id and (not s.build_id or s.build_id.local_state != 'done')) for batch in candidate_batches):
+                        continue
+                    killable_build.append(build.top_parent)
+                    continue
+
+        for build in killable_build:
+            build._ask_kill(message='Build automatically killed, new build found.')
 
     def _reload_nginx(self):
         env = self.env

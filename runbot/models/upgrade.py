@@ -27,10 +27,15 @@ class UpgradeExceptions(models.Model):
     def action_auto_rebuild(self):
         if not self.env.user.has_group('runbot.group_runbot_upgrade_exception_manager'):
             raise UserError('You are not allowed to rebuild templates')
-        builds = self.create_build_id.parent_id.children_ids if self.create_build_id.parent_id else self.create_build_id
-        for build in builds:
-            if not build.orphan_result and build.local_result != 'ok':
-                build.sudo()._rebuild()
+        builds = self.create_build_id
+        if self.create_build_id.parent_id:
+            builds = self.create_build_id.parent_id.children_ids.filtered(lambda build: not build.orphan_result)
+        else:
+            links = self.create_build_id.parent_link_ids
+            if links:
+                builds = links.parent_id.child_link_ids.filtered(lambda link: not link.orphan_result).child_id
+        for build in builds.filtered(lambda build: build.local_result != 'ok'):
+            build.sudo()._rebuild()
 
     @api.depends('create_date')
     def _compute_message(self):
