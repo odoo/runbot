@@ -101,6 +101,7 @@ class BuildParameters(models.Model):
 
     build_ids = fields.One2many('runbot.build', 'params_id')
     builds_reference_ids = fields.Many2many('runbot.build', relation='runbot_build_params_references', copy=True)
+    reference_build_id = fields.Many2one('runbot.build', 'Reference Build', index=True)
     modules = fields.Char('Modules')
 
     upgrade_to_build_id = fields.Many2one('runbot.build', index=True)  # use to define sources to use with upgrade script
@@ -146,6 +147,8 @@ class BuildParameters(models.Model):
                 'dockerfile_id': param.dockerfile_id.id,
                 'skip_requirements': param.skip_requirements,
             }
+            if param.reference_build_id:
+                cleaned_vals['reference_build_id'] = param.reference_build_id.id
             if param.upgrade_to_build_id:
                 cleaned_vals['upgrade_to_build_dockerfile_id'] = param.upgrade_to_build_id.params_id.dockerfile_id.id
                 cleaned_vals['upgrade_to_build_commits'] = get_commit_links_ident(param.upgrade_to_build_id.params_id.commit_link_ids)
@@ -532,7 +535,7 @@ class BuildResult(models.Model):
 
         return res
 
-    def _add_child(self, param_values, orphan=False, description=False, additionnal_commit_links=False):
+    def _add_child(self, param_values, orphan=False, description=False, additionnal_commit_links=False, reference_parent=...):
         build_values = {key: value for key, value in param_values.items() if key not in self.params_id._fields}
         param_values = {key: value for key, value in param_values.items() if key in self.params_id._fields}
 
@@ -544,6 +547,15 @@ class BuildResult(models.Model):
             commit_link_ids = self.params_id.commit_link_ids
             commit_link_ids |= additionnal_commit_links
             param_values['commit_link_ids'] = commit_link_ids
+
+        config = param_values.get('config_id') or self.params_id.config_id
+        if isinstance(config, int):
+            config = self.env['runbot.build.config'].browse(config)
+
+        if reference_parent == ...:
+            reference_parent = config._default_uses_parent(param_values)
+        if reference_parent:
+            param_values['reference_build_id'] = self.id
 
         return self.create({
             'params_id': self.params_id.copy(param_values).id,
@@ -1418,8 +1430,9 @@ class BuildResult(models.Model):
 
         faketime = []
         if faketime_params := self.params_id.config_data.get('faketime'):
-            if self.parent_id:
-                parent_time_offset = (self.parent_id.build_end or self.create_date) - self.parent_id.build_start
+            reference_build = self.params_id.reference_build_id or self.parent_id  # TODO cleanup parent_id
+            if reference_build:
+                parent_time_offset = (reference_build.build_end or self.create_date) - reference_build.build_start
                 faketime_params = (parser.parse(faketime_params) + parent_time_offset).strftime('%Y-%m-%d %H:%M %Z')
             faketime = ['faketime', faketime_params]
 
