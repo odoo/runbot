@@ -24,7 +24,7 @@
                       <field name="version_ids" widget="many2many_tags" optional="hide"/>
                       <field name="trigger_ids" widget="many2many_tags" optional="hide"/>
                       <field name="tag_ids" widget="many2many_tags" readonly="1" optional="hide"/>
-                      <field name="random" optional="hide"/>
+                      <field name="random" readonly="False" optional="hide"/>
                       <field name="first_seen_date" widget="frontend_url" options="{'link_field': 'first_seen_build_id', 'numeric': True}"/>
                       <field name="last_seen_date" widget="frontend_url" options="{'link_field': 'last_seen_build_id', 'numeric': True}"/>
                       <field name="first_seen_build_id" column_invisible="True"/>

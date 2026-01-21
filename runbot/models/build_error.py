@@ -396,7 +396,7 @@ class BuildError(models.Model):
         for record in self:
             record.error_count = len(record.error_content_ids)
 
-    @api.depends('error_content_ids')
+    @api.depends('error_content_ids.random')
     def _compute_random(self):
         for record in self:
             record.random = any(error.random for error in record.error_content_ids)
