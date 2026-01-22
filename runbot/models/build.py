@@ -982,7 +982,7 @@ class BuildResult(models.Model):
         for dest, source in _ro_volumes.items():
             ro_volumes[f'/data/build/{dest}'] = source
         if 'image_tag' not in kwargs:
-            kwargs.update({'image_tag': self.params_id.dockerfile_id.image_tag})
+            kwargs.update({'image_tag': step.dockerfile_id.image_tag or self.params_id.dockerfile_id.image_tag})
         dockerfile_variant = self.params_id.config_data.get('dockerfile_variant', step.dockerfile_variant)
         if dockerfile_variant and f'.{dockerfile_variant.lower()}' not in kwargs['image_tag']:
             kwargs['image_tag'] += f'.{dockerfile_variant.lower()}'

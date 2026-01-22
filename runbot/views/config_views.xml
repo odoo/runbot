@@ -47,6 +47,7 @@
                         <field name="job_type"/>
                         <field name="make_stats"/>
                         <field name="protected"/>
+                        <field name="dockerfile_id"/>
                         <field name="dockerfile_variant"/>
                         <field name="default_sequence" groups="base.group_no_one"/>
                         <field name="group" groups="base.group_no_one"/>
@@ -119,6 +120,12 @@
 
                     <group string="Codeowner settings" invisible="job_type not in ('codeowner', 'python', 'dynamic')">
                         <field name="fallback_reviewer"/>
+                    </group>
+
+                    <group string="Semgrep settings" invisible="job_type not in ('semgrep', 'python', 'dynamic')">
+                        <field name="semgrep_category"/>
+                        <field name="disable_nosem"/>
+                        <field name="custom_link"/>
                     </group>
                     <group>
                       <field name="step_order_ids" groups="base.group_no_one" readonly="1">

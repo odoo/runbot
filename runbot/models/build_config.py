@@ -355,6 +355,7 @@ TYPES = [
         ('test_upgrade', 'Test Upgrade'),
         ('restore', 'Restore'),
         ('dynamic', 'Dynamic'),
+        ('semgrep', 'Semgrep'),
     ]
 
 
@@ -377,6 +378,7 @@ class ConfigStep(models.Model):
     group_name = fields.Char('Group name', related='group.name')
     make_stats = fields.Boolean('Make stats', default=False)
     build_stat_regex_ids = fields.Many2many('runbot.build.stat.regex', string='Stats Regexes')
+    dockerfile_id = fields.Many2one('runbot.dockerfile', string='Dockerfile')
     dockerfile_variant = fields.Char('Docker Variant')
     # install_odoo
     create_db = fields.Boolean('Create Db', default=True, tracking=True)  # future
@@ -426,6 +428,10 @@ class ConfigStep(models.Model):
 
     restore_download_db_suffix = fields.Char('Download db suffix')
     restore_rename_db_suffix = fields.Char('Rename db suffix')
+
+    semgrep_category = fields.Many2one('runbot.checker_category', string='Semgrep Category', tracking=True)
+    custom_link = fields.Char('Custom link for semgrep codes', tracking=True)
+    disable_nosem = fields.Boolean('Disable nosem', default=False, tracking=True)
 
     commit_limit = fields.Integer('Commit limit', default=50)
     file_limit = fields.Integer('File limit', default=450)
@@ -1232,6 +1238,8 @@ class ConfigStep(models.Model):
             self._make_upgrade_results(build)
         elif active_job_type == 'restore':
             self._make_restore_results(build)
+        elif active_job_type == 'semgrep':
+            self._make_semgrep_results(build)
 
     def _make_python_results(self, build):
         eval_ctx = self._make_python_ctx(build)
@@ -1644,6 +1652,139 @@ class ConfigStep(models.Model):
             steps = build.dynamic_config.get('steps', [])
             return next_index < len(steps)
         return False
+
+    def _run_semgrep(self, build):
+        if not self._check_limits(build):
+            return
+
+        rules = self.env['runbot.semgrep_rule'].search([
+            ("category_id", '=', self.semgrep_category.id),
+            '|', ("min_version_number", '=', False), ("min_version_number", "<=", build.params_id.version_id.number),
+            '|', ('max_version_number', '=', False), ('max_version_number', '>', build.params_id.version_id.number),
+        ])
+        if not rules:
+            return
+
+        for rule in rules:
+            build._write_file(f"rules/{rule.name}.yaml", "rules:\n" + rule.rule_text)
+
+        exports = build._checkout()
+
+        files = []
+        targets = []
+        for link in build.params_id.commit_link_ids:
+            # filtering section for progressive CI (style & security)
+            modified = link.commit_id.repo_id._git([
+                'diff',
+                '%s..%s' % (link.merge_base_commit_id.name, link.commit_id.name),
+                '--',
+                '*.py',
+                '*.js',
+            ])
+            for patched_file in PatchSet(modified.splitlines(keepends=True)):
+                target = patched_file.target_file.removeprefix('b/')
+                if target.startswith(('setup/',)):
+                    continue
+                target = link.commit_id.repo_id.name + '/' + target
+
+                before = len(targets)
+                targets.extend(
+                    f"{target}:{line.target_line_no}"
+                    for hunk in patched_file
+                    for line in hunk
+                    if line.is_added
+                )
+                # only look at file if it has additions
+                if len(targets) > before:
+                    files.append(target)
+
+        if not files:
+            build._log("", "Nothing to scan.")
+            return
+
+        build._log("", f"checking {len(targets)} lines in {len(files)} files")
+
+        # add empty ignore file, otherwise semgrep ignores test directories by default
+        build._write_file(".semgrepignore", "")
+        build._write_file(f"logs/{self.name}-files_list.txt", "\n".join(files))
+        build._write_file("targets", "\n".join(targets))
+
+        cmd = f"semgrep scan {'--disable-nosem' if self.disable_nosem else ''} -c /data/build/rules --json --timeout=0 --verbose $(cat logs/{self.name}-files_list.txt) > /data/build/results.json"
+
+        return {
+            "cmd": cmd,
+            "container_name": build._get_docker_name(),
+            "ro_volumes": exports,
+        }
+
+    def _make_semgrep_results(self, build):
+        step_result = "ok"
+        if build._is_file("targets"):
+            targets = set(build._read_file("targets").splitlines(keepends=False))
+            f = build._read_file("results.json")
+            semgrep_result = json.loads(f) if f else {}
+        else:
+            targets = set()
+            semgrep_result = {}
+
+        repo = {
+            link.commit_id.repo_id.name: (link.branch_id.remote_id.base_url, link.commit_id)
+            for link in build.params_id.commit_link_ids
+        }
+
+        # some of the lints can catch the same issue multiple times on the same line, and semgrep does not dedup
+        seen = set()
+
+        # rules results
+        for result in semgrep_result.get('results', ()):
+            _, _, code = result['check_id'].rpartition('.')
+            start = result['start']['line']
+            matches = targets & {
+                f"{result['path']}:{start}"
+                for line in range(result['start']['line'], result['end']['line'] + 1)
+            }
+            if not matches:
+                continue
+
+            if all((target, code) in seen for target in matches):
+                continue
+            seen.update((target, code) for target in matches)
+
+            repo_name, path = result['path'].split('/', 1)
+            filename = f"{path}:{start}"
+            repo_base_url, commit = repo[repo_name]
+            commit_hash = commit.name
+
+            # FIXME: should be a code block :(
+            extra = result['extra']
+            # snippet = extra['lines'] #"\n".join(f'{line}' for line in extra['lines'].splitlines(keepends=False))
+            file = commit._read_source(path, mode='rb')
+            snippet = file[result['start']['offset']:result['end']['offset']].decode()
+
+            codelink = f"{code}: {extra['message']}\n"
+            if self.custom_link:
+                # message may be sensitive, do not display, show snippet on same line if single line, otherwise block below
+                codelink = f"[{code} 🔗]({self.custom_link}#{code}): "
+            if '\n' in snippet:
+                snippet = '\n' + snippet
+
+            build._log(
+                "semgrep",
+                f"""\
+        [%s](https://%s/blob/%s/%s#L%s-L%s)
+        {codelink}`%s`
+            """, filename, repo_base_url, commit_hash, path, result['start']['line'], result['end']['line'], snippet,
+                level=extra['severity'],
+                log_type='markdown',
+            )
+            if extra['severity'] != 'INFO':
+                step_result = "ko"
+
+        # internal semgrep errors
+        for err in semgrep_result.get('errors', ()):
+            build._log("semgrep", err.get('message') or str(err), log_type='markdown')
+
+        build['local_result'] = build._get_worst_result([build.local_result, step_result])
 
 
 class ConfigStepOrder(models.Model):

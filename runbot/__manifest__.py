@@ -6,7 +6,7 @@
     'author': "Odoo SA",
     'website': "http://runbot.odoo.com",
     'category': 'Website',
-    'version': '5.14',
+    'version': '5.15',
     'application': True,
     'depends': ['base', 'base_automation', 'website', 'auth_oauth'],
     'data': [
@@ -57,6 +57,7 @@
         'views/oauth_provider_views.xml',
         'views/repo_views.xml',
         'views/res_config_settings_views.xml',
+        'views/semgrep_rules.xml',
         'views/stat_views.xml',
         'views/upgrade.xml',
         'views/upgrade_matrix_views.xml',
