@@ -852,21 +852,20 @@ class Runbot(Controller):
         else:
             domain = Domain.AND([domain, [('sticky', '=', True)]])
         bundles = request.env['runbot.bundle'].search(domain, order='id desc, name')
-
-        last_batches_infos = {
-            bundle.name: {
+        last_batches_infos = dict()
+        for bundle in bundles:
+            batch = bundle.last_batch if bundle.last_batch.state != 'preparing' else bundle.last_done_batch
+            last_batches_infos[bundle.name] = {
                 "commits": [
                     {
                         "repo": commit_link.commit_id.repo_id.name,
                         "head": commit_link.commit_id.name,
                         "match_type": commit_link.match_type,
                     }
-                    for commit_link in bundle.last_batch.commit_link_ids
+                    for commit_link in batch.commit_link_ids
                 ],
-                "autotags": request.env["runbot.build.error"].sudo()._disabling_tags(build_id=bundle.last_batch.slot_ids.build_id[0]),
+                "autotags": request.env["runbot.build.error"].sudo()._disabling_tags(build_id=batch.slot_ids.build_id[0]),
             }
-            for bundle in bundles
-        }
         return request.make_json_response(last_batches_infos)
 
     @route([
