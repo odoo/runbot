@@ -178,3 +178,5 @@ access_runbot_build_error_merge_filters_user,access_runbot_build_error_merge_fil
 
 access_runbot_bundle_tag_admin,access_runbot_bundle_tag_admin,runbot.model_runbot_bundle_tag,runbot.group_runbot_admin,1,1,1,1
 access_runbot_bundle_tag_user,access_runbot_bundle_tag_user,runbot.model_runbot_bundle_tag,group_user,1,0,0,0
+
+access_runbot_error_error_setpr_user,access_runbot_error_error_setpr_user,runbot.model_runbot_error_setpr,runbot.group_user,1,1,1,1

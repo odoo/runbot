@@ -229,6 +229,7 @@ class BuildError(models.Model):
     team_id = fields.Many2one('runbot.team', 'Assigned team', compute='_compute_team_id', inverse='_inverse_team_id', store=True, tracking=True)
     manual_team_id = fields.Many2one('runbot.team', 'Manually assigned team')
     auto_team_id = fields.Many2one('runbot.team', 'Automatically assigned team', readonly=True) # This is a computed field but not really
+    can_set_pr = fields.Boolean(compute='_compute_can_set_pr')
     fixing_commit = fields.Char('Fixing commit', tracking=True)
     fixing_pr_id = fields.Many2one('runbot.branch', 'Fixing PR', tracking=True, domain=[('is_pr', '=', True)])
     fixing_pr_alive = fields.Boolean('Fixing PR alive', related='fixing_pr_id.alive')
@@ -390,6 +391,10 @@ class BuildError(models.Model):
 
     def _search_content(self, operator, value):
         return [('error_content_ids', 'any', [('content', operator, value)])]
+
+    def _compute_can_set_pr(self):
+        for record in self:
+            record.can_set_pr = self.env.user == record.responsible
 
     @api.depends('error_content_ids')
     def _compute_count(self):
@@ -1317,3 +1322,18 @@ class QualifyErrorTest(models.Model):
     def _compute_content(self):
         for record in self:
             record.build_error_content = '\n'.join([record.error_content_id[sf] or '' for sf in record.qualify_regex_id.check_fields.split(',')])
+
+
+class BuildErrorSetPR(models.TransientModel):
+    _name = 'runbot.error.setpr'
+    _description = "Errors Set PR Wizard"
+
+    fixing_pr_id = fields.Many2one('runbot.branch', 'Fixing PR', domain=[('is_pr', '=', True)])
+
+    def action_submit(self):
+        if not self.env.user.has_group('runbot.runbot_error_manager'):
+            errors = self.env['runbot.build.error'].sudo().browse(self.env.context.get('active_ids')).filtered(lambda rec: rec.responsible == self.env.user)
+        else:
+            errors = self.env['runbot.build.error'].browse(self.env.context.get('active_ids'))
+        for error in errors:
+            error.fixing_pr_id = self.fixing_pr_id

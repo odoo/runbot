@@ -1,5 +1,31 @@
 <odoo>
   <data>
+    <record model="ir.ui.view" id="runbot_error_setpr_form">
+        <field name="name">runbot_error_setpr</field>
+        <field name="model">runbot.error.setpr</field>
+        <field name="arch" type="xml">
+          <form>
+            <sheet>
+              <group name="Fix">
+                <field name="fixing_pr_id" options="{'no_create': True}"/>
+              </group>
+              <footer>
+                <button string="Submit" name="action_submit" type="object" class="btn-primary"/>
+                <button string="Cancel" class="btn-secondary" special="cancel"/>
+              </footer>
+            </sheet>
+          </form>
+        </field>
+    </record>
+    <record id="runbot_open_error_setpr_form" model="ir.actions.act_window">
+        <field name="name">Set PR on error</field>
+        <field name="res_model">runbot.error.setpr</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="view_id" ref="runbot_error_setpr_form"/>
+        <field name="binding_model_id" ref="runbot.model_runbot_build_error"/>
+        <field name="binding_view_types">list</field>
+    </record>
     <record id="runbot_build_error_form" model="ir.ui.view">
       <field name="name">runbot.build.error.form</field>
       <field name="model">runbot.build.error</field>
@@ -10,11 +36,13 @@
                 <button class="oe_stat_button" type="object" icon="fa-exclamation-circle" name="action_get_build_link_record">
                   <field string="Builds Link" name="build_count" widget="statinfo"/>
                 </button>
+                <button name="%(runbot.runbot_open_error_setpr_form)d" string="Set Fixing PR" type="action" class="btn-success" invisible="not can_set_pr"/>
               </div>
               <widget name="web_ribbon" title="Test-tags" bg_color="bg-danger" invisible="not test_tags"/>
-              <button name="action_view_errors" string="See all linked errors" type="object" class="oe_highlight"/>
+                <button name="action_view_errors" string="See all linked errors" type="object" class="oe_highlight"/>
               <group string="Base info">
                 <field name="name"/>
+                <field name="can_set_pr" invisible="1"/>
                 <field name="error_content_ids" readonly="1">
                     <list limit="5">
                       <field name="content" readonly="1"/>
