@@ -41,7 +41,12 @@
                   <field name="fixing_pr_url" widget="pull_request_url" invisible="not fixing_pr_id"/>
                   <field name="fixing_bundle_id" options="{'no_create': True}" readonly="fixing_pr_id"/>
                   <field name="fixing_bundle_url" invisible="not fixing_pr_id"/>
-                  <field name="active"/>
+                  <label class="text-danger" for="active" invisible="not test_tags"/>
+                  <label for="active" invisible="test_tags"/>
+                  <span>
+                    <field name="active" nolabel="1"/>
+                    <i class="fa fa-exclamation-triangle text-danger" title="This error has test-tags !" invisible="not test_tags"/>
+                  </span>
                 </group>
                 <group name="appearance_info" string="Appearance" col="2">
                   <field name="version_ids" widget="many2many_tags"/>
