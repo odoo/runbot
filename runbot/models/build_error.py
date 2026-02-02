@@ -958,7 +958,7 @@ class BuildErrorContent(models.Model):
         res = dict(self.env.cr.fetchall())
 
         for build_error_content in self:
-            build_error_content.version_ids = self.env['runbot.version'].browse([v for v in res.get(build_error_content.id, []) if v])
+            build_error_content.version_ids = self.env['runbot.version'].browse([v for v in res.get(build_error_content.id, []) if v]).sorted('number')
 
     @api.depends('build_ids')
     def _compute_trigger_ids(self):
