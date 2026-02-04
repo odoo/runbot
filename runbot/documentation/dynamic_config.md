@@ -75,7 +75,7 @@ The config steps are mainly defined by their `job_type`. The `name` key is also 
 ```
 The `db_name` is optionnal, usually set to all as a convention on runbot for databases that contains *almost* all modules. If not defined the sanitized version of the name will be used.
 
-`install_modules` and `install_default_modules` behave the same way except that `install_modules` will consider that we start with no module (prepends `.*` filter) while `install_default_modules` will be based on the runbot default module list (all available modules minus the repo blacklist)
+`install_modules` and `install_default_modules` behave the same way except that `install_modules` will consider that we start with no module (prepends `-*` filter) while `install_default_modules` will be based on the runbot default module list (all available modules minus the repo blacklist)
 
 Both entries will use the value as a runbot module filter, and then passed as the -i, [see corresponding section](#module-selection) for more info.
 

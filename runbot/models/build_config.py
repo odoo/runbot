@@ -229,7 +229,7 @@ class Config(models.Model):
                 STR(val, f'{path}.{key}')
 
         NAME = str_checker(r'^[\w \-]+$')
-        STR = str_checker(r'.+')
+        STR = str_checker(r'.*')
         DYNAMIC_VALUE = STR
         TECHNICAL_NAME = str_checker(r'^[a-z0-9_\-]+$')
         BOOL = type_checker(bool)
