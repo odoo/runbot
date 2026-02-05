@@ -12,7 +12,7 @@ _logger = logging.getLogger(__name__)
 
 class RunbotCase(TransactionCase):
 
-    def mock_git_helper(self, repo, cmd):
+    def mock_git_helper(self, repo, cmd, input_data=None, raw=False):
         """Helper that returns a mock for repo._git()"""
         if cmd[:2] == ['show', '-s'] or cmd[:3] == ['show', '--pretty="%H -- %s"', '-s']:
             return 'commit message for %s' % cmd[-1]
@@ -82,7 +82,9 @@ class RunbotCase(TransactionCase):
             self.repo_odoo: [
                 ('odoo/addons', 'base', '__manifest__.py'),
                 ('odoo/addons', 'test_lint', '__manifest__.py'),
+                ('addons', 'account', '__manifest__.py'),
                 ('addons', 'mail', '__manifest__.py'),
+                ('addons', 'test_mail', '__manifest__.py'),
                 ('addons', 'web', '__manifest__.py'),
                 ('addons', 'crm', '__manifest__.py'),
                 ('addons', 'project', '__manifest__.py'),
@@ -194,8 +196,8 @@ class RunbotCase(TransactionCase):
         self.docker_run_calls = []
         self.diff = ''
 
-        def mock_git(repo, cmd, quiet=False):
-            return self.mock_git_helper(repo, cmd)
+        def mock_git(repo, cmd, quiet=False, input_data=None, raw=False):
+            return self.mock_git_helper(repo, cmd, input_data=input_data, raw=raw)
 
         self.start_patcher('git_patcher', 'odoo.addons.runbot.models.repo.Repo._git', new=mock_git)
         self.start_patcher('hostname_patcher', 'odoo.addons.runbot.common.socket.gethostname', 'host.runbot.com')
@@ -232,10 +234,10 @@ class RunbotCase(TransactionCase):
         self.start_patcher('_write_file', 'odoo.addons.runbot.models.build.BuildResult._write_file', None)
         self.start_patcher('_parse_config', 'odoo.addons.runbot.models.build.BuildResult._parse_config', {'--test-enable', '--test-tags', '--with-demo'})
 
-        def get_available_modules(self_commit):
+        def _list_available_modules(self_commit):
             return self.addons_per_repo.get(self_commit.repo_id, [])
 
-        self.start_patcher('_get_available_modules', 'odoo.addons.runbot.models.commit.Commit._get_available_modules', new=get_available_modules)
+        self.start_patcher('_list_available_modules', 'odoo.addons.runbot.models.commit.Commit._list_available_modules', new=_list_available_modules)
 
         def no_commit(*_args, **_kwargs):
             _logger.info('Skipping commit')

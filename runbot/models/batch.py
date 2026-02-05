@@ -15,6 +15,7 @@ class Batch(models.Model):
 
     last_update = fields.Datetime('Last ref update')
     bundle_id = fields.Many2one('runbot.bundle', required=True, index=True, ondelete='cascade')
+    build_all = fields.Boolean('Force all triggers')
     commit_link_ids = fields.Many2many('runbot.commit.link')
     commit_ids = fields.Many2many('runbot.commit', compute='_compute_commit_ids')
     slot_ids = fields.One2many('runbot.batch.slot', 'batch_id')
@@ -187,6 +188,7 @@ class Batch(models.Model):
         priority_offset = self.bundle_id.priority_offset
         if not priority_offset and self.bundle_id.branch_ids.forwardport_of_id and self.bundle_id.last_batchs == self:  # this is the only batch of a forwardported pr.
             priority_offset = - 3600 * 5
+            self.build_all = True  # for normal pr, mergebot will request all ci on r+ if needed, for forward port, we need to ensure they are all created or the chain could be blocked
         self.priority_level = int(self.create_date.timestamp() - priority_offset)
         if use_base_commits:
             self._warning('This batch will use base commits instead of bundle commits')
@@ -383,7 +385,7 @@ class Batch(models.Model):
                 continue
             # in any case, search for an existing build
             config = trigger.config_id
-            if not trigger_custom and trigger.light_config_id and not bundle.build_all and not bundle.is_staging and not bundle.is_base:
+            if not trigger_custom and trigger.light_config_id and not bundle.build_all and not self.build_all and not bundle.is_staging and not bundle.is_base:
                 if (project.use_light_default
                     or
                     project.use_light_draft and any(branch.draft for branch in self.bundle_id.branch_ids)
@@ -455,7 +457,10 @@ class Batch(models.Model):
         is_dev = not bundle.is_staging and not bundle.is_base
         for trigger in self.slot_ids.trigger_id:
             enable_on_bundle = (trigger.on_staging and bundle.is_staging) or (trigger.on_base and bundle.is_base) or (trigger.on_dev and is_dev)
-            if ((trigger.repo_ids & bundle_repos) or bundle.build_all or bundle.sticky) and enable_on_bundle:
+            common_repo = (trigger.repo_ids & bundle_repos)
+            if self.build_all and not common_repo:
+                common_repo = (trigger.dependency_ids & bundle_repos)
+            if (common_repo or bundle.build_all or bundle.sticky) and enable_on_bundle:
                 should_start_triggers_ids.add(trigger.id)
 
         disabled_triggers = self.bundle_id.all_trigger_custom_ids.filtered(lambda tc: tc.start_mode == 'disabled').trigger_id

@@ -323,7 +323,8 @@ class Runbot(Controller):
     @route([
     '/runbot/build/search',
     ], website=True, auth='public', type='http', sitemap=False)
-    def builds(self, **kwargs):
+    def builds(self, limit=100, **kwargs):
+        limit = min(int(limit), 1000)
         domain = []
         for key in ('config_id', 'version_id', 'project_id', 'trigger_id', 'create_batch_id.bundle_id', 'create_batch_id'):  # allowed params
             value = kwargs.get(key)
@@ -337,10 +338,12 @@ class Runbot(Controller):
 
         for key in ('description',):
             if key in kwargs:
-                domain.append((f'{key}', 'ilike', kwargs.get(key)))
+                value = kwargs.get(key)
+                operator = 'ilike' if '%' in value else '='
+                domain.append((f'{key}', operator, value))
 
         context = {
-            'builds': request.env['runbot.build'].search(domain, limit=100),
+            'builds': request.env['runbot.build'].search(domain, limit=limit),
         }
 
         return request.render('runbot.build_search', context)

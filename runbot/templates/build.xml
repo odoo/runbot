@@ -44,7 +44,7 @@
                 </li>
                 <li t-foreach="build.ancestors" t-as="ancestor" t-attf-class="breadcrumb-item{{' active' if ancestor == build else ''}}">
                   <a t-att-href="ancestor.build_url">
-                    <t t-out="ancestor.description or ancestor.config_id.name"/>
+                    <t t-out="(ancestor.description or ancestor.config_id.name)[:50]"/>
                   </a>
                 </li>
               </ol>
@@ -68,7 +68,7 @@
             </t>
           </t>
           <div t-attf-class="bg-{{rowclass.strip()}}-subtle {{'col-md-6' if build.children_ids else 'col-md-12'}}">
-            <div class="build_details">
+            <div class="build_details text-truncate">
               <!-- Batch/bundles links-->
               <t t-if="len(bundles) > 1">
                 This build is referenced in <t t-out="len(bundles)"/> bundles<br/>
@@ -225,7 +225,7 @@
                   </t>
                 </t>
                 <tr t-attf-class="bg-{{rowclass.strip()}}-subtle{{' line-through' if child.orphan_result else ''}}">
-                  <td>
+                  <td class="text-truncate" style="max-width: 0; width: 100%;">
                     <a t-attf-href="/runbot/{{'batch/%s/' % from_batch.id if from_batch else ''}}build/{{child.id}}">
                       Build
                       <t t-out="child.id"/>
@@ -294,7 +294,7 @@
                       <t t-set="build" t-value="subbuild"/>
                     </t>
                   </t>
-                  <td t-attf-class="bg-{{message_class.strip() or logclass}}-subtle">
+                  <td t-attf-class="bg-{{message_class.strip() or logclass}}-subtle" style="max-width: 0; width: 100%;">
                     <t t-if="l.type not in ('runbot', 'link', 'markdown')">
                       <t t-if="l.type == 'subbuild'">
                         <a t-attf-href="/runbot/build/{{l.path}}">

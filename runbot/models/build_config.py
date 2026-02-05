@@ -46,8 +46,21 @@ def filter_all_modules(selector, build, dynamic_vars):
     return filter_default_modules(selector, build, dynamic_vars)
 
 
+def get_dependencies(modules, build, dynamic_vars, depth=None):
+    depth = int(depth) if depth else None
+    modules = modules.split(',')
+    dependant = set(build._get_modules_dependencies(modules, depth)) - set(modules)
+    return ','.join(sorted(dependant))
+
+
+def get_dependant(modules, build, dynamic_vars, depth=None):
+    depth = int(depth) if depth else None
+    modules = modules.split(',')
+    dependant = set(build._get_dependant_modules(modules, depth)) - set(modules)
+    return ','.join(sorted(dependant))
+
+
 def filter_default_modules(selector, build, dynamic_vars):
-    build._checkout()  # we need to ensure source are exported before _get_modules_to_test
     modules = build._get_modules_to_test(selector)
     return ','.join(modules)
 
@@ -57,20 +70,15 @@ def select_existing_modules(selector, build, dynamic_vars):
     return filter_default_modules(selector, build, dynamic_vars)
 
 
-def keep_modified_modules(modules, build, dynamic_vars):
+def keep_modified_modules(modules, build, dynamic_vars, *defaults):
     if build.params_id.config_data.get('skip_modified_modules_filter', False):
         return modules
-    modified_modules = build._modified_modules()
+    if defaults:
+        defaults = [d[1:-1] if re.match(r'^[\'"].*[\'"]$', d) else d for d in defaults]
+    modified_modules = build._modified_modules(defaults=defaults)
     modules = modules.split(',')
     filtered_modules = [module for module in modules if module in modified_modules]
     return ','.join(filtered_modules)
-
-
-def keep_modified_modules_or_base(modules, build, dynamic_vars):
-    bundle = build.params_id.create_batch_id.bundle_id
-    if bundle.is_base or bundle.is_staging:
-        return modules
-    return keep_modified_modules(modules, build, dynamic_vars)
 
 
 def make_module_test_tags(modules, build, dynamic_vars):
@@ -91,6 +99,17 @@ def append_string(modules, build, dynamic_vars, element):
     else:
         element = dynamic_vars.get(element, element)
     return ','.join([f'{module}{element}' for module in modules.split(',')])
+
+
+def union(modules, build, dynamic_vars, element):
+    if re.match(r'^[\'"].*[\'"]$', element):
+        element = element[1:-1]
+    else:
+        element = dynamic_vars.get(element, element)
+    element = element.strip()
+    modules = set(modules.split(',')) if modules else set()
+    new_modules = set(element.split(',')) if element else set()
+    return ','.join(sorted(modules | new_modules))
 
 
 class Config(models.Model):
@@ -227,11 +246,15 @@ class Config(models.Model):
             return wrapper
 
         def VARS(vars, path):
-            if not isinstance(vars, dict):
-                raise ValidationError(f'{path} ({vars}) should be a dict')
-            for key, val in vars.items():
-                TECHNICAL_NAME(key, f'{path}.{key}')
-                STR(val, f'{path}.{key}')
+            if isinstance(vars, list):
+                for item in vars:
+                    VARS(item, path)
+            else:
+                if not isinstance(vars, dict):
+                    raise ValidationError(f'{path} ({vars}) should be a dict')
+                for key, val in vars.items():
+                    TECHNICAL_NAME(key, f'{path}.{key}')
+                    STR(val, f'{path}.{key}')
 
         NAME = str_checker(r'^[\w \-]+$')
         STR = str_checker(r'.*')
@@ -246,6 +269,7 @@ class Config(models.Model):
             'vars': OPTIONAL(VARS),
             'steps': REQUIRED(LIST(STEP)),
             'description': OPTIONAL(DYNAMIC_VALUE),
+            'log': OPTIONAL(DYNAMIC_VALUE),
         }
         valid_steps['odoo'] = {
             'name': REQUIRED(NAME),
@@ -260,6 +284,7 @@ class Config(models.Model):
             'cpu_limit': OPTIONAL(INT),
             'export_database': OPTIONAL(BOOL),
             'make_stats': OPTIONAL(BOOL),
+            'log': OPTIONAL(DYNAMIC_VALUE),
         }
         valid_steps['create_build'] = {
             'name': REQUIRED(NAME),
@@ -268,6 +293,8 @@ class Config(models.Model):
             'for_each_vars': OPTIONAL(LIST(VARS)),
             'for_each_module': OPTIONAL(DYNAMIC_VALUE),
             'max_builds': OPTIONAL(INT),
+            'if': OPTIONAL(DYNAMIC_VALUE),
+            'log': OPTIONAL(DYNAMIC_VALUE),
         }
         valid_steps['restore'] = {
             'name': REQUIRED(NAME),
@@ -277,6 +304,7 @@ class Config(models.Model):
             'trigger_id': OPTIONAL(INT),
             'use_current_batch': OPTIONAL(BOOL),
             'zip_url': OPTIONAL(STR),
+            'log': OPTIONAL(DYNAMIC_VALUE),
         }
         valid_steps['command'] = {
             'name': REQUIRED(NAME),
@@ -289,6 +317,7 @@ class Config(models.Model):
             'check_logs': OPTIONAL(LIST(STR)),
             'expected_logs': OPTIONAL(LIST(STR)),
             'make_stats': OPTIONAL(BOOL),
+            'log': OPTIONAL(DYNAMIC_VALUE),
         }
         validate(config_schema, config, 'config')
 
@@ -1192,7 +1221,7 @@ class ConfigStep(models.Model):
             docker_source_folder = build._docker_source_folder(commit)
             for manifest_file in commit.repo_id.manifest_files.split(','):
                 pattern_to_omit.add('*%s' % manifest_file)
-            for (addons_path, module, _) in commit._get_available_modules():
+            for (addons_path, module, _) in commit._list_available_modules():
                 if module not in modules_to_install:
                     # we want to omit docker_source_folder/[addons/path/]module/*
                     module_path_in_docker = os.sep.join([docker_source_folder, addons_path, module])
@@ -1505,35 +1534,70 @@ class ConfigStep(models.Model):
             raise RunbotException('Too many ancestors builds, possible cyclic dynamic build creation')
         if build.parent_id and build.dynamic_config == build.parent_id.dynamic_config:
             raise RunbotException('A child build cannot load the same dynamic config if parent, recursion detected')
+
+        config_vars_list = build.dynamic_config.get('vars', {})
+        if not isinstance(config_vars_list, list):
+            config_vars_list = [config_vars_list]
+        raw_vars = {}
+        for config_vars in config_vars_list:
+            raw_vars.update(config_vars)
+
+        raw_vars.update(build.params_id.config_data.get('dynamic_vars', {}))
+        dynamic_vars = {}
+        # dynamic_vars can either be raw value like 'account', value to evaluate lazily in anothed dynamic value like 'account->!mail'
+        # or dynamic value that we want to evaluate early like '{{*|filter_all_modules|modified_modules}}' (between {{}})
+        # this loop will evalute the third category
+        # this alows to evaluate only once an expression that could be expensive to use it in multiple dynamic values
+        # this also allow to clarify the config by chaining vars definition
+        # TODO check ordering
+        for key, value in raw_vars.items():
+            dynamic_vars[key] = self._parse_dynamic_entry(value, build, dynamic_vars=dynamic_vars)
+
         current_step = self._get_dynamic_step(build)
         if not current_step:
             build._log('Dynamic Step', 'No dynamic config or steps found, skipping', level="WARNING")
             return
+        if current_step.get('log'):
+            text = self._parse_dynamic_entry(current_step['log'], build, dynamic_vars=dynamic_vars)
+            build._log('_run_dynamic', text)
         if current_step['job_type'] == 'create_build':
             for_each_vars_list = current_step.get('for_each_vars', [{}])
             if 'for_each_module' in current_step:
                 modules_vars = []
                 for for_each_vars in for_each_vars_list:
-                    modules_entry = self._parse_dynamic_entry(current_step['for_each_module'], build, additional_dynamic_vars=for_each_vars)
+                    modules_entry = self._parse_dynamic_entry(current_step['for_each_module'], build, dynamic_vars={**dynamic_vars, **for_each_vars})
                     modules = [m.strip() for m in modules_entry.split(',') if m.strip()]
                     for module in modules:
                         module_vars = {**for_each_vars, 'module': module}
                         modules_vars.append(module_vars)
                 for_each_vars_list = modules_vars
-            parent_vars = {**build.dynamic_config.get('vars', {}), **build.params_id.config_data.get('dynamic_vars', {})}
+
             child_data_list = []
             for child_index, child in enumerate(current_step.get('children', [])):
                 child_vars = child.get('vars', {})
                 for for_each_vars in for_each_vars_list:
                     config_name = child.get('name', build.params_id.config_id.name)
-                    dynamic_vars = {**parent_vars, **child_vars, **for_each_vars}
+                    raw_dynamic_vars = {**dynamic_vars, **for_each_vars, **child_vars}
+                    child_dynamic_vars = {}
+                    # evaluate for_each_vars
+                    for key, value in raw_dynamic_vars.items():
+                        child_dynamic_vars[key] = self._parse_dynamic_entry(value, build, dynamic_vars=child_dynamic_vars)
+                    if 'if' in current_step:
+                        condition = self._parse_dynamic_entry(current_step['if'], build, dynamic_vars=child_dynamic_vars)
+                        if not condition:
+                            continue
                     if 'description' in child:
-                        description = self._parse_dynamic_entry(child['description'], build, additional_dynamic_vars=dynamic_vars)
+                        description = self._parse_dynamic_entry(child['description'], build, dynamic_vars=child_dynamic_vars)
                         # note: we mainly need to provide additional_dynamic_vars because the child is not created yet at this point
                     else:
                         description = config_name
+                    # filter vars not prefixed with _ to simplify child values
+                    if child.get('log'):
+                        text = self._parse_dynamic_entry(child['log'], build, dynamic_vars=child_dynamic_vars)
+                        build._log('_run_dynamic', text)
+                    public_child_dynamic_vars = {key: value for key, value in child_dynamic_vars.items() if not key.startswith('_')}
                     child_data = {
-                        'config_data': {**build.params_id.config_data.dict, "dynamic_vars": dynamic_vars},
+                        'config_data': {**build.params_id.config_data.dict, "dynamic_vars": public_child_dynamic_vars},
                         'config_id': build.params_id.config_id.id,
                         'dynamic_active_step_index': 0,
                         'dynamic_config_position': f'{build.params_id.dynamic_config_position or ""}/{build.dynamic_active_step_index}.{child_index}',
@@ -1564,14 +1628,14 @@ class ConfigStep(models.Model):
                 install_modules_pattern = current_step.get('install_modules', '')
                 if install_modules_pattern.split(',', 1)[0] not in ('*', '-*'):
                     install_modules_pattern = '-*,' + install_modules_pattern
-            config_data['install_module_pattern'] = self._parse_dynamic_entry(install_modules_pattern, build)
+            config_data['install_module_pattern'] = self._parse_dynamic_entry(install_modules_pattern, build, dynamic_vars)
 
             if 'test_tags' in current_step:
-                config_data['test_tags'] = self._parse_dynamic_entry(current_step.get('test_tags'), build)
+                config_data['test_tags'] = self._parse_dynamic_entry(current_step.get('test_tags'), build, dynamic_vars)
             config_data['test_enable'] = bool(current_step.get('test_enable') or current_step.get('test_tags'))
 
             if 'extra_params' in current_step:
-                config_data['extra_params'] = self._parse_dynamic_entry(current_step.get('extra_params'), build)
+                config_data['extra_params'] = self._parse_dynamic_entry(current_step.get('extra_params'), build, dynamic_vars)
 
             for key in ('screencast', 'demo_mode', 'enable_auto_tags'):
                 if key in current_step:
@@ -1593,6 +1657,7 @@ class ConfigStep(models.Model):
                 'addons_path': ",".join(build._get_addons_path()),
                 'exports': ",".join(exports.keys()),
                 'exports_paths': ",".join(exports.values()),
+                **dynamic_vars,
             }
             command = [shlex.quote(self._parse_dynamic_entry(part, build, values)) for part in command]
             pres = []
@@ -1614,23 +1679,23 @@ class ConfigStep(models.Model):
         db_suffix = re.sub(r'[^a-z0-9_\-]', '_', db_suffix.lower())
         return db_suffix
 
-    def _parse_dynamic_entry(self, entry, build, additional_dynamic_vars=None):
+    def _parse_dynamic_entry(self, entry, build, dynamic_vars):
         """
         transforms a module/test-tags entry dynamically
         """
-        dynamic_config = build.dynamic_config
-
         expression_filters = {
             'filter_all_modules': filter_all_modules,
             'filter_default_modules': filter_default_modules,
             'make_module_test_tags': make_module_test_tags,
             'select_existing_modules': select_existing_modules,
+            'get_dependencies': get_dependencies,
+            'get_dependant': get_dependant,
             'prepend': prepend_string,
             'append': append_string,
             'modified_modules': keep_modified_modules,
-            'modified_modules_or_base': keep_modified_modules_or_base,
+            'union': union,
         }
-        dynamic_vars = {**dynamic_config.get('vars', {}), **build.params_id.config_data.get('dynamic_vars', {}), **(additional_dynamic_vars or {})}
+        dynamic_vars = dynamic_vars or {}
 
         def parse_expression(match):
             # inspired by jinja but with limited features

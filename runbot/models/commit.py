@@ -3,7 +3,6 @@ import datetime
 import subprocess
 
 from ..common import os, RunbotException, make_github_session, transactioncache
-import glob
 import shutil
 
 from odoo import models, fields, api
@@ -66,22 +65,14 @@ class Commit(models.Model):
             return self
         return self._get(self.name, self.repo_id.id, self.read()[0], commit.id)
 
-    def _get_available_modules(self):
-        for manifest_file_name in self.repo_id.manifest_files.split(','):  # '__manifest__.py' '__openerp__.py'
-            for addons_path in (self.repo_id.addons_paths or '').split(','):  # '' 'addons' 'odoo/addons'
-                sep = os.path.join(addons_path, '*')
-                for manifest_path in glob.glob(self._source_path(sep, manifest_file_name)):
-                    module = os.path.basename(os.path.dirname(manifest_path))
-                    yield (addons_path, module, manifest_file_name)
-
     def _list_files(self, patterns):
         #example: git ls-files --with-tree=abcf390f90dbdd39fd61abc53f8516e7278e0931 ':(glob)addons/*/*.py' ':(glob)odoo/addons/*/*.py'
         # note that glob is needed to avoid the star matching **
         self.ensure_one()
+        self._fetch()
         return self.repo_id._git(['ls-files', '--with-tree', self.name, *patterns]).split('\n')
 
     def _list_available_modules(self):
-        # beta version, may replace _get_available_modules latter
         addons_paths = (self.repo_id.addons_paths or '').split(',')
         patterns = []
         for manifest_file_name in self.repo_id.manifest_files.split(','):  # '__manifest__.py' '__openerp__.py'
@@ -98,6 +89,7 @@ class Commit(models.Model):
                     module, manifest_file_name = elems
                 yield (addons_path, module, manifest_file_name)
 
+    @transactioncache  # hack to avoid to fetch two time the same commit inside the same transaction
     def _fetch(self):
         self.repo_id._fetch(self.name)
         if not self.repo_id._hash_exists(self.name):
@@ -170,12 +162,43 @@ class Commit(models.Model):
 
     @transactioncache
     def _git_show_file(self, file):
+        return self._git_show_files([file])[0]
+
+    def _git_show_files(self, files):
         self.ensure_one()
+        if not files:
+            return []
+
         self.repo_id._fetch(self.name)
+
+        queries = "\n".join([f"{self.name}:{f}" for f in files]) + "\n"
+
         try:
-            return self.repo_id._git(['show', '%s:%s' % (self.name, file)])
+            buffer = self.repo_id._git(
+                ['cat-file', '--batch'],
+                input_data=queries,
+                raw=True,
+            )
         except subprocess.CalledProcessError:
-            return False
+            return [False] * len(files)
+
+        results = []
+        offset = 0
+        buffer_len = len(buffer)
+        while offset < buffer_len:
+            newline_idx = buffer.find(b'\n', offset)
+            if newline_idx == -1:
+                break
+            header = buffer[offset:newline_idx].decode('utf-8')
+            offset = newline_idx + 1
+            try:
+                size_in_bytes = int(header.rsplit(' ', 1)[-1])
+            except ValueError:  # most likely missing
+                results.append(False)
+                continue
+            results.append(buffer[offset : offset + size_in_bytes].decode('utf-8', errors='replace'))
+            offset += size_in_bytes + 1
+        return results
 
     def _source_path(self, *paths):
         if not self.tree_hash:

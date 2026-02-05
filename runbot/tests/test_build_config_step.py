@@ -439,25 +439,58 @@ class TestBuildConfigStepDynamic(TestBuildConfigStepCommon):
                 }).id,
             'local_result': 'ok',
         })
+        self.module_dependencies = {
+            "test_mail": ["mail"],
+            "mail": ["web"],
+            "account": ["web"],
+            "crm": ["web"],
+            "project": ["web"],
+            "test_l10n": ["l10n_be", "l10n_in"],
+            "l10n_be": ["account"],
+            "l10n_in": ["account"],
+            "web_enterprise": ["web"],
+        }
 
-    def mock_git_helper(self, repo, cmd):
-        if repo == self.repo_odoo and cmd == ['show', 'dfdfcfcf0000ffffffffffffffffffffffffffff:odoo/tests/.runbot/parallel_testing.json']:
-            return self.config_file
-        elif repo == self.repo_odoo and cmd == ['show', 'dfdfcfcf0000ffffffffffffffffffffffffffff:odoo/tests/.runbot/l10n_standalone_testing.json']:
-            return self.l10n_standalone_testing_file
-        elif 'show' in cmd:
+    def mock_git_helper(self, repo, cmd, input_data=None, raw=False):
+        def make_catfile_output(commit, content):
+            content_bytes = content.encode('utf-8')
+            header = f"{commit} blob {len(content_bytes)}\n".encode()
+            result = header + content_bytes + b"\n"
+            return result
+
+        if cmd == ['cat-file', '--batch']:
+            if repo == self.repo_odoo and input_data == 'dfdfcfcf0000ffffffffffffffffffffffffffff:odoo/tests/.runbot/parallel_testing.json\n':
+                return make_catfile_output('dfdfcfcf0000ffffffffffffffffffffffffffff', self.config_file)
+            if repo == self.repo_odoo and input_data == 'dfdfcfcf0000ffffffffffffffffffffffffffff:odoo/tests/.runbot/l10n_standalone_testing.json\n':
+                return make_catfile_output('dfdfcfcf0000ffffffffffffffffffffffffffff', self.l10n_standalone_testing_file)
+
+            if "__manifest__.py" in input_data:
+                modules_info = [
+                    (line, line.split(':')[-1].split('/')[-2])
+                    for line in input_data.splitlines()
+                    if line.endswith('__manifest__.py')
+                ]
+                result = b""
+                for original_query, module in modules_info:
+                    content = '''{'name': '%s', 'depends': %s}''' % (module, self.module_dependencies.get(module, []))
+                    result += make_catfile_output(original_query.split(':')[0], content)
+                return result
+
+        if cmd == ['cat-file', '--batch']:
             raise subprocess.CalledProcessError(cmd, 128)
-        return super().mock_git_helper(repo, cmd)
+        elif 'diff' in cmd:
+            return 'odoo/addons/crm/some/file.py\nodoo/addons/project/some/file.py'
+        return super().mock_git_helper(repo, cmd, input_data, raw)
 
     def test_module_filters(self):
-        self.assertEqual(self.build._get_modules_to_test('-> !mail'), ['base', 'crm', 'documents'])
-        self.assertEqual(self.build._get_modules_to_test('mail -> !web'), ['mail', 'project', 'test_l10n', 'test_lint'])
+        self.assertEqual(self.build._get_modules_to_test('-> !mail'), ['account', 'base', 'crm', 'documents'])
+        self.assertEqual(self.build._get_modules_to_test('mail -> !web'), ['mail', 'project', 'test_l10n', 'test_lint', 'test_mail'])
         self.assertEqual(self.build._get_modules_to_test('web -> web'), ['web'])
         self.assertEqual(self.build._get_modules_to_test('!web ->'), ['web_enterprise'])
-        self.assertEqual(self.build._get_modules_to_test('-> !mail, -crm'), ['base', 'documents'])
-        self.assertEqual(self.build._get_modules_to_test('mail -> !web, !project'), ['mail', 'test_l10n', 'test_lint'])
-        self.assertEqual(self.build._get_modules_to_test('-*,odoo/*'), ['base', 'crm', 'hw_drivers', 'mail', 'project', 'test_l10n', 'test_lint', 'web'])
-        self.assertEqual(self.build._get_modules_to_test('-*,odoo/test_*'), ['test_l10n', 'test_lint'])
+        self.assertEqual(self.build._get_modules_to_test('-> !mail, -crm'), ['account', 'base', 'documents'])
+        self.assertEqual(self.build._get_modules_to_test('mail -> !web, !project'), ['mail', 'test_l10n', 'test_lint', 'test_mail'])
+        self.assertEqual(self.build._get_modules_to_test('-*,odoo/*'), ['account', 'base', 'crm', 'hw_drivers', 'mail', 'project', 'test_l10n', 'test_lint', 'test_mail', 'web'])
+        self.assertEqual(self.build._get_modules_to_test('-*,odoo/test_*'), ['test_l10n', 'test_lint', 'test_mail'])
         self.assertEqual(self.build._get_modules_to_test('-*,enterprise/*'), ['documents', 'l10n_be', 'l10n_in', 'web_enterprise'])
         self.assertEqual(self.build._get_modules_to_test('-*,web*'), ['web', 'web_enterprise'])
         self.assertEqual(self.build._get_modules_to_test('-*,web*,-enterprise/web*'), ['web'])
@@ -466,6 +499,35 @@ class TestBuildConfigStepDynamic(TestBuildConfigStepCommon):
         self.assertEqual(self.build.dynamic_config['steps'][1]['cpu_limit'], 6500)
         self.assertEqual(json.loads(self.config.default_dynamic_config)['vars']['module_filter'], '*,-hw_*')
         self.assertEqual(self.build.dynamic_config['vars']['module_filter'], '*,-hw_*,-l10n_*')
+
+    def test_parse_dynamic_entry(self):
+        Step = self.env['runbot.build.config.step']
+
+        def check_parse(entry, expected):
+            res = Step._parse_dynamic_entry(entry, self.build, {'key': 'value', 'test_method': '.test_method'})
+            self.assertEqual(res, expected)
+        check_parse('{{-test_*|filter_all_modules}}', 'account,base,crm,documents,hw_drivers,l10n_be,l10n_in,mail,project,web,web_enterprise')
+        check_parse('{{-*,web*|filter_all_modules}}', 'web,web_enterprise')
+        check_parse('{{-*,web*|filter_all_modules|make_module_test_tags}}', '/web,/web_enterprise')
+        check_parse('{{-*,web*|filter_all_modules|make_module_test_tags|prepend("some_tag")}}', 'some_tag/web,some_tag/web_enterprise')
+        check_parse('{{-*,web*|filter_all_modules|make_module_test_tags|prepend(key)}}', 'value/web,value/web_enterprise')
+        check_parse('{{-*,web*|filter_all_modules|make_module_test_tags|append(".test_method")}}', '/web.test_method,/web_enterprise.test_method')
+        check_parse('{{-*,web*|filter_all_modules|make_module_test_tags|append(test_method)}}', '/web.test_method,/web_enterprise.test_method')
+
+        self.patch(type(self.build), '_modified_modules', lambda cl, defaults=None: {'crm'})
+
+        check_parse('{{*|filter_all_modules|modified_modules}}', 'crm')
+
+    def test_modules_dependencies(self):
+        self.assertEqual(self.build._get_modules_dependencies(['test_mail'], 1), ['mail', 'test_mail'])
+        self.assertEqual(self.build._get_modules_dependencies(['test_mail']), ['base', 'mail', 'test_mail', 'web'])
+        self.assertEqual(self.build._get_modules_dependencies(['test_l10n']), ['account', 'base', 'l10n_be', 'l10n_in', 'test_l10n', 'web'])
+        self.assertEqual(self.build._get_modules_dependencies(['test_mail', 'test_l10n']), ['account', 'base', 'l10n_be', 'l10n_in', 'mail', 'test_l10n', 'test_mail', 'web'])
+        self.assertEqual(self.build._get_modules_dependencies(['test_mail', 'test_l10n'], 1), ['l10n_be', 'l10n_in', 'mail', 'test_l10n', 'test_mail'])
+
+        self.assertEqual(self.build._get_dependant_modules(['account'], 1), ['account', 'l10n_be', 'l10n_in'])
+        self.assertEqual(self.build._get_dependant_modules(['account']), ['account', 'l10n_be', 'l10n_in', 'test_l10n'])
+        self.assertEqual(self.build._get_dependant_modules(['base']), ['account', 'base', 'crm', 'documents', 'hw_drivers', 'l10n_be', 'l10n_in', 'mail', 'project', 'test_l10n', 'test_lint', 'test_mail', 'web', 'web_enterprise'])
 
     def check_server_cmd(self, cmd, install, test_enable, test_tags, db=None):
         self.assertIn('odoo/server.py', cmd)
@@ -537,7 +599,7 @@ class TestBuildConfigStepDynamic(TestBuildConfigStepCommon):
         cmd = self.docker_run_calls[0][0]
         odoo_cmd = cmd.cmd
         self.check_server_cmd(odoo_cmd,
-            install=['base', 'crm', 'documents', 'mail', 'project', 'test_l10n', 'test_lint', 'web', 'web_enterprise'],
+            install=['account', 'base', 'crm', 'documents', 'mail', 'project', 'test_l10n', 'test_lint', 'test_mail', 'web', 'web_enterprise'],
             test_enable=False,
             test_tags=None,
             db=f'{build.dest}-all',
@@ -572,7 +634,7 @@ class TestBuildConfigStepDynamic(TestBuildConfigStepCommon):
         cmd = self.docker_run_calls[0][0]
         odoo_cmd = cmd.cmd
         self.check_server_cmd(odoo_cmd,
-            install=['base', 'crm', 'documents', 'mail', 'project', 'test_l10n', 'test_lint', 'web', 'web_enterprise'],
+            install=['account', 'base', 'crm', 'documents', 'mail', 'project', 'test_l10n', 'test_lint', 'test_mail', 'web', 'web_enterprise'],
             test_enable=True,
             test_tags='-post_install,-/test_lint',
         )
@@ -589,8 +651,8 @@ class TestBuildConfigStepDynamic(TestBuildConfigStepCommon):
         )
 
         for post_install, expected_tags in [
-            (post_install_1, '-at_install,/base,/crm,/documents,/hw_drivers,/l10n_be,/l10n_in'),  # we need the blacklisted modules here
-            (post_install_2, '-at_install,/mail,/project,/test_l10n,/test_lint'),
+            (post_install_1, '-at_install,/account,/base,/crm,/documents,/hw_drivers,/l10n_be,/l10n_in'),  # we need the blacklisted modules here
+            (post_install_2, '-at_install,/mail,/project,/test_l10n,/test_lint,/test_mail'),
             (post_install_3, '-at_install,/web'),
             (post_install_4, '-at_install,/web_enterprise'),
         ]:
@@ -694,7 +756,7 @@ class TestBuildConfigStepDynamic(TestBuildConfigStepCommon):
             (post_install_1, '-external,-external_l10n,post_install_l10n/l10n_hr_payroll_be,post_install_l10n/l10n_hr_payroll_in'),  # we need the blacklisted modules here
             (post_install_2, '-external,-external_l10n,post_install_l10n/l10n_edi_be,post_install_l10n/l10n_edi_in'),
             (post_install_3, '-external,-external_l10n,post_install_l10n/l10n_reports_be,post_install_l10n/l10n_reports_in'),
-            (post_install_4, Like('-external,-external_l10n,post_install_l10n/base,post_install_l10n/crm,...')),
+            (post_install_4, Like('-external,-external_l10n,post_install_l10n/account,post_install_l10n/base,post_install_l10n/crm,...')),
         ]:
             with self.subTest(post_install=expected_tags):
                 # 4.1 post install restore
@@ -738,6 +800,7 @@ class TestBuildConfigStepDynamic(TestBuildConfigStepCommon):
         self.config.step_ids[0]._run_dynamic(self.build)
         self.assertEqual(self.build.children_ids.mapped('description'),
             [
+                'Post install tests for **account**',
                 'Post install tests for **base**',
                 'Post install tests for **crm**',
                 'Post install tests for **documents**',
@@ -767,31 +830,154 @@ class TestBuildConfigStepDynamic(TestBuildConfigStepCommon):
             }]
         }'''
 
-        self.patch(type(self.build), '_modified_modules', lambda cl: {'crm'})
+        self.patch(type(self.build), '_modified_modules', lambda cl, defaults=None: {'crm'})
         self.config.default_dynamic_config = dynamic_config
         self.config.step_ids[0]._run_dynamic(self.build)
         self.assertEqual(self.build.children_ids.mapped('description'),
-            [
-                'Post install tests for **crm**',
+        [
+            'Post install tests for **crm**',
         ])
 
-    def test_parse_dynamic_entry(self):
-        Step = self.env['runbot.build.config.step']
+    def test_modified_existing_module(self):
+        dynamic_config = '''{
+            "vars": {
+                "modified_modules": "{{*|filter_all_modules|modified_modules}}",
+                "test_modules": "{{modified_modules|prepend('test_')|select_existing_modules}}",
+                "modules_to_test": "{{modified_modules|union(test_modules)}}"
+            },
+            "name": "Foreach module testing",
+            "steps": [{
+                "name": "Create module builds",
+                "job_type": "create_build",
+                "children": [{
+                    "name": "Test single module",
+                    "description": "Post install tests for **{{modules_to_test}}**",
+                    "steps": [{
+                        "name": "Start single module test",
+                        "job_type": "odoo",
+                        "install_modules": "{{modules_to_test}}",
+                        "test_tags": "{{modules_to_test|make_module_test_tags}}"
+                    }]
+                }]
+            }]
+        }'''
 
-        def check_parse(entry, expected):
-            res = Step._parse_dynamic_entry(entry, self.build, {'key': 'value', 'test_method': '.test_method'})
-            self.assertEqual(res, expected)
-        check_parse('{{-test_*|filter_all_modules}}', 'base,crm,documents,hw_drivers,l10n_be,l10n_in,mail,project,web,web_enterprise')
-        check_parse('{{-*,web*|filter_all_modules}}', 'web,web_enterprise')
-        check_parse('{{-*,web*|filter_all_modules|make_module_test_tags}}', '/web,/web_enterprise')
-        check_parse('{{-*,web*|filter_all_modules|make_module_test_tags|prepend("some_tag")}}', 'some_tag/web,some_tag/web_enterprise')
-        check_parse('{{-*,web*|filter_all_modules|make_module_test_tags|prepend(key)}}', 'value/web,value/web_enterprise')
-        check_parse('{{-*,web*|filter_all_modules|make_module_test_tags|append(".test_method")}}', '/web.test_method,/web_enterprise.test_method')
-        check_parse('{{-*,web*|filter_all_modules|make_module_test_tags|append(test_method)}}', '/web.test_method,/web_enterprise.test_method')
+        self.patch(type(self.build), '_modified_modules', lambda cl, defaults=None: {'crm', 'mail'})
+        self.config.default_dynamic_config = dynamic_config
+        self.config.step_ids[0]._run_dynamic(self.build)
+        self.assertEqual(self.build.children_ids.mapped('description'),
+        [
+                'Post install tests for **crm,mail,test_mail**',
+        ])
+        child_dynamic_vars = self.build.children_ids.params_id.config_data['dynamic_vars']
+        self.assertEqual(child_dynamic_vars, {
+            'modified_modules': 'crm,mail',
+            'test_modules': 'test_mail',
+            'modules_to_test': 'crm,mail,test_mail',
+        })
 
-        self.patch(type(self.build), '_modified_modules', lambda cl: {'crm'})
+    def test_modified_existing_module_parallel(self):
+        dynamic_config = '''{
+            "vars": {
+                "modified_modules": "{{*|filter_all_modules|modified_modules}}",
+                "modules_to_test": "{{modified_modules|prepend('test_')|select_existing_modules|union(modified_modules)}}"
+            },
+            "name": "Parallel split modified",
+            "steps": [{
+                "name": "Create module builds",
+                "job_type": "create_build",
+                "for_each_vars": [{
+                        "test_module_filter": "{{modules_to_test}},->!mail"
+                    },
+                    {
+                        "test_module_filter": "{{modules_to_test}},mail->!website"
+                    },
+                    {
+                        "test_module_filter": "{{modules_to_test}},website->"
+                    }
+                ],
+                "if": "{{child_modules_to_test}}",
+                "children": [{
+                    "vars": {
+                        "child_modules_to_test": "{{test_module_filter|select_existing_modules}}"
+                    },
+                    "name": "Test single module",
+                    "description": "Post install tests for **{{child_modules_to_test}}**",
+                    "steps": [{
+                        "name": "Start single module test",
+                        "job_type": "odoo",
+                        "install_modules": "{{child_modules_to_test}}",
+                        "test_tags": "{{child_modules_to_test|make_module_test_tags}}"
+                    }]
+                }]
+            }]
+        }'''
 
-        check_parse('{{*|filter_all_modules|modified_modules}}', 'crm')
+        self.patch(type(self.build), '_modified_modules', lambda cl, defaults=None: {'crm', 'mail'})
+        self.config.default_dynamic_config = dynamic_config
+        self.config.step_ids[0]._run_dynamic(self.build)
+        self.assertEqual(self.build.children_ids.mapped('description'),
+        [
+                'Post install tests for **crm**',
+                'Post install tests for **mail,test_mail**',
+        ])
+
+        self.assertEqual(self.build.children_ids[0].params_id.config_data['dynamic_vars']['child_modules_to_test'], 'crm')
+        self.assertEqual(self.build.children_ids[1].params_id.config_data['dynamic_vars']['child_modules_to_test'], 'mail,test_mail')
+
+    def test_modified_existing_module_parallel_relations(self):
+        dynamic_config = '''{
+            "vars": [
+                {"module_filter": "*,-hw_*,-*l10n_*,-theme_*,-account_bacs,-account_reports_cash_basis,-auth_ldap,-base_gengo,-document_ftp,-iot_drivers,-note_pad,-odoo_referral,-odoo_referral_portal,-pad,-pad_project,-pos_blackbox_be,-pos_cache,-pos_six,-social_demo,-website_gengo,-website_instantclick,test_l10n_be_hr_payroll_account,test_l10n_us_hr_payroll_account"},
+                {"_modified_modules": "{{module_filter|filter_all_modules|modified_modules}}"},
+                {"_modules_dependencies": "{{_modified_modules|get_dependencies(1)}}"},
+                {"_dependant_modules": "{{_modified_modules|get_dependant(1)}}"},
+                {"_test_modules": "{{_modified_modules|prepend('test_')|select_existing_modules}}"},
+                {"_modules_to_test": "{{_modified_modules|union(_test_modules)|union(_dependant_modules)|union(_modules_dependencies)}}"}
+            ],
+            "name": "Parallel split modified",
+            "steps": [{
+                "name": "Create module builds",
+                "job_type": "create_build",
+                "for_each_vars": [{
+                        "_test_module_filter": "{{_modules_to_test}},->!mail"
+                    },
+                    {
+                        "_test_module_filter": "{{_modules_to_test}},mail->!website"
+                    },
+                    {
+                        "_test_module_filter": "{{_modules_to_test}},website->"
+                    }
+                ],
+                "if": "{{child_modules_to_test}}",
+                "log": "Modified modules: {{_modified_modules}}\\nDepenencies: {{_modules_dependencies}}\\nDependant: {{_dependant_modules}}\\nTest modules: {{_test_modules}}",
+                "children": [{
+                    "vars": {
+                        "child_modules_to_test": "{{_test_module_filter|select_existing_modules}}"
+                    },
+                    "name": "Test single module",
+                    "description": "Post install tests for **{{child_modules_to_test}}**",
+                    "steps": [{
+                        "name": "Start single module test",
+                        "job_type": "odoo",
+                        "install_modules": "{{child_modules_to_test}}",
+                        "test_tags": "{{child_modules_to_test|make_module_test_tags}}"
+                    }]
+                }]
+            }]
+        }'''
+
+        self.patch(type(self.build), '_modified_modules', lambda cl, defaults=None: {'crm', 'mail'})
+        self.config.default_dynamic_config = dynamic_config
+        self.config.step_ids[0]._run_dynamic(self.build)
+        self.assertEqual(self.build.children_ids.mapped('description'),
+        [
+                'Post install tests for **crm**',
+                'Post install tests for **mail,test_mail,web**',
+        ])
+        self.assertEqual(self.build.children_ids[0].params_id.config_data['dynamic_vars']['child_modules_to_test'], 'crm')
+        self.assertEqual(self.build.children_ids[1].params_id.config_data['dynamic_vars']['child_modules_to_test'], 'mail,test_mail,web')
+        self.assertEqual(list(self.build.children_ids[0].params_id.config_data['dynamic_vars'].keys()), ['module_filter', 'child_modules_to_test'])
 
 
 class TestBuildConfigStep(TestBuildConfigStepCommon):

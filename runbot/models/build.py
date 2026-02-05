@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import ast
 import datetime
 import getpass
 import hashlib
@@ -10,23 +10,36 @@ import re
 import shutil
 import time
 import uuid
-
 from collections import defaultdict
-from dateutil import parser
 from pathlib import Path
+
+from dateutil import parser
 from psycopg2 import sql
 from psycopg2.extensions import TransactionRollbackError
 
-from ..common import dt2time, now, grep, local_pgadmin_cursor, dest_reg, os, list_local_dbs, pseudo_markdown, RunbotException, findall, sanitize, markdown_escape, tail
-from ..container import docker_stop, docker_state, Command, docker_run, docker_pull
-from ..fields import JsonDictField
-
-from odoo import models, fields, api
-
+from odoo import api, fields, models
 from odoo.exceptions import ValidationError
 from odoo.tools import file_open, file_path
 from odoo.tools.safe_eval import safe_eval
 
+from ..common import (
+    RunbotException,
+    dest_reg,
+    dt2time,
+    findall,
+    grep,
+    list_local_dbs,
+    local_pgadmin_cursor,
+    markdown_escape,
+    now,
+    os,
+    pseudo_markdown,
+    sanitize,
+    tail,
+    transactioncache,
+)
+from ..container import Command, docker_pull, docker_run, docker_state, docker_stop
+from ..fields import JsonDictField
 
 _logger = logging.getLogger(__name__)
 
@@ -60,7 +73,6 @@ def remove_readonly(func, path_str, exinfo):
 
 def make_selection(array):
     return [(elem, elem.replace('_', ' ').capitalize()) if isinstance(elem, str) else elem for elem in array]
-
 
 class BuildParameters(models.Model):
     _name = 'runbot.build.params'
@@ -1091,25 +1103,28 @@ class BuildResult(models.Model):
 
         return exports
 
+    def _list_available_modules(self):
+        for commit in self.env.context.get('defined_commit_ids') or self.params_id.commit_ids:
+            for (addons_path, module, manifest_file_name) in commit._list_available_modules():
+                yield commit, addons_path, module, manifest_file_name
+
     def _get_available_modules(self):
         all_modules = dict()
         available_modules = defaultdict(list)
         # repo_modules = []
-        for commit in self.env.context.get('defined_commit_ids') or self.params_id.commit_ids:
-            for (addons_path, module, manifest_file_name) in commit._get_available_modules():
-                if module in all_modules:
-                    self._log(
-                        'Building environment',
-                        '%s is a duplicated modules (found in "%s", already defined in %s)' % (
-                            module,
-                            commit._source_path(addons_path, module, manifest_file_name),
-                            all_modules[module]._source_path(addons_path, module, manifest_file_name)),
-                        level='WARNING',
-                    )
-                else:
-                    available_modules[commit.repo_id].append(module)
-                    all_modules[module] = commit
-        # return repo_modules, available_modules
+        for commit, addons_path, module, manifest_file_name in self._list_available_modules():
+            if module in all_modules:
+                self._log(
+                    'Building environment',
+                    '%s is a duplicated modules (found in "%s", already defined in %s)' % (
+                        module,
+                        commit._source_path(addons_path, module, manifest_file_name),
+                        all_modules[module]._source_path(addons_path, module, manifest_file_name)),
+                    level='WARNING',
+                )
+            else:
+                available_modules[commit.repo_id].append(module)
+                all_modules[module] = commit
         return available_modules
 
     def _get_modules_to_test(self, modules_patterns=''):
@@ -1119,6 +1134,49 @@ class BuildResult(models.Model):
         params_patterns = (self.params_id.modules or '').split(',')
         modules_patterns = (modules_patterns or '').split(',')
         return trigger._filter_modules_to_test(modules, params_patterns + modules_patterns)  # we may switch params_patterns and modules_patterns order
+
+    @transactioncache
+    def _dependency_graph(self):
+        dependency_graph = defaultdict(set)
+        dependant_graph = defaultdict(set)
+        for commit in self.env.context.get('defined_commit_ids') or self.params_id.commit_ids:
+            file_paths = []
+            modules = []
+            for (addons_path, module, manifest_file_name) in commit._list_available_modules():
+                file_paths.append(os.path.join(addons_path, module, manifest_file_name))
+                modules.append(module)
+            contents = commit._git_show_files(file_paths)
+            for module, manifest in zip(modules, contents):
+                manifest_content = ast.literal_eval(manifest)
+                depends = manifest_content.get('depends', [])
+                if not depends and module != 'base':
+                    depends = ['base']
+                for dep in depends:
+                    dependency_graph[module].add(dep)
+                    dependant_graph[dep].add(module)
+        return dependency_graph, dependant_graph
+
+    def search_modules_graph(self, modules, graph, depth=None):
+        def search(modules, depth=None, visited=None):
+            visited = visited or set()
+            modules = set(modules) - visited
+            visited |= modules
+            dependencies = set(modules)
+            if depth == 0 or not modules:
+                return dependencies
+            for module in modules:
+                dependencies |= search(graph[module], depth - 1 if depth is not None else None, visited)
+            return dependencies
+        return sorted(search(modules, depth))
+
+    def _get_modules_dependencies(self, modules, depth=None):
+        self.ensure_one()
+        dependency_graph, _ = self._dependency_graph()
+        return self.search_modules_graph(modules, dependency_graph, depth)
+
+    def _get_dependant_modules(self, modules, depth=None):
+        _, dependant_graph = self._dependency_graph()
+        return self.search_modules_graph(modules, dependant_graph, depth)
 
     def _local_pg_dropdb(self, dbname):
         msg = ''
@@ -1249,13 +1307,17 @@ class BuildResult(models.Model):
                 modified_files[commit_link] = files
         return modified_files
 
-    def _modified_modules(self, commit_link_links=None):
+    def _modified_modules(self, commit_link_links=None, defaults=None):
         modified_files = self._modified_files(commit_link_links)
         modified_modules = set()
         for commit_link, files in modified_files.items():
             commit = commit_link.commit_id
             for file in files:
-                modified_modules.add(commit.repo_id._get_module(file))
+                module = commit.repo_id._get_module(file)
+                if module:
+                    modified_modules.add(module)
+                elif defaults:
+                    modified_modules |= set(defaults)
         return modified_modules
 
     def _get_upgrade_path(self):

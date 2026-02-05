@@ -91,14 +91,9 @@
                                         </t><t t-else="">
                                             <a role="button" t-attf-class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/triggers/auto_all">Default</a>
                                         </t>
-                                         <t t-if="current_mode=='force'">
-                                            <button role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers">Force all</button>
-                                        </t><t t-else="">
-                                            <a role="button" t-attf-class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/triggers/force_all">Force all</a>
-                                        </t>
-                                        <button role="button" t-attf-class="btn btn-{{'primary' if current_mode=='custom' else 'default'}} btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers" aria-expanded="false" aria-controls="customTriggers"> Custom <i class="fa fa-caret-down ms-1"/></button>
+                                        <button t-if="bundle.trigger_custom_ids" role="button" t-attf-class="btn btn-{{'primary' if current_mode in ('custom', 'force') else 'default'}} btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers" aria-expanded="false" aria-controls="customTriggers"> Custom <i class="fa fa-caret-down ms-1"/></button>
                                         <a t-if="needs_update" role="button" class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/force"><i class="fa fa-play"/> Apply</a>
-                                        <div t-attf-class="collapse {{'show' if expand_custom else ''}}" id="customTriggers">
+                                        <div t-if="bundle.trigger_custom_ids" t-attf-class="collapse {{'show' if expand_custom else ''}}" id="customTriggers">
                                             <div class="card card-body mt-2">
                                                 <t t-foreach="bundle.trigger_custom_ids" t-as="trigger_custom">
                                                     <t t-set="trigger_enabled_by_default" t-value="trigger_custom.trigger_id.repo_ids &amp; modified_repos"/>

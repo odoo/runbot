@@ -12,6 +12,8 @@
                             <field name="extra_params"/>
                             <field name="dockerfile_id"/>
                             <field name="dump_db"/>
+                            <field name="config_data" widget="runbotjsonb" readonly="0"/>
+                            <field name="dynamic_config" widget="runbotjsonb" readonly="0"/>
                         </group>
                         <group colspan="2">
                             <field name="trigger_id"/>

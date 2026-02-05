@@ -259,7 +259,10 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
     else:
         run_cmd = cmd
     run_cmd = f'cd /data/build;touch start-{container_name};{run_cmd};cd /data/build;touch end-{container_name}'
-    _logger.info('Docker run command: %s', run_cmd)
+    run_cmd_repr = str(run_cmd)
+    if len(run_cmd_repr) > 250:
+        run_cmd_repr = run_cmd_repr[:250] + '...'
+    _logger.info('Docker run command: %s', run_cmd_repr)
     docker_clear_state(container_name, build_dir)  # ensure that no state are remaining
     build_dir = file_path(build_dir)
 

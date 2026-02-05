@@ -503,11 +503,19 @@ class Repo(models.Model):
         cmd = ['git', '-C', self.path] + config_args + cmd
         return cmd
 
-    def _git(self, cmd, errors='strict', quiet=False):
+    def _git(self, cmd, errors='strict', quiet=False, input_data=None, raw=False):
         cmd = self._get_git_command(cmd, errors)
         if not quiet:
             _logger.info("git command: %s", shlex.join(cmd))
-        return subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode(errors=errors)
+        kwargs = {'stderr': subprocess.STDOUT}
+        if input_data is not None:
+            if isinstance(input_data, str):
+                input_data = input_data.encode('utf-8')
+            kwargs['input'] = input_data
+        output = subprocess.check_output(cmd, **kwargs)
+        if raw:
+            return output
+        return output.decode(errors=errors)
 
     def _fetch(self, sha):
         if not self._hash_exists(sha):

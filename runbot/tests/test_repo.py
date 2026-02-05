@@ -372,7 +372,7 @@ class TestFetch(RunbotCase):
         self.fetch_count = 0
         self.force_failure = False
 
-    def mock_git_helper(self, repo, cmd):
+    def mock_git_helper(self, repo, cmd, input_data=None, raw=False):
         self.assertIn('fetch', cmd)
         self.fetch_count += 1
         if self.fetch_count < 3 or self.force_failure:
@@ -457,7 +457,7 @@ class TestGetRefs(RunbotCase):
         super().setUp()
         self.test_refs = []
 
-    def mock_git_helper(self, repo, cmd):
+    def mock_git_helper(self, repo, cmd, input_data=None, raw=False):
         self.assertIn('for-each-ref', cmd)
         self.assertIn('refs/*/pull/*', cmd)
         return '\n'.join(['\x00'.join(ref_data) for ref_data in self.test_refs])
