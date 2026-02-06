@@ -13,7 +13,7 @@ from markupsafe import Markup
 from werkzeug.urls import url_join
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tools import SQL, lazy, ormcache
 from odoo.fields import Domain
 
@@ -538,6 +538,12 @@ class BuildError(models.Model):
                         raise UserError("This error as a test-tag and can only be (de)activated by admin")
                     if not vals['active'] and build_error.active and build_error.last_seen_date and build_error.last_seen_date + relativedelta(days=1) > datetime.datetime.now():
                         raise UserError("This error broke less than one day ago can only be deactivated by admin")
+
+        writable_fields = ['responsible', 'fixing_pr_id', 'breaking_pr_id', 'customer', 'random', 'team_id', 'manual_team_id']
+        if not self.env.su and not self.env.user.has_groups('runbot.group_runbot_admin,runbot.group_runbot_error_manager'):
+            no_access_fields = vals.keys() - writable_fields
+            if no_access_fields != set():
+                raise AccessError(f"You are not allowed to modify the following field(s): {','.join(no_access_fields)}")
 
         if (responsible_id := vals.get('responsible')) and vals.get('active', True):
             responsible = self.env['res.users'].browse(responsible_id)
