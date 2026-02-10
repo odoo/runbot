@@ -594,6 +594,10 @@ class BuildError(models.Model):
             if previous_error.team_id:
                 if not error.team_id:
                     error.team_id = previous_error.team_id
+            if previous_error.breaking_pr_id and not error.breaking_pr_id:
+                error.breaking_pr_id = previous_error.breaking_pr_id
+            if previous_error.fixing_pr_id and not error.fixing_pr_id:
+                error.fixing_pr_id = previous_error.fixing_pr_id
             previous_error.error_content_ids.with_context(merging=True).write({'error_id': self})
             previous_error.common_qualifiers = dict()
             previous_error.unique_qualifiers = dict()
