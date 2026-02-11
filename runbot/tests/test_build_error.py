@@ -204,6 +204,21 @@ class TestBuildError(TestBuildErrorCommon):
         self.assertEqual(error_b.test_tags, False)
         self.assertEqual(error_b.active, False)
 
+    def test_merge_pr_ids(self):
+        error_a = self.BuildError.create({
+            'content': 'foo',
+        })
+        error_b = self.BuildError.create({
+            'content': 'bar',
+            'breaking_pr_id': self.dev_pr.id,
+            'fixing_pr_id': self.dev_pr.id,
+        })
+
+        error_a._merge(error_b)
+
+        self.assertEqual(error_a.fixing_pr_id, self.dev_pr)
+        self.assertEqual(error_a.breaking_pr_id, self.dev_pr)
+
     def test_relink_contents(self):
         build_a = self.create_test_build({'local_result': 'ko', 'local_state': 'done'})
         error_content_a = self.BuildErrorContent.create({'content': 'foo bar'})

@@ -572,7 +572,7 @@ class BuildError(models.Model):
         # TODO xdo split the error id change and other params merge in order to avoid the merge in write and write in merge recursion
         self.ensure_one
         error = self
-        fields_to_merge = ['responsible', 'fixing_pr_id']
+        fields_to_merge = ['responsible', 'fixing_pr_id', 'breaking_pr_id']
         fields_to_copy = ['manual_team_id']
         for previous_error in others:
             # todo, check that all relevant fields are checked and transfered/logged
