@@ -117,33 +117,48 @@ class TestCodeowner(TestBuildConfigStepCommon):
         self.assertEqual('module_addons', self.repo_enterprise._get_module('enterprise/module_addons/some/file.py'))
         self.assertEqual(None, self.repo_odoo._get_module('odoo/core/module1/some/file.py'))
         self.assertEqual(None, self.repo_odoo._get_module('odoo/core/module/some/file.py'))
+
     def test_codeowner_regex_multiple(self):
-        self.diff = 'file.js\nfile.py\nfile.xml'
+        self.diff = 'addons/module/file.js\naddons/module/file.py\naddons/module/file.xml'
         self.config_step._run_codeowner(self.parent_build)
         messages = self.parent_build.log_ids.mapped('message')
         self.assertEqual(messages[1], 'Checking 2 codeowner regexed on 3 files')
-        self.assertEqual(markdown_unescape(messages[2]), 'Adding team_js to reviewers for file [odoo/file.js](https://False/blob/dfdfcfcf/file.js)')
-        self.assertEqual(markdown_unescape(messages[3]), 'Adding team_py to reviewers for file [odoo/file.py](https://False/blob/dfdfcfcf/file.py)')
-        self.assertEqual(markdown_unescape(messages[4]), 'Adding codeowner-team to reviewers for file [odoo/file.xml](https://False/blob/dfdfcfcf/file.xml)')
+        self.assertEqual(markdown_unescape(messages[2]), 'Adding team_js to reviewers for file [odoo/addons/module/file.js](https://False/blob/dfdfcfcf/addons/module/file.js)')
+        self.assertEqual(markdown_unescape(messages[3]), 'Adding team_py to reviewers for file [odoo/addons/module/file.py](https://False/blob/dfdfcfcf/addons/module/file.py)')
+        self.assertEqual(markdown_unescape(messages[4]), 'Adding codeowner-team to reviewers for file [odoo/addons/module/file.xml](https://False/blob/dfdfcfcf/addons/module/file.xml)')
         self.assertEqual(markdown_unescape(messages[5]), 'Requesting review for pull request [base/odoo:1234](https://example.com/base/odoo/pull/1234): codeowner-team, team_js, team_py')
         self.assertEqual(self.dev_pr.reviewers, 'codeowner-team,team_js,team_py')
 
+    def test_codeowner_root_file(self):
+        self.diff = 'addons/module/file.js\naddons/module/file.py\naddons/module/file.xml\ntest_file'
+        self.config_step._run_codeowner(self.parent_build)
+        messages = self.parent_build.log_ids.mapped('message')
+        self.assertEqual(messages[1], 'Checking 2 codeowner regexed on 4 files')
+        self.assertEqual(markdown_unescape(messages[2]), 'File odoo/test_file is at the root level and it looks like it could be a mistake, remove it or ensure that a codeowner rule is added for this file')
+        self.assertEqual(markdown_unescape(messages[3]), 'Adding team_js to reviewers for file [odoo/addons/module/file.js](https://False/blob/dfdfcfcf/addons/module/file.js)')
+        self.assertEqual(markdown_unescape(messages[4]), 'Adding team_py to reviewers for file [odoo/addons/module/file.py](https://False/blob/dfdfcfcf/addons/module/file.py)')
+        self.assertEqual(markdown_unescape(messages[5]), 'Adding codeowner-team to reviewers for file [odoo/addons/module/file.xml](https://False/blob/dfdfcfcf/addons/module/file.xml)')
+        self.assertEqual(markdown_unescape(messages[6]), 'No reviewer for file [odoo/test_file](https://False/blob/dfdfcfcf/test_file)')
+        self.assertEqual(markdown_unescape(messages[7]), 'Requesting review for pull request [base/odoo:1234](https://example.com/base/odoo/pull/1234): codeowner-team, team_js, team_py')
+        self.assertEqual(self.dev_pr.reviewers, 'codeowner-team,team_js,team_py')
+        self.assertEqual(self.parent_build.local_result, 'ko')
+
     def test_codeowner_regex_some_already_on(self):
-        self.diff = 'file.js\nfile.py\nfile.xml'
+        self.diff = 'addons/module/file.js\naddons/module/file.py\naddons/module/file.xml'
         self.dev_pr.reviewers = 'codeowner-team,team_js'
         self.config_step._run_codeowner(self.parent_build)
         messages = self.parent_build.log_ids.mapped('message')
         self.assertEqual(markdown_unescape(messages[5]), 'Requesting review for pull request [base/odoo:1234](https://example.com/base/odoo/pull/1234): team_py')
 
     def test_codeowner_regex_all_already_on(self):
-        self.diff = 'file.js\nfile.py\nfile.xml'
+        self.diff = 'addons/module/file.js\naddons/module/file.py\naddons/module/file.xml'
         self.dev_pr.reviewers = 'codeowner-team,team_js,team_py'
         self.config_step._run_codeowner(self.parent_build)
         messages = self.parent_build.log_ids.mapped('message')
         self.assertEqual(messages[5], 'All reviewers are already on pull request [base/odoo:1234](https://example.com/base/odoo/pull/1234)')
 
     def test_codeowner_author_in_team(self):
-        self.diff = 'file.js\nfile.py\nfile.xml'
+        self.diff = 'addons/module/file.js\naddons/module/file.py\naddons/module/file.xml'
         self.team1.github_team = 'team_py'
         self.team1.github_logins = 'some_member,another_member'
         self.team1.skip_team_pr = True

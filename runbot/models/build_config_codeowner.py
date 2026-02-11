@@ -34,7 +34,7 @@ class ConfigStep(models.Model):
                 team_set |= set(t.strip() for t in github_teams)
         return list(regexes.items())
 
-    def _reviewer_per_file(self, files, regexes, ownerships, repo):
+    def _reviewer_per_file(self, files, regexes, ownerships, repo, build):
         reviewer_per_file = {}
         for file in files:
             file_reviewers = set()
@@ -42,7 +42,7 @@ class ConfigStep(models.Model):
                 if re.match(regex, file):
                     if not teams or 'none' in teams:
                         file_reviewers = None
-                        break # blacklisted, break
+                        break  # blacklisted, break
                     file_reviewers |= teams
             if file_reviewers is None:
                 continue
@@ -56,8 +56,11 @@ class ConfigStep(models.Model):
                 for ownership in ownerships:
                     if file_module == ownership.module_id.name:
                         file_reviewers.add(ownership.team_id.github_team)
-            if not file_reviewers and self.fallback_reviewer:
-                file_reviewers.add(self.fallback_reviewer)
+            if not file_reviewers:
+                if len(file.split('/')) <= 2:
+                    build._log('', 'File %s is at the root level and it looks like it could be a mistake, remove it or ensure that a codeowner rule is added for this file', file, log_type='markdown', level="ERROR")
+                elif self.fallback_reviewer:
+                    file_reviewers.add(self.fallback_reviewer)
             reviewer_per_file[file] = file_reviewers
         return reviewer_per_file
 
@@ -121,7 +124,7 @@ class ConfigStep(models.Model):
         for commit_link, files in modified_files.items():
             build._log('', 'Checking %s codeowner regexed on %s files' % (len(regexes), len(files)))
             reviewers = set()
-            reviewer_per_file = self._reviewer_per_file(files, regexes, ownerships, commit_link.commit_id.repo_id)
+            reviewer_per_file = self._reviewer_per_file(files, regexes, ownerships, commit_link.commit_id.repo_id, build)
             for file, file_reviewers in reviewer_per_file.items():
                 href = 'https://%s/blob/%s/%s' % (commit_link.branch_id.remote_id.base_url, commit_link.commit_id.name, file.split('/', 1)[-1])
                 if file_reviewers:
