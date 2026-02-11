@@ -1212,11 +1212,11 @@ class ConfigStep(models.Model):
 
             check_logs = current_step.get('check_logs')
             expected_logs = current_step.get('expected_logs')
-            if current_step['job_type'] == 'script':
+            if current_step['job_type'] == 'command':
                 if check_logs is None:
                     check_logs = ['ERROR', 'WARNING']
                 if expected_logs is None:
-                    expected_logs = ['scripts executed in']
+                    expected_logs = ['executed in']
 
         log_time = self._get_log_last_write(build)
         if log_time:
