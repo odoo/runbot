@@ -207,12 +207,14 @@
         <field name="name">Build Configs</field>
         <field name="res_model">runbot.build.config</field>
         <field name="view_mode">list,form</field>
+        <field name="path">config</field>
     </record>
 
     <record id="open_view_job_tree" model="ir.actions.act_window">
         <field name="name">Build Config Steps</field>
         <field name="res_model">runbot.build.config.step</field>
         <field name="view_mode">list,form</field>
+        <field name="path">config-step</field>
     </record>
 
 

@@ -16,6 +16,7 @@
       <field name="name">Warnings</field>
       <field name="res_model">runbot.warning</field>
       <field name="view_mode">list</field>
+      <field name="path">warning</field>
     </record>
 
   </data>

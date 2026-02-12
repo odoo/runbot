@@ -215,30 +215,35 @@
       <field name="name">Runbot Dashboards Tiles</field>
       <field name="res_model">runbot.dashboard.tile</field>
       <field name="view_mode">list,form</field>
+        <field name="path">dashboard-tile</field>
     </record>
 
     <record id="open_view_runbot_team" model="ir.actions.act_window">
       <field name="name">Runbot teams</field>
       <field name="res_model">runbot.team</field>
       <field name="view_mode">list,form</field>
+      <field name="path">team</field>
     </record>
 
     <record id="open_view_runbot_dashboard" model="ir.actions.act_window">
         <field name="name">Runbot Dashboards</field>
         <field name="res_model">runbot.dashboard</field>
         <field name="view_mode">list,form</field>
+        <field name="path">dashboard</field>
     </record>
 
     <record id="open_view_runbot_module" model="ir.actions.act_window">
       <field name="name">Runbot modules</field>
       <field name="res_model">runbot.module</field>
       <field name="view_mode">list,form</field>
+      <field name="path">module</field>
     </record>
 
     <record id="open_view_runbot_module_ownership" model="ir.actions.act_window">
       <field name="name">Runbot modules ownership</field>
       <field name="res_model">runbot.module.ownership</field>
       <field name="view_mode">list,form</field>
+      <field name="path">module-ownership</field>
     </record>
 
   </data>

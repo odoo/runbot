@@ -105,7 +105,7 @@
                                             </a>
                                             <div class="dropdown-menu dropdown-menu-end js_usermenu" role="menu">
                                                 <a class="dropdown-item" id="o_logout" role="menuitem" t-attf-href="/web/session/logout?redirect=/">Logout</a>
-                                                <a class="dropdown-item" role="menuitem" t-attf-href="/web">Web</a>
+                                                <a class="dropdown-item" role="menuitem" t-attf-href="/odoo">Backend</a>
                                                 <div t-if="user_id.runbot_team_ids" class="dropdown-divider"/>
                                                 <div t-if="user_id.runbot_team_ids" class="dropdown-header">Teams</div>
                                                 <a t-foreach="user_id.runbot_team_ids" t-as="team" class="dropdown-item" role="menuitem" t-attf-href="/runbot/teams/{{team.id}}">
@@ -414,8 +414,7 @@
                         <i class="fa fa-search"/>
                         Find similar builds
                     </a>
-                    <a class="dropdown-item"
-                        t-attf-href="/odoo/runbot.build/{{bu['id']}}?menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}">
+                    <a class="dropdown-item" t-attf-href="/odoo/build/{{bu['id']}}">
                         <i class="fa fa-list"/>
                         View in backend
                     </a>

@@ -59,6 +59,7 @@
         <field name="name">Commits</field>
         <field name="res_model">runbot.commit</field>
         <field name="view_mode">list,form</field>
+        <field name="path">commit</field>
     </record>
 
     <record id="commit_links_view_tree" model="ir.ui.view">
@@ -93,6 +94,7 @@
         <field name="name">Commit Links</field>
         <field name="res_model">runbot.commit.link</field>
         <field name="view_mode">list</field>
+        <field name="path">commit-link</field>
     </record>
 
   </data>

@@ -39,6 +39,7 @@
         <field name="name">Codeowner</field>
         <field name="res_model">runbot.codeowner</field>
         <field name="view_mode">list,form</field>
+        <field name="path">codeowner</field>
     </record>
 
   </data>

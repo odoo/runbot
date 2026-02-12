@@ -268,12 +268,14 @@
     <field name="name">Docker build results</field>
     <field name="res_model">runbot.docker_build_result</field>
     <field name="view_mode">list,form</field>
+    <field name="path">docker-build</field>
   </record>
 
   <record id="open_view_docker_layer_tree" model="ir.actions.act_window">
     <field name="name">Docker Layers</field>
     <field name="res_model">runbot.docker_layer</field>
     <field name="view_mode">list,form</field>
+    <field name="path">docker-layer</field>
   </record>
 
   </data>

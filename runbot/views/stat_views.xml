@@ -37,6 +37,7 @@
         <field name="name">Stat regex</field>
         <field name="res_model">runbot.build.stat.regex</field>
         <field name="view_mode">list,form</field>
+        <field name="path">stat-regex</field>
     </record>
 
   </data>

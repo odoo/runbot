@@ -263,30 +263,35 @@
         <field name="name">Repositories</field>
         <field name="res_model">runbot.repo</field>
         <field name="view_mode">list,form</field>
+        <field name="path">repository</field>
     </record>
 
     <record id="runbot_triggers_action" model="ir.actions.act_window">
       <field name="name">Triggers</field>
       <field name="res_model">runbot.trigger</field>
       <field name="view_mode">list,form</field>
+      <field name="path">trigger</field>
   </record>
 
   <record id="runbot_triggers_dependency_action" model="ir.actions.act_window">
       <field name="name">Triggers dependency</field>
       <field name="res_model">runbot.trigger.dependency</field>
       <field name="view_mode">list,form</field>
+      <field name="path">trigger-dependency</field>
   </record>
 
     <record id="runbot_remotes_action" model="ir.actions.act_window">
         <field name="name">Remotes</field>
         <field name="res_model">runbot.remote</field>
         <field name="view_mode">list,form</field>
+        <field name="path">remote</field>
     </record>
 
     <record id="runbot_triggers_category_action" model="ir.actions.act_window">
         <field name="name">Trigger Categories</field>
         <field name="res_model">runbot.category</field>
         <field name="view_mode">list,form</field>
+        <field name="path">trigger-category</field>
     </record>
 
   </data>

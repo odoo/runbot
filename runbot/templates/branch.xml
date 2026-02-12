@@ -12,7 +12,7 @@
                   <div class="btn-group" role="group">
                     <a t-att-href="branch.branch_url" class="btn btn-sm text-start" title="View Branch on Github"><i class="fa fa-github"/></a>
                     <a groups="runbot.group_runbot_admin" class="btn btn-sm fa fa-list text-start"
-                      t-attf-href="/odoo/runbot.branch/{{branch.id}}?menu_id={{env['ir.model.data']._xmlid_to_res_id('runbot.runbot_menu_root')}}" target="_blank" title="View Branch in Backend"/>
+                      t-attf-href="/odoo/branch/{{branch.id}}" target="_blank" title="View Branch in Backend"/>
                   </div>
                 </h3>
               </div>

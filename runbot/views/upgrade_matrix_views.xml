@@ -71,6 +71,7 @@
       <field name="name">Upgrade matrix</field>
       <field name="res_model">runbot.upgrade.matrix</field>
       <field name="view_mode">list,form</field>
+      <field name="path">upgrade-matrix</field>
     </record>
   </data>
 </odoo>
