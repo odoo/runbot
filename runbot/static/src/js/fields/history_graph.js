@@ -127,7 +127,7 @@ export class HistoryGraph extends Component {
             };
 
             canvas.onclick = (event) => {
-                const { col, row, value, dateLabel, versionLabel } = this.getCellFromEvent(event);
+                const { col, row, dateLabel } = this.getCellFromEvent(event);
                 if (col >= 0 && row >= 0) {
                     const url = `/runbot/batches/${projectId}/${categoryId}/${dateLabel}/${errorId}`;
                     window.open(url, "_blank");
