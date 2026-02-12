@@ -16,7 +16,7 @@ import { BooleanToggleField } from "@web/views/fields/boolean_toggle/boolean_tog
 // https://stackoverflow.com/questions/4810841/pretty-print-json-using-javascript
 function colorizeJson(json) {
     json = json.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g, function (match) {
         let cls = "";
         if (/^"/.test(match)) {
             if (/:$/.test(match)) {
