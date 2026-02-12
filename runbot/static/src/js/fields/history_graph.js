@@ -52,7 +52,7 @@ export class HistoryGraph extends Component {
 
         data.date_labels.forEach((dateLabel, idx) => {
             data.version_labels.forEach((versionLabel, idy) => {
-                let version_id = data.versions_ids[idy];
+                const version_id = data.versions_ids[idy];
                 let value = data.daily_version_freq[idx][idy] || 0;
                 let cellColor = "white";
                 let cellOpacity = 0;

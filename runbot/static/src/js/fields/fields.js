@@ -17,7 +17,7 @@ import { BooleanToggleField } from "@web/views/fields/boolean_toggle/boolean_tog
 function colorizeJson(json) {
     json = json.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
-        var cls = "";
+        let cls = "";
         if (/^"/.test(match)) {
             if (/:$/.test(match)) {
                 cls = "o_runbot_json_key";

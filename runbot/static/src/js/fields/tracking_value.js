@@ -36,27 +36,27 @@ patch(Message.prototype, {
     },
 
     makeDiff(text1, text2) {
-        var dmp = new diff_match_patch();
-        var a = dmp.diff_linesToChars_(text1, text2);
-        var lineText1 = a.chars1;
-        var lineText2 = a.chars2;
-        var lineArray = a.lineArray;
-        var diffs = dmp.diff_main(lineText1, lineText2, false);
+        const dmp = new diff_match_patch();
+        const a = dmp.diff_linesToChars_(text1, text2);
+        const lineText1 = a.chars1;
+        const lineText2 = a.chars2;
+        const lineArray = a.lineArray;
+        const diffs = dmp.diff_main(lineText1, lineText2, false);
         dmp.diff_charsToLines_(diffs, lineArray);
         dmp.diff_cleanupSemantic(diffs);
         return diffs;
     },
 
     prepareForRendering(diffs) {
-        var lines = [];
-        var pre_line_counter = 0;
-        var post_line_counter = 0;
-        for (var x = 0; x < diffs.length; x++) {
-            var diff_type = diffs[x][0];
-            var data = diffs[x][1];
-            var data_lines = data.split("\n");
-            for (var line_index in data_lines) {
-                var line = data_lines[line_index];
+        const lines = [];
+        let pre_line_counter = 0;
+        let post_line_counter = 0;
+        for (let x = 0; x < diffs.length; x++) {
+            const diff_type = diffs[x][0];
+            const data = diffs[x][1];
+            const data_lines = data.split("\n");
+            for (const line_index in data_lines) {
+                let line = data_lines[line_index];
                 line = line.replace(/&/g, "&amp;");
                 line = line.replace(/</g, "&lt;");
                 line = line.replace(/>/g, "&gt;");
