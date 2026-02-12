@@ -1114,7 +1114,7 @@ class BuildResult(models.Model):
             with local_pgadmin_cursor() as local_cr:
                 query = 'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=%s'
                 local_cr.execute(query, [dbname])
-                local_cr.execute('SET LOCAL statement_timeout=10000')  # avoid to be stuck if the dropdb is locked
+                local_cr.execute('SET statement_timeout=10000')  # avoid to be stuck if the dropdb is locked
                 local_cr.execute('DROP DATABASE IF EXISTS "%s"' % dbname)
         except Exception as e:
             msg = f"Failed to drop local logs database : {dbname} with exception: {e}"

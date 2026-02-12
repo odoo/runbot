@@ -395,7 +395,7 @@ class ConfigStep(models.Model):
     enable_auto_tags = fields.Boolean('Allow auto tag', default=True, tracking=True)
     sub_command = fields.Char('Subcommand', tracking=True)
     extra_params = fields.Char('Extra cmd args', tracking=True)
-    additionnal_env = fields.Char('Extra env', help='Example: foo="bar";bar="foo". Cannot contains \' ', tracking=True)
+    additionnal_env = fields.Char('Extra env', help='Example: foo=bar;bar=foo. Cannot contains \' ', tracking=True)
     enable_log_db = fields.Boolean("Enable log db", default=True)
     demo_mode = fields.Selection(
         [('default', 'Default'), ('without_demo', 'Without Demo'), ('with_demo', 'With Demo')],
