@@ -14,6 +14,7 @@ from . import custom_trigger
 from . import database
 from . import docker
 from . import host
+from . import ir_action
 from . import ir_cron
 from . import ir_http
 from . import ir_model_fields_converter
