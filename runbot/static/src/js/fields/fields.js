@@ -16,22 +16,22 @@ import { BooleanToggleField } from "@web/views/fields/boolean_toggle/boolean_tog
 
 // https://stackoverflow.com/questions/4810841/pretty-print-json-using-javascript
 function colorizeJson(json) {
-    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    json = json.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
-        var cls = '';
+        var cls = "";
         if (/^"/.test(match)) {
             if (/:$/.test(match)) {
-                cls = 'o_runbot_json_key';
+                cls = "o_runbot_json_key";
             } else {
-                cls = 'o_runbot_json_value';
+                cls = "o_runbot_json_value";
             }
         }
-        return '<span class="' + cls + '">' + match + '</span>';
+        return `<span class="${cls}">${match}</span>`;
     });
 }
 
 function stringify(obj) {
-        return JSON.stringify(obj, null, '\t');
+        return JSON.stringify(obj, null, "\t");
     }
 export class JsonField extends TextField {
     static template = xml`
@@ -95,7 +95,7 @@ export class FrontendUrl extends Component {
         if (this.props.record.data[this.props.name].isLuxonDateTime){
             return formatDateTime(this.props.record.data[this.props.name])
         } else {
-            return this.props.record.data[this.props.name] ? getFormattedValue(this.props.record, this.props.name) : ''
+            return this.props.record.data[this.props.name] ? getFormattedValue(this.props.record, this.props.name) : ""
         }
     }
 
@@ -106,8 +106,8 @@ export class FrontendUrl extends Component {
     _route(fieldName) {
         const model = this.props.record.fields[fieldName].relation || "runbot.unknown";
         const { id } = this.props.record.data[fieldName];
-        if (model.startsWith('runbot.')){
-            return '/runbot/' + model.split('.')[1] + '/' + id;
+        if (model.startsWith("runbot.")){
+            return `/runbot/${model.split(".")[1]}/${id}`;
         } else {
             return false;
         }
@@ -138,8 +138,8 @@ export class FieldCharFrontendUrl extends Component {
     get route() {
         const model = this.props.record.resModel;
         const id = this.props.record.resId;
-        if (model.startsWith('runbot.')) {
-            return '/runbot/' + model.split('.')[1] + '/' + id;
+        if (model.startsWith("runbot.")) {
+            return `/runbot/${model.split(".")[1]}/${id}`;
         } else {
             return false;
         }
@@ -179,7 +179,7 @@ registry.category("fields").add("pull_request_url", {
 
 
 export class Matrixx2ManyField extends X2ManyField {
-    static template = 'runbot.Matrixx2ManyField';
+    static template = "runbot.Matrixx2ManyField";
 
     static components = { BooleanToggleField };
 

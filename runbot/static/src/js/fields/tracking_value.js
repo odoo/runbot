@@ -9,7 +9,7 @@ patch(Message.prototype, {
     isMultiline(trackingValue) {
         const oldValue = trackingValue.oldValue;
         const newValue = trackingValue.newValue;
-        return ((oldValue && typeof oldValue=== 'string' && oldValue.includes('\n')) && (newValue && typeof oldValue=== 'string' && newValue.includes('\n')))
+        return ((oldValue && typeof oldValue=== "string" && oldValue.includes("\n")) && (newValue && typeof oldValue=== "string" && newValue.includes("\n")))
     },
     formatTracking(trackingFieldInfo, trackingValue) {
         return super.formatTracking(trackingFieldInfo, trackingValue) 
@@ -47,23 +47,23 @@ patch(Message.prototype, {
         for (var x = 0; x < diffs.length; x++) {
             var diff_type = diffs[x][0];
             var data = diffs[x][1];
-            var data_lines = data.split('\n');
+            var data_lines = data.split("\n");
             for (var line_index in data_lines) {
                 var line = data_lines[line_index];
-                line = line.replace(/&/g, '&amp;');
-                line = line.replace(/</g, '&lt;');
-                line = line.replace(/>/g, '&gt;');
+                line = line.replace(/&/g, "&amp;");
+                line = line.replace(/</g, "&lt;");
+                line = line.replace(/>/g, "&gt;");
                 //text = text.replace(/\n/g, '<br>');
                 //text = text.replace(/ /g, '&nbsp&nbsp');
                 if (diff_type == -1) {
-                    lines.push({type:'removed', pre_line_counter: pre_line_counter, post_line_counter: '-', line: line})
+                    lines.push({type:"removed", pre_line_counter: pre_line_counter, post_line_counter: "-", line: line})
                     pre_line_counter += 1
                 } else if (diff_type == 0) {
-                    lines.push({type:'kept', pre_line_counter: '', post_line_counter: post_line_counter, line: line})
+                    lines.push({type:"kept", pre_line_counter: "", post_line_counter: post_line_counter, line: line})
                     pre_line_counter += 1
                     post_line_counter +=1
                 } else if (diff_type == 1) {
-                    lines.push({type:'added', pre_line_counter: '+', post_line_counter: post_line_counter, line: line})
+                    lines.push({type:"added", pre_line_counter: "+", post_line_counter: post_line_counter, line: line})
                     post_line_counter +=1
                 }
             }

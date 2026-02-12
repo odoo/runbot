@@ -1,5 +1,5 @@
-import { FormController } from '@web/views/form/form_controller';
-import { patch } from '@web/core/utils/patch';
+import { FormController } from "@web/views/form/form_controller";
+import { patch } from "@web/core/utils/patch";
 
 
 patch(FormController.prototype, {
@@ -9,7 +9,7 @@ patch(FormController.prototype, {
     async beforeUnload(ev) {
         if (await this.model.root.isDirty()) {
             ev.preventDefault();
-            ev.returnValue = 'Unsaved changes';
+            ev.returnValue = "Unsaved changes";
         } else {
             super.beforeUnload(ev);
         }

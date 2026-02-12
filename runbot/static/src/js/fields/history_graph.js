@@ -91,7 +91,7 @@ export class HistoryGraph extends Component {
         });
         if (mouseActions) {
             canvas.onmousemove = (event) => {
-                let tooltip = canvas.parentElement.querySelector('.history-graph-tooltip');
+                let tooltip = canvas.parentElement.querySelector(".history-graph-tooltip");
                 if (tooltip) {
                     tooltip.remove();
                 }
@@ -99,16 +99,16 @@ export class HistoryGraph extends Component {
                 const { col, row, value, dateLabel, versionLabel } = this.getCellFromEvent(event);
 
                 if ( col >= 0 && row >= 0) {
-                    tooltip = document.createElement('div');
-                    tooltip.className = 'history-graph-tooltip';
-                    tooltip.style.position = 'absolute';
+                    tooltip = document.createElement("div");
+                    tooltip.className = "history-graph-tooltip";
+                    tooltip.style.position = "absolute";
                     tooltip.style.left = `${canvas.offsetLeft}px`;
                     tooltip.style.top = `${canvas.offsetTop + canvas.height}px`;
-                    tooltip.style.background = '#fff';
-                    tooltip.style.border = '1px solid #333';
-                    tooltip.style.padding = '4px 8px';
-                    tooltip.style.fontSize = '12px';
-                    tooltip.style.pointerEvents = 'none';
+                    tooltip.style.background = "#fff";
+                    tooltip.style.border = "1px solid #333";
+                    tooltip.style.padding = "4px 8px";
+                    tooltip.style.fontSize = "12px";
+                    tooltip.style.pointerEvents = "none";
                     tooltip.style.zIndex = 1000;
                     tooltip.innerHTML = `
                         Date: ${dateLabel}
@@ -123,7 +123,7 @@ export class HistoryGraph extends Component {
             };
 
             canvas.onmouseleave = () => {
-                const tooltip = canvas.parentElement.querySelector('.history-graph-tooltip');
+                const tooltip = canvas.parentElement.querySelector(".history-graph-tooltip");
                 if (tooltip) {
                     tooltip.remove();
                     this.renderErrorGraph()
@@ -134,7 +134,7 @@ export class HistoryGraph extends Component {
                 const { col, row, value, dateLabel, versionLabel } = this.getCellFromEvent(event);
                 if (col >= 0 && row >= 0) {
                     const url = `/runbot/batches/${projectId}/${categoryId}/${dateLabel}/${errorId}`;
-                    window.open(url, '_blank');
+                    window.open(url, "_blank");
                 }
             }
         }
@@ -153,7 +153,7 @@ export class HistoryGraph extends Component {
             const versionLabel = data.version_labels[row];
             return { col, row, value, dateLabel, versionLabel };
         } else {
-            return { col: -1, row: -1, value: 0, dateLabel: '', versionLabel: '' };
+            return { col: -1, row: -1, value: 0, dateLabel: "", versionLabel: "" };
         }
     }
 }
