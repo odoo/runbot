@@ -6,22 +6,27 @@ patch(Message.prototype, {
         super.setup(...arguments);
         this.kept = false;
     },
+
     isMultiline(trackingValue) {
         const oldValue = trackingValue.oldValue;
         const newValue = trackingValue.newValue;
-        return ((oldValue && typeof oldValue=== "string" && oldValue.includes("\n")) && (newValue && typeof oldValue=== "string" && newValue.includes("\n")))
+        return ((oldValue && typeof oldValue=== "string" && oldValue.includes("\n")) && (newValue && typeof oldValue=== "string" && newValue.includes("\n")));
     },
+
     formatTracking(trackingFieldInfo, trackingValue) {
-        return super.formatTracking(trackingFieldInfo, trackingValue) 
+        return super.formatTracking(trackingFieldInfo, trackingValue);
     },
+
     toggleKept() {
         this.kept = !this.kept;
     },
+
     copyToClipboard(trackingValue) {
         return function () {
             navigator.clipboard.writeText(trackingValue);
         };
     },
+
     lines(trackingValue) {
         const oldValue = trackingValue.oldValue;
         const newValue = trackingValue.newValue;
@@ -29,6 +34,7 @@ patch(Message.prototype, {
         const lines = this.prepareForRendering(diff);
         return lines;
     },
+
     makeDiff(text1, text2) {
         var dmp = new diff_match_patch();
         var a = dmp.diff_linesToChars_(text1, text2);
@@ -40,10 +46,11 @@ patch(Message.prototype, {
         dmp.diff_cleanupSemantic(diffs);
         return diffs;
     },
+
     prepareForRendering(diffs) {
         var lines = [];
-        var pre_line_counter = 0
-        var post_line_counter = 0
+        var pre_line_counter = 0;
+        var post_line_counter = 0;
         for (var x = 0; x < diffs.length; x++) {
             var diff_type = diffs[x][0];
             var data = diffs[x][1];
@@ -56,18 +63,18 @@ patch(Message.prototype, {
                 //text = text.replace(/\n/g, '<br>');
                 //text = text.replace(/ /g, '&nbsp&nbsp');
                 if (diff_type == -1) {
-                    lines.push({type:"removed", pre_line_counter: pre_line_counter, post_line_counter: "-", line: line})
-                    pre_line_counter += 1
+                    lines.push({ type: "removed", pre_line_counter: pre_line_counter, post_line_counter: "-", line: line });
+                    pre_line_counter += 1;
                 } else if (diff_type == 0) {
-                    lines.push({type:"kept", pre_line_counter: "", post_line_counter: post_line_counter, line: line})
-                    pre_line_counter += 1
-                    post_line_counter +=1
+                    lines.push({ type: "kept", pre_line_counter: "", post_line_counter: post_line_counter, line: line });
+                    pre_line_counter += 1;
+                    post_line_counter += 1;
                 } else if (diff_type == 1) {
-                    lines.push({type:"added", pre_line_counter: "+", post_line_counter: post_line_counter, line: line})
-                    post_line_counter +=1
+                    lines.push({ type: "added", pre_line_counter: "+", post_line_counter: post_line_counter, line: line });
+                    post_line_counter += 1;
                 }
             }
         }
         return lines;
-      },
+    },
 });

@@ -7,21 +7,20 @@ export class HistoryGraph extends Component {
             <canvas t-ref="canvas"/>
         </div>
     `;
+
     setup() {
         this.canvasRef = useRef("canvas");
         useEffect(() => this.renderErrorGraph());
     }
 
     renderErrorGraph(activeCell) {
-
         const data = this.props.record.data[this.props.name] || {};
         const errorId = data.error_id;
         const projectId = data.project_id;
         const categoryId = data.category_id;
         const breaking_pr_close_dates = data.breaking_pr_close_dates;
         const fixing_pr_close_dates = data.fixing_pr_close_dates;
-
-        const canvas = this.canvasRef.el
+        const canvas = this.canvasRef.el;
         const ctx = canvas.getContext("2d");
         const maxValue = data.max_count;
         const canvasBorder = 1;
@@ -35,26 +34,25 @@ export class HistoryGraph extends Component {
         canvas.width = canvasWidth;
         canvas.height = canvasHeight;
 
-
         function getColor(value, opacity) {
             if (value >= 10) {
                 return `rgba(255, 0, 0, ${opacity})`; // red
             } else if (value >= 5) {
                 return `rgba(255, 165, 0, ${opacity})`; // orange
             }
-            return `rgba(0, 170, 0, ${opacity})` // green
+            return `rgba(0, 170, 0, ${opacity})`; // green
         }
 
         ctx.clearRect(0, 0, canvasWidth, canvasHeight);
         ctx.fillStyle = "#EEE";
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
         ctx.strokeStyle = "#333";
-        ctx.lineWidth = canvasBorder * 2; // * 2 to account for each side, not only inner width 
-        ctx.strokeRect(0, 0, canvasWidth, canvasHeight,);
+        ctx.lineWidth = canvasBorder * 2; // * 2 to account for each side, not only inner width
+        ctx.strokeRect(0, 0, canvasWidth, canvasHeight);
 
         data.date_labels.forEach((dateLabel, idx) => {
             data.version_labels.forEach((versionLabel, idy) => {
-                let version_id = data.versions_ids[idy]
+                let version_id = data.versions_ids[idy];
                 let value = data.daily_version_freq[idx][idy] || 0;
                 let cellColor = "white";
                 let cellOpacity = 0;
@@ -68,12 +66,12 @@ export class HistoryGraph extends Component {
 
                 ctx.fillStyle = cellColor;
                 ctx.fillRect(posX, posY, cellWidth, cellHeight);
+
                 if (activeCell && activeCell.col === idx && activeCell.row === idy) {
                     ctx.strokeStyle = "black";
                     ctx.lineWidth = 2;
                     ctx.strokeRect(posX, posY, cellWidth, cellHeight);
                 }
-
 
                 if (fixing_pr_close_dates[version_id] == dateLabel) {
                     ctx.fillStyle = "black";
@@ -85,8 +83,6 @@ export class HistoryGraph extends Component {
                     ctx.font = "12px Arial";
                     ctx.fillText("✗", posX + cellWidth / 2 - 4, posY + cellHeight / 2 + 4);
                 }
-
-
             });
         });
         if (mouseActions) {
@@ -126,7 +122,7 @@ export class HistoryGraph extends Component {
                 const tooltip = canvas.parentElement.querySelector(".history-graph-tooltip");
                 if (tooltip) {
                     tooltip.remove();
-                    this.renderErrorGraph()
+                    this.renderErrorGraph();
                 }
             };
 
@@ -136,10 +132,10 @@ export class HistoryGraph extends Component {
                     const url = `/runbot/batches/${projectId}/${categoryId}/${dateLabel}/${errorId}`;
                     window.open(url, "_blank");
                 }
-            }
+            };
         }
-
     }
+
     getCellFromEvent(event) {
         const data = this.props.record.data[this.props.name] || {};
         const rect = this.canvasRef.el.getBoundingClientRect();
@@ -147,7 +143,7 @@ export class HistoryGraph extends Component {
         const y = event.clientY - rect.top - 1; // Adjust for canvas border
         const col = Math.floor(x / this.props.cellSize);
         const row = Math.floor(y / this.props.cellSize);
-         if ( col >= 0 && col < data.date_labels.length && row >= 0 && row < data.version_labels.length) {
+        if ( col >= 0 && col < data.date_labels.length && row >= 0 && row < data.version_labels.length) {
             const value = data.daily_version_freq[col][row] || 0;
             const dateLabel = data.date_labels[col];
             const versionLabel = data.version_labels[row];
