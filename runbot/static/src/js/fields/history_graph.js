@@ -1,4 +1,3 @@
-/** @odoo-module **/
 import { _lt } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 import { useRef, xml, Component, useEffect } from "@odoo/owl";

@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { TextField } from "@web/views/fields/text/text_field";
 import { CharField } from "@web/views/fields/char/char_field";
 import { Many2OneField } from "@web/views/fields/many2one/many2one_field";
