@@ -2,7 +2,6 @@ import { TextField } from "@web/views/fields/text/text_field";
 import { CharField } from "@web/views/fields/char/char_field";
 import { Many2OneField } from "@web/views/fields/many2one/many2one_field";
 
-import { _lt } from "@web/core/l10n/translation";
 import { formatDateTime } from "@web/core/l10n/dates";
 import { registry } from "@web/core/registry";
 import { useInputField } from "@web/views/fields/input_field_hook";
