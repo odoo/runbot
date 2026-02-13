@@ -375,13 +375,22 @@ class Dockerfile(models.Model):
         tag_dir = re.sub(r'[^\w]', '_', self.image_tag)
         docker_build_path = self.env['runbot.runbot']._path('docker', tag_dir)
         os.makedirs(docker_build_path, exist_ok=True)
-        content = self._get_cached_content(docker_build_path)
-        with open(self.env['runbot.runbot']._path('docker', tag_dir, 'Dockerfile'), 'w') as Dockerfile:
-            Dockerfile.write(content)
-        result = docker_build(docker_build_path, self.image_future_tag, self.pull_on_build)
-        duration = result['duration']
-        msg = result['msg']
-        success = image_id = result.get('image_id')
+
+        duration = 0
+        content = ''
+        image_id = None
+        try:
+            content = self._get_cached_content(docker_build_path)
+            with open(self.env['runbot.runbot']._path('docker', tag_dir, 'Dockerfile'), 'w', encoding="utf-8") as Dockerfile:
+                Dockerfile.write(content)
+            result = docker_build(docker_build_path, self.image_future_tag, self.pull_on_build)
+            duration = result['duration']
+            msg = result['msg']
+            success = image_id = result.get('image_id')
+        except Exception as e:
+            success = False
+            msg = f'Exception during Docker build: "{e}"'
+
         docker_build_result_values = {'dockerfile_id': self.id, 'output': msg, 'duration': duration, 'content': content, 'host_id': host and host.id}
         if success:
             docker_build_result_values['result'] = 'success'
