@@ -66,59 +66,51 @@
                                             </li>
                                         </t>
                                     </t>
-                                    <li class="nav-item divider"/>
-                                    
-                                    <li class="nav-item dropdown">
-                                        <a data-bs-toggle="collapse" href="#collapsePreference" role="button" class="nav-link">
+                                    <li class="nav-item">
+                                        <button class="nav-link btn btn-link" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePreference" aria-expanded="false" aria-controls="collapsePreference">
                                             <i class="fa fa-gear"/>
-                                        </a>
+                                        </button>
                                     </li>
-                                    <li class="nav-item divider" t-ignore="true"/>
                                     <t t-if="not user_id._is_public()">
                                         <t t-if="env.user.has_group('runbot.group_runbot_admin')">
                                             <t t-set="docker_files" t-value="env['runbot.dockerfile'].search([])"/>
                                             <t t-set="out_of_sync_docker_files" t-value="docker_files.filtered(lambda d: d.image_identifier != d.image_future_identifier)"/>
                                             <t t-set="in_error_docker_files" t-value="docker_files.filtered(lambda d: d.to_build and d.in_error)"/>
-                                            <li class="nav-item" t-if="out_of_sync_docker_files or in_error_docker_files">
-                                                <a class="nav-link" href="/odoo/docker">
+                                            <li t-if="out_of_sync_docker_files or in_error_docker_files" class="nav-item">
+                                                <a href="/odoo/docker" class="nav-link btn btn-link">
                                                     <i class="fa fa-warning"/>
-                                                    <t t-if="in_error_docker_files">
-                                                        <span class="text-danger" t-esc="len(in_error_docker_files)" title="In error docker files"/>
-                                                    </t>
-                                                    <t t-if="out_of_sync_docker_files">
-                                                        <span class="text-warning" t-esc="len(out_of_sync_docker_files)" title="Out of sync docker files"/>
-                                                    </t>
+                                                    <span t-if="true or in_error_docker_files" class="badge text-bg-danger" t-esc="len(in_error_docker_files)" t-attf-title="{{len(in_error_docker_files)}} docker files are in error"/>
+                                                    <span t-if="true or out_of_sync_docker_files" class="badge text-bg-warning" t-esc="len(out_of_sync_docker_files)" t-attf-title="{{len(out_of_sync_docker_files)}} docker files are out of sync"/>
                                                 </a>
                                             </li>
                                         </t>
                                         <li t-if="project and project.next_freeze_tag_id" class="nav-item" title="Freeze">
-                                            <a class="nav-link" t-attf-href="/runbot/{{slug(project)}}/bundle/tag/{{slug(project.next_freeze_tag_id)}}">
+                                            <a class="nav-link btn btn-link" t-attf-href="/runbot/{{slug(project)}}/bundle/tag/{{slug(project.next_freeze_tag_id)}}">
                                                 <i class="fa fa-snowflake-o"/>
                                             </a>
                                         </li>
                                         <t t-call="runbot.build_errors_link"/>
                                         <li class="nav-item dropdown" t-ignore="true">
-                                            <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">
-                                                <b>
-                                                    <span t-out="user_id.name[:23] + '...' if user_id.name and len(user_id.name) &gt; 25 else user_id.name"/>
-                                                </b>
-                                            </a>
-                                            <div class="dropdown-menu dropdown-menu-end js_usermenu" role="menu">
-                                                <a class="dropdown-item" id="o_logout" role="menuitem" t-attf-href="/web/session/logout?redirect=/">Logout</a>
-                                                <a class="dropdown-item" role="menuitem" t-attf-href="/web">Web</a>
-                                                <div t-if="user_id.runbot_team_ids" class="dropdown-divider"/>
-                                                <div t-if="user_id.runbot_team_ids" class="dropdown-header">Teams</div>
-                                                <a t-foreach="user_id.runbot_team_ids" t-as="team" class="dropdown-item" role="menuitem" t-attf-href="/runbot/teams/{{team.id}}">
-                                                    <t t-out="team.name.capitalize()"/>
-                                                </a>
-                                            </div>
+                                            <button type="button" class="nav-link dropdown-toggle fw-bold" data-bs-toggle="dropdown">
+                                                <t t-out="user_id.name[:23] + '...' if user_id.name and len(user_id.name) &gt; 25 else user_id.name"/>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end" role="menu">
+                                                <li><a class="dropdown-item" id="o_logout" role="menuitem" href="/web/session/logout?redirect=/">Logout</a></li>
+                                                <li><a class="dropdown-item" role="menuitem" href="/web">Web</a></li>
+                                                <t t-if="user_id.runbot_team_ids">
+                                                    <li><hr class="dropdown-divider"/></li>
+                                                    <li><h6 class="dropdown-header">Teams</h6></li>
+                                                    <li><a class="dropdown-item fst-italic" role="menuitem" href="/runbot/dashboards/all-teams-16">All teams</a></li><!-- Bring back "Custom user dropdown All teams" into code -->
+                                                    <li t-foreach="user_id.runbot_team_ids" t-as="team">
+                                                        <a class="dropdown-item" role="menuitem" t-attf-href="/runbot/teams/{{team.id}}" t-out="team.name.capitalize()"/>
+                                                    </li>
+                                                </t>
+                                            </ul>
                                         </li>
                                     </t>
                                     <t t-else="">
-                                        <li class="nav-item dropdown" t-ignore="true">
-                                            <b>
-                                                <a class="nav-link" t-attf-href="/web/login?redirect={{request.httprequest.path}}">Login</a>
-                                            </b>
+                                        <li class="nav-item" t-ignore="true">
+                                            <a class="nav-link fw-bold" t-attf-href="/web/login?redirect={{request.httprequest.path}}">Login</a>
                                         </li>
                                     </t>
                                 </ul>
@@ -215,31 +207,13 @@
         </template>
 
         <template id="runbot.build_errors_link">
-            <t t-if="nb_assigned_errors">
-                <li class="nav-item divider"/>
-                <li class="nav-item">
-                    <a href="/runbot/errors" class="nav-link text-danger" t-attf-title="You have {{nb_assigned_errors}} random bug assigned">
-                        <i class="fa fa-bug"/>
-                        <t t-out="nb_assigned_errors"/>
-                        <span class="text-warning" t-if="nb_team_errors">+<t t-out="nb_team_errors"/></span>
-                    </a>
-                </li>
-            </t>
-            <t t-elif="nb_team_errors">
-                <li class="nav-item divider"/>
-                <li class="nav-item">
-                    <a href="/runbot/errors" class="nav-link text-warning" t-attf-title="Your team has {{nb_team_errors}} random bug assigned">
-                        <i class="fa fa-bug"/>
-                        <t t-out="nb_team_errors"/>
-                    </a>
-                </li>
-            </t>
-            <t t-elif="nb_build_errors">
-                <li class="nav-item divider"/>
-                <li class="nav-item">
-                    <a href="/runbot/errors" class="nav-link" title="Random Bugs"><i class="fa fa-bug"/></a>
-                </li>
-            </t>
+            <li t-if="nb_build_errors" class="nav-item">
+                <a href="/runbot/errors" class="nav-link btn btn-link">
+                    <i class="fa fa-bug"/>
+                    <span t-if="true or nb_assigned_errors" class="badge text-bg-danger" t-out="nb_assigned_errors" t-attf-title="You have {{nb_assigned_errors}} random bug assigned"/>
+                    <span t-if="true or nb_team_errors" class="badge text-bg-warning" t-out="nb_team_errors" t-attf-title="Your team has {{nb_team_errors}} random bug assigned"/>
+                </a>
+            </li>
         </template>
 
         <template id="runbot.slots_infos" name="Hosts slot nb pending/testing/slots">
