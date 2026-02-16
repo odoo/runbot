@@ -105,8 +105,18 @@ class BuildParameters(models.Model):
 
     # @api.depends('version_id', 'project_id', 'extra_params', 'config_id', 'config_data', 'modules', 'commit_link_ids', 'builds_reference_ids')
     def _compute_fingerprint(self):
+        def get_commit_links_ident(commit_link):
+            commit_idents = []
+            for c in commit_link.commit_id:
+                commit_ident = c.tree_hash or c.name
+                if c.rebase_on_id:
+                    commit_ident += (c.rebase_on_id.tree_hash or c.rebase_on_id.name)
+                    # in a ideal world, we would be able to determine what the real threehash would be
+                commit_idents.append(commit_ident)
+            return sorted(commit_idents)
+
         for param in self:
-            commit_ident = sorted([c.tree_hash or '' for c in param.commit_link_ids.commit_id])
+            commit_ident = get_commit_links_ident(param.commit_link_ids)
             if param.trigger_id.batch_dependent:
                 commit_ident = sorted(param.commit_link_ids.commit_id.ids)
             cleaned_vals = {
@@ -125,7 +135,7 @@ class BuildParameters(models.Model):
             }
             if param.upgrade_to_build_id:
                 cleaned_vals['upgrade_to_build_dockerfile_id'] = param.upgrade_to_build_id.params_id.dockerfile_id.id
-                cleaned_vals['upgrade_to_build_commits'] = sorted([c.tree_hash or c.id for c in param.upgrade_to_build_id.params_id.commit_link_ids.commit_id])
+                cleaned_vals['upgrade_to_build_commits'] = get_commit_links_ident(param.upgrade_to_build_id.params_id.commit_link_ids)
             if param.upgrade_from_build_id:
                 cleaned_vals['upgrade_from_build_id'] = param.upgrade_from_build_id.id
             if param.trigger_id.batch_dependent:
