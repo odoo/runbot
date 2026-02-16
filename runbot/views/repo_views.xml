@@ -25,6 +25,7 @@
                 <group>
                   <field name="description"/>
                   <field name="batch_dependent"/>
+                  <field name="version_dependent"/>
                   <field name="upgrade_dumps_trigger_id"/>
                   <field name="version_domain" widget="domain" options="{'model': 'runbot.version', 'in_dialog': True}"/>
                   <field name="on_base"/>

@@ -364,7 +364,7 @@ class Batch(models.Model):
         base_commit_link_by_repos = {commit_link.commit_id.repo_id.id: commit_link for commit_link in self.base_reference_batch_id.commit_link_ids}
         if use_base_commits:
             commit_link_by_repos = base_commit_link_by_repos
-        version_id = self.bundle_id.version_id.id
+        bundle_version_id = self.bundle_id.version_id.id
         project_id = self.bundle_id.project_id.id
         trigger_customs = {}
         for trigger_custom in self.bundle_id.all_trigger_custom_ids:
@@ -384,6 +384,7 @@ class Batch(models.Model):
                 self._warning(f'This batch will use base commits instead of bundle commits for trigger {trigger.name}')
                 trigger_commit_link_by_repos = base_commit_link_by_repos
             commits_links = [trigger_commit_link_by_repos[repo.id].id for repo in trigger_repos]
+            version_id = bundle_version_id if trigger.version_dependent else False
             params_value = {
                 'version_id':  version_id,
                 'extra_params': extra_params,

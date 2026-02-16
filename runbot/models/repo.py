@@ -75,6 +75,7 @@ class Trigger(models.Model):
     config_data = JsonDictField('Config Data')
     network_enabled = fields.Boolean('Network Enabled')
     batch_dependent = fields.Boolean('Batch Dependent', help="Force adding batch in build parameters to make it unique and give access to bundle")
+    version_dependent = fields.Boolean('Version Dependent', default=True, help="Add the version in build parameters. Uncheck if the version is not needed to determine the build result")
 
     ci_context = fields.Char("CI context", tracking=True)
     category_id = fields.Many2one('runbot.category', default=lambda self: self.env.ref('runbot.default_category', raise_if_not_found=False))
