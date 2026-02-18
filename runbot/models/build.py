@@ -70,7 +70,7 @@ class BuildParameters(models.Model):
     # execution parametter
     commit_link_ids = fields.Many2many('runbot.commit.link', copy=True)
     commit_ids = fields.Many2many('runbot.commit', compute='_compute_commit_ids')
-    version_id = fields.Many2one('runbot.version', required=True, index=True)
+    version_id = fields.Many2one('runbot.version', index=True)
     project_id = fields.Many2one('runbot.project', required=True, index=True)  # for access rights
     trigger_id = fields.Many2one('runbot.trigger', index=True)  # for access rights
     create_batch_id = fields.Many2one('runbot.batch', index=True)
@@ -534,7 +534,7 @@ class BuildResult(models.Model):
     def _compute_dest(self):
         for build in self:
             if build.id:
-                nickname = build.params_id.version_id.name
+                nickname = build.params_id.version_id.name or 'build'
                 nickname = re.sub(r'"|\'|~|\:', '', nickname)
                 nickname = re.sub(r'_|/|\.', '-', nickname)
                 build.dest = ("%05d-%s" % (build.id or 0, nickname[:32])).lower()
