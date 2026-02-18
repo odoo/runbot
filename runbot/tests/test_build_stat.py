@@ -9,6 +9,7 @@ from .common import RunbotCase
 class TestBuildStatRegex(RunbotCase):
     def setUp(self):
         super(TestBuildStatRegex, self).setUp()
+        self.start_patcher('get_size', 'odoo.addons.runbot.models.build_config.os.path.getsize', return_value=100)
         self.StatRegex = self.env["runbot.build.stat.regex"]
         self.ConfigStep = self.env["runbot.build.config.step"]
         self.BuildStat = self.env["runbot.build.stat"]

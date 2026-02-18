@@ -19,6 +19,8 @@ from markupsafe import Markup
 from odoo.fields import Domain
 from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT, file_open, html_escape, OrderedSet
 
+DEFAULT_MAX_FILE_SIZE = 500 * 1024 * 1024
+
 _logger = logging.getLogger(__name__)
 
 dest_reg = re.compile(r'^\d{5,}-.+$')

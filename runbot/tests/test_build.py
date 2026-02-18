@@ -7,7 +7,6 @@ from odoo import fields
 from odoo.tests import tagged
 from odoo.exceptions import UserError, ValidationError
 from .common import RunbotCase, RunbotCaseMinimalSetup
-from unittest.mock import MagicMock
 
 
 def rev_parse(repo, branch_name):

@@ -38,6 +38,7 @@ from ..common import (
     sanitize,
     tail,
     transactioncache,
+    DEFAULT_MAX_FILE_SIZE,
 )
 from ..container import Command, docker_pull, docker_run, docker_state, docker_stop
 from ..fields import JsonDictField
@@ -1505,6 +1506,10 @@ class BuildResult(models.Model):
 
     def _read_file(self, file, mode='r'):
         file_path = self._path(file)
+        max_log_file_size = int(self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_max_log_size', DEFAULT_MAX_FILE_SIZE))
+        if os.path.getsize(file_path) > max_log_file_size:
+            self._log('readfile', f"File size exceeds {max_log_file_size} limit", level="ERROR")
+            return False
         try:
             with file_open(file_path, mode) as f:
                 return f.read()

@@ -1451,6 +1451,7 @@ class TestMakeResult(RunbotCase):
             self.logs.append((level, message))
 
         self.start_patcher('log_patcher', 'odoo.addons.runbot.models.build.BuildResult._log', new=_log)
+        self.start_patcher('get_size', 'odoo.addons.runbot.models.build_config.os.path.getsize', return_value=100)
 
         self.build = self.Build.create({
             'params_id': self.base_params.id,
@@ -1772,3 +1773,12 @@ Initiating shutdown
         config_step._make_results(self.build)
         self.assertEqual(self.build.local_result, 'ko')
         self.assertIn(('ERROR', 'Exit status file "test_exit_status.txt" not found'), self.logs)
+
+    def test_make_result_large_file(self):
+        custom_limit = 1024
+        self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_max_log_size', custom_limit)
+        self.patchers['get_size'].return_value = custom_limit + 1
+        self.config_step._make_results(self.build)
+        self.assertEqual(str(self.build.job_end), '1970-01-01 02:00:00')
+        self.assertIn(('ERROR', 'Log file exceeds %s limit' % custom_limit), self.logs)
+        self.assertEqual(self.build.local_result, 'ko')

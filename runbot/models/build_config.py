@@ -26,6 +26,7 @@ from ..common import (
     rfind,
     s2human,
     time2str,
+    DEFAULT_MAX_FILE_SIZE,
 )
 from ..container import Command, docker_get_gateway_ip
 
@@ -1345,6 +1346,10 @@ class ConfigStep(models.Model):
         log_path = build._path('logs', '%s.txt' % self.sanitized_name(build))
         if not os.path.isfile(log_path):
             build._log('_make_tests_results', "Log file not found at the end of test job", level="ERROR")
+            return 'ko'
+        max_log_file_size = int(self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_max_log_size', DEFAULT_MAX_FILE_SIZE))
+        if os.path.getsize(log_path) > max_log_file_size:
+            build._log('_make_tests_results', f"Log file exceeds {max_log_file_size} limit", level="ERROR")
             return 'ko'
         return 'ok'
 

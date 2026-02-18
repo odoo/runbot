@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 
-from ..common import os
+from ..common import os, DEFAULT_MAX_FILE_SIZE
 import re
 
 from odoo import models, fields, api
@@ -52,6 +52,10 @@ class BuildStatRegex(models.Model):
             returns a dict of key:values
         """
         if not os.path.exists(file_path):
+            return {}
+        max_log_file_size = int(self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_max_log_size', DEFAULT_MAX_FILE_SIZE))
+        if os.path.getsize(file_path) > max_log_file_size:
+            _logger.warning("Log file '%s' exceeds %s limit", file_path, max_log_file_size)
             return {}
         stats_matches = {}
         with file_open(file_path, "r") as log_file:

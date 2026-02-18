@@ -19,6 +19,7 @@ class TestUpgradeFlow(RunbotCase):
 
     def upgrade_flow_setup(self):
         self.start_patcher('find_patcher', 'odoo.addons.runbot.common.find', 0)
+        self.start_patcher('get_size', 'odoo.addons.runbot.models.build_config.os.path.getsize', return_value=100)
         self.additionnal_setup()
 
         self.master_bundle = self.branch_odoo.bundle_id
