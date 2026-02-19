@@ -1,7 +1,7 @@
 from collections import ChainMap
 
 from odoo import models
-from odoo.tools import ConstantMapping
+from odoo.tools.misc import ConstantMapping
 
 
 class MailThread(models.AbstractModel):
