@@ -973,7 +973,6 @@ class ConfigStep(models.Model):
                         'upgrade_from_build_id': source.id,
                         'dump_db': db.id,
                         'config_id': self.upgrade_config_id,
-                        'builds_reference_ids': False,  # remove builds_reference_ids since now upgrade_to_build_id and upgrade_from_build_id are set
                         'commit_link_ids': target_commits_link.ids,
                         'version_id': target.params_id.version_id.id,
                         'trigger_id': None,

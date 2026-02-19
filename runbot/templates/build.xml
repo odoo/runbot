@@ -148,12 +148,6 @@
                     <t t-out="build.params_id.extra_params"/>
                     <br/>
                 </t>
-                <t t-if="build.params_id.builds_reference_ids">
-                  <b>Reference builds:</b>
-                  <div t-foreach="build.params_id.builds_reference_ids" t-as="reference">
-                    <a t-attf-href="/runbot/build/{{reference.id}}"><t t-esc="reference.id"/></a> - <em t-out="reference.params_id.version_id.name"/>
-                  </div>
-                </t>
                 <t t-if="build.params_id.upgrade_to_build_id">
                   <b>Upgrade target build:</b>
                   <a t-attf-href="/runbot/build/{{build.params_id.upgrade_to_build_id.id}}">

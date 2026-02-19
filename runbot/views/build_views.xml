@@ -32,9 +32,6 @@
                         <page string="Builds">
                             <field name="build_ids"/>
                         </page>
-                        <page string="Reference Builds">
-                            <field name="builds_reference_ids"/>
-                        </page>
                     </notebook>
                 </sheet>
             </form>

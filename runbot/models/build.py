@@ -87,7 +87,6 @@ class BuildParameters(models.Model):
     used_custom_trigger = fields.Boolean('Custom trigger was used to generate this build')
 
     build_ids = fields.One2many('runbot.build', 'params_id')
-    builds_reference_ids = fields.Many2many('runbot.build', relation='runbot_build_params_references', copy=True)
     modules = fields.Char('Modules')
 
     upgrade_to_build_id = fields.Many2one('runbot.build', index=True)  # use to define sources to use with upgrade script
@@ -103,7 +102,7 @@ class BuildParameters(models.Model):
         "avoid duplicate params",
     )
 
-    # @api.depends('version_id', 'project_id', 'extra_params', 'config_id', 'config_data', 'modules', 'commit_link_ids', 'builds_reference_ids')
+    # @api.depends('version_id', 'project_id', 'extra_params', 'config_id', 'config_data', 'modules', 'commit_link_ids')
     def _compute_fingerprint(self):
         for param in self:
             commit_ident = sorted([c.tree_hash or '' for c in param.commit_link_ids.commit_id])
@@ -118,7 +117,6 @@ class BuildParameters(models.Model):
                 'config_data': param.config_data.dict,
                 'modules': param.modules or '',
                 'commit_link_ids': commit_ident,
-                'builds_reference_ids': sorted(param.builds_reference_ids.ids),
                 'dump_db': param.dump_db.id,
                 'dockerfile_id': param.dockerfile_id.id,
                 'skip_requirements': param.skip_requirements,
