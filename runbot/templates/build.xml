@@ -148,10 +148,17 @@
                     <t t-out="build.params_id.extra_params"/>
                     <br/>
                 </t>
-                <t t-if="build.params_id.upgrade_to_build_id">
+                <t t-if="build.params_id.upgrade_to_version_id">
                   <b>Upgrade target build:</b>
-                  <a t-attf-href="/runbot/build/{{build.params_id.upgrade_to_build_id.id}}">
-                    <t t-out="build.params_id.upgrade_to_build_id.id"/>
+                  <a t-attf-href="/runbot/build/{{build.params_id.upgrade_to_version_id.id}}">
+                    <t t-out="build.params_id.upgrade_to_version_id.id"/>
+                  </a>
+                  <br/>
+                </t>
+                <t t-if="build.params_id.upgrade_from_version_id">
+                  <b>Upgrade source build:</b>
+                  <a t-attf-href="/runbot/build/{{build.params_id.upgrade_from_version_id.id}}">
+                    <t t-out="build.params_id.upgrade_from_version_id.id"/>
                   </a>
                   <br/>
                 </t>

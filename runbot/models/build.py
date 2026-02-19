@@ -89,8 +89,10 @@ class BuildParameters(models.Model):
     build_ids = fields.One2many('runbot.build', 'params_id')
     modules = fields.Char('Modules')
 
-    upgrade_to_build_id = fields.Many2one('runbot.build', index=True)  # use to define sources to use with upgrade script
+    upgrade_to_version_id = fields.Many2one('runbot.version')
+    upgrade_from_version_id = fields.Many2one('runbot.version')
     upgrade_from_build_id = fields.Many2one('runbot.build', index=True)  # use to download db
+
     dump_db = fields.Many2one('runbot.database', index=True)  # use to define db to download
 
     fingerprint = fields.Char('Fingerprint', compute='_compute_fingerprint', store=True, index=True)
@@ -121,9 +123,10 @@ class BuildParameters(models.Model):
                 'dockerfile_id': param.dockerfile_id.id,
                 'skip_requirements': param.skip_requirements,
             }
-            if param.upgrade_to_build_id:
-                cleaned_vals['upgrade_to_build_dockerfile_id'] = param.upgrade_to_build_id.params_id.dockerfile_id.id
-                cleaned_vals['upgrade_to_build_commits'] = sorted([c.tree_hash or c.id for c in param.upgrade_to_build_id.params_id.commit_link_ids.commit_id])
+            if param.upgrade_to_version_id:
+                cleaned_vals['upgrade_to_version_id'] = param.upgrade_to_version_id.id
+            if param.upgrade_from_version_id:
+                cleaned_vals['upgrade_from_version_id'] = param.upgrade_from_version_id.id
             if param.upgrade_from_build_id:
                 cleaned_vals['upgrade_from_build_id'] = param.upgrade_from_build_id.id
             if param.trigger_id.batch_dependent:
@@ -1252,7 +1255,7 @@ class BuildResult(models.Model):
                 if os.path.isdir(commit._source_path(upgrade_path)):
                     yield os.sep.join([repo_folder, upgrade_path]).strip(os.sep)
 
-    def _upgrade_builds_references(self, refs_batches=None):
+    def _template_builds_per_version(self, refs_batches=None):
         params = self.params_id
         params.ensure_one()
         trigger = params.trigger_id
@@ -1260,7 +1263,7 @@ class BuildResult(models.Model):
         batch = params.create_batch_id
         if refs_batches is None:
             refs_batches = batch.reference_batch_ids or batch.base_reference_batch_id.reference_batch_ids
-        template_builds = self.env['runbot.build']
+        template_builds_per_version = {}
         for batch in refs_batches:
             template_build = None
             for slot in batch.slot_ids:
@@ -1269,17 +1272,17 @@ class BuildResult(models.Model):
                     if not template_build or template_build.local_state != 'done':
                         self._log('', 'Template build in reference batch %s for trigger %s is not done yet', batch.id, template_trigger_id.id)
                     template_build = slot.build_id
-                    template_builds |= template_build
+                    template_builds_per_version[batch.bundle_id.version_id] = template_build
                     break
 
-        return template_builds
+        return template_builds_per_version
 
-    def get_current_batch_template(self):
+    def get_current_batch_target_infos(self):
         current_batch = self.params_id.create_batch_id
-        template_builds = self._upgrade_builds_references(current_batch)
-        if not template_builds:
+        template_builds_per_version = self._template_builds_per_version(current_batch)
+        if not template_builds_per_version:
             self._log('', f'No build template found in batch [{current_batch.id}](/runbot/batch/{current_batch.id})', level='WARNING', log_type='markdown')
-        return template_builds
+        return current_batch.version_id, template_builds_per_version.get(current_batch.version_id).commit_link_ids
 
     def _get_server_info(self, commit=None):
         commit = commit or self._get_server_commit()
