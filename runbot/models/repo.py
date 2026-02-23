@@ -55,6 +55,7 @@ class Trigger(models.Model):
     project_id = fields.Many2one('runbot.project', string="Project id", required=True)
     repo_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_triggers', string="Triggers", domain="[('project_id', '=', project_id)]")
     dependency_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_dependencies', string="Dependencies")
+    use_extra_slot = fields.Boolean('Use extra slot', help="If checked, builds from this trigger can use an extra slot on the builders (for light and fast triggers)")
 
     starts_before_ids = fields.Many2many(
         'runbot.trigger',

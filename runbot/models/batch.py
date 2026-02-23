@@ -163,7 +163,7 @@ class Batch(models.Model):
             build_type = 'normal'
             if self.category_id != self.env.ref('runbot.default_category'):
                 build_type = 'scheduled'
-            elif self.bundle_id.priority:
+            elif self.bundle_id.priority or params.trigger_id.use_extra_slot:
                 build_type = 'priority'
 
             build = self.env['runbot.build'].create({

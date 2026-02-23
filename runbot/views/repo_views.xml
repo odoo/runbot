@@ -21,6 +21,7 @@
                   <field name="config_data" widget="runbotjsonb"/>
                   <field name="report_view_id"/>
                   <field name="has_stats"/>
+                  <field name="use_extra_slot"/>
                 </group>
                 <group>
                   <field name="description"/>
