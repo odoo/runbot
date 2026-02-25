@@ -36,16 +36,24 @@
         <field name="arch" type="xml">
             <list string="Branches">
                 <field name="create_date" options="{'numeric': true}"/>
-                <field name="remote_id"/>
-                <field name="name"/>
             </list>
+        </field>
+    </record>
+    <record id="branch_view_graph" model="ir.ui.view">
+        <field name="name">runbot.branch.graph</field>
+        <field name="model">runbot.branch</field>
+        <field name="arch" type="xml">
+            <graph string="Branches">
+                <field name="create_date" options="{'numeric': true}"/>
+                <field name="name"/>
+            </graph>
         </field>
     </record>
 
     <record id="open_view_branch_tree" model="ir.actions.act_window">
         <field name="name">Branches</field>
         <field name="res_model">runbot.branch</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">list,form,graph</field>
     </record>
 
   </data>
