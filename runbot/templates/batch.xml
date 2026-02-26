@@ -18,6 +18,23 @@
                                 </a>
                             </td>
                         </tr>
+                        <tr t-if="batch.priority_level">
+                            <td>Priority</td>
+                            <td>
+                                <t t-if="batch.priority_level &lt; int(batch.create_date.timestamp())">
+                                    <span class="badge text-bg-success">High</span>
+                                </t>
+                                <t t-else="">
+                                    <t t-if="batch.priority_level &gt; int(batch.create_date.timestamp())">
+                                        <span class="badge text-bg-secondary">Low</span>
+                                    </t>
+                                    <t t-else="">
+                                        Normal
+                                    </t>
+                                    <a groups="runbot.group_user" role="button" class="btn btn-ssm btn-info" t-attf-href="/runbot/batch/{{batch.id}}/prioritize">Set to high</a>
+                                </t>
+                            </td>
+                        </tr>
                         <tr t-if="batch.category_id.id != default_category">
                             <td>Category</td>
                             <td t-out="batch.category_id.name"></td>

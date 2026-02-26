@@ -276,6 +276,7 @@ class BuildResult(models.Model):
     create_batch_id = fields.Many2one('runbot.batch', related='params_id.create_batch_id', store=True, index=True)
     create_bundle_id = fields.Many2one('runbot.bundle', related='params_id.create_batch_id.bundle_id', index=True)
     dynamic_config = JsonDictField('Dynamic Config', related='params_id.dynamic_config')
+    priority_level = fields.Integer('Priority', related='create_batch_id.priority_level', store=True, index=True)
 
     # state machine
     global_state = fields.Selection(make_selection(state_order), string='Status', compute='_compute_global_state', store=True, recursive=True)
@@ -522,6 +523,7 @@ class BuildResult(models.Model):
             'params_id': self.params_id.copy(param_values).id,
             'parent_id': self.id,
             'build_type': self.build_type,
+            'priority_level': self.priority_level,
             'description': description,
             'orphan_result': orphan,
             'keep_host': self.keep_host,

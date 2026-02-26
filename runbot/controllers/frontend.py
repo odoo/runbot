@@ -220,6 +220,12 @@ class Runbot(Controller):
         }
         return request.render('runbot.batch', context)
 
+    @route(['/runbot/batch/<int:batch_id>/prioritize'], website=True, auth='user', type='http', sitemap=False)
+    def batch_priority(self, batch_id=None, **kwargs):
+        batch = request.env['runbot.batch'].browse(batch_id)
+        batch.sudo().priority_level = int(batch.create_date.timestamp() - 3600)
+        return werkzeug.utils.redirect('/runbot/batch/%s' % batch_id)
+
     @route(['/runbot/batch/slot/<model("runbot.batch.slot"):slot>/build'], auth='user', type='http')
     def slot_create_build(self, slot=None, **kwargs):
         build = slot.sudo()._create_missing_build()

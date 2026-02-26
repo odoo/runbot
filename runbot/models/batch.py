@@ -20,6 +20,7 @@ class Batch(models.Model):
     slot_ids = fields.One2many('runbot.batch.slot', 'batch_id')
     all_build_ids = fields.Many2many('runbot.build', compute='_compute_all_build_ids', help="Recursive builds")
     state = fields.Selection([('preparing', 'Preparing'), ('ready', 'Ready'), ('done', 'Done'), ('skipped', 'Skipped')])
+    priority_level = fields.Integer("Priority level", help="Priority level of the batch, determined from the create date and the bundle priority offset. The lower, the higher priority.")
     hidden = fields.Boolean('Hidden', default=False)
     age = fields.Integer(compute='_compute_age', string='Build age')
     category_id = fields.Many2one('runbot.category', index=True, default=lambda self: self.env.ref('runbot.default_category', raise_if_not_found=False))
@@ -182,6 +183,11 @@ class Batch(models.Model):
 
     def _prepare(self, auto_rebase=False, use_base_commits=False):
         _logger.info('Preparing batch %s', self.id)
+
+        priority_offset = self.bundle_id.priority_offset
+        if not priority_offset and self.bundle_id.branch_ids.forwardport_of_id and self.bundle_id.last_batchs == self:  # this is the only batch of a forwardported pr.
+            priority_offset = - 3600 * 5
+        self.priority_level = int(self.create_date.timestamp() - priority_offset)
         if use_base_commits:
             self._warning('This batch will use base commits instead of bundle commits')
         if not self.bundle_id.base_id:

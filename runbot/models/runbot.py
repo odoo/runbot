@@ -138,7 +138,7 @@ class Runbot(models.AbstractModel):
         if domain:
             non_allocated_domain = Domain.AND([non_allocated_domain, domain])
         query = self.env['runbot.build']._search(non_allocated_domain)
-        query.order = 'runbot_build.create_batch_id'
+        query.order = 'runbot_build.priority_level'
         self.env.execute_query(SQL("""UPDATE
                         runbot_build
                     SET

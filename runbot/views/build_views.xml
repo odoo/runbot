@@ -83,6 +83,8 @@
                         <field name="keep_running"/>
                         <field name="gc_date" readonly="1" options="{'numeric': true}"/>
                         <field name="gc_delay"/>
+                        <field name="killable"/>
+                        <field name="priority_level"/>
                     </group>
                 </sheet>
             </form>

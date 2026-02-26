@@ -57,6 +57,8 @@ class Bundle(models.Model):
     tag_ids = fields.Many2many('runbot.bundle.tag', string='Tags')
     team_id = fields.Many2one('runbot.team', compute='_compute_team_id', store=True, readonly=False)
 
+    priority_offset = fields.Integer("Priority offset", help="Offset in seconds to remove from the create date of a batch to define priority, positive value means higher priority, negative value means lower priority.")
+
     def _compute_frontend_url(self):
         for bundle in self:
             bundle.frontend_url = f'/runbot/bundle/{bundle.id}'
