@@ -120,6 +120,7 @@
         <field name="name">Install branch debian/control with latest postgresql-client</field>
         <field name="values" eval="{'odoo_branch': 'master', 'os_release_name': '`lsb_release -s -c`'}"/>
         <field name="content"># This layer updates the repository list to get the latest postgresql-client, mainly needed if the host postgresql version is higher than the default version of the docker os
+# CACHE 60
 ADD https://raw.githubusercontent.com/odoo/odoo/{odoo_branch}/debian/control /tmp/control.txt
 RUN curl -sSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /etc/apt/trusted.gpg.d/psql_client.asc \
     &amp;&amp; echo "deb http://apt.postgresql.org/pub/repos/apt/ {os_release_name}-pgdg main" &gt; /etc/apt/sources.list.d/pgclient.list \
@@ -195,7 +196,8 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1</field>
         <field name="layer_type">template</field>
         <field name="name">Install branch requirements</field>
         <field name="values" eval="{'odoo_branch': 'master'}"/>
-        <field name="content">ADD --chown={USERNAME} https://raw.githubusercontent.com/odoo/odoo/{odoo_branch}/requirements.txt /tmp/requirements.txt
+        <field name="content"># CACHE 60
+ADD --chown={USERNAME} https://raw.githubusercontent.com/odoo/odoo/{odoo_branch}/requirements.txt /tmp/requirements.txt
 RUN python3 -m pip install --no-cache-dir -r /tmp/requirements.txt</field>
     </record>
 
