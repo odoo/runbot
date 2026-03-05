@@ -137,7 +137,7 @@ RUN curl -sSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /etc/apt/tru
         <field name="dockerfile_id" ref="runbot.docker_default"/>
         <field name="layer_type">template</field>
         <field name="name">Install chrome</field>
-        <field name="values" eval="{'chrome_version': '141.0.7390.54-1'}"/>
+        <field name="values" eval="{'chrome_version': '145.0.7632.116-1'}"/>
         <field name="content">RUN curl -sSL https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_{chrome_version}_amd64.deb -o /tmp/chrome.deb \
     &amp;&amp; apt-get update \
     &amp;&amp; apt-get -y install --no-install-recommends /tmp/chrome.deb \
