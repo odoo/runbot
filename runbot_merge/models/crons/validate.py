@@ -1,7 +1,10 @@
 import contextlib
 import json
 import logging
-from typing import Self
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 from odoo import fields, models, api
 

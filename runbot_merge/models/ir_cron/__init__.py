@@ -2,7 +2,11 @@ import contextvars
 import datetime
 import math
 import time
-from typing import Self, Literal
+from typing import Literal
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 from odoo import models
 
