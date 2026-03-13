@@ -1,74 +1,78 @@
 /** @odoo-module **/
 import { patch } from "@web/core/utils/patch";
 import { Message } from "@mail/core/common/message";
+import { CopyButton } from "@web/core/copy_button/copy_button";
+import { memoize } from "@web/core/utils/functions";
+
+const diffMatchPatch = new diff_match_patch();
+
+function makeDiff(text1, text2) {
+    const { chars1, chars2, lineArray } = diffMatchPatch.diff_linesToChars_(text1, text2);
+    const diffs = diffMatchPatch.diff_main(chars1, chars2, false);
+    diffMatchPatch.diff_charsToLines_(diffs, lineArray);
+    diffMatchPatch.diff_cleanupSemantic(diffs);
+    return diffs;
+}
+
+function prepareForRendering(diffs) {
+    const lines = [];
+    let preLineCounter = 0;
+    let postLineCounter = 0;
+    for (const { 0: diffType, 1: data } of diffs) {
+        for (let line of data.split("\n")) {
+            line = line.replace(/&/g, "&amp;");
+            line = line.replace(/</g, "&lt;");
+            line = line.replace(/>/g, "&gt;");
+            //text = text.replace(/\n/g, "<br>");
+            //text = text.replace(/ /g, "&nbsp&nbsp");
+            let type;
+            if (diffType === -1) {
+                type = "removed";
+                preLineCounter += 1;
+            } else if (diffType === 0) {
+                type = "kept";
+                preLineCounter += 1;
+                postLineCounter += 1;
+            } else if (diffType === 1) {
+                type = "added";
+                postLineCounter += 1;
+            }
+            lines.push({ type, preLineCounter, postLineCounter, line });
+        }
+    }
+    return lines;
+}
+
+function computeDiff({ oldValue, newValue }) {
+    const diff = makeDiff(oldValue, newValue);
+    return prepareForRendering(diff);
+}
+
+patch(Message, {
+    components: {
+        ...Message.components,
+        CopyButton,
+    },
+});
 
 patch(Message.prototype, {
     setup() {
         super.setup(...arguments);
-        this.kept = false;
+        this.state.showKept = false;
     },
-    isMultiline(trackingValue) {
-        const oldValue = trackingValue.oldValue;
-        const newValue = trackingValue.newValue;
-        return ((oldValue && typeof oldValue=== 'string' && oldValue.includes('\n')) && (newValue && typeof oldValue=== 'string' && newValue.includes('\n')))
+
+    lines: memoize(computeDiff),
+
+    isMultiline({ oldValue, newValue }) {
+        return (
+            typeof oldValue === "string" &&
+            oldValue.includes("\n") &&
+            typeof oldValue === "string" &&
+            newValue.includes("\n")
+        );
     },
-    formatTracking(trackingFieldInfo, trackingValue) {
-        return super.formatTracking(trackingFieldInfo, trackingValue) 
-    },
+
     toggleKept() {
-        this.kept = !this.kept;
+        this.state.showKept = !this.state.showKept;
     },
-    copyToClipboard(trackingValue) {
-        return function () {
-            navigator.clipboard.writeText(trackingValue);
-        };
-    },
-    lines(trackingValue) {
-        const oldValue = trackingValue.oldValue;
-        const newValue = trackingValue.newValue;
-        const diff = this.makeDiff(oldValue, newValue);
-        const lines = this.prepareForRendering(diff);
-        return lines;
-    },
-    makeDiff(text1, text2) {
-        var dmp = new diff_match_patch();
-        var a = dmp.diff_linesToChars_(text1, text2);
-        var lineText1 = a.chars1;
-        var lineText2 = a.chars2;
-        var lineArray = a.lineArray;
-        var diffs = dmp.diff_main(lineText1, lineText2, false);
-        dmp.diff_charsToLines_(diffs, lineArray);
-        dmp.diff_cleanupSemantic(diffs);
-        return diffs;
-    },
-    prepareForRendering(diffs) {
-        var lines = [];
-        var pre_line_counter = 0
-        var post_line_counter = 0
-        for (var x = 0; x < diffs.length; x++) {
-            var diff_type = diffs[x][0];
-            var data = diffs[x][1];
-            var data_lines = data.split('\n');
-            for (var line_index in data_lines) {
-                var line = data_lines[line_index];
-                line = line.replace(/&/g, '&amp;');
-                line = line.replace(/</g, '&lt;');
-                line = line.replace(/>/g, '&gt;');
-                //text = text.replace(/\n/g, '<br>');
-                //text = text.replace(/ /g, '&nbsp&nbsp');
-                if (diff_type == -1) {
-                    lines.push({type:'removed', pre_line_counter: pre_line_counter, post_line_counter: '-', line: line})
-                    pre_line_counter += 1
-                } else if (diff_type == 0) {
-                    lines.push({type:'kept', pre_line_counter: '', post_line_counter: post_line_counter, line: line})
-                    pre_line_counter += 1
-                    post_line_counter +=1
-                } else if (diff_type == 1) {
-                    lines.push({type:'added', pre_line_counter: '+', post_line_counter: post_line_counter, line: line})
-                    post_line_counter +=1
-                }
-            }
-        }
-        return lines;
-      },
 });
