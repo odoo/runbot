@@ -769,7 +769,7 @@ class Runbot(Controller):
             raise NotFound
         if batch_ids:
             batch_ids = [int(bid) for bid in batch_ids.split(',')]
-            batches = request.env['runbot.batch'].browse(batch_ids).exists().sorted(lambda b: b.bundle_id.version_id.number, reverse=True)
+            batches = request.env['runbot.batch'].browse(batch_ids).exists().sorted(lambda b: b.version_id.number, reverse=True)
             if not batches:
                 raise NotFound
             next_date_url = None

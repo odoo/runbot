@@ -940,7 +940,7 @@ class ConfigStep(models.Model):
             if repo_version != build.params_id.version_id:
                 # for stable, use the upgrade commits from the corresponding master batch
                 reference_batches = reference_batch.reference_batch_ids or reference_batch.base_reference_batch_id.reference_batch_ids
-                reference_batch = reference_batches.filtered(lambda b: b.bundle_id.version_id == repo_version)
+                reference_batch = reference_batches.filtered(lambda b: b.version_id == repo_version)
                 build._log('', f'Using batch [{reference_batch.id}](/runbot/batch/{reference_batch.id}) to select {repo_version.name} upgrade commits', log_type='markdown')
             repo_commit = reference_batch.commit_link_ids.filtered(lambda cl: cl.commit_id.repo_id in repos)
             if not repo_commit:

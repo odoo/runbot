@@ -649,6 +649,7 @@ class Repo(models.Model):
                     preparing = self.env['runbot.batch'].create({
                         'last_update': datetime.datetime.now(),
                         'bundle_id': bundle.id,
+                        'version_id': bundle.version_id.id,
                         'state': 'preparing',
                     })
                     bundle.last_batch = preparing

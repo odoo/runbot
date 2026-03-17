@@ -24,7 +24,7 @@
                         </tr>
                         <tr>
                             <td>Version</td>
-                            <td t-out="batch.slot_ids[0].params_id.version_id.name if batch.slot_ids else batch.bundle_id.version_id.name"/>
+                            <td t-out="batch.version_id.name"/>
                         </tr>
                         <tr>
                             <td>Create date</td>
@@ -138,9 +138,9 @@
                                 </t>
                             </td>
                             <td>
-                                <t t-foreach="reference_batch_ids.sorted(lambda b: b.bundle_id.version_id.number, reverse=True)" t-as="reference_batch">
+                                <t t-foreach="reference_batch_ids.sorted(lambda b: b.version_id.number, reverse=True)" t-as="reference_batch">
                                     <div t-attf-title="Created {{s2human(reference_batch.create_date - batch.create_date)}} before this one">
-                                         <a t-attf-href="/runbot/batch/{{reference_batch.id}}"><t t-out="reference_batch.bundle_id.version_id.name"/> (<t t-out="reference_batch.id"/>)</a>
+                                         <a t-attf-href="/runbot/batch/{{reference_batch.id}}"><t t-out="reference_batch.version_id.name"/> (<t t-out="reference_batch.id"/>)</a>
                                     </div>
                                 </t>
                             </td>

@@ -26,6 +26,7 @@ class Batch(models.Model):
     log_ids = fields.One2many('runbot.batch.log', 'batch_id')
     has_warning = fields.Boolean("Has warning")
     base_reference_batch_id = fields.Many2one('runbot.batch')
+    version_id = fields.Many2one('runbot.version')
     reference_batch_ids = fields.Many2many(
         'runbot.batch',
         string="Reference batches",
