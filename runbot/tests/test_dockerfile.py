@@ -204,7 +204,7 @@ ADD https://nowhere.example.org/nothing.txt /data/nothing.txt
 
         expected_content = """# CacheAddTest
 FROM ubuntu:noble
-# CACHE 60
+# CACHED ADD https://nowhere.example.org/nothing.txt /data/nothing.txt
 COPY _data_nothing_txt /data/nothing.txt
 
 
@@ -270,7 +270,7 @@ ADD https://nowhere.example.org/nothing.txt /data/nothing.txt
 
         expected_content = """# Cache Test
 FROM ubuntu:noble
-# CACHE 60
+# CACHED ADD https://nowhere.example.org/nothing.txt /data/nothing.txt
 COPY _data_nothing_txt /data/nothing.txt
 
 

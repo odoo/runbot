@@ -352,6 +352,7 @@ class Dockerfile(models.Model):
                     destination = add_match.group('destination')
                     # Use the destination name as hardlink name to avoid rebuild if file content is the same but not the url
                     hardlink_name = re.sub(r'[^a-zA-Z0-9]', '_', destination)
+                    lines[i] = f'# CACHED {lines[i + 1]}'
                     lines[i + 1] = f'COPY {hardlink_name} {destination}'
                     cache_file_path = cache_dir / filename
                     if not cache_file_path.exists() or time.time() - cache_file_path.lstat().st_mtime > cache_duration:
