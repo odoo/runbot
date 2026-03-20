@@ -1021,7 +1021,9 @@ class BuildResult(models.Model):
 
         containers_memory_limit = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_containers_memory', 0)
         if containers_memory_limit and 'memory' not in kwargs:
-            kwargs['memory'] = int(float(containers_memory_limit) * 1024 ** 3)
+            memory_limit_factor = float(self.params_id.config_data.get('memory_limit_factor', 1))
+            containers_memory_limit = int(float(containers_memory_limit) * 1024 ** 3) * memory_limit_factor
+            kwargs['memory'] = containers_memory_limit
 
         self.docker_start = now()
         if self.job_start:

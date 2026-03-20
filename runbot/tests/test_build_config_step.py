@@ -1185,21 +1185,14 @@ def run():
             'job_type': 'install_odoo',
         })
 
-        # by default, network is disabled
-        def first_docker_run(cmd, log_path, *args, **kwargs):
-            self.assertFalse(kwargs['network_enabled'])
-
-        self.docker_run_patch = first_docker_run
         config_step._run_step(self.parent_build)()
-
-        def second_docker_run(cmd, log_path, *args, **kwargs):
-            self.assertTrue(kwargs['network_enabled'])
-
-        self.docker_run_patch = second_docker_run
+        self.assertFalse(self.docker_run_calls[0][3]['network_enabled'])
 
         parent_build_params = self.parent_build.params_id.copy({'config_data': {'network_enabled': True}})
         parent_build = self.parent_build.copy({'params_id': parent_build_params.id})
         config_step._run_step(parent_build)()
+
+        self.assertTrue(self.docker_run_calls[1][3]['network_enabled'])
 
 
     @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
@@ -1241,6 +1234,21 @@ docker_params = dict(cmd=cmd, network_enabled=True)
         tags = self.get_test_tags(params)
         self.assertEqual(tags, '"-at_install,/web/foo.py:WebSuite.test_unit_desktop[@bar/test with spaces],-/web/bar.py[@snafu/other test with spaces]"')
 
+        @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
+        def test_memory_limit(self, mock_checkout):
+            """ test that network can be disabled with config_data """
+            config_step = self.ConfigStep.create({
+                'name': 'default',
+                'job_type': 'install_odoo',
+            })
+            self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_containers_memory', 10)
+            config_step._run_step(self.parent_build)()
+            self.assertEqual(self.docker_run_calls[0][3]['memory'], 10 * 1024 ** 3)
+
+            parent_build_params = self.parent_build.params_id.copy({'config_data': {'memory_limit_factor': 0.9}})
+            parent_build = self.parent_build.copy({'params_id': parent_build_params.id})
+            config_step._run_step(parent_build)()
+            self.assertEqual(self.docker_run_calls[1][3]['memory'], 9 * 1024 ** 3)
 class TestMakeResult(RunbotCase):
 
     def setUp(self):
