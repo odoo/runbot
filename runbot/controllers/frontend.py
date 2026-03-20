@@ -80,7 +80,7 @@ class Runbot(Controller):
             '/runbot/<model("runbot.project"):project>',
             '/runbot/<model("runbot.project"):project>/search/<search>'], website=True, auth='public', type='http')
     def bundles(self, project=None, search='', refresh=False, limit=40, has_pr=None, **kwargs):
-        search = search if len(search) < 60 else search[:60]
+        search = search if len(search) < 60 else search[:200]
         env = request.env
         categories = env['runbot.category'].search([])
         projects = self.env['runbot.project'].search([('hidden', '=', False)])
@@ -119,13 +119,11 @@ class Runbot(Controller):
                 pr_numbers = []
                 for search_elem in search.split("|"):
                     if search_elem.isnumeric():
-                        pr_numbers.append(int(search_elem))
+                        search_domains.append([('branch_ids', 'any', [('name', '=', search_elem)])])
+                    if ':' in search_elem:
+                        search_domains.append([('branch_ids', 'any', [('pull_head_name', '=', search_elem)])])
                     operator = '=ilike' if '%' in search_elem else 'ilike'
                     search_domains.append([('name', operator, search_elem)])
-                if pr_numbers:
-                    res = request.env['runbot.branch'].search([('name', 'in', pr_numbers)])
-                    if res:
-                        search_domains.append([('id', 'in', res.mapped('bundle_id').ids)])
                 search_domain = Domain.OR(search_domains)
                 domain = Domain.AND([domain, search_domain])
 

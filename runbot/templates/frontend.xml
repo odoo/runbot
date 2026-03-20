@@ -6,7 +6,7 @@
         <t t-set="nav_form">
           <form class="form-inline my-2 my-lg-0" role="search" t-att-action="qu(search='')" method="get">
             <div class="input-group md-form form-sm form-2 ps-0">
-              <input class="form-control my-0 py-1" type="text" placeholder="Search" aria-label="Search" name="search" t-att-value="search"/>
+              <input class="form-control my-0 py-1" type="text" placeholder="Search" aria-label="Search" name="search" t-att-value="search" autofocus="autofocus"/>
               <a t-if="has_pr" class="btn btn-primary active input-group-text" title="All" t-att-href="qu(has_pr=None)">
                 <i class="fa fa-github text-grey"/>
               </a>
