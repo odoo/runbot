@@ -432,6 +432,7 @@ class Repo(models.Model):
     enforce_version = fields.Boolean('Force version', help="Force all bundle containing branch from this repo to be prefixed with the correct version", default=True)
     forbidden_regex = fields.Char('Forbidden regex', help="Regex that forid bundle creation if branch name is matching", tracking=True)
     invalid_branch_message = fields.Char('Forbidden branch message', tracking=True)
+    allow_slashes = fields.Boolean('Allow slashes in branch names', help="Allow branches with slashes in their name (e.g. odoo/tests/my_branch). If unchecked, only one level of branches is allowed (e.g. odoo/my_branch)", default=True)
 
     def _compute_get_ref_time(self):
         self.env.cr.execute("""
@@ -556,7 +557,10 @@ class Repo(models.Model):
                 self._set_ref_time(get_ref_time)
                 fields = ['refname', 'objectname', 'committerdate:unix', 'authorname', 'authoremail', 'subject', 'committername', 'committeremail', 'tree']
                 fmt = "%00".join(["%(" + field + ")" for field in fields])
-                cmd = ['for-each-ref', '--format', fmt, '--sort=-committerdate', 'refs/*/heads/*']
+                refs_desc = 'refs/*/heads/*'
+                if self.allow_slashes:
+                    refs_desc += ' refs/*/heads/**'
+                cmd = ['for-each-ref', '--format', fmt, '--sort=-committerdate', refs_desc]
                 if any(remote.fetch_pull for remote in self.remote_ids):
                     cmd.append('refs/*/pull/*')
                 git_refs = self._git(cmd)
@@ -583,7 +587,7 @@ class Repo(models.Model):
         """
 
         # FIXME WIP
-        names = [r[0].split('/')[-1] for r in refs]
+        names = [r[0].split('/', 3)[-1] for r in refs]
         branches = self.env['runbot.branch'].search([('name', 'in', names), ('remote_id', 'in', self.remote_ids.ids)])
         ref_branches = {branch._ref(): branch for branch in branches}
         new_branch_values = []
@@ -592,7 +596,7 @@ class Repo(models.Model):
                 # format example:
                 # refs/ruodoo-dev/heads/12.0-must-fail
                 # refs/ruodoo/pull/1
-                _, remote_name, branch_type, name = ref_name.split('/')
+                _, remote_name, branch_type, name = ref_name.split('/', 3)
                 remote_id = self.remote_ids.filtered(lambda r: r.remote_name == remote_name).id
                 if not remote_id:
                     _logger.warning('Remote %s not found', remote_name)
