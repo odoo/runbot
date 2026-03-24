@@ -199,6 +199,7 @@
                 <group>
                   <field name="identity_file"/>
                   <field name="single_version"/>
+                  <field name="enforce_version"/>
                 </group>
 
                 <group string="debug">

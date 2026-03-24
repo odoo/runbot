@@ -429,6 +429,7 @@ class Repo(models.Model):
     get_ref_time = fields.Float('Last refs db update', compute='_compute_get_ref_time')
     trigger_ids = fields.Many2many('runbot.trigger', relation='runbot_trigger_triggers', readonly=True)
     single_version = fields.Many2one('runbot.version', "Single version", help="Limit the repo to a single version for non versionned repo")
+    enforce_version = fields.Boolean('Force version', help="Force all bundle containing branch from this repo to be prefixed with the correct version", default=True)
     forbidden_regex = fields.Char('Forbidden regex', help="Regex that forid bundle creation if branch name is matching", tracking=True)
     invalid_branch_message = fields.Char('Forbidden branch message', tracking=True)
 
