@@ -17,6 +17,7 @@
                   <field name="category_id" required='1'/>
                   <field name="project_id" default=""/>
                   <field name="config_id"/>
+                  <field name="light_config_id"/>
                   <field name="network_enabled"/>
                   <field name="config_data" widget="runbotjsonb"/>
                   <field name="report_view_id"/>

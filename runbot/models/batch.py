@@ -382,7 +382,11 @@ class Batch(models.Model):
                 self._warning('Missing commit for repo %s for trigger %s', (trigger_repos & missing_repos).mapped('name'), trigger.name)
                 continue
             # in any case, search for an existing build
-            config = trigger_custom.config_id or trigger.config_id
+            config = trigger.config_id
+            if trigger_custom.config_id:
+                config = trigger_custom.config_id
+            elif trigger_custom.start_mode == 'light' and trigger.light_config_id:
+                config = trigger.light_config_id
             extra_params = trigger_custom.extra_params or ''
             config_data = dict(trigger.config_data or {}) | dict(trigger_custom.config_data or {})
             trigger_commit_link_by_repos = commit_link_by_repos
@@ -402,7 +406,7 @@ class Batch(models.Model):
                 'modules': bundle.modules,
                 'dockerfile_id': dockerfile_id,
                 'create_batch_id': self.id,
-                'used_custom_trigger': bool(trigger_custom),
+                'used_custom_trigger': bool(trigger_custom.config_id or trigger_custom.extra_params or trigger_custom.config_data or trigger_custom.use_base_commits),
             }
 
             params = self.env['runbot.build.params'].create(params_value)

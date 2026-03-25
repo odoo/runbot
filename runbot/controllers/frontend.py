@@ -164,7 +164,7 @@ class Runbot(Controller):
         '/runbot/bundle/<model("runbot.bundle"):bundle>/page/<int:page>',
         '/runbot/bundle/<string:bundle>',
         ], website=True, auth='public', type='http', sitemap=False)
-    def bundle(self, bundle=None, page=1, limit=50, **kwargs):
+    def bundle(self, bundle=None, page=1, limit=50, expand_custom=False, **kwargs):
         if isinstance(bundle, str):
             bundle = request.env['runbot.bundle'].search([('name', '=', bundle)], limit=1, order='id')
             if not bundle:
@@ -188,6 +188,7 @@ class Runbot(Controller):
             'project': bundle.project_id,
             'title': 'Bundle %s' % bundle.name,
             'page_info_state': bundle.last_batch._get_global_result(),
+            'expand_custom': expand_custom,
         }
 
         return request.render('runbot.bundle', context)
@@ -667,18 +668,39 @@ class Runbot(Controller):
         request.env['runbot.build.error']._parse_logs(ir_log)
         return werkzeug.utils.redirect('/runbot/build/%s' % ir_log.build_id.id)
 
-    @route(['/runbot/bundle/toggle_no_build/<int:bundle_id>/<int:value>'], type='http', auth='user', sitemap=False)
-    def toggle_no_build(self, bundle_id, value, **kwargs):
-        if not request.env.user.has_group('base.group_user'):
-            return 'Forbidden'
-        bundle = request.env['runbot.bundle'].browse(bundle_id).exists()
-        if bundle.sticky or bundle.is_base:
-            return 'Forbidden'
-        if bundle.project_id.tmp_prefix and bundle.name.startswith(bundle.project_id.tmp_prefix):
-            return 'Forbidden'
-        bundle.sudo().no_build = bool(value)
-        _logger.info('Bundle %s no_build set to %s by %s', bundle.name, bool(value), request.env.user.name)
-        return werkzeug.utils.redirect(f'/runbot/bundle/{bundle_id}')
+    @route(['/runbot/bundle/<int:bundle_id>/triggers/<string:action>'], type='http', auth='user', sitemap=False)
+    def configure_bundle_triggers(self, bundle_id, action, expand_custom=False, **kwargs):
+        if not request.env.user.has_group('runbot.group_user'):
+            raise NotFound()
+
+        bundle = request.env['runbot.bundle'].browse(bundle_id)
+        if bundle.is_base or bundle.is_staging:
+            raise NotFound()
+        if action == 'disable_all':
+            bundle.sudo().configure_custom_trigger_start_mode('disabled')
+        elif action == 'force_all':
+            bundle.sudo().configure_custom_trigger_start_mode('force')
+        elif action == 'auto_all':
+            bundle.sudo().configure_custom_trigger_start_mode('auto')
+        elif action == 'light_all':
+            bundle.sudo().configure_custom_trigger_start_mode('light')
+        else:
+            raise NotFound()
+        expand_kwrags = '?expand_custom=1' if expand_custom else ''
+
+        return werkzeug.utils.redirect(f'/runbot/bundle/{bundle_id}{expand_kwrags}')
+
+    @route(['/runbot/trigger_custom/<int:trigger_custom_id>/set_mode/<string:mode>'], type='http', auth='user', sitemap=False)
+    def configure_custom_trigger(self, trigger_custom_id, mode, **kwargs):
+        if not request.env.user.has_group('runbot.group_user'):
+            raise NotFound()
+        trigger_custom = request.env['runbot.bundle.trigger.custom'].browse(trigger_custom_id)
+        bundle = trigger_custom.bundle_id
+        if bundle.is_base or bundle.is_staging:
+            raise NotFound()
+
+        trigger_custom.sudo().start_mode = mode
+        return werkzeug.utils.redirect(f'/runbot/bundle/{trigger_custom.bundle_id.id}?expand_custom=1')
 
     @route(['/runbot/trigger/report/<model("runbot.trigger"):trigger_id>'], type='http', auth='user', website=True, sitemap=False)
     def report_view(self, trigger_id=None, **kwargs):

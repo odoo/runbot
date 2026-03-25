@@ -8,7 +8,7 @@ class BundleTriggerCustomization(models.Model):
     _description = 'Custom trigger'
 
     trigger_id = fields.Many2one('runbot.trigger')
-    start_mode = fields.Selection([('disabled', 'Disabled'), ('auto', 'Auto'), ('force', 'Force')], required=True, default='auto')
+    start_mode = fields.Selection([('disabled', 'Disabled'), ('auto', 'Auto'), ('light', 'Light'), ('force', 'Force')], required=True, default='auto')
     use_base_commits = fields.Boolean("Use base commits",  help="Allow to test a trigger without the branch changes", default=False)
     bundle_id = fields.Many2one('runbot.bundle')
     config_id = fields.Many2one('runbot.build.config')

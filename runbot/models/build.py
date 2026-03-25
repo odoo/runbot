@@ -1470,14 +1470,18 @@ class BuildResult(models.Model):
                     build.parent_id._github_status()
             else:
                 trigger = build.params_id.trigger_id
-                if not trigger.ci_context:
+                ci_context = trigger.ci_context
+                if not ci_context:
                     continue
 
                 desc = trigger.ci_description or " (runtime %ss)" % (build.job_time,)
                 if build.params_id.used_custom_trigger:
-                    state = 'error'
+                    ci_context += " (custom)"
                     desc = "This build used custom config. Remove custom trigger to restore default ci"
-                elif build.global_result in ('ko', 'warn'):
+                if build.params_id.config_id == build.trigger_id.light_config_id:
+                    ci_context += " (light)"
+                    desc = "This build used a light config. Enable default build configuration to restore default ci"
+                if build.global_result in ('ko', 'warn'):
                     state = 'error'
                 elif build.global_state in ('pending', 'testing'):
                     state = 'pending'
@@ -1530,7 +1534,7 @@ class BuildResult(models.Model):
                     else:
                         target_url = f"{self.get_base_url()}/runbot/build/{build.id}"
 
-                    commit._github_status(build, trigger.ci_context, state, target_url, desc, ci_strategy=trigger.ci_strategy)
+                    commit._github_status(build, ci_context, state, target_url, desc, ci_strategy=trigger.ci_strategy)
 
     def _parse_config(self):
         return set(findall(self._server("tools/config.py"), r'--[\w-]+', ))

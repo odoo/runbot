@@ -6,108 +6,132 @@
                 <div class="container-fluid">
                     <div class="row">
                         <div class='col-md-12'>
-                            <div class="navbar navbar-default">
-                                <span class="text-center" style="font-size: 18px;">
-                                    <t t-out="bundle.name"/>
-                                    <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e" />
-                                    <div class="btn-group" role="group">
-                                        <a groups="runbot.group_runbot_advanced_user"
-                                            t-attf-href="/odoo/bundle/{{bundle.id}}" class="btn btn-default" title="View in Backend">
-                                          <i class="fa fa-list"/>
-                                        </a>
-                                        <a groups="runbot.group_runbot_advanced_user" class="btn btn-default" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Force A New Batch">
-                                            <i class="fa fa-play"/>
-                                        </a>
-                                        <a t-if="bundle.env.user.has_group('runbot.group_runbot_advanced_user') or (bundle.env.user.has_group('runbot.group_user') and ':' in bundle.name)" class="btn btn-default" t-attf-href="/runbot/bundle/{{bundle.id}}/force?auto_rebase=1" title="Force A New Batch with automatic rebase">
-                                            <i class="fa fa-fast-forward"/>
-                                        </a>
-                                        <a groups="runbot.group_runbot_advanced_user" class="btn btn-default" t-attf-href="/runbot/bundle/{{bundle.id}}/force?use_base_commits=1" title="Force A New Batch using base commits">
-                                            <i class="fa fa-fast-backward"/>
-                                        </a>
+                            <h5><t t-out="bundle.name"/> <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e" />
+                                <div class="btn-group btn-group-sm" role="group">
                                         <t t-call="runbot.branch_copy_button">
                                             <t t-set="btn_size" t-value="'btn'"/>
                                         </t>
-                                         <a groups="base.group_user" class="btn btn-default" t-attf-href="/runbot/stats/{{bundle.id}}">
-                                            <i class="fa fa-bar-chart"/>
+                                        <a groups="runbot.group_runbot_advanced_user"
+                                            t-attf-href="/odoo/bundle/{{bundle.id}}" class="btn btn-default" title="View in Backend">
+                                        <i class="fa fa-list"/> Form view
                                         </a>
-                                    </div>
-                                </span>
-                                <span class="pull-right">
-                                    <t t-call="website.pager" />
-                                </span>
-                            </div>
-                            <div>
-                                <table class="table table-condensed table-responsive table-stripped">
-                                    <tr groups="base.group_user" t-if="not bundle.sticky and not bundle.is_base">
-                                        <t t-if="bundle.no_build">
-                                            <td class="text-danger">Build disabled</td>
-                                            <td>
-                                                <a class="btn btn-primary btn-ssm"
-                                                   t-attf-href="/runbot/bundle/toggle_no_build/{{bundle.id}}/0">
-                                                Enable builds
-                                                </a>
-                                            </td>
-                                        </t>
-                                        <t t-else="">
-                                            <td>Build enabled</td>
-                                            <td>
-                                                <a class="btn btn-secondary btn-ssm"
-                                                   t-attf-href="/runbot/bundle/toggle_no_build/{{bundle.id}}/1">
-                                                Disable builds
-                                                </a>
-                                            </td>
-                                        </t>
-                                    </tr>
-                                    <tr>
-                                        <td>Version</td>
-                                        <td>
-                                            <t t-out="bundle.version_id.name"/>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>Branches</td>
-                                        <td>
-                                            <t t-foreach="bundle._branch_groups().items()" t-as="group">
-                                                <t t-foreach="group[1]" t-as="branch">
-                                                    <small>
-                                                        <div class="btn-toolbar mb-1" role="toolbar">
-                                                            <div class="btn-group btn-group-ssm" role="group">
-                                                                <a t-att-href="branch.branch_url" class="btn btn-default text-start" title="View Branch on Github"><i class="fa fa-github"/></a>
-                                                                <a groups="runbot.group_runbot_admin" class="btn btn-default fa fa-list text-start"
-                                                                    t-attf-href="/odoo/branch/{{branch.id}}" target="_blank" title="View Branch in Backend"/>
-                                                                <a href="#" t-out="branch.remote_id.short_name" class="btn btn-default disabled text-start"/>
-                                                                <a t-attf-href="/runbot/branch/{{branch.id}}" class="btn btn-default text-start" title="View Branch Details"><span t-att-class="'' if branch.alive else 'line-through'" t-out="branch.name"/> <i t-if="not branch.alive" title="deleted/closed" class="fa fa-ban text-danger"/></a>
-                                                                <t t-if="not any (b.is_pr and b.alive for b in group[1]) and not branch.is_pr">
-                                                                    <a t-attf-href="https://{{group[0].main_remote_id.base_url}}/compare/{{bundle.version_id.name}}...{{branch.remote_id.owner}}:{{branch.name}}?expand=1" class="btn btn-default text-start" title="Create pr"><i class="fa fa-code-fork"/> Create pr</a>
-                                                                </t>
-                                                            </div>
+                                        <a groups="base.group_user" class="btn btn-default" t-attf-href="/runbot/stats/{{bundle.id}}" title="View stats">
+                                            <i class="fa fa-bar-chart"/> Stats
+                                        </a>
+                                        <button type="button" class="btn btn-default dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="fa fa-play"/> Actions <i class="fa fa-caret-down ms-1"/>
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <a groups="runbot.group_runbot_advanced_user" class="btn btn-default dropdown-item" t-attf-href="/runbot/bundle/{{bundle.id}}/force?use_base_commits=1" title="Force a new batch using base commits mainly for random errors debugging">
+                                                <i class="fa fa-fast-backward"/> Start a batch without the branch commits
+                                            </a>
+                                            <a groups="runbot.group_runbot_advanced_user" class="btn btn-default dropdown-item" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Create a new Batch, applies new trigger configurations and updates build references for upgrades if needed">
+                                                <i class="fa fa-play"/> Start a new batch
+                                            </a>
+                                            <a t-if="bundle.env.user.has_group('runbot.group_runbot_advanced_user') or (bundle.env.user.has_group('runbot.group_user') and ':' in bundle.name)" t-attf-href="/runbot/bundle/{{bundle.id}}/force?auto_rebase=1" class="btn btn-default dropdown-item"  title="Force A New Batch with automatic rebase, useful to test outdated branches without pushing before a merge">
+                                                <i class="fa fa-fast-forward"/> Start a batch with simulated autorebase
+                                            </a>
+                                        </ul>
+                                </div></h5>
+                            
+                            <table class="table table-condensed table-responsive table-stripped">
+                                <tr>
+                                    <td>Version</td>
+                                    <td>
+                                        <t t-out="bundle.version_id.name"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Branches</td>
+                                    <td>
+                                        <t t-foreach="bundle._branch_groups().items()" t-as="group">
+                                            <t t-foreach="group[1]" t-as="branch">
+                                                <small>
+                                                    <div class="btn-toolbar mb-1" role="toolbar">
+                                                        <div class="btn-group btn-group-ssm" role="group">
+                                                            <a t-att-href="branch.branch_url" class="btn btn-default text-start" title="View Branch on Github"><i class="fa fa-github"/></a>
+                                                            <a groups="runbot.group_runbot_admin" class="btn btn-default fa fa-list text-start"
+                                                                t-attf-href="/odoo/branch/{{branch.id}}" target="_blank" title="View Branch in Backend"/>
+                                                            <a href="#" t-out="branch.remote_id.short_name" class="btn btn-default disabled text-start"/>
+                                                            <a t-attf-href="/runbot/branch/{{branch.id}}" class="btn btn-default text-start" title="View Branch Details"><span t-att-class="'' if branch.alive else 'line-through'" t-out="branch.name"/> <i t-if="not branch.alive" title="deleted/closed" class="fa fa-ban text-danger"/></a>
+                                                            <t t-if="not any (b.is_pr and b.alive for b in group[1]) and not branch.is_pr">
+                                                                <a t-attf-href="https://{{group[0].main_remote_id.base_url}}/compare/{{bundle.version_id.name}}...{{branch.remote_id.owner}}:{{branch.name}}?expand=1" class="btn btn-default text-start" title="Create pr"><i class="fa fa-code-fork"/> Create pr</a>
+                                                            </t>
                                                         </div>
-                                                    </small>
-                                                </t>
+                                                    </div>
+                                                </small>
                                             </t>
-                                        </td>
-                                    </tr>
+                                        </t>
+                                    </td>
+                                </tr>
+                                <tr t-if="not bundle.sticky and not bundle.is_base">
+                                    <td>Configuration</td>
+                                    <td>
+                                        <t t-set="current_mode" t-value="'custom'"/>
+                                        <t t-set="modified_repos" t-value="bundle.branch_ids.remote_id.repo_id"/>
 
-                                    <tr t-if="more">
-                                        <td>Project</td>
-                                        <td t-out="bundle.project_id.name"/>
-                                    </tr>
-                                    <tr t-if="more">
-                                        <td>New build enabled</td>
-                                        <td>
-                                            <i t-attf-class="fa fa-{{'times' if bundle.no_build else 'check'}}"/>
-                                        </td>
-                                    </tr>
-                                    <tr t-if="more">
-                                        <td>Modules</td>
-                                        <td t-out="bundle.modules or '/'"/>
-                                    </tr>
-                                </table>
-                            </div>
+                                        <t t-if="not bundle.trigger_custom_ids"> <t t-set="current_mode" t-value="'auto'"/></t>
+                                        <t t-elif="all(trigger_custom.start_mode == 'disabled' for trigger_custom in bundle.trigger_custom_ids)"> <t t-set="current_mode" t-value="'disabled'"/></t>
+                                        <t t-elif="all(trigger_custom.start_mode == 'force' for trigger_custom in bundle.trigger_custom_ids)"> <t t-set="current_mode" t-value="'force'"/></t>
+                                        <t t-elif="all(trigger_custom.start_mode == 'auto' for trigger_custom in bundle.trigger_custom_ids)"> <t t-set="current_mode" t-value="'auto'"/></t>
+                                        <t t-elif="all(trigger_custom.start_mode in ('light', 'auto') for trigger_custom in bundle.trigger_custom_ids)"> <t t-set="current_mode" t-value="'light'"/></t>
+                                        <t t-if="current_mode=='disabled'">
+                                            <a role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" href="#customTriggers">Disable all</a>
+                                        </t><t t-else="">
+                                            <a role="button" t-attf-class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/triggers/disable_all"> Disable all</a>
+                                        </t>
+                                        <t t-if="current_mode=='light'">
+                                            <a role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" href="#customTriggers">Light</a>
+                                        </t><t t-else="">
+                                            <a role="button" t-attf-class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/triggers/light_all">Light</a>
+                                        </t>
+                                        <t t-if="current_mode=='auto'">
+                                            <a role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" href="#customTriggers">Default</a>
+                                        </t><t t-else="">
+                                            <a role="button" t-attf-class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/triggers/auto_all">Default</a>
+                                        </t>
+                                         <t t-if="current_mode=='force'">
+                                            <a role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" href="#customTriggers">Force all</a>
+                                        </t><t t-else="">
+                                            <a role="button" t-attf-class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/triggers/force_all">Force all</a>
+                                        </t>
+                                        <a role="button" t-attf-class="btn btn-{{'primary' if current_mode=='custom' else 'default'}} btn-ssm" data-bs-toggle="collapse" href="#customTriggers" aria-expanded="false" aria-controls="customTriggers"> Custom <i class="fa fa-caret-down ms-1"/></a>
+
+                                        <div t-attf-class="collapse {{'show' if expand_custom else ''}}" id="customTriggers">
+                                            <div class="card card-body mt-2">
+                                                <t t-foreach="bundle.trigger_custom_ids" t-as="trigger_custom">
+                                                    <t t-set="trigger_enabled_by_default" t-value="trigger_custom.trigger_id.repo_ids &amp; modified_repos"/>
+                                                    <t t-set="level_color" t-if="trigger_enabled_by_default and trigger_custom.start_mode == 'disabled'">danger</t>
+                                                    <t t-set="level_color" t-elif="trigger_enabled_by_default and trigger_custom.start_mode == 'light'">info</t>
+                                                    <t t-set="level_color" t-elif="not trigger_enabled_by_default and trigger_custom.start_mode == 'force'">warning</t>
+                                                    <t t-set="level_color" t-elif="trigger_enabled_by_default">success</t>
+                                                    <t t-set="level_color" t-else="">secondary</t>
+                                                    <div>
+                                                        <a href="#" t-attf-class="badge text-bg-{{level_color}} dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                                            <t t-out="trigger_custom.start_mode"/>
+                                                            <i class="fa fa-caret-down ms-1"/>
+                                                        </a>
+                                                        <form class="dropdown-menu">
+                                                            <li t-foreach="['disabled', 'light', 'auto', 'force']" t-as="mode">
+                                                                <a class="dropdown-item" t-attf-href="/runbot/trigger_custom/{{trigger_custom.id}}/set_mode/{{mode}}" t-if="mode != trigger_custom.start_mode and (mode != 'light' or trigger_custom.trigger_id.light_config_id)">
+                                                                    <span t-out="mode"/>
+                                                                </a>
+                                                            </li>
+                                                        </form>
+                                                        <span t-out="trigger_custom.trigger_id.name"/>
+                                                    </div>
+                                                </t>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
                             <div t-foreach="bundle._consistency_warning()" t-as="warning" t-out="warning[1]" t-attf-class="alert alert-{{warning[0]}}"/>
+                            <t t-call="website.pager" />
                             <div class="batch_row" t-foreach="batchs" t-as="batch">
                                 <t t-call="runbot.batch_tile"/>
                             </div>
+                            <t t-call="website.pager" />
                         </div>
                     </div>
                 </div>

@@ -322,7 +322,10 @@ class Bundle(models.Model):
         return self._generate_custom_trigger_action(context)
 
     def action_disable_all_triggers(self):
-        triggers_to_disable = (
+        self.configure_custom_trigger_start_mode('disable')
+
+    def configure_custom_trigger_start_mode(self, mode):
+        triggers_to_create = (
             self.env["runbot.trigger"]
             .search([
                 ("id", "not in", self.trigger_custom_ids.trigger_id.ids),
@@ -335,13 +338,17 @@ class Bundle(models.Model):
             )
         )
         vals = []
-        for trigger in triggers_to_disable:
+        for trigger in triggers_to_create:
             vals.append({
                 'bundle_id': self.id,
                 'trigger_id': trigger.id,
-                'start_mode': 'disabled',
             })
         self.env['runbot.bundle.trigger.custom'].create(vals)
+        for custom_trigger in self.trigger_custom_ids:
+            trigger_mode = mode
+            if mode == 'light' and not custom_trigger.trigger_id.light_config_id:
+                trigger_mode = 'auto'
+            custom_trigger.start_mode = trigger_mode
 
 
 class BundleTag(models.Model):

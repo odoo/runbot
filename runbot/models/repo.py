@@ -73,6 +73,7 @@ class Trigger(models.Model):
     )
     module_filters = fields.One2many('runbot.module.filter', 'trigger_id', string="Module filters", help='Will be combined with repo module filters when used with this trigger')
     config_id = fields.Many2one('runbot.build.config', string="Config", required=True)
+    light_config_id = fields.Many2one('runbot.build.config', string="Light config", help="Alternative config to use when light mode is enabled")
     config_data = JsonDictField('Config Data')
     network_enabled = fields.Boolean('Network Enabled')
     batch_dependent = fields.Boolean('Batch Dependent', help="Force adding batch in build parameters to make it unique and give access to bundle")
