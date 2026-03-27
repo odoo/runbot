@@ -4,7 +4,7 @@
     <template id="runbot.modules_stats">
       <t t-call='runbot.layout'>
         <script>
-          let main_trigger = <t t-esc="main_trigger.id or 'undefined'"/>;
+          let main_trigger = <t t-esc="main_trigger.id if main_trigger else 'undefined'"/>;
         </script>
         <input type="hidden" id="bundle_id" t-att-value="bundle.id"/>
         <div class="container-fluid">
