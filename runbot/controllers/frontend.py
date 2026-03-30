@@ -677,13 +677,13 @@ class Runbot(Controller):
         if bundle.is_base or bundle.is_staging:
             raise NotFound()
         if action == 'disable_all':
-            bundle.sudo().configure_custom_trigger_start_mode('disabled')
+            bundle.sudo()._configure_custom_trigger_start_mode('disabled')
         elif action == 'force_all':
-            bundle.sudo().configure_custom_trigger_start_mode('force')
+            bundle.sudo()._configure_custom_trigger_start_mode('force')
         elif action == 'auto_all':
-            bundle.sudo().configure_custom_trigger_start_mode('auto')
+            bundle.sudo()._configure_custom_trigger_start_mode('auto')
         elif action == 'light_all':
-            bundle.sudo().configure_custom_trigger_start_mode('light')
+            bundle.sudo()._configure_custom_trigger_start_mode('light')
         else:
             raise NotFound()
         expand_kwrags = '?expand_custom=1' if expand_custom else ''

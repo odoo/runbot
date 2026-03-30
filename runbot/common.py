@@ -24,6 +24,13 @@ _logger = logging.getLogger(__name__)
 dest_reg = re.compile(r'^\d{5,}-.+$')
 
 
+try:
+    from odoo.addons.saas_worker.util import from_role
+except ImportError:
+    def from_role(*_, **__):
+        return lambda _: None
+
+
 def transactioncache(method):
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):

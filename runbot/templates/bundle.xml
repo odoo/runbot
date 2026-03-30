@@ -18,20 +18,22 @@
                                         <a groups="base.group_user" class="btn btn-default" t-attf-href="/runbot/stats/{{bundle.id}}" title="View stats">
                                             <i class="fa fa-bar-chart"/> Stats
                                         </a>
-                                        <button type="button" class="btn btn-default dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                                            <i class="fa fa-play"/> Actions <i class="fa fa-caret-down ms-1"/>
-                                        </button>
-                                        <ul class="dropdown-menu">
-                                            <a groups="runbot.group_runbot_advanced_user" class="btn btn-default dropdown-item" t-attf-href="/runbot/bundle/{{bundle.id}}/force?use_base_commits=1" title="Force a new batch using base commits mainly for random errors debugging">
-                                                <i class="fa fa-fast-backward"/> Start a batch without the branch commits
-                                            </a>
-                                            <a groups="runbot.group_runbot_advanced_user" class="btn btn-default dropdown-item" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Create a new Batch, applies new trigger configurations and updates build references for upgrades if needed">
-                                                <i class="fa fa-play"/> Start a new batch
-                                            </a>
-                                            <a t-if="bundle.env.user.has_group('runbot.group_runbot_advanced_user') or (bundle.env.user.has_group('runbot.group_user') and ':' in bundle.name)" t-attf-href="/runbot/bundle/{{bundle.id}}/force?auto_rebase=1" class="btn btn-default dropdown-item"  title="Force A New Batch with automatic rebase, useful to test outdated branches without pushing before a merge">
-                                                <i class="fa fa-fast-forward"/> Start a batch with simulated autorebase
-                                            </a>
-                                        </ul>
+                                        <t groups="runbot.group_runbot_advanced_user">
+                                            <button type="button" class="btn btn-default dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="fa fa-play"/> Actions <i class="fa fa-caret-down ms-1"/>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <a groups="runbot.group_runbot_advanced_user" class="btn btn-default dropdown-item" t-attf-href="/runbot/bundle/{{bundle.id}}/force?use_base_commits=1" title="Force a new batch using base commits mainly for random errors debugging">
+                                                    <i class="fa fa-fast-backward"/> Start a batch without the branch commits
+                                                </a>
+                                                <a groups="runbot.group_runbot_advanced_user" class="btn btn-default dropdown-item" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Create a new Batch, applies new trigger configurations and updates build references for upgrades if needed">
+                                                    <i class="fa fa-play"/> Start a new batch
+                                                </a>
+                                                <a t-if="bundle.env.user.has_group('runbot.group_runbot_advanced_user') or (bundle.env.user.has_group('runbot.group_user') and ':' in bundle.name)" t-attf-href="/runbot/bundle/{{bundle.id}}/force?auto_rebase=1" class="btn btn-default dropdown-item"  title="Force A New Batch with automatic rebase, useful to test outdated branches without pushing before a merge">
+                                                    <i class="fa fa-fast-forward"/> Start a batch with simulated autorebase
+                                                </a>
+                                            </ul>
+                                        </t>
                                 </div></h5>
                             
                             <table class="table table-condensed table-responsive table-stripped">

@@ -18,6 +18,9 @@
                     <field name="hidden"/>
                     <field name="active"/>
                     <field name="process_delay"/>
+                    <field name="use_light_default"/>
+                    <field name="use_light_draft"/>
+                    <field name="use_light_no_pr"/>
                 </group>
             </form>
         </field>

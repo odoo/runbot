@@ -383,10 +383,20 @@ class Batch(models.Model):
                 continue
             # in any case, search for an existing build
             config = trigger.config_id
+            if trigger.light_config_id:
+                if (project.use_light_default
+                    or
+                    project.use_light_draft and any(branch.draft for branch in self.bundle_id.branch_ids)
+                    or
+                    project.use_light_no_pr and not any(branch.is_pr for branch in self.bundle_id.branch_ids)
+                ):
+                    config = trigger.light_config_id
+
             if trigger_custom.config_id:
                 config = trigger_custom.config_id
             elif trigger_custom.start_mode == 'light' and trigger.light_config_id:
                 config = trigger.light_config_id
+
             extra_params = trigger_custom.extra_params or ''
             config_data = dict(trigger.config_data or {}) | dict(trigger_custom.config_data or {})
             trigger_commit_link_by_repos = commit_link_by_repos

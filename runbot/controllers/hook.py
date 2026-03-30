@@ -4,8 +4,9 @@ import time
 import json
 import logging
 
-from odoo import http
+from odoo import http, fields
 from odoo.http import request
+from ..common import from_role
 
 _logger = logging.getLogger(__name__)
 
@@ -50,3 +51,18 @@ class Hook(http.Controller):
                 branch = request.env['runbot.branch'].sudo().search([('remote_id', '=', remote.id), ('name', '=', branch_ref)])
                 branch.alive = False
         return ""
+
+    @from_role('mergebot', signed=True)
+    @http.route(['/runbot/request_ci'], type='http', methods=["POST"], auth="public", website=True, csrf=False, sitemap=False)
+    def force_ci(self):
+        pull_request_names = request.get_json_data().get('pull_requests', [])
+        pull_domains = []
+        for pull_request_names in pull_request_names:
+            remote_short_name, name = pull_request_names.split('#')
+            owner, repo_name = remote_short_name.split('/')
+            pull_domains.append([('remote_id.owner', '=', owner), ('remote_id.repo_name', '=', repo_name), ('name', '=', name)])
+        pull_domains = fields.Domain.OR(pull_domains)
+        pull_requests = request.env['runbot.branch'].sudo().search([('is_pr', '=', True)] + pull_domains)
+        bundles = pull_requests.bundle_id
+        _logger.info('Received CI request for bundles: %s', bundles.mapped('name'))
+        bundles._force_ci()

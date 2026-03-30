@@ -322,9 +322,11 @@ class Bundle(models.Model):
         return self._generate_custom_trigger_action(context)
 
     def action_disable_all_triggers(self):
-        self.configure_custom_trigger_start_mode('disable')
+        self._configure_custom_trigger_start_mode('disable')
 
-    def configure_custom_trigger_start_mode(self, mode):
+    def _configure_custom_trigger_start_mode(self, mode):
+        self.ensure_one()
+
         triggers_to_create = (
             self.env["runbot.trigger"]
             .search([
@@ -338,17 +340,26 @@ class Bundle(models.Model):
             )
         )
         vals = []
+        bundle_repos = self.branch_ids.remote_id.repo_id
         for trigger in triggers_to_create:
-            vals.append({
-                'bundle_id': self.id,
-                'trigger_id': trigger.id,
-            })
+            if trigger.repo_ids & bundle_repos or trigger.dependency_ids & bundle_repos:
+                vals.append({
+                    'bundle_id': self.id,
+                    'trigger_id': trigger.id,
+                })
         self.env['runbot.bundle.trigger.custom'].create(vals)
         for custom_trigger in self.trigger_custom_ids:
             trigger_mode = mode
             if mode == 'light' and not custom_trigger.trigger_id.light_config_id:
                 trigger_mode = 'auto'
             custom_trigger.start_mode = trigger_mode
+
+    def _force_ci(self):
+        for bundle in self:
+            bundle._configure_custom_trigger_start_mode('force')
+            # we need to create a new batch in case some of the triggers were in minimal mode
+            batch = bundle._force() or bundle.last_batch
+            batch._log("Batch was requested for ci")
 
 
 class BundleTag(models.Model):
