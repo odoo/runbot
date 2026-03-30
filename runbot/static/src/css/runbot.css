@@ -1,5 +1,9 @@
 :root {
 	--gray:  #6c757d; /* used for batch limitation */
+	--btn-default-color: var(--bs-body-color);
+	--btn-default-bg: var(--bs-body-bg);
+	--btn-default-border: #ccc;
+	--active-project-color: #777;
 }
 
 /*
@@ -13,12 +17,18 @@
 	--bs-info-bg-subtle: #d9edf7;
 	--bs-info-rgb: 23, 162, 184;
 }
-:root[data-bs-theme=red404] { 
+
+:root[data-bs-theme=red404] {
 	--bs-success-bg-subtle: #cdffb9;
 	--bs-danger-bg-subtle: #e67ecf;
 	--bs-warning-bg-subtle: #fae9b1;
 	--bs-info-bg-subtle: #b6e2f8;
 	--bs-info-rgb: 23, 162, 184;
+}
+
+:root[data-bs-theme=dark] {
+	--btn-default-border: #333;
+	--active-project-color: #CCC;
 }
 
 [data-bs-theme=legacy] .text-bg-info {
@@ -59,37 +69,28 @@
 	--bs-btn-disabled-border-color: #b90e6c;
 }
 
-
-:root {
-	--alternative:#ccc;
-	--btn-default-color: var(--bs-body-color);
-	--btn-default-border:#ccc;
-	--bs-default-rgb: var(--bs-body-color-rgb);
-	--active-project-color: #777;
-	
-}
-
-:root[data-bs-theme=dark] {
-	--btn-default-border:#333;
-	--btn-default-color: var(--bs-body-color);
-	--active-project-color: #CCC;
-}
-
 .btn-default {
 	--bs-btn-color: var(--btn-default-color);
-	--bs-btn-bg: var(--bs-body-bg);
+	--bs-btn-bg: var(--btn-default-bg);
 	--bs-btn-border-color: var(--btn-default-border);
 	--bs-btn-hover-color: var(--btn-default-color);
-	--bs-btn-hover-bg: var(--btn-default-border);
-	--bs-btn-hover-border-color: var(--btn-default-border);
+	--bs-btn-hover-bg: color-mix(in lab, var(--btn-default-bg), black 15%);
+	--bs-btn-hover-border-color: color-mix(in lab, var(--btn-default-border), black 10%);
 	--bs-btn-focus-shadow-rgb: 60, 153, 110;
 	--bs-btn-active-color: var(--btn-default-color);
-	--bs-btn-active-bg: var(--bs-body-bg);
-	--bs-btn-active-border-color: var(--bs-body-bg);
+	--bs-btn-active-bg: color-mix(in lab, var(--btn-default-bg), black 20%);
+	--bs-btn-active-border-color: color-mix(in lab, var(--btn-default-border), black 15%);
 	--bs-btn-active-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125);
 	--bs-btn-disabled-color: var(--btn-default-color);
-	--bs-btn-disabled-bg: var(--bs-body-bg);
-	--bs-btn-disabled-border-color: var(--btn-default-border);;
+	--bs-btn-disabled-bg: var(--btn-default-bg);
+	--bs-btn-disabled-border-color: var(--btn-default-border);
+}
+
+[data-bs-theme=dark] .btn-default {
+	--bs-btn-hover-bg: color-mix(in lab, var(--btn-default-bg), white 15%);
+	--bs-btn-hover-border-color: color-mix(in lab, var(--btn-default-border), white 10%);
+	--bs-btn-active-bg: color-mix(in lab, var(--btn-default-bg), white 20%);
+	--bs-btn-active-border-color: color-mix(in lab, var(--btn-default-border), white 15%);
 }
 
 .btn-info {
