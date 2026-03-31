@@ -458,13 +458,16 @@ class Batch(models.Model):
             if ((trigger.repo_ids & bundle_repos) or bundle.build_all or bundle.sticky) and enable_on_bundle:
                 should_start_triggers_ids.add(trigger.id)
 
+        disabled_triggers = self.bundle_id.all_trigger_custom_ids.filtered(lambda tc: tc.start_mode == 'disabled').trigger_id
         for slot in self.slot_ids:
             if slot.build_id:
                 continue
             trigger = slot.trigger_id
-            if trigger.starts_after_ids - success_trigger:  # some required triggers are missing
-                continue
             trigger_custom = trigger_customs.get(trigger, self.env['runbot.bundle.trigger.custom'])
+            missing_triggers = trigger.starts_after_ids - success_trigger
+            if missing_triggers:
+                if not trigger_custom or (missing_triggers - disabled_triggers):
+                    continue
             force_trigger = trigger_custom and trigger_custom.start_mode == 'force'
             skip_trigger = (trigger_custom and trigger_custom.start_mode == 'disabled') or trigger.manual
             should_start = slot.trigger_id.id in should_start_triggers_ids
