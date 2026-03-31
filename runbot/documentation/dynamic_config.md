@@ -344,21 +344,43 @@ Filters are a way to transform dynamic values before using them. They are define
 
 For example, to transform a module filter into test tags:
 
+#### filter_all_modules, make_module_test_tags
+
 ```json
     {"test_tags": "-at_install,{{test_module_filter|filter_all_modules|make_module_test_tags}}",
 ```
 
 In this example, the `filter_all_modules` filters will first transform the `test_module_filter` variable (which is a module filter) into a list of modules, and then the `make_module_test_tags` filters will transform this list of modules into test tags by prepending each module with a `/` to indicate that we want to run all tests from these modules.
 
-Note that `filter_all_modules` is actually equivalent to `filter_default_modules`, but prepending a `*` at the begining of the filter.
+#### filter_default_modules
+
+`filter_all_modules` is actually equivalent to `filter_default_modules`, but prepending a `*` at the begining of the filter. Without that a runbot defined filter is applied, returning a default list of modules per repo.
 
 `*,mail -> !web|filter_default_modules` is the same as `mail -> !web|filter_all_modules`
 
+
+#### prepend, append
 In some case we also want to combine the test-tags module with another tag or test method, this can be done using prepend and append
 
 `"{{-*,web*|filter_all_modules|make_module_test_tags|append('.test_method')}}`
 `{{-*,web*|filter_all_modules|make_module_test_tags|prepend('custom_tag')}}`
 
 
-It is also possible to filter modules based on the one modified in the current bundle.
+#### modified_modules
+
+It is possible to filter modules based on the one modified in the current bundle.
 `{{*|filter_all_modules|modified_modules}}"`
+
+#### select_existing_modules
+
+`select_existing_modules` is equivalent to `filter_default_modules` but with a -* at the beginning of the filter, meaning that we start with an empty selection and only add modules that are explicitly selected. 
+
+This is a solution to keep only existing modules from a specific list, when we are not sure modules exists:
+`{{*|filter_all_modules|modified_modules|prepend('test_')|select_existing_modules|make_module_test_tags}}`
+
+- `*|filter_all_modules` will select all existing modules
+- `|modified_modules` will only keep the modified ones
+- `prepend('test_')` will prepend test_ to have the test equivalent name of the modified modules (mail-> test_mail, base -> test_base)
+- `select_existing_modules` will only keep modules that exists (test_mail)
+- `make_module_test_tags` make the module test tags by prepending a / to each module.
+

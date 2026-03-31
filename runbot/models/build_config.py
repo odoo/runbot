@@ -52,6 +52,11 @@ def filter_default_modules(selector, build, dynamic_vars):
     return ','.join(modules)
 
 
+def select_existing_modules(selector, build, dynamic_vars):
+    selector = f'-*,{selector}'
+    return filter_default_modules(selector, build, dynamic_vars)
+
+
 def keep_modified_modules(modules, build, dynamic_vars):
     if build.params_id.config_data.get('skip_modified_modules_filter', False):
         return modules
@@ -251,6 +256,7 @@ class Config(models.Model):
             'test_tags': OPTIONAL(DYNAMIC_VALUE),
             'demo_mode': OPTIONAL(IN(['default', 'with_demo', 'without_demo'])),
             'enable_auto_tags': OPTIONAL(BOOL),
+            'extra_params': OPTIONAL(DYNAMIC_VALUE),
             'cpu_limit': OPTIONAL(INT),
             'export_database': OPTIONAL(BOOL),
             'make_stats': OPTIONAL(BOOL),
@@ -724,8 +730,8 @@ class ConfigStep(models.Model):
         elif demo_mode == 'without_demo' and demo_installed_by_default:
             cmd.append('--without-demo=true')
 
+        extra_params = config_data.get('extra_params', build.params_id.extra_params or self.extra_params or '')
         # list module to install
-        extra_params = build.params_id.extra_params or self.extra_params or ''
         if mods and '-i' not in extra_params:
             cmd += ['-i', mods]
         config_path = build._server("tools/config.py")
@@ -1564,6 +1570,9 @@ class ConfigStep(models.Model):
                 config_data['test_tags'] = self._parse_dynamic_entry(current_step.get('test_tags'), build)
             config_data['test_enable'] = bool(current_step.get('test_enable') or current_step.get('test_tags'))
 
+            if 'extra_params' in current_step:
+                config_data['extra_params'] = self._parse_dynamic_entry(current_step.get('extra_params'), build)
+
             for key in ('screencast', 'demo_mode', 'enable_auto_tags'):
                 if key in current_step:
                     value = current_step[key]
@@ -1615,6 +1624,7 @@ class ConfigStep(models.Model):
             'filter_all_modules': filter_all_modules,
             'filter_default_modules': filter_default_modules,
             'make_module_test_tags': make_module_test_tags,
+            'select_existing_modules': select_existing_modules,
             'prepend': prepend_string,
             'append': append_string,
             'modified_modules': keep_modified_modules,
