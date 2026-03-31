@@ -273,6 +273,7 @@
                 <span t-attf-class="btn btn-{{color}} disabled" t-att-title="slot.link_type">
                     <i t-attf-class="fa fa-{{slot._fa_link_type()}}"/>
                 </span>
+                <a t-if="slot.params_id.config_id == slot.trigger_id.light_config_id" class="badge btn btn-info" t-attf-href="/runbot/bundle/{{slot.batch_id.bundle_id.id}}">Light</a>
                 <a t-if="bu" t-attf-href="/runbot/batch/{{slot.batch_id.id}}/build/#{bu.id}" t-attf-class="btn btn-default slot_name">
                     <span t-out="slot.trigger_id.name"/>
                 </a>

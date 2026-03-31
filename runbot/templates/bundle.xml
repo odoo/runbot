@@ -71,34 +71,33 @@
                                     <td>
                                         <t t-set="current_mode" t-value="'custom'"/>
                                         <t t-set="modified_repos" t-value="bundle.branch_ids.remote_id.repo_id"/>
-
-                                        <t t-if="not bundle.trigger_custom_ids"> <t t-set="current_mode" t-value="'auto'"/></t>
+                                        <t t-if="not bundle.trigger_custom_ids"> <t t-set="current_mode" t-value="'none'"/></t>
                                         <t t-elif="all(trigger_custom.start_mode == 'disabled' for trigger_custom in bundle.trigger_custom_ids)"> <t t-set="current_mode" t-value="'disabled'"/></t>
                                         <t t-elif="all(trigger_custom.start_mode == 'force' for trigger_custom in bundle.trigger_custom_ids)"> <t t-set="current_mode" t-value="'force'"/></t>
                                         <t t-elif="all(trigger_custom.start_mode == 'auto' for trigger_custom in bundle.trigger_custom_ids)"> <t t-set="current_mode" t-value="'auto'"/></t>
                                         <t t-elif="all(trigger_custom.start_mode in ('light', 'auto') for trigger_custom in bundle.trigger_custom_ids)"> <t t-set="current_mode" t-value="'light'"/></t>
                                         <t t-if="current_mode=='disabled'">
-                                            <a role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" href="#customTriggers">Disable all</a>
+                                            <button role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers">Disable all</button>
                                         </t><t t-else="">
                                             <a role="button" t-attf-class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/triggers/disable_all"> Disable all</a>
                                         </t>
                                         <t t-if="current_mode=='light'">
-                                            <a role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" href="#customTriggers">Light</a>
+                                            <button role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers">Light</button>
                                         </t><t t-else="">
                                             <a role="button" t-attf-class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/triggers/light_all">Light</a>
                                         </t>
                                         <t t-if="current_mode=='auto'">
-                                            <a role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" href="#customTriggers">Default</a>
+                                            <button role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers">Default</button>
                                         </t><t t-else="">
                                             <a role="button" t-attf-class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/triggers/auto_all">Default</a>
                                         </t>
                                          <t t-if="current_mode=='force'">
-                                            <a role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" href="#customTriggers">Force all</a>
+                                            <button role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers">Force all</button>
                                         </t><t t-else="">
                                             <a role="button" t-attf-class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/triggers/force_all">Force all</a>
                                         </t>
-                                        <a role="button" t-attf-class="btn btn-{{'primary' if current_mode=='custom' else 'default'}} btn-ssm" data-bs-toggle="collapse" href="#customTriggers" aria-expanded="false" aria-controls="customTriggers"> Custom <i class="fa fa-caret-down ms-1"/></a>
-
+                                        <button role="button" t-attf-class="btn btn-{{'primary' if current_mode=='custom' else 'default'}} btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers" aria-expanded="false" aria-controls="customTriggers"> Custom <i class="fa fa-caret-down ms-1"/></button>
+                                        <a t-if="needs_update" role="button" class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/force"><i class="fa fa-play"/> Apply</a>
                                         <div t-attf-class="collapse {{'show' if expand_custom else ''}}" id="customTriggers">
                                             <div class="card card-body mt-2">
                                                 <t t-foreach="bundle.trigger_custom_ids" t-as="trigger_custom">

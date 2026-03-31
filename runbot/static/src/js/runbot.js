@@ -38,3 +38,19 @@ function copyToClipboard(text) {
     }
     navigator.clipboard.writeText(text);
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    const collapseElement = document.getElementById('customTriggers');
+    if (collapseElement) {
+        collapseElement.addEventListener('show.bs.collapse', function () {
+            const url = new URL(window.location);
+            url.searchParams.set('expand_custom', '1');
+            window.history.replaceState({}, '', url);
+        });
+        collapseElement.addEventListener('hide.bs.collapse', function () {
+            const url = new URL(window.location);
+            url.searchParams.delete('expand_custom');
+            window.history.replaceState({}, '', url);
+        });
+    }
+});

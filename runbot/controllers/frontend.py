@@ -181,6 +181,7 @@ class Runbot(Controller):
         )
         batchs = request.env['runbot.batch'].search(domain, limit=limit, offset=pager.get('offset', 0), order='id desc')
 
+        # compute if we should display the new batch button
         context = {
             'bundle': bundle,
             'batchs': batchs,
@@ -189,6 +190,7 @@ class Runbot(Controller):
             'title': 'Bundle %s' % bundle.name,
             'page_info_state': bundle.last_batch._get_global_result(),
             'expand_custom': expand_custom,
+            'needs_update': bundle.last_batch and bundle.last_batch.needs_update(),
         }
 
         return request.render('runbot.bundle', context)
@@ -198,7 +200,7 @@ class Runbot(Controller):
         '/runbot/bundle/<model("runbot.bundle"):bundle>/force/<int:auto_rebase>',
     ], type='http', auth="user", methods=['GET', 'POST'], csrf=False)
     def force_bundle(self, bundle, auto_rebase=False, use_base_commits=False, **_post):
-        if not request.env.user.has_group('runbot.group_runbot_advanced_user') and ':' not in bundle.name:
+        if not request.env.user.has_group('runbot.group_runbot_advanced_user') and ':' not in bundle.name and not bundle.last_batch.needs_update():
             message = "Only users with a specific group can do that. Please contact runbot administrators"
             raise Forbidden(message)
         _logger.info('user %s forcing bundle %s', request.env.user.name, bundle.name)  # user must be able to read bundle
@@ -686,9 +688,9 @@ class Runbot(Controller):
             bundle.sudo()._configure_custom_trigger_start_mode('light')
         else:
             raise NotFound()
-        expand_kwrags = '?expand_custom=1' if expand_custom else ''
-
-        return werkzeug.utils.redirect(f'/runbot/bundle/{bundle_id}{expand_kwrags}')
+        if expand_custom:
+            return werkzeug.utils.redirect(f'/runbot/bundle/{bundle_id}?expand_custom=1')
+        return werkzeug.utils.redirect(f'/runbot/bundle/{bundle_id}')
 
     @route(['/runbot/trigger_custom/<int:trigger_custom_id>/set_mode/<string:mode>'], type='http', auth='user', sitemap=False)
     def configure_custom_trigger(self, trigger_custom_id, mode, **kwargs):

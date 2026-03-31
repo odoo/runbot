@@ -532,6 +532,23 @@ class Batch(models.Model):
             'level': level,
         })
 
+    def needs_update(self):
+        bundle = self.bundle_id
+        custom_trigger_per_trigger = {ct.trigger_id: ct for ct in bundle.trigger_custom_ids}
+        for slot in self.slot_ids:
+            trigger = slot.trigger_id
+            custom_trigger = custom_trigger_per_trigger.get(trigger)
+            if not custom_trigger:
+                continue
+            expected_config = trigger.config_id
+            if custom_trigger.config_id:
+                expected_config = custom_trigger.config_id
+            elif trigger.light_config_id and custom_trigger.start_mode == 'light':
+                expected_config = trigger.light_config_id
+            if slot.params_id.config_id != expected_config:
+                return True
+        return False
+
 class BatchLog(models.Model):
     _name = 'runbot.batch.log'
     _description = 'Batch log'

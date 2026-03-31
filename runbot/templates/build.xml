@@ -114,6 +114,9 @@
                   </t>
                 </div>
               </t>
+              <t t-if="build.params_id.config_id==build.trigger_id.light_config_id">
+                <b>Mode:</b> <span class="badge btn btn-info">Light</span> <a t-if="unique_batch" t-attf-href="/runbot/bundle/{{unique_batch.bundle_id.id}}">Configure</a><br/>
+              </t>
               <t t-if='more'>
                 <b>Version:</b>
                 <t t-out="build.params_id.version_id.name"/>
