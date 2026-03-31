@@ -383,7 +383,7 @@ class Batch(models.Model):
                 continue
             # in any case, search for an existing build
             config = trigger.config_id
-            if trigger.light_config_id and not bundle.build_all and not bundle.is_staging and not bundle.is_base:
+            if not trigger_custom and trigger.light_config_id and not bundle.build_all and not bundle.is_staging and not bundle.is_base:
                 if (project.use_light_default
                     or
                     project.use_light_draft and any(branch.draft for branch in self.bundle_id.branch_ids)
@@ -396,6 +396,7 @@ class Batch(models.Model):
                 config = trigger_custom.config_id
             elif trigger_custom.start_mode == 'light' and trigger.light_config_id:
                 config = trigger.light_config_id
+
 
             extra_params = trigger_custom.extra_params or ''
             config_data = dict(trigger.config_data or {}) | dict(trigger_custom.config_data or {})
