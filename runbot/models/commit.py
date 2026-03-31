@@ -98,12 +98,14 @@ class Commit(models.Model):
                     module, manifest_file_name = elems
                 yield (addons_path, module, manifest_file_name)
 
+    def _fetch(self):
+        self.repo_id._fetch(self.tree_hash)
 
     def _export(self, build):
         """Export a git repo into a sources"""
         #  TODO add automated tests
         self.ensure_one()
-        self.repo_id._fetch(self.tree_hash)
+        self._fetch()
         if not self.env['runbot.commit.export'].search([('build_id', '=', build.id), ('commit_id', '=', self.id)]):
             self.env['runbot.commit.export'].create({'commit_id': self.id, 'build_id': build.id})
         export_path = self._source_path()

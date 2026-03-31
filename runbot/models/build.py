@@ -1242,7 +1242,9 @@ class BuildResult(models.Model):
             commit_link_links = self.params_id.commit_link_ids
         for commit_link in commit_link_links:
             commit = commit_link.commit_id
-            modified = commit.repo_id._git(['diff', '--name-only', '%s..%s' % (commit_link.merge_base_commit_id.name, commit.name)])
+            commit._fetch()
+            commit_link.merge_base_commit_id._fetch()
+            modified = commit.repo_id._git(['diff', '--name-only', '%s..%s' % (commit_link.merge_base_commit_id.tree_hash, commit.tree_hash)])
             if modified:
                 files = [os.sep.join([self._docker_source_folder(commit), file]) for file in modified.split('\n') if file]
                 modified_files[commit_link] = files
