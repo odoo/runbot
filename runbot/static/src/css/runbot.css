@@ -152,6 +152,22 @@ table {
     font-size: 0.875rem;
 }
 
+dialog.modal {
+    --bs-modal-zindex: auto;
+    margin: 0;
+	padding: 0;
+	border: none;
+    background-color: transparent;
+
+    &::backdrop {
+        background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    &[open] {
+        display: block;
+    }
+}
+
 .fa {
 	line-height: inherit; /* reset fa icon line height to body height*/
 }

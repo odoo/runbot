@@ -67,11 +67,11 @@
                                         </t>
                                     </t>
                                     <li class="nav-item divider"/>
-                                    
-                                    <li class="nav-item dropdown">
-                                        <a data-bs-toggle="collapse" href="#collapsePreference" role="button" class="nav-link">
+
+                                    <li class="nav-item">
+                                        <button command="show-modal" commandfor="collapsePreference" type="button" class="nav-link">
                                             <i class="fa fa-gear"/>
-                                        </a>
+                                        </button>
                                     </li>
                                     <li class="nav-item divider" t-ignore="true"/>
                                     <t t-if="not user_id._is_public()">
@@ -147,68 +147,78 @@
                             </div>
                         </div>
                     </div></div>
-                    <div id="collapsePreference" class="collapse">
-                        <form class="px-4 py-3" method="post" action="/runbot/submit" id="preferences_form">
-                            <input type="hidden" name="redirect" t-att-value="current_path"/>
-                            <div>
-                                <div class="form-check form-switch">
-                                <label for="more" class="form-check-label" >More info</label>
-                                <input onclick="document.getElementById('preferences_form').submit()" class="form-check-input" type="checkbox" role="switch" id="more" name="more" t-att-checked="more"/>
-                            </div></div>
-                            <div> 
-                                <label for="theme_selection" style="min-width: 80px">Theme:</label>
-                                <div id="theme_selection" class="text-nowrap btn-group btn-group-sm" role="group">
-                                <button onclick="document.cookie = 'theme=legacy; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='legacy' else 'secondary'}}">Legacy</button>
-                                <button onclick="document.cookie = 'theme=dark; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='dark' else 'secondary'}}">Dark</button>
-                                <button onclick="document.cookie = 'theme=light; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='light' else 'secondary'}}">Light</button>
-                                <button onclick="document.cookie = 'theme=red404; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='red404' else 'secondary'}}">Red404</button>
-                            </div></div>
-                            <div>
-                                <label for="theme_selection" style="min-width: 80px">Sticky:</label>
-                                <div class="text-nowrap btn-group btn-group-sm" role="group">
-                                <button onclick="document.cookie = 'filter_mode=default; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if filter_mode=='default' else 'secondary'}}" help="Only display sticky except if searching">Default</button>
-                                <button onclick="document.cookie = 'filter_mode=all; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if filter_mode=='all' else 'secondary'}}">All</button>
-                                <button onclick="document.cookie = 'filter_mode=sticky; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if filter_mode=='sticky' else 'secondary'}}">Sticky only</button>
-                                <button onclick="document.cookie = 'filter_mode=nosticky; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if filter_mode=='nosticky' else 'secondary'}}">Dev only</button>
-                            </div></div>
-                            <div>
-                                <label for="theme_selection" style="min-width: 80px">Category:</label>
-                                <div class="text-nowrap btn-group btn-group-sm" role="group">
-                                <t t-foreach="categories" t-as="category">
-                                    <button t-attf-onclick="document.cookie = 'category={{category.id}}; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if category.id == active_category_id else 'secondary'}}" t-out="category.name"/>
-                                </t>
-                            </div></div>
-        
-                            <hr class="separator"/>
-                            <div t-if="triggers">
-                                <input type="hidden" name="update_triggers" t-att-value="project.id"/>
-                                <t t-foreach="categories" t-as="category">
-                                    <t t-set="category_triggers" t-value="triggers.filtered(lambda t: not t.manual and t.category_id == category)"/>
-                                    <t t-if="category_triggers">
-                                        <h3 t-out="category.name"/>
-                                        <div class="row">
-                                            <t t-foreach="category_triggers" t-as="trigger">
-                                                <div class="col-md-3 text-nowrap">
-                                                    <input t-attf-class="trigger_selection {{'trigger_selection_hide' if trigger.hide else 'trigger_selection_show'}}" type="checkbox" t-attf-name="trigger_{{trigger.id}}" t-attf-id="trigger_{{trigger.id}}" t-att-checked="not trigger.hide if trigger_display is None else trigger.id in trigger_display"/>
-                                                    <label t-attf-for="trigger_{{trigger.id}}" t-out="trigger.name"/>
+                    <dialog id="collapsePreference" class="modal modal-xl">
+                        <div class="modal-dialog">
+                            <form class="modal-content" method="post" action="/runbot/submit" id="preferences_form">
+                                <header class="modal-header">
+                                    <h5 class="modal-title">Preferences</h5>
+                                    <button type="button" class="btn-close" command="close" commandfor="collapsePreference"/>
+                                </header>
+                                <div class="modal-body">
+                                    <input type="hidden" name="redirect" t-att-value="current_path"/>
+                                    <div>
+                                        <div class="form-check form-switch">
+                                        <label for="more" class="form-check-label" >More info</label>
+                                        <input onclick="document.getElementById('preferences_form').submit()" class="form-check-input" type="checkbox" role="switch" id="more" name="more" t-att-checked="more"/>
+                                    </div></div>
+                                    <div>
+                                        <label for="theme_selection" style="min-width: 80px">Theme:</label>
+                                        <div id="theme_selection" class="text-nowrap btn-group btn-group-sm" role="group">
+                                        <button onclick="document.cookie = 'theme=legacy; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='legacy' else 'secondary'}}">Legacy</button>
+                                        <button onclick="document.cookie = 'theme=dark; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='dark' else 'secondary'}}">Dark</button>
+                                        <button onclick="document.cookie = 'theme=light; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='light' else 'secondary'}}">Light</button>
+                                        <button onclick="document.cookie = 'theme=red404; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='red404' else 'secondary'}}">Red404</button>
+                                    </div></div>
+                                    <div>
+                                        <label for="theme_selection" style="min-width: 80px">Sticky:</label>
+                                        <div class="text-nowrap btn-group btn-group-sm" role="group">
+                                        <button onclick="document.cookie = 'filter_mode=default; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if filter_mode=='default' else 'secondary'}}" help="Only display sticky except if searching">Default</button>
+                                        <button onclick="document.cookie = 'filter_mode=all; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if filter_mode=='all' else 'secondary'}}">All</button>
+                                        <button onclick="document.cookie = 'filter_mode=sticky; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if filter_mode=='sticky' else 'secondary'}}">Sticky only</button>
+                                        <button onclick="document.cookie = 'filter_mode=nosticky; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if filter_mode=='nosticky' else 'secondary'}}">Dev only</button>
+                                    </div></div>
+                                    <div>
+                                        <label for="theme_selection" style="min-width: 80px">Category:</label>
+                                        <div class="text-nowrap btn-group btn-group-sm" role="group">
+                                        <t t-foreach="categories" t-as="category">
+                                            <button t-attf-onclick="document.cookie = 'category={{category.id}}; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if category.id == active_category_id else 'secondary'}}" t-out="category.name"/>
+                                        </t>
+                                    </div></div>
+
+                                    <hr class="separator"/>
+                                    <div t-if="triggers">
+                                        <input type="hidden" name="update_triggers" t-att-value="project.id"/>
+                                        <t t-foreach="categories" t-as="category">
+                                            <t t-set="category_triggers" t-value="triggers.filtered(lambda t: not t.manual and t.category_id == category)"/>
+                                            <t t-if="category_triggers">
+                                                <h3 t-out="category.name"/>
+                                                <div class="row">
+                                                    <t t-foreach="category_triggers" t-as="trigger">
+                                                        <div class="col-md-3 text-nowrap">
+                                                            <input t-attf-class="trigger_selection {{'trigger_selection_hide' if trigger.hide else 'trigger_selection_show'}}" type="checkbox" t-attf-name="trigger_{{trigger.id}}" t-attf-id="trigger_{{trigger.id}}" t-att-checked="not trigger.hide if trigger_display is None else trigger.id in trigger_display"/>
+                                                            <label t-attf-for="trigger_{{trigger.id}}" t-out="trigger.name"/>
+                                                        </div>
+                                                    </t>
                                                 </div>
                                             </t>
-                                        </div>
-                                    </t>
-                                </t>
-                            </div>
-                            <button 
-                                onclick="Array.from(document.getElementsByClassName('trigger_selection_show')).forEach((element) => element.checked = true); Array.from(document.getElementsByClassName('trigger_selection_hide')).forEach((element) => element.checked = false); event.preventDefault();"
-                                class="btn btn-secondary">Reset to default</button>
-                            <button 
-                                onclick="Array.from(document.getElementsByClassName('trigger_selection')).forEach((element) => element.checked = true); event.preventDefault();"
-                                class="btn btn-secondary">All</button>
-                            <button 
-                                onclick="Array.from(document.getElementsByClassName('trigger_selection')).forEach((element) => element.checked = false); event.preventDefault();"
-                                class="btn btn-secondary">None</button>
-                            <button type="submit" class="btn btn-primary">Save</button>
-                        </form>
-                    </div>
+                                        </t>
+                                    </div>
+                                </div>
+                                <footer class="modal-footer">
+                                    <button
+                                        onclick="Array.from(document.getElementsByClassName('trigger_selection_show')).forEach((element) => element.checked = true); Array.from(document.getElementsByClassName('trigger_selection_hide')).forEach((element) => element.checked = false); event.preventDefault();"
+                                        class="btn btn-secondary">Reset to default</button>
+                                    <button
+                                        onclick="Array.from(document.getElementsByClassName('trigger_selection')).forEach((element) => element.checked = true); event.preventDefault();"
+                                        class="btn btn-secondary">All</button>
+                                    <button
+                                        onclick="Array.from(document.getElementsByClassName('trigger_selection')).forEach((element) => element.checked = false); event.preventDefault();"
+                                        class="btn btn-secondary">None</button>
+                                    <button type="submit" class="btn btn-primary">Save</button>
+                                </footer>
+                            </form>
+                        </div>
+                    </dialog>
                     <t t-out="0"/>
                 </body>
             </xpath>

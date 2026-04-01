@@ -82,6 +82,7 @@
             'runbot/static/lib/fontawesome/css/font-awesome.css',
             'runbot/static/src/css/runbot.css',
 
+            'runbot/static/src/js/polyfill_command_api.js',
             'runbot/static/lib/jquery/jquery.js',
             'runbot/static/lib/bootstrap/js/bootstrap.bundle.js',
             'runbot/static/src/js/runbot.js',
