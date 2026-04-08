@@ -72,6 +72,8 @@ class BatchValidate(models.Model):
                 validate_pr(pr, states[pr.repository.name, pr.target.name])
             except exceptions.Mismatch as e:
                 mismatch_warn(e, "data mismatch during check:\n{diff}")
+            except exceptions.Skip as e:
+                continue
             except exceptions.MergeError as e:
                 if len(e.args) > 1 and e.args[1]:
                     reason = e.args[1]
