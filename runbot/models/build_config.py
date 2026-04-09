@@ -435,6 +435,9 @@ class ConfigStep(models.Model):
     restore_download_db_suffix = fields.Char('Download db suffix')
     restore_rename_db_suffix = fields.Char('Rename db suffix')
 
+    # TODO change the default to True once we are sure that it works as expected
+    check_exit_status = fields.Boolean('Check exit status', default=False, help='Check exit status of the main command')
+
     semgrep_category = fields.Many2one('runbot.checker_category', string='Semgrep Category', tracking=True)
     custom_link = fields.Char('Custom link for semgrep codes', tracking=True)
     disable_nosem = fields.Boolean('Disable nosem', default=False, tracking=True)
@@ -1228,6 +1231,10 @@ class ConfigStep(models.Model):
         if log_time:
             build.job_end = log_time
 
+        if self.check_exit_status and (exit_status := self._get_exit_status(build)) != 0:
+            build._log('_make_results', f'Main command exited with status code {exit_status}', level='ERROR')
+            build.local_result = 'ko'
+
         if check_logs or expected_logs:
             self._make_custom_result(build, check_logs, expected_logs)
         elif active_job_type == 'python':
@@ -1385,6 +1392,21 @@ class ConfigStep(models.Model):
             if result != 'ok':
                 return result
         return 'ok'
+
+    def _get_exit_status(self, build):
+        exit_status_filename = f'{self.sanitized_name(build)}_exit_status.txt'
+        if not os.path.exists(build._path(exit_status_filename)):
+            build._log('_make_tests_results', f'Exit status file "{exit_status_filename}" not found', level="ERROR")
+            return 1
+        res = build._read_file(exit_status_filename)
+        if res:
+            try:
+                return int(res.strip('\n'))
+            except ValueError:
+                build._log('_make_tests_results', f'Status file "{exit_status_filename}" does not contain an integer', level="ERROR")
+                return -242
+        build._log('_make_tests_results', f'Exception or file empty while reading status file "{exit_status_filename}"', level="ERROR")
+        return -241
 
     def _make_custom_result(self, build, enabled_checkers=None, expected_logs=None):
         build._log('run', 'Getting results for build %s' % build.dest)

@@ -1032,6 +1032,8 @@ class BuildResult(models.Model):
         starting_config = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_default_odoorc')
         if isinstance(cmd, Command):
             rc_content = cmd.get_config(starting_config=starting_config)
+            if step.check_exit_status:
+                cmd.finals = [['echo', r'$?', '>', f'/data/build/logs/{step.sanitized_name(self)}_exit_status.txt']] + cmd.finals
         else:
             rc_content = starting_config
         self._write_file('.odoorc', rc_content)

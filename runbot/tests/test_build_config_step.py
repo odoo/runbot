@@ -662,11 +662,14 @@ class TestBuildConfigStepDynamic(TestBuildConfigStepCommon):
         )
 
         # 0.2 run standalone l10n script
+        self.config_step.check_exit_status = True
         self.docker_run_calls = []
         build._schedule()()
         self.assertEqual(len(self.docker_run_calls), 1, "One docker run should have been called for install_all step")
         cmd = self.docker_run_calls[0][0]
-        self.assertEqual(cmd.build(), f'odoo/odoo/tests/test_module_operations.py -d {build.dest}-l10n --data-dir /data/build/datadir/ --addons-path odoo/addons,odoo/core/addons,enterprise --standalone all_l10n')
+        expected_cmd = f'odoo/odoo/tests/test_module_operations.py -d {build.dest}-l10n --data-dir /data/build/datadir/ --addons-path odoo/addons,odoo/core/addons,enterprise --standalone all_l10n'
+        expected_cmd += r' ; echo $? > /data/build/logs/running_standalone_exit_status.txt'
+        self.assertEqual(cmd.build(), expected_cmd)
 
         # 0.3. create post install builds
         build._schedule()
@@ -1474,3 +1477,103 @@ Initiating shutdown
         mock_make_odoo_results.side_effect = make_warn
         config_step._make_results(build)
         self.assertEqual(build.local_result, 'warn')
+
+    def test_check_exit_status_ok(self):
+        self.config_step.write({'check_exit_status': True})
+        file_content = """
+Loading stuff
+odoo.stuff.modules.loading: Modules loaded.
+Some post install stuff
+Initiating shutdown
+    """
+        exit_status_content = "0\n"
+
+        def mock_open_files(filename, mode='r', *args, **kwargs):
+            if filename.endswith('_exit_status.txt'):
+                return mock_open(read_data=exit_status_content)()
+            return mock_open(read_data=file_content)()
+
+        with patch('builtins.open', mock_open_files):
+            with patch('os.path.exists', return_value=True):
+                self.config_step._make_results(self.build)
+
+        self.assertEqual(self.build.local_result, 'ok')
+
+    def test_check_exit_status_ko(self):
+        self.config_step.write({'check_exit_status': True})
+        file_content = """
+Loading stuff
+odoo.stuff.modules.loading: Modules loaded.
+Some post install stuff
+Initiating shutdown
+    """
+        exit_status_content = "1\n"
+
+        def mock_open_files(filename, mode='r', *args, **kwargs):
+            if filename.endswith('_exit_status.txt'):
+                return mock_open(read_data=exit_status_content)()
+            return mock_open(read_data=file_content)()
+
+        with patch('builtins.open', mock_open_files):
+            with patch('os.path.exists', return_value=True):
+                self.config_step._make_results(self.build)
+
+        self.assertEqual(self.build.local_result, 'ko')
+        self.assertIn(('ERROR', 'Main command exited with status code 1'), self.logs)
+
+    def test_check_exit_status_file_empty(self):
+        self.config_step.write({'check_exit_status': True})
+        file_content = """
+Loading stuff
+odoo.stuff.modules.loading: Modules loaded.
+Some post install stuff
+Initiating shutdown
+    """
+        exit_status_content = ""
+
+        def mock_open_files(filename, mode='r', *args, **kwargs):
+            if filename.endswith('_exit_status.txt'):
+                return mock_open(read_data=exit_status_content)()
+            return mock_open(read_data=file_content)()
+
+        with patch('builtins.open', mock_open_files):
+            with patch('os.path.exists', return_value=True):
+                self.config_step._make_results(self.build)
+
+        self.assertEqual(self.build.local_result, 'ko')
+        self.assertIn(('ERROR', 'Exception or file empty while reading status file "all_exit_status.txt"'), self.logs)
+        self.assertIn(('ERROR', 'Main command exited with status code -241'), self.logs)
+
+    def test_check_exit_status_file_non_integer(self):
+        self.config_step.write({'check_exit_status': True})
+        file_content = """
+Loading stuff
+odoo.stuff.modules.loading: Modules loaded.
+Some post install stuff
+Initiating shutdown
+    """
+        exit_status_content = "d0d0caca"
+
+        def mock_open_files(filename, mode='r', *args, **kwargs):
+            if filename.endswith('_exit_status.txt'):
+                return mock_open(read_data=exit_status_content)()
+            return mock_open(read_data=file_content)()
+
+        with patch('builtins.open', mock_open_files):
+            with patch('os.path.exists', return_value=True):
+                self.config_step._make_results(self.build)
+
+        self.assertEqual(self.build.local_result, 'ko')
+        self.assertIn(('ERROR', 'Status file "all_exit_status.txt" does not contain an integer'), self.logs)
+        self.assertIn(('ERROR', 'Main command exited with status code -242'), self.logs)
+
+    def test_check_exit_status_file_not_found(self):
+        config_step = self.ConfigStep.create({
+            'name': 'test',
+            'job_type': 'install_odoo',
+            'check_exit_status': True,
+        })
+        self.patchers['file_exist'].return_value = False
+        config_step._make_results(self.build)
+        self.assertEqual(self.build.local_result, 'ko')
+        self.assertIn(('ERROR', 'Exit status file "test_exit_status.txt" not found'), self.logs)
