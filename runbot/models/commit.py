@@ -70,7 +70,7 @@ class Commit(models.Model):
         # note that glob is needed to avoid the star matching **
         self.ensure_one()
         self._fetch()
-        return self.repo_id._git(['ls-files', '--with-tree', self.name, *patterns]).split('\n')
+        return self.repo_id._git(['ls-files', '--with-tree', self.tree_hash, *patterns]).split('\n')
 
     def _list_available_modules(self):
         addons_paths = (self.repo_id.addons_paths or '').split(',')
@@ -91,8 +91,9 @@ class Commit(models.Model):
 
     @transactioncache  # hack to avoid to fetch two time the same commit inside the same transaction
     def _fetch(self):
-        self.repo_id._fetch(self.name)
-        if not self.repo_id._hash_exists(self.name):
+        try:
+            self.repo_id._fetch(self.name)
+        except RunbotException:
             self.repo_id._fetch(self.tree_hash)
 
     def _export(self, build):
