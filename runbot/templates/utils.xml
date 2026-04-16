@@ -15,7 +15,7 @@
                         <meta http-equiv="refresh" t-att-content="refresh"/>
                     </t>
 
-                    <t t-if="not page_info_state or page_info_state == 'ok' or page_info_state not in ('warn', 'ko', 'skipped', 'killed', 'manually_killed')">
+                    <t t-if="not page_info_state or page_info_state == 'ok' or page_info_state not in ('warn', 'ko', 'skipped', 'killed')">
                         <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_ok.png"/>
                         <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_ok.svg"/>
                     </t>
@@ -31,7 +31,7 @@
                         <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_skipped.png"/>
                         <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_skipped.svg"/>
                     </t>
-                    <t t-elif="page_info_state == 'killed' or page_info_state == 'manually_killed'">
+                    <t t-elif="page_info_state == 'killed'">
                         <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_killed.png"/>
                         <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_killed.svg"/>
                     </t>
@@ -330,7 +330,7 @@
                 <t t-if="build.global_result == 'skipped'">
                     <t t-set="rowclass">default</t>
                 </t>
-                <t t-if="build.global_result in ['killed', 'manually_killed']">
+                <t t-if="build.global_result == 'killed'">
                     <t t-set="rowclass">killed</t>
                 </t>
             </t>
@@ -365,12 +365,12 @@
                         Database selector
                     </a>
                 </t>
-                <a class="dropdown-item" t-if="bu.global_state in ['done','running'] or bu.requested_action == 'deathrow'" groups="base.group_user" href="#" data-runbot="rebuild" t-att-data-runbot-build="bu['id']" title="Retry this build, usefull for false positive">
+                <a class="dropdown-item" t-if="bu.global_state in ['done','running'] or bu.to_kill" groups="base.group_user" href="#" data-runbot="rebuild" t-att-data-runbot-build="bu['id']" title="Retry this build, usefull for false positive">
                     <i class="fa fa-refresh"/>
                     Rebuild
                 </a>
                 <t t-if="bu.global_state != 'done'">
-                    <t t-if="bu.requested_action != 'deathrow'">
+                    <t t-if="not bu.to_kill">
                         <a groups="base.group_user" href="#" data-runbot="kill" class="dropdown-item" t-att-data-runbot-build="bu['id']">
                             <i class="fa fa-crosshairs"/>
                             Kill

@@ -65,7 +65,7 @@
                         <field name="dest"/>
                         <field name="local_state"/>
                         <field name="global_state"/>
-                        <field name="requested_action" groups="base.group_no_one"/>
+                        <field name="to_kill"/>
                         <field name="local_result"/>
                         <field name="global_result"/>
                         <field name="host"/>

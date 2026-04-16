@@ -341,7 +341,7 @@ class Host(models.Model):
         return self.env['runbot.build'].search(self._get_build_domain(domain), order=order)
 
     def _process_messages(self):
-        self.host_message_ids._process()
+        return self.host_message_ids._process()
 
 
 class MessageQueue(models.Model):
@@ -351,14 +351,20 @@ class MessageQueue(models.Model):
     _log_access = False
 
     create_date = fields.Datetime('Create date', default=fields.Datetime.now)
-    host_id = fields.Many2one('runbot.host', required=True, ondelete='cascade')
-    build_id = fields.Many2one('runbot.build')
+    host_id = fields.Many2one('runbot.host', required=True, ondelete='cascade', index=True)
+    build_id = fields.Many2one('runbot.build', index=True)
     message = fields.Char('Message')
 
     def _process(self):
         records = self
+        processed = False
         # todo consume messages here
         if records:
+            processed = True
             for record in records:
+                if record.message == 'kill':
+                    if record.build_id:
+                        record.build_id._kill('killed')
                 self.env['runbot.runbot']._warning(f'Host {record.host_id.name} got an unexpected message {record.message}')
         self.unlink()
+        return processed

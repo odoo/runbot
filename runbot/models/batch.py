@@ -154,7 +154,7 @@ class Batch(models.Model):
 
         build = self.env['runbot.build'].search(domain, limit=1, order='id desc')
         link_type = 'matched'
-        killed_states = ('skipped', 'killed', 'manually_killed')
+        killed_states = ('skipped', 'killed')
         if build and build.local_result not in killed_states and build.global_result not in killed_states:
             if build.killable:
                 build.killable = False

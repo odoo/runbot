@@ -68,6 +68,9 @@ access_runbot_error_regex_manager,runbot_error_regex_manager,runbot.model_runbot
 access_runbot_host_public,runbot_host_public,runbot.model_runbot_host,runbot.base_runbot_model_access,1,0,0,0
 access_runbot_host_manager,runbot_host_manager,runbot.model_runbot_host,runbot.group_runbot_admin,1,1,1,1
 
+access_runbot_host_message_public,runbot_host_message_public,runbot.model_runbot_host_message,runbot.base_runbot_model_access,1,0,0,0
+access_runbot_host_message_admin,runbot_host_message_admin,runbot.model_runbot_host_message,runbot.group_runbot_admin,1,1,1,1
+
 access_runbot_repo_hooktime,runbot_repo_hooktime,runbot.model_runbot_repo_hooktime,group_user,1,0,0,0
 access_runbot_repo_referencetime,runbot_repo_referencetime,runbot.model_runbot_repo_reftime,group_user,1,0,0,0
 access_runbot_build_stat_admin,runbot_build_stat_admin,runbot.model_runbot_build_stat,runbot.group_runbot_admin,1,1,1,1
@@ -105,7 +108,6 @@ access_runbot_project_runbot_admin,access_runbot_project_runbot_admin,runbot.mod
 access_runbot_bundle_public,access_runbot_bundle_public,runbot.model_runbot_bundle,runbot.base_runbot_model_access,1,0,0,0
 access_runbot_bundle_runbot_bundle_manager,access_runbot_bundle_runbot_manager,runbot.model_runbot_bundle,runbot.group_runbot_bundle_manager,1,1,0,0
 access_runbot_bundle_runbot_admin,access_runbot_bundle_runbot_admin,runbot.model_runbot_bundle,runbot.group_runbot_admin,1,1,1,1
-
 
 access_runbot_batch_public,access_runbot_batch_public,runbot.model_runbot_batch,runbot.base_runbot_model_access,1,0,0,0
 access_runbot_batch_runbot_admin,access_runbot_batch_runbot_admin,runbot.model_runbot_batch,runbot.group_runbot_admin,1,1,1,1

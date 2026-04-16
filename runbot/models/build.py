@@ -43,7 +43,7 @@ from ..fields import JsonDictField
 
 _logger = logging.getLogger(__name__)
 
-result_order = ['ok', 'warn', 'ko', 'skipped', 'killed', 'manually_killed']
+result_order = ['ok', 'warn', 'ko', 'skipped', 'killed', 'manually_killed']  # TODO remove manually_killed
 state_order = ['pending', 'testing', 'waiting', 'running', 'done']
 
 COPY_WHITELIST = [
@@ -297,6 +297,8 @@ class BuildResult(models.Model):
     local_result = fields.Selection(make_selection(result_order), string='Build Result', default='ok')
 
     requested_action = fields.Selection([('wake_up', 'To wake up'), ('deathrow', 'To kill')], string='Action requested', index=True)
+    to_kill = fields.Boolean('To kill', compute='_compute_to_kill')
+    message_ids = fields.One2many('runbot.host.message', 'build_id', string='Messages')
     # web infos
     host = fields.Char('Host name')
     host_id = fields.Many2one('runbot.host', string="Host", compute='_compute_host_id')
@@ -393,6 +395,11 @@ class BuildResult(models.Model):
                     record.global_state = 'waiting'
             else:
                 record.global_state = record.local_state
+
+    @api.depends('message_ids')
+    def _compute_to_kill(self):
+        for record in self:
+            record.to_kill = any(message.message == 'kill' for message in record.message_ids)
 
     @api.depends('gc_delay', 'job_end')
     def _compute_gc_date(self):
@@ -542,17 +549,6 @@ class BuildResult(models.Model):
             'host': self.host if self.keep_host else False,
             **build_values,
         })
-
-    def _result_multi(self):
-        if all(build.global_result == 'ok' or not build.global_result for build in self):
-            return 'ok'
-        if any(build.global_result in ('skipped', 'killed', 'manually_killed') for build in self):
-            return 'killed'
-        if any(build.global_result == 'ko' for build in self):
-            return 'ko'
-        if any(build.global_result == 'warning' for build in self):
-            return 'warning'
-        return 'ko'  # ?
 
     @api.depends('params_id.version_id.name')
     def _compute_dest(self):
@@ -826,11 +822,13 @@ class BuildResult(models.Model):
     def _process_requested_actions(self):
         self.ensure_one()
         build = self
+        # TODO remove, replaced by queue
         if build.requested_action == 'deathrow':
             result = None
             if build.local_state != 'running' and build.global_result not in ('warn', 'ko'):
-                result = 'manually_killed'
+                result = 'killed'
             build._kill(result=result)
+            build.requested_action = False
             return
 
         if build.requested_action == 'wake_up':
@@ -1232,7 +1230,7 @@ class BuildResult(models.Model):
             'line': '0',
         })
 
-    def _kill(self, result=None):
+    def _kill(self, result='killed'):
         host_name = self.env['runbot.host']._get_current_name()
         self.ensure_one()
         build = self
@@ -1240,30 +1238,38 @@ class BuildResult(models.Model):
             return
         build._log('kill', 'Kill build %s' % build.dest)
         docker_stop(build._get_docker_name(), build._path())
-        v = {'local_state': 'done', 'requested_action': False, 'active_step': False, 'job_end': now()}
+        build.local_state = 'done'
+        build.active_step = False
+        build.job_end = now()
         if not build.build_end:
-            v['build_end'] = now()
+            build.build_end = now()
         if result:
-            v['local_result'] = result
-        build.write(v)
+            build.local_result = result
 
-    def _ask_kill(self, lock=True, message=None):
-        # if build remains in same bundle, it's ok like that
-        # if build can be cross bundle, need to check number of ref to build
-        if lock:
-            self.env.cr.execute("""SELECT id FROM runbot_build WHERE parent_path like %s FOR UPDATE""", ['%s%%' % self.parent_path])
+    def _ask_kill(self, message=None):
         self.ensure_one()
         user = self.env.user
         uid = user.id
         build = self
         message = message or 'Killing build %s, requested by %s (user #%s)' % (build.dest, user.name, uid)
         build._log('_ask_kill', message)
-        if build.local_state == 'pending':
-            build._skip()
-        elif build.local_state in ['testing', 'running']:
-            build.requested_action = 'deathrow'
-        for child in build.children_ids:
-            child._ask_kill(lock=False)
+
+        self.env.cr.execute("""SELECT id, local_state FROM runbot_build WHERE parent_path like %s""", ['%s%%' % self.parent_path])
+        builds = self.browse([b[0] for b in self.env.cr.fetchall()])
+        pending = builds.filtered(lambda b: b.local_state == 'pending')
+        killable = builds.filtered(lambda b: b.local_state in ('running', 'testing'))
+        if pending:
+            pending.local_state = 'done'
+            pending.local_result = 'killed'
+        pending.flush_recordset()  # faster concurrent error or lock row
+
+        values = [{
+            'host_id': build.host_id.id,
+            'build_id': build_id,
+            'message': 'kill',
+        } for build_id in killable.ids]
+
+        self.env['runbot.host.message'].sudo().create(values)
 
     def _wake_up(self):
         user = self.env.user
@@ -1518,7 +1524,7 @@ class BuildResult(models.Model):
         if self.global_result == 'ok':
             return 'success'
 
-        if self.global_result in ('skipped', 'killed', 'manually_killed'):
+        if self.global_result in ('skipped', 'killed'):
             return 'secondary'
         return 'default'
 

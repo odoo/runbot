@@ -53,9 +53,9 @@ class Runbot(models.AbstractModel):
             processed += 1
             build._process_requested_actions()
             self._commit()
+        if host._process_messages():
+            self._commit()
         host._process_logs()
-        self._commit()
-        host._process_messages()
         self._commit()
         for build in host._get_builds([('local_state', 'in', ['testing', 'running'])]) | self._get_builds_to_init(host):
             build = build.browse(build.id)  # remove preftech ids, manage build one by one
@@ -113,14 +113,14 @@ class Runbot(models.AbstractModel):
         ][:running_max]
         build_ids = host._get_builds([('local_state', '=', 'running'), ('id', 'not in', cannot_be_killed_ids)], order='job_start desc').ids
         for build in Build.browse(build_ids)[running_max:]:
-            build._kill()
+            build._kill(None)
 
     def _gc_testing(self, host):
         """garbage collect builds that could be killed"""
         # decide if we need room
         Build = self.env['runbot.build']
         domain_host = host._get_build_domain()
-        testing_builds = Build.search(domain_host + [('local_state', 'in', ['testing', 'pending']), ('requested_action', '!=', 'deathrow')])
+        testing_builds = Build.search(domain_host + [('local_state', 'in', ['testing', 'pending']), ('message_ids', '=', False)])
         used_slots = len(testing_builds)
         available_slots = host.nb_worker - used_slots
         nb_pending = Build.search_count([('local_state', '=', 'pending'), ('host', '=', False)])

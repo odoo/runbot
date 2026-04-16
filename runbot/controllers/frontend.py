@@ -276,6 +276,7 @@ class Runbot(Controller):
     ], type='http', auth="user", methods=['POST'], csrf=False)
     def build_operations(self, build_id, operation, **post):
         build = request.env['runbot.build'].sudo().browse(build_id)
+        build.check_access('read')
         if operation == 'rebuild':
             build = build._rebuild()
         elif operation == 'kill':

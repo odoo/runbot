@@ -1027,7 +1027,7 @@ class ConfigStep(models.Model):
                     )
 
                     if self.allow_similar_build_quick_result:
-                        existing_done_build = next((build for build in child.params_id.build_ids.sorted('id') if build.global_state == 'done' and build.local_result not in ('skipped', 'killed', 'manually_killed')), None)
+                        existing_done_build = next((build for build in child.params_id.build_ids.sorted('id') if build.global_state == 'done' and build.local_result not in ('skipped', 'killed')), None)
                         if existing_done_build:
                             child._log('', 'A similar [build](%s) has been found, marking as done directly', existing_done_build.build_url, log_type='markdown')
                             child.local_state = 'done'

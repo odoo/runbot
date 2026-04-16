@@ -744,7 +744,6 @@ class TestGc(RunbotCaseMinimalSetup):
         bundle_b = self.env['runbot.bundle'].search([('name', '=', branch_b_name)])
         bundle_b.last_batch._process()
 
-
         build_b = bundle_b.last_batch.slot_ids[0].build_id
 
         # the two builds are starting tests on two different hosts
@@ -754,8 +753,8 @@ class TestGc(RunbotCaseMinimalSetup):
 
         # no room needed, verify that nobody got killed
         self.Runbot._gc_testing(host)
-        self.assertFalse(build_a.requested_action)
-        self.assertFalse(build_b.requested_action)
+        self.assertFalse(build_a.to_kill)
+        self.assertFalse(build_b.to_kill)
 
         # a new commit is pushed on branch_a
         self.push_commit(self.remote_odoo_dev, branch_a_name, 'new subject', sha='d0cad0ca')
@@ -775,10 +774,10 @@ class TestGc(RunbotCaseMinimalSetup):
 
         # no room needed, verify that nobody got killed
         self.Runbot._gc_testing(host)
-        self.assertFalse(build_a.requested_action)
-        self.assertFalse(build_b.requested_action)
-        self.assertFalse(build_a_last.requested_action)
-        self.assertFalse(children_b.requested_action)
+        self.assertFalse(build_a.to_kill)
+        self.assertFalse(build_b.to_kill)
+        self.assertFalse(build_a_last.to_kill)
+        self.assertFalse(children_b.to_kill)
 
         # now children_b starts on runbot_xxx
         children_b.write({'local_state': 'testing', 'host': host.name})
@@ -789,10 +788,10 @@ class TestGc(RunbotCaseMinimalSetup):
         self.Runbot._gc_testing(host)
 
         # the killable build should have been marked to be killed
-        self.assertEqual(build_a.requested_action, 'deathrow')
-        self.assertFalse(build_b.requested_action)
-        self.assertFalse(build_a_last.requested_action)
-        self.assertFalse(children_b.requested_action)
+        self.assertTrue(build_a.to_kill)
+        self.assertFalse(build_b.to_kill)
+        self.assertFalse(build_a_last.to_kill)
+        self.assertFalse(children_b.to_kill)
 
 
 class TestGithubStatus(RunbotCase):
