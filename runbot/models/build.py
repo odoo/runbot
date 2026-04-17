@@ -1263,11 +1263,14 @@ class BuildResult(models.Model):
             pending.local_result = 'killed'
         pending.flush_recordset()  # faster concurrent error or lock row
 
+        _logger.info('Asking to kill builds %s, requested by %s (user #%s)', builds.ids, user.name, uid)
+        _logger.info('killable %s', killable.ids, user.name, uid)
+
         values = [{
             'host_id': b.host_id.id,
             'build_id': b.id,
             'message': 'kill',
-        } for b in killable.ids]
+        } for b in killable]
 
         self.env['runbot.host.message'].sudo().create(values)
 
