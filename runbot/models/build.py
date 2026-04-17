@@ -1264,10 +1264,10 @@ class BuildResult(models.Model):
         pending.flush_recordset()  # faster concurrent error or lock row
 
         values = [{
-            'host_id': build.host_id.id,
-            'build_id': build_id,
+            'host_id': b.host_id.id,
+            'build_id': b.id,
             'message': 'kill',
-        } for build_id in killable.ids]
+        } for b in killable.ids]
 
         self.env['runbot.host.message'].sudo().create(values)
 
