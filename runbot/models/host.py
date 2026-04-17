@@ -364,7 +364,11 @@ class MessageQueue(models.Model):
             for record in records:
                 if record.message == 'kill':
                     if record.build_id:
-                        record.build_id._kill('killed')
+                        build = record.build_id
+                        result = None
+                        if build.local_state != 'running' and build.global_result not in ('warn', 'ko'):
+                            result = 'killed'
+                        build._kill(result=result)
                 self.env['runbot.runbot']._warning(f'Host {record.host_id.name} got an unexpected message {record.message}')
         self.unlink()
         return processed
