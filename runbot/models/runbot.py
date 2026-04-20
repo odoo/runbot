@@ -72,6 +72,10 @@ class Runbot(models.AbstractModel):
         self._commit()
         processed += self._assign_pending_builds(host, host.nb_worker and host.nb_worker + 1, [('build_type', '=', 'priority')])
         self._commit()
+        for build in host._get_builds([('global_state', 'in', ['pending', 'testing', 'waiting', 'running'])]):
+            build._update_global_state()
+            build._update_global_result()
+            self._commit()
         self._gc_running(host)
         self._commit()
         self._reload_nginx()

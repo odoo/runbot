@@ -618,6 +618,11 @@ class TestBuildResult(RunbotCase):
 
         build1_1_2.local_state = 'done'
 
+        # simulate scheduler ran
+        build1_1._update_global_state()
+        build1_2._update_global_state()
+        build1._update_global_state()
+
         self.assertEqual('done', build1.global_state)
         self.assertEqual('done', build1_1.global_state)
         self.assertEqual('done', build1_2.global_state)
@@ -647,6 +652,14 @@ class TestBuildResult(RunbotCase):
 
         build1_1_1.local_result = 'ko'
         build1_1_1.local_state = 'done'
+
+
+        # simulate scheduler ran
+        build1_1._update_global_state()
+        build1._update_global_state()
+        build1_1._update_global_result()
+        build1._update_global_result()
+
         self.assertEqual('done', build1.global_state)
         self.assertEqual('done', build1_1.global_state)
         self.assertEqual('done', build1_1_1.global_state)
@@ -660,6 +673,12 @@ class TestBuildResult(RunbotCase):
         })
         build1_1_1.orphan_result = True
 
+        # simulate scheduler ran
+        build1_1._update_global_state()
+        build1._update_global_state()
+        build1_1._update_global_result()
+        build1._update_global_result()
+
         self.assertEqual('ok', build1.global_result)
         self.assertEqual('ok', build1_1.global_result)
         self.assertEqual('ko', build1_1_1.global_result)
@@ -670,6 +689,13 @@ class TestBuildResult(RunbotCase):
 
         rebuild1_1_1.local_result = 'ok'
         rebuild1_1_1.local_state = 'done'
+
+
+        # simulate scheduler ran
+        build1_1._update_global_state()
+        build1._update_global_state()
+        build1_1._update_global_result()
+        build1._update_global_result()
 
         self.assertEqual('ok', build1.global_result)
         self.assertEqual('ok', build1_1.global_result)
@@ -812,11 +838,13 @@ class TestGithubStatus(RunbotCase):
         with patch('odoo.addons.runbot.models.build.BuildResult._github_status', github_status):
             self.callcount = 0
             self.build.local_state = 'testing'
+            self.assertEqual(self.build.global_state, 'testing')
 
             self.assertEqual(self.callcount, 0, "_github_status shouldn't have been called")
 
             self.callcount = 0
             self.build.local_state = 'running'
+            self.assertEqual(self.build.global_state, 'running')
 
             self.assertEqual(self.callcount, 1, "_github_status should have been called")
 
