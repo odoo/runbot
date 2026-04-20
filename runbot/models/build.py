@@ -295,9 +295,9 @@ class BuildResult(models.Model):
     priority_level = fields.Integer('Priority', related='create_batch_id.priority_level', store=True, index=True)
 
     # state machine
-    global_state = fields.Selection(make_selection(state_order), string='Status', compute='_compute_global_state', store=True, recursive=True)
+    global_state = fields.Selection(make_selection(state_order), string='Status', default='pending')
     local_state = fields.Selection(make_selection(state_order), string='Build Status', default='pending', required=True, index=True)
-    global_result = fields.Selection(make_selection(result_order), string='Result', compute='_compute_global_result', store=True, recursive=True)
+    global_result = fields.Selection(make_selection(result_order), string='Result', default='ok')
     local_result = fields.Selection(make_selection(result_order), string='Build Result', default='ok')
 
     requested_action = fields.Selection([('wake_up', 'To wake up'), ('deathrow', 'To kill')], string='Action requested', index=True)
@@ -377,6 +377,8 @@ class BuildResult(models.Model):
 
     access_token = fields.Char('Token', default=lambda self: uuid.uuid4().hex)
 
+    _global_state_idx = models.Index("(global_state) WHERE global_state != 'done'")
+
     @api.depends('description', 'params_id.config_id')
     def _compute_display_name(self):
         for build in self:
@@ -388,8 +390,7 @@ class BuildResult(models.Model):
         for record in self:
             record.host_id = get_host(record.host)
 
-    @api.depends('children_ids.global_state', 'local_state')
-    def _compute_global_state(self):
+    def _update_global_state(self):
         for record in self:
             waiting_score = record._get_state_score('waiting')
             children_ids = [child for child in record.children_ids if not child.orphan_result]
@@ -401,6 +402,21 @@ class BuildResult(models.Model):
                     record.global_state = 'waiting'
             else:
                 record.global_state = record.local_state
+
+    def _update_global_result(self):
+        for record in self:
+            if record.local_result and record._get_result_score(record.local_result) >= record._get_result_score('ko'):
+                record.global_result = record.local_result
+            else:
+                children_ids = [child for child in record.children_ids if not child.orphan_result]
+                if children_ids:
+                    children_result = record._get_worst_result([child.global_result for child in children_ids], max_res='ko')
+                    if record.local_result:
+                        record.global_result = record._get_worst_result([record.local_result, children_result])
+                    else:
+                        record.global_result = children_result
+                else:
+                    record.global_result = record.local_result
 
     @api.depends('message_ids')
     def _compute_to_kill(self):
@@ -441,22 +457,6 @@ class BuildResult(models.Model):
 
     def _get_state_score(self, result):
         return state_order.index(result)
-
-    @api.depends('children_ids.global_result', 'local_result', 'children_ids.orphan_result')
-    def _compute_global_result(self):
-        for record in self:
-            if record.local_result and record._get_result_score(record.local_result) >= record._get_result_score('ko'):
-                record.global_result = record.local_result
-            else:
-                children_ids = [child for child in record.children_ids if not child.orphan_result]
-                if children_ids:
-                    children_result = record._get_worst_result([child.global_result for child in children_ids], max_res='ko')
-                    if record.local_result:
-                        record.global_result = record._get_worst_result([record.local_result, children_result])
-                    else:
-                        record.global_result = children_result
-                else:
-                    record.global_result = record.local_result
 
     @api.depends('build_error_link_ids')
     def _compute_build_error_ids(self):
@@ -503,6 +503,17 @@ class BuildResult(models.Model):
         })
         return [values]
 
+    def create(self, vals):
+        records = super().create(vals)
+        parents = records.parent_id
+        # it doesn't make sense to create a build in another state than pending, and ok result,
+        # so we can assume that we don't need to update the created records globals,
+        # but we need to update the parents global state and result as the new build can impact them
+        if parents:
+            parents._update_global_state()
+            parents._update_global_result()
+        return records
+
     def write(self, values):
         # some validation to ensure db consistency
         if 'local_state' in values:
@@ -516,22 +527,37 @@ class BuildResult(models.Model):
                     values.pop('local_result')
                 else:
                     raise ValidationError('Local result cannot be set to a less critical level')
-        init_global_results = self.mapped('global_result')
-        init_global_states = self.mapped('global_state')
-        init_local_states = self.mapped('local_state')
+        if "global_result" in values:
+            init_global_results = self.mapped('global_result')
+        if "global_state" in values:
+            init_global_states = self.mapped('global_state')
+        if "local_state" in values:
+            init_local_states = self.mapped('local_state')
 
         res = super(BuildResult, self).write(values)
-        for init_global_result, build in zip(init_global_results, self):
-            if init_global_result != build.global_result:
-                build._github_status()
+        if 'local_state' in values:
+            self._update_global_state()
+        if 'local_result' in values:
+            self._update_global_result()
 
-        for init_local_state, build in zip(init_local_states, self):
-            if init_local_state not in ('done', 'running') and build.local_state in ('done', 'running'):
-                build.build_end = now()
+        if 'orphan_result' in values:
+            self.parent_id._update_global_result()
+            self.parent_id._update_global_state()
 
-        for init_global_state, build in zip(init_global_states, self):
-            if init_global_state not in ('done', 'running') and build.global_state in ('done', 'running'):
-                build._github_status()
+        if "global_result" in values:
+            for init_global_result, build in zip(init_global_results, self):
+                if init_global_result != build.global_result:
+                    build._github_status()
+
+        if "local_state" in values:
+            for init_local_state, build in zip(init_local_states, self):
+                if init_local_state not in ('done', 'running') and build.local_state in ('done', 'running'):
+                    build.build_end = now()
+
+        if "global_state" in values:
+            for init_global_state, build in zip(init_global_states, self):
+                if init_global_state not in ('done', 'running') and build.global_state in ('done', 'running'):
+                    build._github_status()
 
         return res
 
@@ -660,7 +686,7 @@ class BuildResult(models.Model):
 
         new_build = self.create(values)
         if self.parent_id:
-            new_build._github_status()
+            new_build._github_status()  # not sure this is needed since creating a child should trigger an update of parent global state.
         user = self.env.user
         new_build._log('rebuild', 'Rebuild initiated by %s%s' % (user.name, (' :%s' % message) if message else ''))
 
