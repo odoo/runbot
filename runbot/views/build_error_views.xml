@@ -10,6 +10,9 @@
                 <button class="oe_stat_button" type="object" icon="fa-exclamation-circle" name="action_get_build_link_record">
                   <field string="Builds Link" name="build_count" widget="statinfo"/>
                 </button>
+                <button name="action_view_duplicate_breaking_pr" type="object" class="oe_stat_button" icon="fa-external-link" invisible="duplicate_breaking_pr_count == 0">
+                  <field name="duplicate_breaking_pr_count" widget="statinfo"/>
+                </button>
               </div>
               <widget name="web_ribbon" title="Test-tags" bg_color="bg-danger" invisible="not test_tags"/>
               <button name="action_view_errors" string="See all linked errors" type="object" class="oe_highlight"/>

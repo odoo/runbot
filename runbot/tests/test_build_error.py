@@ -219,6 +219,44 @@ class TestBuildError(TestBuildErrorCommon):
         self.assertEqual(error_a.fixing_pr_id, self.dev_pr)
         self.assertEqual(error_a.breaking_pr_id, self.dev_pr)
 
+    def test_duplicate_breaking_pr(self):
+        pr_branch = self.Branch.create({
+            'name': '242',
+            'is_pr': True,
+            'alive': True,
+            'remote_id': self.remote_odoo.id,
+            'target_branch_name': self.branch_odoo.name,
+            'pull_head_name': f'{self.remote_odoo.owner}:{self.dev_branch.name}',
+        })
+
+        error_a = self.BuildError.create({'content': 'error A', 'breaking_pr_id': pr_branch.id})
+        error_b = self.BuildError.create({'content': 'error B', 'breaking_pr_id': pr_branch.id})
+        error_c = self.BuildError.create({'content': 'error C', 'breaking_pr_id': pr_branch.id})
+        error_d = self.BuildError.create({'content': 'error D'})
+
+        # Test compute count (excludes self)
+        self.assertEqual(error_a.duplicate_breaking_pr_count, 2)
+        self.assertEqual(error_b.duplicate_breaking_pr_count, 2)
+        self.assertEqual(error_c.duplicate_breaking_pr_count, 2)
+        self.assertEqual(error_d.duplicate_breaking_pr_count, 0)
+
+        # Test action returns all errors including self
+        action = error_a.action_view_duplicate_breaking_pr()
+        self.assertEqual(action['type'], 'ir.actions.act_window')
+        self.assertEqual(action['res_model'], 'runbot.build.error')
+        errors_in_action = self.BuildError.search(action['domain'])
+        self.assertIn(error_a, errors_in_action)
+        self.assertEqual(len(errors_in_action), 3)
+
+        # Test count update on deactivation
+        error_b.active = False
+        error_a.invalidate_recordset(['duplicate_breaking_pr_count'])
+        self.assertEqual(error_a.duplicate_breaking_pr_count, 1)
+
+        # Test count update on breaking PR removal
+        error_a.breaking_pr_id = False
+        self.assertEqual(error_a.duplicate_breaking_pr_count, 0)
+
     def test_relink_contents(self):
         build_a = self.create_test_build({'local_result': 'ko', 'local_state': 'done'})
         error_content_a = self.BuildErrorContent.create({'content': 'foo bar'})
