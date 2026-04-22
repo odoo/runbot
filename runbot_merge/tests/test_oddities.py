@@ -492,7 +492,7 @@ def test_staging_push_blocked(env, project, repo, config, users):
         f"""\
 <pre>\
 remote: error: GH013: Repository rule violations found for refs/heads/staging.master.        
-remote: Review all repository rules        
+remote: Review all repository rules at https://github.com/{repo.name}/rules?ref=refs%2Fheads%2Fstaging.master        
 remote: 
 remote: - Cannot create ref due to creations being restricted.        
 remote: 
