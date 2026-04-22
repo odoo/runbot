@@ -14,12 +14,13 @@ from collections import defaultdict
 from pathlib import Path
 
 from dateutil import parser
+from markupsafe import Markup
 from psycopg2 import sql
 from psycopg2.extensions import TransactionRollbackError
 
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError
-from odoo.tools import file_open, file_path
+from odoo.tools import file_open, file_path, html_escape
 from odoo.tools.safe_eval import safe_eval
 
 from ..common import (
@@ -1527,6 +1528,58 @@ class BuildResult(models.Model):
         if self.global_result in ('skipped', 'killed'):
             return 'secondary'
         return 'default'
+
+    def _get_file_url(self, path, line=None):
+        repo_name = path.replace('/data/build/', '').split('/')[0]
+        for commit_link in self.params_id.commit_link_ids:
+            if commit_link.commit_id.repo_id.name == repo_name:
+                repo_base_url = commit_link.branch_id.remote_id.base_url
+                commit_hash = commit_link.commit_id.name
+                path = path.replace('/data/build/%s/' % repo_name, '')
+                url = f'https://{repo_base_url}/blob/{commit_hash}/{path}'
+                if line:
+                    url = f'{url}#L{line}'
+                return url
+        return ''
+
+    def _format_message(self, log):
+        text = log.message
+        if not "\n" in text and 'in: /data/build/' in text:
+            parts = text.split('in: /data/build/')
+            text = parts[0]
+            url = f'http://{self.host}/runbot/static/build/{self.dest}/{parts[-1]}'
+            template = Markup('<a href="%s" target="_blank"><b>%s</b></a>')
+            return template % (url, text)
+        text = text.strip('\n')
+        text = html_escape(text)
+
+        def get_link(match):
+            path = match.group(1)
+            line = match.group(2)
+            url = self._get_file_url(path, line)
+            if url:
+                if line:
+                    return Markup('<a href="%s" target="_blank" class="subtle_link">%s</a>&#34;, line %s') % (url, path, line)
+                return Markup('<a href="%s" target="_blank" class="subtle_link">%s</a>') % (url, path)
+            return match.group(0)
+        regex = r'''
+            (/data/build/[\w\-\./]+\.(?:py|xml|js|css)) # Path in /data/build ending with a common extension
+            (?:
+            \&\#34;,\sline\s(\d+)                    # Optional line number (escaped quote)
+            )?
+        '''
+        text = Markup(re.sub(regex, get_link, text, flags=re.VERBOSE))
+
+        return text
+
+    def _log_details(self, log):
+        title = f"Logger: {log.name}\nFunc: {log.func}"
+        test_data = log.metadata.dict.get('test')
+        if test_data:
+            title += '\n'
+            for test_line in test_data:
+                title += f'\n{test_line}: {test_data[test_line]}'
+        return title
 
     def _github_status(self):
         """Notify github of failed/successful builds"""

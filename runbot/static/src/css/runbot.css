@@ -185,7 +185,7 @@ a.slots_infos:hover {
 }
 
 .separator {
-	border-top: 2px solid #666;
+	border-top: 0.2em solid #666;
 }
 
 body, .table {
@@ -426,4 +426,32 @@ code {
 
 .hide-success tr.bg-success-subtle {
     display: none;
+}
+
+.pre {
+	display: block;
+    font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    white-space: pre;
+	overflow: auto;
+	font-size: 0.875em;
+	margin:0;
+	padding:0;
+	margin-top: 0.2em;
+	border: none;
+
+}
+
+.subtle_link {
+	color: var(--bs-body-color);
+	text-decoration: underline;
+}
+
+.table-condensed .log-server td, .table-condensed .log-details td {
+	padding-top: 0;
+	padding-bottom: 0;
+	border: none;
+}
+
+.log-details td {
+	padding-left: 20px;
 }

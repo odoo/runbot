@@ -215,7 +215,6 @@ class BuildError(models.Model):
     _inherit = ('mail.thread', 'mail.activity.mixin', 'runbot.build.error.seen.mixin')
     _mail_post_access = 'read'
 
-
     name = fields.Char("Name")
     active = fields.Boolean('Open (not fixed)', default=True, tracking=True)
     description = fields.Text("Description", store=True, compute='_compute_description')

@@ -705,6 +705,32 @@ class TestBuildResult(RunbotCase):
         second_child_cmd = second_child._cmd(py_version=3)
         self.assertIn('faketime "2024-02-04 04:42 UTC" python3 odoo/server.py', str(second_child_cmd))
 
+    def test_format_message(self):
+        def get_log(message):
+            return self.env['ir.logging'].create({
+                'build_id': build.id,
+                'type': 'server',
+                'message': message,
+                'level': 'INFO',
+                'name': 'odoo.addons.web.tests.test_web',
+                'path': '',
+                'func': '',
+                'line': '',
+            })
+        build = self.Build.create({
+            'params_id': self.server_params.id,
+            'description': 'A nice **description** with a link to odoo.com',
+        })
+        self.assertEqual(
+            build._format_message(get_log('File "/data/build/odoo/addons/web/tests/test_web.py", line 42, in test_web')),
+            'File &#34;<a href="https://False/blob/dfdfcfcf0000ffffffffffffffffffffffffffff/addons/web/tests/test_web.py#L42" target="_blank" class="subtle_link">/data/build/odoo/addons/web/tests/test_web.py</a>&#34;, line 42, in test_web'
+        )
+
+        self.assertEqual(
+            build._format_message(get_log('File "/data/build/odoo/addons/web/tests/test_web.py", in test_web')),
+            'File &#34;<a href="https://False/blob/dfdfcfcf0000ffffffffffffffffffffffffffff/addons/web/tests/test_web.py" target="_blank" class="subtle_link">/data/build/odoo/addons/web/tests/test_web.py</a>&#34;, in test_web'
+        )
+
 class TestGc(RunbotCaseMinimalSetup):
 
     def test_repo_gc_testing(self):
