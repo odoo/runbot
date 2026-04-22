@@ -2585,6 +2585,7 @@ Please check and re-approve.
 
         with repo:
             pr.post_comment("hansen r+", config['role_reviewer']['token'])
+        with repo:
             repo.post_status(c, 'success')
         env.run_crons()
         assert not pr_id.blocked
