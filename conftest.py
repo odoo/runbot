@@ -1135,7 +1135,9 @@ class Repo:
         for hook in hook_urls:
             r = sess.patch(hook, json={'active': False})
             assert r.ok, r.text
+        wait_for_hook()
         yield
+        wait_for_hook()
         for hook in reversed(hook_urls):
             r = sess.patch(hook, json={'active': True})
             assert r.ok, r.text
