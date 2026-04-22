@@ -581,7 +581,7 @@ def test_not_prestage(env, project, repo, users, config):
     # pytest assertion rewriting tacks the extra info to the user-provided
     # assertion message, so we need to strip it
     payload, _ = e.value.args[0].split('\n', 1)
-    assert json.loads(payload)['status'] == '404'
+    assert json.loads(payload)['status'] == '422'
 
 def test_split_depthfirst(env, project, repo, users, config):
     project.branch_ids.depth_first_splits = True
