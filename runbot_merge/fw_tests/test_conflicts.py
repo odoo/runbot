@@ -170,6 +170,55 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         'i': 'a',
     }
 
+def test_conflict_unknown_root_head(
+    env, config, make_repo,
+):
+    """Very specific implementation detail: on conflict we try to infer
+    modify/delete conflicts in order to mark the files git reintrodued, to do so
+    we try to list the files modified by the original PR, and that requires
+    having the head of its target branch locally...
+    """
+    fw_cron = env.ref('runbot_merge.port_forward')
+    fw_cron.active = False
+    prod, _other = make_basic(env, config, make_repo, statuses="default")
+
+    with prod:
+        # generate conflict: remove f from b, while updating f in a
+        prod.make_commits(
+            'b', Commit('33', tree={'g': 'c'}, reset=True),
+            ref='heads/b'
+        )
+        [p_0] = prod.make_commits(
+            'a', Commit('p_0', tree={'f': 'xxx'}),
+            ref='heads/a_pr'
+        )
+        pr = prod.make_pr(target='a', head='a_pr')
+        prod.post_status(p_0, 'success')
+        pr.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+    with prod:
+        prod.post_status('staging.a', 'success')
+    env.run_crons()
+
+    # there should be no forward port (yet)
+    assert env['runbot_merge.pull_requests'].search_count([]) == 1
+    # there should be an fw job
+    assert env['forwardport.batches'].search_count([]) == 1
+
+    # add a commit to a which the mergebot should not know about
+    with prod:
+        prod.make_commits(
+            'a',
+            Commit('X', tree={'g': 'fkdshf'}),
+            ref='heads/a',
+        )
+
+    fw_cron.active = True
+    fw_cron.trigger()
+    env.run_crons()
+
+    assert env['runbot_merge.pull_requests'].search_count([]) == 2
+
 def test_massive_conflict(env, config, make_repo):
     """If the conflict is large enough, the commit message may exceed ARG_MAX
      and trigger E2BIG.

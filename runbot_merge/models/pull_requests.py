@@ -2100,7 +2100,7 @@ For your own safety I've ignored *everything in your entire comment*.
             # port / conflict it's a modify/delete conflict: the file was
             # deleted in the target branch, and the update (modify) in the
             # original PR causes it to be added back
-            base = conf.remote_head(root.repository, root.target.name)
+            base = conf.fetchone(root.repository, root.target.name)
             original_modified = set(conf.diff(
                 "--diff-filter=M", "--name-only",
                 "--merge-base", base,

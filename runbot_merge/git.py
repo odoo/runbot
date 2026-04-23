@@ -193,16 +193,6 @@ class Repo:
         """
         return next(self.fetch_heads(repo, f"refs/heads/{branch}"))
 
-    def remote_head(self, repo, branch: str) -> str:
-        r = self.stdout().with_config(check=True, encoding="utf-8").ls_remote(
-            source_url(repo),
-            f'refs/heads/{branch}',
-        )
-        assert r.stdout.count('\n') == 1, f"expected single line, got {r.stdout}"
-        # The output is in the format: <oid> TAB <ref> LF
-        head, _ = r.stdout.split('\t', 1)
-        return head
-
     def get_tree(self, rev: str) -> str:
         return self.stdout().with_config(check=True, encoding="utf-8")\
             .rev_parse(f'{rev}^{{tree}}')\
