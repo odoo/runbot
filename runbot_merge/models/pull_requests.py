@@ -2469,6 +2469,8 @@ class Feedback(models.Model):
         string="Bot User",
         help="Token field (from repo's project) to use to post messages"
     )
+    tried = fields.Integer()
+    retry_after = fields.Datetime()
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -2480,7 +2482,12 @@ class Feedback(models.Model):
         ghs = {}
         i = 0
         limit = 100
-        for i, f in enumerate(self.search([], limit=limit), start=1):
+        try_limit = 12
+        for i, f in enumerate(self.search([
+            '|', ('tried', '=', False), ('tried', '<', try_limit),
+            '|', ('retry_after', '=', False),
+                 ('retry_after', '<', datetime.datetime.now()),
+        ], limit=limit), start=1):
             repo = f.repository
             gh = ghs.get((repo, f.token_field))
             if not gh:
@@ -2532,6 +2539,15 @@ class Feedback(models.Model):
                     repo.name, f.pull_request,
                     utils.shorten(f.message, 200)
                 )
+                f.tried += 1
+                f.retry_after = datetime.datetime.now() \
+                              + datetime.timedelta(minutes=10)
+                if f.tried >= try_limit:
+                    self.env['mail.thread'].message_notify(
+                        subject=f"Failed to send feedback {f.id} to {f.repository.name}#{f.pull_request}",
+                        body=f.message,
+                        partner_ids=self.env.ref('runbot_merge.group_admin').users.partner_id.ids,
+                    )
             else:
                 f.unlink()
 
