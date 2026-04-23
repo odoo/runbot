@@ -291,18 +291,17 @@ class Runbot(Controller):
         '/runbot/batch/<int:from_batch>/build/<int:build_id>',
     ], type='http', auth="public", website=True, sitemap=False)
     def build(self, build_id, search=None, from_batch=None, **post):
-        """Events/Logs"""
-
+        build = request.env['runbot.build'].browse(build_id)
         if from_batch:
             from_batch = request.env['runbot.batch'].browse(int(from_batch))
-            if build_id not in from_batch.with_context(active_test=False).slot_ids.build_id.ids:
+            if build.top_parent_id not in from_batch.with_context(active_test=False).slot_ids.build_id.ids and build.create_batch_id != from_batch:
                 # the url may have been forged replacing the build id, redirect to hide the batch
                 return werkzeug.utils.redirect('/runbot/build/%s' % build_id)
 
             from_batch = from_batch.with_context(batch=from_batch)
         Build = request.env['runbot.build'].with_context(batch=from_batch)
 
-        build = Build.browse([build_id])[0]
+        build = Build.browse(build_id)
         if not build.exists():
             return request.not_found()
         siblings = (build.parent_id.children_ids if build.parent_id else from_batch.slot_ids.build_id if from_batch else build).sorted('id')
