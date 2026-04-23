@@ -2450,6 +2450,7 @@ class Tagging(models.Model):
                 to_remove.extend(ids)
         self.browse(to_remove).unlink()
 
+
 class Feedback(models.Model):
     """ Queue of feedback comments to send to PR users
     """
@@ -2477,8 +2478,9 @@ class Feedback(models.Model):
 
     def _send(self):
         ghs = {}
-        to_remove = []
-        for f in self.search([]):
+        i = 0
+        limit = 100
+        for i, f in enumerate(self.search([], limit=limit), start=1):
             repo = f.repository
             gh = ghs.get((repo, f.token_field))
             if not gh:
@@ -2522,8 +2524,7 @@ class Feedback(models.Model):
                         "Comment not found (%s) when trying to send a reaction to %s#%s (%s)",
                         e, f.repository.name, f.pull_request, f.reaction,
                     )
-                    to_remove.append(f.id)
-                    continue
+                    f.unlink()
 
                 _logger.exception(
                     "Error while trying to %s %s#%s (%s)",
@@ -2532,8 +2533,13 @@ class Feedback(models.Model):
                     utils.shorten(f.message, 200)
                 )
             else:
-                to_remove.append(f.id)
-        self.browse(to_remove).unlink()
+                f.unlink()
+
+        # if we reached the end of the batch, there are probably leftover
+        # feedbacks to send
+        if i == limit:
+            self.env.ref('runbot_merge.feedback_cron')._trigger()
+
 
 class FeedbackTemplate(models.Model):
     _name = 'runbot_merge.pull_requests.feedback.template'
