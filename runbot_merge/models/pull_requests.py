@@ -1416,12 +1416,15 @@ For your own safety I've ignored *everything in your entire comment*.
 
     @api.depends(
         'statuses', 'overrides', 'target', 'parent_id', 'skipchecks',
+        'closed',
         'applicable_statuses.context',
         'applicable_statuses.branch_filter',
         'applicable_statuses.prs',
     )
     def _compute_statuses(self):
         for pr in self:
+            if pr.merge_date or pr.closed:
+                continue
             statuses = {**json.loads(pr.statuses), **pr._get_overrides()}
 
             pr.statuses_full = json.dumps(statuses, indent=4)
