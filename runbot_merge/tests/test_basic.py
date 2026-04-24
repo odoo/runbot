@@ -1468,7 +1468,6 @@ commits, I need to know how to merge it:
 * `rebase-merge` to rebase and merge, using the PR as merge commit message
 * `rebase-ff` to rebase and fast-forward
 """.format_map(users)),
-            (users['user'], "@{user} @{reviewer} unable to stage: missing merge method".format_map(users)),
         ]
 
     def test_pr_method_no_review(self, repo, env, users, config):
