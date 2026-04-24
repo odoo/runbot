@@ -74,26 +74,43 @@ def redo(pr: str) -> int:
         exit("not a forward port")
     parent = info(res["parent"])
     repository_url, reflist = ls_remote(
-        res["repository"], res["target"], parent["target"]
+        res["repository"],
+        res["target"],
+        parent["target"],
+        res['ref'],
     )
     refs = dict(reflist)
-    commits_of_interest = [*refs.values(), parent["head"], res["head"]]
+    commits_of_interest = [*refs.values(), parent["head"], res["head"], res['ref']]
     if cm := parent["commits_map"]:
         commits_of_interest.append(cm[""])
+    if f'refs/heads/{res["ref"]}' in refs:
+        devname = res['repository']
+    else:
+        # try to probe a dev repository for the branch
+        devname = res['repository'].replace('odoo/', 'odoo-dev/')
+        dev_url, reflist = ls_remote(devname, res['ref'])
+        if not reflist:
+            exit(f"unable to find ref {res['ref']!r} in {res['repository']!r} or {devname!r}")
+
+    urls = tuple(
+        f"{root}{devname}{ext}"
+        for root in ("https://github.com/", 'git@github.com:')
+        for ext in ('.git', '')
+    )
+
+    for name, url, kind in remotes():
+        if kind == 'fetch' and url in urls:
+            remotename = name
+            break
+    else:
+        exit(f"found {res['ref']!r} in {devname!r} but no configured remote for it")
+
     r = run(
-        [
-            "git",
-            "fetch",
-            "--dry-run",
-            "--porcelain",
-            "--no-tags",
-            repository_url,
-            *commits_of_interest,
-        ],
+        ["git", "fetch", "--no-tags", "-q", remotename, *commits_of_interest],
         stdout=DEVNULL,
     )
     if r.returncode:
-        exit("unable to retrieve commits of interest")
+        exit(f"unable to retrieve commits of interest from {remotename!r}")
 
     # list the source's commits
     r = run(
@@ -115,7 +132,8 @@ def redo(pr: str) -> int:
         # remap commits to forward port to those which got merged
         commits = [cm[c] for c in commits]
 
-    run(["git", "switch", res["ref"]], check=True)
+    run(["git", "switch", "--guess", res["ref"]], check=True)
+    run(["git", "branch", "--set-upstream-to", f"{remotename}/{res['ref']}"], check=True, stdout=DEVNULL)
     merge_base = run(
         ["git", "merge-base", refs[f"refs/heads/{res['target']}"], res["head"]],
         stdout=PIPE,
@@ -142,11 +160,28 @@ def parse_pr(pr: str) -> tuple[str, str]:
     exit(f"failed to find PR information in {pr!r}")
 
 
-def from_remotes() -> str:
+def remotes() -> typing.Iterator[tuple[str, str, str]]:
     r = run(["git", "remote", "-v"], check=True, stdout=PIPE, encoding="utf-8")
     for line in r.stdout.splitlines(keepends=False):
         # a line should be name TAB url SPACE ( kind )
-        _name, url, _kind = line.split()
+        if m := re.fullmatch(
+            r'''
+            (?P<name>[^\t]+)
+            \t
+            (?P<url>[^ ]+)
+            \x20
+            \((?P<kind>.+)\)
+            # promisor filters
+            (?: \[.*])?
+            ''',
+            line,
+            re.VERBOSE,
+        ):
+            yield typing.cast(tuple[str, str, str], m.groups())
+
+
+def from_remotes() -> str:
+    for _name, url, _kind in remotes():
         for prefix in ('git@github.com:', 'https://github.com/'):
             if url.startswith(prefix):
                 return url.removeprefix(prefix)\
