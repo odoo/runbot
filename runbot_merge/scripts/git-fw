@@ -167,7 +167,7 @@ def ls_remote(
         f"git@github.com:{repository}",
     ]:
         r = run(
-            ["git", "ls-remote", "-q", repository_url, *patterns],
+            ["git", "-c", "credential.interactive=false", "ls-remote", "-q", repository_url, *patterns],
             stdout=PIPE,
             stderr=DEVNULL,
         )
