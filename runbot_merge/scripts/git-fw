@@ -38,8 +38,8 @@ SYNOPSYS
 \tgit fw (--continue | --skip | --abort | --quit)
 
 DESCRIPTION
-\tGiven a pull request (by github or mergebot URL, or <owner>/<repo>#<number>
-\tshort form), re-execute its forward porting via git-cherry-pick(1),
+\tGiven a pull request (by number, <owner>/<repo>#<number> short form, or full
+\tgithub or mergebot URL), re-execute its forward porting via git-cherry-pick(1),
 \tproviding the ability to interactively fix conflicts then push the result
 \tback onto the forward-port branch.
 
@@ -127,6 +127,9 @@ def redo(pr: str) -> int:
 
 
 def parse_pr(pr: str) -> tuple[str, str]:
+    if m := re.fullmatch(r'#?(\d+)', pr):
+        return from_remotes(), m[1]
+
     if m := re.fullmatch(r"(\w+/\w+)#(\d+)", pr):
         return m[1], m[2]
 
@@ -137,6 +140,19 @@ def parse_pr(pr: str) -> tuple[str, str]:
         return m[1], m[2]
 
     exit(f"failed to find PR information in {pr!r}")
+
+
+def from_remotes() -> str:
+    r = run(["git", "remote", "-v"], check=True, stdout=PIPE, encoding="utf-8")
+    for line in r.stdout.splitlines(keepends=False):
+        # a line should be name TAB url SPACE ( kind )
+        _name, url, _kind = line.split()
+        for prefix in ('git@github.com:', 'https://github.com/'):
+            if url.startswith(prefix):
+                return url.removeprefix(prefix)\
+                    .removesuffix('.git')\
+                    .replace('odoo-dev/', 'odoo/')
+    exit(f"Found no github remote in:\n{r.stdout}")
 
 
 def ls_remote(
