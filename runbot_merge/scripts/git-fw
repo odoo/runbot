@@ -3,9 +3,12 @@
 # requires-python = ">= 3.10
 # dependencies = []
 # ///
+import hashlib
 import json
+import pathlib
 import re
 import sys
+import threading
 import typing
 import urllib.error
 import urllib.parse
@@ -13,6 +16,7 @@ import urllib.request
 from subprocess import run, PIPE, DEVNULL
 
 __VERSION__ = "0.1"
+SCRIPT_URL = 'https://raw.githubusercontent.com/odoo/runbot/refs/heads/17.0/runbot_merge/scripts/git-fw'
 
 
 class PrInfo(typing.TypedDict):
@@ -229,5 +233,17 @@ def info(url: str) -> PrInfo:
         exit(f"invalid response (not json): {e}")
 
 
+def check_version(f):
+    if not f:
+        return
+
+    h = hashlib.blake2b(pathlib.Path(f).read_bytes(), usedforsecurity=False)
+    with urllib.request.urlopen(SCRIPT_URL) as r:
+        hh = hashlib.blake2b(r.read(), usedforsecurity=False)
+    if h.digest() != hh.digest():
+        print(f"You may want to update {f}:\nA different version is available at {SCRIPT_URL}")
+
+
 if __name__ == "__main__":
+    threading.Thread(target=check_version, args=(__file__,), daemon=True).start()
     exit(main())
