@@ -206,7 +206,7 @@ All substitutions are tentatively applied sequentially to the input.
                 # don't go through controller because try_closing does weird things
                 # for safety / race condition reasons which ends up committing
                 # and breaks everything
-                pr_id.state = 'closed'
+                pr_id.closed = True
             self.env['runbot_merge.pull_requests.feedback'].create({
                 'repository': pr_id.repository.id,
                 'pull_request': number,
