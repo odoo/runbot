@@ -9,16 +9,15 @@ from collections import defaultdict
 from dateutil import rrule
 from dateutil.relativedelta import relativedelta
 from markupsafe import Markup
-
 from werkzeug.urls import url_join
 
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
-from odoo.tools import SQL, lazy, ormcache
 from odoo.fields import Domain
+from odoo.tools import SQL, lazy, ormcache
 
+from ..common import TestTagsParser, transactioncache
 from ..fields import JsonDictField
-from ..common import transactioncache, TestTagsParser
 
 _logger = logging.getLogger(__name__)
 
@@ -242,8 +241,8 @@ class BuildError(models.Model):
     breaking_bundle_url = fields.Char('Breaking bundle url', related='breaking_bundle_id.frontend_url')
     breaking_pr_date = fields.Datetime('Breaking date', related="breaking_pr_id.close_date", help="Date of the merge of the first pr")
 
-    test_tags = fields.Char(string='Test tags', help="Comma separated list of test_tags to use to reproduce/remove this error", tracking=True)
-    canonical_tags = fields.Char('Canonical tag', compute='_compute_canonical_tags', store=True)
+    test_tags = fields.Text(string='Test tags', help="Comma separated list of test_tags to use to reproduce/remove this error", tracking=True)
+    canonical_tags = fields.Text('Canonical tag', compute='_compute_canonical_tags', store=True)
     tags_match_count = fields.Integer('Nb errors matching the test_tags', compute='_compute_tags_match_count')
     tags_min_version_excluded_id = fields.Many2one('runbot.version', 'Tag min version (excluded)')
     tags_min_version_id = fields.Many2one('runbot.version', 'Tags Min version', compute="_compute_tags_min_version_id", inverse="_inverse_tags_min_version_id", help="Minimal version where the test tags will be applied.", tracking=True)
@@ -288,7 +287,7 @@ class BuildError(models.Model):
     def _compute_canonical_tags(self):
         for record in self:
             canonical_tags = sorted(set(record.error_content_ids.filtered('canonical_tag').mapped('canonical_tag')))
-            record.canonical_tags = ','.join(canonical_tags)
+            record.canonical_tags = '\n'.join(canonical_tags)
 
     @api.depends('tags_min_version_id')
     def _compute_tags_min_version_id(self):
@@ -488,16 +487,20 @@ class BuildError(models.Model):
         for record in self:
             record.tags_match_count = 0
             if record.test_tags:
-                tags_parser = TestTagsParser(record.test_tags)
-                search_domain = tags_parser.test_tags_to_search_domain(exclude_error_id=record.id)
-                if search_domain:
-                    record.tags_match_count = self.env['runbot.build.error'].with_context(active_test=True).search_count(search_domain)
+                try:
+                    tags_parser = TestTagsParser(record.test_tags.replace('\n', ','))
+                    search_domain = tags_parser.test_tags_to_search_domain(exclude_error_id=record.id or record.id.origin)
+                    if search_domain:
+                        record.tags_match_count = self.env['runbot.build.error'].with_context(active_test=True).search_count(search_domain)
+                except Exception as e:  # noqa: BLE001
+                    record.tags_match_count = -1
+                    _logger.warning("Error while computing tags_match_count for error %s with test_tags %s: %s", record.id, record.test_tags, e)
 
     def action_view_impacted_by_tag(self):
         self.ensure_one()
         if not self.test_tags:
             return
-        tags_parser = TestTagsParser(self.test_tags)
+        tags_parser = TestTagsParser(self.test_tags.replace('\n', ','))
         return {
             'type': 'ir.actions.act_window',
             'views': [(False, 'list'), (False, 'form')],
@@ -510,8 +513,15 @@ class BuildError(models.Model):
     @api.constrains('test_tags')
     def _check_test_tags(self):
         for build_error in self:
-            if build_error.test_tags and '-' in build_error.test_tags:
-                raise ValidationError('Build error test_tags should not be negated')
+            if build_error.test_tags:
+                try:
+                    test_tags = build_error.test_tags.replace('\n', ',')
+                    tags_parser = TestTagsParser(test_tags)
+                    tags_parser = TestTagsParser(test_tags, keep_escape=False)
+                except Exception as e:  # noqa: BLE001
+                    raise ValidationError(f'Invalid test_tags format: {e}')
+                if tags_parser.exclude or any(params[0] == '-' for p, params in tags_parser.parameters):
+                    raise ValidationError('Build error test_tags should not be negated')
 
     @api.onchange('test_tags')
     def _onchange_test_tags(self):
@@ -586,12 +596,12 @@ class BuildError(models.Model):
                     error.sudo().test_tags = previous_error.test_tags
                     previous_error.sudo().test_tags = False
                 elif self.env.su:
-                    test_tags = error.test_tags.split(',')
-                    previous_error
-                    for tag in previous_error.test_tags.split(','):
+                    test_tags = TestTagsParser(error.test_tags.replace('\n', ',')).filter_specs
+                    previous_error_tags = TestTagsParser(previous_error.test_tags.replace('\n', ',')).filter_specs
+                    for tag in previous_error_tags:
                         if tag not in test_tags:
                             test_tags.append(tag)
-                    error.test_tags = ','.join(test_tags)
+                    error.test_tags = '\n'.join(test_tags)
                     previous_error.test_tags = False
             for field in fields_to_merge + fields_to_copy:
                 if previous_error[field]:
@@ -622,7 +632,16 @@ class BuildError(models.Model):
             return True
 
         test_tag_list = self.search([('test_tags', '!=', False)]).filtered(filter_tags).mapped('test_tags')
-        return [test_tag for error_tags in test_tag_list for test_tag in (error_tags).split(',')]
+        parsed_test_tags = []
+        for error_tags in test_tag_list:
+            try:
+                # we cannot rely only on '\n' since old test-tags or user defined ones could be comma separated
+                error_tags = error_tags.replace('\n', ',')
+                tags_parser = TestTagsParser(error_tags)
+                parsed_test_tags.extend(tags_parser.filter_specs)
+            except Exception as e:  # noqa: BLE001
+                _logger.warning('Error while parsing test_tags for error with id %s: %s', self.id, e)
+        return parsed_test_tags
 
     @api.model
     def _disabling_tags(self, build_id=False):
@@ -853,7 +872,7 @@ class BuildErrorContent(models.Model):
     breaking_pr_id = fields.Many2one(related='error_id.breaking_pr_id')
     fixing_pr_alive = fields.Boolean(related='error_id.fixing_pr_alive')
     fixing_pr_url = fields.Char(related='error_id.fixing_pr_url')
-    test_tags = fields.Char(related='error_id.test_tags')
+    test_tags = fields.Text(related='error_id.test_tags')
     tags_min_version_id = fields.Many2one(related='error_id.tags_min_version_id')
     tags_max_version_id = fields.Many2one(related='error_id.tags_max_version_id')
 

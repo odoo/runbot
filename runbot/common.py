@@ -329,9 +329,35 @@ class TestTagsParser:
                                 (?:\[(.*)\])?               # parameters
                                 $''', re.VERBOSE)  # [-][tag][/module][:class][.method][[params]]
 
-    def __init__(self, test_tags):
-        parts = re.split(r',(?![^\[]*\])', test_tags)  # split on all comma not inside [] (not followed by ])
+    def __init__(self, test_tags, keep_escape=True):
+        parts = ['']
+        bracket_level = 0
+        escape_next = False
+        for char in test_tags:
+            if char == ',' and bracket_level == 0:
+                parts.append('')
+                continue
+
+            if char == '\\':
+                if not escape_next:
+                    escape_next = True
+                    if keep_escape:
+                        parts[-1] += '\\'  # not as the TagsSelector, we keep the escape character
+                    continue
+            elif char == '[':
+                if not escape_next:
+                    bracket_level += 1
+            elif char == ']':
+                if not escape_next:
+                    bracket_level -= 1
+            elif not keep_escape and escape_next:  # the previous \ was not escaping anything, put it back
+                parts[-1] += '\\'
+
+            escape_next = False
+            parts[-1] += char
+
         filter_specs = [t.strip() for t in parts if t.strip()]
+        self.filter_specs = filter_specs
         self.exclude = set()
         self.include = set()
         self.parameters = OrderedSet()
@@ -339,8 +365,7 @@ class TestTagsParser:
         for filter_spec in filter_specs:
             match = self.filter_spec_re.match(filter_spec)
             if not match:
-                _logger.error('Invalid tag %s', filter_spec)
-                continue
+                raise ValueError('Invalid tag %s' % filter_spec)
 
             sign, tag, file_path, module, klass, method, parameters = match.groups()
             is_include = sign != '-'
@@ -369,6 +394,7 @@ class TestTagsParser:
 
     def test_tags_to_search_domain(self, exclude_error_id=None):
         search_domains = []
+        params_by_spec = dict(self.parameters)
         for include in self.include:
             _, test_module, test_class, test_method, file_path = include
             module_path = file_path or ((test_module or '') + '%')
@@ -376,6 +402,10 @@ class TestTagsParser:
             test_method = test_method or '%'
             search_pattern = f'{module_path}:{test_class}.{test_method}'
             tag_domain = [('canonical_tags', 'like', f'{search_pattern}')]
+            params = params_by_spec.get(include)
+            if params:
+                _sign, parameters = params
+                tag_domain.append(('canonical_tags', 'like', f'%[{parameters}%]%'))
             if exclude_error_id:
                 tag_domain.append(('id', '!=', exclude_error_id))
             search_domains.append(tag_domain)

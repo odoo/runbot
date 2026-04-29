@@ -1,35 +1,46 @@
 import base64
+import fnmatch
 import glob
 import json
 import logging
-import fnmatch
-import psutil
 import re
 import shlex
 import time
-from unidiff import PatchSet
-from ..common import now, grep, time2str, rfind, s2human, os, RunbotException, ReProxy, markdown_escape
-from ..container import docker_get_gateway_ip, Command
-from odoo import models, fields, api, tools
+
+import psutil
+from unidiff import VERSION, PatchSet, patch
+
+from odoo import api, fields, models, tools
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools.misc import file_open
-from odoo.tools.safe_eval import safe_eval, test_python_expr, _SAFE_OPCODES, to_opcodes
+from odoo.tools.safe_eval import _SAFE_OPCODES, safe_eval, test_python_expr, to_opcodes
 
-# adding some additionnal optcode to safe_eval. This is not 100% needed and won't be done in standard but will help
-# to simplify some python step by wraping the content in a function to allow return statement and get closer to other
-# steps
-
+from ..common import (
+    ReProxy,
+    RunbotException,
+    TestTagsParser,
+    grep,
+    markdown_escape,
+    now,
+    os,
+    rfind,
+    s2human,
+    time2str,
+)
+from ..container import Command, docker_get_gateway_ip
 
 # There is an issue in unidiff 0.7.3 fixed in 0.7.4
 # https://github.com/matiasb/python-unidiff/commit/a3faffc54e5aacaee3ded4565c534482d5cc3465
 # Since the unidiff packaged version in noble is 0.7.3
 # patching it looks like the easiest solution
 
-from unidiff import patch, VERSION
 if VERSION == '0.7.3':
     patch.RE_DIFF_GIT_DELETED_FILE = re.compile(r'^deleted file mode \d+$')
     patch.RE_DIFF_GIT_NEW_FILE = re.compile(r'^new file mode \d+$')
 
+# adding some additionnal optcode to safe_eval. This is not 100% needed and won't be done in standard but will help
+# to simplify some python step by wraping the content in a function to allow return statement and get closer to other
+# steps
 
 _SAFE_OPCODES |= set(to_opcodes(['LOAD_DEREF', 'STORE_DEREF', 'LOAD_CLOSURE', 'MAKE_CELL', 'COPY_FREE_VARS']))
 
@@ -426,7 +437,7 @@ class ConfigStep(models.Model):
     paths_to_omit = fields.Char('Paths to omit from coverage', tracking=True)
     flamegraph = fields.Boolean('Allow Flamegraph', default=False, tracking=True)
     test_enable = fields.Boolean('Test enable', default=True, tracking=True)
-    test_tags = fields.Char('Test tags', help="comma separated list of test tags", tracking=True)
+    test_tags = fields.Char('Test tags', help="new line (or comma) separated list of test tags", tracking=True)
     enable_auto_tags = fields.Boolean('Allow auto tag', default=True, tracking=True)
     sub_command = fields.Char('Subcommand', tracking=True)
     extra_params = fields.Char('Extra cmd args', tracking=True)
@@ -637,6 +648,7 @@ class ConfigStep(models.Model):
             'json_loads': json.loads,
             'PatchSet': PatchSet,
             'markdown_escape': markdown_escape,
+            'TestTagsParser': TestTagsParser,
         }
 
     def _run_python(self, build, force=False):
@@ -774,7 +786,7 @@ class ConfigStep(models.Model):
         test_tags_in_extra = '--test-tags' in extra_params
 
         if (test_enable or test_tags) and "--test-tags" in available_options and not test_tags_in_extra:
-            test_tags = [t.strip() for t in (test_tags or '').split(',')]
+            test_tags = [t.strip() for t in TestTagsParser(test_tags or '').filter_specs]
             if enable_auto_tags and not config_data.get('disable_auto_tags', False):
                 if grep(config_path, "[/module][:class]"):
                     auto_tags = self.env['runbot.build.error']._disabling_tags(build)

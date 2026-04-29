@@ -266,7 +266,7 @@ class TestBuildError(TestBuildErrorCommon):
         build_b = self.create_test_build({'local_result': 'ko', 'local_state': 'done'})
         error_content_b = self.BuildErrorContent.create({'content': 'foo bar'})
         error_b = error_content_b.error_id
-        error_b.test_tags = 'footag'
+        error_b.test_tags = 'footag[@test, comma]\nfootag2[@test, comma],footag3[@test, comma]'
         self.BuildErrorLink.create({'build_id': build_b.id, 'error_content_id': error_content_b.id})
 
         self.assertEqual(self.BuildErrorContent.search([('fingerprint', '=', error_content_a.fingerprint)]), error_content_a | error_content_b)
@@ -275,7 +275,7 @@ class TestBuildError(TestBuildErrorCommon):
         self.assertFalse(error_b.error_content_ids)
 
         self.assertTrue(error_a.active, 'The merged error without test tags should have been deactivated')
-        self.assertEqual(error_a.test_tags, 'footag', 'Tags should have been transfered from b to a')
+        self.assertEqual(error_a.test_tags, 'footag[@test, comma]\nfootag2[@test, comma],footag3[@test, comma]', 'Tags should have been transfered from b to a')
         self.assertFalse(error_b.active, 'The merged error with test tags should remain active')
         self.assertIn(build_a, error_content_a.build_ids)
         self.assertIn(build_b, error_content_a.build_ids)
@@ -284,9 +284,9 @@ class TestBuildError(TestBuildErrorCommon):
 
         tagged_error_content = self.BuildErrorContent.create({'content': 'foo bar'})
         tagged_error = tagged_error_content.error_id
-        tagged_error.test_tags = 'bartag'
+        tagged_error.test_tags = 'bartag[@test, comma]\nbartag2[@test, comma],bartag3[@test, comma]'
         (error_content_a | tagged_error_content)._relink()
-        self.assertEqual(error_a.test_tags, 'footag,bartag')
+        self.assertEqual(error_a.test_tags, 'footag[@test, comma]\nfootag2[@test, comma]\nfootag3[@test, comma]\nbartag[@test, comma]\nbartag2[@test, comma]\nbartag3[@test, comma]')
         self.assertTrue(error_a.active)
         self.assertFalse(tagged_error.active)
 
@@ -869,7 +869,38 @@ class TestErrorMerge(TestBuildErrorCommon):
         self.assertEqual(error_content_2.canonical_tag, '/web/tests/test_file.py:TestUi.TestUi')
         self.assertNotEqual(error_content_1, error_content_2)
         self.assertEqual(error_content_1.error_id, error_content_2.error_id)
-        self.assertEqual(error_content_1.error_id.canonical_tags, '/base/tests/test_file.py:TestUi.TestUi,/web/tests/test_file.py:TestUi.TestUi')
+        self.assertEqual(error_content_1.error_id.canonical_tags, '/base/tests/test_file.py:TestUi.TestUi\n/web/tests/test_file.py:TestUi.TestUi')
+        error_content_1.error_id.test_tags = error_content_1.error_id.canonical_tags
+        self.assertEqual(error_content_1.error_id._disabling_tags(), [
+            '-/base/tests/test_file.py:TestUi.TestUi',
+            '-/web/tests/test_file.py:TestUi.TestUi',
+        ])
+        error_content_3 = self.env['runbot.build.error.content'].create({
+            'content': 'Tour foobar_tour failed at step step_14 in mode mode',
+            'metadata': {'test': {'canonical_tag': '/web/tests/test_file.py:TestJs.test_unit_desktop[@web/some , comma\\[\\] and brackets]'}},
+        })
+        self.assertEqual(error_content_3.canonical_tag, '/web/tests/test_file.py:TestJs.test_unit_desktop[@web/some , comma\\[\\] and brackets]')
+        self.assertNotEqual(error_content_1, error_content_2)
+        self.assertEqual(error_content_1.error_id, error_content_2.error_id)
+        self.assertEqual(error_content_1.error_id.canonical_tags, """/base/tests/test_file.py:TestUi.TestUi\n/web/tests/test_file.py:TestJs.test_unit_desktop[@web/some , comma\\[\\] and brackets]\n/web/tests/test_file.py:TestUi.TestUi""")
+        error_content_1.error_id.test_tags = error_content_1.error_id.canonical_tags
+        self.assertEqual(error_content_1.error_id._disabling_tags(), [
+                '-/base/tests/test_file.py:TestUi.TestUi',
+                '-/web/tests/test_file.py:TestJs.test_unit_desktop[@web/some , comma\\[\\] and brackets]',
+                '-/web/tests/test_file.py:TestUi.TestUi',
+            ], "disabling tags must keep the escaping and correct format")
+        error_content_1.error_id.test_tags = error_content_1.error_id.test_tags.replace('\n', ',')
+        self.assertEqual(error_content_1.error_id._disabling_tags(), [
+                '-/base/tests/test_file.py:TestUi.TestUi',
+                '-/web/tests/test_file.py:TestJs.test_unit_desktop[@web/some , comma\\[\\] and brackets]',
+                '-/web/tests/test_file.py:TestUi.TestUi',
+            ], "_disabling_tags shoudl also work fine with comma separted tags")
+        error_content_1.error_id.test_tags = error_content_1.error_id.test_tags.replace('\\', '')
+        self.assertEqual(error_content_1.error_id._disabling_tags(), [
+            '-/base/tests/test_file.py:TestUi.TestUi',
+            '-/web/tests/test_file.py:TestJs.test_unit_desktop[@web/some , comma[] and brackets]',
+            '-/web/tests/test_file.py:TestUi.TestUi',
+        ])
 
 
 class TestCodeOwner(RunbotCase):
