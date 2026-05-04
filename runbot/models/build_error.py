@@ -429,10 +429,10 @@ class BuildError(models.Model):
     @api.depends('common_qualifiers')
     def _compute_similar_ids(self):
         for record in self:
-            if record.common_qualifiers:
+            if record.common_qualifiers and (record.id or record.id.origin):
                 query = SQL(
                     r"""SELECT id FROM runbot_build_error WHERE id != %s AND common_qualifiers @> %s""",
-                    record.id,
+                    record.id or record.id.origin,
                     json.dumps(record.common_qualifiers.dict),
                 )
                 self.env.cr.execute(query)
@@ -443,10 +443,10 @@ class BuildError(models.Model):
     @api.depends('common_qualifiers')
     def _compute_similar_content_ids(self):
         for record in self:
-            if record.common_qualifiers:
+            if record.common_qualifiers and (record.id or record.id.origin):
                 query = SQL(
                     r"""SELECT id FROM runbot_build_error_content WHERE error_id != %s AND qualifiers @> %s""",
-                    record.id,
+                    record.id or record.id.origin,
                     json.dumps(record.common_qualifiers.dict),
                 )
                 self.env.cr.execute(query)
@@ -457,10 +457,10 @@ class BuildError(models.Model):
     @api.depends('common_qualifiers')
     def _compute_analogous_ids(self):
         for record in self:
-            if record.common_qualifiers:
+            if record.common_qualifiers and (record.id or record.id.origin):
                 query = SQL(
                     r"""SELECT id FROM runbot_build_error WHERE id != %s AND unique_qualifiers @> %s""",
-                    record.id,
+                    record.id or record.id.origin,
                     json.dumps(record.unique_qualifiers.dict),
                 )
                 self.env.cr.execute(query)
@@ -471,10 +471,10 @@ class BuildError(models.Model):
     @api.depends('common_qualifiers')
     def _compute_analogous_content_ids(self):
         for record in self:
-            if record.common_qualifiers:
+            if record.common_qualifiers and (record.id or record.id.origin):
                 query = SQL(
                     r"""SELECT id FROM runbot_build_error_content WHERE error_id != %s AND qualifiers @> %s""",
-                    record.id,
+                    record.id or record.id.origin,
                     json.dumps(record.unique_qualifiers.dict),
                 )
                 self.env.cr.execute(query)
@@ -1010,10 +1010,10 @@ class BuildErrorContent(models.Model):
     def _compute_similar_ids(self):
         """error contents having the exactly the same qualifiers"""
         for record in self:
-            if record.qualifiers:
+            if record.qualifiers and (record.id or record.id.origin):
                 query = SQL(
                     r"""SELECT id FROM runbot_build_error_content WHERE id != %s AND qualifiers @> %s AND qualifiers <@ %s""",
-                    record.id,
+                    record.id or record.id.origin,
                     json.dumps(record.qualifiers.dict),
                     json.dumps(record.qualifiers.dict),
                 )
