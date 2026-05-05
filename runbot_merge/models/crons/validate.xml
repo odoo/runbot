@@ -9,7 +9,7 @@
     </record>
 
     <record model="ir.cron" id="cron_validate">
-        <field name="name">Close issues linked to merged PRs</field>
+        <field name="name">Validate previously blocked batches</field>
         <field name="model_id" ref="model_runbot_merge_batch_validate"/>
         <field name="state">code</field>
         <field name="code">model._run()</field>
