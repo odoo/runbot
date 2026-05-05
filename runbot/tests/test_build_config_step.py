@@ -1050,12 +1050,13 @@ class TestBuildConfigStep(TestBuildConfigStepCommon):
             'name': 'coverage',
             'job_type': 'install_odoo',
             'coverage': True,
+            'coverage_make_report': True
         })
 
         cmd = config_step._run_install_odoo(self.parent_build)['cmd']
-        self.assertEqual(cmd.cmd[:10], ['python3', '-m', 'coverage', 'run', '--branch', '--source', '/data/build', '--omit', '*__manifest__.py,odoo/addons/hw_drivers/*', 'odoo/server.py'])
-        self.assertIn(['python3', '-m', 'coverage', 'html', '-d', '/data/build/coverage', '--ignore-errors'], cmd.finals)
-        self.assertIn(['python3', '-m', 'coverage', 'xml', '-o', '/data/build/logs/coverage.xml', '--ignore-errors'], cmd.finals)
+        self.assertEqual(cmd.cmd[:7], ['python3', '-m', 'coverage', 'run', '--source', '/data/build', 'odoo/server.py'])
+        self.assertIn(['python3', '-m', 'coverage', 'html', '-d', '/data/build/logs/coverage', '--ignore-errors'], cmd.finals)
+        self.assertIn(['python3', '-m', 'coverage', 'json', '-o', '/data/build/logs/coverage.json', '--ignore-errors'], cmd.finals)
 
 
     @patch('odoo.addons.runbot.models.build.BuildResult._checkout')

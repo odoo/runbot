@@ -351,6 +351,7 @@ class BuildResult(models.Model):
     ancestors = fields.Many2many('runbot.build', compute='_compute_ancestors')
     # should we add a has children stored boolean?
     children_ids = fields.One2many('runbot.build', 'parent_id')
+    all_children_ids = fields.One2many('runbot.build', compute='_compute_all_children_ids')
 
     # config of top_build is inherithed from params, but subbuild will have different configs
 
@@ -425,6 +426,10 @@ class BuildResult(models.Model):
     def _compute_ancestors(self):
         for build in self:
             build.ancestors = self.browse([int(b) for b in build.parent_path.split('/') if b])
+
+    def _compute_all_children_ids(self):
+        for build in self:
+            build.all_children_ids = self.search([('parent_path', '=like', build.parent_path + '%')])
 
     def _get_youngest_state(self, states):
         index = min([self._get_state_score(state) for state in states])
@@ -628,7 +633,7 @@ class BuildResult(models.Model):
         # TODO don't rebuild if there is a more recent build for this params?
         values = {
             'params_id': self.params_id.id,
-            'build_type': 'rebuild',
+            'build_type': 'rebuild' if self.build_type == "normal" else self.build_type,
         }
         if self.keep_host:
             values['host'] = self.host

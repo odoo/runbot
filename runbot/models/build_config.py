@@ -8,11 +8,11 @@ import shlex
 import time
 
 import psutil
+import requests
 from unidiff import VERSION, PatchSet, patch
 
 from odoo import api, fields, models, tools
 from odoo.exceptions import UserError, ValidationError
-from odoo.tools.misc import file_open
 from odoo.tools.safe_eval import _SAFE_OPCODES, safe_eval, test_python_expr, to_opcodes
 
 from ..common import (
@@ -434,6 +434,10 @@ class ConfigStep(models.Model):
     cpu_limit = fields.Integer('Cpu limit', default=3600, tracking=True)
     container_cpus = fields.Integer('Allowed CPUs', help='Allowed container CPUs. Fallback on config parameter if 0.', default=0, tracking=True)
     coverage = fields.Boolean('Coverage', default=False, tracking=True)
+    coverage_branch = fields.Boolean('Coverage branch', default=False, tracking=True)
+    coverage_concurrency = fields.Boolean('Coverage concurrency', default=False, tracking=True)
+    coverage_test_context = fields.Boolean('Coverage test context', default=False, tracking=True)
+    coverage_make_report = fields.Boolean('Make coverage report', default=False, tracking=True)
     paths_to_omit = fields.Char('Paths to omit from coverage', tracking=True)
     flamegraph = fields.Boolean('Allow Flamegraph', default=False, tracking=True)
     test_enable = fields.Boolean('Test enable', default=True, tracking=True)
@@ -628,6 +632,9 @@ class ConfigStep(models.Model):
                     build._log('create_build', 'created with config %s' % config_name, log_type='subbuild', path=str(child.id))
 
     def _make_python_ctx(self, build):
+        def log(*args, **kwargs):
+            args = [str(arg) for arg in args]
+            build._log(self.name, *args, **kwargs)
         return {
             'datetime': tools.safe_eval.datetime,
             'dateutil': tools.safe_eval.dateutil,
@@ -649,6 +656,8 @@ class ConfigStep(models.Model):
             'PatchSet': PatchSet,
             'markdown_escape': markdown_escape,
             'TestTagsParser': TestTagsParser,
+            'requests': requests.Session(),
+            'log': log,
         }
 
     def _run_python(self, build, force=False):
@@ -735,7 +744,6 @@ class ConfigStep(models.Model):
         return dict(cmd=cmd, exposed_ports=[build_port, build_port + 1], ro_volumes=exports, env_variables=env_variables, cpu_limit=None, network_enabled=True)
 
     def _run_install_odoo(self, build, config_data=None):
-
         if config_data:
             config_data = {**config_data, **build.params_id.config_data}
         else:
@@ -746,10 +754,14 @@ class ConfigStep(models.Model):
         mods = ",".join(modules_to_install)
         python_params = []
         py_version = build._get_py_version()
-        if self.coverage:
+        if self.coverage or config_data.get('coverage'):
             build.coverage = True
-            coverage_extra_params = self._coverage_params(build, modules_to_install)
-            python_params = ['-m', 'coverage', 'run', '--branch', '--source', '/data/build'] + coverage_extra_params
+            python_params = ['-m', 'coverage', 'run', '--source', '/data/build']
+            if config_data.get('coverage_branch', self.coverage_branch):
+                python_params += ['--branch']
+            if config_data.get('coverage_concurrency', self.coverage_concurrency):
+                python_params += ['--concurrency=thread']
+            python_params += self._coverage_params(build, config_data)
         elif self.flamegraph:
             python_params = ['-m', 'flamegraph', '-o', self._perfs_data_path(build)]
         cmd = build._cmd(python_params, py_version, sub_command=self.sub_command, enable_log_db=self.enable_log_db)
@@ -818,7 +830,7 @@ class ConfigStep(models.Model):
         if extra_params:
             cmd.extend(shlex.split(extra_params))
 
-        cmd.finals.extend(self._post_install_commands(build, modules_to_install, py_version))  # coverage post, extra-checks, ...
+        cmd.finals.extend(self._post_install_commands(build, config_data, py_version))  # coverage post, extra-checks, ...
 
         if config_data.get('export_database', True):
             self._add_zip_generation(build, cmd, db_name)
@@ -830,10 +842,14 @@ class ConfigStep(models.Model):
         if config_env_variables := config_data.get('env_variables', False):
             env_variables += config_env_variables.split(';')
 
+        if config_data.get('coverage_test_context', self.coverage_test_context):
+            env_variables.append("COVERAGE_DYNAMIC_CONTEXT=test_function")
+
         cpu_limit = None
         if config_data.get('cpu_limit'):
             cpu_limit = min(self.cpu_limit, int(config_data['cpu_limit']))
-
+        if cpu_limit and config_data.get('cpu_limit_factor'):
+            cpu_limit = int(cpu_limit * float(config_data['cpu_limit_factor']))
         return dict(cmd=cmd, ro_volumes=exports, cpu_limit=cpu_limit, env_variables=env_variables)
 
     def _add_zip_generation(self, build, cmd, db_name):
@@ -1201,11 +1217,11 @@ class ConfigStep(models.Model):
             log_type = 'markdown'
         build._log('', message, *args, log_type=log_type)
 
-        if self.coverage:
-            xml_url = '%scoverage.xml' % build._http_log_url()
-            html_url = 'http://%s/runbot/static/build/%s/coverage/index.html' % (build.host, build.dest)
-            message = 'Coverage report: [xml @icon-download](%s), [html @icon-eye](%s)'
-            build._log('end_job', message, xml_url, html_url, log_type='markdown')
+        if self.coverage and self.coverage_make_report:
+            json_url = f'http://{build.host}/runbot/static/build/{build.dest}/logs/coverage/coverage.json'
+            html_url = f'http://{build.host}/runbot/static/build/{build.dest}/logs/coverage/'
+            message = 'Coverage report: [json @icon-download](%s), [html @icon-eye](%s)'
+            build._log('end_job', message, json_url, html_url, log_type='markdown')
 
         if self.flamegraph:
             dat_url = '%sflame_%s.%s' % (build._http_log_url(), self.sanitized_name(build), 'log.gz')
@@ -1213,34 +1229,27 @@ class ConfigStep(models.Model):
             message = 'Flamegraph report: [data @icon-download](%s), [svg @icon-eye](%s)'
             build._log('end_job', message, dat_url, svg_url, log_type='markdown')
 
-    def _post_install_commands(self, build, modules_to_install, py_version=None):
+    def _post_install_commands(self, build, config_data, py_version):
         cmds = []
-        if self.coverage:
-            py_version = py_version if py_version is not None else build._get_py_version()
-            # prepare coverage result
-            cov_path = build._path('coverage')
-            os.makedirs(cov_path, exist_ok=True)
-            cmds.append(['python%s' % py_version, "-m", "coverage", "html", "-d", "/data/build/coverage", "--ignore-errors"])
-            cmds.append(['python%s' % py_version, "-m", "coverage", "xml", "-o", "/data/build/logs/coverage.xml", "--ignore-errors"])
+        if config_data.get('coverage_make_report', (self.coverage and self.coverage_make_report)):
+            cmds.append(['python%s' % py_version, "-m", "coverage", "html", "-d", "/data/build/logs/coverage", "--ignore-errors"])
+            cmds.append(['python%s' % py_version, "-m", "coverage", "json", "-o", "/data/build/logs/coverage.json", "--ignore-errors"])
+        if config_data.get('coverage', self.coverage):
+            cmds.append(['mv', "/data/build/.coverage", f"/data/build/logs/coverage.{build.id}.{int(time.time())}"])
         return cmds
 
     def _perfs_data_path(self, build, ext='log'):
         return '/data/build/logs/flame_%s.%s' % (self.sanitized_name(build), ext)
 
-    def _coverage_params(self, build, modules_to_install):
+    def _coverage_params(self, build, config_data):
         pattern_to_omit = set()
         if self.paths_to_omit:
-            pattern_to_omit = set(self.paths_to_omit.split(','))
-        for commit in build.params_id.commit_ids:
-            docker_source_folder = build._docker_source_folder(commit)
-            for manifest_file in commit.repo_id.manifest_files.split(','):
-                pattern_to_omit.add('*%s' % manifest_file)
-            for (addons_path, module, _) in commit._list_available_modules():
-                if module not in modules_to_install:
-                    # we want to omit docker_source_folder/[addons/path/]module/*
-                    module_path_in_docker = os.sep.join([docker_source_folder, addons_path, module])
-                    pattern_to_omit.add('%s/*' % (module_path_in_docker))
-        return ['--omit', ','.join(sorted(pattern_to_omit))]
+            pattern_to_omit |= set(self.paths_to_omit.split(','))
+        if config_data.get('paths_to_omit'):
+            pattern_to_omit |= set(config_data.get('paths_to_omit').split(','))
+        if pattern_to_omit:
+            return ['--omit', ','.join(sorted(pattern_to_omit))]
+        return []
 
     def _make_results(self, build):
         # TODO fixme config data are not the same as the run part in dynamic steps
@@ -1279,8 +1288,6 @@ class ConfigStep(models.Model):
             elif self.test_enable or self.test_tags:
                 self._make_odoo_results(build)
         elif active_job_type == 'install_odoo':
-            if self.coverage:
-                build.write(self._make_coverage_results(build))
             if not self.sub_command:
                 self._make_odoo_results(build)
         elif active_job_type == 'test_upgrade':
@@ -1298,23 +1305,6 @@ class ConfigStep(models.Model):
         if not isinstance(return_value, dict):
             raise RunbotException('python_result_code must set return_value to a dict values on build')
         build.write(return_value)  # old style support
-
-    def _make_coverage_results(self, build):
-        build_values = {}
-        build._log('coverage_result', 'Start getting coverage result')
-        cov_path = build._path('coverage/index.html')
-        if os.path.exists(cov_path):
-            with file_open(cov_path, 'r') as f:
-                data = f.read()
-                covgrep = re.search(r'pc_cov.>(?P<coverage>\d+)%', data)
-                build_values['coverage_result'] = covgrep and covgrep.group('coverage') or False
-                if build_values['coverage_result']:
-                    build._log('coverage_result', 'Coverage result: %s' % build_values['coverage_result'])
-                else:
-                    build._log('coverage_result', 'Coverage result not found', level='WARNING')
-        else:
-            build._log('coverage_result', 'Coverage file not found', level='WARNING')
-        return build_values
 
     def _make_upgrade_results(self, build):
         build._log('upgrade', 'Getting results for build %s' % build.dest)

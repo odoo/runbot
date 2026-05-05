@@ -76,6 +76,10 @@
                         <field name="cpu_limit" groups="base.group_no_one"/>
                         <field name="container_cpus" groups="base.group_no_one"/>
                         <field name="coverage"/>
+                        <field name="coverage_branch" invisible="not coverage"/>
+                        <field name="coverage_concurrency" invisible="not coverage"/>
+                        <field name="coverage_test_context" invisible="not coverage"/>
+                        <field name="coverage_make_report" invisible="not coverage"/>
                         <field name="paths_to_omit" invisible="not coverage"/>
                         <field name="test_enable"/>
                         <field name="test_tags"/>
