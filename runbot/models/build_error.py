@@ -549,6 +549,17 @@ class BuildError(models.Model):
             self.tags_min_version_id = min(self.version_ids, key=lambda rec: rec.number)
             self.tags_max_version_id = max(self.version_ids, key=lambda rec: rec.number)
 
+    def _update_version_tags(self):
+        for error in self:
+            if not (error.test_tags and error.version_ids):
+                continue
+            new_min = min(error.version_ids, key=lambda rec: rec.number)
+            new_max = max(error.version_ids, key=lambda rec: rec.number)
+            if not error.tags_min_version_id or new_min.number < error.tags_min_version_id.number:
+                error.tags_min_version_id = new_min
+            if not error.tags_max_version_id or new_max.number > error.tags_max_version_id.number:
+                error.tags_max_version_id = new_max
+
     @api.onchange('customer')
     def _onchange_customer(self):
         if not self.responsible:
@@ -789,7 +800,7 @@ class BuildError(models.Model):
                 record._onchange_test_tags()
 
     @api.model
-    def _parse_logs(self, ir_logs):
+    def _parse_logs(self, ir_logs, update_tags=False):
         if not ir_logs:
             return None
         regexes = self.env['runbot.error.regex'].search([])
@@ -844,6 +855,11 @@ class BuildError(models.Model):
                         'error_content_id': build_error_content.id,
                         'log_date': rec.create_date,
                     })
+
+        if update_tags:
+            errors_to_update = build_error_contents.error_id.filtered('test_tags')
+            for error in errors_to_update:
+                error._update_version_tags()
 
         if build_error_contents:
             window_action = {

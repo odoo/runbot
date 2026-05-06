@@ -670,7 +670,7 @@ class Runbot(Controller):
 
     @route(['/runbot/parse_log/<model("ir.logging"):ir_log>'], type='http', auth='user', sitemap=False)
     def parse_log(self, ir_log, **kwargs):
-        request.env['runbot.build.error']._parse_logs(ir_log)
+        request.env['runbot.build.error']._parse_logs(ir_log, update_tags=True)
         return werkzeug.utils.redirect('/runbot/build/%s' % ir_log.build_id.id)
 
     @route(['/runbot/bundle/<int:bundle_id>/triggers/<string:action>'], type='http', auth='user', sitemap=False)

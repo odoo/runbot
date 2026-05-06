@@ -257,6 +257,120 @@ class TestBuildError(TestBuildErrorCommon):
         error_a.breaking_pr_id = False
         self.assertEqual(error_a.duplicate_breaking_pr_count, 0)
 
+    def test_onchange_test_tags(self):
+        error = self.BuildError.create({})
+        error_content = self.BuildErrorContent.create({'content': 'very bad trip', 'error_id': error.id})
+        build_13 = self.create_test_build({'local_result': 'ko'})
+        self.BuildErrorLink.create({
+            'build_id': build_13.id,
+            'error_content_id': error_content.id,
+        })
+        self.assertEqual(error.tags_min_version_id.id, False)
+        self.assertEqual(error.tags_max_version_id.id, False)
+
+        error.test_tags = '/account'
+        error._onchange_test_tags()
+        self.assertEqual(error.tags_min_version_id, self.version_13)
+        self.assertEqual(error.tags_max_version_id, self.version_13)
+
+        version_14 = self.Version._get('14.0')
+        params_14 = self.create_params({'version_id': version_14.id})
+        build_14 = self.create_test_build({'local_result': 'ko', 'params_id': params_14.id})
+        self.BuildErrorLink.create({
+            'build_id': build_14.id,
+            'error_content_id': error_content.id,
+        })
+        error._onchange_test_tags()
+        self.assertEqual(error.tags_min_version_id, self.version_13)
+        self.assertEqual(error.tags_max_version_id, version_14)
+
+    def test_parse_logs_updates_version_bounds(self):
+        build_13 = self.create_test_build({'local_result': 'ko', 'local_state': 'done'})
+        log_data = {
+            'name': 'test-parse-logs',
+            'type': 'server',
+            'path': 'runbot',
+            'level': 'ERROR',
+            'func': 'test_trip',
+            'line': 242,
+            'message': 'Error Very Bad Trip',
+            'build_id': build_13.id,
+        }
+        log_13 = self.IrLog.create(log_data)
+
+        action = self.BuildError._parse_logs(log_13, update_tags=True)
+        self.assertEqual(action.get('type'), 'ir.actions.act_window')
+        error_content = self.BuildErrorContent.browse(action.get('res_id'))
+        error = error_content.error_id
+        error.test_tags = '/account'
+        error._update_version_tags()
+        self.assertEqual(error.tags_min_version_id, self.version_13)
+        self.assertEqual(error.tags_max_version_id, self.version_13)
+
+        # Scanning a newer build extends the max without updating the min
+        version_14 = self.Version._get('14.0')
+        params_14 = self.create_params({'version_id': version_14.id})
+        build_14 = self.create_test_build({'local_result': 'ko', 'local_state': 'done', 'params_id': params_14.id})
+        log_data.update({'build_id': build_14.id})
+        log_14 = self.IrLog.create(log_data)
+        self.BuildError._parse_logs(log_14, update_tags=True)
+        self.assertIn(build_14, error.build_ids)
+        self.assertEqual(error.tags_min_version_id, self.version_13)
+        self.assertEqual(error.tags_max_version_id, version_14)
+
+    def test_parse_logs_no_update_without_flag(self):
+        build_13 = self.create_test_build({'local_result': 'ko', 'local_state': 'done'})
+        log_13 = self.IrLog.create({
+            'name': 'test-parse-logs',
+            'type': 'server',
+            'path': 'runbot',
+            'level': 'ERROR',
+            'func': 'test_trip',
+            'line': 242,
+            'message': 'Error Very Bad Trip',
+            'build_id': build_13.id,
+        })
+        action = self.BuildError._parse_logs(log_13)
+        self.assertEqual(action.get('type'), 'ir.actions.act_window')
+        error_content = self.BuildErrorContent.browse(action.get('res_id'))
+        error = error_content.error_id
+        error.test_tags = '/discuss'
+        self.assertFalse(error.tags_min_version_id)
+        self.assertFalse(error.tags_max_version_id)
+
+    def test_update_version_tags_no_update_inside_bounds(self):
+        version_14 = self.Version._get('14.0')
+        version_16 = self.Version._get('16.0')
+        params_14 = self.create_params({'version_id': version_14.id})
+        params_16 = self.create_params({'version_id': version_16.id})
+        build_14 = self.create_test_build({'local_result': 'ko', 'params_id': params_14.id})
+        build_16 = self.create_test_build({'local_result': 'ko', 'params_id': params_16.id})
+
+        error = self.BuildError.create({})
+        error_content = self.BuildErrorContent.create({'content': 'inside bounds test', 'error_id': error.id})
+        link_14 = self.BuildErrorLink.create({'build_id': build_14.id, 'error_content_id': error_content.id})
+        link_16 = self.BuildErrorLink.create({'build_id': build_16.id, 'error_content_id': error_content.id})
+
+        error.test_tags = '/account'
+        error._update_version_tags()
+        self.assertEqual(error.tags_min_version_id, version_14)
+        self.assertEqual(error.tags_max_version_id, version_16)
+
+        link_14.unlink()
+        self.assertNotIn(version_14, error.version_ids)
+        # There is only version 16.0 on the error now but if we update the tags, it should leave the min at 14.0
+        error._update_version_tags()
+        self.assertEqual(error.tags_min_version_id, version_14)
+        self.assertEqual(error.tags_max_version_id, version_16)
+
+        link_14 = self.BuildErrorLink.create({'build_id': build_14.id, 'error_content_id': error_content.id})
+        link_16.unlink()
+        self.assertNotIn(version_16, error.version_ids)
+        # Now there is only version 14.0 on the error but if we update the tags, it should leave the max at 16.0
+        error._update_version_tags()
+        self.assertEqual(error.tags_min_version_id, version_14)
+        self.assertEqual(error.tags_max_version_id, version_16)
+
     def test_relink_contents(self):
         build_a = self.create_test_build({'local_result': 'ko', 'local_state': 'done'})
         error_content_a = self.BuildErrorContent.create({'content': 'foo bar'})
