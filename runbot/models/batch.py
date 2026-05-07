@@ -186,9 +186,16 @@ class Batch(models.Model):
         _logger.info('Preparing batch %s', self.id)
 
         priority_offset = self.bundle_id.priority_offset
-        if not priority_offset and self.bundle_id.branch_ids.forwardport_of_id and self.bundle_id.last_batchs == self:  # this is the only batch of a forwardported pr.
-            priority_offset = - 3600 * 5
-            self.build_all = True  # for normal pr, mergebot will request all ci on r+ if needed, for forward port, we need to ensure they are all created or the chain could be blocked
+        if not priority_offset and self.bundle_id.branch_ids.forwardport_of_id:
+            if self.bundle_id.last_batchs == self:  # this is the first batch of a forwardported pr.
+                priority_offset = - 3600 * 5
+            if len(self.bundle_id.last_batchs) <= 2:
+                # for normal pr, mergebot will request all ci on r+ if needed, for forward port, we need to ensure they are all created or the chain could be blocked
+                # In some rare cases the branch can create a batch and the pr a second one (github issues)
+                # in this case, forwardport_of_id is falsy for the fisrt, and self.bundle_id.last_batchs == self is falsy for the second
+                # we still want to build all for the second one, relaxing the condition to len(self.bundle_id.last_batchs) <= 2
+                # It also means that fixing a conflict or an error will build all on the first push, but not on second (looks almost like a feature)
+                self.build_all = True
         self.priority_level = int(self.create_date.timestamp() - priority_offset)
         if use_base_commits:
             self._warning('This batch will use base commits instead of bundle commits')
