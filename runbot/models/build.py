@@ -323,6 +323,7 @@ class BuildResult(models.Model):
     build_start = fields.Datetime('Build start')
     build_end = fields.Datetime('Build end')
     docker_start = fields.Datetime('Docker start')
+    docker_time = fields.Integer('Docker time', default=0, help='Accumulated time spent in Docker containers')
     job_time = fields.Integer(compute='_compute_job_time', string='Job time')
     build_time = fields.Integer(compute='_compute_build_time', string='Build time')
     wait_time = fields.Integer(compute='_compute_wait_time', string='Wait time')
@@ -907,7 +908,9 @@ class BuildResult(models.Model):
             if self.env['runbot.host']._fetch_local_logs(build_ids=build.ids):
                 return True  # avoid to make results with remaining logs
             # No job running, make result and select next job
-
+            if build.docker_start:
+                docker_duration = int(time.time() - dt2time(build.docker_start))
+                build.docker_time += docker_duration
             build.job_end = now()
             build.docker_start = False
             # make result of previous job
