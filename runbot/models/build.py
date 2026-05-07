@@ -360,7 +360,7 @@ class BuildResult(models.Model):
     build_url = fields.Char('Build url', compute='_compute_build_url', store=False)
     build_error_link_ids = fields.One2many('runbot.build.error.link', 'build_id')
     build_error_ids = fields.Many2many('runbot.build.error', compute='_compute_build_error_ids', string='Errors')
-    keep_running = fields.Boolean('Keep running', help='Keep running', index=True)
+    gc_running_date = fields.Date('GC Running Date', help='Running build cannot be killed before this date', index='btree_not_null')
     log_counter = fields.Integer('Log Lines counter', default=100)
 
     slot_ids = fields.One2many('runbot.batch.slot', 'build_id')

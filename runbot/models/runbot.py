@@ -104,7 +104,7 @@ class Runbot(models.AbstractModel):
     def _gc_running(self, host):
         running_max = host._get_running_max()
         Build = self.env['runbot.build']
-        cannot_be_killed_ids = host._get_builds([('keep_running', '=', True)]).ids
+        cannot_be_killed_ids = host._get_builds([('gc_running_date', '>', fields.Date.today())]).ids
         sticky_bundles = self.env['runbot.bundle'].search([('sticky', '=', True), ('project_id.keep_sticky_running', '=', True)])
         cannot_be_killed_ids += [
             build.id

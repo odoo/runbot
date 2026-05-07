@@ -82,7 +82,7 @@
                         <field name="parent_id"/>
                         <field name="orphan_result"/>
                         <field name="build_url" widget="url" readonly="1"/>
-                        <field name="keep_running"/>
+                        <field name="gc_running_date" placeholder="Keep running until this date"/>
                         <field name="gc_date" readonly="1" options="{'numeric': true}"/>
                         <field name="gc_delay"/>
                         <field name="killable"/>
