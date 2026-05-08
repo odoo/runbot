@@ -598,7 +598,7 @@ class ConfigStep(models.Model):
 
             config_data = {**kwargs.get('config_data', {}), **build.params_id.config_data}
             if docker_params['cpu_limit'] and config_data.get('cpu_limit_factor'):
-                docker_params['cpu_limit'] = int(docker_params['cpu_limit'] * min(float(config_data['cpu_limit_factor']), 2))
+                docker_params['cpu_limit'] = int(docker_params['cpu_limit'] * min(float(config_data['cpu_limit_factor']), 3))
 
             container_cpus = float(self.container_cpus or self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_containers_cpus', 0))
             if 'cpus' not in docker_params and container_cpus:
@@ -1642,6 +1642,9 @@ class ConfigStep(models.Model):
 
             if 'extra_params' in current_step:
                 config_data['extra_params'] = self._parse_dynamic_entry(current_step.get('extra_params'), build, dynamic_vars)
+
+            if 'cpu_limit' in current_step:
+                config_data['cpu_limit'] = int(current_step.get('cpu_limit'))
 
             for key in ('screencast', 'demo_mode', 'enable_auto_tags'):
                 if key in current_step:

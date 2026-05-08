@@ -317,7 +317,7 @@ class BuildResult(models.Model):
     active_step = fields.Many2one('runbot.build.config.step', 'Active step')
     job = fields.Char('Active step display name', compute='_compute_job')
     dynamic_active_step_index = fields.Integer('Dynamic active step index')
-
+    cpu_limit = fields.Integer('CPU limit for the current running docker')
     job_start = fields.Datetime('Job start')
     job_end = fields.Datetime('Job end')
     build_start = fields.Datetime('Build start')
@@ -886,7 +886,8 @@ class BuildResult(models.Model):
         else:
             _docker_state = docker_state(build._get_docker_name(), build._path())
             if _docker_state == 'RUNNING':
-                timeout = min(build.active_step.cpu_limit, int(icp.get_param('runbot.runbot_timeout', default=10000)))
+                build_limit = build.cpu_limit or build.active_step.cpu_limit
+                timeout = min(build_limit, int(icp.get_param('runbot.runbot_timeout', default=10000)))
                 if build.local_state != 'running' and build.job_time > timeout:
                     build.active_step._make_stats(build)
                     build._log('_schedule', '%s time exceeded (%ss)' % (build.active_step._get_display_name(self) if build.active_step else "?", build.job_time))
@@ -1064,6 +1065,7 @@ class BuildResult(models.Model):
         self.env.flush_all()
         env_variables = env_variables or []
         env_variables.append('ODOO_RUNBOT=1')
+        self.cpu_limit = kwargs.get('cpu_limit')
         def start_docker():
             docker_run(
                 cmd=cmd,
