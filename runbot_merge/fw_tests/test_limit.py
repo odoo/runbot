@@ -258,13 +258,13 @@ Currently available commands:
 |command||
 |-|-|
 |`help`|displays this help|
-|`r(eview)+`|approves the PR, if it's a forwardport also approves all non-detached parents|
+|`r(eview)+`|approves the PR, if it&#39;s a forwardport also approves all non-detached parents|
 |`r(eview)=<number>`|only approves the specified parents|
 |`r(eview)-`|removes approval of a previously approved PR, if the PR is staged the staging will be cancelled|
-|`retry`|re-tries staging a PR in the "error" state|
+|`retry`|re-tries staging a PR in the &#34;error&#34; state|
 |`fw=no`|does not forward-port this PR|
 |`fw=default`|forward-ports this PR normally|
-|`fw=skipci`|does not wait for a forward-port's statuses to succeed before creating the next one|
+|`fw=skipci`|does not wait for a forward-port&#39;s statuses to succeed before creating the next one|
 |`fw=skipmerge`|does not wait for the source to be merged before creating forward ports|
 |`up to <branch>`|only ports this PR forward to the specified branch (included)|
 |`merge`|integrate the PR with a simple merge commit, using the PR description as message|
@@ -273,13 +273,13 @@ Currently available commands:
 |`squash`|squashes the PR as a single commit on the target branch, using the PR description as message|
 |`delegate+`|grants approval rights to the PR author|
 |`delegate=<...>`|grants approval rights on this PR to the specified github users|
-|`nice`|only stages the PR if there's room in the batch after `default` PRs|
+|`nice`|only stages the PR if there&#39;s room in the batch after `default` PRs|
 |`default`|stages the PR normally|
 |`priority`|tries to stage this PR first, then adds `default` PRs if the staging has room|
 |`alone`|stages this PR only with other PRs of the same priority|
 |`cancel=staging`|automatically cancels the current staging when this PR becomes ready|
 |`check`|fetches or refreshes PR metadata, resets mergebot state|
-|`remindme:<branch>=<message>`|When the PR gets forward-ported to <branch>, ping you with <message>. <message> can be quoted if it needs spaces.|
+|`remindme:<branch>=<message>`|When the PR gets forward-ported to &lt;branch&gt;, ping you with &lt;message&gt;. &lt;message&gt; can be quoted if it needs spaces.|
 
 Note: this help text is dynamic and will change with the state of the PR.
 """.format_map(users)),

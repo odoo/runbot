@@ -15,7 +15,6 @@ import shutil
 import statistics
 import subprocess
 import tempfile
-import time
 import typing
 from enum import IntEnum
 from functools import reduce
@@ -26,12 +25,12 @@ import psycopg2.errors
 import sentry_sdk
 import werkzeug
 import werkzeug.urls
-from markupsafe import Markup
+from markupsafe import Markup, escape
 from requests import HTTPError
 
 from odoo import api, fields, models, tools, Command
 from odoo.addons.base.controllers.rpc import OdooMarshaller
-from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.exceptions import UserError, ValidationError
 from odoo.osv import expression
 from odoo.tools import html_escape, Reverse, mute_logger, groupby
 from odoo.tools.safe_eval import safe_eval
@@ -875,7 +874,7 @@ class PullRequests(models.Model):
                 '|-|-|',
             ]
             s.extend(
-                f"|`{cmd}`|{text}|"
+                f"|`{cmd}`|{escape(text)}|"
                 for cmd, text in acls.help()
             )
 
