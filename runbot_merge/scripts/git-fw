@@ -3,8 +3,10 @@
 # requires-python = ">= 3.10
 # dependencies = []
 # ///
+import contextlib
 import hashlib
 import json
+import os
 import pathlib
 import re
 import sys
@@ -17,6 +19,7 @@ from subprocess import run, PIPE, DEVNULL
 
 __VERSION__ = "0.1"
 SCRIPT_URL = 'https://raw.githubusercontent.com/odoo/runbot/refs/heads/17.0/runbot_merge/scripts/git-fw'
+GIT_DIR = None
 
 
 class PrInfo(typing.TypedDict):
@@ -52,37 +55,46 @@ DESCRIPTION
 """
 
 
+ENV = {**os.environ, 'GIT_EDITOR': 'git fw edit'}
 def main() -> int:
     match sys.argv[1:]:
         # case ['do', pr]:
         #     return do(pr)
         case ["redo", pr]:
+            threading.Thread(target=check_version, args=(__file__,), daemon=True).start()
             return redo(pr)
         case [("--continue" | "--skip" | "--abort" | "--quit") as subcommand]:
-            r = run(["git", "cherry-pick", subcommand])
+            r = run(["git", "cherry-pick", subcommand], env=ENV)
             exit(r.returncode)
+        case ["edit", msgpath]:
+            return edit(msgpath)
         case ["--version"]:
             print(f"git-fw version {__VERSION__}")
+            check_version(__file__)
             exit(0)
         case _:
             print(HELP)
+            check_version(__file__)
             exit(0)
 
 
 def redo(pr: str) -> int:
     repo, number = parse_pr(pr)
 
-    print(f"Resolving {repo}#{number}...")
+    print(f"Resolving {repo}#{number}")
     res = info(f"https://mergebot.odoo.com/{repo}/pull/{number}.json")
     if not res["parent"]:
         exit("not a forward port")
+    print(".", end="", flush=True)
     parent = info(res["parent"])
+    print(".", end="", flush=True)
     repository_url, reflist = ls_remote(
         res["repository"],
         res["target"],
         parent["target"],
         res['ref'],
     )
+    print(".", end="", flush=True)
     refs = dict(reflist)
     commits_of_interest = [*refs.values(), parent["head"], res["head"], res['ref']]
     if cm := parent["commits_map"]:
@@ -94,7 +106,7 @@ def redo(pr: str) -> int:
         devname = res['repository'].replace('odoo/', 'odoo-dev/')
         dev_url, reflist = ls_remote(devname, res['ref'])
         if not reflist:
-            exit(f"unable to find ref {res['ref']!r} in {res['repository']!r} or {devname!r}")
+            exit(f"\nunable to find ref {res['ref']!r} in {res['repository']!r} or {devname!r}")
 
     urls = tuple(
         f"{root}{devname}{ext}"
@@ -107,14 +119,16 @@ def redo(pr: str) -> int:
             remotename = name
             break
     else:
-        exit(f"found {res['ref']!r} in {devname!r} but no configured remote for it")
+        exit(f"\nfound {res['ref']!r} in {devname!r} but no configured remote for it")
+    print(".", end="", flush=True)
 
     r = run(
         ["git", "fetch", "--no-tags", "-q", remotename, *commits_of_interest],
         stdout=DEVNULL,
     )
     if r.returncode:
-        exit(f"unable to retrieve commits of interest from {remotename!r}")
+        exit(f"\nunable to retrieve commits of interest from {remotename!r}")
+    print(".", end="", flush=True)
 
     # list the source's commits
     r = run(
@@ -131,10 +145,13 @@ def redo(pr: str) -> int:
     )
     if r.returncode:
         exit(r.returncode)
+    print(".")
     commits = r.stdout.splitlines(keepends=False)
     if cm:
         # remap commits to forward port to those which got merged
         commits = [cm[c] for c in commits]
+        with GIT_DIR.joinpath("FW_CMAP").open("w", encoding="utf-8") as f:
+            json.dump(cm, f)
 
     run(["git", "switch", "--guess", res["ref"]], check=True)
     run(["git", "branch", "--set-upstream-to", f"{remotename}/{res['ref']}"], check=True, stdout=DEVNULL)
@@ -145,7 +162,10 @@ def redo(pr: str) -> int:
         check=True,
     )
     run(["git", "reset", "--hard", merge_base.stdout.strip()], check=True)
-    return run(["git", "cherry-pick", "-x", f"{commits[0]}~..{commits[-1]}"]).returncode
+    return run(
+        ["git", "cherry-pick", "-e", f"{commits[0]}~..{commits[-1]}"],
+        env=ENV,
+    ).returncode
 
 
 def parse_pr(pr: str) -> tuple[str, str]:
@@ -233,17 +253,48 @@ def info(url: str) -> PrInfo:
         exit(f"invalid response (not json): {e}")
 
 
+def edit(msgpath: str) -> int:
+    source_commit = GIT_DIR.joinpath('CHERRY_PICK_HEAD').read_text(encoding="utf-8").strip()
+
+    original = source_commit
+    with contextlib.suppress(FileNotFoundError):
+        # When the parent PR is merged, `x-original-commit` could (/ should) be
+        # the commit we merged, however we don't want its `closes` or
+        # `signed-off-by`, so retrieve and copy the commit message from the PR.
+        with GIT_DIR.joinpath('FW_CMAP').open(encoding="utf-8") as f:
+            cmap = json.load(f)
+        original = next(o for o, f in cmap.items() if f == source_commit)
+    r = run(
+        ['git', 'show', '--format=%B', '--no-patch', original],
+        stdout=PIPE,
+        stderr=DEVNULL,
+    )
+    if r.returncode:
+        exit(f"Unable to get commit message for {original} (source of {source_commit})")
+
+    with open(msgpath, "wb") as f:
+        r = run([
+            'git', 'interpret-trailers',
+                # WARNING: order is important
+                '--if-exists=replace',
+                f'--trailer=X-original-commit:{source_commit}',
+        ], input=r.stdout, stdout=f, stderr=DEVNULL)
+    return r.returncode
+
+
 def check_version(f):
     if not f:
         return
 
-    h = hashlib.blake2b(pathlib.Path(f).read_bytes(), usedforsecurity=False)
     with urllib.request.urlopen(SCRIPT_URL) as r:
         hh = hashlib.blake2b(r.read(), usedforsecurity=False)
+    h = hashlib.blake2b(pathlib.Path(f).read_bytes(), usedforsecurity=False)
     if h.digest() != hh.digest():
         print(f"You may want to update {f}:\nA different version is available at {SCRIPT_URL}")
 
 
 if __name__ == "__main__":
-    threading.Thread(target=check_version, args=(__file__,), daemon=True).start()
+    r = run(["git", "rev-parse", "--git-dir"], stdout=PIPE, stderr=DEVNULL, encoding="utf-8")
+    if r.returncode == 0:
+        GIT_DIR = pathlib.Path(r.stdout.strip())
     exit(main())
