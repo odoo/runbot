@@ -1791,13 +1791,7 @@ For your own safety I've ignored *everything in your entire comment*.
           -- deleting branches & reusing labels)
               pr.state != 'merged'
           AND pr.state != 'closed'
-        GROUP BY
-            pr.target,
-            CASE
-                WHEN pr.label SIMILAR TO '%%:patch-[[:digit:]]+'
-                    THEN pr.id::text
-                ELSE pr.label
-            END
+        GROUP BY pr.batch_id
         HAVING
           -- one of the batch's PRs should be ready & not marked
               bool_or(pr.state = 'ready' AND NOT pr.link_warned)
@@ -1808,6 +1802,14 @@ For your own safety I've ignored *everything in your entire comment*.
             prs = self.browse(ids)
             ready = prs.filtered(lambda p: p.state == 'ready')
             unready = (prs - ready).sorted(key=lambda p: (p.repository.name, p.number))
+
+            if all(u.reviewed_by for u in unready) and any(u.status == 'pending' for u in unready):
+                if prs.batch_id.target.project_id.request_missing_statuses:
+                    write_threshold = datetime.datetime.now() - datetime.timedelta(hours=2)
+                else:
+                    write_threshold = datetime.datetime.now() - datetime.timedelta(hours=1)
+                if any(r.write_date > write_threshold for r in ready):
+                    continue
 
             for r in ready:
                 self.env.ref('runbot_merge.pr.linked.not_ready')._send(
