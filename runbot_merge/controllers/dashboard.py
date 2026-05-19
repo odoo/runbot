@@ -230,8 +230,10 @@ def json_render(pr_id) -> Response:
         'batch': pr_id.batch_id.id,
         'ref': pr_id.refname,
         'head': pr_id.head,
-        'parent': parent and f'{parent.url}.json',
-        'child': child and f'{child.url}.json',
+        'source': f'{pr_id.source_id}.json' if pr_id.source_id else None,
+        'root': f'{pr_id.root_id}.json' if pr_id.root_id else None,
+        'parent': f'{parent.url}.json' if parent else None,
+        'child': f'{child.url}.json' if child else None,
         'siblings': [
             f'{sibling.url}.json'
             for sibling in (pr_id.batch_id.prs - pr_id)
