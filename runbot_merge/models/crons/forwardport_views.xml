@@ -8,8 +8,8 @@
         <field name="name">Forward port batches</field>
         <field name="model">forwardport.batches</field>
         <field name="arch" type="xml">
-            <tree decoration-danger="cannot_apply">
-                <field name="cannot_apply" column_invisible="1"/>
+            <tree decoration-danger="disabled">
+                <field name="disabled" column_invisible="1"/>
                 <field name="source"/>
                 <field name="batch_id"/>
                 <field name="retry_after_relative" string="Retry In"/>

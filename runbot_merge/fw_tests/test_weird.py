@@ -926,19 +926,21 @@ def test_missing_magic_ref(env, config, make_repo):
         .replace(tzinfo=None).isoformat(" ", "seconds")
 
     # check notifications
-    assert not req.cannot_apply
+    assert not req.disabled
     env['res.users'].search([]).notification_type = 'inbox'
-    req.retry_after = "9999-12-31 23:59:59"
-    assert req.cannot_apply
+    req.retry_after = datetime.now().isoformat(" ", "seconds")
+    req.sequence = 23
+    env.run_crons(None)
+    assert req.sequence == 24
+    assert req.disabled
     notifications = env['mail.notification'].search([])
-    assert notifications
-    assert all(
-        notification.mail_message_id.body.startswith("<p>Cannot forward port")
-        for notification in notifications
-    )
+    message_id = notifications.mail_message_id
+    assert message_id.res_id == req.id
+    assert message_id.body == "<p>Cannot process, disabling.</p>"
 
-    # reset retry_after
-    req.retry_after = '1900-01-01 01:01:01'
+    # re-enable
+    req.sequence = 0
+    req.retry_after = datetime.now().isoformat(" ", "seconds")
 
     # add a real commit
     with prod:

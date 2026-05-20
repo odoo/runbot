@@ -1,105 +1,27 @@
 # -*- coding: utf-8 -*-
-import builtins
-import collections
 import logging
 import re
-import sys
-from collections.abc import Mapping
-from datetime import datetime, timedelta
 
 import requests
-import sentry_sdk
-from babel.dates import format_timedelta
-from dateutil import relativedelta
 
-from odoo import api, fields, models
-from odoo.addons.runbot_merge import git
+from odoo import fields, models
 
-from odoo.modules.registry import Registry
+from ... import git
 
-# how long a merged PR survives
-MERGE_AGE = relativedelta.relativedelta(weeks=1)
 FOOTER = '\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'
 
 _logger = logging.getLogger(__name__)
 
-PROCESS_LIMIT = 10
-class Queue(models.BaseModel):
-    _name = 'forwardport.queue'
-    _description = "Common cron behaviour for queue-type models attached to crons"
-    _cron_name: str
-
-    pool: Registry
-    sequence = fields.Integer(default=0)
-
-    def init(self):
-        super().init()
-        # not sure why this triggers on abstract models...
-        if not self._abstract:
-            self.pool.post_init(self._init_cron)
-
-    def _init_cron(self):
-        cron_values = {
-            'name': self._description,
-            'state': 'code',
-            'code': "model._process()",
-            'interval_number': 12,
-            'interval_type': 'hours',
-            'numbercall': -1,
-        }
-        if c := self.env.ref(self._cron_name, raise_if_not_found=False):
-            c.write(cron_values)
-        else:
-            c = self.env['ir.cron'].create({
-                **cron_values,
-                'model_id': self.env['ir.model']._get(self._name).id,
-            })
-        self.env['ir.model.data']._update_xmlids([{
-            'xml_id': self._cron_name,
-            'record': c,
-        }])
-
-    @api.model_create_multi
-    def create(self, vals_list):
-        self.env.ref(self._cron_name)._trigger()
-        return super().create(vals_list)
-
-    def _process_item(self):
-        raise NotImplementedError
-
-    def _process(self):
-        item = self.search([
-            ('sequence', '<', PROCESS_LIMIT),
-            *self._search_domain(),
-        ], order='sequence, create_date, id', limit=1)
-        if not item:
-            return
-
-        try:
-            with sentry_sdk.start_span(description=self._name):
-                item._process_item()
-            item.unlink()
-        except Exception:
-            _logger.exception(
-                "Error while processing %s (attempt %d / %d)",
-                item, item.sequence + 1, PROCESS_LIMIT
-            )
-            self.env.cr.rollback()
-            if item._on_failure():
-                item.sequence += 1
-        self.env.ref(self._cron_name)._trigger()
-
-    def _on_failure(self):
-        return True
-
-    def _search_domain(self):
-        return []
 
 class ForwardPortTasks(models.Model):
     _name = 'forwardport.batches'
-    _inherit = ['forwardport.queue', 'mail.thread']
+    _inherit = ['runbot_merge.queue.retryable']
     _description = 'Check merged batches to forward port'
     _cron_name = 'runbot_merge.port_forward'
+    _logger = _logger
+    # retry every hour for a day
+    RETRY_DELAY = 60
+    RETRY_LIMIT = 24
 
     batch_id = fields.Many2one('runbot_merge.batch', required=True, index=True)
     source = fields.Selection([
@@ -108,57 +30,10 @@ class ForwardPortTasks(models.Model):
         ('insert', 'New branch port'),
         ('complete', 'Complete ported batches'),
     ], required=True)
-    retry_after = fields.Datetime(required=True, default='1900-01-01 01:01:01', tracking=True)
-    cannot_apply = fields.Boolean(compute='_compute_cannot_apply', store=True)
-    retry_after_relative = fields.Char(compute="_compute_retry_after_relative")
     pr_id = fields.Many2one('runbot_merge.pull_requests')
-
-    def write(self, vals):
-        if retry := vals.get('retry_after'):
-            self.env.ref(self._cron_name)\
-                ._trigger(fields.Datetime.to_datetime(retry))
-        return super().write(vals)
-
-    def _search_domain(self):
-        return super()._search_domain() + [
-            ('cannot_apply', '=', False),
-            ('retry_after', '<=', fields.Datetime.to_string(fields.Datetime.now())),
-        ]
-
-    @api.depends('retry_after', 'cannot_apply')
-    def _compute_retry_after_relative(self):
-        now = fields.Datetime.now()
-        for t in self:
-            if t.cannot_apply:
-                t.retry_after_relative = "N/A"
-            elif t.retry_after <= now:
-                t.retry_after_relative = ""
-            else:
-                t.retry_after_relative = format_timedelta(t.retry_after - now, locale=t.env.lang)
-
-    @api.depends('retry_after')
-    def _compute_cannot_apply(self):
-        for t in self:
-            prev = t.cannot_apply
-            t.cannot_apply = t.retry_after > (t.create_date + timedelta(days=1))
-            if not prev and t.cannot_apply:
-                # notify as odoobot to make sure every relevant user always
-                # gets notified even if this latch is triggered through a user
-                # updating a record
-                t.with_user(1).message_notify(
-                    body=f"Cannot forward port {t.batch_id.name}, disabling.",
-                    partner_ids=self.env.ref('runbot_merge.group_admin').users.partner_id.ids,
-                )
-
-    def _on_failure(self):
-        super()._on_failure()
-        _, e, _ = sys.exc_info()
-        self._message_log(body=f"Error while processing forward-port batch: {e}")
-        self.retry_after = fields.Datetime.now() + timedelta(hours=1)
 
     def _process_item(self):
         batch = self.batch_id
-        sentry_sdk.set_tag('forward-porting', batch.prs.mapped('display_name'))
         if self.source == 'complete':
             self._complete_batches()
             return
@@ -322,150 +197,3 @@ class ForwardPortTasks(models.Model):
 
             pr = new_pr
 
-
-Update = tuple[str, str, str]
-Updates = list[Update]
-class UpdateQueue(models.Model):
-    _name = 'forwardport.updates'
-    _inherit = ['forwardport.queue']
-    _description = 'Update forward ports of an updated PR'
-    _cron_name = 'runbot_merge.updates'
-
-    original_root = fields.Many2one('runbot_merge.pull_requests')
-    new_root = fields.Many2one('runbot_merge.pull_requests')
-
-    def _process_item(self):
-        sentry_sdk.set_tag("update-root", self.new_root.display_name)
-        # dict[repo: [ref, old_head, new_head]
-        updates: Mapping[str, Updates] = collections.defaultdict[str, Updates](Updates)
-
-        roots = self.new_root.batch_id.prs
-        previouses = dict(zip(roots, roots))
-        for batch in zip(*(
-            root._iter_descendants()
-            for root in roots
-        )):
-            if p := next(((r, c) for r, c in zip(roots, batch) if c.state in ('closed', 'merged')), None):
-                root, child = p
-                self.env.ref('runbot_merge.forwardport.updates.closed')._send(
-                    repository=child.repository,
-                    pull_request=child.number,
-                    token_field='fp_github_token',
-                    format_args={'pr': child, 'parent': root},
-                )
-                return
-
-            for root, child in zip(roots, batch):
-                original_root = self.original_root if root == self.new_root else root.root_id
-                previous = previouses[root]
-                self.env.cr.execute("""
-                    SELECT id
-                    FROM runbot_merge_pull_requests
-                    WHERE id = %s
-                    FOR UPDATE NOWAIT
-                """, [child.id])
-                _logger.info(
-                    "Re-port %s from %s (changed root %s -> %s)",
-                    child.display_name,
-                    previous.display_name,
-                    original_root.display_name,
-                    root.display_name,
-                )
-
-                repo = git.get_local(previous.repository)
-                conflicts, new_head, n = previous._create_port_branch(repo, child.target, forward=True)
-
-                if conflicts:
-                    _, out, err, _ = conflicts
-                    self.env.ref('runbot_merge.forwardport.updates.conflict.parent')._send(
-                        repository=previous.repository,
-                        pull_request=previous.number,
-                        token_field='fp_github_token',
-                        format_args={'pr': previous._suppress_ping(), 'next': child},
-                    )
-                    self.env.ref('runbot_merge.forwardport.updates.conflict.child')._send(
-                        repository=child.repository,
-                        pull_request=child.number,
-                        token_field='fp_github_token',
-                        format_args={
-                            'previous': previous,
-                            'pr': child._suppress_ping(),
-                            'stdout': (f'\n\nstdout:\n```\n{out.strip()}\n```' if out.strip() else ''),
-                            'stderr': (f'\n\nstderr:\n```\n{err.strip()}\n```' if err.strip() else ''),
-                        },
-                    )
-
-                old_head = child.head
-                # update child's head to the head we're going to push
-                child.with_context(ignore_head_update=True).write({
-                    'head': new_head,
-                    # 'state': 'opened',
-                    'squash': n == 1,
-                })
-                updates[child.repository].append((child.refname, old_head, new_head))
-
-                previouses[root] = child
-
-        for repository, refs in updates.items():
-            # then update the child branches to the new heads
-            git.get_local(repository).push(
-                *(f'--force-with-lease={ref}:{old}' for ref, old, _new in refs),
-                git.fw_url(repository),
-                *(f"{new}:refs/heads/{ref}" for ref, _old, new in refs)
-            )
-
-_deleter = _logger.getChild('deleter')
-class DeleteBranches(models.Model):
-    _name = 'forwardport.branch_remover'
-    _inherit = ['forwardport.queue']
-    _description = "Removes branches of merged and closed PRs"
-    _cron_name = 'runbot_merge.remover'
-
-    pr_id = fields.Many2one('runbot_merge.pull_requests', index=True)
-
-    def _search_domain(self):
-        cutoff = getattr(builtins, 'forwardport_merged_before', None) \
-             or fields.Datetime.to_string(datetime.now() - MERGE_AGE)
-        return [
-            '|', ('pr_id.merge_date', '<', cutoff),
-                 '&', ('pr_id.closed', '=', True),
-                      ('pr_id.write_date', '<', cutoff),
-        ]
-
-    def _process_item(self):
-        _deleter.info(
-            "PR %s: checking deletion of linked branch %s",
-            self.pr_id.display_name,
-            self.pr_id.label
-        )
-
-        if self.pr_id.state not in ('merged', 'closed'):
-            _deleter.info('✘ PR is active (%s)', self.pr_id.state)
-            return
-
-        repository = self.pr_id.repository
-        fp_remote = repository.fp_remote_target
-        if not fp_remote:
-            _deleter.info('✘ no forward-port target')
-            return
-
-        repo_owner, repo_name = fp_remote.split('/')
-        owner, branch = self.pr_id.label.split(':')
-        if repo_owner != owner:
-            _deleter.info('✘ PR owner != FP target owner (%s)', repo_owner)
-            return # probably don't have access to arbitrary repos
-
-        r = git.get_local(repository).check(False).push(
-            git.fw_url(repository),
-            '--delete', branch,
-            f'--force-with-lease={branch}:{self.pr_id.head}',
-        )
-        if r.returncode:
-            _deleter.info(
-                '✘ failed to delete branch %s of PR %s:\n%s',
-                self.pr_id.label,
-                self.pr_id.display_name,
-                r.stderr.decode(),
-            )
-        else:
-            _deleter.info('✔ deleted branch %s of PR %s', self.pr_id.label, self.pr_id.display_name)
