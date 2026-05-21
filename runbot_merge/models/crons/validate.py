@@ -9,7 +9,6 @@ except ImportError:
 from odoo import fields, models, api
 
 from ... import git, exceptions
-from ..stagings_create import StagingSlice, validate_pr, mismatch_warn
 
 _logger = logging.getLogger(__name__)
 
@@ -27,6 +26,7 @@ class BatchValidate(models.Model):
         return super().create(vals_list)
 
     def _run(self) -> None:
+        from ..stagings_create import StagingSlice, validate_pr, mismatch_warn
         validations = self.search([])
         if blocked := validations.filtered(lambda v: v.batch_id.blocked):
             _logger.warning(

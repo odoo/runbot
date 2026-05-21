@@ -233,14 +233,13 @@ class GH(object):
     def close(self, pr):
         self('PATCH', 'pulls/{}'.format(pr), json={'state': 'closed'})
 
-    def change_tags(self, pr, remove, add):
-        labels_endpoint = 'issues/{}/labels'.format(pr)
-        tags_before = {label['name'] for label in self('GET', labels_endpoint).json()}
-        tags_after = (tags_before - remove) | add
+    def add_tags(self, pr, add):
         # replace labels entirely
-        self('PUT', labels_endpoint, json={'labels': list(tags_after)})
+        r = self('POST', f'issues/{pr}/labels', json={'labels': list(add)})
+        tags = r.json()
 
-        _logger.debug('change_tags(%s, %s, from=%s, to=%s)', self._repo, pr, tags_before, tags_after)
+        _logger.debug('add_tags(%s, %s, %s) -> %s', self._repo, pr, add, tags)
+        return tags
 
     def _check_updated(self, branch, to):
         """

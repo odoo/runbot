@@ -1,4 +1,6 @@
 from . import queue
+from . import feedback
+from . import tagging
 from . import cleanup_scratch_branches
 from . import issues_closer
 from . import forwardport
@@ -6,4 +8,5 @@ from . import branch_remover
 from . import update_followup
 from . import validate
 from . import status_request
+from . import fetch_pr
 from . import check_commits

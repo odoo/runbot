@@ -4,6 +4,8 @@ from . import ir_ui_view
 from . import mail_thread
 from . import res_partner
 
+from . import crons
+
 from . import project
 from . import pull_requests
 from . import commands
@@ -14,4 +16,3 @@ from . import stagings_create
 from . import staging_cancel
 from . import backport
 from . import events_sources
-from . import crons
