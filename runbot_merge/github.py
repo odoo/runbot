@@ -115,14 +115,25 @@ GH_LOG_PATTERN = """=> {method} {path}{qs}{body}
 {body2}
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 """
+# Since the main operation mode is workers this should normally have just 1
+# session in it, and we rely on urllib3's internal smarts to properly tear down
+# and rebuild
+POOL = []
 class GH(object):
     def __init__(self, token, repo):
         self._url = 'https://api.github.com'
         self._repo = repo
         self._last_update = 0
-        session = self._session = requests.Session()
-        session.headers['Authorization'] = 'token {}'.format(token)
+        try:
+            session = POOL.pop()
+        except IndexError:
+            session = requests.Session()
+        self._session = session
+        session.headers['Authorization'] = f'token {token}'
         session.headers['Accept'] = 'application/vnd.github.symmetra-preview+json'
+
+    def __del__(self):
+        POOL.append(self._session)
 
     def _log_gh(self, logger: logging.Logger, response: requests.Response, level: int = logging.INFO, extra=None):
         """ Logs a pair of request / response to github, to the specified
