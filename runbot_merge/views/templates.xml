@@ -122,32 +122,30 @@
 
         <xpath expr="//t[@t-out='0']" position="replace">
             <header t-if="not no_header" id="top" data-anchor="true">
-                <t t-cache="None if website.is_menu_cache_disabled() else (xmlid,website,website.is_public_user())">
-                    <nav>
-                        <ul id="top_menu" class="top_menu" role="menu">
-                            <t t-foreach="website.menu_id.child_id" t-as="submenu">
-                                <t t-call="website.submenu">
-                                    <t t-set="item_class" t-valuef="nav-item"/>
-                                    <t t-set="link_class" t-valuef="nav-link"/>
-                                </t>
+                <nav>
+                    <ul id="top_menu" class="top_menu" role="menu">
+                        <t t-foreach="website.menu_id.child_id" t-as="submenu">
+                            <t t-call="website.submenu">
+                                <t t-set="item_class" t-valuef="nav-item"/>
+                                <t t-set="link_class" t-valuef="nav-link"/>
                             </t>
-                        </ul>
-                        <ul class="extras">
-                            <t t-if="'mail.notification' in env['ir.model.access']._get_allowed_models()">
-                                <t t-set="notifications" t-value="env['mail.notification'].search_count([('res_partner_id', '=', env.user.partner_id.id), ('is_read', '=', False)])"/>
-                                <li t-if="notifications">
-                                    <a class="fa fa-lg fa-comments bg-danger" href="/web#action=mail.action_discuss"/>
-                                </li>
-                            </t>
-                            <t t-call="portal.placeholder_user_sign_in"/>
-                            <t t-call="portal.user_dropdown">
-                                <t t-set="_item_class" t-valuef="dropdown"/>
-                                <t t-set="_user_name" t-value="True"/>
-                            </t>
-                            <t t-call="website.placeholder_header_call_to_action"/>
-                        </ul>
-                    </nav>
-                </t>
+                        </t>
+                    </ul>
+                    <ul class="extras">
+                        <t t-if="'mail.notification' in env['ir.model.access']._get_allowed_models()">
+                            <t t-set="notifications" t-value="env['mail.notification'].search_count([('res_partner_id', '=', env.user.partner_id.id), ('is_read', '=', False)])"/>
+                            <li t-if="notifications">
+                                <a class="fa fa-lg fa-comments bg-danger" href="/web#action=mail.action_discuss"/>
+                            </li>
+                        </t>
+                        <t t-call="portal.placeholder_user_sign_in"/>
+                        <t t-call="portal.user_dropdown">
+                            <t t-set="_item_class" t-valuef="dropdown"/>
+                            <t t-set="_user_name" t-value="True"/>
+                        </t>
+                        <t t-call="website.placeholder_header_call_to_action"/>
+                    </ul>
+                </nav>
             </header>
             <main>
                 <t t-out="0"/>
