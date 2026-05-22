@@ -23,6 +23,7 @@
                 <field name="pull_on_build"/>
                 <field name="to_build"/>
                 <field name="in_error"/>
+                <field name="nocache"/>
                 <field name="always_pull"/>
                 <field name="version_ids" widget="many2many_tags"/>
                 <field name="project_ids" widget="many2many_tags"/>
@@ -107,6 +108,8 @@
             <field name="in_error" widget="boolean_toggle" groups="runbot.group_runbot_admin"/>
             <field name="always_pull" groups="!runbot.group_runbot_admin"/>
             <field name="always_pull" widget="boolean_toggle" groups="runbot.group_runbot_admin"/>
+            <field name="nocache" groups="!runbot.group_runbot_admin"/>
+            <field name="nocache" widget="boolean_toggle" groups="runbot.group_runbot_admin"/>
             <field name="version_ids" widget="many2many_tags"/>
             <field name="project_ids" widget="many2many_tags"/>
             <field name="use_count"/>

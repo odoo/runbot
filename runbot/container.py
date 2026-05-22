@@ -108,21 +108,22 @@ class Command():
         return res.read()
 
 
-def docker_build(build_dir, image_tag, pull=False):
-    return _docker_build(build_dir, image_tag, pull)
+def docker_build(build_dir, image_tag, pull=False, nocache=False):
+    return _docker_build(build_dir, image_tag, pull, nocache)
 
 
-def _docker_build(build_dir, image_tag, pull=False):
+def _docker_build(build_dir, image_tag, pull=False, nocache=False):
     """Build the docker image
     :param build_dir: the build directory that contains Dockerfile.
     :param image_tag: name used to tag the resulting docker image
+    :param nocache: bypass Docker layer cache when True
     :return: dict
     """
 
     with DockerManager(image_tag) as dm:
         last_step = None
         dm.result['success'] = False  # waiting for an image_id
-        for chunk in dm.consume(dm.docker_client.api.build(path=build_dir, tag=image_tag, rm=True, pull=pull)):
+        for chunk in dm.consume(dm.docker_client.api.build(path=build_dir, tag=image_tag, rm=True, pull=pull, nocache=nocache)):
             if 'stream' in chunk:
                 stream = chunk['stream']
                 if stream.startswith('Step '):
