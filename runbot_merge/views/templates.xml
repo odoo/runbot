@@ -208,10 +208,11 @@
                 <t t-set="prs" t-value="
                     (project.env['runbot_merge.pull_requests'].search([
                         ('target', 'in', project.branch_ids.filtered('active').ids),
-                        ('state', 'in', ('ready', 'error')),
+                        ('state', '=', 'ready'),
+                        ('blocked', '=', False),
                         ('staging_id', '=', False),
                     ]) - project.branch_ids.split_ids.batch_ids.prs
-                    ).grouped(lambda p: (p.target, p.state, bool(p.blocked)))
+                    ).grouped(lambda p: p.target)
                 "/>
                 <section t-foreach="project.branch_ids" t-as="branch"
                          t-if="branch.active"
@@ -240,29 +241,11 @@
                             </li>
                         </ul>
                     </div>
-                    <t t-set="ready" t-value="prs.get((branch, 'ready', False))"/>
+                    <t t-set="ready" t-value="prs.get(branch)"/>
                     <div t-if="ready" class="pr-listing pr-awaiting">
                         <h5>Awaiting</h5>
                         <ul>
                             <li t-foreach="ready.prioritized()" t-as="pr">
-                                <t t-call="runbot_merge.link-pr"/>
-                            </li>
-                        </ul>
-                    </div>
-                    <t t-set="blocked" t-value="prs.get((branch, 'ready', True))"/>
-                    <div t-if="blocked" class="pr-listing pr-blocked">
-                        <h5>Blocked</h5>
-                        <ul>
-                            <li t-foreach="blocked" t-as="pr">
-                                <t t-call="runbot_merge.link-pr"/>
-                            </li>
-                        </ul>
-                    </div>
-                    <t t-set="failed" t-value="prs.get((branch, 'error', True))"/>
-                    <div t-if="failed" class="pr-listing pr-failed">
-                        <h5>Failed</h5>
-                        <ul>
-                            <li t-foreach="failed" t-as="pr">
                                 <t t-call="runbot_merge.link-pr"/>
                             </li>
                         </ul>
