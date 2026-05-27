@@ -495,10 +495,10 @@ class Repo(models.Model):
             repo.path = repo._path()
 
     def _path(self, *path_parts):
-        return self.env['runbot.runbot']._path('repo', sanitize(self.name), *path_parts)
+        return self.env['runbot.runbot']._local_path('repo', sanitize(self.name), *path_parts)
 
     def _source_path(self, *path_parts):
-        return self.env['runbot.runbot']._path('sources', sanitize(self.name), *path_parts)
+        return self.env['runbot.runbot']._local_path('sources', sanitize(self.name), *path_parts)
 
     def _get_git_command(self, cmd, errors='strict'):
         """Execute a git command 'cmd'"""
@@ -718,7 +718,7 @@ class Repo(models.Model):
                 git_config_path = repo._path('config')
                 template_params = {'repo': repo}
                 git_config = self.env['ir.ui.view']._render_template("runbot.git_config", template_params)
-                with file_open(git_config_path, 'w') as config_file:
+                with file_open(git_config_path, 'w', env=self.env) as config_file:
                     config_file.write(str(git_config))
                 _logger.info('Config updated for repo %s' % repo.name)
             else:

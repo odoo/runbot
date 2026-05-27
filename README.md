@@ -238,7 +238,7 @@ Create a repo for your custom addons repo
 - **Remotes**: `git@github.com:odoo/runbot.git` 
 - The remote *PR* option can be checked if needed to fetch pull request too. Will work only if a github token is given for this repo.
 
-A config file with your remotes should be created for each repo. You can check the content in `/runbot/static/repo/(runbot|odoo)/config`. The repo will be fetched, this operation may take some time too. After that, you should start seeing empty batches in both projects on the frontend (`/` or `/runbot`)
+A config file with your remotes should be created for each repo. You can check the content in `~/.local/share/runbot/repo/(runbot|odoo)/config`. The repo will be fetched, this operation may take some time too. After that, you should start seeing empty batches in both projects on the frontend (`/` or `/runbot`)
 
 #### Triggers and config
 At this point, runbot will discover new branches, new commits, create bundle, but no build will be created.

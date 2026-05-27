@@ -127,11 +127,19 @@ class Host(models.Model):
 
     def _bootstrap(self):
         """ Create needed directories in static """
-        dirs = ['build', 'nginx', 'repo', 'sources', 'src', 'docker']
-        static_path = self.env['runbot.runbot']._root()
-        static_dirs = {d: self.env['runbot.runbot']._path(d) for d in dirs}
-        for dir, path in static_dirs.items():
+        for local_dir in ['nginx', 'repo', 'sources', 'docker']:
+            path = self.env['runbot.runbot']._local_path(local_dir)
+            if not os.path.exists(path):  # migration of existing statics dirs, todo remove in 21.0
+                static_path = self.env['runbot.runbot']._path(local_dir)
+                if os.path.exists(static_path):
+                    _logger.info('Moving %s to %s', static_path, path)
+                    os.rename(static_path, path)
             os.makedirs(path, exist_ok=True)
+
+        for static_dir in ['build', 'src']:
+            path = self.env['runbot.runbot']._path(static_dir)
+            os.makedirs(path, exist_ok=True)
+
         self._bootstrap_db_template()
         self._bootstrap_local_logs_db()
 

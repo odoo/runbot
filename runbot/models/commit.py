@@ -156,7 +156,7 @@ class Commit(models.Model):
     def _read_source(self, file, mode='r'):
         file_path = self._source_path(file)
         try:
-            with file_open(file_path, mode) as f:
+            with file_open(file_path, mode, env=self.env) as f:
                 return f.read()
         except:
             return False

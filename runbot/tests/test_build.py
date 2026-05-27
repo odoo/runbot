@@ -384,7 +384,7 @@ class TestBuildResult(RunbotCase):
         build = self.Build.create({
             'params_id': self.server_params.id,
         })
-        cmd = build._cmd(py_version=3)
+        cmd = build._cmd()
         self.assertIn('log_db = runbot_logs', cmd.get_config())
 
 
@@ -400,7 +400,7 @@ class TestBuildResult(RunbotCase):
         build = self.Build.create({
             'params_id': self.server_params.id,
         })
-        cmd = build._cmd(py_version=3)
+        cmd = build._cmd()
         self.assertIn(['python3', '-m', 'pip', 'install', '--progress-bar', 'off', '-r', 'odoo/requirements.txt'], cmd.pres)
         self.assertIn(custom_pre, cmd.pres)
         self.assertIn(custom_post, cmd.posts)
@@ -411,7 +411,7 @@ class TestBuildResult(RunbotCase):
         build = self.Build.create({
             'params_id': self.server_params.id,
         })
-        cmd = build._cmd(py_version=3)
+        cmd = build._cmd()
         self.assertEqual('python3', cmd[0])
         self.assertEqual('odoo/server.py', cmd[1])
         self.assertIn('--addons-path', cmd)
@@ -424,13 +424,13 @@ class TestBuildResult(RunbotCase):
 
         def is_file(file):
             self.assertIn(file, [
-                self.env['runbot.runbot']._path('sources/enterprise/0d0d0caca0000fffffffffffffffffffffffffff/requirements.txt'),
-                self.env['runbot.runbot']._path('sources/odoo/0dfdfcfcf0000fffffffffffffffffffffffffff/requirements.txt'),
-                self.env['runbot.runbot']._path('sources/odoo/0dfdfcfcf0000fffffffffffffffffffffffffff/server.py'),
-                self.env['runbot.runbot']._path('sources/odoo/0dfdfcfcf0000fffffffffffffffffffffffffff/odoo/tools/config.py'),
-                self.env['runbot.runbot']._path('sources/odoo/0dfdfcfcf0000fffffffffffffffffffffffffff/odoo/sql_db.py'),
+                self.env['runbot.runbot']._local_path('sources/enterprise/0d0d0caca0000fffffffffffffffffffffffffff/requirements.txt'),
+                self.env['runbot.runbot']._local_path('sources/odoo/0dfdfcfcf0000fffffffffffffffffffffffffff/requirements.txt'),
+                self.env['runbot.runbot']._local_path('sources/odoo/0dfdfcfcf0000fffffffffffffffffffffffffff/server.py'),
+                self.env['runbot.runbot']._local_path('sources/odoo/0dfdfcfcf0000fffffffffffffffffffffffffff/odoo/tools/config.py'),
+                self.env['runbot.runbot']._local_path('sources/odoo/0dfdfcfcf0000fffffffffffffffffffffffffff/odoo/sql_db.py'),
             ])
-            return file != self.env['runbot.runbot']._path('static/sources/enterprise/0d0d0caca0000fffffffffffffffffffffffffff/requirements.txt')
+            return file != self.env['runbot.runbot']._local_path('sources/enterprise/0d0d0caca0000fffffffffffffffffffffffffff/requirements.txt')
 
         def is_dir(file):
             paths = [
@@ -448,7 +448,7 @@ class TestBuildResult(RunbotCase):
             'params_id': self.addons_params.id,
         })
 
-        cmd = build._cmd(py_version=3)
+        cmd = build._cmd()
         self.assertIn('--addons-path', cmd)
         addons_path_pos = cmd.index('--addons-path') + 1
         self.assertEqual(cmd[addons_path_pos], 'odoo/addons,odoo/core/addons,enterprise')
@@ -690,19 +690,19 @@ class TestBuildResult(RunbotCase):
         build = self.Build.create({
             'params_id': self.server_params.id,
         })
-        cmd = build._cmd(py_version=3)
+        cmd = build._cmd()
         self.assertIn('faketime "2024-02-04 02:42 UTC" python3 odoo/server.py', str(cmd))
 
         # let's ensure that a time offset is added to a child build
         build.build_start = datetime.datetime(2025, 1, 1, 12, 00)
         child_build = build._add_child({})
         child_build.create_date = datetime.datetime(2025, 1, 1, 13, 00)
-        child_cmd = child_build._cmd(py_version=3)
+        child_cmd = child_build._cmd()
         self.assertIn('faketime "2024-02-04 03:42 UTC" python3 odoo/server.py', str(child_cmd))
 
         build.build_end = datetime.datetime(2025, 1, 1, 14, 00)
         second_child = build._add_child({})
-        second_child_cmd = second_child._cmd(py_version=3)
+        second_child_cmd = second_child._cmd()
         self.assertIn('faketime "2024-02-04 04:42 UTC" python3 odoo/server.py', str(second_child_cmd))
 
     def test_format_message(self):

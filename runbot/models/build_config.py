@@ -757,7 +757,6 @@ class ConfigStep(models.Model):
         modules_to_install = build._get_modules_to_test(install_module_pattern)
         mods = ",".join(modules_to_install)
         python_params = []
-        py_version = build._get_py_version()
         if self.coverage or config_data.get('coverage'):
             build.coverage = True
             python_params = ['-m', 'coverage', 'run', '--source', '/data/build']
@@ -768,7 +767,7 @@ class ConfigStep(models.Model):
             python_params += self._coverage_params(build, config_data)
         elif self.flamegraph:
             python_params = ['-m', 'flamegraph', '-o', self._perfs_data_path(build)]
-        cmd = build._cmd(python_params, py_version, sub_command=self.sub_command, enable_log_db=self.enable_log_db)
+        cmd = build._cmd(python_params, sub_command=self.sub_command, enable_log_db=self.enable_log_db)
         # create db if needed
         db_suffix = config_data.get('db_name') or (build.params_id.dump_db.db_suffix if not self.create_db else False) or self._get_db_name(build)
         db_suffix = re.sub(r'[^a-z0-9\-_]', '_', db_suffix.lower())
@@ -834,7 +833,7 @@ class ConfigStep(models.Model):
         if extra_params:
             cmd.extend(shlex.split(extra_params))
 
-        cmd.finals.extend(self._post_install_commands(build, config_data, py_version))  # coverage post, extra-checks, ...
+        cmd.finals.extend(self._post_install_commands(build, config_data))  # coverage post, extra-checks, ...
 
         if config_data.get('export_database', True):
             self._add_zip_generation(build, cmd, db_name)
@@ -1231,11 +1230,11 @@ class ConfigStep(models.Model):
             message = 'Flamegraph report: [data @icon-download](%s), [svg @icon-eye](%s)'
             build._log('end_job', message, dat_url, svg_url, log_type='markdown')
 
-    def _post_install_commands(self, build, config_data, py_version):
+    def _post_install_commands(self, build, config_data):
         cmds = []
         if config_data.get('coverage_make_report', (self.coverage and self.coverage_make_report)):
-            cmds.append(['python%s' % py_version, "-m", "coverage", "html", "-d", "/data/build/logs/coverage", "--ignore-errors"])
-            cmds.append(['python%s' % py_version, "-m", "coverage", "json", "-o", "/data/build/logs/coverage.json", "--ignore-errors"])
+            cmds.append(['python3', "-m", "coverage", "html", "-d", "/data/build/logs/coverage", "--ignore-errors"])
+            cmds.append(['python3', "-m", "coverage", "json", "-o", "/data/build/logs/coverage.json", "--ignore-errors"])
         if config_data.get('coverage', self.coverage):
             cmds.append(['mv', "/data/build/.coverage", f"/data/build/logs/coverage.{build.id}.{int(time.time())}"])
         return cmds
