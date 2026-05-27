@@ -45,6 +45,7 @@ class Host(models.Model):
 
     paused = fields.Boolean('Paused', help='Host will stop scheduling while paused')
     profile = fields.Boolean('Profile', help='Enable profiling on this host')
+    profile_limit = fields.Integer('Profile count')
 
     is_leader = fields.Boolean('Is leader', help='This host is the leader of the cluster', default=False)
     is_builder = fields.Boolean('Is builder', help='This host is a builder of the cluster', default=True)

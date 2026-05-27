@@ -26,6 +26,7 @@
                         <field name="last_exception" readonly='1'/>
                         <field name="exception_count" readonly='1'/>
                         <field name="profile"/>
+                        <field name="profile_limit"/>
                     </group>
                     <notebook>
                         <page string="Messages">

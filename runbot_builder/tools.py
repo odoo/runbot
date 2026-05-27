@@ -55,7 +55,7 @@ class RunbotClient():
             ' (assigned only)' if self.host.assigned_only else ''
         )
         while True:
-            context_manager = Profiler(db=self.env.cr.dbname) if self.host.profile else nullcontext()
+            context_manager = Profiler(db=self.env.cr.dbname) if self.host.profile or self.host.profile_limit > 0 else nullcontext()
             with context_manager:
                 try:
                     self.host.last_start_loop = fields.Datetime.now()
@@ -78,9 +78,11 @@ class RunbotClient():
                     self.env.cr.rollback()
                     self.env.clear()
                     self.sleep(10)
+                if self.host.profile_limit > 0:
+                    self.host.profile_limit -= 1
+                    self.env.cr.commit()
                 if self.ask_interrupt.is_set():
                     return
-
     def loop_turn(self):
         raise NotImplementedError()
 
