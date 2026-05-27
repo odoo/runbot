@@ -383,26 +383,28 @@ class TestFetch(RunbotCase):
 
 class TestIdentityFile(RunbotCase):
 
-        def check_output_helper(self):
-            """Helper that returns a mock for repo._git()"""
-            def mock_check_output(cmd, *args, **kwargs):
-                expected_option = r'-c core.sshCommand=ssh -i \/.+\/\.ssh\/fake_identity'
-                git_cmd = ' '.join(cmd)
-                self.assertTrue(re.search(expected_option, git_cmd), '%s did not match %s' % (git_cmd, expected_option))
-                return Mock()
+    def popen_helper(self):
+        """Helper that returns a mock for repo._git()"""
+        def mock_popen(cmd, *args, **kwargs):
+            expected_option = r'-c core.sshCommand=ssh -i \/.+\/\.ssh\/fake_identity'
+            git_cmd = ' '.join(cmd)
+            self.assertTrue(re.search(expected_option, git_cmd), '%s did not match %s' % (git_cmd, expected_option))
+            popen_mock = Mock()
+            attrs = {"communicate.return_value": (b"", b"")}
+            popen_mock.configure_mock(**attrs)
+            return popen_mock
 
-            return mock_check_output
+        return mock_popen
 
-        def test_identity_file(self):
-            """test that the identity file is used in git command"""
+    def test_identity_file(self):
+        """test that the identity file is used in git command"""
 
-            self.patcher_objects['git_patcher'].stop()
-            self.start_patcher('check_output_patcher', 'odoo.addons.runbot.models.repo.subprocess.check_output', new=self.check_output_helper())
+        self.patcher_objects['git_patcher'].stop()
+        self.start_patcher('popen_patcher', 'odoo.addons.runbot.models.repo.subprocess.Popen', new=self.popen_helper())
+        self.repo_odoo.identity_file = 'fake_identity'
 
-            self.repo_odoo.identity_file = 'fake_identity'
-
-            with mute_logger("odoo.addons.runbot.models.repo"):
-                self.repo_odoo._update_fetch_cmd()
+        with mute_logger("odoo.addons.runbot.models.repo"):
+            self.repo_odoo._update_fetch_cmd()
 
 
 class TestRepoScheduler(RunbotCase):
