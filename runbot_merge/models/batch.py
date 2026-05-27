@@ -231,6 +231,7 @@ class Batch(models.Model):
                 continue
             batch.unblocked_at = False
             Validator.search([('batch_id', '=', batch.id)]).unlink()
+        self._schedule_fp_followup()
 
 
     def _port_forward(self):
@@ -445,43 +446,42 @@ class Batch(models.Model):
         scheduled = self.browse(())
         for batch in self:
             fw_policy = batch.source.fw_policy
-            forcefw = force_fw or fw_policy == 'skipmerge'
-            prs = ', '.join(batch.prs.mapped('display_name'))
+            ident = str(batch) + ', '.join(batch.prs.mapped('display_name'))
 
-            _logger.info('Checking if forward-port %s (%s)', batch, prs)
+            _logger.info('Checking if forward-port %s', ident)
             if fw_policy == 'no':
-                _logger.info('-> disabled on %s (%s)', batch, prs)
+                _logger.info('-> disabled on %s', ident)
+                continue
+            # even if we force_fw, a *followup* should still only be for forward
+            # ports so check that the batch has a parent
+            if not batch.parent_id:
+                _logger.info('-> batch has no parent %s', ident)
                 continue
             # in case of conflict or update individual PRs will "lose" their
             # parent, which should prevent forward porting
-            #
-            # even if we force_fw, a *followup* should still only be for forward
-            # ports so check that the batch has a parent (which should be the
-            # same thing as all the PRs having a source, kinda, but cheaper,
-            # it's not entirely true as technically the user could have added a
-            # PR to the forward ported batch
-            if not (batch.parent_id and (forcefw or all(p.parent_id for p in batch.prs))):
-                _logger.info('-> no parent %s (%s)', batch, prs)
-                continue
-            if not forcefw and fw_policy not in ('skipci', 'skipmerge') \
-                    and (invalid := batch.prs.filtered(lambda p: p.status != 'success')):
-                _logger.info(
-                    '-> wrong state %s (%s)',
-                    batch,
-                    ', '.join(f"{p.display_name}: {p.state}" for p in invalid),
-                )
-                continue
+            if not force_fw and fw_policy != 'skipmerge':
+                if orphans := batch.prs.filtered(lambda p: not p.parent_id):
+                    _logger.info('-> prs without parent %s: %s', batch, orphans.mapped('display_name'))
+                    continue
+                if fw_policy != 'skipci' and (
+                        invalid := batch.prs.filtered(lambda p: p.status != 'success')
+                ):
+                    _logger.info(
+                        '-> wrong state in %s: %s',
+                        ident,
+                        ', '.join(f"{p.display_name}: {p.state}" for p in invalid),
+                    )
+                    continue
 
             # check if we've already forward-ported this branch
             next_target = batch._find_next_targets()
             if not next_target:
-                _logger.info("-> forward port done (no next target)")
+                _logger.info("-> forward port done (no next target) for %s", ident)
                 continue
             if len(next_target) > 1:
                 _logger.error(
-                    "-> cancelling forward-port of %s (%s): inconsistent next target branch (%s)",
+                    "-> cancelling forward-port of %s: inconsistent next target branch (%s)",
                     batch,
-                    prs,
                     ', '.join(next_target.mapped('name')),
                 )
                 continue
@@ -490,15 +490,14 @@ class Batch(models.Model):
                 ('target', '=', next_target.id),
                 ('parent_id', '=', batch.id),
             ], limit=1):
-                _logger.info('-> already forward-ported (%s)', n)
+                _logger.info('-> already forward-ported %s => %s', ident, n)
                 continue
 
-            _logger.info("check pending port for %s (%s)", batch, prs)
             if self.env['forwardport.batches'].search_count([('batch_id', '=', batch.id)]):
-                _logger.warning('-> already recorded')
+                _logger.warning('-> already recorded forward port for %s', ident)
                 continue
 
-            _logger.info('-> ok')
+            _logger.info('-> ok forward porting %s', ident)
             self.env['forwardport.batches'].create({
                 'batch_id': batch.id,
                 'source': 'fp',

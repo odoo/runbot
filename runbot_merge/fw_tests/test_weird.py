@@ -1649,3 +1649,55 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         pr_c.post_comment('hansen r+', config['role_user']['token'])
     env.run_crons()
     assert pr_c_id.state == 'approved'
+
+def test_close_blocker(
+    env, make_repo, users, config, partners,
+):
+    repo1, _ = make_basic(env, config, make_repo, statuses='default')
+    repo2, fw_repo = make_basic(env, config, make_repo, statuses='default')
+    with repo1:
+        repo1.make_commits('a', Commit('first', tree={'x': '42'}), ref="heads/abranch")
+        pr_a1 = repo1.make_pr(target='a', head='abranch')
+        repo1.post_status(pr_a1.head, 'success')
+        pr_a1.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+    with repo1, repo2:
+        repo1.post_status('staging.a', 'success')
+        repo2.post_status('staging.a', 'success')
+    env.run_crons()
+    pr_a1_id, pr_b1_id = env['runbot_merge.pull_requests'].search([], order='number')
+    assert fw_repo.owner == pr_b1_id.label.split(':')[0]
+    with repo2, fw_repo:
+        fw_repo.make_commits(
+            repo2.commit('b').id,
+            Commit('second', tree={'x': '42'}),
+            ref=f"heads/{pr_b1_id.refname}",
+        )
+        pr_b2 = repo2.make_pr(title="a pr", target='b', head=pr_b1_id.label)
+    assert len(pr_b1_id.batch_id.prs) == 2
+    with repo1:
+        repo1.post_status(pr_b1_id.head, 'success')
+    env.run_crons()
+
+    pr_b2_id = to_pr(env, pr_b2)
+    assert pr_b2.number == pr_b2_id.number
+    with repo2:
+        pr_b2.close()
+    env.run_crons()
+
+    assert pr_b2_id.closed
+    assert pr_b2_id.state == 'closed'
+    assert env['runbot_merge.pull_requests'].search_count([]) == 4,\
+        "should have triggered fw when we closed the PR"
+
+    with repo1:
+        repo1.get_pr(pr_b1_id.number).post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+
+    with repo1, repo2:
+        repo1.post_status('staging.b', 'success')
+        repo2.post_status('staging.b', 'success')
+    env.run_crons()
+
+    assert pr_b1_id.state == 'merged'
+    assert env['runbot_merge.pull_requests'].search_count([]) == 4
