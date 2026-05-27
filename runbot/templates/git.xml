@@ -7,7 +7,7 @@
 	bare = true
 <t t-foreach="repo.remote_ids" t-as="remote_id">
 [remote "<t t-out="remote_id.remote_name"/>"]
-	url = <t t-out="remote_id.name"/>
+	url = <t t-out="remote_id._get_fetch_url()"/>
 <t t-if = "remote_id.fetch_heads">	fetch = +refs/heads/*:refs/<t t-out='remote_id.remote_name'/>/heads/*</t>
 <t t-if = "remote_id.fetch_pull">	fetch = +refs/pull/*/head:refs/<t t-out='remote_id.remote_name'/>/pull/*</t>
 </t></template>

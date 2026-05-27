@@ -13,6 +13,7 @@ _logger = logging.getLogger(__name__)
 class BuilderClient(RunbotClient):
 
     def on_start(self):
+        self.last_update = datetime(1970, 1, 1)
         self.last_docker_updates = None
         if self.host.is_builder:
             builds_path = self.env['runbot.runbot']._path('build')
@@ -30,6 +31,8 @@ class BuilderClient(RunbotClient):
                 self.host._docker_update_images()
                 self.env.cr.commit()
         if self.host.is_builder:
+            self.last_update = self.env['runbot.repo'].search([('write_date', '>', self.last_update)])._update_git_config()
+            self.env.cr.commit()
             if self.count == 1:  # cleanup at second iteration
                 self.env['runbot.runbot']._source_cleanup()
                 self.env.cr.commit()
@@ -38,8 +41,6 @@ class BuilderClient(RunbotClient):
                 self.env['runbot.runbot']._docker_cleanup()
                 self.env.cr.commit()
                 self.host._set_psql_conn_count()
-                self.env.cr.commit()
-                self.env['runbot.repo']._update_git_config()
                 self.env.cr.commit()
                 self.git_gc()
                 self.env.cr.commit()

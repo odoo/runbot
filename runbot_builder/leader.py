@@ -1,23 +1,27 @@
 #!/usr/bin/python3
 from tools import RunbotClient, run
 import logging
-import time
+
+from datetime import datetime
+
 
 _logger = logging.getLogger(__name__)
 
 
-class LeaderClient(RunbotClient):  # Conductor, Director, Main, Maestro, Lead
+class LeaderClient(RunbotClient):
     def __init__(self, env):
         self.pull_info_failures = {}
+        self.last_update = datetime(1970, 1, 1)
         super().__init__(env)
 
     def loop_turn(self):
         if not self.host.is_leader:
             _logger.warning('Leader client is not a leader host, skipping loop_turn')
             return 10
+
+        self.last_update = self.env['runbot.repo'].search([('write_date', '>', self.last_update)])._update_git_config()
+        self.env.cr.commit()
         if self.count == 0:
-            self.env['runbot.repo']._update_git_config()
-            self.env.cr.commit()
             self.git_gc()
             self.env.cr.commit()
 
