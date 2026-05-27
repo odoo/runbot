@@ -524,17 +524,14 @@ class Repo(models.Model):
 
     def _fetch(self, sha):
         if not self._hash_exists(sha):
-            self._update(force=True)
+            for remote in self.remote_ids:
+                try:
+                    self._git(['fetch', remote.remote_name, sha])
+                    break
+                except subprocess.CalledProcessError:
+                    pass
             if not self._hash_exists(sha):
-                for remote in self.remote_ids:
-                    try:
-                        self._git(['fetch', remote.remote_name, sha])
-                        _logger.info('Success fetching specific head %s on %s', sha, remote)
-                        break
-                    except subprocess.CalledProcessError:
-                        pass
-                if not self._hash_exists(sha):
-                    raise RunbotException("Commit %s is unreachable. Did you force push the branch?" % sha)
+                raise RunbotException("Commit %s is unreachable, most likely because it is not attached to any branch anymore" % sha)
 
     def _hash_exists(self, commit_hash):
         """ Verify that a commit hash exists in the repo """

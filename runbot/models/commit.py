@@ -106,7 +106,7 @@ class Commit(models.Model):
         export_path = self._source_path()
 
         if os.path.isdir(export_path):
-            _logger.info('git export: exporting to %s (already exists)', export_path)
+            _logger.debug('git export: exporting to %s (already exists)', export_path)
             return export_path
 
         _logger.info('git export: exporting to %s (new)', export_path)
