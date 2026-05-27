@@ -508,11 +508,11 @@ class Repo(models.Model):
         cmd = ['git', '-C', self.path] + config_args + cmd
         return cmd
 
-    def _git(self, cmd, errors='strict', quiet=False, input_data=None, raw=False):
+    def _git(self, cmd, errors='strict', quiet=False, input_data=None, raw=False, timeout=None):
         cmd = self._get_git_command(cmd, errors)
         if not quiet:
             _logger.info("git command: %s", shlex.join(cmd))
-        kwargs = {'stderr': subprocess.STDOUT}
+        kwargs = {'stderr': subprocess.STDOUT, 'timeout': timeout}
         if input_data is not None:
             if isinstance(input_data, str):
                 input_data = input_data.encode('utf-8')
@@ -526,13 +526,16 @@ class Repo(models.Model):
         if not self._hash_exists(sha):
             self._update(force=True)
             if not self._hash_exists(sha):
+                fetch_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_fetch_timeout', default=120))
                 for remote in self.remote_ids:
                     try:
-                        self._git(['fetch', remote.remote_name, sha])
+                        self._git(['fetch', remote.remote_name, sha], timeout=fetch_timeout)
                         _logger.info('Success fetching specific head %s on %s', sha, remote)
                         break
                     except subprocess.CalledProcessError:
                         pass
+                    except subprocess.TimeoutExpired:
+                        _logger.warning('Fetch of %s from %s timed out after %s sec', sha, remote.remote_name, fetch_timeout)
                 if not self._hash_exists(sha):
                     raise RunbotException("Commit %s is unreachable. Did you force push the branch?" % sha)
 
@@ -748,21 +751,25 @@ class Repo(models.Model):
     def _update_fetch_cmd(self):
         # Extracted from update_git to be easily overriden in external module
         self.ensure_one()
+        fetch_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_fetch_timeout', default=120))
         try_count = 0
         success = False
         delay = 0
         while not success and try_count < 5:
             time.sleep(delay)
             try:
-                self._git(['fetch', '-p', '--all', '-j2'])  # j2 to use two job and fetch multiple origin at the same time
+                self._git(['fetch', '-p', '--all', '-j2'], timeout=fetch_timeout)  # j2 to use two job and fetch multiple origin at the same time
                 success = True
-            except subprocess.CalledProcessError as e:
+            except (subprocess.CalledProcessError, subprocess.TimeoutException) as e:
                 try_count += 1
                 delay = delay * 1.5 if delay else 0.5
                 if try_count > 4:
                     message = 'Failed to fetch repo %s: %s' % (self.name, e.output.decode())
                     host = self.env['runbot.host']._get_current()
                     host.message_post(body=message)
+                if isinstance(e, subprocess.TimeoutException):
+                    _logger.warning('Fetching all remotes from repo %s timed out after %s sec', self.name, fetch_timeout)
+                    fetch_timeout += 30
         return success
 
     def _update(self, force=False, poll_delay=5*60):
