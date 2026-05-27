@@ -503,8 +503,11 @@ class Repo(models.Model):
         """Execute a git command 'cmd'"""
         self.ensure_one()
         config_args = []
+        ssh_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_ssh_timeout', default=20))
+        ssh_args = ['-o', f'ConnectTimeout={ssh_timeout}']
         if self.identity_file:
-            config_args = ['-c', 'core.sshCommand=ssh -i %s/.ssh/%s' % (str(Path.home()), self.identity_file)]
+            ssh_args += ['-i', f'{Path.home()}/.ssh/{self.identity_file}']
+        config_args = ['-c', f'core.sshCommand=ssh {" ".join(ssh_args)}']
         cmd = ['git', '-C', self.path] + config_args + cmd
         return cmd
 

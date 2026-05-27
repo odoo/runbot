@@ -386,7 +386,7 @@ class TestIdentityFile(RunbotCase):
         def check_output_helper(self):
             """Helper that returns a mock for repo._git()"""
             def mock_check_output(cmd, *args, **kwargs):
-                expected_option = r'-c core.sshCommand=ssh -i \/.+\/\.ssh\/fake_identity'
+                expected_option = r'-c core.sshCommand=ssh.+-i \/.+\/\.ssh\/fake_identity'
                 git_cmd = ' '.join(cmd)
                 self.assertTrue(re.search(expected_option, git_cmd), '%s did not match %s' % (git_cmd, expected_option))
                 return Mock()
