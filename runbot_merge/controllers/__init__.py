@@ -113,7 +113,7 @@ class MergebotController(Controller):
                 else: # but our servers use 1.4.3
                     scope.transaction = f"webhook {event}"
 
-        github._gh.info(self._format(req))
+        github._gh.getChild('hook').info(self._format(req))
 
         env = request.env(user=1)
         data = request.get_json_data()
@@ -159,18 +159,12 @@ class MergebotController(Controller):
         return c(env, data)
 
     def _format(self, request):
-        return """{r.method} {r.full_path}
+        headers = '\n'.join('\t%s: %s' % entry for entry in request.headers.items())
+        action = f".{a}" if (a := request.json.get('action')) else ""
+        return f"""{request.headers['x-github-event']}{action}
 {headers}
-
-{body}
-vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\
-""".format(
-            r=request,
-            headers='\n'.join(
-                '\t%s: %s' % entry for entry in request.headers.items()
-            ),
-            body=request.get_data(as_text=True),
-        )
+{request.get_data(as_text=True)}
+"""
 
 def handle_pr(env, event):
     pr = event['pull_request']

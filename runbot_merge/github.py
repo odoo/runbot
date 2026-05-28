@@ -6,6 +6,7 @@ import logging.handlers
 import os
 import pathlib
 import pprint
+import textwrap
 import time
 import unicodedata
 from typing import Iterable, List, TypedDict, Literal
@@ -108,12 +109,10 @@ class PullRequest(TypedDict):
     base: Base
 
 
-GH_LOG_PATTERN = """=> {method} {path}{qs}{body}
-
-<= {r.status_code} {r.reason}
+GH_LOG_PATTERN = """{method} {path}{qs}{body}
+{r.status_code} {r.reason}
 {headers}
 {body2}
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 """
 # Since the main operation mode is workers this should normally have just 1
 # session in it, and we rely on urllib3's internal smarts to properly tear down
@@ -148,7 +147,7 @@ class GH(object):
         if url.netloc != 'api.github.com':
             return
 
-        body = '' if not req.body else ('\n' + pprint.pformat(json.loads(req.body.decode()), indent=4))
+        body = '' if not req.body else ('\n' + textwrap.indent(pprint.pformat(json.loads(req.body.decode())), '    '))
 
         body2 = ''
         if response.content:
@@ -188,7 +187,7 @@ class GH(object):
         if method.casefold() != 'get':
             self._last_update = time.time() + int(r.headers.get('Retry-After', 0))
 
-        self._log_gh(_gh, r)
+        self._log_gh(_gh.getChild('call'), r)
         if check:
             try:
                 if isinstance(check, collections.abc.Mapping):
