@@ -511,30 +511,36 @@ class Repo(models.Model):
 
     def _git(self, cmd, errors='strict', quiet=False, input_data=None, raw=False):
         cmd = self._get_git_command(cmd, errors)
-        if not quiet:
-            _logger.info("git command: %s", shlex.join(cmd))
-
         if input_data is not None and isinstance(input_data, str):
             input_data = input_data.encode('utf-8')
 
-        stdin = subprocess.PIPE if input_data is not None else None
-        process = subprocess.Popen(cmd, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
         fetch_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_fetch_timeout', default=30))
-        while True:
-            try:
-                output, _ = process.communicate(input=input_data, timeout=fetch_timeout)
-                break
-            except subprocess.TimeoutExpired:
-                try:
-                    parent = psutil.Process(process.pid)
-                    for child in parent.children(recursive=True):
-                        if 'git-upload-pack' in str(child.cmdline()) and child.status() == psutil.STATUS_SLEEPING:
-                            child.kill()
-                            _logger.info("Killed sleeping git subprocess (pid: %s)", child.pid)
-                except psutil.NoSuchProcess:
-                    pass
+        for i in range(3):  # retry in case of timeout
+            if not quiet:
+                _logger.info("git command: %s", shlex.join(cmd))
 
+            killed_fetch = False
+            stdin = subprocess.PIPE if input_data is not None else None
+            process = subprocess.Popen(cmd, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+            while True:
+                try:
+                    output, _ = process.communicate(input=input_data, timeout=fetch_timeout)
+                    break
+                except subprocess.TimeoutExpired:
+                    try:
+                        parent = psutil.Process(process.pid)
+                        for child in parent.children(recursive=True):
+                            if 'git-upload-pack' in str(child.cmdline()) and child.status() == psutil.STATUS_SLEEPING:
+                                child.kill()
+                                _logger.info("Killed sleeping git subprocess (pid: %s)", child.pid)
+                                killed_fetch = True
+                                fetch_timeout *= 10  # increase the timeout for the next try
+                    except psutil.NoSuchProcess:
+                        pass
+
+            if not killed_fetch:
+                break
         if process.returncode:
             raise subprocess.CalledProcessError(process.returncode, cmd, output=output)
 
