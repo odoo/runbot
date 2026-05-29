@@ -549,6 +549,7 @@ class Repo(models.Model):
         return output.decode(errors=errors)
 
     def _fetch(self, sha):
+        self._git_init()
         if not self._hash_exists(sha):
             for remote in self.remote_ids:
                 try:
