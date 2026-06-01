@@ -230,7 +230,6 @@ class RunbotCase(TransactionCase):
         self.start_patcher('_local_pg_createdb', 'odoo.addons.runbot.models.build.BuildResult._local_pg_createdb', True)
         self.start_patcher('getmtime', 'odoo.addons.runbot.common.os.path.getmtime', datetime.datetime.now().timestamp())
         self.start_patcher('file_exist', 'odoo.tools.misc.os.path.exists', True)
-        self.start_patcher('_get_py_version', 'odoo.addons.runbot.models.build.BuildResult._get_py_version', 3)
         self.start_patcher('_write_file', 'odoo.addons.runbot.models.build.BuildResult._write_file', None)
         self.start_patcher('_parse_config', 'odoo.addons.runbot.models.build.BuildResult._parse_config', {'--test-enable', '--test-tags', '--with-demo'})
 

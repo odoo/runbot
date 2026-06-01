@@ -1381,27 +1381,23 @@ class BuildResult(models.Model):
         _logger.error('None of %s found in commit, actual commit content:\n %s' % (commit.repo_id.server_files, os.listdir(commit._source_path())))
         raise RunbotException('No server found in %s' % commit.dname)
 
-    def _make_pip_command(self, py_version=None):
-        if not py_version:
-            py_version = self._get_py_version()
+    def _make_pip_command(self):
         pres = []
         if not self.params_id.skip_requirements and not self.params_id.config_data.get('skip_requirements'):
             for commit_id in self.env.context.get('defined_commit_ids') or self.params_id.commit_ids.sorted(lambda c: (c.repo_id.sequence, c.repo_id.id)):
                 if os.path.isfile(commit_id._source_path('requirements.txt')):
                     repo_dir = self._docker_source_folder(commit_id)
                     requirement_path = os.sep.join([repo_dir, 'requirements.txt'])
-                    pres.append([f'python{py_version}', '-m', 'pip', 'install', '--progress-bar', 'off', '-r', f'{requirement_path}'])
+                    pres.append([f'python3', '-m', 'pip', 'install', '--progress-bar', 'off', '-r', f'{requirement_path}'])
         return pres
 
-    def _cmd(self, python_params=None, py_version=None, local_only=True, sub_command=None, enable_log_db=True):
+    def _cmd(self, python_params=None, local_only=True, sub_command=None, enable_log_db=True):
         """Return a list describing the command to start the build
         """
         self.ensure_one()
         build = self
         python_params = python_params or []
-        py_version = py_version if py_version is not None else build._get_py_version()
-
-        pres = self._make_pip_command(py_version)
+        pres = self._make_pip_command()
 
         faketime = []
         if faketime_params := self.params_id.config_data.get('faketime'):
@@ -1415,7 +1411,7 @@ class BuildResult(models.Model):
         server_dir = self._docker_source_folder(server_commit)
 
         # commandline
-        cmd = faketime + ['python%s' % py_version] + python_params + [os.sep.join([server_dir, server_file])]
+        cmd = faketime + ['python3'] + python_params + [os.sep.join([server_dir, server_file])]
         if sub_command:
             cmd += [sub_command]
 
@@ -1476,15 +1472,6 @@ class BuildResult(models.Model):
                 'name': dbname,
                 'build_id': self.id
             })
-
-    def _get_py_version(self):
-        """return the python name to use from build batch"""
-        (server_commit, server_file) = self._get_server_info()
-        server_path = server_commit._source_path(server_file)
-        with file_open(server_path, 'r') as f:
-            if f.readline().strip().endswith('python3'):
-                return '3'
-        return ''
 
     def _parse_logs(self):
         """ Parse build logs to classify errors """

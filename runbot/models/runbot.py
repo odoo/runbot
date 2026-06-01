@@ -15,7 +15,7 @@ from requests.exceptions import HTTPError
 from odoo import fields, models
 from odoo.exceptions import UserError
 from odoo.fields import Domain
-from odoo.tools import config, file_open, SQL
+from odoo.tools import config, SQL
 
 from ..common import dest_reg, os, sanitize
 from ..container import docker_ps, docker_stop
@@ -36,9 +36,24 @@ class Runbot(models.AbstractModel):
         """Return root directory of repository"""
         return os.path.abspath(os.sep.join([os.path.dirname(__file__), '../static']))
 
+    def _local_root(self):
+        """Return local root directory"""
+        local_root = os.path.expanduser('~/.local/share/runbot')
+        if not local_root in self.env.transaction._Transaction__file_open_tmp_paths:
+            self.env.transaction._Transaction__file_open_tmp_paths.append(local_root)
+        return local_root
+
     def _path(self, *path_parts):
         """Return the repo build path"""
         root = self.env['runbot.runbot']._root()
+        file_path = os.path.normpath(os.sep.join([root] + [sanitize(path) for path_part in path_parts for path in path_part.split(os.sep) if path]))
+        if not file_path.startswith(root):
+            raise UserError('Invalid path')
+        return file_path
+
+    def _local_path(self, *path_parts):
+        """Return the local repo build path"""
+        root = self.env['runbot.runbot']._local_root()
         file_path = os.path.normpath(os.sep.join([root] + [sanitize(path) for path_part in path_parts for path in path_part.split(os.sep) if path]))
         if not file_path.startswith(root):
             raise UserError('Invalid path')
@@ -158,7 +173,7 @@ class Runbot(models.AbstractModel):
         settings['port'] = config.get('http_port')
         settings['runbot_static'] = self.env['runbot.runbot']._root() + os.sep
         settings['base_url'] = self.get_base_url()
-        nginx_dir = self.env['runbot.runbot']._path('nginx')
+        nginx_dir = self.env['runbot.runbot']._local_path('nginx')
         settings['nginx_dir'] = nginx_dir
         settings['re_escape'] = re.escape
         host_name = self.env['runbot.host']._get_current_name()
@@ -169,17 +184,17 @@ class Runbot(models.AbstractModel):
         nginx_config = env['ir.ui.view']._render_template("runbot.nginx_config", settings)
         os.makedirs(nginx_dir, exist_ok=True)
         content = None
-        nginx_conf_path = self.env['runbot.runbot']._path('nginx', 'nginx.conf')
+        nginx_conf_path = self.env['runbot.runbot']._local_path('nginx', 'nginx.conf')
         content = ''
         if os.path.isfile(nginx_conf_path):
-            with file_open(nginx_conf_path, 'r') as f:
+            with open(nginx_conf_path, 'r') as f:
                 content = f.read()
         if content != nginx_config:
             _logger.info('reload nginx')
             with open(nginx_conf_path, 'w') as f:
                 f.write(str(nginx_config))
             try:
-                pid = int(file_open(self.env['runbot.runbot']._path('nginx', 'nginx.pid')).read().strip(' \n'))
+                pid = int(open(self.env['runbot.runbot']._local_path('nginx', 'nginx.pid')).read().strip(' \n'))
                 os.kill(pid, signal.SIGHUP)
             except Exception:
                 _logger.info('start nginx')
