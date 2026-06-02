@@ -54,3 +54,18 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// Expand/collapse all team sections at once.
+document.addEventListener('DOMContentLoaded', function() {
+    const expandBtn = document.getElementById('toggleTeamsButton');
+    if (expandBtn) {
+        const bundleGrid = document.querySelector('.o_team_bundle_grid');
+        const container = bundleGrid.closest('.container-fluid');
+        expandBtn.addEventListener('click', function () {
+            const details = container.querySelectorAll('details');
+            const allOpen = Array.from(details).every(d => d.open);
+            details.forEach(d => d.open = !allOpen);
+            this.textContent = allOpen ? 'Expand all' : 'Collapse all';
+        });
+    }
+});
