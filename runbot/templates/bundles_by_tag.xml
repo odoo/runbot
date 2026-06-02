@@ -36,6 +36,7 @@
                         <t t-out="tag.name"/>
                         <button type="button" class="btn btn-primary btn-ssm disabled"><t t-out="nb_bundles_done"/> / <t t-out="nb_bundles"/></button>
                         <button id="toggleTeamsButton" type="button" class="btn btn-secondary btn-ssm">Expand all</button>
+                        <button id="toggleHideDoneButton" type="button" class="btn btn-secondary btn-ssm o_btn_toggle_done">Hide done</button>
                     </h1>
                     <t t-foreach="sorted(bundles_by_team.keys())" t-as="team">
                         <t t-set="team_bundles" t-value="bundles_by_team.get(team)"/>

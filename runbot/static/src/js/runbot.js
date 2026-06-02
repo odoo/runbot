@@ -69,3 +69,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// Show/hide done bundles, persisted across reloads.
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleHideDoneBtn = document.getElementById('toggleHideDoneButton');
+    if (toggleHideDoneBtn) {
+        const bundleGrid = document.querySelector('.o_team_bundle_grid');
+        const container = bundleGrid.closest('.container-fluid');
+        toggleHideDoneBtn.addEventListener('click', function () {
+            const hidden = container.classList.toggle('o_hide_done');
+            this.textContent = hidden ? 'Show done' : 'Hide done';
+            localStorage.setItem('runbot_hide_done_bundles', hidden ? '1' : '');
+        });
+    }
+});

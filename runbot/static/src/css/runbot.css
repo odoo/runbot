@@ -490,3 +490,7 @@ code {
 .o_team_bundle_grid > li > button {
 	grid-column: 1; /* each bundle starts a new grid row, even if the previous one has no age badge */
 }
+
+.o_hide_done .o_team_bundle_grid > li:has(a.bundle-done) {
+	display: none;
+}
