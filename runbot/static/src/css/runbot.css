@@ -471,3 +471,22 @@ code {
 .log-details td {
 	padding-left: 20px;
 }
+
+/*
+ * Bundle by tag
+ */
+.o_team_bundle_grid {
+	display: grid;
+	/* menu | name (2/3 of free space) | tags | age | filler (1/3) */
+	grid-template-columns: max-content 2fr max-content max-content 1fr;
+	column-gap: .5rem;
+	align-items: center;
+}
+
+.o_team_bundle_grid > li {
+	display: contents;
+}
+
+.o_team_bundle_grid > li > button {
+	grid-column: 1; /* each bundle starts a new grid row, even if the previous one has no age badge */
+}

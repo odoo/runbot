@@ -16,13 +16,15 @@
             <t t-call="runbot.branch_github_menu">
                 <t t-set="btn_classes" t-value="'btn btn-link btn-ssm'"/>
             </t>
-            <a t-out="bundle.description or bundle.name" t-attf-href="/runbot/bundle/{{bundle.id}}" t-att-class="link_class" t-att-title="link_title" target="_blank"/>
+            <a t-out="bundle.description or bundle.name" t-attf-href="/runbot/bundle/{{bundle.id}}" t-attf-class="text-truncate {{link_class}}" t-att-title="link_title" target="_blank"/>
             <t t-set="other_tags" t-value="bundle.tag_ids.filtered(lambda rec: rec != tag)"/>
-            <t t-foreach="other_tags" t-as="other_tag">
-                <span class="badge rounded-pill text-bg-success"><t t-out="other_tag.name"/></span>
-            </t>
+            <span class="d-flex gap-1">
+                <t t-foreach="other_tags" t-as="other_tag">
+                    <span class="badge text-bg-light border"><t t-out="other_tag.name"/></span>
+                </t>
+            </span>
             <t t-if="not done">
-                <span t-attf-class="badge text-bg-info" data-toggle="tooltip" title="Last batch age">
+                <span t-attf-class="badge text-bg-info text-center" style="min-width: 4.5rem" data-toggle="tooltip" title="Last batch age">
                     <t t-out="bundle.last_batch._get_formated_age()"/>
                 </span>
             </t>
@@ -48,7 +50,7 @@
                                     <span class="badge text-bg-success ms-1" title="Open bundles">All Done</span>
                                 </t>
                             </summary>
-                            <ul>
+                            <ul class="list-unstyled ps-4 mb-2 o_team_bundle_grid">
                                 <t t-foreach="team_bundles" t-as="bundle">
                                     <li><t t-call="runbot.bundle_tag_slot"/></li>
                                 </t>
