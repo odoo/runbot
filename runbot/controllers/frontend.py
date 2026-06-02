@@ -908,6 +908,7 @@ class Runbot(Controller):
         if not project and projects:
             project = projects[0]
         bundles_by_team = defaultdict(list)
+        open_bundles_by_team = defaultdict(int)
         nb_bundles = 0
         nb_bundles_done = 0
         for bundle in self.env['runbot.bundle'].search([('tag_ids', 'in', bundle_tag_id.id)]):
@@ -916,10 +917,13 @@ class Runbot(Controller):
             bundle_prs = bundle.branch_ids.filtered(lambda rec: rec.is_pr)
             if any(bundle_prs) and not any(bundle_prs.mapped('alive')):
                 nb_bundles_done += 1
+            else:
+                open_bundles_by_team[bundle.team_id.name or 'No Team Defined'] += 1
 
         qctx = {
             'tag': bundle_tag_id,
             'bundles_by_team': bundles_by_team,
+            'open_bundles_by_team': open_bundles_by_team,
             'nb_bundles': nb_bundles,
             'nb_bundles_done': nb_bundles_done,
         }
