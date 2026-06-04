@@ -1,4 +1,7 @@
-from odoo.tests.common import new_test_user
+import datetime
+from textwrap import dedent
+
+from odoo.tests.common import new_test_user, tagged
 from odoo.tools import mute_logger
 
 from .common import RunbotCase, RunbotCaseMinimalSetup
@@ -65,6 +68,7 @@ class TestBranch(RunbotCase):
             branch,
             self.Branch.search([('dname', '=', branch.dname)]),
         )
+
 
 class TestBranchRelations(RunbotCase):
 
@@ -364,3 +368,101 @@ class TestBundleTeam(RunbotCase):
 
         self.assertIn(pr_branch, bundle.branch_ids)
         self.assertIn(github_user, bundle.author_ids)
+
+
+@tagged('-at_install', 'post_install')
+class TestBranchMergeDate(RunbotCase):
+
+    def mock_git_helper(self, repo, cmd, input_data=None, raw=False):
+        return dedent("""
+            commit d0d0caca
+            Author: foobar <foobar@nowhere.com>
+            Date:   Wed May 20 10:37:07 2026 +0000
+
+            [FIX] brol: prevent error
+
+            opw-123456
+
+            closes odoo/odoo#789102
+
+            X-original-commit: f00ffafa
+            Signed-off-by: manchu (manchu) <manchu@foo.com>
+
+            commit deadbeef
+            Author: manchu <manchu@foo.com>
+            Date:   Wed May 19 07:47:15 2026 +0000
+
+            [ADD] brol: add random error
+
+            opw-123455
+
+            closes odoo/odoo#2420242
+
+            X-original-commit: baddcafe
+            Signed-off-by: foobar (foob) <foob@nowhere.com>
+        """)
+
+    def test_branch_merge_date(self):
+        self.dev_pr.name = '2420242'
+
+        close_pr_automation = self.env['base.automation'].create({
+            'name': 'Test Branch Merge Date',
+            'trigger': 'on_create',
+            'model_id': self.env['ir.model']._get_id('runbot.batch'),
+        })
+
+        action_code = dedent(r"""
+            test_mergedate = datetime.datetime(2026, 6, 4, 15, 0)
+            bundle = record.bundle_id
+            #pr_regex = re.compile(r"closes\s+(?P<org>[\w.-]+)/(?P<repo>[\w.-]+)#(?P<prnumber>\d+)")
+            pr_ids = []
+            if bundle.is_base:
+                for cl in record.commit_link_ids:
+                    messages = cl.commit_id.repo_id._git(['log', f'{cl.commit_id.name}..{cl.base_commit_id.name}'])
+                    for line in messages.split('\n'):
+                        if line.startswith('closes') and '#' in line:
+                            pr_id = line.split('#')[1]
+                            if pr_id:
+                                pr_ids.append((cl.commit_id.repo_id, pr_id))
+            for repo_id, pr_id in pr_ids:
+                pr_branch = env['runbot.branch'].search([('repo_id', '=', repo_id.id), ('name', '=', pr_id)])
+                pr_branch.write({'merge_date': test_mergedate})
+        """)
+
+        self.env['ir.actions.server'].create({
+            'name': 'Test Set Merge Date On PR Closed',
+            'base_automation_id': close_pr_automation.id,
+            'model_id': self.env['ir.model']._get_id('runbot.batch'),
+            'usage': 'base_automation',
+            'state': 'code',
+            'code': action_code,
+        })
+
+        bundle_odoo_master = self.master_bundle
+        bundle_odoo_master.is_base = True
+
+        fixing_commit = self.env['runbot.commit'].create({
+            'name': 'd0d0caca',
+            'repo_id': self.repo_odoo.id,
+        })
+
+        base_commit = self.env['runbot.commit'].create({
+            'name': 'deadbeef',
+            'repo_id': self.repo_odoo.id,
+        })
+
+        commit_link_id = self.env['runbot.commit.link'].create({
+            'commit_id': fixing_commit.id,
+            'base_commit_id': base_commit.id,
+            'match_type': 'new',
+            'branch_id': self.branch_odoo.id,
+        })
+
+
+        self.env['runbot.batch'].create({
+            'bundle_id': bundle_odoo_master.id,
+            'state': 'preparing',
+            'commit_link_ids': [commit_link_id.id],
+        })
+
+        self.assertEqual(self.dev_pr.merge_date, datetime.datetime(2026, 6, 4, 15))
