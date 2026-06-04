@@ -1,0 +1,28 @@
+.table-group-divider {
+    > tr > th {
+        cursor: pointer;
+
+        &::before {
+            content: "\25BC";
+            display: inline-block;
+            width: 1rem;
+        }
+    }
+}
+
+.table-group-hidden {
+    > tr > th {
+        &::before {
+            content: "\25B6";
+            font-size: x-small
+        }
+    }
+
+    > tr:not(:has(> th)) {
+        display: none;
+    }
+}
+
+.w-0 {
+    width: 0;
+}

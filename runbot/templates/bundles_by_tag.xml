@@ -2,6 +2,7 @@
 <odoo>
     <data>
         <template id="runbot.bundle_tag_slot">
+            <t t-set="other_tags" t-value="bundle.tag_ids.filtered(lambda rec: rec != tag)"/>
             <t t-set="link_class" t-value="'link-primary'"/>
             <t t-set="link_title" t-value="bundle.name"/>
             <t t-if="not any(bundle.branch_ids.filtered(lambda rec: rec.is_pr))">
@@ -13,37 +14,77 @@
                 <t t-set="link_title" t-value="'All PR are closed'"/>
                 <t t-set="done" t-value="True"/>
             </t>
-            <t t-call="runbot.branch_github_menu">
-                <t t-set="btn_classes" t-value="'btn btn-link btn-ssm'"/>
-            </t>
-            <a t-out="bundle.description or bundle.name" t-attf-href="/runbot/bundle/{{bundle.id}}" t-att-class="link_class" t-att-title="link_title" target="_blank"/>
-            <t t-set="other_tags" t-value="bundle.tag_ids.filtered(lambda rec: rec != tag)"/>
-            <t t-foreach="other_tags" t-as="other_tag">
-                <span class="badge rounded-pill text-bg-success"><t t-out="other_tag.name"/></span>
-            </t>
-            <t t-if="not done">
-                <span t-attf-class="badge text-bg-info" data-toggle="tooltip" title="Last batch age">
-                    <t t-out="bundle.last_batch._get_formated_age()"/>
-                </span>
-            </t>
+            <tr>
+                <td>
+                    <t t-call="runbot.branch_github_menu">
+                        <t t-set="btn_classes" t-value="'btn btn-link btn-ssm'"/>
+                    </t>
+                </td>
+                <td>
+                    <a t-out="bundle.description or bundle.name" t-att-href="bundle.frontend_url" t-att-class="link_class" t-att-title="link_title" target="_blank"/>
+                </td>
+                <td>
+                    <span t-if="done" class="badge text-bg-success" data-tag="done">Done!</span>
+                    <span t-else="" class="badge text-bg-secondary" title="Last batch age" t-out="bundle.last_batch._get_formated_age()"/>
+                    <t t-foreach="other_tags" t-as="other_tag">
+                        <span class="badge rounded-pill text-bg-primary" t-att-data-tag="other_tag.id" t-out="other_tag.name"/>
+                    </t>
+                </td>
+            </tr>
         </template>
         <template id="runbot.bundles_by_tag">
             <t t-call='runbot.layout'>
                 <div class="container-fluid">
-                    <h1 class="text-capitalize">
-                        <t t-out="tag.name"/>
-                        <button type="button" class="btn btn-primary btn-ssm disabled"><t t-out="nb_bundles_done"/> / <t t-out="nb_bundles"/></button>
-                    </h1>
-                    <t t-foreach="sorted(bundles_by_team.keys())" t-as="team">
-                        <t t-set="team_bundles" t-value="bundles_by_team.get(team)"/>
-                        <details t-att-open="bool(team_bundles) and ''"><summary t-out="team"/>
-                            <ul>
+                    <table class="table table-condensed table-group table-filter caption-top text-body-secondary">
+                        <caption>
+                            <div class="row align-items-center">
+                                <h1 class="col-12 col-md-auto text-capitalize">
+                                    <t t-out="tag.name"/>
+                                    <span class="badge text-bg-primary fs-6 align-middle">
+                                        <t t-out="nb_bundles_done"/> / <t t-out="len(bundles)"/>
+                                    </span>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" data-toggle="table-group-collapse">Collapse all</button>
+                                </h1>
+                                <div class="d-flex col-12 col-md-auto align-items-center ms-auto" role="toolbar" aria-label="Toolbar with button groups">
+                                    <div class="form-check form-check-inline form-switch">
+                                        <input type="checkbox" class="form-check-input" id="filter-tag-done" autocomplete="off" checked="checked" data-toggle="filter-row" data-filter="tag==done"/>
+                                        <label class="form-check-label" for="filter-tag-done">Done</label>
+                                    </div>
+                                    <t t-set="tags" t-value="bundles.tag_ids.filtered(lambda rec: rec != tag)"/>
+                                    <t t-foreach="tags" t-as="filter_tag">
+                                        <div class="form-check form-check-inline form-switch">
+                                            <input type="checkbox" class="form-check-input" t-attf-id="filter-tag-{{filter_tag.id}}" checked="checked" autocomplete="off" data-toggle="filter-row" t-attf-data-filter="tag=={{filter_tag.id}}"/>
+                                            <label class="form-check-label" t-attf-for="filter-tag-{{filter_tag.id}}" t-out="filter_tag.name"/>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+                        </caption>
+                        <colgroup>
+                            <col class="w-0"/>
+                            <col class="w-75"/>
+                            <col/>
+                        </colgroup>
+                        <t t-foreach="sorted(bundles_by_team.keys())" t-as="team">
+                            <t t-set="team_bundles" t-value="bundles_by_team.get(team)"/>
+                            <t t-set="nb_team_bundles" t-value="len(team_bundles)"/>
+                            <t t-set="nb_team_bundles_done" t-value="len(list(filter(lambda b: not b.has_pr, team_bundles)))"/>
+                            <tbody class="table-group-divider">
+                                <tr class="table-active">
+                                    <th colspan="3" class="py-1">
+                                        <t t-out="team"/>
+                                        <span t-if="nb_team_bundles_done == nb_team_bundles" class="badge text-bg-success">All Done!</span>
+                                        <span t-else="" class="badge text-bg-primary">
+                                            <t t-out="nb_team_bundles_done"/> / <t t-out="nb_team_bundles"/>
+                                        </span>
+                                    </th>
+                                </tr>
                                 <t t-foreach="team_bundles" t-as="bundle">
-                                    <li><t t-call="runbot.bundle_tag_slot"/></li>
+                                    <t t-call="runbot.bundle_tag_slot"/>
                                 </t>
-                            </ul>
-                        </details>
-                    </t>
+                            </tbody>
+                        </t>
+                    </table>
                 </div>
             </t>
         </template>
