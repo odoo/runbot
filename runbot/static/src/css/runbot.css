@@ -130,6 +130,10 @@
 	--bs-table-bg: transparent; /* Forced to white in bootstrap latest version, hides the color of sub builds, batch commits, ...*/
 }
 
+.table-layout-fixed {
+    table-layout: fixed;
+}
+
 /*.accordion-button:not(.collapsed) {
 	background-color: transparent; /* remove crappy color
 }*/
