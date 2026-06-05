@@ -481,6 +481,7 @@ class Runbot(Controller):
             'build_errors': build_errors,
             'title': 'Build Errors',
             'sort_order_choices': sort_order_choices,
+            'sort_order': sort_order,
             'page': page,
             'pager': pager,
         }

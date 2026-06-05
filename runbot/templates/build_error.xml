@@ -2,57 +2,72 @@
 <odoo>
   <data>
     <template id="runbot.build_error_cards">
-      <div t-if="build_errors" class="accordion" t-attf-id="accordion_{{accordion_id}}">
-        <div class="card">
-          <div class="card-header">
-            <div class="row">
-              <div class="col">Last seen date</div>
-              <div class="col col-md-8">Summary</div>
-              <div class="col">Triggers</div>
-              <div class="col">Assigned to</div>
-              <div class="col">&amp;nbsp;</div>
+      <table class="table table-group table-layout-fixed caption-top text-body-tertiary">
+        <caption>
+          <div class="row">
+            <h2 class="col-12 col-md-auto">
+              <t t-out="table_title"/>
+              <span t-if="build_errors_counter" class="badge text-bg-primary fs-6 align-middle" t-out="build_errors_counter"/>
+              <button type="button" class="btn btn-sm btn-outline-primary" data-toggle="table-group-collapse"/>
+            </h2>
+            <div class="btn-toolbar col-12 col-md-auto ms-auto gap-2">
+              <t t-out="additional_buttons"/>
             </div>
           </div>
-        </div>
+        </caption>
+        <colgroup>
+          <col/>
+          <col class="w-50"/>
+          <col class="w-25"/>
+          <col/>
+          <col/>
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Last seen</th>
+            <th>Summary</th>
+            <th>Triggers</th>
+            <th>Assigned to</th>
+            <th/>
+          </tr>
+        </thead>
         <t t-foreach="build_errors" t-as="build_error">
-          <div class="card">
-            <div class="card-header">
-              <div class="row">
-                <div class="col"><t t-out="build_error.last_seen_date" t-options='{"widget": "datetime"}'/></div>
-                <div class="col col-md-8">
-                  <button class="btn accordion-button collapsed" type="button" data-bs-toggle="collapse" t-attf-data-bs-target="#collapse{{build_error.id}}" aria-expanded="true" aria-controls="collapseOne">
-                    <code><t t-out="build_error.name"/></code>
-                  </button>
+          <tbody class="table-group-divider table-group-hidden">
+            <tr>
+              <td t-out="build_error.last_seen_date" t-options='{"widget": "datetime"}'/>
+              <th>
+                <code t-out="build_error.name"/>
+              </th>
+              <td>
+                <t t-foreach="build_error.trigger_ids" t-as="trigger">
+                  <span class="badge text-bg-info" t-out="trigger.name"/>
+                </t>
+              </td>
+              <td>
+                <t t-if="build_error.responsible" t-out="build_error.responsible.name"/>
+                <a t-else="" t-attf-href="/runbot/errors/assign/{{build_error.id}}" data-runbot="action" role="button" class="btn btn-primary btn-sm">Assign to me</a>
+              </td>
+              <td class="text-nowrap">
+                <a t-att-href="build_error.last_seen_build_id.build_url" t-attf-title="View last affected build ({{build_error.last_seen_build_id.id}})">
+                  <i class="fa fa-external-link"/>
+                </a>
+                <a groups="base.group_user" t-attf-href="/odoo/error/{{build_error.id}}" target="_blank" title="View in Backend">
+                  <span class="badge text-bg-info" t-out="build_error.build_count" t-attf-title="This error was seen {{build_error.build_count}} View in backend"/>
+                </a>
+                <span groups="!base.group_user" class="badge text-bg-info" t-out="build_error.build_count" t-attf-title="This error was seen {{build_error.build_count}}"/>
+                <span class="fa fa-random" t-if="build_error.random"/>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="5">
+                <div class="overflow-x-auto">
+                    <pre class="bg-danger-subtle p-2" t-out="build_error.content.strip()"/>
                 </div>
-                <div class="col">
-                  <t t-foreach="build_error.trigger_ids" t-as="trigger">
-                    <span class="badge text-bg-pill text-bg-info small"><t t-out="trigger.name"/></span>
-                  </t>
-                </div>
-                <div class="col">
-                  <t t-if="build_error.responsible" t-out="build_error.responsible.name"/>
-                  <a t-else="" t-attf-href="/runbot/errors/assign/{{build_error.id}}" data-runbot="action" role="button" class="btn btn-primary btn-sm">Assign to me</a>
-                </div>
-                <div class="col">
-                  <a t-att-href="build_error.last_seen_build_id.build_url" t-attf-title="View last affected build ({{build_error.last_seen_build_id.id}})"><i class="fa fa-external-link"/></a>
-                  <a groups="base.group_user"
-                    t-attf-href="/odoo/error/{{build_error.id}}" target="_blank" title="View in Backend">
-                    <span class="badge text-bg-info" t-out="build_error.build_count" t-attf-title="This error was seen {{build_error.build_count}} View in backend"/>
-                  </a>
-                  <span groups="!base.group_user" class="badge text-bg-info" t-out="build_error.build_count" t-attf-title="This error was seen {{build_error.build_count}}"/>
-                  <span class="fa fa-random" t-if="build_error.random"/>
-                </div>
-              </div>
-            </div>
-
-            <div t-attf-id="collapse{{build_error.id}}" class="collapse" aria-labelledby="headingOne" t-attf-data-parent="#accordion_{{accordion_id}}">
-              <div class="card-body">
-                <pre class="pre-scrollable bg-danger-subtle"><t t-out="build_error.content.strip()" /></pre>
-              </div>
-            </div>
-          </div>
+              </td>
+            </tr>
+          </tbody>
         </t>
-      </div>
+      </table>
     </template>
 
     <template id="runbot.build_error">
@@ -61,42 +76,39 @@
           <div class="row">
             <div class='col-md-12'>
               <t t-if="page==1 and current_user_errors">
-                <h4>Your assigned build errors</h4>
                 <t t-call="runbot.build_error_cards">
+                  <t t-set="table_title">Your assigned build errors</t>
                   <t t-set="build_errors" t-value="current_user_errors"/>
-                  <t t-set="accordion_id">user_errors</t>
+                  <t t-set="build_errors_counter" t-value="len(current_user_errors)"/>
                 </t>
               </t>
               <t t-if="page==1 and current_team_errors">
-                <h4>Team unassigned build errors</h4>
                 <t t-call="runbot.build_error_cards">
+                  <t t-set="table_title">Team unassigned build errors</t>
                   <t t-set="build_errors" t-value="current_team_errors"/>
-                  <t t-set="accordion_id">user_errors</t>
+                  <t t-set="build_errors_counter" t-value="len(current_team_errors)"/>
                 </t>
               </t>
               <t t-if="build_errors">
-                <nav class="navbar navbar-expand-lg navbar-light">
-                  <h4 class="d-inline"> All builds errors</h4>
-                    <span class="ms-auto">
-                      <span class="dropdown me-auto">
-                      <a role="button" href="#" class="dropdown-toggle btn btn-secondary" data-bs-toggle="dropdown">
-                        Sort By: <t t-out="request.params.get('sort', '')"/>
-                      </a>
-                      <div class="dropdown-menu" aria-labelledby="sortMenuButton" role="menu">
-                        <t t-foreach="sort_order_choices" t-as="sort_choice">
-                          <a role="menuitem" class="dropdown-item" t-attf-href="/runbot/errors?sort={{sort_choice}}"><t t-out="sort_order_choices[sort_choice]"/></a>
-                        </t>
-                      </div>
-                    </span>
-                  </span>
-                  <span class="ms-auto">
-                    <t t-call="website.pager" />
-                  </span>
-                </nav>
-
                 <t t-call="runbot.build_error_cards">
+                  <t t-set="table_title">All builds errors</t>
                   <t t-set="build_errors" t-value="build_errors"/>
-                  <t t-set="accordion_id">all_errors</t>
+                  <t t-set="build_errors_counter" t-value="current_user_errors.search_count([])"/>
+                  <t t-set="additional_buttons">
+                    <div class="dropdown">
+                      <button type="button" class="dropdown-toggle btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
+                        Sort By: <t t-out="sort_order_choices.get(sort_order)"/>
+                      </button>
+                      <ul class="dropdown-menu" aria-labelledby="sortMenuButton" role="menu">
+                        <li t-foreach="sort_order_choices" t-as="sort_choice">
+                          <a role="menuitem" class="dropdown-item" t-attf-href="/runbot/errors?sort={{sort_choice}}"><t t-out="sort_order_choices[sort_choice]"/></a>
+                        </li>
+                      </ul>
+                    </div>
+                    <t t-call="website.pager">
+                      <t t-set="classname" t-valuef="pagination-sm"/>
+                    </t>
+                  </t>
                 </t>
               </t>
             </div>
