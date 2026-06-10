@@ -25,6 +25,7 @@ class Version(models.Model):
     next_intermediate_version_ids = fields.Many2many('runbot.version', compute='_compute_version_relations')
 
     dockerfile_id = fields.Many2one('runbot.dockerfile', default=lambda self: self.env['runbot.version'].search([('name', '=', 'master')], limit=1).dockerfile_id or self.env.ref('runbot.docker_default', raise_if_not_found=False))
+    postgres_dockerfile_id = fields.Many2one('runbot.dockerfile', default=lambda self: self.env['runbot.version'].search([('name', '=', 'master')], limit=1).postgres_dockerfile_id or self.env.ref('runbot.postgresql_docker_default', raise_if_not_found=False))
 
     _unique_name = models.Constraint(
         'unique (name)',

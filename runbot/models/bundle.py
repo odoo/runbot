@@ -53,6 +53,7 @@ class Bundle(models.Model):
     all_trigger_custom_ids = fields.Many2many('runbot.bundle.trigger.custom', compute='_compute_all_trigger_custom_ids', recursive=True)
     host_id = fields.Many2one('runbot.host', compute="_compute_host_id", store=True)
     dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, help="Use a custom Dockerfile")
+    postgres_dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, help="Use a custom PostgreSQL Dockerfile")
     commit_limit = fields.Integer("Commit limit")
     file_limit = fields.Integer("File limit")
     disable_codeowner = fields.Boolean("Disable codeowners", tracking=True)

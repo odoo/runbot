@@ -237,6 +237,31 @@
       </field>
     </record>
 
+  <record id="docker_compose_form" model="ir.ui.view">
+    <field name="name">runbot.docker_compose.form</field>
+    <field name="model">runbot.docker_compose</field>
+    <field name="arch" type="xml">
+      <form string="Docker Compose file">
+        <sheet>
+          <group>
+            <field name="name"/>
+            <field name="content" widget="ace"/>
+          </group>
+        </sheet>
+      </form>
+    </field>
+  </record>
+
+  <record id="docker_compose_list" model="ir.ui.view">
+    <field name="name">runbot.docker_compose.list</field>
+    <field name="model">runbot.docker_compose</field>
+    <field name="arch" type="xml">
+      <list string="Docker Compose files">
+        <field name="name"/>
+      </list>
+    </field>
+  </record>
+
   <record id="dockerfile_duplicate_fully" model="ir.actions.server">
       <field name="name">Duplicate With Variants</field>
       <field name="model_id" ref="runbot.model_runbot_dockerfile"/>
@@ -280,6 +305,16 @@
     <field name="view_mode">list,form</field>
     <field name="path">docker-layer</field>
   </record>
+
+
+  <record id="open_view_docker_compose_list" model="ir.actions.act_window">
+    <field name="name">Docker Compose files</field>
+    <field name="res_model">runbot.docker_compose</field>
+    <field name="view_mode">list,form</field>
+    <field name="path">docker-compose</field>
+  </record>
+
+
 
   </data>
 </odoo>

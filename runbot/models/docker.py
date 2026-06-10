@@ -46,7 +46,6 @@ class DockerLayer(models.Model):
     reference_count = fields.Integer('Number of references', compute='_compute_references')
     has_xml_id = fields.Boolean(compute='_compute_has_xml_id')
 
-
     @api.depends('referencing_dockerlayer_ids', 'dockerfile_id.referencing_dockerlayer_ids')
     def _compute_references(self):
         for record in self:
@@ -476,3 +475,17 @@ class DockerBuildOutput(models.Model):
                     if negativ_diff or positiv_diff:
                         diff_dict[k] = [f'- {s}' for s in negativ_diff] + [f'+ {s}' for s in positiv_diff]
         return diff_dict
+
+
+class DockerCompose(models.Model):
+    _name = 'runbot.docker_compose'
+    _description = "Docker compose file"
+
+    name = fields.Char('Name', required=True)
+    content = fields.Text('Content', required=True)
+
+    def _render(self, values):
+        rendered = self.content
+        for key, value in values.items():
+            rendered = rendered.replace('{%s}' % key, str(value))
+        return rendered

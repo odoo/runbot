@@ -426,6 +426,8 @@ class ConfigStep(models.Model):
     make_stats = fields.Boolean('Make stats', default=False)
     build_stat_regex_ids = fields.Many2many('runbot.build.stat.regex', string='Stats Regexes')
     dockerfile_id = fields.Many2one('runbot.dockerfile', string='Dockerfile')
+    postgres_dockerfile_id = fields.Many2one('runbot.dockerfile', string='PostgreSQL Dockerfile')
+    docker_compose_id = fields.Many2one('runbot.docker_compose', string='Docker Compose configuration')
     dockerfile_variant = fields.Char('Docker Variant')
     # install_odoo
     create_db = fields.Boolean('Create Db', default=True, tracking=True)  # future
@@ -1047,6 +1049,7 @@ class ConfigStep(models.Model):
                         'version_id': target.params_id.version_id.id,
                         'trigger_id': None,
                         'dockerfile_id': target.params_id.dockerfile_id.id,
+                        'postgres_dockerfile_id': target.params_id.postgres_dockerfile_id.id,
                     })
                     source_description = source.params_id.version_id.name
                     target_description = target.params_id.version_id.name
@@ -1111,7 +1114,7 @@ class ConfigStep(models.Model):
             env_variables.append(exception_env)
         if config_env_variables := build.params_id.config_data.get('env_variables', False):
             env_variables += config_env_variables.split(';')
-        return dict(cmd=migrate_cmd, ro_volumes=exports, env_variables=env_variables, image_tag=build.params_id.dockerfile_id.image_tag)
+        return dict(cmd=migrate_cmd, ro_volumes=exports, env_variables=env_variables)
 
     def _run_restore(self, build, config_data=None):
         # exports = build._checkout()
