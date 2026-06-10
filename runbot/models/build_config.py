@@ -1641,7 +1641,7 @@ class ConfigStep(models.Model):
             return self._run_create_build(
                 build,
                 {'child_data': child_data_list, 'number_build': current_step.get('number_builds', 1)},
-                max_build=min(current_step.get('max_builds', 20), 200),
+                max_build=min(current_step.get('max_builds', 50), 200),
             )
 
         if current_step['job_type'] == 'restore':
