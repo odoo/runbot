@@ -6,9 +6,9 @@ class MergebotController(Controller):
 
     @from_role('tx', signed=True)
     @route('/i18n/merge_commit', type='json', auth='public')
-    def merge_commit(self, commit_hash, repository, branch, project="RD"):
+    def merge_commit(self, commit_hash, repository, branch, project="RD", callback_url=None):
         """Merge a specific commit hash in a repository
-        
+
         The commit_hash must be known by mergebot (in the git network)
         Used for translation synchronisation from transifex
         """
@@ -25,9 +25,12 @@ class MergebotController(Controller):
         if not target:
             return {"error": f"Target branch {project}:{branch} not found"}
 
-        patch = request.env["runbot_merge.patch"].sudo().create({
+        vals = {
             "repository": repository_id.id,
             "target": target.id,
-            "commit": commit_hash
-        })
+            "commit": commit_hash,
+        }
+        if callback_url:
+            vals["callback_url"] = callback_url
+        patch = request.env["runbot_merge.patch"].sudo().create(vals)
         return {"patch": patch.id}

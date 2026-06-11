@@ -21,6 +21,7 @@ from email.utils import parseaddr
 from typing import Union
 
 from markupsafe import Markup
+import requests
 
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError
@@ -144,6 +145,16 @@ class Patch(models.Model):
     repository = fields.Many2one('runbot_merge.repository', required=True, tracking=True)
     target = fields.Many2one('runbot_merge.branch', required=True, tracking=True)
     commit = fields.Char(size=40, string="commit to cherry-pick, must be in-network", tracking=True)
+    callback_url = fields.Char(
+        help="If set, a POST request is made to this URL after the patch was either applied or failed.",
+        tracking=True,
+    )
+    callback_retries_left = fields.Integer(
+        help="Number of times the callback can still be retried.",
+        default=5,
+        tracking=True,
+    )
+    success = fields.Boolean(help="Indicates whether the patch was successfully applied.", default=False, tracking=True)
 
     patch = fields.Text(string="unified diff to apply", tracking=True)
     format = fields.Selection([
@@ -215,7 +226,11 @@ class Patch(models.Model):
         super()._auto_init()
         self.env.cr.execute("""
         CREATE INDEX IF NOT EXISTS runbot_merge_patch_active
-            ON runbot_merge_patch (target) WHERE active
+            ON runbot_merge_patch (target) WHERE active;
+        CREATE INDEX IF NOT EXISTS runbot_merge_patch_callback
+            ON runbot_merge_patch (callback_url, active)
+         WHERE callback_url IS NOT NULL
+           AND active IS FALSE;
         """)
 
     @api.model_create_multi
@@ -354,7 +369,9 @@ class Patch(models.Model):
                 )
             else:
                 info['target_head'] = c
+                patch.success = True
 
+        self.env.ref('runbot_merge.ir_cron_fire_patch_callbacks')._trigger()
         return True
 
     def _apply_commit(self, r: git.Repo, parent: str) -> str:
@@ -441,3 +458,32 @@ class Patch(models.Model):
             author=p.author,
             committer=p.committer,
         ).stdout.strip()
+
+    @api.model
+    def _cron_fire_pending_callbacks(self) -> None:
+        pending_patches = self.search([('active', '=', False), ('callback_url', '!=', False)])
+        if not pending_patches:
+            return
+
+        session = requests.Session()
+        for patch in pending_patches:
+            if patch.callback_retries_left <= 0:
+                patch.callback_url = False
+                _logger.warning("Patch callback to %s failed too many times, giving up.", patch.callback_url)
+                self.env.cr.commit()
+                continue
+
+            try:
+                res = session.post(
+                    patch.callback_url,
+                    params={'success': patch.success},
+                    timeout=10,
+                )
+                res.raise_for_status()
+                patch.callback_url = False
+                _logger.info("Patch callback to %s succeeded.", patch.callback_url)
+            except requests.RequestException:
+                _logger.warning("Patch callback to %s failed.", patch.callback_url)
+            finally:
+                patch.callback_retries_left -= 1
+                self.env.cr.commit()
