@@ -68,7 +68,7 @@
                         <t t-foreach="sorted(bundles_by_team.keys())" t-as="team">
                             <t t-set="team_bundles" t-value="bundles_by_team.get(team)"/>
                             <t t-set="nb_team_bundles" t-value="len(team_bundles)"/>
-                            <t t-set="nb_team_bundles_done" t-value="len(list(filter(lambda b: not b.has_pr, team_bundles)))"/>
+                            <t t-set="nb_team_bundles_done" t-value="len(list(filter(lambda b: b.has_pr and not b.has_active_pr, team_bundles)))"/>
                             <tbody class="table-group-divider">
                                 <tr class="table-active">
                                     <th colspan="3" class="py-1">

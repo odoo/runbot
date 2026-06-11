@@ -38,7 +38,8 @@ class Bundle(models.Model):
     defined_base_id = fields.Many2one('runbot.bundle', 'Forced base bundle', domain="[('project_id', '=', project_id), ('is_base', '=', True)]")
     base_id = fields.Many2one('runbot.bundle', 'Base bundle', compute='_compute_base_id', store=True)
 
-    has_pr = fields.Boolean('Has PR', compute='_compute_has_pr', store=True)
+    has_pr = fields.Boolean('Has PR', compute='_compute_has_pr')
+    has_active_pr = fields.Boolean('Has Active PR', compute='_compute_has_active_pr', store=True)
 
     version_id = fields.Many2one('runbot.version', 'Version', compute='_compute_version_id', store=True, recursive=True)
     version_number = fields.Char(related='version_id.number', store=True, index=True)
@@ -124,10 +125,15 @@ class Bundle(models.Model):
             else:
                 bundle.base_id = master_base or fallback
 
-    @api.depends('branch_ids.is_pr', 'branch_ids.alive')
+    @api.depends('branch_ids.is_pr')
     def _compute_has_pr(self):
         for bundle in self:
-            bundle.has_pr = any(branch.is_pr and branch.alive for branch in bundle.branch_ids)
+            bundle.has_pr = any(bundle.branch_ids.filtered('is_pr'))
+
+    @api.depends('branch_ids.is_pr', 'branch_ids.alive')
+    def _compute_has_active_pr(self):
+        for bundle in self:
+            bundle.has_active_pr = any(branch.is_pr and branch.alive for branch in bundle.branch_ids)
 
     @tools.ormcache('project_id')
     def _get_base_ids(self, project_id):
