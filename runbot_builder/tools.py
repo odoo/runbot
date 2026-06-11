@@ -114,9 +114,14 @@ class RunbotClient():
             _logger.info('Starting git gc on repositories')
             commands = []
             host_name = self.host.name
-            for repo in self.env['runbot.repo'].search([]):
+            repos = self.env['runbot.repo'].search([('mode', '!=', 'disabled')])
+            for repo in repos:
                 commands.append((repo.name, repo._get_git_command(['gc', '--prune=all', '--quiet'])))
+                # update the repos once a day to speed up individual commit fetches
+                repo._update(force=True)
+
             self.env.cr.rollback()
+
             # gc commands can be slow, rollbacking to avoid to keep a transaction idle for multiple minutes.
             messages = []
             for repo_name, command in commands:
