@@ -10,3 +10,4 @@ from . import validate
 from . import status_request
 from . import fetch_pr
 from . import check_commits
+from . import patch_callback

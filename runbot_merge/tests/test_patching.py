@@ -1,4 +1,7 @@
+import threading
 import xmlrpc.client
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from types import SimpleNamespace
 
 import pytest
 
@@ -451,3 +454,108 @@ index d00491fd7e5b..0cfbf08886fc 100644
 """,
         '',
     ]
+
+
+@pytest.fixture
+def callback_server():
+    """Spins up a local HTTP server the patch callback can POST to, records the
+    requests it receives and allows configuring the status code it answers with.
+    """
+    state = SimpleNamespace(requests=[], status=200)
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            length = int(self.headers.get('Content-Length') or 0)
+            if length:
+                self.rfile.read(length)
+            state.requests.append(self.path)
+            self.send_response(state.status)
+            self.end_headers()
+
+        def log_message(self, *args):  # silence the default stderr logging
+            pass
+
+    with HTTPServer(('127.0.0.1', 0), Handler) as server:
+        state.url = f"http://127.0.0.1:{server.server_address[1]}/hook?state=42"
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield state
+        finally:
+            server.shutdown()
+            thread.join()
+
+def test_apply_callback_success(env, project, repo, users, callback_server):
+    """When a patch with a callback URL applies successfully, the target is
+    notified (once) with ``success=True`` and the callback is dropped from the
+    queue.
+    """
+    env['ir.model.access'].create({
+        "name": "xxx",
+        "model_id": env.ref("runbot_merge.model_runbot_merge_patch_callback").id,
+        "group_id": env.ref("runbot_merge.group_admin").id,
+        "perm_read": True,
+    })
+    p = env['runbot_merge.patch'].create({
+        'target': project.branch_ids.id,
+        'repository': project.repo_ids.id,
+        'patch': BASIC_UDIFF,
+        'callback_url': callback_server.url,
+    })
+
+    env.run_crons()
+
+    HEAD = repo.commit('master')
+    assert repo.read_tree(HEAD) == {'a': '2', 'b': '2\n'}, "the branch was correctly patched"
+    assert not p.active
+
+    assert len(callback_server.requests) == 1, "the callback_url was hit once"
+    assert callback_server.requests == ["/hook?state=42&success=1"]
+
+    assert env['runbot_merge.patch.callback'].search_count([]) == 0
+
+
+@pytest.mark.expect_log_errors(
+    reason="a callback target answering with an error status is logged on"
+           " every failed attempt until the hook is cancelled",
+)
+def test_apply_callback_failure(env, project, repo, users, callback_server):
+    """If the callback target does not respond appropriately, the branch is
+    still patched but the hook is retried and eventually cancelled (disabled).
+    """
+    callback_server.status = 404
+    env['ir.model.access'].create({
+        "name": "xxx",
+        "model_id": env.ref("runbot_merge.model_runbot_merge_patch_callback").id,
+        "group_id": env.ref("runbot_merge.group_admin").id,
+        "perm_read": True,
+        "perm_write": True,
+    })
+
+    p = env['runbot_merge.patch'].create({
+        'target': project.branch_ids.id,
+        'repository': project.repo_ids.id,
+        'patch': BASIC_UDIFF,
+        'callback_url': callback_server.url,
+    })
+
+    env.run_crons()
+
+    assert repo.read_tree(repo.commit('master')) == {'a': '2', 'b': '2\n'},\
+        "the branch was correctly patched"
+    assert not p.active
+
+    cb = env['runbot_merge.patch.callback'].search([('patch_id', '=', p.id)])
+    assert cb, "the callback should still be queued for retry"
+    assert cb.sequence == 1, "the job should have failed once"
+    assert not cb.disabled, "a single failure should not cancel the hook yet"
+
+    for _ in range(5):  # PatchCallback.RETRY_LIMIT
+        cb.retry_after = '0001-01-01 00:00:00'
+        env.run_crons('runbot_merge.patch_callback_cron')
+
+    assert cb.disabled
+    assert callback_server.requests == ["/hook?state=42&success=1"]*5
+
+    assert repo.read_tree(repo.commit('master')) == {'a': '2', 'b': '2\n'},\
+        "the branch is still patched"

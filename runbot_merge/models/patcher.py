@@ -144,6 +144,10 @@ class Patch(models.Model):
     repository = fields.Many2one('runbot_merge.repository', required=True, tracking=True)
     target = fields.Many2one('runbot_merge.branch', required=True, tracking=True)
     commit = fields.Char(size=40, string="commit to cherry-pick, must be in-network", tracking=True)
+    callback_url = fields.Char(
+        help="If set, a POST request is made to this URL after the patch was either applied or failed.",
+        tracking=True,
+    )
 
     patch = fields.Text(string="unified diff to apply", tracking=True)
     format = fields.Selection([
@@ -215,7 +219,7 @@ class Patch(models.Model):
         super()._auto_init()
         self.env.cr.execute("""
         CREATE INDEX IF NOT EXISTS runbot_merge_patch_active
-            ON runbot_merge_patch (target) WHERE active
+            ON runbot_merge_patch (target) WHERE active;
         """)
 
     @api.model_create_multi
@@ -293,7 +297,8 @@ class Patch(models.Model):
         if len(patches) < selected:
             self.env.ref('runbot_merge.staging_cron')._trigger(fields.Datetime.now() + timedelta(minutes=30))
 
-        for patch in patches:
+        results = [False] * len(patches)
+        for i, patch in enumerate(patches):
             patch.active = False
             info = repo_info[patch.repository]
             r = info['local']
@@ -354,6 +359,13 @@ class Patch(models.Model):
                 )
             else:
                 info['target_head'] = c
+                results[i] = True
+
+        self.env['runbot_merge.patch.callback'].create([
+            {'patch_id': patch.id, 'success': success}
+            for patch, success in zip(patches, results)
+            if patch.callback_url
+        ])
 
         return True
 
@@ -441,3 +453,4 @@ class Patch(models.Model):
             author=p.author,
             committer=p.committer,
         ).stdout.strip()
+
