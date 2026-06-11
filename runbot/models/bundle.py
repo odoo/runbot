@@ -225,7 +225,7 @@ class Bundle(models.Model):
                 if author not in github_logins:
                     github_logins.append(author)
             github_logins_by_bundle[bundle] = github_logins
-            if VALID_BUNDLE_NAME_RE.match(bundle.name):
+            if bundle.name and VALID_BUNDLE_NAME_RE.match(bundle.name):
                 ngram = bundle.name.split('-')[-1].lower()
                 ngram_by_bundle[bundle] = ngram
 
