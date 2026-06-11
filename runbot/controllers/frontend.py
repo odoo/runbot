@@ -104,7 +104,7 @@ class Runbot(Controller):
                 domain.append(('no_build', '=', False))
 
             if has_pr is not None:
-                domain.append(('has_pr', '=', bool(has_pr)))
+                domain.append(('has_active_pr', '=', bool(has_pr)))
 
             filter_mode = request.httprequest.cookies.get('filter_mode', 'default')
             if filter_mode == 'sticky':
@@ -908,13 +908,10 @@ class Runbot(Controller):
         if not project and projects:
             project = projects[0]
         bundles_by_team = defaultdict(list)
-        nb_bundles_done = 0
         bundles = self.env['runbot.bundle'].search([('tag_ids', 'in', bundle_tag_id.id)])
+        nb_bundles_done = len(bundles.filtered(lambda b: b.has_pr and not b.has_active_pr))
         for bundle in bundles:
             bundles_by_team[bundle.team_id.name or 'No Team Defined'].append(bundle)
-            bundle_prs = bundle.branch_ids.filtered(lambda rec: rec.is_pr)
-            if any(bundle_prs) and not any(bundle_prs.mapped('alive')):
-                nb_bundles_done += 1
 
         qctx = {
             'tag': bundle_tag_id,

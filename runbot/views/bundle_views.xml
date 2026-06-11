@@ -69,6 +69,7 @@
                             <field name="base_id"/>
                             <field name="defined_base_id" readonly="is_base"/>
                             <field name="version_id"/>
+                            <field name="has_active_pr"/>
                             <field name="has_pr"/>
                         </group>
                         <group string="Testing options">
@@ -177,7 +178,7 @@
             <field name="name"/>
             <field name="version_id"/>
             <separator/>
-            <filter string="Has open pr" name="has_pr" domain="[('has_pr', '=', True)]"/>
+            <filter string="Has open pr" name="has_active_pr" domain="[('has_active_pr', '=', True)]"/>
             <filter string="No pr" name="no_pr" domain="[('branch_ids', '!=', []), '!', ('branch_ids', 'any', [('is_pr', '=', True)])]"/>
             <filter string="Is base" name="is_base" domain="[('is_base', '=', True)]"/>
             <filter string="Is sticky" name="is_sticky" domain="[('sticky', '=', True)]"/>
