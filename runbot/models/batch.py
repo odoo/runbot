@@ -468,12 +468,13 @@ class Batch(models.Model):
 
         should_start_triggers_ids = set()
         is_dev = not bundle.is_staging and not bundle.is_base
-        for trigger in self.slot_ids.trigger_id:
+        for slot in self.slot_ids:
+            trigger = slot.trigger_id
             enable_on_bundle = (trigger.on_staging and bundle.is_staging) or (trigger.on_base and bundle.is_base) or (trigger.on_dev and is_dev)
             common_repo = (trigger.repo_ids & bundle_repos)
             if self.build_all and not common_repo:
                 common_repo = (trigger.dependency_ids & bundle_repos)
-            if (common_repo or bundle.build_all or bundle.sticky) and enable_on_bundle:
+            if (common_repo or bundle.build_all or bundle.sticky or (slot.params_id.create_batch_id.bundle_id == bundle and slot.params_id.build_ids)) and enable_on_bundle:
                 should_start_triggers_ids.add(trigger.id)
 
         disabled_triggers = self.bundle_id.all_trigger_custom_ids.filtered(lambda tc: tc.start_mode == 'disabled').trigger_id
