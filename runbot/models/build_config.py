@@ -446,8 +446,8 @@ class ConfigStep(models.Model):
     dockerfile_id = fields.Many2one('runbot.dockerfile', string='Dockerfile')
     dockerfile_variant = fields.Char('Docker Variant')
     # install_odoo
-    create_db = fields.Boolean('Create Db', default=True, tracking=True)  # future
-    custom_db_name = fields.Char('Custom Db Name', tracking=True)  # future
+    create_db = fields.Boolean('Create Db', default=True, tracking=True)  # TODO remove
+    custom_db_name = fields.Char('Custom Db Name', tracking=True)
     install_modules = fields.Char('Modules to install', help="List of module patterns to install, use * to install all available modules, prefix the pattern with dash to remove the module.", default='', tracking=True)
     db_name = fields.Char('Db Name', compute='_compute_db_name', inverse='_inverse_db_name', tracking=True)
     cpu_limit = fields.Integer('Cpu limit', default=3600, tracking=True)
@@ -797,6 +797,7 @@ class ConfigStep(models.Model):
         db_suffix = re.sub(r'[^a-z0-9\-_]', '_', db_suffix.lower())
         db_name = '%s-%s' % (build.dest, db_suffix)
         cmd += ['-d', db_name]
+        self.env['runbot.database'].create({'name': db_name, 'build_id': self.id})
 
         # Demo data behavior changed in 18.1 -> demo data became opt-in instead of opt-out
         available_options = build._parse_config()
@@ -1215,6 +1216,7 @@ class ConfigStep(models.Model):
 
         icp = self.env['ir.config_parameter']
         db_template = icp.get_param('runbot.runbot_db_template', default='template0')
+        self.env['runbot.database'].create({'name': restore_db_name, 'build_id': self.id})
         cmd = ' && '.join([
             'mkdir /data/build/restore',
             'cd /data/build/restore',
