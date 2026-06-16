@@ -49,6 +49,7 @@ class BuilderClient(RunbotClient):
         if self.host.is_backup:
             self.env['runbot.runbot']._backup_databases()
             self.env.cr.commit()
+            self.env['runbot.runbot']._reload_nginx()
         if self.host.is_builder:
             self.last_update = self.env['runbot.repo'].search([('write_date', '>', self.last_update)])._update_git_config()
             self.env.cr.commit()

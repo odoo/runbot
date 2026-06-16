@@ -9,6 +9,7 @@ import docker
 import requests
 
 from odoo import api, exceptions, fields, models
+from odoo.tools import file_open
 
 from ..common import ansi_to_html
 from ..container import docker_build
@@ -21,6 +22,17 @@ USERUID = os.getuid()
 USERGID = os.getgid()
 USERNAME = getpass.getuser()
 
+
+def _render_file(content, file_destination):
+    lines = content.splitlines()
+    quoted_lines = ["'" + line.replace("'", "'\"'\"'") + "'" for line in lines]
+
+    rendered = (
+        "printf '%s\\n' \\\n"
+        + " \\\n".join(quoted_lines)
+        + f" \\\n> {file_destination}"
+    )
+    return rendered
 
 class DockerLayer(models.Model):
     _name = 'runbot.docker_layer'
@@ -78,15 +90,7 @@ class DockerLayer(models.Model):
 
     def _render_file_layer(self, values):
         content = self._render_file_content(values)
-        lines = content.splitlines()
-        quoted_lines = ["'" + line.replace("'", "'\"'\"'") + "'" for line in lines]
-
-        rendered = (
-            "RUN printf '%s\\n' \\\n"
-            + " \\\n".join(quoted_lines)
-            + f" \\\n> {self.file_destination}"
-        )
-        return rendered
+        return 'RUN ' + _render_file(content, self.file_destination)
 
     def _get_values(self, custom_values=None):
         base_values = {
@@ -195,6 +199,7 @@ class Dockerfile(models.Model):
     variant_ids = fields.One2many('runbot.dockerfile', 'parent_id', string='Variants', help="Variants of this dockerfile, they inherit the parent dockerfile layers and can add their own layers.")
     message = fields.Text('Message', compute='_compute_message')
 
+    use_host_postgres = fields.Boolean('Use host postgres', help="Mount host postgres socket and skip oot entrypoint", default=True)    # TODO cleanup postgres remove
     _runbot_dockerfile_image_tag_unique = models.Constraint(
         'unique(image_tag)',
         "A Dockerfile with this tag already exists.",
@@ -296,9 +301,23 @@ class Dockerfile(models.Model):
                     'reference_dockerfile_id': rec.parent_id.id,
                 }) + layers
             content = layers.render_layers()
-            switch_user = f"\nUSER {USERNAME}\n"
-            if not content.endswith(switch_user):
-                content = content + switch_user
+            if 'ENV PG_VERSION' in content:
+                content += 'USER root\n'
+                files_operations = []
+                for file in (Path(__file__).parent.parent / 'docker_files' / 'postgres').iterdir():
+                    with file_open(file) as f:
+                        file_content = f.read()
+                    files_operations.append(_render_file(file_content, '/' + file.name))
+                files_operations.append('chmod +x /entrypoint.sh')
+                files_operations.append('mkdir -p /data/build')  # mostly for testing, will be erased by mount
+                files_operations.append('chmod 777 /data/build')
+                files_operations = ' && '.join(files_operations)
+                content += f"""RUN {files_operations}\n"""
+                content += """
+                ENV PGDATA=/data/build/postgres/${PG_VERSION} PGHOST=/data/build/pgsock ODOO_FILESTORE=/data/build/datadir/filestore
+                ENTRYPOINT ["/entrypoint.sh"]
+                """
+            content += f"\nUSER {USERNAME}\nENV USER {USERNAME}\n"
 
             rec.dockerfile = content
 
@@ -361,7 +380,7 @@ class Dockerfile(models.Model):
                 for key, command in commands.items():
                     name = f"GetDockerInfos_{image_id}_{key}"
                     try:
-                        result = docker_client.containers.run(image_id, name=name,command=['/bin/bash', '-c', command], detach=False, remove=True)
+                        result = docker_client.containers.run(image_id, name=name, entrypoint='', command=['/bin/bash', '-c', command], detach=False, remove=True)
                         result = result.decode('utf-8').strip()
                         if 'packages' in key:
                             result = result.split('\n')
