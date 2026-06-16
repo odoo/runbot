@@ -288,7 +288,8 @@ class TestBuildConfigStepRestore(TestBuildConfigStepCommon):
         docker_params = self.restore_config_step._run_restore(dev_build)
         cmds = docker_params['cmd'].split(' && ')
         self.assertEqual(f'wget --retry-on-host-error https://False/runbot/static/build/{reference_build.dest}/logs/{reference_build.dest}-suffix.zip', cmds[2])
-        self.assertEqual(f'psql -q {dev_build.dest}-suffix < dump.sql', cmds[8])
+        self.assertEqual(f'createdb {dev_build.dest}-suffix -T template0', cmds[8])
+        self.assertEqual(f'psql -q {dev_build.dest}-suffix < dump.sql', cmds[9])
         self.called = True
 
 class TestBuildConfigStepCreate(TestBuildConfigStepCommon):

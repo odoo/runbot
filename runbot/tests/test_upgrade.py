@@ -526,6 +526,7 @@ class TestUpgradeFlow(RunbotCase):
                             f'mkdir -p /data/build/datadir/filestore/{db_name}',
                             f'mv filestore/* /data/build/datadir/filestore/{db_name}',
                             'echo "### restoring db"',
+                            f'createdb {db_name} -T template0',
                             f'psql -q {db_name} < dump.sql',
                             'echo "### performing an analyze"',
                             f'psql -q -d {db_name} -c "ANALYZE;"',
