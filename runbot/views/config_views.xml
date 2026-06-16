@@ -84,6 +84,7 @@
                         <field name="test_tags"/>
                         <field name="enable_auto_tags"/>
                         <field name="sub_command"/>
+                        <field name="export_database"/>
                     </group>
                      <group string="Limits" invisible="job_type not in ('python', 'install_odoo', 'dynamic', 'test_upgrade', 'dynamic')">
                         <field name="cpu_limit" groups="base.group_no_one"/>
@@ -124,6 +125,7 @@
                     <group string="Restore settings" invisible="job_type != 'restore'">
                         <field name="restore_download_db_suffix"/>
                         <field name="restore_rename_db_suffix"/>
+                        <field name="restore_cluster"/>
                     </group>
 
                     <group string="Codeowner settings" invisible="job_type not in ('codeowner', 'python', 'dynamic')">
