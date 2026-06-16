@@ -3,6 +3,7 @@
     <record model="runbot.dockerfile" id="runbot.docker_default">
         <field name="name">DockerDefault</field>
         <field name="to_build">True</field>
+        <field name="to_build">True</field>
         <field name="description">Default Dockerfile for latest Odoo versions.</field>
     </record>
 
@@ -37,8 +38,9 @@
         <field name="sequence" eval="0"/>
         <field name="dockerfile_id" ref="runbot.docker_default"/>
         <field name="layer_type">raw</field>
-        <field name="name">FROM ubuntu:noble</field>
-        <field name="content">FROM ubuntu:noble</field>
+        <field name="name">FROM ubuntu:resolute</field>
+        <field name="content">FROM ubuntu:resolute
+ARG PG_VERSION=18</field>
     </record>
 
     <record id="runbot.docker_layer_lang" model="runbot.docker_layer">
@@ -64,6 +66,21 @@
         <field name="name">Install base debian packages</field>
         <field name="packages">apt-transport-https build-essential ca-certificates curl faketime file fonts-freefont-ttf fonts-noto-cjk gawk gnupg gsfonts libldap2-dev libjpeg9-dev libsasl2-dev libxslt1-dev lsb-release npm ocrmypdf sed sudo unzip xfonts-75dpi zip zlib1g-dev</field>
         <field name="reference_docker_layer_id" ref="runbot.docker_layer_debian_packages_template"/>
+    </record>
+
+    <record id="runbot.docker_setup_postgres" model="runbot.docker_layer">
+        <field name="sequence" eval="105"/>
+        <field name="dockerfile_id" ref="runbot.docker_default"/>
+        <field name="layer_type">template</field>
+        <field name="name">RUN npm install</field>
+        <field name="content">
+ENV PG_VERSION=${PG_VERSION}
+RUN set -x ; \
+    apt-get update \
+    &amp;&amp; DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends postgresql-${PG_VERSION} postgresql-${PG_VERSION}-pgvector locales\
+    &amp;&amp; rm -rf /var/lib/apt/lists/*
+RUN locale-gen en_US.UTF-8
+</field>
     </record>
 
     <record id="runbot.docker_layer_pydebs" model="runbot.docker_layer">
@@ -112,6 +129,7 @@
         <field name="name">RUN npm install</field>
         <field name="content">RUN npm install --force -g rtlcss@3.4.0 es-check@6.0.0 eslint@8.1.0 prettier@2.7.1 eslint-config-prettier@8.5.0 eslint-plugin-prettier@4.2.1</field>
     </record>
+
 
     <record id="runbot.docker_layer_masterdebiancontroll" model="runbot.docker_layer">
         <field name="sequence" eval="500"/>

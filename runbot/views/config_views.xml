@@ -124,6 +124,7 @@
                     <group string="Restore settings" invisible="job_type != 'restore'">
                         <field name="restore_download_db_suffix"/>
                         <field name="restore_rename_db_suffix"/>
+                        <field name="restore_cluster"/>
                     </group>
 
                     <group string="Codeowner settings" invisible="job_type not in ('codeowner', 'python', 'dynamic')">

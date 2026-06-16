@@ -9,6 +9,7 @@ import docker
 import requests
 
 from odoo import api, exceptions, fields, models
+from odoo.tools import file_open
 
 from ..common import ansi_to_html
 from ..container import docker_build
@@ -21,6 +22,17 @@ USERUID = os.getuid()
 USERGID = os.getgid()
 USERNAME = getpass.getuser()
 
+
+def _render_file(content, file_destination):
+    lines = content.splitlines()
+    quoted_lines = ["'" + line.replace("'", "'\"'\"'") + "'" for line in lines]
+
+    rendered = (
+        "RUN printf '%s\\n' \\\n"
+        + " \\\n".join(quoted_lines)
+        + f" \\\n> {file_destination}"
+    )
+    return rendered
 
 class DockerLayer(models.Model):
     _name = 'runbot.docker_layer'
@@ -78,15 +90,7 @@ class DockerLayer(models.Model):
 
     def _render_file_layer(self, values):
         content = self._render_file_content(values)
-        lines = content.splitlines()
-        quoted_lines = ["'" + line.replace("'", "'\"'\"'") + "'" for line in lines]
-
-        rendered = (
-            "RUN printf '%s\\n' \\\n"
-            + " \\\n".join(quoted_lines)
-            + f" \\\n> {self.file_destination}"
-        )
-        return rendered
+        return _render_file(content, self.file_destination)
 
     def _get_values(self, custom_values=None):
         base_values = {
@@ -194,6 +198,7 @@ class Dockerfile(models.Model):
     public_visibility = fields.Boolean('Public', default=lambda self: self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_dockerfile_public_by_default'), help="Dockerfile is public and can be accessed by anyone with /runbot/dockerfile route")
     variant_ids = fields.One2many('runbot.dockerfile', 'parent_id', string='Variants', help="Variants of this dockerfile, they inherit the parent dockerfile layers and can add their own layers.")
     message = fields.Text('Message', compute='_compute_message')
+    include_postgres = fields.Boolean('Include postgresql server', default=True)
 
     _runbot_dockerfile_image_tag_unique = models.Constraint(
         'unique(image_tag)',
@@ -296,9 +301,20 @@ class Dockerfile(models.Model):
                     'reference_dockerfile_id': rec.parent_id.id,
                 }) + layers
             content = layers.render_layers()
-            switch_user = f"\nUSER {USERNAME}\n"
-            if not content.endswith(switch_user):
-                content = content + switch_user
+            if self.include_postgres:
+                content += 'USER root\n'
+                for file in (Path(__file__).parent.parent / 'docker_files' / 'postgres').iterdir():
+                    with file_open(file) as f:
+                        file_content = f.read()
+                    content += _render_file(file_content, '/' + file.name) + '\n'
+                content += """
+                ENV PGDATA=/data/build/postgres/${PG_VERSION}
+                ENV PGHOST=/data/build/pgsock
+                ENV ODOO_FILESTORE=/data/build/datadir/filestore
+                RUN chmod +x /entrypoint.sh
+                ENTRYPOINT ["/entrypoint.sh"]
+                """
+            content += f"\nUSER {USERNAME}\nENV USER {USERNAME}\n"
 
             rec.dockerfile = content
 
@@ -422,6 +438,7 @@ class Dockerfile(models.Model):
             content = self._get_cached_content(docker_build_path)
             with open(self.env['runbot.runbot']._path('docker', tag_dir, 'Dockerfile'), 'w', encoding="utf-8") as Dockerfile:
                 Dockerfile.write(content)
+
             self.env.cr.commit()  # avoid to have a running transaction during the build
             result = docker_build(docker_build_path, self.image_future_tag, self.pull_on_build, self.nocache)
             duration = result['duration']

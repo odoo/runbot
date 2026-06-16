@@ -158,7 +158,7 @@ class RunbotClient():
 def run(client_class):
     # parse args
     parser = argparse.ArgumentParser()
-    parser.add_argument('--odoo-path', help='Odoo sources path')
+    parser.add_argument('--odoo-path', help='Odoo sources path', default=str(Path(__file__).parent.parent.parent / 'odoo'))
     parser.add_argument('--db_host')
     parser.add_argument('--db_port')
     parser.add_argument('--db_user')
