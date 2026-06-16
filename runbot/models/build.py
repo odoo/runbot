@@ -15,7 +15,6 @@ from pathlib import Path
 
 from dateutil import parser
 from markupsafe import Markup
-from psycopg2 import sql
 from psycopg2.extensions import TransactionRollbackError
 
 from odoo import api, fields, models
