@@ -428,8 +428,8 @@ class ConfigStep(models.Model):
     dockerfile_id = fields.Many2one('runbot.dockerfile', string='Dockerfile')
     dockerfile_variant = fields.Char('Docker Variant')
     # install_odoo
-    create_db = fields.Boolean('Create Db', default=True, tracking=True)  # future
-    custom_db_name = fields.Char('Custom Db Name', tracking=True)  # future
+    create_db = fields.Boolean('Create Db', default=True, tracking=True)  # TODO remove
+    custom_db_name = fields.Char('Custom Db Name', tracking=True)
     install_modules = fields.Char('Modules to install', help="List of module patterns to install, use * to install all available modules, prefix the pattern with dash to remove the module.", default='', tracking=True)
     db_name = fields.Char('Db Name', compute='_compute_db_name', inverse='_inverse_db_name', tracking=True)
     cpu_limit = fields.Integer('Cpu limit', default=3600, tracking=True)
@@ -777,9 +777,8 @@ class ConfigStep(models.Model):
         db_suffix = config_data.get('db_name') or (build.params_id.dump_db.db_suffix if not self.create_db else False) or self._get_db_name(build)
         db_suffix = re.sub(r'[^a-z0-9\-_]', '_', db_suffix.lower())
         db_name = '%s-%s' % (build.dest, db_suffix)
-        if modules_to_install and self.create_db:
-            build._local_pg_createdb(db_name)
         cmd += ['-d', db_name]
+        self.env['runbot.database'].create({'name': db_name, 'build_id': self.id})
 
         # Demo data behavior changed in 18.1 -> demo data became opt-in instead of opt-out
         available_options = build._parse_config()
@@ -1167,7 +1166,9 @@ class ConfigStep(models.Model):
         target_suffix = config_data.get('target_suffix', self.restore_rename_db_suffix or download_db_suffix)
         restore_db_name = '%s-%s' % (build.dest, target_suffix)
 
-        build._local_pg_createdb(restore_db_name)
+        icp = self.env['ir.config_parameter']
+        db_template = icp.get_param('runbot.runbot_db_template', default='template0')
+        self.env['runbot.database'].create({'name': restore_db_name, 'build_id': self.id})
         cmd = ' && '.join([
             'mkdir /data/build/restore',
             'cd /data/build/restore',
@@ -1177,6 +1178,7 @@ class ConfigStep(models.Model):
             'mkdir -p /data/build/datadir/filestore/%s' % restore_db_name,
             'mv filestore/* /data/build/datadir/filestore/%s' % restore_db_name,
             'echo "### restoring db"',
+            'createdb %s -T %s' % (restore_db_name, db_template),
             'psql -q %s < dump.sql' % (restore_db_name),
             'echo "### performing an analyze"',
             'psql -q -d %s -c "ANALYZE;"' % restore_db_name,
