@@ -29,6 +29,7 @@
                 <field name="version_ids" widget="many2many_tags" invisible="is_template"/>
                 <field name="project_ids" widget="many2many_tags" invisible="is_template"/>
                 <field name="public_visibility"/>
+                <field name="use_host_postgres"/>
                 <field name="description"/>
               </group>
               <group>
