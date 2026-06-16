@@ -52,6 +52,10 @@ _re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING .*'
 PYTHON_DEFAULT = "# type python code here\n\n\n\n\n\n"
 
 
+def echo(text):
+    return f'echo $(date -u "+%Y-%m-%d %H:%M:%S,%3N") {text}'
+
+
 def filter_all_modules(selector, build, dynamic_vars):
     if selector.split(',', 1)[0] != '*':
         selector = f'*,{selector}'
@@ -863,9 +867,13 @@ class ConfigStep(models.Model):
         filestore_path = '/data/build/datadir/filestore/%s' % db_name
         filestore_dest = '%s/filestore/' % dump_dir
         zip_path = '/data/build/logs/%s.zip' % db_name
+        cmd.finals.append([echo('### Generating dump')])
         cmd.finals.append(['pg_dump', db_name, '>', sql_dest])
+        cmd.finals.append([echo('### Copying filestore')])
         cmd.finals.append(['cp', '-r', filestore_path, filestore_dest])
+        cmd.finals.append([echo('### Generaing zip')])
         cmd.finals.append(['cd', dump_dir, '&&', 'zip', '-rmq9', zip_path, '*'])
+        cmd.finals.append([echo('### Done')])
         infos = '{\n    "db_name": "%s",\n    "build_id": %s,\n    "shas": [%s]\n}' % (db_name, build.id, ', '.join(['"%s"' % build_commit.commit_id.dname for build_commit in build.params_id.commit_link_ids]))
         build._write_file('logs/%s/info.json' % db_name, infos)
 
@@ -1172,22 +1180,23 @@ class ConfigStep(models.Model):
         cmd = ' && '.join([
             'mkdir /data/build/restore',
             'cd /data/build/restore',
+            echo('### getting archive'),
             'wget --retry-on-host-error %s' % dump_url,
             'unzip -q %s' % zip_name,
-            'echo "### restoring filestore"',
+            echo('### restoring filestore'),
             'mkdir -p /data/build/datadir/filestore/%s' % restore_db_name,
             'mv filestore/* /data/build/datadir/filestore/%s' % restore_db_name,
-            'echo "### restoring db"',
+            echo('### restoring db'),
             'createdb %s -T %s' % (restore_db_name, db_template),
             'psql -q %s < dump.sql' % (restore_db_name),
-            'echo "### performing an analyze"',
+            echo('### performing an analyze'),
             'psql -q -d %s -c "ANALYZE;"' % restore_db_name,
             'cd /data/build',
-            'echo "### cleaning"',
+            echo('### cleaning'),
             'rm -r restore',
-            'echo "### listing modules"',
+            echo('### listing modules'),
             """psql %s -c "select name from ir_module_module where state = 'installed'" -t -A > /data/build/logs/restore_modules_installed.txt""" % restore_db_name,
-            'echo "### restore" "successful"',  # two part string to avoid miss grep
+            echo('### restore" "successful'),  # two part string to avoid miss grep
             ])
 
         return dict(cmd=cmd, network_enabled=True)
