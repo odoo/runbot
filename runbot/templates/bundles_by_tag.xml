@@ -27,7 +27,7 @@
                     <span t-if="done" class="badge text-bg-success" data-tag="done">Done!</span>
                     <span t-else="" class="badge text-bg-secondary" title="Last batch age" t-out="bundle.last_batch._get_formated_age()"/>
                     <t t-foreach="other_tags" t-as="other_tag">
-                        <span class="badge rounded-pill text-bg-primary" t-att-data-tag="other_tag.id" t-out="other_tag.name"/>
+                        <span t-attf-class="badge rounded-pill text-bg-color_{{ other_tag.id % 5 }}" t-att-data-tag="other_tag.id" t-out="other_tag.name"/>
                     </t>
                 </td>
             </tr>
