@@ -471,3 +471,39 @@ code {
 .log-details td {
 	padding-left: 20px;
 }
+
+[class*="text-bg-color_"] {
+	--runbot-tag-color: var(--bs-primary);
+	--runbot-tag-associated-color: color-mix(in lab, var(--runbot-tag-color), white 90%);
+	color: var(--runbot-tag-color);
+	background-color: var(--runbot-tag-associated-color);
+	
+	:root[data-bs-theme=dark] & {
+		color: var(--runbot-tag-associated-color);
+		background-color: var(--runbot-tag-color);
+	}
+}
+
+.text-bg-color_0 {
+	--runbot-tag-color: #ba0f0f;
+}
+
+.text-bg-color_1 {
+	--runbot-tag-color: #9c4824;
+}
+
+.text-bg-color_2 {
+	--runbot-tag-color: #920c4c;
+}
+
+.text-bg-color_3 {
+	--runbot-tag-color: #172b98;
+}
+
+.text-bg-color_4 {
+	--runbot-tag-color: #2f7b39;
+}
+
+.text-bg-color_5 {
+	--runbot-tag-color: #5221b8;
+}
