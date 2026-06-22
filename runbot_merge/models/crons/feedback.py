@@ -72,13 +72,12 @@ class Feedback(models.Model):
         _, e, _ = sys.exc_info()
 
         if isinstance(e, HTTPError) and e.response.status_code == 500:
-            self.env.context.get('deactivate', lambda _: None)(True)
+            self.sequence = self.RETRY_LIMIT
             self.with_user(1).message_notify(
                 subject=f"{e.response.reason}, disabled feedback cron",
                 body=e.response.text or str(e),
                 partner_ids=self.env.ref('runbot_merge.group_admin').users.partner_id.ids,
             )
-            return False
 
         if isinstance(e, HTTPError) and e.response.status_code == 404 and self.reaction:
             _logger.info(
