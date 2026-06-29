@@ -280,13 +280,16 @@ class Batch(models.Model):
 
         # 2. FIND missing commit in a compatible base bundle
         if bundle.is_base or auto_rebase:
-            self.reference_batch_ids = self.env['runbot.batch'].browse(result[1] for result in self.env['runbot.batch']._read_group(
+            existing = self.reference_batch_ids
+            existing_versions = existing.mapped('bundle_id.version_id')
+            self.reference_batch_ids = self.reference_batch_ids | self.env['runbot.batch'].browse(result[1] for result in self.env['runbot.batch']._read_group(
                 domain=[
                     ('state', '=', 'done'),
                     ('bundle_id.project_id', '=', bundle.project_id.id),
                     ('bundle_id.is_base', '=', True),
                     ('bundle_id.sticky', '=', True),
                     ('category_id', '=', self.category_id.id),
+                    ('bundle_id.version_id', 'not in', existing_versions.ids),
                 ],
                 groupby=['bundle_id'],
                 aggregates=['id:max'],
