@@ -182,6 +182,20 @@ class Batch(models.Model):
         slot.build_id = build
         build._github_status()
 
+    def _get_latest_batch_per_version(self, skip_versions):
+        return self.env['runbot.batch'].browse(result[1] for result in self.env['runbot.batch']._read_group(
+            domain=[
+                ('state', '=', 'done'),
+                ('bundle_id.project_id', '=', self.bundle_id.project_id.id),
+                ('bundle_id.is_base', '=', True),
+                ('bundle_id.sticky', '=', True),
+                ('category_id', '=', self.category_id.id),
+                ('bundle_id.version_id', 'not in', skip_versions.ids),
+            ],
+            groupby=['bundle_id'],
+            aggregates=['id:max'],
+        ))
+
     def _prepare(self, auto_rebase=False, use_base_commits=False):
         _logger.info('Preparing batch %s', self.id)
 
@@ -282,18 +296,7 @@ class Batch(models.Model):
         if bundle.is_base or auto_rebase:
             existing = self.reference_batch_ids
             existing_versions = existing.mapped('bundle_id.version_id')
-            self.reference_batch_ids = self.reference_batch_ids | self.env['runbot.batch'].browse(result[1] for result in self.env['runbot.batch']._read_group(
-                domain=[
-                    ('state', '=', 'done'),
-                    ('bundle_id.project_id', '=', bundle.project_id.id),
-                    ('bundle_id.is_base', '=', True),
-                    ('bundle_id.sticky', '=', True),
-                    ('category_id', '=', self.category_id.id),
-                    ('bundle_id.version_id', 'not in', existing_versions.ids),
-                ],
-                groupby=['bundle_id'],
-                aggregates=['id:max'],
-            ))
+            self.reference_batch_ids = self.reference_batch_ids | self._get_latest_batch_per_version(skip_versions=existing_versions)
         if not bundle.is_base:
             merge_base_commits = self.commit_link_ids.mapped('merge_base_commit_id')
             if self.base_reference_batch_id:
