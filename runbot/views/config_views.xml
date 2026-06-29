@@ -73,8 +73,6 @@
                         <field name="install_modules"/>
                         <field name="demo_mode"/>
                         <field name="db_name" groups="base.group_no_one"/>
-                        <field name="cpu_limit" groups="base.group_no_one"/>
-                        <field name="container_cpus" groups="base.group_no_one"/>
                         <field name="coverage"/>
                         <field name="coverage_branch" invisible="not coverage"/>
                         <field name="coverage_concurrency" invisible="not coverage"/>
@@ -85,6 +83,10 @@
                         <field name="test_tags"/>
                         <field name="enable_auto_tags"/>
                         <field name="sub_command"/>
+                    </group>
+                     <group string="Limits" invisible="job_type not in ('python', 'install_odoo', 'dynamic', 'test_upgrade', 'dynamic')">
+                        <field name="cpu_limit" groups="base.group_no_one"/>
+                        <field name="container_cpus" groups="base.group_no_one"/>
                     </group>
                     <group string="Extra Parameters" invisible="job_type not in ('python', 'install_odoo', 'test_upgrade', 'run_odoo', 'dynamic')">
                         <field name="extra_params"/>
