@@ -210,6 +210,12 @@
                             <field name="link_type"/>
                         </list>
                     </field>
+                    <field name="reference_batch_ids">
+                        <list>
+                            <field name="id"/>
+                            <field name="bundle_id"/>
+                        </list>
+                    </field>
                 </group>
             </form>
         </field>

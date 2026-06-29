@@ -7,6 +7,7 @@
                 <sheet>
                     <group>
                         <group colspan="2">
+                            <field name="fingerprint"/>
                             <field name="config_id"/>
                             <field name="config_data"/>
                             <field name="extra_params"/>
@@ -27,6 +28,7 @@
                             <field name="commit_link_ids">
                                 <list>
                                     <field name="commit_id"/>
+                                    <field name="tree_hash"/>
                                     <field name="match_type"/>
                                 </list>
                             </field>
