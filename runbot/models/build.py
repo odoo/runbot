@@ -1361,7 +1361,7 @@ class BuildResult(models.Model):
             refs_batches = batch.reference_batch_ids or batch.base_reference_batch_id.reference_batch_ids
             missing_batches = batch._get_latest_batch_per_version(skip_versions=refs_batches.bundle_id.version_id)
             if missing_batches:
-                self._log('upgrade_builds_references', 'Missing reference batches for %s: %s' % (batch.id, ', '.join([str(b.id) for b in missing_batches])))
+                self._log('upgrade_builds_references', 'Missing reference batches for %s, getting latest ones: %s' % (', '.join(missing_batches.bundle_id.version_id.mapped('name')), ', '.join([str(b.id) for b in missing_batches])))
                 refs_batches |= missing_batches
 
         template_builds = self.env['runbot.build']
