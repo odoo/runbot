@@ -274,6 +274,12 @@ class CommitLink(models.Model):
     file_changed = fields.Integer('# file changed')
     diff_add = fields.Integer('# line added')
     diff_remove = fields.Integer('# line removed')
+    tree_hash = fields.Char('Tree hash', compute='_compute_tree_hash')
+
+    @api.depends('commit_id.tree_hash')
+    def _compute_tree_hash(self):
+        for link in self:
+            link.tree_hash = link.commit_id.tree_hash
 
 
 class CommitStatus(models.Model):
