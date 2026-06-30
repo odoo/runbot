@@ -28,7 +28,6 @@ from ..common import (
     dest_reg,
     dt2time,
     findall,
-    grep,
     list_local_dbs,
     local_pgadmin_cursor,
     markdown_escape,
@@ -1435,39 +1434,31 @@ class BuildResult(models.Model):
             cmd += ['--addons-path', ",".join(addons_paths)]
 
         # options
-        config_path = build._server("tools/config.py")
-        if grep(config_path, "no-xmlrpcs"):  # move that to configs ?
-            cmd.append("--no-xmlrpcs")
-        if grep(config_path, "no-netrpc"):
-            cmd.append("--no-netrpc")
-
+        available_options = build._parse_config()
         pres += self.params_id.config_data.get('pres', [])
         posts = self.params_id.config_data.get('posts', [])
         finals = self.params_id.config_data.get('finals', [])
         config_tuples = self.params_id.config_data.get('config_tuples', [])
 
-        command = Command(pres, cmd, posts, finals=finals, config_tuples=config_tuples, cmd_checker=build) 
+        command = Command(pres, cmd, posts, finals=finals, config_tuples=config_tuples, cmd_checker=build)
 
         # use the username of the runbot host to connect to the databases
         command.add_config_tuple('db_user', '%s' % pwd.getpwuid(USERUID).pw_name)
 
-        if local_only:
-            if grep(config_path, "--http-interface"):
+        if "--http-interface" in available_options:
+            if local_only:
                 command.add_config_tuple("http_interface", "127.0.0.1")
-            elif grep(config_path, "--xmlrpc-interface"):
-                command.add_config_tuple("xmlrpc_interface", "127.0.0.1")
-        else:
-            if grep(config_path, "--http-interface"):
+            else:
                 command.add_config_tuple("http_interface", "0.0.0.0")
 
         if enable_log_db:
             log_db = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
-            if grep(config_path, "log-db"):
+            if "--log-db" in available_options:
                 command.add_config_tuple("log_db", log_db)
-                if grep(config_path, 'log-db-level'):
+                if "--log-db-level" in available_options:
                     command.add_config_tuple("log_db_level", '25')
 
-        if grep(config_path, "data-dir"):
+        if "--data-dir" in available_options:
             datadir = build._path('datadir')
             if not os.path.exists(datadir):
                 os.mkdir(datadir)
