@@ -725,6 +725,7 @@ class BuildResult(models.Model):
             for _id in self.exists().ids:
                 additionnal_conditions.append("datname like '%s-%%'" % _id)
 
+        # TODO cleanup remove
         log_db = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
         existing_db = [db for db in list_local_dbs(additionnal_conditions=additionnal_conditions) if db != log_db]
 
@@ -906,7 +907,7 @@ class BuildResult(models.Model):
                         build._log('_schedule', 'Docker with state %s not started after 60 seconds, skipping' % _docker_state, level='ERROR')
                     else:
                         build._log('_schedule', 'Docker was likely killed, skipping%s' % details, level='ERROR')
-            if self.env['runbot.host']._fetch_local_logs(build_ids=build.ids):
+            if self.env['runbot.host']._fetch_local_logs(builds=build)[0]:
                 return True  # avoid to make results with remaining logs
             # No job running, make result and select next job
             if build.docker_start:
@@ -1056,6 +1057,8 @@ class BuildResult(models.Model):
             rc_content = cmd.get_config(starting_config=starting_config)
             if step.check_exit_status:
                 cmd.finals = [['echo', r'$?', '>', f'/data/build/logs/{step.sanitized_name(self)}_exit_status.txt']] + cmd.finals
+            for filepath, content in cmd.files.items():
+                self._write_file(filepath, content)
         else:
             rc_content = starting_config
         self._write_file('.odoorc', rc_content)
@@ -1444,7 +1447,6 @@ class BuildResult(models.Model):
 
         # use the username of the runbot host to connect to the databases
         command.add_config_tuple('db_user', '%s' % pwd.getpwuid(USERUID).pw_name)
-
         if "--http-interface" in available_options:
             if local_only:
                 command.add_config_tuple("http_interface", "127.0.0.1")
@@ -1452,6 +1454,31 @@ class BuildResult(models.Model):
                 command.add_config_tuple("http_interface", "0.0.0.0")
 
         if enable_log_db:
+            if '--log-config' in available_options:
+                command.add_config_tuple("log_config", '/data/build/logconfig.json')
+                command.files['odoo_log.seek'] = "0"
+                command.files['logconfig.json'] = """{
+  "version": 1,
+  "keep_odoo_default": true,
+  "formatters": {
+    "runbot": {
+      "()": "odoo.logging.JSONFormatter",
+      "record_keys": ["dbname", "name", "levelname", "pathname", "funcName", "lineno", "test", "created", "message"]
+    }
+  },
+  "handlers": {
+    "runbot": {
+      "class": "logging.handlers.WatchedFileHandler",
+      "formatter": "runbot",
+      "filename": "logs/%s_logs.json",
+      "level": "RUNBOT"
+    }
+  },
+  "root": {
+    "handlers": ["runbot"]
+  }
+}""" % self.active_step.sanitized_name(self)
+            # TODO cleanup remove
             log_db = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
             if "--log-db" in available_options:
                 command.add_config_tuple("log_db", log_db)
@@ -1463,7 +1490,6 @@ class BuildResult(models.Model):
             if not os.path.exists(datadir):
                 os.mkdir(datadir)
             command.add_config_tuple("data_dir", '/data/build/datadir')
-
         return command
 
     def _cmd_check(self, cmd):
