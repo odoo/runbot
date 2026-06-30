@@ -28,7 +28,7 @@ docker_stop_failures = {}
 
 class Command():
 
-    def __init__(self, pres, cmd, posts, finals=None, config_tuples=None, cmd_checker=None):
+    def __init__(self, pres, cmd, posts, finals=None, config_tuples=None, files=None, cmd_checker=None):
         """ Command object that represent commands to run in Docker container
         :param pres: list of pre-commands
         :param cmd: list of main command only run if the pres commands succeed (&&)
@@ -44,6 +44,7 @@ class Command():
         self.finals = finals or []
         self.config_tuples = config_tuples or []
         self.cmd_checker = cmd_checker
+        self.files = files or {}
 
     def set_pres(self, pres):
         self.pres = pres
@@ -61,7 +62,7 @@ class Command():
         return self.cmd[key]
 
     def __add__(self, l):
-        return Command(self.pres, self.cmd + l, self.posts, self.finals, self.config_tuples, self.cmd_checker)
+        return Command(self.pres, self.cmd + l, self.posts, self.finals, self.config_tuples, self.files, self.cmd_checker)
 
     def __str__(self):
         return self.shell_join(self.cmd)

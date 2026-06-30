@@ -1,3 +1,5 @@
+import datetime
+import json
 import logging
 
 from collections import defaultdict
@@ -78,6 +80,7 @@ class Host(models.Model):
         return super().create(vals_list)
 
     def _bootstrap_local_logs_db(self):
+        # TODO cleanup remove
         """ bootstrap a local database that will collect logs from builds """
         logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
         if logs_db_name not in list_local_dbs():
@@ -260,54 +263,103 @@ class Host(models.Model):
         if nb_reserved < (nb_hosts / 2):
             self.assigned_only = True
 
-    def _fetch_local_logs(self, build_ids=None):
-        """ fetch build logs from local database """
-        logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
-        with local_pg_cursor(logs_db_name) as local_cr:
-            res = []
-            where_clause = "WHERE split_part(dbname, '-', 1) IN %s" if build_ids else ''
-            query = f"""
-                    SELECT *
-                    FROM (
-                            SELECT id, create_date, name, level, dbname, func, path, line, type, message, split_part(dbname, '-', 1) as build_id, metadata
-                            FROM ir_logging
-                            )
-                        AS ir_logs
-                    {where_clause}
-                ORDER BY id
-                LIMIT 10000
-                """
-            if build_ids:
-                build_ids = [tuple(str(build) for build in build_ids)]
-            local_cr.execute(query, build_ids)
-            col_names = [col.name for col in local_cr.description]
-            for row in local_cr.fetchall():
-                res.append({name:value for name, value in zip(col_names, row)})
-            return res
+    def _fetch_local_logs(self, builds=None):
+        res = []
+        cleanups = []
+        for build in builds:
+            if build._is_file('odoo_log.seek'):
+                new_seek = seek = int(build._read_file('odoo_log.seek'))
+                log_file_path = 'logs/%s_logs.json' % build.active_step.sanitized_name(build)
+                if not build._is_file(log_file_path):
+                    continue
+                with open(build._path(log_file_path), encoding='utf-8') as f:
+                    f.seek(seek)
+                    for line in f.readlines():
+                        try:
+                            json_log = json.loads(line)
+                            log_data = {
+                                'create_date': datetime.datetime.fromtimestamp(float(json_log['created'])) if json_log.get('created') else datetime.datetime.now(),
+                                'level': str(json_log.get('levelname', 'INFO')),
+                                'name': str(json_log.get('name', '')),
+                                'dbname': str(json_log.get('dbname', '')),
+                                'func': str(json_log.get('funcName', '')),
+                                'path': str(json_log.get('pathname', '')),
+                                'line': str(json_log.get('lineno', '')),
+                                'type': 'server',
+                                'message': str(json_log.get('message', '')),
+                                'build_id': build.id,
+                            }
+                            if json_log.get('test'):
+                                log_data['metadata'] = {'test': json_log.get('test')}
 
-    def _process_logs(self, build_ids=None):
+                            new_seek = f.tell()
+                            res.append(log_data)
+                        except Exception as e:
+                            _logger.exception('Failed to parse log line: %s', e)
+                            break
+
+                if new_seek != seek:
+                    def cleanup(build=build, new_seek=new_seek):
+                        build._write_file('odoo_log.seek', str(new_seek))
+                    cleanups.append(cleanup)
+                continue
+
+            # TODO cleanup remove
+            log_to_delete = []
+            build_ids = build.ids
+            logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
+            with local_pg_cursor(logs_db_name) as local_cr:
+                where_clause = "WHERE split_part(dbname, '-', 1) IN %s" if build_ids else ''
+                query = f"""
+                        SELECT *
+                        FROM (
+                                SELECT id, create_date, name, level, dbname, func, path, line, type, message, metadata
+                                FROM ir_logging
+                                )
+                            AS ir_logs
+                        {where_clause}
+                    ORDER BY id
+                    LIMIT 10000
+                    """
+                build_ids = [tuple(str(build) for build in build_ids)]
+                local_cr.execute(query, build_ids)
+                col_names = [col.name for col in local_cr.description]
+                for row in local_cr.fetchall():
+                    vals = {name: value for name, value in zip(col_names, row)}
+                    res.append(vals)
+                    log_to_delete = vals.pop('id')
+            if log_to_delete:
+                def cleanup(log_to_delete=log_to_delete):
+                    logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
+                    with local_pg_cursor(logs_db_name) as local_cr:
+                        local_cr.execute("DELETE FROM ir_logging WHERE id in %s", [tuple(log_to_delete)])
+                cleanups.append(cleanup)
+
+        return res, cleanups
+
+    def _process_logs(self, testing_builds):
         """move logs from host to the leader"""
-        ir_logs = self._fetch_local_logs()
+        ir_logs, cleanups = self._fetch_local_logs(testing_builds)
         logs_by_build_id = defaultdict(list)
 
         local_log_ids = []
         for log in ir_logs:
-            if log['dbname'] and '-' in log['dbname']:
+            if not log.get('build_id'):  # TODO cleanup remove condition, not needed once using only json log
                 try:
-                    logs_by_build_id[int(log['dbname'].split('-', maxsplit=1)[0])].append(log)
-                except ValueError:
-                    pass
-            else:
-                local_log_ids.append(log['id'])
-
-        builds = self.env['runbot.build'].browse(logs_by_build_id.keys())
+                    log['build_id'] = int(log['dbname'].split('-', maxsplit=1)[0])
+                except Exception:
+                    if log.get('id'):
+                        local_log_ids.append(log['id']) # TODO cleanup remove not needed once using only json log
+            if log.get('build_id'):
+                logs_by_build_id[log['build_id']].append(log)
 
         logs_to_send = []
-        for build in builds.exists():
+        for build in testing_builds:
             log_counter = build.log_counter
             build_logs = logs_by_build_id[build.id]
             for ir_log in build_logs:
-                local_log_ids.append(ir_log['id'])
+                if 'id' in ir_log:  # TODO cleanup
+                    local_log_ids.append(ir_log['id'])
                 ir_log['type'] = 'server'
                 log_counter -= 1
                 if log_counter == 0:
@@ -322,16 +374,15 @@ class Host(models.Model):
                         ir_log['message'] = ir_log['message'][:10000] + "\n ...<message too long, truncated>"
 
                 ir_log['build_id'] = build.id
-                logs_to_send.append({k:ir_log[k] for k in ir_log if k != 'id'})
+                logs_to_send.append(ir_log)
             build.log_counter = log_counter
 
         if logs_to_send:
             self.env['ir.logging'].create(logs_to_send)
         self.env.cr.commit()  # we don't want to remove local logs that were not inserted in main runbot db
-        if local_log_ids:
-            logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
-            with local_pg_cursor(logs_db_name) as local_cr:
-                local_cr.execute("DELETE FROM ir_logging WHERE id in %s", [tuple(local_log_ids)])
+
+        for cleanup in cleanups:
+            cleanup()
 
     def _get_build_domain(self, domain=None):
         domain = domain or []

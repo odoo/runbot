@@ -55,7 +55,8 @@ class Runbot(models.AbstractModel):
             self._commit()
         if host._process_messages():
             self._commit()
-        host._process_logs()
+        testing_builds = host._get_builds([('local_state', '=', 'testing')])
+        host._process_logs(testing_builds)
         self._commit()
         for build in host._get_builds([('local_state', 'in', ['testing', 'running'])]) | self._get_builds_to_init(host):
             build = build.browse(build.id)  # remove preftech ids, manage build one by one
