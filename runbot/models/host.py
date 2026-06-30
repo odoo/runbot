@@ -294,8 +294,8 @@ class Host(models.Model):
 
                             new_seek = f.tell()
                             res.append(log_data)
-                        except Exception as e:
-                            _logger.exception('Failed to parse log line: %s', e)
+                        except (KeyError, json.JSONDecodeError):
+                            _logger.exception('Failed to parse log line:')
                             break
 
                 if new_seek != seek:
@@ -325,7 +325,7 @@ class Host(models.Model):
                 local_cr.execute(query, build_ids)
                 col_names = [col.name for col in local_cr.description]
                 for row in local_cr.fetchall():
-                    vals = {name: value for name, value in zip(col_names, row)}
+                    vals = dict(zip(col_names, row))
                     res.append(vals)
                     log_to_delete = vals.pop('id')
             if log_to_delete:
@@ -347,9 +347,9 @@ class Host(models.Model):
             if not log.get('build_id'):  # TODO cleanup remove condition, not needed once using only json log
                 try:
                     log['build_id'] = int(log['dbname'].split('-', maxsplit=1)[0])
-                except Exception:
+                except (ValueError, AttributeError, KeyError):
                     if log.get('id'):
-                        local_log_ids.append(log['id']) # TODO cleanup remove not needed once using only json log
+                        local_log_ids.append(log['id'])  # TODO cleanup remove not needed once using only json log
             if log.get('build_id'):
                 logs_by_build_id[log['build_id']].append(log)
 

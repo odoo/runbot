@@ -34,11 +34,10 @@ class TestSchedule(RunbotCase):
         })
         mock_docker_state.return_value = 'UNKNOWN'
         self.assertEqual(build.local_state, 'testing')
-        build._schedule()  # too fast, docker not started
+        build._schedule()
         self.assertEqual(build.local_state, 'testing')
         self.assertEqual(build.local_result, 'ok')
 
-        self.start_patcher('fetch_local_logs', 'odoo.addons.runbot.models.host.Host._fetch_local_logs', [])  # the local logs have to be empty
         build.write({'docker_start': datetime.datetime.now() - datetime.timedelta(seconds=70)})  # docker never started
 
         with patch('odoo.addons.runbot.common.file_open', mock_open(read_data='')):

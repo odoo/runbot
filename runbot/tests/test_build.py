@@ -378,14 +378,13 @@ class TestBuildResult(RunbotCase):
 
         self.assertEqual(modules_to_test, sorted(['other_mod_2']))
 
-    def test_build_cmd_log_db(self):
+    def test_build_cmd_log_config(self):
         """ test that the log_db parameter is set in the .odoorc file """
         build = self.Build.create({
             'params_id': self.server_params.id,
         })
         cmd = build._cmd(py_version=3)
-        self.assertIn('log_db = runbot_logs', cmd.get_config())
-
+        self.assertIn('log_config = /data/build/logconfig.json', cmd.get_config())
 
     def test_build_cmd_custom_pre_post(self):
         """ test that the log_db parameter is set in the .odoorc file """

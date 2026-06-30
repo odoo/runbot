@@ -349,7 +349,6 @@ class TestUpgradeFlow(RunbotCase):
         master_template_build = master_batch.slot_ids.filtered(lambda slot: slot.trigger_id == self.trigger_template).build_id
         self.assertEqual(sorted(master_batch.reference_batch_ids), sorted(self.batches_per_version.values()))
         master_upgrade_build._schedule()
-        self.start_patcher('fetch_local_logs', 'odoo.addons.runbot.models.host.Host._fetch_local_logs', [])  # the local logs have to be empty
         master_upgrade_build._schedule()
         self.assertEqual(master_upgrade_build.local_state, 'done')
         self.assertEqual(len(master_upgrade_build.children_ids), 2)
