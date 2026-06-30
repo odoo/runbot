@@ -263,20 +263,23 @@ def docker_monitoring_loop(builds_dir):
         try:
             stats_per_docker = dict()
             for container in docker_client.containers.list(filters={'status': 'running'}):
-                if re.match(r'^\d+-.+_.+', container.name):
-                    dest, suffix = container.name.split('_', maxsplit=1)
-                    container_log_dir = builds_dir / dest / 'logs'
-                    if not container_log_dir.exists():
-                        _logger.warning('Log dir not found: `%s`', container_log_dir)
-                        continue
-                    current_stats = get_docker_stats(container.id)
-                    previous_stats = previous_stats_per_docker.get(container.name)
-                    previous_stats, log_line = prepare_stats_log(dest, previous_stats, current_stats)
-                    if log_line:
-                        stat_log_file = container_log_dir / f'{suffix}-stats.txt'
-                        with open(stat_log_file, mode='a') as f:
-                            f.write(f'{log_line}\n')
-                    stats_per_docker[container.name] = previous_stats
+                try:
+                    if re.match(r'^\d+-.+_.+', container.name):
+                        dest, suffix = container.name.split('_', maxsplit=1)
+                        container_log_dir = builds_dir / dest / 'logs'
+                        if not container_log_dir.exists():
+                            _logger.warning('Log dir not found: `%s`', container_log_dir)
+                            continue
+                        current_stats = get_docker_stats(container.id)
+                        previous_stats = previous_stats_per_docker.get(container.name)
+                        previous_stats, log_line = prepare_stats_log(dest, previous_stats, current_stats)
+                        if log_line:
+                            stat_log_file = container_log_dir / f'{suffix}-stats.txt'
+                            with open(stat_log_file, mode='a', encoding='utf-8') as f:
+                                f.write(f'{log_line}\n')
+                        stats_per_docker[container.name] = previous_stats
+                except docker.errors.NotFound:
+                    continue
             previous_stats_per_docker = stats_per_docker
             time.sleep(1)
         except Exception as e:
