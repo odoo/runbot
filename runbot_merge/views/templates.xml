@@ -713,7 +713,19 @@ action = batches
                                    t-attf-class="fa fa-external-link"
                                    t-att-href="p['backend_url']"
                                 />
-                                <sup t-if="not p['checked']" class="text-danger">missing statuses</sup>
+                                <t t-if="not p['checked'] and p['pr'].status != 'success'">
+                                    <sup t-if="p['pr'].status == 'pending'" class="text-warning">
+                                        missing statuses
+                                    </sup>
+                                    <sup t-else="" class="text-danger">
+                                        <t t-out="' '.join(
+                                            ci.context
+                                            for ci, st in p['pr'].expected_statuses()
+                                            if ci.prs == 'required'
+                                            if st['state'] in ('error', 'failure')
+                                        )"/>
+                                    </sup>
+                                </t>
                                 <sup t-if="not p['reviewed']" class="text-danger">missing r+</sup>
                                 <sup t-if="not p['attached']"
                                      t-attf-title="detached: {{p['pr'].detach_reason}}"

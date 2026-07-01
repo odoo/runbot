@@ -1371,6 +1371,12 @@ For your own safety I've ignored *everything in your entire comment*.
         # user is probably always False on a forward port
         return ACL(False, False, self.author == user)
 
+    def expected_statuses(self, statuses = None):
+        if statuses is None:
+            statuses = json.loads(self.statuses_full)
+        for ci in self.repository.status_ids._for_pr(self):
+            yield ci, statuses.get(ci.context) or {'state': ci._default_pr_state}
+
     def _validate(self, statuses):
         # could have two PRs (e.g. one open and one closed) at least
         # temporarily on the same head, or on the same head with different
@@ -1379,11 +1385,9 @@ For your own safety I've ignored *everything in your entire comment*.
         updateable.statuses = statuses or '{}'
         for pr in updateable:
             if pr.status == "failure":
-                statuses = json.loads(pr.statuses_full)
-                for ci in pr.repository.status_ids._for_pr(pr).mapped('context'):
-                    status = statuses.get(ci) or {'state': 'pending'}
+                for ci, status in pr.expected_statuses():
                     if status['state'] in ('error', 'failure'):
-                        pr._notify_ci_new_failure(ci, status)
+                        pr._notify_ci_new_failure(ci.context, status)
         self.batch_id._schedule_fp_followup()
 
     def modified(self, fnames, create=False, before=False):
@@ -1431,8 +1435,8 @@ For your own safety I've ignored *everything in your entire comment*.
                 continue
 
             st = 'success'
-            for ci in pr.repository.status_ids._for_pr(pr):
-                v = (statuses.get(ci.context) or {'state': ci._default_pr_state})['state']
+            for _, status in pr.expected_statuses(statuses):
+                v = status['state']
                 if v in ('error', 'failure'):
                     st = 'failure'
                     break
