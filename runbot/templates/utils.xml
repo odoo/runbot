@@ -279,12 +279,14 @@
         <template id="runbot.slot_button">
             <t t-set="bu" t-value="slot.build_id"/>
             <t t-set="color" t-value="bu._get_color_class()"/>
-            <div t-attf-class="btn-group btn-group-ssm slot_button_group">
-                <span t-attf-class="btn btn-{{color}} disabled" t-att-title="slot.link_type">
-                    <i t-attf-class="fa fa-{{slot._fa_link_type()}}"/>
+            <div t-attf-class="btn-group btn-group-ssm slot_button_group {{'slot_link_created' if slot.link_type == 'created' else 'slot_link_matched'}}">
+                <span t-attf-class="btn btn-{{color}} disabled">
+                    <i t-if="slot.build_id.global_state in ('testing', 'pending', 'waiting')" class="fa fa-spinner fa-spin fa-fw"/>
+                    <i t-else="" t-attf-class="fa fa-{{slot._fa_result()}} fa-fw"/>
                 </span>
                 <a t-if="slot.params_id.config_id == slot.trigger_id.light_config_id" class="badge btn btn-info" t-attf-href="/runbot/bundle/{{slot.batch_id.bundle_id.id}}">Light</a>
                 <a t-if="bu" t-attf-href="/runbot/batch/{{slot.batch_id.id}}/build/#{bu.id}" t-attf-class="btn btn-default slot_name">
+                    <!--i t-if="slot.link_type != 'created'" t-att-title="slot.link_type" t-attf-class="fa fa-{{slot._fa_link_type()}}"/-->
                     <span t-out="slot.trigger_id.name"/>
                 </a>
                 <span t-else="" t-attf-class="btn btn-default disabled slot_name">
@@ -354,8 +356,8 @@
         </template>
 
         <template id="runbot.build_menu">
-            <button t-attf-class="btn btn-default dropdown-toggle" data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false">
-                <i t-attf-class="fa  {{'fa-spinner' if bu.global_state == 'pending' else 'fa-cog'}} {{'' if bu.global_state in ('done', 'running') else 'fa-spin'}} fa-fw"/>
+            <button t-attf-class="btn {{'btn-default' if bu.global_state not in ('waiting', 'pending', 'testing') else 'btn-info'}} dropdown-toggle" data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false">
+                <i t-attf-class="fa  {{'fa-spinner' if bu.global_state == 'pending' else 'fa-cog'}} fa-fw"/>
                 <span class="caret"/>
             </button>
             <div class="dropdown-menu dropdown-menu-end" role="menu">

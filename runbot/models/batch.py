@@ -584,6 +584,7 @@ class BatchLog(models.Model):
 
 
 fa_link_types = {'created': 'hashtag', 'matched': 'link', 'rebuild': 'refresh'}
+fa_results = {'ok': 'check', 'warn': 'exclamation-triangle', 'skipped': 'ban', 'ko': 'times'}
 
 class BatchSlot(models.Model):
     _name = 'runbot.batch.slot'
@@ -611,6 +612,11 @@ class BatchSlot(models.Model):
 
     def _fa_link_type(self):
         return fa_link_types.get(self.link_type, 'exclamation-triangle')
+
+    def _fa_result(self):
+        #if self.build_id.global_result == "ok" and self.build_id.global_state != "done":
+        #    return 'spinner fa-spin'
+        return fa_results.get(self.build_id.global_result, '')
 
     def _create_missing_build(self):
         """Create a build when the slot does not have one"""

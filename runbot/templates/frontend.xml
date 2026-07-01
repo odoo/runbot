@@ -87,7 +87,7 @@
       <t t-if="batch.state=='done' and all(slot.build_id.global_result == 'ok' for slot in batch.slot_ids if slot.build_id)" t-set="klass">success</t>
       <t t-if="batch.state=='done' and any(slot.build_id.global_result in ('ko', 'warn') for slot in batch.slot_ids)" t-set="klass">danger</t>
 
-      <div t-attf-class="batch_tile if more">
+      <div t-attf-class="batch_tile">
         <div t-attf-class="card bg-{{klass}}-subtle">
           <a t-attf-href="/runbot/batch/#{batch.id}" t-att-title="batch.create_date.strftime('%Y-%m-%d %H:%M:%S')">
             <div class="batch_header">
