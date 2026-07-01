@@ -691,9 +691,9 @@ action = batches
                         <td t-if="ps['prs']"
                             t-att-title="'detached' if detached else None"
                             t-attf-class="{{
-                                'table-active' if ps['active'] else ''
-                            }} {{
-                                'detached' if detached else ''
+                                'table-active ' if ps['active'] else ''
+                            }}{{
+                                'detached ' if detached else ''
                             }}{{stateclass}}">
                             <!--
                             there should be only one PR per (repo, target) but
