@@ -196,7 +196,7 @@ def remotes() -> typing.Iterator[tuple[str, str, str]]:
             \x20
             \((?P<kind>.+)\)
             # promisor filters
-            (?: \[.*])?
+            (?:\x20\[.*])?
             ''',
             line,
             re.VERBOSE,
