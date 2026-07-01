@@ -4,6 +4,7 @@
 	--btn-default-bg: var(--bs-body-bg);
 	--btn-default-border: #ccc;
 	--active-project-color: #777;
+	--text-color-link: #507279;
 }
 
 /*
@@ -29,6 +30,7 @@
 :root[data-bs-theme=dark] {
 	--btn-default-border: #333;
 	--active-project-color: #CCC;
+	--text-color-link: #97d4e0;
 }
 
 [data-bs-theme=legacy] .text-bg-info {
@@ -277,6 +279,11 @@ body, .table {
 .slot_button_group {
 	display: flex;
 	padding: 0 1px;
+}
+
+.slot_link_matched > .slot_name {
+	--bs-btn-color: var(--text-color-link);
+	font-style: italic;
 }
 
 .slot_button_group .btn {
