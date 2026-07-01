@@ -181,6 +181,36 @@ class TestBranchRelations(RunbotCase):
         self.assertEqual(sorted(bundle.intermediate_version_base_ids.mapped('name')), ['saas-13.1', 'saas-13.2'])
         self.assertIn(dev_branch, bundle.branch_ids)
 
+class TestBranchSlashNames(RunbotCase):
+
+    def setUp(self):
+        super().setUp()
+
+        def create_base(name):
+            branch = self.Branch.create({
+                'remote_id': self.remote_odoo.id,
+                'name': name,
+                'is_pr': False,
+            })
+            branch.bundle_id.is_base = True
+            return branch
+
+        create_base('19.0')
+        self.env['runbot.bundle'].flush_model()
+        self.env['runbot.version'].flush_model()
+
+    def test_branch_version_detection(self):
+        for branch_name in ('19.0/foo', '19.0/tests/my-feature', '19.0-dev-tri'):
+            with self.subTest(branch_name=branch_name):
+                branch = self.Branch.create({
+                    'remote_id': self.remote_odoo_dev.id,
+                    'name': branch_name,
+                    'is_pr': False,
+                })
+                self.assertEqual(branch.bundle_id.base_id.name, '19.0')
+                self.assertEqual(branch.bundle_id.version_id.name, '19.0')
+
+
 class TestBranchForbidden(RunbotCase):
     """Test that a branch matching the repo forbidden regex, goes to dummy bundle"""
 
