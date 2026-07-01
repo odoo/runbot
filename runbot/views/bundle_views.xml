@@ -10,6 +10,8 @@
                     <field name="keep_sticky_running"/>
                     <field name="always_use_foreign"/>
                     <field name="dockerfile_id"/>
+                    <field name="postgres_dockerfile_id"/>
+                    <field name="docker_compose_id"/>
                     <field name="next_freeze_tag_id"/>
                     <field name="group_ids"/>
                     <field name="trigger_ids"/>
@@ -33,6 +35,8 @@
                 <field name="name"/>
                 <field name="keep_sticky_running"/>
                 <field name="dockerfile_id"/>
+                <field name="postgres_dockerfile_id"/>
+                <field name="docker_compose_id"/>
                 <field name="next_freeze_tag_id"/>
                 <field name="group_ids"/>
                 <field name="trigger_ids"/>
@@ -78,6 +82,7 @@
                             <field name="build_all"/>
                             <field name="always_use_foreign"/>
                             <field name="dockerfile_id"/>
+                            <field name="postgres_dockerfile_id"/>
                             <field name="host_id" readonly="0"/>
                             <field name="commit_limit"/>
                             <field name="file_limit"/>
@@ -239,6 +244,7 @@
                 <field name="number"/>
                 <field name="is_major"/>
                 <field name="dockerfile_id"/>
+                <field name="postgres_dockerfile_id"/>
             </list>
         </field>
     </record>

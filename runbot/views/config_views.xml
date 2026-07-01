@@ -48,6 +48,7 @@
                         <field name="make_stats"/>
                         <field name="protected"/>
                         <field name="dockerfile_id"/>
+                        <field name="postgres_dockerfile_id"/>
                         <field name="dockerfile_variant"/>
                         <field name="default_sequence" groups="base.group_no_one"/>
                         <field name="group" groups="base.group_no_one"/>

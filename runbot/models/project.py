@@ -12,6 +12,8 @@ class Project(models.Model):
     keep_sticky_running = fields.Boolean('Keep last sticky builds running')
     trigger_ids = fields.One2many('runbot.trigger', 'project_id', string='Triggers')
     dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, help="Project Default Dockerfile")
+    postgres_dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, help="Project Default Postgres Dockerfile")
+    docker_compose_id = fields.Many2one('runbot.docker_compose', index=True, help="Project Default Docker Compose configuration")
     repo_ids = fields.One2many('runbot.repo', 'project_id', string='Repos')
     sequence = fields.Integer('Sequence')
     organisation = fields.Char('organisation', default=lambda self: self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_organisation'))

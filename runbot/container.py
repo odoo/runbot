@@ -17,6 +17,7 @@ import os
 import re
 import subprocess
 import time
+import yaml
 
 from odoo.tools import file_path
 
@@ -235,7 +236,7 @@ def docker_run(*args, **kwargs):
     return _docker_run(*args, **kwargs)
 
 
-def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False, image_tag=False, exposed_ports=None, cpu_limit=None, cpu_period=100000, cpus=0, memory=None, preexec_fn=None, ro_volumes=None, env_variables=None, network_enabled=False):
+def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False, image_tag=False, docker_compose_content=None, exposed_ports=None, cpu_limit=None, cpus=0, memory=None, preexec_fn=None, ro_volumes=None, env_variables=None, network_enabled=False):
     """Run tests in a docker container
     :param run_cmd: command string to run in container
     :param log_path: path to the logfile that will contain odoo stdout and stderr
@@ -244,8 +245,7 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
     :param container_name: used to give a name to the container for later reference
     :param image_tag: Docker image tag name to select which docker image to use
     :param exposed_ports: if not None, starting at 8069, ports will be exposed as exposed_ports numbers
-    :param cpu_period: Specify the CPU CFS scheduler period, which is used alongside cpu_quota
-    :param cpus: used to compute cpu_quota = cpu_period * cpus (equivalent of --cpus in docker CLI)
+    :param cpus: used to compute cpu_quota = 100000 * cpus (equivalent of --cpus in docker CLI)
     :param memory: memory limit in bytes for the container
     :params ro_volumes: dict of dest:source volumes to mount readonly in builddir
     :params env_variables: list of environment variables
@@ -273,7 +273,6 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
     logs.write("Docker command:\n%s\n=================================================\n" % cmd_str)
     # create start script
     volumes = {
-        '/var/run/postgresql': {'bind': '/var/run/postgresql', 'mode': 'rw'},
         f'{build_dir}': {'bind': '/data/build', 'mode': 'rw'},
         f'{log_path}': {'bind': '/data/buildlogs.txt', 'mode': 'rw'}
     }
@@ -294,25 +293,69 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
         ulimits.append(docker.types.Ulimit(name='cpu', soft=cpu_limit, hard=cpu_limit))
 
     docker_client = docker.from_env()
-    container = docker_client.containers.run(
-        image_tag,
-        name=container_name,
-        volumes=volumes,
-        shm_size='128m',
-        mem_limit=memory,
-        ports=ports,
-        ulimits=ulimits,
-        cpu_period=cpu_period,
-        cpu_quota=int(cpus * cpu_period ) if cpus else None,
-        environment=env_variables,
-        init=True,
-        command=['/bin/bash', '-c',
-                 f'exec &>> /data/buildlogs.txt ;{run_cmd}'],
-        auto_remove=True,
-        detach=True,
-        user=USERNAME,
-        network_mode=None if network_enabled else 'none'
-    )
+    if docker_compose_content:
+        docker_compose = yaml.safe_load(docker_compose_content)
+        for service_name, service in docker_compose['services'].items():
+            service["restart"] = "no"
+            if service_name == 'main':
+                service["container_name"] = container_name
+            else:
+                service["container_name"] = container_name + '-' + service_name
+        service = docker_compose['services']['main']
+        service['command'] = ['/bin/bash', '-c', f'exec &>> /data/buildlogs.txt ;{run_cmd}']
+        service['volumes'] = service.get('volumes', []) + [f'{source}:{volume["bind"]}:{volume["mode"]}'for source, volume in volumes.items()]
+        service["ports"] = [f"{hp}:{dp}/tcp" for dp, hp in enumerate(exposed_ports, start=8069)]
+        service["user"] = USERNAME
+        service["ulimits"] = {u["name"]: {"soft": u["soft"], "hard": u["hard"]} for u in ulimits}
+        service["environment"] = env_variables or {}
+        service["shm_size"] = '128m'
+        service["init"] = True
+        if not network_enabled:
+            service["network_mode"] = "none"
+
+        limits = {}
+        if memory:
+            limits["memory"] = memory
+        if cpus:
+            limits["cpus"] = str(cpus)
+        if limits:
+            service["deploy"] = {"resources": {"limits": limits}}
+
+        compose_path = os.path.join(build_dir, "docker-compose.yml")
+        with open(compose_path, 'w') as f:
+            yaml.dump(docker_compose, f, default_flow_style=False, sort_keys=False)
+        cmd = [
+            "docker", "compose",
+            "-f", compose_path,
+            "-p", container_name,
+            "up", "-d", "--remove-orphans",
+        ]
+        subprocess.run(cmd, check=True)
+        container = docker_client.containers.get(container_name)
+
+    else:
+
+        volumes['/var/run/postgresql'] = {'bind': '/var/run/postgresql', 'mode': 'rw'}
+        cpu_period = 100000
+        container = docker_client.containers.run(
+            image_tag,
+            name=container_name,
+            volumes=volumes,
+            shm_size='128m',
+            mem_limit=memory,
+            ports=ports,
+            ulimits=ulimits,
+            cpu_period=cpu_period,
+            cpu_quota=int(cpus * cpu_period) if cpus else None,
+            environment=env_variables,
+            init=True,
+            command=['/bin/bash', '-c',
+                    f'exec &>> /data/buildlogs.txt ;{run_cmd}'],
+            auto_remove=True,
+            detach=True,
+            user=USERNAME,
+            network_mode=None if network_enabled else 'none'
+        )
     if container.status not in ('running', 'created') :
         _logger.error('Container %s started but status is not running or created:  %s', container_name, container.status)
     else:
@@ -323,6 +366,17 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
 def docker_stop(container_name, build_dir=None):
     return _docker_stop(container_name, build_dir)
 
+
+def docker_compose_cleanup(container_name):
+    docker_client = docker.from_env()
+    for container in docker_client.containers.list(all=True, filters={'label': f'com.docker.compose.project={container_name}'}):
+        try:
+            container.stop(timeout=1)
+            container.remove(v=True)
+        except docker.errors.NotFound:
+            pass
+        except docker.errors.APIError as e:
+            _logger.warning('compose cleanup: %s on %s', e, container.name)
 
 def _docker_stop(container_name, build_dir):
     """Stops the container named container_name"""
@@ -342,8 +396,10 @@ def _docker_stop(container_name, build_dir):
     else:
         _logger.info('Stopping docker without defined build_dir')
     try:
+        docker_compose_cleanup(container_name)
         container = docker_client.containers.get(container_name)
         container.stop(timeout=1)
+        container.remove(v=True)
         return
     except docker.errors.NotFound:
         _logger.error('Cannnot stop container %s. Container not found', container_name)

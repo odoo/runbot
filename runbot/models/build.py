@@ -40,7 +40,7 @@ from ..common import (
     transactioncache,
     DEFAULT_MAX_FILE_SIZE,
 )
-from ..container import Command, docker_pull, docker_run, docker_state, docker_stop
+from ..container import Command, docker_pull, docker_run, docker_state, docker_stop, docker_compose_cleanup
 from ..fields import JsonDictField
 
 _logger = logging.getLogger(__name__)
@@ -90,6 +90,7 @@ class BuildParameters(models.Model):
     create_batch_id = fields.Many2one('runbot.batch', index=True)
     category = fields.Char('Category', index=True)  # normal vs nightly vs weekly, ...
     dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, default=lambda self: self.env.ref('runbot.docker_default', raise_if_not_found=False))
+    postgres_dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, default=lambda self: self.env.ref('runbot.postgresql_docker_default', raise_if_not_found=False))
     skip_requirements = fields.Boolean('Skip requirements.txt auto install')
     # other informations
     extra_params = fields.Char('Extra cmd args')
@@ -162,6 +163,8 @@ class BuildParameters(models.Model):
                 cleaned_vals['dynamic_config_position'] = param.dynamic_config_position
             if param.dynamic_config.dict:
                 cleaned_vals['dynamic_config'] = param.dynamic_config.dict
+            if param.postgres_dockerfile_id:
+                cleaned_vals['postgres_dockerfile_id'] = param.postgres_dockerfile_id.id
 
             param.fingerprint = hashlib.sha256(str(cleaned_vals).encode('utf8')).hexdigest()
 
@@ -909,6 +912,7 @@ class BuildResult(models.Model):
                         build._log('_schedule', 'Docker was likely killed, skipping%s' % details, level='ERROR')
             if self.env['runbot.host']._fetch_local_logs(build_ids=build.ids):
                 return True  # avoid to make results with remaining logs
+            docker_compose_cleanup(build._get_docker_name())
             # No job running, make result and select next job
             if build.docker_start:
                 docker_duration = int(time.time() - dt2time(build.docker_start))
@@ -1008,37 +1012,60 @@ class BuildResult(models.Model):
                 build._log("run", message, level='ERROR')
                 build._kill(result='ko')
 
-    def _docker_run(self, step, cmd=None, ro_volumes=None, env_variables=None, **kwargs):
+    def _docker_run(self, step, cmd=None, ro_volumes=None, env_variables=None, image_tag=None, postgres_image_tag=None, use_docker_compose=False, **kwargs):
         self.ensure_one()
         _ro_volumes = ro_volumes or {}
         ro_volumes = {}
         for dest, source in _ro_volumes.items():
             ro_volumes[f'/data/build/{dest}'] = source
-        if 'image_tag' not in kwargs:
-            kwargs.update({'image_tag': step.dockerfile_id.image_tag or self.params_id.dockerfile_id.image_tag})
+        if image_tag is None:
+            image_tag = step.dockerfile_id.image_tag or self.params_id.dockerfile_id.image_tag
+
+        if postgres_image_tag is None:
+            postgres_image_tag = step.postgres_dockerfile_id.image_tag or self.params_id.postgres_dockerfile_id.image_tag or self.params_id.version_id.postgres_dockerfile_id.image_tag
+
         dockerfile_variant = self.params_id.config_data.get('dockerfile_variant', step.dockerfile_variant)
-        if dockerfile_variant and f'.{dockerfile_variant.lower()}' not in kwargs['image_tag']:
-            kwargs['image_tag'] += f'.{dockerfile_variant.lower()}'
+        if dockerfile_variant and f'.{dockerfile_variant.lower()}' not in image_tag:
+            image_tag += f'.{dockerfile_variant.lower()}'
         if self.params_id.config_data.get('docker_use_future') and not kwargs['image_tag'].endswith('.future'):
-            kwargs['image_tag'] += '.future'
+            image_tag += '.future'
+            if postgres_image_tag:
+                postgres_image_tag += '.future'
         docker_registry_url = self.host_id._get_docker_registry_url()
         image_id = None
         if docker_registry_url and self.host_id.use_remote_docker_registry:
-            try:
-                result = docker_pull(f"{docker_registry_url}/{kwargs['image_tag']}")
-                if result['success']:
-                    result['image'].tag(kwargs['image_tag'])
-                if result.get('log_progress'):
-                    self._log('Docker Run', f'Docker image was pulled {"" if result["success"] else "with errors"}')
-                image_id = result.get('image_id')
-            except Exception:
-                _logger.exception('Failed to pull docker image %s', kwargs['image_tag'])
-                self._log('Docker Run', 'Failed to pull docker image')
+            for pull_image_tag in (postgres_image_tag, image_tag):
+                try:
+                    result = docker_pull(f"{docker_registry_url}/{pull_image_tag}")
+                    if result['success']:
+                        result['image'].tag(pull_image_tag)
+                    if result.get('log_progress'):
+                        self._log('Docker Run', f'Docker image was pulled {"" if result["success"] else "with errors"}')
+                    image_id = result.get('image_id')
+                except Exception:
+                    _logger.exception('Failed to pull docker image %s', pull_image_tag)
+                    self._log('Docker Run', 'Failed to pull docker image')
 
-        self._log('Preparing', 'Using Dockerfile Tag [%s](/runbot/dockerfile_result/%s/%s)', kwargs['image_tag'], kwargs['image_tag'], image_id, log_type='markdown')
+        self._log('Preparing', 'Using Dockerfile Tag [%s](/runbot/dockerfile_result/%s/%s)', pull_image_tag, pull_image_tag, image_id, log_type='markdown')
 
         # network is disabled by default, can be enabled via kwargs['network_enabled'] (run, restore) or config_data['network_enabled'] (external, nightly,...)
         kwargs['network_enabled'] = kwargs.get('network_enabled') or self.params_id.config_data.get('network_enabled') or self.params_id.trigger_id.network_enabled or False
+        use_docker_compose = use_docker_compose or self.params_id.config_data.get('use_docker_compose') or self.params_id.trigger_id.use_docker_compose or False
+        docker_compose_content = None
+        build_dir = self._path()
+        if use_docker_compose:
+            docker_compose_id = self.params_id.config_data.get('docker_compose_id') or step.docker_compose_id.id or self.params_id.project_id.docker_compose_id.id
+            docker_compose = self.env['runbot.docker_compose'].browse(docker_compose_id)
+            if docker_compose:
+                docker_compose_content = docker_compose._render({
+                    'image_tag': image_tag,
+                    'postgres_image_tag': postgres_image_tag,
+                    'build_dir': build_dir,
+                })
+        if docker_compose_content:
+            kwargs['docker_compose_content'] = docker_compose_content
+        else:
+            kwargs['image_tag'] = image_tag
 
         containers_memory_limit = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_containers_memory', 0)
         if containers_memory_limit and 'memory' not in kwargs:
@@ -1065,7 +1092,6 @@ class BuildResult(models.Model):
         kwargs.pop('log_path', False)
         kwargs.pop('container_name', False)
         log_path = self._path('logs', '%s.txt' % step.sanitized_name(self))
-        build_dir = self._path()
         container_name = self._get_docker_name()
         self.env.flush_all()
         env_variables = env_variables or []
