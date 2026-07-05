@@ -147,6 +147,7 @@ def redo(pr: str) -> int:
         exit(r.returncode)
     print(".")
     commits = r.stdout.splitlines(keepends=False)
+    GIT_DIR.joinpath("FW_CMAP").unlink(missing_ok=True)
     if cm:
         # remap commits to forward port to those which got merged
         commits = [cm[c] for c in commits]
