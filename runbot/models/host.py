@@ -327,7 +327,7 @@ class Host(models.Model):
                 for row in local_cr.fetchall():
                     vals = dict(zip(col_names, row))
                     res.append(vals)
-                    log_to_delete = vals.pop('id')
+                    log_to_delete.append(int(vals.pop('id')))
             if log_to_delete:
                 def cleanup(log_to_delete=log_to_delete):
                     logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
