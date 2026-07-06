@@ -387,7 +387,7 @@ class Bundle(models.Model):
         return self._generate_custom_trigger_action(context)
 
     def action_disable_all_triggers(self):
-        self._configure_custom_trigger_start_mode('disable')
+        self._configure_custom_trigger_start_mode('disabled')
 
     def _configure_custom_trigger_start_mode(self, mode):
         self.ensure_one()
