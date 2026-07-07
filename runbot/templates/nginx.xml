@@ -53,8 +53,13 @@ server {
           autoindex on;
           add_header 'Access-Control-Allow-Origin' '<t t-out="base_url"/>';
       }
+      location ~ /runbot/static/backups/ {
+          autoindex off;
+          add_header 'Access-Control-Allow-Origin' '<t t-out="base_url"/>';
+      }
     }
 }
+
 
 server {
   listen 8080;

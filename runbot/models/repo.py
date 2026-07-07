@@ -77,6 +77,7 @@ class Trigger(models.Model):
     light_config_id = fields.Many2one('runbot.build.config', string="Light config", help="Alternative config to use when light mode is enabled")
     config_data = JsonDictField('Config Data')
     network_enabled = fields.Boolean('Network Enabled')
+    backup_databases = fields.Boolean('Backup Databases', help="If checked, builds from this trigger will be backed up by the backup host for sticky bundles")
     batch_dependent = fields.Boolean('Batch Dependent', help="Force adding batch in build parameters to make it unique and give access to bundle")
     version_dependent = fields.Boolean('Version Dependent', default=True, help="Add the version in build parameters. Uncheck if the version is not needed to determine the build result")
 

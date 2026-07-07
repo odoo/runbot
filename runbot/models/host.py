@@ -51,6 +51,7 @@ class Host(models.Model):
     is_leader = fields.Boolean('Is leader', help='This host is the leader of the cluster', default=False)
     is_builder = fields.Boolean('Is builder', help='This host is a builder of the cluster', default=True)
     is_registry = fields.Boolean('Is docker registry', help='This host is a docker regisrty', default=False)
+    is_backup = fields.Boolean('Is backup', help='This host backup the most important databases', default=False)
     send_status = fields.Boolean('Send status', help='If leader, this host will send status updates, disable to use the status service', default=True)
 
     use_remote_docker_registry = fields.Boolean('Use remote Docker Registry', default=False, help="Use docker registry for pulling images")
@@ -71,6 +72,17 @@ class Host(models.Model):
     def _compute_build_ids(self):
         for host in self:
             host.build_ids = self.env['runbot.build'].search([('host', '=', host.name), ('local_state', 'in', ('pending', 'testing', 'running'))])
+
+    def _static_url(self):
+        use_ssl = self.env['ir.config_parameter'].get_param('runbot.use_ssl', default=True)
+        scheme = 'https' if use_ssl else 'http'
+        return f'{scheme}://{self.name}/runbot/static/'
+
+    def _build_url(self, build):
+        return f'{self._static_url()}build/{build.dest}/'
+
+    def _backup_url(self):
+        return f'{self._static_url()}backups/'
 
     @api.model_create_multi
     def create(self, vals_list):
