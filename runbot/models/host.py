@@ -394,6 +394,14 @@ class Host(models.Model):
     def _process_messages(self):
         return self.host_message_ids._process()
 
+    def _action_pause(self):
+        for host in self:
+            host.paused = True
+
+    def _action_unpause(self):
+        for host in self:
+            host.paused = False
+
 
 class MessageQueue(models.Model):
     _name = 'runbot.host.message'

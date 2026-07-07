@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from logging.handlers import WatchedFileHandler
 
+
 LOG_FORMAT = '%(asctime)s %(levelname)s %(name)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 logging.getLogger('odoo.addons.runbot').setLevel(logging.DEBUG)
@@ -40,6 +41,7 @@ class RunbotClient():
     def main_loop(self):
         from odoo import fields
         from odoo.tools.profiler import Profiler
+        from odoo.tools.misc import str2bool
         self.on_start()
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
@@ -64,7 +66,7 @@ class RunbotClient():
                         self.env.reset()
                         self.env = self.env()
                     self.count = self.count % self.max_count
-                    if self.host.paused:
+                    if self.host.paused or str2bool(self.env['ir.config_parameter'].sudo().get_param('pause_all_hosts', 'False')):
                         sleep_time = 5
                     else:
                         sleep_time = self.loop_turn()

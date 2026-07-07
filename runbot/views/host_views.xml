@@ -63,7 +63,7 @@
                 <field name="is_leader"/>
                 <field name="is_builder"/>
                 <field name="is_registry"/>
-
+                <field name="paused" widget="boolean_toggle"/>
             </list>
         </field>
     </record>
@@ -75,5 +75,28 @@
         <field name="path">host</field>
     </record>
 
+    <record model="ir.actions.server" id="action_pause_hosts">
+        <field name="name">Pause Selected Hosts</field>
+        <field name="model_id" ref="runbot.model_runbot_host" />
+        <field name="binding_model_id" ref="runbot.model_runbot_host" />
+        <field name="type">ir.actions.server</field>
+        <field name="state">code</field>
+        <field name="code">
+            action = records._action_pause()
+        </field>
+    </record>
+
+    <record model="ir.actions.server" id="action_unpause_hosts">
+        <field name="name">Unpause Selected Hosts</field>
+        <field name="model_id" ref="runbot.model_runbot_host" />
+        <field name="binding_model_id" ref="runbot.model_runbot_host" />
+        <field name="type">ir.actions.server</field>
+        <field name="state">code</field>
+        <field name="code">
+            action = records._action_unpause()
+        </field>
+    </record>
+
   </data>
+
 </odoo>
