@@ -58,93 +58,118 @@
           <t t-if="refresh">
             <meta http-equiv="refresh" t-att-content="refresh"/>
           </t>
-          <style>
-            h4 {
-            padding: 3px 0;
-            border-bottom: 1px solid grey;
-            }
-            .r-mb02 { margin-bottom: 0.2em; }
-          </style>
         </t>
+          <style type="text/css">
+            h4 {
+              padding: 3px 0;
+              border-bottom: 1px solid grey;
+            }
+            article.card {
+              --bs-card-spacer-y: .5rem;
+              --bs-card-spacer-x: .5rem;
+              --bs-card-cap-padding-x: .5rem;
+              --bs-card-cap-padding-y: .25rem;
+              --bs-card-border-width: 2px;
+            }
+          </style>
         <div class="container-fluid">
           <div class="row">
-            <div class="col-md-12">
-              <div>
-                <t t-call="runbot.slots_infos"/>
-              </div>
+            <div class="col-12 my-2">
+              <t t-call="runbot.slots_infos"/>
+            </div>
+          </div>
+          <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 row-cols-xxl-6 g-2">
               <t t-foreach="hosts_data.sorted(key=lambda h:h.name)" t-as="host">
-                <div>
-                  <span t-out="host.name.split('.')[0]"/>
-                  <t t-if="host.nb_testing == 0">
-                    <t t-set="klass">success</t>
-                  </t>
-                  <t t-if="host.nb_testing > 0">
-                    <t t-set="klass">info</t>
-                  </t>
-                  <t t-if="host.nb_testing == host.nb_worker">
-                    <t t-set="klass">warning</t>
-                  </t>
-                  <t t-if="host.nb_testing > host.nb_worker">
-                    <t t-set="klass">danger</t>
-                  </t>
-                  <a t-attf-class="badge text-bg-{{klass}}" t-attf-href="/runbot/load_info?host={{host.name}}">
-                    <span t-out="host.nb_testing"/>
-                    /
-                    <span t-out="host.nb_worker"/>
-                  </a>
-                  <t t-out="host.nb_running"/>
-                  <t t-set="succes_time" t-value="int(datetime.datetime.now().timestamp() - host.last_success.timestamp())"/>
-                  <t t-set="start_time" t-value="int(datetime.datetime.now().timestamp() - host.last_start_loop.timestamp())"/>
-                  <t t-set="end_time" t-value="int(datetime.datetime.now().timestamp() - host.last_end_loop.timestamp())"/>
-
+                <t t-if="host.nb_testing == 0 or host.nb_worker == 0">
                   <t t-set="klass">success</t>
-                  <t t-if="succes_time > 30">
-                    <t t-set="klass">info</t>
-                  </t>
-                  <t t-if="succes_time > 180">
-                    <t t-set="klass">danger</t>
-                  </t>
+                  <t t-set="icon">check-circle</t>
+                </t>
+                <t t-elif="host.nb_testing &gt; 0 and host.nb_testing &lt; host.nb_worker">
+                  <t t-set="klass">info</t>
+                  <t t-set="icon">check-circle</t>
+                </t>
+                <t t-elif="host.nb_testing == host.nb_worker">
+                  <t t-set="klass">warning</t>
+                  <t t-set="icon">exclamation-circle</t>
+                </t>
+                <t t-elif="host.nb_testing &gt; host.nb_worker">
+                  <t t-set="klass">danger</t>
+                  <t t-set="icon">exclamation-triangle</t>
+                </t>
+                <t t-set="success_time" t-value="int(datetime.datetime.now().timestamp() - host.last_success.timestamp())"/>
+                <t t-set="start_time" t-value="int(datetime.datetime.now().timestamp() - host.last_start_loop.timestamp())"/>
+                <t t-set="end_time" t-value="int(datetime.datetime.now().timestamp() - host.last_end_loop.timestamp())"/>
+                <t t-set="loop_time" t-value="end_time-start_time"/>
 
-                  <span t-attf-class="badge text-bg-{{klass}}">
-                    <span t-out="succes_time"/>
-                  </span>
-
-                  <t t-set="klass">success</t>
-                  <t t-if="start_time > 60*10">
-                    <t t-set="klass">info</t>
-                  </t>
-                  <t t-if="start_time > 60*15">
-                    <t t-set="klass">danger</t>
-                  </t>
-
-                  <span t-attf-class="badge text-bg-{{klass}}">
-                    <span t-out="start_time"/>
-                  </span>
-
-                  <t t-set="klass">success</t>
-                  <t t-if="end_time > 60*10">
-                    <t t-set="klass">info</t>
-                  </t>
-                  <t t-if="end_time > 60*15">
-                    <t t-set="klass">danger</t>
-                  </t>
-
-                  <span t-attf-class="badge text-bg-{{klass}}">
-                    <span t-out="end_time"/>
-                  </span>
-
-                  <t t-set="loop_time" t-value="end_time-start_time"/>
-                  <t t-set="klass">success</t>
-                  <t t-if="abs(loop_time) > 10">
-                    <t t-set="klass">info</t>
-                  </t>
-                  <t t-if="abs(loop_time) > 60">
-                    <t t-set="klass">danger</t>
-                  </t>
-                  <span t-attf-class="badge text-bg-{{klass}}">
-                    <span t-out="loop_time"/>
-                  </span>
-
+                <div t-attf-class="col">
+                  <article t-attf-class="card border-{{klass}}">
+                    <header class="card-header d-flex gap-1">
+                      <i t-attf-class="fa fa-fw fa-lg fa-{{icon}} text-{{klass}}"/>
+                      <h5 class="my-0" t-out="host.name.split('.')[0]"/>
+                      <a class="ms-auto" t-attf-href="/runbot/load_info?host={{host.name}}">
+                        <i class="fa fa-fw fa-lg fa-tasks"/>
+                      </a>
+                    </header>
+                    <div class="card-body">
+                      <div class="row">
+                        <div class="col-6">
+                          Testing: <t t-out="host.nb_testing"/> / <t t-out="host.nb_worker"/>
+                        </div>
+                        <div class="col-6">
+                          <div class="progress" role="progressbar" aria-label="Slots" t-att-aria-valuenow="host.nb_testing + 1" aria-valuemin="1" t-att-aria-valuemax="host.nb_worker + 1">
+                            <div t-attf-class="progress-bar text-bg-{{klass}}" t-attf-style="width: calc({{host.nb_testing + 1}} / {{host.nb_worker + 1}} * 100%)"/>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="row">
+                        <div class="col-12">
+                          Running: <t t-out="host.nb_running"/>
+                        </div>
+                      </div>
+                      <div class="row">
+                        <div class="col-12">
+                          Timings:
+                          <div class="d-flex gap-1 justify-content-between">
+                          <t t-set="klass">success</t>
+                          <t t-if="success_time > 30">
+                            <t t-set="klass">info</t>
+                          </t>
+                          <t t-if="success_time > 180">
+                            <t t-set="klass">danger</t>
+                          </t>
+                          <span t-attf-class="badge text-bg-{{klass}}" t-out="success_time"/>
+                          
+                          <t t-set="klass">success</t>
+                          <t t-if="start_time > 60*10">
+                            <t t-set="klass">info</t>
+                          </t>
+                          <t t-if="start_time > 60*15">
+                            <t t-set="klass">danger</t>
+                          </t>
+                          <span t-attf-class="badge text-bg-{{klass}}" t-out="start_time"/>
+                          
+                          <t t-set="klass">success</t>
+                          <t t-if="end_time > 60*10">
+                            <t t-set="klass">info</t>
+                          </t>
+                          <t t-if="end_time > 60*15">
+                            <t t-set="klass">danger</t>
+                          </t>
+                          <span t-attf-class="badge text-bg-{{klass}}" t-out="end_time"/>
+                          
+                          <t t-set="klass">success</t>
+                          <t t-if="abs(loop_time) > 10">
+                            <t t-set="klass">info</t>
+                          </t>
+                          <t t-if="abs(loop_time) > 60">
+                            <t t-set="klass">danger</t>
+                          </t>
+                          <span t-attf-class="badge text-bg-{{klass}}" t-out="loop_time"/>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
                 </div>
               </t>
 
@@ -178,7 +203,6 @@
                   </td>
                 </tr>
               </table>
-            </div>
           </div>
         </div>
       </t>
