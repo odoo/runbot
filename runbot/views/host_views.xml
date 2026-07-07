@@ -16,6 +16,7 @@
                         <field name="send_status" invisible="not is_leader"/>
                         <field name="is_builder"/>
                         <field name="is_registry"/>
+                        <field name="is_backup"/>
                         <field name="docker_registry_url"/>
                         <field name="last_start_loop" readonly='1' options="{'numeric': true}"/>
                         <field name="last_end_loop" readonly='1' options="{'numeric': true}"/>
@@ -63,6 +64,7 @@
                 <field name="is_leader"/>
                 <field name="is_builder"/>
                 <field name="is_registry"/>
+                <field name="is_backup"/>
 
             </list>
         </field>

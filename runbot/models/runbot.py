@@ -7,7 +7,7 @@ import signal
 import subprocess
 import time
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import docker
 from requests.exceptions import HTTPError
@@ -364,6 +364,33 @@ class Runbot(models.AbstractModel):
             message = f'Starting registry failed with exception: {e}'
             self.warning(message)
             _logger.error(message)
+
+    def _backup_databases(self):
+        icp = self.env['ir.config_parameter'].sudo()
+        db_gc_days = int(icp.get_param('runbot.db_gc_days', default=30))
+        min_create_date = datetime.now() - timedelta(days=db_gc_days)
+        batches_to_backup = self.env['runbot.batch'].search([('bundle_id.sticky', '=', True), ('create_date', '>', min_create_date)])
+        builds_to_backup = batches_to_backup.slot_ids.filtered('trigger_id.backup_databases').build_id
+        backup_location = self._path('backups')
+        os.makedirs(backup_location, exist_ok=True)
+        existing_backups = {f.removesuffix('.zip') for f in os.listdir(backup_location) if f.endswith('.zip')}
+        _logger.info('Checking %s databases', len(builds_to_backup.database_ids))
+        for database in builds_to_backup.database_ids:
+            if database.name in existing_backups:
+                existing_backups.discard(database.name)
+                continue
+            _logger.info('Backing up database %s', database.name)
+            url = f'{database.build_id._http_log_url()}{database.name}.zip'
+            assert str(database.build_id.id) in database.name  # ensure that database are well uniquified by build in order to avoid to forget to adapt this if it changes in the future
+            try:
+                subprocess.run(['wget', '-O', self._path('backups', f'{database.name}.zip'), url], check=True)
+            except subprocess.CalledProcessError as e:
+                _logger.error('Failed to backup database %s: %s', database.name, e)
+        # cleanup old backup
+        # we could keep them longer than on hosts but let's keep it simple for now
+        for remaining_backup in existing_backups:
+            _logger.info('Removing old backup %s', remaining_backup)
+            os.remove(self._path('backups', f'{remaining_backup}.zip'))
 
     def _warning(self, message, *args):
         if args:

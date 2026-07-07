@@ -1160,10 +1160,20 @@ class ConfigStep(models.Model):
                 download_db_suffix = config_data.get('dump_suffix', self.restore_download_db_suffix or 'all')
                 dump_build = build.parent_id
             assert download_db_suffix and dump_build
-            download_db_name = '%s-%s' % (dump_build.dest, download_db_suffix)
-            zip_name = '%s.zip' % download_db_name
-            dump_url = '%s%s' % (dump_build._http_log_url(), zip_name)
-            build._log('test-migration', 'Restoring dump [%s](%s) from build [%s](%s)', zip_name, dump_url, dump_build.id, dump_build.build_url, log_type='markdown')
+            download_db_name = f'{dump_build.dest}-{download_db_suffix}'
+            zip_name = f'{download_db_name}.zip'
+            dump_url = f'{dump_build._http_log_url()}{zip_name}'
+            use_backup = False
+            if dump_build.trigger_id.backup_databases and requests.head(dump_url, timeout=5).status_code != 200:
+                for backup_host in self.env['runbot.host'].search([('is_backup', '=', True)]):
+                    backup_url = f'{backup_host._backup_url()}{zip_name}'
+                    if requests.head(backup_url, timeout=5).status_code == 200:
+                        build._log('_run_restore', 'Dump [%s](%s) from build [%s](%s) is missing, using [backup](%s)', zip_name, dump_url, dump_build.id, dump_build.build_url, backup_url, log_type='markdown')
+                        dump_url = backup_url
+                        use_backup = True
+                        break
+            if not use_backup:
+                build._log('_run_restore', 'Restoring dump [%s](%s) from build [%s](%s)', zip_name, dump_url, dump_build.id, dump_build.build_url, log_type='markdown')
         target_suffix = config_data.get('target_suffix', self.restore_rename_db_suffix or download_db_suffix)
         restore_db_name = '%s-%s' % (build.dest, target_suffix)
 

@@ -19,6 +19,7 @@
                   <field name="config_id"/>
                   <field name="light_config_id"/>
                   <field name="network_enabled"/>
+                  <field name="backup_databases"/>
                   <field name="config_data" widget="runbotjsonb"/>
                   <field name="report_view_id"/>
                   <field name="has_stats"/>
