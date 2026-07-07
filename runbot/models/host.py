@@ -45,7 +45,7 @@ class Host(models.Model):
     host_message_ids = fields.One2many('runbot.host.message', 'host_id')
     build_ids = fields.One2many('runbot.build', compute='_compute_build_ids')
 
-    paused = fields.Boolean('Paused', help='Host will stop scheduling while paused')
+    paused = fields.Boolean('Paused', help='Host will stop scheduling while paused', tracking=True)
     profile = fields.Boolean('Profile', help='Enable profiling on this host')
 
     is_leader = fields.Boolean('Is leader', help='This host is the leader of the cluster', default=False)
@@ -406,6 +406,14 @@ class Host(models.Model):
 
     def _process_messages(self):
         return self.host_message_ids._process()
+
+    def _action_pause(self):
+        for host in self:
+            host.paused = True
+
+    def _action_unpause(self):
+        for host in self:
+            host.paused = False
 
 
 class MessageQueue(models.Model):
