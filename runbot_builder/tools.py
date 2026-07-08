@@ -57,6 +57,11 @@ class RunbotClient():
             ' (assigned only)' if self.host.assigned_only else ''
         )
         while True:
+            if str2bool(self.env['ir.config_parameter'].sudo().get_param('pause_all_hosts', 'False')):
+                # don't even access hosts to make upgrades possible
+                _logger.info('All hosts are paused, sleeping 10s')
+                self.sleep(10)
+                continue
             context_manager = Profiler(db=self.env.cr.dbname) if self.host.profile else nullcontext()
             with context_manager:
                 try:
@@ -66,7 +71,7 @@ class RunbotClient():
                         self.env.reset()
                         self.env = self.env()
                     self.count = self.count % self.max_count
-                    if self.host.paused or str2bool(self.env['ir.config_parameter'].sudo().get_param('pause_all_hosts', 'False')):
+                    if self.host.paused:
                         sleep_time = 5
                     else:
                         sleep_time = self.loop_turn()
