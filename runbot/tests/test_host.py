@@ -170,9 +170,7 @@ class TestHost(RunbotCase):
         self.patchers['docker_tag'].assert_has_calls(expected_docker_tag_calls)
 
         expected_push_calls = [
-            call('odoo:DockerTest', '127.0.0.1:5001'),
             call('odoo:DockerTest', 'registryhost_nowhere'),
-            call('odoo:DockerTest.future', '127.0.0.1:5001'),
             call('odoo:DockerTest.future', 'registryhost_nowhere')
         ]
 
