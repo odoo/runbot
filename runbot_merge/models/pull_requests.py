@@ -22,7 +22,6 @@ from operator import itemgetter
 from typing import Optional, Union, List, Iterator, Tuple
 
 import psycopg2.errors
-import sentry_sdk
 import werkzeug
 import werkzeug.urls
 from markupsafe import Markup, escape
@@ -2936,10 +2935,7 @@ class Stagings(models.Model):
             FOR UPDATE
             ''', [tuple(self.mapped('batch_ids.prs.id'))])
             try:
-                with sentry_sdk.start_span(description="merge staging") as span:
-                    span.set_tag("staging", self.id)
-                    span.set_tag("branch", self.target.name)
-                    self._safety_dance()
+                self._safety_dance()
             except exceptions.FastForwardError as e:
                 logger.warning(
                     "Could not fast-forward successful staging on %s:%s: %s",

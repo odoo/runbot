@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 from typing import Callable
 
 import psycopg2.errors
-import sentry_sdk
 from werkzeug.exceptions import NotFound, UnprocessableEntity
 
 from odoo.api import Environment
@@ -105,14 +104,6 @@ class MergebotController(Controller):
     def index(self) -> Response:
         req = request.httprequest
         event = req.headers['X-Github-Event']
-        with sentry_sdk.configure_scope() as scope:
-            if scope.transaction:
-                # only in 1.8.0 (or at least 1.7.2
-                if hasattr(scope, 'set_transaction_name'):
-                    scope.set_transaction_name(f"webhook {event}")
-                else: # but our servers use 1.4.3
-                    scope.transaction = f"webhook {event}"
-
         github._gh.getChild('hook').info(self._format(req))
 
         env = request.env(user=1)
@@ -155,7 +146,6 @@ class MergebotController(Controller):
                 response="Not setup to receive event.",
             )
 
-        sentry_sdk.set_context('webhook', data)
         return c(env, data)
 
     def _format(self, request):

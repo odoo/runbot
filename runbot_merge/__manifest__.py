@@ -43,7 +43,6 @@
             'runbot_merge/static/src/**/*.js',
         ],
     },
-    'post_load': 'enable_sentry',
     'pre_init_hook': '_check_citext',
     'license': 'LGPL-3',
 }

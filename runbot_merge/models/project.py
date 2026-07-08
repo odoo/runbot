@@ -4,7 +4,6 @@ import shutil
 from typing import List
 
 import requests
-import sentry_sdk
 
 from odoo import models, fields, api
 from odoo.exceptions import UserError
@@ -181,9 +180,7 @@ class Project(models.Model):
                     self.env.cr.commit()
 
             try:
-                with self.env.cr.savepoint(), \
-                    sentry_sdk.start_span(description=f'create staging {branch.name}') as span:
-                    span.set_tag('branch', branch.name)
+                with self.env.cr.savepoint():
                     try_staging(branch)
             except Exception:
                 _logger.exception("Failed to create staging for branch %r", branch.name)

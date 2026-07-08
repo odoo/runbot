@@ -1,5 +1,4 @@
 from . import models, controllers
-from .sentry import enable_sentry
 
 def _check_citext(env):
     env.cr.execute("select 1 from pg_extension where extname = 'citext'")
