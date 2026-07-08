@@ -493,7 +493,7 @@ ul.stagings {
 }
 
 div.dropdown[popover] {
-    :has(&) {
+    :has(> &) {
         anchor-scope: all;
     }
     button:has(+ &) {
@@ -511,8 +511,9 @@ div.dropdown[popover] {
 
     position: absolute;
     inset: unset;
-    top: anchor(var(--my-anchor) bottom);
-    left: anchor(var(--my-anchor) left);
+    position-anchor: var(--my-anchor);
+    bottom: anchor(top);
+    left: anchor(left);
     position-try-fallbacks: flip-block, flip-inline;
 
     max-height: 70vh;
