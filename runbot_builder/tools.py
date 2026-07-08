@@ -138,6 +138,7 @@ class RunbotClient():
             self.env.cr.commit()
             self.update_next_git_gc_date()
 
+
 def run(client_class):
     # parse args
     parser = argparse.ArgumentParser()
