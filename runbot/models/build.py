@@ -777,7 +777,7 @@ class BuildResult(models.Model):
                             elif log_file_path.name.endswith('.zip'):
                                 if not self.children_ids:
                                     log_file_path.unlink()
-                            elif not log_file_path.name.endswith('.txt'):
+                            elif not (log_file_path.name.endswith('.txt') or log_file_path.name.endswith('logs.json')):
                                 log_file_path.unlink()
                     gcstamp.write_text(f'gc date: {datetime.datetime.now()}')
 
