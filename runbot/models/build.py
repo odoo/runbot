@@ -1462,7 +1462,7 @@ class BuildResult(models.Model):
   "formatters": {
     "runbot": {
       "()": "odoo.logging.JSONFormatter",
-      "record_keys": ["dbname", "name", "levelname", "pathname", "funcName", "lineno", "test", "created", "message"]
+      "record_keys": ["dbname", "name", "levelname", "pathname", "funcName", "lineno", "test", "created", "message", "exc_info"]
     }
   },
   "handlers": {
