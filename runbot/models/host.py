@@ -303,6 +303,8 @@ class Host(models.Model):
                             }
                             if json_log.get('test'):
                                 log_data['metadata'] = {'test': json_log.get('test')}
+                            if json_log.get('exc_info'):
+                                log_data['message'] = f'{log_data["message"]}\n{json_log["exc_info"]}'
 
                             new_seek = f.tell()
                             res.append(log_data)
