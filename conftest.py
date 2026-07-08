@@ -639,39 +639,6 @@ def reviewer_admin(env, partners):
         ],
     })
 
-VARCHAR = "[0-9a-z_]|%[0-9a-f]{2}"
-VARNAME = fr"(?:(?:{VARCHAR})(?:\.|{VARCHAR})*)"
-VARLIST = fr"{VARNAME}(?:\,{VARNAME})*"
-TEMPLATE = re.compile(fr'''
-\{{
-    # op level 2/3/reserved
-    (?P<operator>[+\#./;?&=,!@|])?
-    (?P<varlist>{VARLIST})
-    # modifier level 4
-    (:? (?P<prefix>:[0-9]+) | (?P<explode>\*) )
-\}}
-''', flags=re.VERBOSE | re.IGNORECASE)
-def template(tmpl, **params):
-    # FIXME: actually implement RFC 6570 cleanly
-    # see https://stackoverflow.com/a/76276177/8182118 for the expansions github
-    # seems to be using (except it's missing + so probably incomplete...)
-    def replacer(m):
-        esc = lambda v: quote(v, safe="")
-        match m['operator']:
-            case None: # simple
-                pass
-            case '+': # allowReserved
-                esc = lambda v: v
-            case s:
-                raise NotImplementedError(f"Operator {s!r} is not supported")
-
-        v = params[m['varlist']]
-        if not isinstance(v, str):
-            raise TypeError(f"Unsupported parameter type {type(v).__name__!r}")
-        return esc(v)
-
-    return TEMPLATE.sub(replacer, tmpl)
-
 def check(response):
     assert response.ok, response.text or response.reason
     return response
@@ -741,7 +708,7 @@ def make_repo(
             }))
             time.sleep(1)
 
-        check(github.put(template(r['contents_url'], path='a'), json={
+        check(github.put(r['contents_url'].replace('{+path}', 'a'), json={
             'path': 'a',
             'message': 'github returns a 409 (Git Repository is Empty) if trying to create a tree in a repo with no objects',
             'content': base64.b64encode(b'whee').decode('ascii'),
@@ -853,17 +820,6 @@ class Repo:
         assert 200 <= r.status_code < 300, r.text
 
     def get_ref(self, ref):
-        # differs from .commit(ref).id for the sake of assertion error messages
-        # apparently commits/{ref} returns 422 or some other fool thing when the
-        # ref' does not exist which sucks for asserting "the ref' has been
-        # deleted"
-        # FIXME: avoid calling get_ref on a hash & remove this code
-        if re.match(r'[0-9a-f]{40}', ref):
-            # just check that the commit exists
-            r = self._session.get(f'https://api.github.com/repos/{self.name}/git/commits/{ref}')
-            assert 200 <= r.status_code < 300, r.reason or http.client.responses[r.status_code]
-            return r.json()['sha']
-
         if ref.startswith('refs/'):
             ref = ref[5:]
         if not ref.startswith('heads'):
@@ -1498,12 +1454,10 @@ class Model:
         'create': (True, True),
         'exists': (False, True),
         'fields_get': (True, False),
-        'name_create': (False, True),
         'name_search': (True, False),
         'search': (True, True),
         'search_count': (True, False),
         'search_read': (True, False),
-        'filtered': (False, True),
     }
 
     def browse(self, ids):
@@ -1626,6 +1580,3 @@ class Model:
             return NotImplemented
 
         return Model(self._env, self._model, tuple(id_ for id_ in self._ids if id_ in other._ids), fields=self._fields)
-
-    def invalidate_cache(self, fnames=None, ids=None):
-        pass # not a concern when every access is an RPC call
