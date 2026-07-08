@@ -210,7 +210,11 @@
               <field name="summary"/>
             </group>
             <notebook>
-              <page string="Output">
+
+              <page string="Formated Output">
+                <field name="formated_output"  readonly="1"/>
+              </page>
+              <page string="Raw Output">
                 <field name="output"  readonly="1"/>
               </page>
               <page string="Content">

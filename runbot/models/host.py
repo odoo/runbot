@@ -199,19 +199,16 @@ class Host(models.Model):
                     docker_tag(dockerfile.image_previous_identifier, dockerfile.image_previous_tag)
                     docker_tag(dockerfile.image_identifier, dockerfile.image_tag)
                     docker_tag(dockerfile.image_future_identifier, dockerfile.image_future_tag)
-                    for tag in [dockerfile.image_tag, dockerfile.image_future_tag]:
-                        try:
-                            docker_push(tag)  # for now, always push locally
-                            if is_main_registry:
-                                docker_registry_url = self.docker_registry_url
-                                if self.docker_registry_url:
-                                    docker_registry_url = self.docker_registry_url
-                                else:
-                                    docker_registry_url = icp.get_param('runbot.docker_registry_url', default='').strip('/')
-                                if docker_registry_url:
+                    tags_to_push = [dockerfile.image_tag, dockerfile.image_future_tag]
+                    docker_registry_url = self._get_docker_registry_url()
+                    if docker_registry_url:
+                        self.env.cr.commit()
+                        for tag in tags_to_push:
+                            try:
+                                if is_main_registry or docker_registry_url == self.docker_registry_url:
                                     docker_push(tag, docker_registry_url)
-                        except ImageNotFound:
-                            _logger.warning("Image tag `%s` not found. Skipping push", tag)
+                            except ImageNotFound:
+                                _logger.warning("Image tag `%s` not found. Skipping push", tag)
                 else:
                     if future_identifier:
                         docker_tag(future_identifier, dockerfile.image_tag) # for a setup without registry

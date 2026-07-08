@@ -14,7 +14,7 @@ import time
 from babel.dates import LC_TIME, TIMEDELTA_UNITS, Locale
 from collections import OrderedDict
 from datetime import timedelta
-from markupsafe import Markup
+from markupsafe import Markup, escape
 
 from odoo.fields import Domain
 from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT, file_open, html_escape, OrderedSet
@@ -413,3 +413,46 @@ class TestTagsParser:
             search_domains.append(tag_domain)
         search_domain = Domain.OR(search_domains)
         return search_domain
+
+
+ANSI_ESCAPE_RE = re.compile(r'\x1b\[([0-9;]*)m')
+
+ANSI_COLORS = {
+    30: '#000000', 31: '#AA0000', 32: '#00AA00', 33: '#AA5500',
+    34: '#0000AA', 35: '#AA00AA', 36: '#00AAAA', 37: '#AAAAAA',
+    90: '#555555', 91: '#FF5555', 92: '#55FF55', 93: '#FFFF55',
+    94: '#5555FF', 95: '#FF55FF', 96: '#55FFFF', 97: '#FFFFFF',
+}
+
+
+def ansi_to_html(text: str):
+    result = []
+    open_span = False
+    pos = 0
+
+    for match in ANSI_ESCAPE_RE.finditer(text):
+        chunk = text[pos:match.start()]
+        if chunk:
+            result.append(escape(chunk))
+
+        codes = match.group(1)
+        codes = [int(c) for c in codes.split(';') if c] if codes else [0]
+
+        for code in codes:
+            if open_span:
+                result.append(Markup('</span>'))
+                open_span = False
+            if code in ANSI_COLORS:
+                result.append(Markup(f'<span style="color:{ANSI_COLORS[code]}">'))
+                open_span = True
+
+        pos = match.end()
+
+    remaining = text[pos:]
+    if remaining:
+        result.append(escape(remaining))
+
+    if open_span:
+        result.append(Markup('</span>'))
+
+    return Markup('<span style="white-space:pre-wrap">') + Markup('').join(result) + Markup('</span>')
