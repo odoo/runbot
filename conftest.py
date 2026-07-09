@@ -314,7 +314,7 @@ def http_proxy(pytestconfig: pytest.Config, users_file: pathlib.Path) -> Iterato
         cleanup.callback(gh.wait, 30)
         cleanup.callback(gh.terminate)
 
-        gh_port = waitfile(portfile, lambda f: int(f.read_text()), ValueError)
+        gh_port = waitfile(portfile, lambda f: int(f.read_text()), ValueError, 300)
         gh_url = f'http://localhost:{gh_port}/'
 
         proxy = cleanup.enter_context(subprocess.Popen([
