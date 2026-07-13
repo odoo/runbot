@@ -39,7 +39,7 @@
                   <field name="layer_ids">
                     <list default_order="sequence,id">
                       <field name="sequence" widget="handle"/>
-                      <field name="rendered" decoration-it="layer_type in ('reference_layer', 'reference_file')" decoration-bg-info="layer_type == 'template' or (layer_type == 'reference_layer' and (packages or values))" decoration-bg-success="layer_type == 'raw'"/>
+                      <field name="rendered" decoration-it="layer_type in ('reference_layer', 'reference_file')" decoration-bg-info="layer_type == 'template' or (layer_type == 'reference_layer' and (packages or values))" decoration-bg-success="layer_type == 'raw'" decoration-bg-dark="layer_type == 'file'"/>
                       <field name="reference_count" string="#" decoration="True" decoration-bg-danger="referencing_dockerlayer_ids" decoration-bg-warning="reference_count != 0"/>
                       <field name="referencing_dockerlayer_ids" column_invisible="True"/>
                       <field name="layer_type" column_invisible="True"/>
@@ -158,10 +158,11 @@
               <field name="name" readonly="has_xml_id"/>
               <field name="dockerfile_id" invisible="dockerfile_id" readonly="has_xml_id"/>
               <field name="layer_type" readonly="has_xml_id"/>
-              <field name="content" widget="ace" invisible="layer_type not in ('raw', 'template')" readonly="has_xml_id"/>
+              <field name="file_destination" invisible="layer_type not in ('file',)" readonly="has_xml_id"/>
+              <field name="content" widget="ace" invisible="layer_type not in ('raw', 'template', 'file')" readonly="has_xml_id"/>
               <field name="reference_docker_layer_id" invisible="layer_type not in ('reference_layer')" readonly="has_xml_id"/>
               <field name="reference_dockerfile_id"  invisible="layer_type != 'reference_file'" readonly="has_xml_id"/>
-              <field name="values" widget="runbotjsonb" invisible="layer_type not in ('template', 'reference_layer', 'reference_file')" readonly="has_xml_id"/>
+              <field name="values" widget="runbotjsonb" invisible="layer_type not in ('file', 'template', 'reference_layer', 'reference_file')" readonly="has_xml_id"/>
               <field name="packages" widget="ace" invisible="layer_type not in ('template', 'reference_layer', 'reference_file')" readonly="has_xml_id"/>
               <field name="all_referencing_dockerlayer_ids"  widget="many2many_tags" readonly="1"/>
             </group>
@@ -187,7 +188,7 @@
           <field name="values" column_invisible="True"/>
           <field name="reference_count" string="#refs" decoration-danger="referencing_dockerlayer_ids" decoration-warning="reference_count != 0"/>
           <field name="all_referencing_dockerlayer_ids" string="#referencing" widget="many2many_tags"/>
-          <field name="rendered" decoration-warning="layer_type in ('reference_layer', 'reference_file')" decoration-info="layer_type == 'template' or (layer_type == 'reference_layer' and (packages or values))" decoration-success="layer_type == 'raw'"/>
+          <field name="rendered" decoration-it="layer_type in ('reference_layer', 'reference_file')" decoration-bg-info="layer_type == 'template' or (layer_type == 'reference_layer' and (packages or values))" decoration-bg-success="layer_type == 'raw'" decoration-bg-dark="layer_type == 'file'"/>
         </list>
       </field>
     </record>
