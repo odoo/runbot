@@ -287,7 +287,7 @@ class Batch(models.Model):
         # 1.2 FIND merge_base info for those commits
         #  use last not preparing batch to define previous repos_heads instead of branches heads:
         #  Will allow to have a diff info on base bundle, compare with previous bundle
-        last_base_batch = self.env['runbot.batch'].search([('bundle_id', '=', bundle.base_id.id), ('state', '!=', 'preparing'), ('category_id', '=', self.category_id.id), ('id', '!=', self.id)], order='id desc', limit=1)
+        last_base_batch = self.env['runbot.batch'].search([('bundle_id', '=', bundle.base_id.id), ('state', 'in', ('ready', 'done')), ('category_id', '=', self.category_id.id), ('id', '!=', self.id)], order='id desc', limit=1)
         if last_base_batch:
             base_head_per_repo = {commit.repo_id.id: commit for commit in last_base_batch.commit_ids}
             self._update_commits_infos(base_head_per_repo)  # set base_commit, diff infos, ...
