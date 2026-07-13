@@ -263,7 +263,14 @@ def setreviewers(partners):
     return _
 
 @pytest.fixture
-def users(partners, rolemap) -> dict[str, str]:
+def botname(rolemap):
+    """The username of the bot user (the user through which runbot_merge replies
+    to PR comments)
+    """
+    return rolemap['user']['login']
+
+@pytest.fixture
+def users(partners, rolemap, botname) -> dict[str, str]:
     return {k: v['login'] for k, v in rolemap.items()}
 
 @pytest.fixture(scope='session')

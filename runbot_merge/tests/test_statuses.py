@@ -91,7 +91,7 @@ def test_incomplete_statuses_request(env, project, make_repo, users, setreviewer
 ])
 def test_complete_statuses_norequest(
     env, project, make_repo, users, setreviewers, config, status
-):
+, botname):
     """If *any* status has been sent on the status we don't trigger the
     request.
     """
@@ -120,12 +120,12 @@ def test_complete_statuses_norequest(
     assert env['saas.calls'].search([]) == env['saas.calls']
     if status not in ('error', 'failure'):
         assert pr.comments == [
-            seen(env, pr, users),
+            (botname, seen(env, pr)),
             (users['reviewer'], 'hansen r+'),
         ]
     else:
         assert pr.comments == [
-            seen(env, pr, users),
+            (botname, seen(env, pr)),
             (users['reviewer'], 'hansen r+'),
-            (users['user'], "@{reviewer} you may want to rebuild or fix this PR as it has failed CI.".format_map(users)),
+            (botname, "@{reviewer} you may want to rebuild or fix this PR as it has failed CI.".format_map(users)),
         ]

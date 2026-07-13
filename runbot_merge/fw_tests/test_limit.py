@@ -43,7 +43,7 @@ def test_configure_fp_limit(env, config, make_repo, source, limit, count, page):
 
         page(f'/{prod.name}/pull/{pr.number}.png')
 
-def test_ignore(env, config, make_repo, users):
+def test_ignore(env, config, make_repo, users, botname):
     """ Provide an "ignore" command which is equivalent to setting the limit
     to target
     """
@@ -69,12 +69,12 @@ def test_ignore(env, config, make_repo, users):
         "should not have created a forward port"
 
     assert pr.comments == [
-        seen(env, pr, users),
+        (botname, seen(env, pr)),
         (users['reviewer'], "hansen ignore"),
         (users['reviewer'], "hansen r+ fw=no"),
-        (users['user'], "'ignore' is deprecated, use 'fw=no' to disable forward porting."),
-        (users['user'], "Forward-port disabled (via limit)."),
-        (users['user'], "Disabled forward-porting."),
+        (botname, "'ignore' is deprecated, use 'fw=no' to disable forward porting."),
+        (botname, "Forward-port disabled (via limit)."),
+        (botname, "Disabled forward-porting."),
     ]
 
     with prod:
@@ -85,7 +85,7 @@ def test_ignore(env, config, make_repo, users):
         "should still not have created a forward port"
     assert pr.comments[6:] == [
         (users['reviewer'], 'hansen up to c'),
-        (users['user'], "@%s can not forward-port, policy is 'no' on %s" % (
+        (botname, "@%s can not forward-port, policy is 'no' on %s" % (
             users['reviewer'],
             pr_id.display_name,
         ))
@@ -100,7 +100,7 @@ def test_ignore(env, config, make_repo, users):
 
     assert pr.comments[8:] == [
         (users['reviewer'], "hansen fw=default"),
-        (users['user'], "Starting forward-port. Waiting for CI to create followup forward-ports.")
+        (botname, "Starting forward-port. Waiting for CI to create followup forward-ports.")
     ]
 
     assert env['runbot_merge.pull_requests'].search([('source_id', '=', pr_id.id)]),\
@@ -146,7 +146,7 @@ def test_ignore_fw(env, config, make_repo, users):
 
     assert not env['runbot_merge.pull_requests'].search([('target.name', '=', 'c')])
 
-def test_unignore(env, config, make_repo, users, page):
+def test_unignore(env, config, make_repo, users, page, botname):
     env['res.partner'].create({'name': users['other'], 'github_login': users['other'], 'email': 'other@example.org'})
 
     prod, _ = make_basic(env, config, make_repo, statuses="default")
@@ -188,21 +188,21 @@ def test_unignore(env, config, make_repo, users, page):
     assert pr_id.batch_id.fw_policy == 'default'
 
     assert pr.comments == [
-        seen(env, pr, users),
+        (botname, seen(env, pr)),
         (users['other'], "hansen fw=no"),
-        (users['user'], "Disabled forward-porting."),
+        (botname, "Disabled forward-porting."),
         (users['other'], "hansen fw=default"),
-        (users['user'], "Waiting for CI to create followup forward-ports."),
+        (botname, "Waiting for CI to create followup forward-ports."),
         (users['other'], "hansen fw=no"),
-        (users['user'], "Disabled forward-porting."),
+        (botname, "Disabled forward-porting."),
         (users['other'], "hansen up to c"),
-        (users['user'], "Forward-porting to 'c'. Re-enabled forward-porting "\
+        (botname, "Forward-porting to 'c'. Re-enabled forward-porting "\
                         "(you should use `fw=default` to re-enable forward "\
                         "porting after disabling)."
         ),
     ]
 
-def test_disable(env, config, make_repo, users):
+def test_disable(env, config, make_repo, users, botname):
     """ Checks behaviour if the limit target is disabled:
 
     * disable target while FP is ongoing -> skip over (and stop there so no FP)
@@ -246,9 +246,9 @@ def test_disable(env, config, make_repo, users):
     # use a set because git webhooks delays might lead to mis-ordered
     # responses and we don't care that much
     assert set(pr.comments) == {
-        seen(env, pr, users),
+        (botname, seen(env, pr)),
         (users['reviewer'], "hansen r+ up to"),
-        (users['user'], """\
+        (botname, """\
 @{reviewer} please provide a branch to forward-port to.
 
 For your own safety I've ignored *everything in your entire comment*.
@@ -284,15 +284,15 @@ Currently available commands:
 Note: this help text is dynamic and will change with the state of the PR.
 """.format_map(users)),
         (users['reviewer'], "hansen up to b"),
-        (users['user'], "@{reviewer} branch 'b' is disabled, it can't be used as a forward port target.".format_map(users)),
+        (botname, "@{reviewer} branch 'b' is disabled, it can't be used as a forward port target.".format_map(users)),
         (users['reviewer'], "hansen up to foo"),
-        (users['user'], "@{reviewer} there is no branch 'foo', it can't be used as a forward port target.".format_map(users)),
+        (botname, "@{reviewer} there is no branch 'foo', it can't be used as a forward port target.".format_map(users)),
         (users['reviewer'], "hansen up to c"),
-        (users['user'], "Forward-porting to 'c'."),
+        (botname, "Forward-porting to 'c'."),
     }
 
 
-def test_limit_after_merge(env, config, make_repo, users):
+def test_limit_after_merge(env, config, make_repo, users, botname):
     prod, other = make_basic(env, config, make_repo, statuses='default')
     reviewer = config['role_reviewer']['token']
     branch_b = env['runbot_merge.branch'].search([('name', '=', 'b')])
@@ -318,20 +318,20 @@ def test_limit_after_merge(env, config, make_repo, users):
     assert p1.limit_id == p2.limit_id == branch_b
     assert pr1.comments == [
         (users['reviewer'], "hansen r+"),
-        seen(env, pr1, users),
+        (botname, seen(env, pr1)),
         (users['reviewer'], 'hansen up to b'),
-        (users['user'], "Forward-porting to 'b'."),
-        (users['user'], f"Forward-porting to 'b' (from {p2.display_name})."),
+        (botname, "Forward-porting to 'b'."),
+        (botname, f"Forward-porting to 'b' (from {p2.display_name})."),
     ]
     assert pr2.comments == [
-        seen(env, pr2, users),
-        (users['user'], """\
+        (botname, seen(env, pr2)),
+        (botname, """\
 This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """),
         (users['reviewer'], 'hansen up to b'),
-        (users['user'], f"Forward-porting {p1.display_name} to 'b'."),
+        (botname, f"Forward-porting {p1.display_name} to 'b'."),
     ]
 
     # update pr2 to detach it from pr1
@@ -353,7 +353,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 
     assert pr2.comments[4:] == [
         (users['reviewer'], 'hansen up to c'),
-        (users['user'], "Forward-porting to 'c'."),
+        (botname, "Forward-porting to 'c'."),
     ]
     with prod:
         prod.post_status(p2.head, 'success')
@@ -370,8 +370,8 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         pr3.post_comment("hansen up to c", reviewer)
     env.run_crons()
     assert pr3.comments == [
-        seen(env, pr3, users),
-        (users['user'], f"""\
+        (botname, seen(env, pr3)),
+        (botname, f"""\
 @{users['user']} @{users['reviewer']} this PR targets c and is the last of the forward-port chain.
 
 To merge the full chain, use
@@ -380,11 +380,11 @@ To merge the full chain, use
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """),
         (users['reviewer'], "hansen up to c"),
-        (users['user'], f"Forward-porting {p2.display_name} to 'c'."),
+        (botname, f"Forward-porting {p2.display_name} to 'c'."),
     ]
     # 6 of previous check, plus r+
     assert pr2.comments[7:] == [
-        (users['user'], f"Forward-porting to 'c' (from {p3.display_name}).")
+        (botname, f"Forward-porting to 'c' (from {p3.display_name}).")
     ]
 
 
@@ -431,7 +431,7 @@ def test_post_merge(
         env, post_merge, users, config, branches,
         update_from: callable,
         limit: int,
-):
+botname):
     PRs = env['runbot_merge.pull_requests']
     _project, prod, _ = post_merge
     reviewer = config['role_reviewer']['token']
@@ -471,12 +471,12 @@ def test_post_merge(
             root_opt = '' if p.number == root.number else f' {root.display_name}'
             trailer = '' if actual_limit == limit else f" (instead of the requested '{limit}' because {current_id.display_name} already exists)"
             assert p.comments[before[p.number] + 1:] == [
-                (users['user'], f"Forward-porting{root_opt} to '{actual_limit}'{trailer}.")
+                (botname, f"Forward-porting{root_opt} to '{actual_limit}'{trailer}.")
             ]
         # case for reference PRs source and root (which get their own notifications)
         elif p.number in (source.number, root.number):
             assert p.comments[before[p.number]:] == [
-                (users['user'], f"Forward-porting to '{actual_limit}' (from {from_id.display_name}).")
+                (botname, f"Forward-porting to '{actual_limit}' (from {from_id.display_name}).")
             ]
 
 @pytest.mark.parametrize('mode', [
@@ -490,7 +490,7 @@ def test_post_merge(
     # every forward port should be merged before bump
     'mergeall',
 ])
-def test_resume_fw(env, post_merge, users, config, branches, mode):
+def test_resume_fw(env, post_merge, users, config, branches, mode, botname):
     """Singleton version of test_post_merge: completes the forward porting
     including validation then tries to increase the limit, which should resume
     forward porting
@@ -553,11 +553,11 @@ def test_resume_fw(env, post_merge, users, config, branches, mode):
         # because the initial forward porting was never finished as the PR CI
         # failed until *after* we bumped the limit, so it's not *resuming* per se.
         assert prs[0].comments[before[1]+1:] == [
-            (users['user'], f"Forward-porting to '6'.")
+            (botname, f"Forward-porting to '6'.")
         ]
     else:
         assert prs[0].comments[before[1]+1:] == [
-            (users['user'], f"Forward-porting to '6', resuming forward-port stopped at {pr5_id.display_name}.")
+            (botname, f"Forward-porting to '6', resuming forward-port stopped at {pr5_id.display_name}.")
         ]
 
 def setci(*, source, repo, target, status='success'):

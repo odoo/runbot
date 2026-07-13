@@ -8,7 +8,7 @@ from utils import seen, matches, Commit, make_basic, to_pr
 
 
 @pytest.mark.parametrize("merge_parent", [False, True])
-def test_update_pr(env, config, make_repo, users, merge_parent) -> None:
+def test_update_pr(env, config, make_repo, users, merge_parent, botname) -> None:
     """ Even for successful cherrypicks, it's possible that e.g. CI doesn't
     pass or the reviewer finds out they need to update the code.
 
@@ -39,8 +39,8 @@ def test_update_pr(env, config, make_repo, users, merge_parent) -> None:
 
     assert pr.comments == [
         (users['reviewer'], 'hansen r+'),
-        seen(env, pr, users),
-        (users['user'], "@{user} @{reviewer} 'ci/runbot' failed on this reviewed PR.".format_map(users)),
+        (botname, seen(env, pr)),
+        (botname, "@{user} @{reviewer} 'ci/runbot' failed on this reviewed PR.".format_map(users)),
     ]
 
     with prod:
@@ -56,12 +56,12 @@ def test_update_pr(env, config, make_repo, users, merge_parent) -> None:
 
     pr0_id, pr1_id = env['runbot_merge.pull_requests'].search([], order='number')
 
-    fp_intermediate = (users['user'], '''\
+    fp_intermediate = (botname, '''\
 This PR targets b and is part of the forward-port chain. Further PRs will be created up to d.
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 ''')
-    ci_warning = (users['user'], '@%(user)s @%(reviewer)s ci/runbot failed on this forward-port PR' % users)
+    ci_warning = (botname, '@%(user)s @%(reviewer)s ci/runbot failed on this forward-port PR' % users)
 
     # oh no CI of the first FP PR failed!
     # simulate status being sent multiple times (e.g. on multiple repos) with
@@ -77,7 +77,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     assert env['runbot_merge.pull_requests'].search([], order='number') == pr0_id | pr1_id,\
         "forward port should not continue on CI failure"
     pr1_remote = prod.get_pr(pr1_id.number)
-    assert pr1_remote.comments == [seen(env, pr1_remote, users), fp_intermediate, ci_warning]
+    assert pr1_remote.comments == [(botname, seen(env, pr1_remote)), fp_intermediate, ci_warning]
 
     # it was a false positive, rebuild... it fails again!
     with prod:
@@ -86,7 +86,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     # check that FP did not resume & we have a ping on the PR
     assert env['runbot_merge.pull_requests'].search([], order='number') == pr0_id | pr1_id,\
         "ensure it still hasn't restarted"
-    assert pr1_remote.comments == [seen(env, pr1_remote, users), fp_intermediate, ci_warning, ci_warning]
+    assert pr1_remote.comments == [(botname, seen(env, pr1_remote)), fp_intermediate, ci_warning, ci_warning]
 
     # nb: updating the head would detach the PR and not put it in the warning
     # path anymore
@@ -158,8 +158,8 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 
     pr3 = prod.get_pr(pr3_id.number)
     assert pr3.comments == [
-        seen(env, pr3, users),
-        (users['user'], f"""\
+        (botname, seen(env, pr3)),
+        (botname, f"""\
 @{users['user']} @{users['reviewer']} this PR targets d and is the last of the forward-port chain containing:
 * {pr2_id.display_name}
 
@@ -171,8 +171,8 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     ]
 
     assert pr2.comments[:2] == [
-        seen(env, pr2, users),
-        (users['user'], """\
+        (botname, seen(env, pr2)),
+        (botname, """\
 This PR targets c and is part of the forward-port chain. Further PRs will be created up to d.
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
@@ -185,14 +185,14 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         ]
     else:
         assert pr2.comments[2:] == [
-            (users['user'], f"@{users['user']} @{users['reviewer']} child PR "
+            (botname, f"@{users['user']} @{users['reviewer']} child PR "
                             f"{pr3_id.display_name} has become a normal PR "
                             "because testing. This PR (and any of its parents) "
                             "will need to be merged independently as approvals "
                             "won't cross."),
         ]
 
-def test_update_merged(env, make_repo, config, users):
+def test_update_merged(env, make_repo, config, users, botname):
     """ Strange things happen when an FP gets closed / merged but then its
     parent is modified and the forwardport tries to update the (now merged)
     child.
@@ -268,13 +268,13 @@ def test_update_merged(env, make_repo, config, users):
     assert not env['forwardport.updates'].search([])
 
     assert pr2.comments == [
-        seen(env, pr2, users),
-        (users['user'], '''This PR targets c and is part of the forward-port chain. Further PRs will be created up to d.
+        (botname, seen(env, pr2)),
+        (botname, '''This PR targets c and is part of the forward-port chain. Further PRs will be created up to d.
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 '''),
         (users['reviewer'], 'hansen r+'),
-        (users['user'], """@%s @%s ancestor PR %s has been updated but this PR is merged and can't be updated to match.
+        (botname, """@%s @%s ancestor PR %s has been updated but this PR is merged and can't be updated to match.
 
 You may want or need to manually update any followup PR.""" % (
             users['user'],
@@ -389,7 +389,7 @@ def test_duplicate_fw(env, make_repo, setreviewers, config, users):
     # env.run_crons()
     assert PRs.search([], order='number') == pr_ids
 
-def test_subsequent_conflict(env, make_repo, config, users):
+def test_subsequent_conflict(env, make_repo, config, users, botname):
     """ Test for updating an fw PR in the case where it produces a conflict in
     the followup. Cf #467.
     """
@@ -446,7 +446,7 @@ conflict!
     # 1. link to mergebot status page
     # 2. "forward port chain" bit
     assert pr2.comments[2:] == [
-        (users['user'], f"@{users['user']} @{users['reviewer']} WARNING: the latest change ({pr2_id.head}) triggered "
+        (botname, f"@{users['user']} @{users['reviewer']} WARNING: the latest change ({pr2_id.head}) triggered "
                         f"a conflict when updating the next forward-port "
                         f"({pr3_id.display_name}), and has been ignored.\n\n"
                         f"You will need to update this pull request "
@@ -457,7 +457,7 @@ conflict!
     # 1. link to status page
     # 2. forward-port chain thing
     assert repo.get_pr(pr3_id.number).comments[2:] == [
-        (users['user'], f'''\
+        (botname, f'''\
 @{users['user']} @{users['reviewer']} WARNING: the update of {pr2_id.display_name} to {pr2_id.head} has caused a \
 conflict in this pull request, data may have been lost.
 
@@ -681,7 +681,7 @@ def test_update_reset_state(env, config, make_repo, users) -> None:
     assert prb_id.state == 'opened'
     assert prc_id.state == 'opened'
 
-def test_update_through_disabled_branch(env, config, make_repo, users) -> None:
+def test_update_through_disabled_branch(env, config, make_repo, users, botname) -> None:
     prod, _ = make_basic(env, config, make_repo, statuses='default')
     # needs a 4th branch to trigger the issue
     project = env['runbot_merge.project'].search([])
@@ -707,13 +707,15 @@ def test_update_through_disabled_branch(env, config, make_repo, users) -> None:
     env.run_crons()
     pr_c = prod.get_pr(pr_c_id.number)
     assert pr_c.comments == [
-        seen(env, pr_c, users),
+        (botname, seen(env, pr_c)),
         (
-            users['user'],
-            matches(f"cherrypicking of pull request {prod.name}#{pr_a.number} failed.\n$$"),
+            botname,
+            matches(
+                f"cherrypicking of pull request {prod.name}#{pr_a.number} failed.\n$$"
+            ),
         ),
         (
-            users["user"],
+            botname,
             "@{user} the target branch {target!r} has been disabled, you may want to close this PR.".format(
                 **users,
                 target=pr_c_id.target.name,

@@ -505,7 +505,7 @@ def test_sub_match(env, project, repo_a, repo_b, repo_c, config):
     assert s == list(st.ids)
 
 
-def test_merge_fail(env, project, repo_a, repo_b, users, config):
+def test_merge_fail(env, project, repo_a, repo_b, users, config, botname):
     """ In a matched-branch scenario, if merging in one of the linked repos
     fails it should revert the corresponding merges
     """
@@ -552,8 +552,8 @@ def test_merge_fail(env, project, repo_a, repo_b, users, config):
     assert failed.state == 'error'
     assert pr1b.comments == [
         (users['reviewer'], 'hansen r+'),
-        seen(env, pr1b, users),
-        (users['user'], '@%(user)s @%(reviewer)s unable to stage: merge conflict' % users),
+        (botname, seen(env, pr1b)),
+        (botname, '@%(user)s @%(reviewer)s unable to stage: merge conflict' % users),
     ]
     other = to_pr(env, pr1a)
     reviewer = get_partner(env, users["reviewer"]).formatted_email
@@ -612,7 +612,7 @@ def test_ff_fail(env, project, repo_a, repo_b, config):
     assert len(st) == 1
     assert len(st.batch_ids.prs) == 2
 
-def test_ff_fail_second_step(env, project, repo_a, repo_b, config, users):
+def test_ff_fail_second_step(env, project, repo_a, repo_b, config, users, botname):
     """In a matched branch scenario, normally the safety_dance / ff dry run on
     tmp handles FF errors, however it's possible for that to succeed then for
     the "real" fast-forward to fail e.g. if github has transient errors.
@@ -705,8 +705,8 @@ def test_ff_fail_second_step(env, project, repo_a, repo_b, config, users):
     assert to_pr(env, pr_ab_b).state == "error"
     assert pr_ab_a.comments == [
         (users['reviewer'], "hansen r+"),
-        seen(env, pr_ab_a, users),
-        (users['user'], "@{user} @{reviewer} staging failed: inconsistent integration - succeeded for {repo_a} but failed for {repo_b}.".format(
+        (botname, seen(env, pr_ab_a)),
+        (botname, "@{user} @{reviewer} staging failed: inconsistent integration - succeeded for {repo_a} but failed for {repo_b}.".format(
             **users,
             repo_a=repo_a.name,
             repo_b=repo_b.name,
@@ -727,7 +727,7 @@ def test_ff_fail_second_step(env, project, repo_a, repo_b, config, users):
     ]
 
 class TestCompanionsNotReady:
-    def test_one_pair(self, env, project, repo_a, repo_b, config, users):
+    def test_one_pair(self, env, project, repo_a, repo_b, config, users, botname):
         """ If the companion of a ready branch-matched PR is not ready,
         they should not get staged
         """
@@ -762,8 +762,8 @@ class TestCompanionsNotReady:
 
         assert p_a.comments == [
             (users['reviewer'], 'hansen r+'),
-            seen(env, p_a, users),
-            (users['user'], "@%s @%s linked pull request(s) %s not ready. Linked PRs are not staged until all of them are ready." % (
+            (botname, seen(env, p_a)),
+            (botname, "@%s @%s linked pull request(s) %s not ready. Linked PRs are not staged until all of them are ready." % (
                 users['user'],
                 users['reviewer'],
                 pr_b.display_name,
@@ -773,16 +773,16 @@ class TestCompanionsNotReady:
         env.run_crons('runbot_merge.check_linked_prs_status')
         assert p_a.comments == [
             (users['reviewer'], 'hansen r+'),
-            seen(env, p_a, users),
-            (users['user'], "@%s @%s linked pull request(s) %s not ready. Linked PRs are not staged until all of them are ready." % (
+            (botname, seen(env, p_a)),
+            (botname, "@%s @%s linked pull request(s) %s not ready. Linked PRs are not staged until all of them are ready." % (
                 users['user'],
                 users['reviewer'],
                 pr_b.display_name,
             )),
         ]
-        assert p_b.comments == [seen(env, p_b, users)]
+        assert p_b.comments == [(botname, seen(env, p_b))]
 
-    def test_two_of_three_unready(self, env, project, repo_a, repo_b, repo_c, users, config):
+    def test_two_of_three_unready(self, env, project, repo_a, repo_b, repo_c, users, config, botname):
         """ In a 3-batch, if two of the PRs are not ready both should be
         linked by the first one
         """
@@ -810,19 +810,19 @@ class TestCompanionsNotReady:
             )
         env.run_crons()
 
-        assert pr_a.comments == [seen(env, pr_a, users)]
+        assert pr_a.comments == [(botname, seen(env, pr_a))]
         assert pr_b.comments == [
             (users['reviewer'], 'hansen r+'),
-            seen(env, pr_b, users),
-            (users['user'], "@%s @%s linked pull request(s) %s#%d, %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
+            (botname, seen(env, pr_b)),
+            (botname, "@%s @%s linked pull request(s) %s#%d, %s#%d not ready. Linked PRs are not staged until all of them are ready." % (
                 users['user'], users['reviewer'],
                 repo_a.name, pr_a.number,
                 repo_c.name, pr_c.number
             ))
         ]
-        assert pr_c.comments == [seen(env, pr_c, users)]
+        assert pr_c.comments == [(botname, seen(env, pr_c))]
 
-    def test_one_of_three_unready(self, env, project, repo_a, repo_b, repo_c, users, config):
+    def test_one_of_three_unready(self, env, project, repo_a, repo_b, repo_c, users, config, botname):
         """ In a 3-batch, if one PR is not ready it should be linked on the
         other two
         """
@@ -850,20 +850,20 @@ class TestCompanionsNotReady:
             )
         env.run_crons()
 
-        assert pr_a.comments == [seen(env, pr_a, users)]
+        assert pr_a.comments == [(botname, seen(env, pr_a))]
         assert pr_b.comments == [
             (users['reviewer'], 'hansen r+'),
-            seen(env, pr_b, users),
-            (users['user'], f"@{users['user']} @{users['reviewer']} linked pull request(s) {repo_a.name}#{pr_a.number} not ready. Linked PRs are not staged until all of them are ready.")
+            (botname, seen(env, pr_b)),
+            (botname, f"@{users['user']} @{users['reviewer']} linked pull request(s) {repo_a.name}#{pr_a.number} not ready. Linked PRs are not staged until all of them are ready.")
         ]
         assert pr_c.comments == [
             (users['reviewer'], 'hansen r+'),
-            seen(env, pr_c, users),
-            (users['user'],
+            (botname, seen(env, pr_c)),
+            (botname,
              f"@{users['user']} @{users['reviewer']} linked pull request(s) {repo_a.name}#{pr_a.number} not ready. Linked PRs are not staged until all of them are ready.")
         ]
 
-def test_other_failed(env, project, repo_a, repo_b, users, config):
+def test_other_failed(env, project, repo_a, repo_b, users, config, botname):
     """ In a non-matched-branch scenario, if the companion staging (copy of
     targets) fails when built with the PR, it should provide a non-useless
     message
@@ -893,8 +893,8 @@ def test_other_failed(env, project, repo_a, repo_b, users, config):
     assert pr.state == 'error'
     assert pr_a.comments == [
         (users['reviewer'], 'hansen r+'),
-        seen(env, pr_a, users),
-        (users['user'], '@%s @%s staging failed: default on %s (view more at http://example.org/b)' % (
+        (botname, seen(env, pr_a)),
+        (botname, '@%s @%s staging failed: default on %s (view more at http://example.org/b)' % (
             users['user'], users['reviewer'],
             sth
         ))
@@ -1260,7 +1260,7 @@ class TestSubstitutions:
         assert pra_id.batch_id == prb_id.batch_id, "both prs should be part of the same batch"
 
 def test_multi_project(env, make_repo, setreviewers, users, config,
-                       tunnel):
+                       tunnel, botname):
     """ There should be no linking of PRs across projects, even if there is some
     structural overlap between the two.
 
@@ -1347,9 +1347,9 @@ def test_multi_project(env, make_repo, setreviewers, users, config,
 
     assert pr1.comments == [
         (users['reviewer'], 'hansen r+'),
-        seen(env, pr1, users),
+        (botname, seen(env, pr1)),
     ]
-    assert pr2.comments == [seen(env, pr2, users)]
+    assert pr2.comments == [(botname, seen(env, pr2))]
 
 def test_freeze_complete(env, project, repo_a, repo_b, repo_c, users, config):
     """ Tests the freeze wizard feature (aside from the UI):

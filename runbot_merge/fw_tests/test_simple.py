@@ -118,7 +118,7 @@ class MakeBasic(typing.Protocol):
     "%(stage)s.%(target)s%(sub)s",
     "%(target)s%(sub)s-%(stage)s",
 ])
-def test_straightforward_flow(env, config, users, make_basic, staging_pattern):
+def test_straightforward_flow(env, config, users, make_basic, botname, staging_pattern):
     # TODO: ~all relevant data in users when creating partners
     # get reviewer's name
     reviewer_name = env['res.partner'].search([
@@ -225,13 +225,13 @@ def test_straightforward_flow(env, config, users, make_basic, staging_pattern):
 
     assert pr.comments == [
         (users['reviewer'], 'hansen r+ rebase-ff'),
-        seen(env, pr, users),
-        (users['user'], 'Merge method set to rebase and fast-forward.'),
+        (botname, seen(env, pr)),
+        (botname, 'Merge method set to rebase and fast-forward.'),
     ]
     pr1_remote = prod.get_pr(pr1.number)
     assert pr1_remote.comments == [
-        seen(env, pr1_remote, users),
-        (users['user'], """\
+        (botname, seen(env, pr1_remote)),
+        (botname, """\
 This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
@@ -254,8 +254,8 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     }
     pr2_remote = prod.get_pr(pr2.number)
     assert pr2_remote.comments == [
-        seen(env, pr2_remote, users),
-        (users['user'], """\
+        (botname, seen(env, pr2_remote)),
+        (botname, """\
 @%s @%s this PR targets c and is the last of the forward-port chain containing:
 * %s
 
@@ -267,7 +267,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
             users['other'], users['reviewer'],
             pr1.display_name,
     )),
-        (users['user'], "@%s @%s this forward port of %s is awaiting action (not merged or closed)." % (
+        (botname, "@%s @%s this forward port of %s is awaiting action (not merged or closed)." % (
             users['other'],
             users['reviewer'],
             pr0.display_name,
@@ -348,7 +348,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     with pytest.raises(AssertionError, match="Not Found"):
         other.get_ref(pr2_ref)
 
-def test_empty(env, config, users, make_basic):
+def test_empty(env, config, users, make_basic, botname):
     """ Cherrypick of an already cherrypicked (or separately implemented)
     commit -> conflicting pr.
     """
@@ -418,13 +418,7 @@ def test_empty(env, config, users, make_basic):
 
     # should not have created any new PR
     assert env['runbot_merge.pull_requests'].search([], order='number') == prs
-    # change FP token to see if the feedback comes from the proper user
-    project = env['runbot_merge.project'].search([])
-    project.write({
-        'fp_github_name': False,
-        'fp_github_token': config['role_other']['token'],
-    })
-    assert project.fp_github_name == users['other']
+    project = env["runbot_merge.project"].search([])
 
     # check reminder
     fail_id.reminder_next = datetime.now() - timedelta(days=1)
@@ -433,13 +427,13 @@ def test_empty(env, config, users, make_basic):
     env.run_crons('runbot_merge.reminder')
 
     awaiting = (
-        users['other'],
+        botname,
         '@%s @%s this forward port of %s is awaiting action (not merged or closed).' % (
             users['user'], users['reviewer'],
             pr1_id.display_name
         )
     )
-    conflict = (users['user'], matches(
+    conflict = (botname, matches(
         f"""@{users['user']} @{users['reviewer']} cherrypicking of pull request {pr1_id.display_name} failed.
 
 stdout:
@@ -462,11 +456,11 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """))
     assert pr1.comments == [
         (users['reviewer'], 'hansen r+'),
-        seen(env, pr1, users),
+        (botname, seen(env, pr1)),
     ]
     fail_pr = prod.get_pr(fail_id.number)
     assert fail_pr.comments == [
-        seen(env, fail_pr, users),
+        (botname, seen(env, fail_pr)),
         conflict,
         awaiting,
         awaiting,
@@ -478,7 +472,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     env.run_crons('runbot_merge.reminder')
     assert pr1.comments == [
         (users['reviewer'], 'hansen r+'),
-        seen(env, pr1, users),
+        (botname, seen(env, pr1)),
     ]
     assert fail_pr.comments[2:] == [awaiting]*2,\
         "message should not be triggered on closed PR"
@@ -664,7 +658,7 @@ def signoff(conf, message):
             return signoff
     raise AssertionError("Failed to find signoff by %s in %s" % (conf, message))
 
-def test_disapproval(env, config, users, make_basic):
+def test_disapproval(env, config, users, make_basic, botname):
     """The author of a source PR should be able to unapprove the forward port in
     case they approved it then noticed an issue of something.
     """
@@ -720,10 +714,10 @@ def test_disapproval(env, config, users, make_basic):
     assert pr2_id.state == 'ready', "pr2 should not be affected"
 
     assert pr1.comments == [
-        seen(env, pr1, users),
-        (users['user'], 'This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.\n\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'),
+        (botname, seen(env, pr1)),
+        (botname, 'This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.\n\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'),
         (users['other'], "hansen r-"),
-        (users['user'], "Note that only this forward-port has been unapproved, "
+        (botname, "Note that only this forward-port has been unapproved, "
                         "sibling forward ports may have to be unapproved "
                         "individually."),
     ]
@@ -736,7 +730,7 @@ def test_disapproval(env, config, users, make_basic):
         (users['other'], "hansen r-"),
     ], "shouldn't have a warning on r- because it's the only approved PR of the chain"
 
-def test_delegate_fw(env, config, users, make_basic):
+def test_delegate_fw(env, config, users, make_basic, botname):
     """If a user is delegated *on a forward port* they should be able to approve
     *the followup*.
     """
@@ -796,8 +790,8 @@ def test_delegate_fw(env, config, users, make_basic):
     env.run_crons()
 
     assert pr2.comments == [
-        seen(env, pr2, users),
-        (users['user'], '''@{self_reviewer} @{reviewer} this PR targets c and is the last of the forward-port chain.
+        (botname, seen(env, pr2)),
+        (botname, '''@{self_reviewer} @{reviewer} this PR targets c and is the last of the forward-port chain.
 
 To merge the full chain, use
 > @hansen r+
@@ -809,7 +803,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     assert pr2_id.reviewed_by
 
 
-def test_redundant_approval(env, config, users, make_basic):
+def test_redundant_approval(env, config, users, make_basic, botname):
     """If a forward port sequence has been partially approved, fw-bot r+ should
     not perform redundant approval as that triggers warning messages.
     """
@@ -844,15 +838,15 @@ def test_redundant_approval(env, config, users, make_basic):
     env.run_crons()
 
     assert pr1.comments == [
-        seen(env, pr1, users),
-        (users['user'], 'This PR targets b and is part of the forward-port chain. '
+        (botname, seen(env, pr1)),
+        (botname, 'This PR targets b and is part of the forward-port chain. '
                         'Further PRs will be created up to c.\n\n'
                         'More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'),
         (users['reviewer'], 'hansen r+'),
     ]
 
 
-def test_batched(env, config, users, make_basic):
+def test_batched(env, config, users, make_basic, botname):
     """ Tests for projects with multiple repos & sync'd branches. Batches
     should be FP'd to batches
     """
@@ -917,15 +911,15 @@ def test_batched(env, config, users, make_basic):
         ('repository.name', '=', main2.name),
     ])
     # check that relevant users were pinged
-    ping = (users['user'], """\
+    ping = (botname, """\
 This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """)
     pr_remote_1b = main1.get_pr(pr1b.number)
     pr_remote_2b = main2.get_pr(pr2b.number)
-    assert pr_remote_1b.comments == [seen(env, pr_remote_1b, users), ping]
-    assert pr_remote_2b.comments == [seen(env, pr_remote_2b, users), ping]
+    assert pr_remote_1b.comments == [(botname, seen(env, pr_remote_1b)), ping]
+    assert pr_remote_2b.comments == [(botname, seen(env, pr_remote_2b)), ping]
 
     with main1, main2:
         validate_all([main1], [pr1b.head])
@@ -1001,7 +995,7 @@ def test_fw_nice(env, config, users, make_basic):
     assert pr2_id.batch_id.priority == 'default'
 
 class TestClosing:
-    def test_closing_before_fp(self, env, config, users, make_basic):
+    def test_closing_before_fp(self, env, config, users, make_basic, botname):
         """ Closing a PR should preclude its forward port
         """
         prod, _other = make_basic()
@@ -1036,15 +1030,15 @@ class TestClosing:
         assert env['runbot_merge.pull_requests'].search([], order='number') == pr0_id | pr1_id,\
             "closing the PR should suppress the FP sequence"
         assert pr1.comments == [
-            seen(env, pr1, users),
-            (users['user'], """\
+            (botname, seen(env, pr1)),
+            (botname, """\
 This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """)
         ]
 
-    def test_closing_after_fp(self, env, config, users, make_basic):
+    def test_closing_after_fp(self, env, config, users, make_basic, botname):
         """ Closing a PR which has been forward-ported should not touch the
         followups
         """
@@ -1087,8 +1081,8 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
             "the descendant of a closed PR doesn't really make sense, maybe?"
         pr2 = prod.get_pr(pr2_id.number)
         assert pr2.comments == [
-            seen(env, pr2, users),
-            (users['user'], """\
+            (botname, seen(env, pr2)),
+            (botname, """\
 @{user} @{reviewer} this PR targets c and is the last of the forward-port chain containing:
 * {pr1_id.display_name}
 
@@ -1105,7 +1099,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         assert not pr1_id.parent_id
         assert not pr2_id.parent_id
 
-    def test_closing_after_fp_second(self, env, config, users, make_basic):
+    def test_closing_after_fp_second(self, env, config, users, make_basic, botname):
         """If we close a forward-ported PR whose child has a child, then we don't
         need to send a notification on the child: while it is technically detached,
         said detachment has no effect as it does not need forward porting anymore.
@@ -1144,15 +1138,15 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         assert not pr_c_id.parent_id
         prc = prod.get_pr(pr_c_id.number)
         assert prc.comments == [
-            seen(env, prc, users),
-            (users['user'], """\
+            (botname, seen(env, prc)),
+            (botname, """\
 This PR targets c and is part of the forward-port chain. Further PRs will be created up to d.
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """),
         ]
 
-    def test_close_disabled(self, env, users, config, make_basic):
+    def test_close_disabled(self, env, users, config, make_basic, botname):
         """ If an fwport's target is disabled and its branch is closed, it
         should not be notified (multiple times), also its descendant should not
         be nodified if already merged, also there should not be recursive
@@ -1188,18 +1182,18 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 
         pr2 = repo.get_pr(pr2_id.number)
         assert pr2.comments == [
-            seen(env, pr2, users),
-            (users['user'], "This PR targets b and is part of the forward-port chain. "
+            (botname, seen(env, pr2)),
+            (botname, "This PR targets b and is part of the forward-port chain. "
                            "Further PRs will be created up to c.\n\n"
                            "More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n"),
-            (users['user'], "@{user} @{reviewer} the target branch 'b' has been disabled, you may want to close this PR.".format_map(
+            (botname, "@{user} @{reviewer} the target branch 'b' has been disabled, you may want to close this PR.".format_map(
                 users
             )),
         ]
         pr3 = repo.get_pr(pr3_id.number)
         assert pr3.comments == [
-            seen(env, pr3, users),
-            (users['user'], """\
+            (botname, seen(env, pr3)),
+            (botname, """\
 @{user} @{reviewer} this PR targets c and is the last of the forward-port chain containing:
 * {pr2_id.display_name}
 
@@ -1408,7 +1402,7 @@ class TestRecognizeCommands:
             pr.post_comment(f'{indent}@hansen up to a', config['role_reviewer']['token'])
         assert pr_id.limit_id == a
 
-def test_reminders(env, config, users, make_basic):
+def test_reminders(env, config, users, make_basic, botname):
     prod, _ = make_basic()
     with prod:
         prod.make_commits('a', Commit('c', tree={'x': '0'}), ref='heads/hugechange')
@@ -1445,26 +1439,26 @@ def test_reminders(env, config, users, make_basic):
         (users['self_reviewer'], branches[2], "other message"),
     ]
     assert prb.comments == [
-        seen(env, prb, users),
-        (users['user'], """\
+        (botname, seen(env, prb)),
+        (botname, """\
 This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """),
-        (users['user'], f"@{users['other']} firstmessage"),
+        (botname, f"@{users['other']} firstmessage"),
         (users['self_reviewer'], 'hansen remindme:b="initial message"'),
         (users['self_reviewer'], "hansen remindme:c='other message'"),
         (users['self_reviewer'], "hansen remindme:x='some message'"),
-        (users['user'], f"@{users['self_reviewer']} pr is already ported to 'b', I can't remind you for that"),
-        (users['user'], f"@{users['self_reviewer']} unknown or invalid branch 'x'"),
+        (botname, f"@{users['self_reviewer']} pr is already ported to 'b', I can't remind you for that"),
+        (botname, f"@{users['self_reviewer']} unknown or invalid branch 'x'"),
     ]
 
     prc_id = pra_id.forwardport_ids - prb_id
     prc = prod.get_pr(prc_id.number)
 
     assert prc.comments == [
-        seen(env, prc, users),
-        (users['user'], f"""\
+        (botname, seen(env, prc)),
+        (botname, f"""\
 @{users['user']} @{users['reviewer']} this PR targets c and is the last of the forward-port chain containing:
 * {prb_id.display_name}
 
@@ -1473,5 +1467,5 @@ To merge the full chain, use
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """),
-        (users['user'], f'@{users['other']} second message\n@{users['self_reviewer']} other message'),
+        (botname, f'@{users['other']} second message\n@{users['self_reviewer']} other message'),
     ]

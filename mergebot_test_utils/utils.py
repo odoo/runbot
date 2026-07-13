@@ -69,9 +69,9 @@ class matches(str):
             return NotImplemented
         return self._r.search(text)
 
-def seen(env, pr, users):
+def seen(env, pr):
     url = to_pr(env, pr).url
-    return users['user'], f'[![Pull request status dashboard]({url}.png)]({url})'
+    return f'[![Pull request status dashboard]({url}.png)]({url})'
 
 def make_basic(
         env,

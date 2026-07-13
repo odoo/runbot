@@ -52,7 +52,7 @@ def test_finding(env):
         'partner_id': partner.id,
     }), id="byacl"),
 ])
-def test_basic(env, project, make_repo, users, setreviewers, config, setoverride):
+def test_basic(env, project, make_repo, users, setreviewers, config, setoverride, botname):
     """
     Test that we can override a status on a PR:
 
@@ -99,9 +99,9 @@ def test_basic(env, project, make_repo, users, setreviewers, config, setoverride
     comments = pr.comments
     assert comments == [
         (users['reviewer'], 'hansen r+'),
-        seen(env, pr, users),
+        (botname, seen(env, pr)),
         (users['reviewer'], 'hansen override=l/int'),
-        (users['user'], f"@{users['reviewer']} you can't override=l/int."),
+        (botname, f"@{users['reviewer']} you can't override=l/int."),
         (users['other'], "hansen override=l/int"),
     ]
     assert pr_id.statuses == '{}'
@@ -174,7 +174,7 @@ def test_multiple(env, project, make_repo, users, setreviewers, config):
             },
         }
 
-def test_no_repository(env, project, make_repo, users, setreviewers, config):
+def test_no_repository(env, project, make_repo, users, setreviewers, config, botname):
     """ A repo missing from an override allows overriding the status in every repo
     """
     repo = make_repo('repo')
@@ -211,7 +211,7 @@ def test_no_repository(env, project, make_repo, users, setreviewers, config):
     comments = pr.comments
     assert comments == [
         (users['reviewer'], 'hansen r+'),
-        seen(env, pr, users),
+        (botname, seen(env, pr)),
         (users['other'], "hansen override=l/int"),
     ]
     assert pr_id.statuses == '{}'
