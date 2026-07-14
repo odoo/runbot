@@ -37,6 +37,10 @@ from urllib.parse import urlsplit, quote
 import pytest
 import requests
 
+pytest_plugins = [
+    "pytest_github_apps",
+]
+
 collect_ignore = [
     p.name
     for p in pathlib.Path(__file__).parent.iterdir()
