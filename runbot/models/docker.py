@@ -172,6 +172,7 @@ class Dockerfile(models.Model):
     dockerfile = fields.Text(compute='_compute_dockerfile', recursive=True, tracking=True)
     in_error = fields.Boolean('In error', help='The last build failed.', default=False)
     to_build = fields.Boolean('To Build', help='Build Dockerfile. Check this when the Dockerfile is ready.', default=True)
+    is_template = fields.Boolean('Is template', help='This dockerfile is a template and should not be used directly.', default=False)
     nocache = fields.Boolean('No Cache', help='Force a full rebuild on next build, bypassing the Docker layer cache. Automatically reset to False after the build.', copy=False)
     always_pull = fields.Boolean('Always pull', help='Always Pull on the hosts, not only at the use time', default=False, tracking=True, copy=False)
     version_ids = fields.One2many('runbot.version', 'dockerfile_id', string='Versions')
@@ -226,12 +227,13 @@ class Dockerfile(models.Model):
     def _compute_message(self):
         for record in self:
             messages = []
-            if record.in_error:
-                messages.append("The last build failed and this docker image won't be build anymore, remove the in_error flag to reenable.")
-            elif not record.to_build:
-                messages.append("The docker won't be build automatically")
-            if missing_variants := record.get_missing_variants():
-                messages.append(f'This variants is missing on the following docker files: {", ".join(missing_variants.mapped("name"))}')
+            if not record.is_template:
+                if record.in_error:
+                    messages.append("The last build failed and this docker image won't be build anymore, remove the in_error flag to reenable.")
+                elif not record.to_build:
+                    messages.append("The docker won't be build automatically")
+                if missing_variants := record.get_missing_variants():
+                    messages.append(f'This variants is missing on the following docker files: {", ".join(missing_variants.mapped("name"))}')
             record.message = '\n'.join(messages)
 
     def get_missing_variants(self):
@@ -301,6 +303,11 @@ class Dockerfile(models.Model):
     @api.onchange('dockerfile')
     def onchange_dockerfile(self):
         self.in_error = False
+
+    @api.onchange('is_template')
+    def onchange_is_template(self):
+        self.in_error = False
+        self.to_build = not self.is_template
 
     @api.depends('name', 'parent_id.image_tag')
     def _compute_image_tag(self):

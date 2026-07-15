@@ -25,7 +25,7 @@ class BuilderClient(RunbotClient):
         if self.host.is_registry:
             self.env['runbot.runbot']._start_docker_registry()
         if self.host.is_registry or self.host.is_builder:
-            last_docker_updates = self.env['runbot.dockerfile'].search([('to_build', '=', True)]).mapped('write_date')
+            last_docker_updates = self.env['runbot.dockerfile'].search(['|', ('to_build', '=', True), ('is_template', '=', True)]).mapped('write_date')
             if self.count == 1 or self.last_docker_updates != last_docker_updates:
                 self.last_docker_updates = last_docker_updates
                 self.host._docker_update_images()
