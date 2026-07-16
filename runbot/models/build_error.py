@@ -130,7 +130,7 @@ class BuildErrorSeenMixin(models.AbstractModel):
             versions = self.env['runbot.bundle'].search([('project_id', '=', project_id), ('sticky', '=', True)]).version_id.sorted(lambda v: (v.sequence, v.number), reverse=True)
             versions_ids = versions.ids
             date_labels = [date.strftime("%Y-%m-%d") for date in rrule.rrule(rrule.DAILY, dtstart=start_date, until=end_date)]
-            version_labels = [version.number for version in versions]
+            version_labels = [version.name for version in versions]
             x_indexes = {date: idx for idx, date in enumerate(date_labels)}
             y_indexes = {version_id: idx for idx, version_id in enumerate(versions_ids)}
             daily_version_freq = []
