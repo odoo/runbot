@@ -68,7 +68,7 @@ X-original-commit: {pr_id.head}\
     assert fw_pr.comments == [
         (botname, seen(env, fw_pr)),
         (botname, '''\
-@{user} @{reviewer} this PR targets b and is the last of the forward-port chain.
+@{fp} @{reviewer} this PR targets b and is the last of the forward-port chain.
 
 To merge the full chain, use
 > @hansen r+

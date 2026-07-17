@@ -198,8 +198,10 @@ def config(users_file: pathlib.Path) -> dict[str, dict[str, str]]:
             case _ if e['type'] == 'User':
                 picks.append(val)
     cnf['github'] = dict(cnf['role_user'])
+    cnf['fp_github'] = dict(cnf['role_user'])
     if owner := cnf.get('role_owner'):
         cnf['github']['owner'] = owner['login']
+        cnf['fp_github']['owner'] = owner['login']
 
     cnf.update(zip(
         ('role_reviewer', 'role_self_reviewer', 'role_other'),
@@ -228,8 +230,13 @@ def rolemap(
         r.raise_for_status()
 
         user = rolemap[k[5:]] = r.json()
+        data['id'] = user['id']
         n = data['user'] = user['login']
         data.setdefault('name', n)
+    # `user` is the primary user for the test suite, `bot` is the primary user
+    # for mergebot, and `fp` is the secondary (forward-port) user for mergebot,
+    # by default they are identical but in app mode they very much aren't...
+    rolemap['bot'] = rolemap['fp'] = rolemap['user']
     return rolemap
 
 @pytest.fixture

@@ -607,7 +607,7 @@ def post_merge(env, config, users, make_repo, branches):
         'github_prefix': 'hansen',
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",
-        'fp_github_token': config['github']['token'],
+        'fp_github_token': config['fp_github']['token'],
         'fp_github_name': 'herbert',
         'branch_ids': [
             (0, 0, {'name': str(i), 'sequence': 1000 - (i * 10)})

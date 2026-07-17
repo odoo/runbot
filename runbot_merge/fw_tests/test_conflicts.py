@@ -239,7 +239,7 @@ def test_massive_conflict(env, config, make_repo):
         'github_prefix': 'hansen',
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",
-        'fp_github_token': config['github']['token'],
+        'fp_github_token': config['fp_github']['token'],
         'fp_github_name': 'herbert',
         'branch_ids': [
             (0, 0, {'name': 'a', 'sequence': 100}),
@@ -450,7 +450,7 @@ def test_conflict_deleted_deep(env, config, make_repo):
         'github_prefix': 'hansen',
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",
-        'fp_github_token': config['github']['token'],
+        'fp_github_token': config['fp_github']['token'],
         'fp_github_name': 'herbert',
         'branch_ids': [
             (0, 0, {'name': 'a', 'sequence': 100}),
@@ -697,7 +697,7 @@ def setup_unstructured_conflict(env, config, make_repo):
         'github_prefix': 'hansen',
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",
-        'fp_github_token': config['github']['token'],
+        'fp_github_token': config['fp_github']['token'],
         'fp_github_name': 'herbert',
         'branch_ids': [
             (0, 0, {'name': 'a', 'sequence': 100}),
