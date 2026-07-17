@@ -615,9 +615,9 @@ def test_access_rights(env, config, users, author, reviewer, delegate, success, 
             token=author_token,
         )
         prod.post_status(c, 'success')
-        pr.post_comment('hansen r+', token=config['github']['token'])
+        pr.post_comment('hansen r+')
         if delegate:
-            pr.post_comment('hansen delegate=%s' % users[delegate], token=config['github']['token'])
+            pr.post_comment(f'hansen delegate={users[delegate]}')
     env.run_crons()
 
     with prod:

@@ -686,7 +686,7 @@ def make_repo(
     """
     owner = config['github']['owner']
     github = requests.Session()
-    github.headers['Authorization'] = 'token %s' % config['github']['token']
+    github.headers['Authorization'] = f'token {config["role_user"]["token"]}'
 
     # check whether "owner" is a user or an org, as repo-creation endpoint is
     # different
