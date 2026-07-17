@@ -38,16 +38,14 @@ except ImportError:
         return iter(())
 
 def source_url(repository) -> str:
-    return 'https://{}@github.com/{}'.format(
-        repository.project_id.github_token,
-        repository.name,
-    )
+    if (token := repository.project_id.github_token).startswith('ghs_'):
+        token = f"x-access-token:{token}"
+    return f'https://{token}@github.com/{repository.name}'
 
 def fw_url(repository) -> str:
-    return 'https://{}@github.com/{}'.format(
-        repository.project_id.fp_github_token,
-        repository.fp_remote_target,
-    )
+    if (token := repository.project_id.fp_github_token).startswith('ghs_'):
+        token = f"x-access-token:{token}"
+    return f'https://{token}@github.com/{repository.fp_remote_target}'
 
 Authorship = Union[Tuple[str, str], Tuple[str, str, str]]
 
