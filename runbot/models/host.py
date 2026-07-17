@@ -52,6 +52,7 @@ class Host(models.Model):
     is_builder = fields.Boolean('Is builder', help='This host is a builder of the cluster', default=True)
     is_registry = fields.Boolean('Is docker registry', help='This host is a docker regisrty', default=False)
     is_backup = fields.Boolean('Is backup', help='This host backup the most important databases', default=False)
+    is_assigner = fields.Boolean('Is assigner', help='This host will assign builds to other hosts', default=False)
     send_status = fields.Boolean('Send status', help='If leader, this host will send status updates, disable to use the status service', default=True)
 
     use_remote_docker_registry = fields.Boolean('Use remote Docker Registry', default=False, help="Use docker registry for pulling images")
