@@ -211,10 +211,10 @@ def rolemap(request, config):
     # only fetch github logins once per session
     rolemap = {}
     for k, data in config.items():
-        if not data['token']:
+        if not k.startswith('role_'):
             continue
 
-        r = _rate_limited(lambda: requests.get('https://api.github.com/user', headers={'Authorization': f'token {data["token"]}'}))
+        r = _rate_limited(lambda: requests.get(f'https://api.github.com/users/{data["login"]}'))
         r.raise_for_status()
 
         user = rolemap[k[5:]] = r.json()
