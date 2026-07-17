@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
+import hmac
 import itertools
+import json
 import re
 import time
 import typing
 
+import requests
 from lxml import html
 
 MESSAGE_TEMPLATE = """{message}
@@ -138,7 +142,7 @@ def make_basic(
         })
 
     prod = make_repo(reponame)
-    env['runbot_merge.events_sources'].create({'repository': prod.name})
+    env['runbot_merge.events_sources'].create({'repository': prod.name, 'secret': config['github']['secret']})
     with prod:
         _0, _1, a_2, _3, _4, = prod.make_commits(
             None,
@@ -314,3 +318,19 @@ def log_to_node(log):
             todo.append(c)
 
     return nodes[log[0]['sha']]
+
+def fakehook(port, env, repository, data):
+    assert isinstance(data, dict), f"webhook payloads are dicts (json objects), got {type(data)}"
+    headers = {"Content-Type": "application/json", "X-Github-Event": "pull_request"}
+    payload = json.dumps(data)
+    if source := env['runbot_merge.events_sources'].search([('repository', '=', repository.name)]):
+        sig = hmac.new(source.secret.strip().encode(), payload.encode(), hashlib.sha256)
+        headers['X-Hub-Signature-256'] = f"sha256={sig.hexdigest()}"
+
+    r = requests.post(
+        f"http://localhost:{port}/runbot_merge/hooks",
+        headers=headers,
+        data=payload,
+    )
+    r.raise_for_status()
+    return r

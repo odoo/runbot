@@ -253,7 +253,7 @@ class TestNotAllBranches:
             'branch_filter': '[("name", "in", ["a", "c"])]',
         })
         setreviewers(repo_a, repo_b)
-        env['runbot_merge.events_sources'].create([{'repository': a.name}, {'repository': b.name}])
+        env['runbot_merge.events_sources'].create([{'repository': a.name, 'secret': config['github']['secret']}, {'repository': b.name, 'secret': config['github']['secret']}])
         return project, a, a_dev, b, b_dev
 
     def test_single_first(self, env, repos, config):
@@ -986,7 +986,7 @@ def test_disable_branch_with_batches(env, config, make_repo, users, botname):
         "required_statuses": "default",
         "fp_remote_target": fork2.name,
     })
-    env['runbot_merge.events_sources'].create({'repository': repo2.name})
+    env['runbot_merge.events_sources'].create({'repository': repo2.name, 'secret': config['github']['secret']})
     env['res.partner'].search([
         ('github_login', '=', config['role_reviewer']['user'])
     ]).write({
@@ -1095,7 +1095,7 @@ def test_disable_multitudes(env, config, make_repo, users, setreviewers, botname
         })],
     })
     setreviewers(project.repo_ids)
-    env['runbot_merge.events_sources'].create({'repository': repo.name})
+    env['runbot_merge.events_sources'].create({'repository': repo.name, 'secret': config['github']['secret']})
 
     with repo:
         [a, b, c, d] = repo.make_commits(

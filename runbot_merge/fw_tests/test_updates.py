@@ -328,7 +328,7 @@ def test_duplicate_fw(env, make_repo, setreviewers, config, users):
         ]
     })
     setreviewers(*proj.repo_ids)
-    env['runbot_merge.events_sources'].create({'repository': repo.name})
+    env['runbot_merge.events_sources'].create({'repository': repo.name, 'secret': config['github']['secret']})
 
     # create a PR in v1, merge it, then create all 3 ports
     with repo:

@@ -248,7 +248,7 @@ def test_massive_conflict(env, config, make_repo):
     })
 
     repo = make_repo("repo")
-    env['runbot_merge.events_sources'].create({'repository': repo.name})
+    env['runbot_merge.events_sources'].create({'repository': repo.name, 'secret': config['github']['secret']})
 
     repo_id = env['runbot_merge.repository'].create({
         'project_id': project.id,
@@ -425,7 +425,7 @@ def test_conflict_deleted_deep(env, config, make_repo):
     """
     # region: setup
     prod = make_repo("test")
-    env['runbot_merge.events_sources'].create({'repository': prod.name})
+    env['runbot_merge.events_sources'].create({'repository': prod.name, 'secret': config['github']['secret']})
     with prod:
         [a, b] = prod.make_commits(
             None,
@@ -705,7 +705,7 @@ def setup_unstructured_conflict(env, config, make_repo):
         ],
     })
     prod = make_repo("test")
-    env['runbot_merge.events_sources'].create({'repository': prod.name})
+    env['runbot_merge.events_sources'].create({'repository': prod.name, 'secret': config['github']['secret']})
     with prod:
         [a, b] = prod.make_commits(
             None,

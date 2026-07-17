@@ -13,7 +13,7 @@ def test_optional_statuses(env, project, make_repo, users, setreviewers, config)
         'status_ids': [(0, 0, {'context': 'l/int', 'prs': 'optional'})]
     })
     setreviewers(*project.repo_ids)
-    env['runbot_merge.events_sources'].create({'repository': repository.name})
+    env['runbot_merge.events_sources'].create({'repository': repository.name, 'secret': config['github']['secret']})
 
     with repository:
         m = repository.make_commits(None, Commit('root', tree={'a': '1'}), ref='heads/master')
@@ -64,7 +64,7 @@ def test_incomplete_statuses_request(env, project, make_repo, users, setreviewer
         'status_ids': [(0, 0, {'context': 'l/azy'})]
     })
     setreviewers(*project.repo_ids)
-    env['runbot_merge.events_sources'].create({'repository': repo.name})
+    env['runbot_merge.events_sources'].create({'repository': repo.name, 'secret': config['github']['secret']})
 
     with repo:
         m = repo.make_commits(None, Commit('root', tree={'a': '1'}), ref='heads/master')
@@ -103,7 +103,7 @@ def test_complete_statuses_norequest(
         'status_ids': [(0, 0, {'context': 'l/azy'}), (0, 0, {'context': 'o/ptional', 'prs': 'optional'})]
     })
     setreviewers(*project.repo_ids)
-    env['runbot_merge.events_sources'].create({'repository': repo.name})
+    env['runbot_merge.events_sources'].create({'repository': repo.name, 'secret': config['github']['secret']})
 
     with repo:
         m = repo.make_commits(None, Commit('root', tree={'a': '1'}), ref='heads/master')

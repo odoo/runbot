@@ -14,7 +14,7 @@ def project(env, config, rolemap):
 
 
 @pytest.fixture
-def make_repo2(env, project, make_repo, users, setreviewers):
+def make_repo2(env, project, make_repo, users, setreviewers, config):
     """Layer over ``make_repo`` which also:
 
     - adds the new repo to ``project`` (with no group and the ``'default'`` status required)
@@ -30,7 +30,7 @@ def make_repo2(env, project, make_repo, users, setreviewers):
             'required_statuses': 'default',
         })
         setreviewers(rr)
-        env['runbot_merge.events_sources'].create({'repository': r.name})
+        env['runbot_merge.events_sources'].create({'repository': r.name, 'secret': config['github']['secret']})
         return r
     return mr
 

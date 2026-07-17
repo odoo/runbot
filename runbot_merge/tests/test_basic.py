@@ -1,5 +1,7 @@
 import contextlib
 import datetime
+import hashlib
+import hmac
 import itertools
 import json
 import re
@@ -17,7 +19,21 @@ import requests
 from lxml import html
 
 import odoo
-from utils import _simple_init, seen, matches, get_partner, Commit, pr_page, to_pr, part_of, ensure_one, read_tracking_value, node, log_to_node
+from utils import (
+    _simple_init,
+    seen,
+    matches,
+    get_partner,
+    Commit,
+    pr_page,
+    to_pr,
+    part_of,
+    ensure_one,
+    read_tracking_value,
+    node,
+    log_to_node,
+    fakehook,
+)
 
 
 @pytest.fixture(autouse=True, params=["statuses", "runbot"])
@@ -373,28 +389,31 @@ Co-authored-by: Bob <bob@example.com>""".format(
         )
 
 class TestWebhookSecurity:
-    @pytest.fixture(autouse=True)
-    def add_secret_to_source(self, env, repo):
+    @pytest.mark.xfail(reason="""\
+to test the secretless mode (and probably the rest for consistency) we'd need\
+ to set up a repository-level webhook on which we have full control: while\
+ secrets are also optional on apps, they are automatically generated when\
+ creating from a manifest, and can only be removed via the UI\
+""")
+    def test_no_secret(self, env, project, repo):
+        """ Test 1: didn't add a secret to the source, should be ignored
+        """
         env['runbot_merge.events_sources'].search([
             ('repository', '=', repo.name),
-        ]).secret = "a secret"
-
-    def test_no_secret(self, env, project, repo):
-        """ Test 1: didn't add a secret to the repo, should be ignored
-        """
+        ]).secret = False
         with repo:
             [m] = repo.make_commits(None, Commit("initial", tree={'a': 'some content'}), ref='heads/master')
 
             [c0] = repo.make_commits(m, Commit('replace file contents', tree={'a': 'some other content'}))
             pr0 = repo.make_pr(title="gibberish", body="blahblah", target='master', head=c0)
 
-        with pytest.raises(TimeoutError):
-            to_pr(env, pr0)
+        to_pr(env, pr0)
 
     def test_wrong_secret(self, env, project, repo):
+        env['runbot_merge.events_sources'].search([
+            ('repository', '=', repo.name),
+        ]).secret = "wrong secret"
         with repo:
-            repo.set_secret("wrong secret")
-
             [m] = repo.make_commits(None, Commit("initial", tree={'a': 'some content'}), ref='heads/master')
 
             [c0] = repo.make_commits(m, Commit('replace file contents', tree={'a': 'some other content'}))
@@ -403,10 +422,11 @@ class TestWebhookSecurity:
         with pytest.raises(TimeoutError):
             to_pr(env, pr0)
 
-    def test_correct_secret(self, env, project, repo):
+    def test_correct_secret(self, env, project, repo, installation):
+        env['runbot_merge.events_sources'].search([
+            ('repository', '=', repo.name),
+        ]).secret = installation.app.webhook_secret
         with repo:
-            repo.set_secret("a secret")
-
             [m] = repo.make_commits(None, Commit("initial", tree={'a': 'some content'}), ref='heads/master')
 
             [c0] = repo.make_commits(m, Commit('replace file contents', tree={'a': 'some other content'}))
@@ -2558,35 +2578,27 @@ Please check and re-approve.
 
         pr_id = to_pr(env, pr)
         pr_id.head = '0'*40
-        with requests.Session() as s:
-            r = s.post(
-                f"http://localhost:{port}/runbot_merge/hooks",
-                headers={
-                    "X-Github-Event": "pull_request",
-                },
-                json={
-                    'action': 'synchronize',
-                    'sender': {
-                        'login': users['user'],
-                    },
-                    'repository': {
+        fakehook(port, env, repo, {
+            'action': 'synchronize',
+            'sender': {
+                'login': users['user'],
+            },
+            'repository': {
+                'full_name': repo.name,
+            },
+            'pull_request': {
+                'number': pr.number,
+                'head': {'sha': c},
+                'title': "c",
+                'commits': 40123,
+                'base': {
+                    'ref': 'xxx',
+                    'repo': {
                         'full_name': repo.name,
                     },
-                    'pull_request': {
-                        'number': pr.number,
-                        'head': {'sha': c},
-                        'title': "c",
-                        'commits': 40123,
-                        'base': {
-                            'ref': 'xxx',
-                            'repo': {
-                                'full_name': repo.name,
-                            },
-                        }
-                    }
                 }
-            )
-            r.raise_for_status()
+            }
+        })
         assert pr_id.head == c, "the head should have been updated"
         assert not pr_id.squash, "the wrong count should be used"
 

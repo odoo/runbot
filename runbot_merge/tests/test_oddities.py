@@ -3,7 +3,7 @@ import datetime
 import pytest
 import requests
 
-from utils import Commit, to_pr, seen, read_tracking_value, matches
+from utils import Commit, to_pr, seen, read_tracking_value, matches, fakehook
 
 
 def test_partner_merge(env):
@@ -682,12 +682,11 @@ def test_create_commits_count(
     with pytest.raises(TimeoutError):
         to_pr(env, pr)
 
-    r = requests.post(
-        f"http://localhost:{port}/runbot_merge/hooks",
-        headers={
-            "X-Github-Event": "pull_request",
-        },
-        json={
+    fakehook(
+        port,
+        env,
+        repo,
+        {
             'action': 'opened',
             'sender': {'login': users['user']},
             'repository': {'full_name': repo.name},
@@ -703,7 +702,6 @@ def test_create_commits_count(
             }
         }
     )
-    r.raise_for_status()
 
     pr_id = to_pr(env, pr)
     assert not pr_id.squash
@@ -719,12 +717,11 @@ def test_sync_commits_count(port, env, project, repo, users, config) -> None:
     env.run_crons()
 
     # simulate github being stupid
-    r = requests.post(
-        f"http://localhost:{port}/runbot_merge/hooks",
-        headers={
-            "X-Github-Event": "pull_request",
-        },
-        json={
+    fakehook(
+        port,
+        env,
+        repo,
+        {
             'action': 'labeled',
             'sender': {
                 'login': users['user'],
@@ -746,7 +743,6 @@ def test_sync_commits_count(port, env, project, repo, users, config) -> None:
             }
         }
     )
-    r.raise_for_status()
 
     pr_id = to_pr(env, pr)
     assert not pr_id.squash
