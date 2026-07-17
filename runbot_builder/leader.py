@@ -19,6 +19,9 @@ class LeaderClient(RunbotClient):
             _logger.warning('Leader client is not a leader host, skipping loop_turn')
             return 10
 
+        if self.host.is_assigner:
+            self.env['runbot.runbot']._assign_pending_builds()
+
         self.last_update = self.env['runbot.repo'].search([('write_date', '>', self.last_update)])._update_git_config()
         self.env.cr.commit()
         if self.count == 0:

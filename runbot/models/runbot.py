@@ -14,8 +14,7 @@ from requests.exceptions import HTTPError
 
 from odoo import fields, models
 from odoo.exceptions import UserError
-from odoo.fields import Domain
-from odoo.tools import config, file_open, SQL
+from odoo.tools import config, file_open
 
 from ..common import dest_reg, os, sanitize
 from ..container import docker_ps, docker_stop
@@ -67,29 +66,59 @@ class Runbot(models.AbstractModel):
             if callable(result):
                 result()  # start docker
                 self._commit()
-        processed += self._assign_pending_builds(host, host.nb_worker, [('build_type', '!=', 'scheduled')])
-        self._commit()
-        processed += self._assign_pending_builds(host, host.nb_worker - 1 or host.nb_worker)
-        self._commit()
-        processed += self._assign_pending_builds(host, host.nb_worker and host.nb_worker + 1, [('build_type', '=', 'priority')])
-        self._commit()
         self._gc_running(host)
         self._commit()
         self._reload_nginx()
         self._commit()
         return processed
 
-    def _assign_pending_builds(self, host, nb_worker, domain=None):
-        if host.assigned_only or nb_worker <= 0:
-            return 0
-        reserved_slots = len(host._get_builds([('local_state', 'in', ('testing', 'pending'))]))
-        assignable_slots = (nb_worker - reserved_slots)
-        if assignable_slots > 0:
-            allocated = self._allocate_builds(host, assignable_slots, domain)
-            if allocated:
-                _logger.info('Builds %s where allocated to runbot', allocated)
-            return len(allocated)
-        return 0
+    def _assign_pending_builds(self):
+        _logger.info('Assigning pending builds to hosts')
+        builders = self.env['runbot.host'].search([('nb_worker', '>', 0), ('is_builder', '=', True), ('assigned_only', '=', False)])
+        non_allocated_domain = [('local_state', '=', 'pending'), ('host', '=', False)]
+
+        build_to_assign = self.env['runbot.build'].search(non_allocated_domain, order='priority_level')
+        priority_builds = build_to_assign.filtered(lambda b: b.build_type == 'priority')
+        scheduled_builds = build_to_assign.filtered(lambda b: b.build_type == 'scheduled')
+        normal_builds = build_to_assign.filtered(lambda b: b.build_type not in ('priority', 'scheduled'))
+
+        groups = self.env['runbot.build']._read_group(
+            [('host', 'in', builders.mapped('name')), ('local_state', 'in', ('testing', 'pending'))],
+            ['host'],
+            ['id:count'],
+        )
+        reserved_slots_by_host = dict(groups)
+        nb_workers_by_host = {host.name: host.nb_worker for host in builders}
+
+        def _available_slots(host_name, nb_workers, slots_modifier):
+            return ((nb_workers + slots_modifier) or nb_workers) - reserved_slots_by_host.get(host_name, 0)
+
+        self._commit()  # avoid to lock builds for too long in case one of them is modified during the assignment process
+        for builds, slots_modifier in [(priority_builds, 1), (normal_builds, 0), (scheduled_builds, -1)]:
+            offset = 0
+            available_slot_by_host = {host_name: _available_slots(host_name, nb_workers, slots_modifier) for host_name, nb_workers in nb_workers_by_host.items()}
+            ordered_hosts = sorted(
+                available_slot_by_host.items(),
+                key=lambda item: item[1],
+                reverse=True,
+            )
+            for host_name, available_slots in ordered_hosts:
+                if len(builds) <= offset:
+                    break
+                if available_slots <= 0:
+                    break  # since we ordered the hosts by available slots, if the first one has no available slots, the others won't have any either
+                builds_to_assign = self.env['runbot.build'].browse(builds[offset:offset + available_slots].ids)
+                offset += len(builds_to_assign)
+                _logger.info('Assigning builds %s to host %s', builds_to_assign.ids, host_name)
+                builds_to_assign.invalidate_recordset()  # should be done by _commit() but lets be safe and explicit
+                builds_to_assign.fetch(['host', 'local_state'])
+                for build in builds_to_assign:  # rebrowse to only prefetch the concerned builds
+                    if not build.host and build.local_state == 'pending':  # since we committedthe loop, we need to ensure the build is still unassigned
+                        build.host = host_name
+                        reserved_slots_by_host[host_name] = reserved_slots_by_host.get(host_name, 0) + 1
+                    else:
+                        _logger.warning('Build %s was already assigned to host %s or is not pending anymore, skipping assignment', build.id, build.host)
+                self._commit()
 
     def _get_builds_to_init(self, host):
         domain_host = host._get_build_domain()
@@ -131,27 +160,6 @@ class Runbot(models.AbstractModel):
         for build in testing_builds:
             if build.top_parent.killable:
                 build.top_parent._ask_kill(message='Build automatically killed, new build found.')
-
-    def _allocate_builds(self, host, nb_slots, domain=None):
-        if nb_slots <= 0:
-            return []
-        non_allocated_domain = [('local_state', '=', 'pending'), ('host', '=', False)]
-        if domain:
-            non_allocated_domain = Domain.AND([non_allocated_domain, domain])
-        query = self.env['runbot.build']._search(non_allocated_domain)
-        query.order = 'runbot_build.priority_level'
-        self.env.execute_query(SQL("""UPDATE
-                        runbot_build
-                    SET
-                        host = %s
-                    WHERE
-                        runbot_build.id IN (
-                            %s
-                            FOR UPDATE OF runbot_build SKIP LOCKED
-                            LIMIT %s
-                        )
-                    RETURNING id""", host.name, query.select(), nb_slots))
-        return self.env.cr.fetchall()
 
     def _reload_nginx(self):
         env = self.env
@@ -247,7 +255,6 @@ class Runbot(models.AbstractModel):
         try:
             yield res
             host.last_success = datetime.now()
-            self._commit()
         except Exception as e:
             self.env.cr.rollback()
             self.env.clear()
@@ -264,6 +271,7 @@ class Runbot(models.AbstractModel):
             if host.last_exception:
                 host.last_exception = ""
                 host.exception_count = 0
+            self._commit()
 
     def _source_cleanup(self):
         try:

@@ -13,6 +13,7 @@
                         <field name="active"/>
                         <field name="use_remote_docker_registry"/>
                         <field name="is_leader"/>
+                        <field name="is_assigner"/>
                         <field name="send_status" invisible="not is_leader"/>
                         <field name="is_builder"/>
                         <field name="is_registry"/>
@@ -62,6 +63,7 @@
                 <field name="nb_worker"/>
                 <field name="nb_run_slot"/>
                 <field name="is_leader"/>
+                <field name="is_assigner"/>
                 <field name="is_builder"/>
                 <field name="is_registry"/>
                 <field name="is_backup"/>
