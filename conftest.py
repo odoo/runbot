@@ -828,12 +828,11 @@ class Repo:
         r = self._session.get(
             f'https://api.github.com/repos/{self.name}/hooks')
         assert 200 <= r.status_code < 300, r.text
-        [hook] = r.json()
-
-        r = self._session.patch(f'https://api.github.com/repos/{self.name}/hooks/{hook["id"]}', json={
-            'config': {**hook['config'], 'secret': secret},
-        })
-        assert 200 <= r.status_code < 300, r.text
+        for hook in r.json():
+            r = self._session.patch(f'https://api.github.com/repos/{self.name}/hooks/{hook["id"]}', json={
+                'config': {**hook['config'], 'secret': secret},
+            })
+            assert 200 <= r.status_code < 300, r.text
 
     def get_ref(self, ref):
         if ref.startswith('refs/'):
