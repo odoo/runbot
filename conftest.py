@@ -394,6 +394,14 @@ def shared_dir(
     # level up to deref it
     return shared_dir.parent
 
+@contextlib.contextmanager
+def xdist_lock(file: pathlib.Path) -> Generator[io.TextIOBase]:
+    lockfile = os.open(file, os.O_CREAT | os.O_RDWR)
+    fcntl.flock(lockfile, fcntl.LOCK_EX)
+
+    with os.fdopen(lockfile, mode="r+", encoding='utf-8') as f:
+        yield f
+
 @pytest.fixture(scope='session')
 def template_db(
         shared_dir: pathlib.Path,
@@ -402,19 +410,12 @@ def template_db(
     """ Creates template DB once per run, then just duplicates it before
     starting odoo and running the testcase
     """
-    with contextlib.ExitStack() as atexit:
-        f = atexit.enter_context(os.fdopen(os.open(
-            shared_dir / f'template',
-            os.O_CREAT | os.O_RDWR
-        ), mode="r+", encoding='utf-8'))
-        fcntl.lockf(f, fcntl.LOCK_EX)
-        atexit.callback(fcntl.lockf, f, fcntl.LOCK_UN)
-
+    with xdist_lock(shared_dir / 'template') as f:
         db = f.read()
         if db:
             return db
 
-        d = (shared_dir / f'shared')
+        d = (shared_dir / 'shared')
         try:
             d.mkdir()
         except FileExistsError:
@@ -449,7 +450,22 @@ def db(
         tmp_path: pathlib.Path,
 ) -> Iterator[str]:
     rundb = f'mergebot-{secrets.token_hex(16)}'
-    subprocess.run(['createdb', '-T', template_db, rundb], check=True)
+    # createdb sometimes fails with "source database is being accessed by other
+    # users". *We* have no connection (`template_db` has completed and the mutex
+    # seems to work fine), and fetching the connected clients doesn't return
+    # anything. This also is not consistent in time (relative to where we are
+    # in the test suite). So I think this is something `postgres does
+    # internally, for an instant, when creating a database from a template, and
+    # if a concurrenty createdb starts at just the wrong time they conflict.
+    #
+    # In every occurrence I saw, the following attempt worked, so just attempt
+    # it a few times.
+    for _ in range(5):
+        # createdb just returns 0/1 no details
+        if subprocess.run(['createdb', '-T', template_db, rundb]).returncode == 0:
+            break
+    else:
+        raise Exception("Failed to create test database")
     share = tmp_path.joinpath('share')
     share.mkdir()
     shutil.copytree(shared_dir / f'shared', share, dirs_exist_ok=True)
