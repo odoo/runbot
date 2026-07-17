@@ -153,6 +153,51 @@ class Runbot(models.AbstractModel):
                     RETURNING id""", host.name, query.select(), nb_slots))
         return self.env.cr.fetchall()
 
+    def _get_main_nginx_pid(self):
+        # not under an Odoo root, so plain open() rather than file_open()
+        try:
+            with open('/var/run/nginx/nginx.pid', encoding='utf-8') as f:
+                return int(f.read().strip())
+        except (FileNotFoundError, ValueError):
+            return None
+
+    def _start_nginx(self):
+        nginx_dir = self.env['runbot.runbot']._path('nginx')
+        _logger.info('start nginx')
+        main_nginx_pid = self._get_main_nginx_pid()
+        # file_open does not let create new files
+        with open(self.env['runbot.runbot']._path('nginx', 'main_nginx.pid'), 'w', encoding='utf-8') as f:
+            f.write(str(main_nginx_pid) if main_nginx_pid is not None else '')
+
+        if subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf']):
+            # obscure nginx bug leaving orphan worker listening on nginx port
+            if not subprocess.call(['pkill', '-f', '-P1', 'nginx: worker']):
+                _logger.warning('failed to start nginx - orphan worker killed, retrying')
+                subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf'])
+            else:
+                _logger.warning('failed to start nginx - failed to kill orphan worker - oh well')
+
+    def _check_main_nginx(self):
+        need_start = False
+        try:
+            with file_open(self.env['runbot.runbot']._path('nginx', 'main_nginx.pid')) as f:
+                known_main_nginx_pid = int(f.read().strip())
+        except (FileNotFoundError, ValueError):
+            need_start = True
+
+        current_main_nginx_pid = self._get_main_nginx_pid()
+        if current_main_nginx_pid is not None and known_main_nginx_pid != current_main_nginx_pid:
+            _logger.info('main nginx restarted (%s -> %s), restarting runbot nginx', known_main_nginx_pid, current_main_nginx_pid)
+            need_start = True
+
+        if need_start:
+            try:
+                with file_open(self.env['runbot.runbot']._path('nginx', 'nginx.pid')) as f:
+                    os.kill(int(f.read().strip()), signal.SIGTERM)
+            except (FileNotFoundError, ValueError, ProcessLookupError):
+                pass
+            self._start_nginx()
+
     def _reload_nginx(self):
         env = self.env
         settings = {}
@@ -183,14 +228,8 @@ class Runbot(models.AbstractModel):
                 pid = int(file_open(self.env['runbot.runbot']._path('nginx', 'nginx.pid')).read().strip(' \n'))
                 os.kill(pid, signal.SIGHUP)
             except Exception:
-                _logger.info('start nginx')
-                if subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf']):
-                    # obscure nginx bug leaving orphan worker listening on nginx port
-                    if not subprocess.call(['pkill', '-f', '-P1', 'nginx: worker']):
-                        _logger.warning('failed to start nginx - orphan worker killed, retrying')
-                        subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf'])
-                    else:
-                        _logger.warning('failed to start nginx - failed to kill orphan worker - oh well')
+                self._start_nginx()
+        self._check_main_nginx()
 
     def _fetch_loop_turn(self, host, pull_info_failures, default_sleep=1):
         with self._manage_host_exception(host) as manager:
