@@ -62,7 +62,8 @@
                   <thead>
                       <tr>
                           <th>Ref Date</th>
-                          <th>SHA</th>
+                          <th>Commit Hash</th>
+                          <th>Tree Hash</th>
                           <th>Commit Date</th>
                           <th>Author</th>
                           <th>Subject</th>
@@ -71,6 +72,7 @@
                   <tr t-foreach='branch.reflog_ids' t-as='reflog'>
                     <td t-out="reflog.date"/>
                     <td><a t-attf-href="/runbot/commit/{{reflog.commit_id.id}}" t-out="reflog.commit_id.name"/></td>
+                    <td><a t-attf-href="/runbot/{{branch.repo_id.id}}/tree_hash/{{reflog.commit_id.tree_hash}}" t-out="reflog.commit_id.tree_hash"/></td>
                     <td t-out="reflog.commit_id.date"/>
                     <td t-out="reflog.commit_id.author"/>
                     <td t-out="reflog.commit_id.subject"/>

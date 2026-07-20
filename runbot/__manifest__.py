@@ -41,6 +41,7 @@
         'templates/commit_link_details.xml',
         'templates/bundles_by_tag.xml',
         'templates/versions.xml',
+        'templates/tree_hash.xml',
 
         'views/branch_views.xml',
         'views/build_error_link_views.xml',

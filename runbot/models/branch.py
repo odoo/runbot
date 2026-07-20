@@ -311,6 +311,7 @@ class RefLog(models.Model):
     _name = 'runbot.ref.log'
     _description = 'Ref log'
     _log_access = False
+    _order = 'id desc'
 
     commit_id = fields.Many2one('runbot.commit', index=True)
     branch_id = fields.Many2one('runbot.branch', index=True)

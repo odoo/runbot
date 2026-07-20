@@ -40,7 +40,7 @@
               <tr>
                 <td>Tree hash</td>
                 <td>
-                  <t t-out="commit.tree_hash"/>
+                  <a t-attf-href="/runbot/{{project.id}}/tree_hash/{{commit.tree_hash}}" title="Tree Hash details"><t t-out="commit.tree_hash"/></a>
                 </td>
               </tr>
               <tr>

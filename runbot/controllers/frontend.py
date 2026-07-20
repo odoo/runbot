@@ -271,6 +271,30 @@ class Runbot(Controller):
             _logger.info('github status %s resent by %s', status_id, request.env.user.name)
         return werkzeug.utils.redirect('/runbot/commit/%s' % status.commit_id.id)
 
+    @route([
+        '/runbot/tree_hash/<string(minlength=6, maxlength=40):tree_hash>',
+        '/runbot/<model("runbot.project"):project>/tree_hash/<string(minlength=6, maxlength=40):tree_hash>',
+    ], website=True, auth='public', type='http', sitemap=False)
+    def tree_hash(self, tree_hash=None, project=None, **kwargs):
+        if not project:
+            project = self.env.ref('runbot.main_project')
+        if tree_hash:
+            ref_logs = self.env["runbot.ref.log"].search([
+                ("commit_id.repo_id.project_id", "=", project.id),
+                ("commit_id.tree_hash", "=", tree_hash),
+            ])
+            if ref_logs:
+                batches = self.env['runbot.batch'].search([('commit_link_ids.commit_id.tree_hash', '=', tree_hash)], order='create_date desc')
+                context = {
+                    'tree_hash': tree_hash,
+                    'ref_logs': ref_logs,
+                    'batches': batches,
+                    'project': project,
+                    'repo': ref_logs[0].branch_id.repo_id,
+                }
+                return request.render('runbot.tree_hash', context)
+        raise NotFound
+
     @o_route([
         '/runbot/build/<int:build_id>/<operation>',
     ], type='http', auth="user", methods=['POST'], csrf=False)

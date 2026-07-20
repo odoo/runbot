@@ -1,0 +1,83 @@
+
+<odoo>
+  <data>
+    <template id="runbot.tree_hash">
+      <t t-call='runbot.layout'>
+        <div class="row g-0">
+          <!-- Tree hash informations -->
+          <div class="col-md-6">
+            <table class="table">
+              <tr>
+                <td>Tree Hash:</td>
+                <td>
+                  <t t-out="tree_hash"/>
+                </td>
+              </tr>
+              <tr>
+                <td>Project:</td>
+                <td>
+                  <t t-out="project.name"/>
+                </td>
+              </tr>
+              <tr>
+                <td>Repo:</td>
+                <td>
+                  <t t-out="repo.name"/>
+                </td>
+              </tr>
+            </table>
+          </div>
+          <!-- Commits -->
+          <table class="table table-condensed" style="table-layout: initial;">
+            <thead>
+              <tr>
+                <th colspan="6">Commits:</th>
+              </tr>
+              <tr>
+                  <th>Commit Hash</th>
+                  <th>Commit Date</th>
+                  <th>Author</th>
+                  <th>Subject</th>
+                  <th>Branch</th>
+                  <th>Ref date</th>
+              </tr>
+            </thead>
+            <t t-set="prev_commit_id" t-value="None"/>
+            <tr t-foreach='ref_logs' t-as='ref_log'>
+              <t t-if="ref_log.commit_id.id != prev_commit_id">
+                <td><a t-attf-href="/runbot/commit/{{ref_log.commit_id.id}}" t-out="ref_log.commit_id.name"/></td>
+                <td t-out="ref_log.commit_id.date"/>
+                <td t-out="ref_log.commit_id.author"/>
+                <td t-out="ref_log.commit_id.subject"/>
+              </t>
+              <t t-else="">
+                <td colspan="4"></td>
+              </t>
+              <td t-out="ref_log.branch_id.name"/>
+              <td t-out="ref_log.date"/>
+              <t t-set="prev_commit_id" t-value="ref_log.commit_id.id"/>
+            </tr>
+          </table>
+          <!-- Bundles / Batches -->
+          <table class="table table-condensed" style="table-layout: initial;">
+            <thead>
+              <tr>
+                <th colspan="3">Batches:</th>
+              </tr>
+              <tr>
+                  <th>Bundle</th>
+                  <th>Date</th>
+                  <th>Batch</th>
+              </tr>
+            </thead>
+            <tr t-foreach='batches' t-as='batch'>
+              <td><a t-attf-href="/runbot/bundle/{{batch.bundle_id.id}}" t-out="batch.bundle_id.name"/></td>
+              <td t-out="batch.create_date"/>
+              <td><a t-attf-href="/runbot/batch/{{batch.id}}" t-out="batch.id"/></td>
+            </tr>
+          </table>
+        </div>
+      </t>
+    </template>
+  </data>
+</odoo>
