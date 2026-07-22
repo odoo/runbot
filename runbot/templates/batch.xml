@@ -70,11 +70,24 @@
                                 <div t-foreach="batch.commit_link_ids.sorted(key=lambda lc: (lc.commit_id.repo_id.sequence, lc.commit_id.repo_id.id))" t-as="commit_link">
                                     <t t-set="commit" t-value="commit_link.commit_id"/>
                                     <span/>
-                                    <a t-attf-href="/runbot/commit/#{commit.id}">
-                                        <i class="fa fa-fw fa-hashtag" t-if="commit_link.match_type == 'new'" title="This commit is a new head"/>
-                                        <i class="fa fa-fw fa-link" t-if="commit_link.match_type == 'head'" title="This commit is an existing head from bundle branches"/>
-                                        <i class="fa fa-fw fa-code-fork" t-if="commit_link.match_type == 'base_match'" title="This commit is matched from a base batch with matching merge_base"/>
-                                        <i class="fa fa-fw fa-clock-o" t-if="commit_link.match_type == 'base_head'" title="This commit is the head of a base branch"/>
+                                    <t t-if="commit_link.match_type == 'new'">
+                                        <t t-set="commit_icon">fa-hashtag</t>
+                                        <t t-set="commit_title">This commit is a new head</t>
+                                    </t>
+                                    <t t-elif="commit_link.match_type == 'head'">
+                                        <t t-set="commit_icon">fa-link</t>
+                                        <t t-set="commit_title">This commit is an existing head from bundle branches</t>
+                                    </t>
+                                    <t t-elif="commit_link.match_type == 'base_match'">
+                                        <t t-set="commit_icon">fa-code-fork</t>
+                                        <t t-set="commit_title">This commit is matched from a base batch with matching merge_base</t>
+                                    </t>
+                                    <t t-elif="commit_link.match_type == 'base_head'">
+                                        <t t-set="commit_icon">fa-clock-o</t>
+                                        <t t-set="commit_title">This commit is the head of a base branch</t>
+                                    </t>
+                                    <a t-attf-href="/runbot/commit/#{commit.id}" t-att-title="commit_title">
+                                        <i t-attf-class="fa fa-fw {{commit_icon}}"/>
                                         <span class="label" t-out="commit.dname"/>
                                     </a>
                                     <a t-att-href="'https://%s/commit/%s' % (commit_link.branch_id.remote_id.base_url, commit_link.commit_id.name)" title="View Commit on Github"><i class="fa fa-github"/></a>
@@ -113,6 +126,10 @@
                                     </small>
                                     <b t-if="commit.rebase_on_id">Automatic rebase on <t t-out="commit.rebase_on_id.name"/><br/></b>
                                     <t t-if="more or not (commit_link.match_type and commit_link.match_type.startswith('base'))">
+                                        <a t-attf-href="/runbot/tree_hash/#{commit.tree_hash}">
+                                            <i t-attf-class="fa fa-fw fa-tree"/>
+                                            <t t-out="commit.tree_hash[:8]"/>
+                                        </a><br/>
                                         Subject:
                                         <span t-out="commit.subject"/>
                                         <br/>
