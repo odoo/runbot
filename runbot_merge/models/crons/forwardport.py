@@ -126,7 +126,6 @@ class ForwardPortTasks(models.Model):
                 self.env['runbot_merge.pull_requests.feedback'].create({
                     'repository': repository.id,
                     'pull_request': source.number,
-                    'token_field': 'fp_github_token',
                     'message': """\
 {pr.ping}unable to port this PR forwards due to inconsistency: goes from \
 {pr.target.name} to {next_target.name} but {batch} ({batch_prs}) targets \
@@ -181,7 +180,6 @@ class ForwardPortTasks(models.Model):
                 self.env.ref('runbot_merge.forwardport.failure.conflict')._send(
                     repository=pr.repository,
                     pull_request=pr.number,
-                    token_field='fp_github_token',
                     format_args={'source': source, 'pr': pr._suppress_ping(), 'new': new_pr, 'footer': FOOTER},
                 )
             new_pr._fp_conflict_feedback(pr, {pr: conflict})

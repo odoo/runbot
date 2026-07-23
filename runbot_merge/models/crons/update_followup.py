@@ -33,7 +33,6 @@ class UpdateQueue(models.Model):
                 self.env.ref('runbot_merge.forwardport.updates.closed')._send(
                     repository=child.repository,
                     pull_request=child.number,
-                    token_field='fp_github_token',
                     format_args={'pr': child, 'parent': root},
                 )
                 return
@@ -63,13 +62,11 @@ class UpdateQueue(models.Model):
                     self.env.ref('runbot_merge.forwardport.updates.conflict.parent')._send(
                         repository=previous.repository,
                         pull_request=previous.number,
-                        token_field='fp_github_token',
                         format_args={'pr': previous._suppress_ping(), 'next': child},
                     )
                     self.env.ref('runbot_merge.forwardport.updates.conflict.child')._send(
                         repository=child.repository,
                         pull_request=child.number,
-                        token_field='fp_github_token',
                         format_args={
                             'previous': previous,
                             'pr': child._suppress_ping(),

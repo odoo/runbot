@@ -127,8 +127,8 @@ All substitutions are tentatively applied sequentially to the input.
             vals['status_ids'] = [(5, 0, {})] + [(0, 0, {'context': c}) for c in st.split(',')]
         return super().write(vals)
 
-    def github(self, token_field='github_token') -> github.GH:
-        return github.GH(self.project_id[token_field], self.name)
+    def github(self) -> github.GH:
+        return github.GH(self.project_id['github_token'], self.name)
 
     def _auto_init(self):
         res = super()._auto_init()
@@ -1264,7 +1264,6 @@ For your own safety I've ignored *everything in your entire comment*.
                 'repository': p.repository.id,
                 'pull_request': p.number,
                 'message': root_msg,
-                'token_field': 'fp_github_token',
             }
             # send messages to source and root unless root is self (as it
             # already gets the normal message)
@@ -1512,7 +1511,6 @@ For your own safety I've ignored *everything in your entire comment*.
             self.env.ref('runbot_merge.forwardport.ci.failed')._send(
                 repository=self.repository,
                 pull_request=self.number,
-                token_field='fp_github_token',
                 format_args={'pr': self, 'ci': ci},
             )
 
@@ -1742,7 +1740,6 @@ For your own safety I've ignored *everything in your entire comment*.
                     self.env.ref('runbot_merge.forwardport.update.detached')._send(
                         repository=p.repository,
                         pull_request=p.number,
-                        token_field='fp_github_token',
                         format_args={'pr': p.with_context(
                             suppress_ping=p.source_id.batch_id.fw_policy=='skipmerge',
                         )},
@@ -1751,7 +1748,6 @@ For your own safety I've ignored *everything in your entire comment*.
                     self.env.ref('runbot_merge.forwardport.update.parent')._send(
                         repository=parent.repository,
                         pull_request=parent.number,
-                        token_field='fp_github_token',
                         format_args={
                             'pr': parent.with_context(
                                 suppress_ping=p.source_id.batch_id.fw_policy=='skipmerge',
@@ -1990,7 +1986,6 @@ For your own safety I've ignored *everything in your entire comment*.
         self.env.ref(template)._send(
             repository=self.repository,
             pull_request=self.number,
-            token_field='fp_github_token',
             format_args=format_args,
         )
 
@@ -2146,7 +2141,7 @@ For your own safety I've ignored *everything in your entire comment*.
         # <xxx>.cherrypick.<number>
         logger = _logger.getChild(str(self.id)).getChild('cherrypick')
 
-        commits = self.repository.github('fp_github_token').commits(self.number)
+        commits = self.repository.github().commits(self.number)
         logger.info(
             "%s: copy %s commits to %s (%s)%s",
             self, len(commits), branch.name, head,
@@ -2279,7 +2274,6 @@ For your own safety I've ignored *everything in your entire comment*.
                 self.env.ref('runbot_merge.forwardport.reminder')._send(
                     repository=pr.repository,
                     pull_request=pr.number,
-                    token_field='fp_github_token',
                     format_args={'pr': pr, 'source': pr.source_id},
                 )
 

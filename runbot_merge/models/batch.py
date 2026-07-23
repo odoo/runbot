@@ -292,7 +292,6 @@ class Batch(models.Model):
                     self.env.ref('runbot_merge.forwardport.failure.discrepancy')._send(
                         repository=pr.repository,
                         pull_request=pr.number,
-                        token_field='fp_github_token',
                         format_args={'pr': pr, 'linked': linked, 'next': t.name, 'other': other.name},
                     )
             _logger.warning(
@@ -384,7 +383,6 @@ class Batch(models.Model):
                 self.env.ref('runbot_merge.forwardport.failure.conflict')._send(
                     repository=pr.repository,
                     pull_request=pr.number,
-                    token_field='fp_github_token',
                     format_args={'source': source, 'pr': pr._suppress_ping(), 'new': new_pr, 'footer': FOOTER},
                 )
 
