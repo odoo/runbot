@@ -6,7 +6,7 @@
                 <div class="row g-0">
                     <div class="col-lg-6">
                     <t t-set="batch_class" t-value="'bg-info-subtle' if batch.state=='preparing' else 'bg-success-subtle' if not any(log.level != 'INFO' for log in batch.log_ids) else 'bg-warning-subtle'"/>
-                    <table class="table table-stripped">
+                    <table class="table">
                         <tr>
                             <td>Bundle</td>
                             <td>
@@ -182,7 +182,7 @@
                     </table>
                     </div>
                     <div class="col-lg-6">
-                    <table class="table table-stripped">
+                    <table class="table">
                         <tr>
                             <td>Builds</td>
                             <td>
