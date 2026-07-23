@@ -10,6 +10,9 @@ filterwarnings =
     error::
     ignore::DeprecationWarning
     ignore:pkg_resources:UserWarning
+    ;; `webbrowser.open`  leaves subprocesses dangling when it selects a
+    ;; background browser
+    ignore:subprocess \d+ is still running:ResourceWarning
 ;; 15mn per test including setup as it can get stuck
 timeout=900
 ;; not sure it's necessary but doesn't seem harmful
