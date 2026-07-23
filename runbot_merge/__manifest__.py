@@ -5,10 +5,10 @@
     'data': [
         'security/security.xml',
         'security/ir.model.access.csv',
+        'models/crons/ir.model.access.csv',
 
         'data/merge_cron.xml',
         'models/crons/cleanup_scratch_branches.xml',
-        'models/crons/issues_closer.xml',
         'data/runbot_merge.pull_requests.feedback.template.csv',
         'views/res_partner.xml',
         'views/runbot_merge_project.xml',
@@ -21,13 +21,11 @@
         'models/staging_cancel/views.xml',
         'models/backport/views.xml',
         'models/ir_cron/views.xml',
-        'models/crons/forwardport.xml',
         'models/crons/forwardport_views.xml',
         'models/commands/acls.xml',
         'models/commands/views.xml',
         'models/crons/validate.xml',
         'models/crons/status_request.xml',
-        'models/crons/check_commits.xml',
     ],
     'assets': {
        'web._assets_primary_variables': [

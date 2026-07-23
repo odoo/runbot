@@ -15,7 +15,7 @@ _logger = logging.getLogger(__name__)
 
 class BatchValidate(models.Model):
     _name = 'runbot_merge.batch.validate'
-    _descrition = "Post-ready / pre-staging validations"
+    _description = "Post-ready / pre-staging validations"
 
     batch_id = fields.Many2one('runbot_merge.batch', index=True)
 
