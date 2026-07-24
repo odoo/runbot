@@ -68,8 +68,7 @@ class Runbot(models.AbstractModel):
                 self._commit()
         for build in host._get_builds([('global_state', 'in', ['pending', 'testing', 'waiting', 'running'])]):
             build = build.browse(build.id)  # remove preftech ids, manage build one by one
-            build._update_global_state()
-            build._update_global_result()
+            build._update_globals()
             self._commit()
         self._gc_running(host)
         self._commit()

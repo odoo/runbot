@@ -180,7 +180,7 @@ class Batch(models.Model):
 
         slot.link_type = link_type
         slot.build_id = build
-        build._github_status()
+        build._prepare_github_status()
 
     def _get_latest_batch_per_version(self, skip_versions):
         return self.env['runbot.batch'].browse(result[1] for result in self.env['runbot.batch']._read_group(
