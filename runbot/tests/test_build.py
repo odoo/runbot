@@ -617,15 +617,59 @@ class TestBuildResult(RunbotCase):
         build1_1_2.local_state = 'done'
 
         # simulate scheduler ran
-        build1_1._update_global_state()
-        build1_2._update_global_state()
-        build1._update_global_state()
+        build1_1._update_globals()
+        build1_2._update_globals()
+        build1._update_globals()
 
         self.assertEqual('done', build1.global_state)
         self.assertEqual('done', build1_1.global_state)
         self.assertEqual('done', build1_2.global_state)
         self.assertEqual('done', build1_1_1.global_state)
         self.assertEqual('done', build1_1_2.global_state)
+
+    def test_rebuild_sent_status(self):
+        # setup everything to ensure status are created
+        # TODO rework default setup to have a consistent state for all tests
+        bundle = self.dev_bundle
+        self.trigger_addons.unlink()  # TODO should not be needed, but will generate a warning without that
+        batch = bundle._force()
+        batch._prepare()
+        bundle.last_batch = batch
+        self.server_params.trigger_id = self.trigger_server
+        self.trigger_server.ci_context = 'ci/test'
+        batch.commit_link_ids[0].match_type = 'head'
+        batch.commit_link_ids[0].commit_id = self.server_params.commit_link_ids[0].commit_id
+
+        current_max = self.env['runbot.commit.status'].search([], order='id desc', limit=1).id or 0
+        build1 = self.Build.create({
+            'params_id': self.server_params.id,
+        })
+        batch.slot_ids[0].build_id = build1
+
+        build1_1 = self.Build.create({
+            'params_id': self.server_params.id,
+            'parent_id': build1.id,
+        })
+        build1.local_state = 'done'
+        build1.local_result = 'ok'
+        build1_1.local_state = 'done'
+        build1_1.local_result = 'ko'
+        build1_1._update_globals()
+        build1._update_globals()
+        self.assertEqual('ko', build1.global_result)
+        self.assertEqual('done', build1.global_state)
+        self.cr.precommit.run()
+
+        new_status = self.env['runbot.commit.status'].search([('id', '>', current_max)], order='id')
+        current_max = new_status[-1].id
+        self.assertEqual(new_status.mapped('state'), ['error'])
+        new_build = build1_1._rebuild()
+        self.assertEqual('ok', build1.global_result)
+        self.assertEqual('waiting', build1.global_state)
+
+        self.cr.precommit.run()
+        new_status = self.env['runbot.commit.status'].search([('id', '>', current_max)], order='id')
+        self.assertEqual(new_status.mapped('state'), ['pending'])        
 
     def test_rebuild_sub_sub_build(self):
         build1 = self.Build.create({
@@ -652,10 +696,8 @@ class TestBuildResult(RunbotCase):
         build1_1_1.local_state = 'done'
 
         # simulate scheduler ran
-        build1_1._update_global_state()
-        build1._update_global_state()
-        build1_1._update_global_result()
-        build1._update_global_result()
+        build1_1._update_globals()
+        build1._update_globals()
 
         self.assertEqual('done', build1.global_state)
         self.assertEqual('done', build1_1.global_state)
@@ -671,10 +713,8 @@ class TestBuildResult(RunbotCase):
         build1_1_1.orphan_result = True
 
         # simulate scheduler ran
-        build1_1._update_global_state()
-        build1._update_global_state()
-        build1_1._update_global_result()
-        build1._update_global_result()
+        build1_1._update_globals()
+        build1._update_globals()
 
         self.assertEqual('ok', build1.global_result)
         self.assertEqual('ok', build1_1.global_result)
@@ -688,10 +728,8 @@ class TestBuildResult(RunbotCase):
         rebuild1_1_1.local_state = 'done'
 
         # simulate scheduler ran
-        build1_1._update_global_state()
-        build1._update_global_state()
-        build1_1._update_global_result()
-        build1._update_global_result()
+        build1_1._update_globals()
+        build1._update_globals()
 
         self.assertEqual('ok', build1.global_result)
         self.assertEqual('ok', build1_1.global_result)
@@ -858,19 +896,19 @@ class TestGithubStatus(RunbotCase):
         def github_status(build):
             self.callcount += 1
 
-        with patch('odoo.addons.runbot.models.build.BuildResult._github_status', github_status):
+        with patch('odoo.addons.runbot.models.build.BuildResult._prepare_github_status', github_status):
             self.callcount = 0
             self.build.local_state = 'testing'
             self.assertEqual(self.build.global_state, 'testing')
 
-            self.assertEqual(self.callcount, 0, "_github_status shouldn't have been called")
+            self.assertEqual(self.callcount, 0, "_prepare_github_status shouldn't have been called")
 
             self.callcount = 0
             self.build.local_state = 'running'
             self.assertEqual(self.build.global_state, 'running')
 
-            self.assertEqual(self.callcount, 1, "_github_status should have been called")
+            self.assertEqual(self.callcount, 1, "_prepare_github_status should have been called")
 
             self.callcount = 0
             self.build.local_state = 'done'
-            self.assertEqual(self.callcount, 0, "_github_status shouldn't have been called")
+            self.assertEqual(self.callcount, 0, "_prepare_github_status shouldn't have been called")

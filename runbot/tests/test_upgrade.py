@@ -575,8 +575,8 @@ class TestUpgradeFlow(RunbotCase):
                 # self.assertEqual(current_build.global_result, 'ok')
 
         # simulate scheduler ran
-        from_version_builds._update_global_state()
-        to_version_builds._update_global_state()
+        from_version_builds._update_globals()
+        to_version_builds._update_globals()
 
         self.assertEqual(from_version_builds.mapped('global_state'), ['done'] * 10)
 

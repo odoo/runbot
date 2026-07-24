@@ -390,7 +390,7 @@ class BuildResult(models.Model):
         for record in self:
             record.host_id = get_host(record.host)
 
-    def _update_global_state(self):
+    def _update_globals(self):
         for record in self:
             waiting_score = record._get_state_score('waiting')
             children_ids = [child for child in record.children_ids if not child.orphan_result]
@@ -403,8 +403,6 @@ class BuildResult(models.Model):
             else:
                 record.global_state = record.local_state
 
-    def _update_global_result(self):
-        for record in self:
             if record.local_result and record._get_result_score(record.local_result) >= record._get_result_score('ko'):
                 record.global_result = record.local_result
             else:
@@ -510,8 +508,7 @@ class BuildResult(models.Model):
         # so we can assume that we don't need to update the created records globals,
         # but we need to update the parents global state and result as the new build can impact them
         if parents:
-            parents._update_global_state()
-            parents._update_global_result()
+            parents._update_globals()
         return records
 
     def write(self, values):
@@ -535,19 +532,16 @@ class BuildResult(models.Model):
             init_local_states = self.mapped('local_state')
 
         res = super(BuildResult, self).write(values)
-        if 'local_state' in values:
-            self._update_global_state()
-        if 'local_result' in values:
-            self._update_global_result()
+        if 'local_state' in values or 'local_result' in values:
+            self._update_globals()
 
         if 'orphan_result' in values:
-            self.parent_id._update_global_result()
-            self.parent_id._update_global_state()
+            self.parent_id._update_globals()
 
         if "global_result" in values:
             for init_global_result, build in zip(init_global_results, self):
                 if init_global_result != build.global_result:
-                    build._github_status()
+                    build._prepare_github_status()
 
         if "local_state" in values:
             for init_local_state, build in zip(init_local_states, self):
@@ -557,7 +551,7 @@ class BuildResult(models.Model):
         if "global_state" in values:
             for init_global_state, build in zip(init_global_states, self):
                 if init_global_state not in ('done', 'running') and build.global_state in ('done', 'running'):
-                    build._github_status()
+                    build._prepare_github_status()
 
         return res
 
@@ -693,11 +687,11 @@ class BuildResult(models.Model):
                 'parent_id': self.parent_id.id,
                 'description': self.description,
             })
-            self.orphan_result = True
-
+        
         new_build = self.create(values)
         if self.parent_id:
-            new_build._github_status()  # not sure this is needed since creating a child should trigger an update of parent global state.
+            self.orphan_result = True
+
         user = self.env.user
         new_build._log('rebuild', 'Rebuild initiated by %s%s' % (user.name, (' :%s' % message) if message else ''))
 
@@ -1682,6 +1676,36 @@ class BuildResult(models.Model):
                 title += f'\n{test_line}: {test_data[test_line]}'
         return title
 
+    def _prepare_github_status(self):
+        """Queue a github status recomputation on transaction precommit."""
+        if not self:
+            return
+        for build in self:
+            if build.parent_id:
+                if build.orphan_result:
+                    _logger.info('Skipping result for orphan build %s', build.id)
+                else:
+                    build.parent_id._prepare_github_status()
+                continue
+
+            env = build.env
+            cr = env.cr
+            cache_key = '_runbot_pending_github_status_build_ids'
+            pending_ids = cr.cache.get(cache_key)
+            if pending_ids is None:
+                pending_ids = set()
+                cr.cache[cache_key] = pending_ids
+                def _flush_github_status():
+                    ids = list(cr.cache.get(cache_key, set()))
+                    cr.cache[cache_key] = None
+                    if ids:
+                        for build in env['runbot.build'].browse(ids).exists():
+                            build._github_status()
+
+                cr.precommit.add(_flush_github_status)
+
+            pending_ids.add(build.id)
+
     def _github_status(self):
         """Notify github of failed/successful builds"""
         for build in self:
@@ -1706,7 +1730,7 @@ class BuildResult(models.Model):
                     desc = "This build used a light config. Enable default build configuration to restore default ci"
                 if build.global_result in ('ko', 'warn'):
                     state = 'error'
-                elif build.global_state in ('pending', 'testing'):
+                elif build.global_state in ('pending', 'testing', 'waiting'):
                     state = 'pending'
                 elif build.global_state in ('running', 'done'):
                     state = 'error'
@@ -1753,9 +1777,9 @@ class BuildResult(models.Model):
                     if trigger.ci_url:
                         target_url = trigger.ci_url
                     elif batch:
-                        target_url = f"{self.get_base_url()}/runbot/batch/{batch.id}/build/{build.id}"
+                        target_url = f"{build.get_base_url()}/runbot/batch/{batch.id}/build/{build.id}"
                     else:
-                        target_url = f"{self.get_base_url()}/runbot/build/{build.id}"
+                        target_url = f"{build.get_base_url()}/runbot/build/{build.id}"
 
                     commit._github_status(build, ci_context, state, target_url, desc, ci_strategy=trigger.ci_strategy)
 

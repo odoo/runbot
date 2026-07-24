@@ -316,7 +316,7 @@ class TestBuildConfigStepCreate(TestBuildConfigStepCommon):
             self.assertEqual(child_build.global_result, 'ko')
 
         # simulate sheduler ran
-        self.parent_build._update_global_result()
+        self.parent_build._update_globals()
 
         self.assertEqual(self.parent_build.global_result, 'ko')
 

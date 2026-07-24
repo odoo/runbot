@@ -66,6 +66,7 @@ class TestBatch(RunbotCase):
         self.assertEqual(build_2.params_id._get_batch_commit_link_ids(batch_4).commit_id.name, 'bbbbbb2')
 
         def assert_status_info(commit):
+            self.env.cr.precommit.run()
             infos = commit._get_last_statuses()[1]['test']
             parts = infos.target_url.split('/')
             return {
