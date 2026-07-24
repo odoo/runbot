@@ -404,7 +404,7 @@
                         </li>
                         <li t-attf-t-if="host and log_list[0]"><hr class="dropdown-divider"/></li>
                         <li t-attf-t-if="host" t-attf-t-foreach="log_list" t-attf-t-as="log_name">
-                            <a class="dropdown-item" href="{{log_url}}/runbot/static/build/{{dest}}/logs/{{log_name}}.txt">
+                            <a class="dropdown-item" href="http://{{host}}/runbot/static/build/{{dest}}/logs/{{log_name}}.txt">
                                 <i class="fa fa-fw fa-file-text-o"/> Full {{log_name}} logs
                             </a>
                         </li>
@@ -444,7 +444,6 @@
                 t-att-data-description="bu.description or ''"
                 t-att-data-log_list="json.dumps(bu.log_list.split(',') if bu.log_list else [])"
                 t-att-data-host="bu.host"
-                t-att-data-log_url="'http://%s' % bu.host if bu.host != fqdn else ''"
             >
                 <i t-attf-class="fa {{'fa-spinner' if bu.global_state == 'pending' else 'fa-cog'}} fa-fw"/>
             </build-options-dropdown>
