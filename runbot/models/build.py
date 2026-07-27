@@ -1702,6 +1702,14 @@ class BuildResult(models.Model):
 
             pending_ids.add(build.id)
 
+    def _get_ci_status(self):
+        self.ensure_one()
+        if self.global_result != 'ok':
+            return 'error'
+        elif self.global_state in ('running', 'done'):
+            return 'success'
+        return 'pending'
+
     def _send_ci_status(self):
         """Notify github of failed/successful builds"""
         for build in self:
@@ -1709,28 +1717,9 @@ class BuildResult(models.Model):
                 continue
             else:
                 trigger = build.params_id.trigger_id
-                ci_context = trigger.ci_context
-                if not ci_context:
+                if not trigger.ci_context:
                     continue
-                ci_context_suffix = ''
-                desc = trigger.ci_description or " (runtime %ss)" % (build.job_time,)
-                if build.params_id.used_custom_trigger:
-                    ci_context_suffix += " (custom)"
-                    desc = "This build used custom config. Remove custom trigger to restore default ci"
-                if build.params_id.config_id == build.trigger_id.light_config_id:
-                    ci_context_suffix += " (light)"
-                    desc = "This build used a light config. Enable default build configuration to restore default ci"
-                if build.global_result in ('ko', 'warn'):
-                    state = 'error'
-                elif build.global_state in ('pending', 'testing', 'waiting'):
-                    state = 'pending'
-                elif build.global_state in ('running', 'done'):
-                    state = 'error'
-                    if build.global_result == 'ok':
-                        state = 'success'
-                else:
-                    _logger.info("skipping github status for build %s ", build.id)
-                    continue
+                ci_status = build._get_ci_status()
 
                 repo_ids_to_notify = {}
                 batch_per_commit = {}
@@ -1739,18 +1728,14 @@ class BuildResult(models.Model):
                     if (trigger.ci_send_all or (commit.repo_id in trigger.repo_ids)):
                         repo_ids_to_notify[commit.repo_id.id] = commit.tree_hash
 
-                batches = build.slot_ids.batch_id
-                # not sure for this part: only send status if batch is the last_batch. Will avoid to send useless status, status of killed builds, ....
-                # we could have a special case if the last_batch is preparing and the new build is linked to the one that just sent a status,
-                # but we send the status when linking a build and it should be enough for this corner case. If the build is not linked, the result
-                # is not relevant.
-                # one problem is that we may not have a status for a commit that is not in the last batch, mainly problematic for sticky
-
-                last_batches = batches.bundle_id.last_batch
-                sticky_batches = batches.filtered(lambda b: b.bundle_id.sticky)
-                if batches - last_batches:
-                    _logger.info("skipping github status for some batches %s, not the last batch", batches - last_batches)
-                batches = (batches & last_batches) | sticky_batches
+                # get all batches that are either the last batch of a bundle, or a sticky batch
+                all_batches = build.slot_ids.batch_id
+                last_batches = all_batches.bundle_id.last_batch  # we could find batches attached to the same params
+                sticky_batches = all_batches.filtered(lambda b: b.bundle_id.sticky)
+                batches = (all_batches & last_batches) | sticky_batches
+                skipped_batches = all_batches - batches
+                if skipped_batches:
+                    _logger.info("skipping github status for some batches %s, not the last batch", skipped_batches)
 
                 batches = batches.sorted(lambda b: (b.bundle_id.sticky, b.id))
 
@@ -1764,17 +1749,37 @@ class BuildResult(models.Model):
                                 _logger.warning("commit for repo %s in batch %s (%s) does not match build %s treehash (%s), something strange happened", repo.id, batch.id, commit.tree_hash, self.id, original_tree_hash)
                                 continue
                             batch_per_commit[commit_link.commit_id] = batch
-
                 for commit, batch in batch_per_commit.items():
-                    if trigger.ci_url:
-                        target_url = trigger.ci_url
-                    elif batch:
-                        target_url = f"{build.get_base_url()}/runbot/batch/{batch.id}/build/{build.id}"
-                    else:
-                        target_url = f"{build.get_base_url()}/runbot/build/{build.id}"
-                    for ci_context in trigger.ci_context.split(','):
-                        ci_context = ci_context.strip() + ci_context_suffix
-                        commit._send_ci_status(build, ci_context, state, target_url, desc, ci_strategy=trigger.ci_strategy)
+                    self._add_status_to_send(commit, batch, ci_status)
+
+    def _get_ci_contexts(self):
+        trigger = self.params_id.trigger_id
+        ci_context_suffix = ''
+        description = trigger.ci_description or " (runtime %ss)" % (self.job_time,)
+        if self.params_id.used_custom_trigger:
+            ci_context_suffix += " (custom)"
+            description = "This build used custom config. Remove custom trigger to restore default ci"
+        if self.params_id.config_id == self.trigger_id.light_config_id:
+            ci_context_suffix += " (light)"
+            description = "This build used a light config. Enable default build configuration to restore default ci"
+
+        for trigger_ci_context in trigger.ci_context.strip().split(','):
+            ci_context = trigger_ci_context + ci_context_suffix
+            yield ci_context, description
+
+    def _add_status_to_send(self, commit, batch, state):
+        trigger = self.params_id.trigger_id
+        self.ensure_one()
+
+        if trigger.ci_url:
+            target_url = trigger.ci_url
+        elif batch:
+            target_url = f"{self.get_base_url()}/runbot/batch/{batch.id}/build/{self.id}"
+        else:
+            target_url = f"{self.get_base_url()}/runbot/build/{self.id}"
+
+        for ci_context, description in self._get_ci_contexts():
+            commit._send_ci_status(self, ci_context, state, target_url, description=description, ci_strategy=trigger.ci_strategy)
 
     def _parse_config(self):
         return set(findall(self._server("tools/config.py"), r'--[\w-]+', ))

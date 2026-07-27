@@ -219,10 +219,6 @@ class Commit(models.Model):
             commit.dname = '%s:%s' % (commit.repo_id.name, commit.name[:8])
 
     def _send_ci_status(self, build, context, state, target_url, description=None, ci_strategy="all"):
-        if state == 'failure':
-            state = 'error'  # github does not make a big difference between error and failure, lets simplify
-        self.ensure_one()
-        build_id = build.id if build else False
         Status = self.env['runbot.commit.status']
         last_status = Status.search([('commit_id', '=', self.id), ('context', '=', context)], order='id desc', limit=1)
         if last_status and last_status.state == state:
@@ -230,15 +226,15 @@ class Commit(models.Model):
             return
 
         if ci_strategy != 'all' and state == 'pending':
-            _logger.debug("skipping github pending status for build %s and ci %s", build_id, context)
+            _logger.debug("skipping github pending status for commit %s and ci %s", self.name, context)
             return
 
         if ci_strategy == 'errors' and state != 'error' and last_status.state not in ('error', 'failure'):
-            _logger.info("skipping github status for build %s, ci_strategy is failures", build_id)
+            _logger.info("skipping github status for commit %s, ci_strategy is failures", self.name)
             return
 
         last_status = Status.create({
-            'build_id': build_id,
+            'build_id': build.id if build else False,
             'commit_id': self.id,
             'context': context,
             'state': state,
@@ -305,7 +301,7 @@ class CommitStatus(models.Model):
     def _send(self):
         session_cache = {}
         processed = set()
-        for commit_status in self.sorted(lambda cs: (cs.create_date, cs.id), reverse=True): # ensure most recent are processed first
+        for commit_status in self.sorted(lambda cs: (cs.create_date, cs.id), reverse=True):  # ensure most recent are processed first
             commit_status.to_process = False
             # only send the last status for each commit+context
             key = (commit_status.context, commit_status.commit_id.name)
@@ -317,6 +313,7 @@ class CommitStatus(models.Model):
                     'target_url': commit_status.target_url,
                     'description': commit_status.description,
                 }
+                # send on remotes
                 for remote in commit_status.commit_id.repo_id.remote_ids.filtered('send_status'):
                     if not remote.token:
                         _logger.warning('No token on remote %s, skipping status', remote.mapped("name"))

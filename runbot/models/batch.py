@@ -21,6 +21,7 @@ class Batch(models.Model):
     slot_ids = fields.One2many('runbot.batch.slot', 'batch_id')
     all_build_ids = fields.Many2many('runbot.build', compute='_compute_all_build_ids', help="Recursive builds")
     state = fields.Selection([('preparing', 'Preparing'), ('ready', 'Ready'), ('done', 'Done'), ('skipped', 'Skipped')])
+    last_ci = fields.Char('Last ci', help="Last notified ci of the batch")
     priority_level = fields.Integer("Priority level", help="Priority level of the batch, determined from the create date and the bundle priority offset. The lower, the higher priority.")
     hidden = fields.Boolean('Hidden', default=False)
     age = fields.Integer(compute='_compute_age', string='Build age')
@@ -137,7 +138,22 @@ class Batch(models.Model):
                     batch._log('Batch done')
                     batch.state = 'done'
                     processed |= batch
+            batch._update_ci_summary()
         return processed
+
+    def _update_ci_summary(self):
+        statuses = [{
+            'trigger_id': slot.trigger_id.id,
+            'result': slot.build_id._get_ci_status(),
+        } for slot in self.slot_ids if slot.build_id]
+
+        summary = {
+            'batch_id': self.id,
+            'statuses': statuses,
+        }
+        if self.last_ci != summary:
+            self.last_ci = summary
+            
 
     def _create_build(self, params, slot):
         """
@@ -627,3 +643,57 @@ class BatchSlot(models.Model):
         self.batch_id._log(f'Trigger {self.trigger_id.name} was started by {self.env.user.name}')
         self.batch_id._create_build(self.params_id, self)
         return self.build_id
+class CommitStatus(models.Model):
+    _name = 'runbot.commit.status'
+    _description = 'Commit status'
+    _order = 'id desc'
+
+    commit_id = fields.Many2one('runbot.commit', string='Commit', required=True, index=True)
+    context = fields.Char('Context', required=True)
+    state = fields.Char('State', required=True, copy=True)
+    build_id = fields.Many2one('runbot.build', string='Build', index=True)
+    target_url = fields.Char('Url')
+    description = fields.Char('Description')
+    sent_date = fields.Datetime('Sent Date')
+    to_process = fields.Boolean('Status was not processed yet', index=True)
+
+    def _send_to_process(self):
+        commits_status = self.search([('to_process', '=', True), ('build_id.create_date', '<', datetime.datetime.now() - datetime.timedelta(minutes=2))], order='create_date DESC, id DESC')
+        if commits_status:
+            _logger.info('Sending %s commit status', len(commits_status))
+            commits_status._send()
+
+    def _send(self):
+        session_cache = {}
+        processed = set()
+        for commit_status in self.sorted(lambda cs: (cs.create_date, cs.id), reverse=True):  # ensure most recent are processed first
+            commit_status.to_process = False
+            # only send the last status for each commit+context
+            key = (commit_status.context, commit_status.commit_id.name)
+            if key not in processed:
+                processed.add(key)
+                status = {
+                    'context': commit_status.context,
+                    'state': commit_status.state,
+                    'target_url': commit_status.target_url,
+                    'description': commit_status.description,
+                }
+                # send on remotes
+                for remote in commit_status.commit_id.repo_id.remote_ids.filtered('send_status'):
+                    if not remote.token:
+                        _logger.warning('No token on remote %s, skipping status', remote.mapped("name"))
+                    else:
+                        if remote.token not in session_cache:
+                            session_cache[remote.token] = make_github_session(remote.token)
+                        session = session_cache[remote.token]
+                        _logger.info(
+                            "github updating %s status %s to %s in repo %s",
+                            status['context'], commit_status.commit_id.name, status['state'], remote.name)
+                        remote._github('/repos/:owner/:repo/statuses/%s' % commit_status.commit_id.name,
+                            status,
+                            ignore_errors=True,
+                            session=session
+                        )
+                commit_status.sent_date = datetime.datetime.now()
+            else:
+                _logger.info('Skipping outdated status for %s %s', commit_status.context, commit_status.commit_id.name)

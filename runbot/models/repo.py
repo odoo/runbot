@@ -683,7 +683,7 @@ class Repo(models.Model):
                 if branch.reference_name and branch.remote_id and branch.remote_id.repo_id._is_branch_forbidden(branch.reference_name):
                     message = "This branch name is incorrect. Branch name should be prefixed with a valid version"
                     message = branch.remote_id.repo_id.invalid_branch_message or message
-                    branch.head._send_ci_status(False, "Branch naming", 'failure', False, message)
+                    branch.head._send_ci_status(False, "Branch naming", 'error', False, message)
 
                 bundle = branch.bundle_id
                 if bundle.no_build:
