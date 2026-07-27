@@ -1677,15 +1677,10 @@ class BuildResult(models.Model):
         return title
 
     def _prepare_github_status(self):
-        """Queue a github status recomputation on transaction precommit."""
         if not self:
             return
         for build in self:
             if build.parent_id:
-                if build.orphan_result:
-                    _logger.info('Skipping result for orphan build %s', build.id)
-                else:
-                    build.parent_id._prepare_github_status()
                 continue
 
             env = build.env
@@ -1695,6 +1690,7 @@ class BuildResult(models.Model):
             if pending_ids is None:
                 pending_ids = set()
                 cr.cache[cache_key] = pending_ids
+
                 def _flush_github_status():
                     ids = list(cr.cache.get(cache_key, set()))
                     cr.cache[cache_key] = None
@@ -1709,12 +1705,8 @@ class BuildResult(models.Model):
     def _github_status(self):
         """Notify github of failed/successful builds"""
         for build in self:
-            # TODO maybe avoid to send status if build is killable (another new build exist and will send the status)
             if build.parent_id:
-                if build.orphan_result:
-                    _logger.info('Skipping result for orphan build %s', build.id)
-                else:
-                    build.parent_id._github_status()
+                continue
             else:
                 trigger = build.params_id.trigger_id
                 ci_context = trigger.ci_context
