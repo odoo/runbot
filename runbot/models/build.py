@@ -1677,12 +1677,12 @@ class BuildResult(models.Model):
         return title
 
     def _prepare_github_status(self):
+        """Queue a github status recomputation on transaction precommit for this build."""
         if not self:
             return
         for build in self:
             if build.parent_id:
                 continue
-
             env = build.env
             cr = env.cr
             cache_key = '_runbot_pending_github_status_build_ids'
@@ -1712,13 +1712,13 @@ class BuildResult(models.Model):
                 ci_context = trigger.ci_context
                 if not ci_context:
                     continue
-
+                ci_context_suffix = ''
                 desc = trigger.ci_description or " (runtime %ss)" % (build.job_time,)
                 if build.params_id.used_custom_trigger:
-                    ci_context += " (custom)"
+                    ci_context_suffix += " (custom)"
                     desc = "This build used custom config. Remove custom trigger to restore default ci"
                 if build.params_id.config_id == build.trigger_id.light_config_id:
-                    ci_context += " (light)"
+                    ci_context_suffix += " (light)"
                     desc = "This build used a light config. Enable default build configuration to restore default ci"
                 if build.global_result in ('ko', 'warn'):
                     state = 'error'
@@ -1772,8 +1772,9 @@ class BuildResult(models.Model):
                         target_url = f"{build.get_base_url()}/runbot/batch/{batch.id}/build/{build.id}"
                     else:
                         target_url = f"{build.get_base_url()}/runbot/build/{build.id}"
-
-                    commit._github_status(build, ci_context, state, target_url, desc, ci_strategy=trigger.ci_strategy)
+                    for ci_context in trigger.ci_context.split(','):
+                        ci_context = ci_context.strip() + ci_context_suffix
+                        commit._github_status(build, ci_context, state, target_url, desc, ci_strategy=trigger.ci_strategy)
 
     def _parse_config(self):
         return set(findall(self._server("tools/config.py"), r'--[\w-]+', ))

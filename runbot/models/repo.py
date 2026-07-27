@@ -81,7 +81,7 @@ class Trigger(models.Model):
     batch_dependent = fields.Boolean('Batch Dependent', help="Force adding batch in build parameters to make it unique and give access to bundle")
     version_dependent = fields.Boolean('Version Dependent', default=True, help="Add the version in build parameters. Uncheck if the version is not needed to determine the build result")
 
-    ci_context = fields.Char("CI context", tracking=True)
+    ci_context = fields.Char("CI context", tracking=True, help="comma separated list of context to use when sending github status")
     category_id = fields.Many2one('runbot.category', default=lambda self: self.env.ref('runbot.default_category', raise_if_not_found=False))
     version_domain = fields.Char(string="Version domain")
     on_staging = fields.Boolean('Run on staging', default=True)
