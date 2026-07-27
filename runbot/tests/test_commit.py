@@ -119,81 +119,81 @@ class TestCommitStatus(HttpCase):
             return self.env['runbot.commit.status'].search([('commit_id', '=', commit.id), ('context', '=', context())], order='id desc', limit=1) or self.env['runbot.commit.status']
 
         # pending
-        new_status = commit._github_status(False, context(), 'pending', '', description=None, ci_strategy=ci_strategy)
+        new_status = commit._send_ci_status(False, context(), 'pending', '', description=None, ci_strategy=ci_strategy)
         self.assertEqual(last_status().state, 'pending')
         self.assertEqual(new_status, last_status())
         # success
-        new_status = commit._github_status(False, context(), 'success', '', description=None, ci_strategy=ci_strategy)
+        new_status = commit._send_ci_status(False, context(), 'success', '', description=None, ci_strategy=ci_strategy)
         self.assertEqual(last_status().state, 'success')
         self.assertEqual(new_status, last_status())
         # pending
-        new_status = commit._github_status(False, context(), 'pending', '', description=None, ci_strategy=ci_strategy)
+        new_status = commit._send_ci_status(False, context(), 'pending', '', description=None, ci_strategy=ci_strategy)
         self.assertEqual(last_status().state, 'pending')
         self.assertEqual(new_status, last_status())
         # error
-        new_status = commit._github_status(False, context(), 'error', '', description=None, ci_strategy=ci_strategy)
+        new_status = commit._send_ci_status(False, context(), 'error', '', description=None, ci_strategy=ci_strategy)
         self.assertEqual(last_status().state, 'error')
         self.assertEqual(new_status, last_status())
         # error again (skipped)
-        new_status = commit._github_status(False, context(), 'error', '', description=None, ci_strategy=ci_strategy)
+        new_status = commit._send_ci_status(False, context(), 'error', '', description=None, ci_strategy=ci_strategy)
         self.assertEqual(last_status().state, 'error')
         self.assertEqual(new_status, None)
 
         ci_strategy = "no_pending"
 
         # pending (skipped)
-        new_status = commit._github_status(False, context(), 'pending', '', description=None, ci_strategy=ci_strategy)
+        new_status = commit._send_ci_status(False, context(), 'pending', '', description=None, ci_strategy=ci_strategy)
         self.assertEqual(new_status, None)
         self.assertEqual(last_status().state, False)
 
         # success
-        new_status = commit._github_status(False, context(), 'success', '', description=None, ci_strategy=ci_strategy)
+        new_status = commit._send_ci_status(False, context(), 'success', '', description=None, ci_strategy=ci_strategy)
         self.assertEqual(new_status, last_status())
         self.assertEqual(last_status().state, 'success')
 
         # error
-        new_status = commit._github_status(False, context(), 'error', '', description=None, ci_strategy=ci_strategy)
+        new_status = commit._send_ci_status(False, context(), 'error', '', description=None, ci_strategy=ci_strategy)
         self.assertEqual(new_status, last_status())
         self.assertEqual(last_status().state, 'error')
 
         # pending (skipped)
-        new_status = commit._github_status(False, context(), 'pending', '', description=None, ci_strategy=ci_strategy)
+        new_status = commit._send_ci_status(False, context(), 'pending', '', description=None, ci_strategy=ci_strategy)
         self.assertEqual(new_status, None)
         self.assertEqual(last_status().state, 'error')
 
         # error again (skipped)
-        new_status = commit._github_status(False, context(), 'error', '', description=None, ci_strategy=ci_strategy)
+        new_status = commit._send_ci_status(False, context(), 'error', '', description=None, ci_strategy=ci_strategy)
         self.assertEqual(last_status().state, 'error')
         self.assertEqual(new_status, None)
 
         ci_strategy = "errors"
 
         # pending (skipped)
-        new_status = commit._github_status(False, context(), 'pending', '', description=None, ci_strategy=ci_strategy)
+        new_status = commit._send_ci_status(False, context(), 'pending', '', description=None, ci_strategy=ci_strategy)
         self.assertEqual(new_status, None)
         self.assertEqual(last_status().state, False)
 
         # success (skipped)
-        new_status = commit._github_status(False, context(), 'success', '', description=None, ci_strategy=ci_strategy)
+        new_status = commit._send_ci_status(False, context(), 'success', '', description=None, ci_strategy=ci_strategy)
         self.assertEqual(new_status, None)
         self.assertEqual(last_status().state, False)
 
         # error
-        new_status = commit._github_status(False, context(), 'error', '', description=None, ci_strategy=ci_strategy)
+        new_status = commit._send_ci_status(False, context(), 'error', '', description=None, ci_strategy=ci_strategy)
         self.assertEqual(new_status, last_status())
         self.assertEqual(last_status().state, 'error')
 
         # pending (skipped)
-        new_status = commit._github_status(False, context(), 'pending', '', description=None, ci_strategy=ci_strategy)
+        new_status = commit._send_ci_status(False, context(), 'pending', '', description=None, ci_strategy=ci_strategy)
         self.assertEqual(new_status, None)
         self.assertEqual(last_status().state, 'error')
 
         # error again (skipped)
-        new_status = commit._github_status(False, context(), 'error', '', description=None, ci_strategy=ci_strategy)
+        new_status = commit._send_ci_status(False, context(), 'error', '', description=None, ci_strategy=ci_strategy)
         self.assertEqual(last_status().state, 'error')
         self.assertEqual(new_status, None)
 
         # success (not skipped, reset failure)
-        new_status = commit._github_status(False, context(), 'success', '', description=None, ci_strategy=ci_strategy)
+        new_status = commit._send_ci_status(False, context(), 'success', '', description=None, ci_strategy=ci_strategy)
         self.assertEqual(new_status, last_status())
         self.assertEqual(last_status().state, 'success')

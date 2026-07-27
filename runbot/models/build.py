@@ -541,7 +541,7 @@ class BuildResult(models.Model):
         if "global_result" in values:
             for init_global_result, build in zip(init_global_results, self):
                 if init_global_result != build.global_result:
-                    build._prepare_github_status()
+                    build._prepare_ci_status()
 
         if "local_state" in values:
             for init_local_state, build in zip(init_local_states, self):
@@ -551,7 +551,7 @@ class BuildResult(models.Model):
         if "global_state" in values:
             for init_global_state, build in zip(init_global_states, self):
                 if init_global_state not in ('done', 'running') and build.global_state in ('done', 'running'):
-                    build._prepare_github_status()
+                    build._prepare_ci_status()
 
         return res
 
@@ -1676,7 +1676,7 @@ class BuildResult(models.Model):
                 title += f'\n{test_line}: {test_data[test_line]}'
         return title
 
-    def _prepare_github_status(self):
+    def _prepare_ci_status(self):
         """Queue a github status recomputation on transaction precommit for this build."""
         if not self:
             return
@@ -1685,24 +1685,24 @@ class BuildResult(models.Model):
                 continue
             env = build.env
             cr = env.cr
-            cache_key = '_runbot_pending_github_status_build_ids'
+            cache_key = '_runbot_pending_ci_status_build_ids'
             pending_ids = cr.cache.get(cache_key)
             if pending_ids is None:
                 pending_ids = set()
                 cr.cache[cache_key] = pending_ids
 
-                def _flush_github_status():
+                def _flush_ci_status():
                     ids = list(cr.cache.get(cache_key, set()))
                     cr.cache[cache_key] = None
                     if ids:
                         for build in env['runbot.build'].browse(ids).exists():
-                            build._github_status()
+                            build._send_ci_status()
 
-                cr.precommit.add(_flush_github_status)
+                cr.precommit.add(_flush_ci_status)
 
             pending_ids.add(build.id)
 
-    def _github_status(self):
+    def _send_ci_status(self):
         """Notify github of failed/successful builds"""
         for build in self:
             if build.parent_id:
@@ -1774,7 +1774,7 @@ class BuildResult(models.Model):
                         target_url = f"{build.get_base_url()}/runbot/build/{build.id}"
                     for ci_context in trigger.ci_context.split(','):
                         ci_context = ci_context.strip() + ci_context_suffix
-                        commit._github_status(build, ci_context, state, target_url, desc, ci_strategy=trigger.ci_strategy)
+                        commit._send_ci_status(build, ci_context, state, target_url, desc, ci_strategy=trigger.ci_strategy)
 
     def _parse_config(self):
         return set(findall(self._server("tools/config.py"), r'--[\w-]+', ))

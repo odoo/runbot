@@ -893,22 +893,22 @@ class TestGithubStatus(RunbotCase):
     def test_change_state(self):
         self.callcount = 0
 
-        def github_status(build):
+        def ci_status(build):
             self.callcount += 1
 
-        with patch('odoo.addons.runbot.models.build.BuildResult._prepare_github_status', github_status):
+        with patch('odoo.addons.runbot.models.build.BuildResult._prepare_ci_status', ci_status):
             self.callcount = 0
             self.build.local_state = 'testing'
             self.assertEqual(self.build.global_state, 'testing')
 
-            self.assertEqual(self.callcount, 0, "_prepare_github_status shouldn't have been called")
+            self.assertEqual(self.callcount, 0, "_prepare_ci_status shouldn't have been called")
 
             self.callcount = 0
             self.build.local_state = 'running'
             self.assertEqual(self.build.global_state, 'running')
 
-            self.assertEqual(self.callcount, 1, "_prepare_github_status should have been called")
+            self.assertEqual(self.callcount, 1, "_prepare_ci_status should have been called")
 
             self.callcount = 0
             self.build.local_state = 'done'
-            self.assertEqual(self.callcount, 0, "_prepare_github_status shouldn't have been called")
+            self.assertEqual(self.callcount, 0, "_prepare_ci_status shouldn't have been called")

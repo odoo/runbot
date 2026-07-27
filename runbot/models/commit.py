@@ -218,7 +218,7 @@ class Commit(models.Model):
         for commit in self:
             commit.dname = '%s:%s' % (commit.repo_id.name, commit.name[:8])
 
-    def _github_status(self, build, context, state, target_url, description=None, ci_strategy="all"):
+    def _send_ci_status(self, build, context, state, target_url, description=None, ci_strategy="all"):
         if state == 'failure':
             state = 'error'  # github does not make a big difference between error and failure, lets simplify
         self.ensure_one()
