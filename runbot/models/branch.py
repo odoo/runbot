@@ -51,6 +51,8 @@ class Branch(models.Model):
     forwardport_of_id = fields.Many2one('runbot.branch', compute='_compute_forwardport_of_id', string='Forwardport of', store=True, index=True)
     forwardport_ids = fields.One2many('runbot.branch', 'forwardport_of_id', string='Forwardports')
 
+    review_ids = fields.One2many('runbot.team.review', 'branch_id', string='Reviews')
+
     @api.depends('name', 'remote_id.short_name')
     def _compute_dname(self):
         for branch in self:

@@ -11,6 +11,8 @@
                   <span class="text-muted"><t t-out="branch.remote_id.short_name"/>:</span><t t-out="branch.name"/> <i t-if="not branch.alive" title="deleted/closed" class="fa fa-ban text-danger"/>
                   <div class="btn-group" role="group">
                     <a t-att-href="branch.branch_url" class="btn btn-sm text-start" title="View Branch on Github"><i class="fa fa-github"/></a>
+                    <a t-if="branch.is_pr" groups="runbot.group_user" t-attf-href="/runbot/bundle_reviews/{{branch.bundle_id.id}}"
+                      class="btn btn-sm fa fa-list-ul text-start" title="View the files to review of this bundle"/>
                     <a groups="runbot.group_runbot_admin" class="btn btn-sm fa fa-list text-start"
                       t-attf-href="/odoo/branch/{{branch.id}}" target="_blank" title="View Branch in Backend"/>
                   </div>
