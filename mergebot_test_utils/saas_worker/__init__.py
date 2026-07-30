@@ -19,6 +19,7 @@ class Base(models.AbstractModel):
     _inherit = 'base'
 
     def run_crons(self):
+        _logger.info("run crons...")
         builtins.current_date = self.env.context.get('current_date')
         builtins.forwardport_merged_before = self.env.context.get('forwardport_merged_before')
         self.env['ir.cron']._process_jobs(self.env.cr.dbname)
@@ -42,12 +43,13 @@ class IrCron(models.Model):
                     for j in cls._get_all_ready_jobs(cron_cr)
                     if (job := cls._acquire_one_job(cron_cr, (j['id'],)))
                 ), None):
+                    _logger.info("processing job %s...", job['cron_name'])
                     # take into account overridings of _process_job() on that database
                     registry = odoo.registry(db_name)
                     registry[cls._name]._process_job(db, cron_cr, job)
                     cron_cr.commit()
 
-        except psycopg2.ProgrammingError as e:
+        except psycopg2.ProgrammingError:
             raise
         except Exception:
             _logger.warning('Exception in cron:', exc_info=True)
