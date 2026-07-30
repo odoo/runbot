@@ -243,8 +243,8 @@ def test_rejoin_different_batches(env, project, repo_a, repo_b, config):
     with repo_a, repo_b:
         repo_a.make_commits(None, Commit('initial', tree={'master': 'a_0'}), ref='heads/master')
         repo_b.make_commits(None, Commit('initial', tree={'master': 'b_0'}), ref='heads/master')
-        repo_a.make_commits(None, Commit('initial', tree={'other': 'a_0'}), ref='heads/other')
-        repo_b.make_commits(None, Commit('initial', tree={'other': 'b_0'}), ref='heads/other')
+        repo_a.make_commits('master', Commit('initial', tree={'other': 'a_0'}), ref='heads/other')
+        repo_b.make_commits('master', Commit('initial', tree={'other': 'b_0'}), ref='heads/other')
     with repo_a, repo_b:
         pr1 = make_pr(
             repo_a, "foo", [{'x': 'y'}],
@@ -258,6 +258,7 @@ def test_rejoin_different_batches(env, project, repo_a, repo_b, config):
             user=config['role_user']['token'],
             reviewer=config['role_reviewer']['token'],
         )
+        pr2.post_comment("hansen rebase-ff", config['role_reviewer']['token'])
     env.run_crons()
 
     pr1_id = to_pr(env, pr1)
@@ -275,6 +276,21 @@ def test_rejoin_different_batches(env, project, repo_a, repo_b, config):
     env.run_crons()
     assert pr1_id.staging_id and pr2_id.staging_id
     assert pr1_id.staging_id == pr2_id.staging_id
+
+    with repo_a, repo_b:
+        repo_a.post_status('staging.master', 'success')
+        repo_b.post_status('staging.master', 'success')
+    env.run_crons()
+
+    assert repo_a.read_tree(repo_a.commit('master')) == {
+        'master': 'a_0',
+        'x': 'y',
+    }
+    assert repo_b.read_tree(repo_b.commit('master')) == {
+        'master': 'b_0',
+        'other': 'b_0',
+        'x': 'y',
+    }
 
 def test_rejoin_no_duplicates(env, project, repo_a, repo_b, config):
     """An exclusionary subcase of the previous is if the candidate batch for

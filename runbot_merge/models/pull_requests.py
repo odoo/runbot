@@ -1563,6 +1563,8 @@ For your own safety I've ignored *everything in your entire comment*.
             batch = batches.get(batch_key)
             if batch is None:
                 batch = batches[batch_key] = self._get_batch(target=vals['target'], label=vals['label'])
+                repo = self.env['runbot_merge.repository'].browse(vals['repository'])
+                batch.prs[:1].unstage("%s#%s joined to batch", repo.name, vals['number'])
             vals['batch_id'] = batch.id
 
             if 'limit_id' not in vals:
@@ -1672,8 +1674,7 @@ For your own safety I've ignored *everything in your entire comment*.
                     pr.target.display_name,
                     self.env['runbot_merge.branch'].browse(t).display_name,
                 )
-                if (
-                    'batch_id' not in vals
+                if ('batch_id' not in vals
                 and (other_batch := self._get_batch(target=t, label=vals.get('label') or pr.label, create=False))
                 and other_batch != pr.batch_id
                 and not any(p.repository == pr.repository for p in other_batch.prs)
@@ -1681,9 +1682,10 @@ For your own safety I've ignored *everything in your entire comment*.
                     assert len(self) == 1, \
                         "unable to migrate multiple PRs to the same batch"
                     vals['batch_id'] = other_batch.id
+                    other_batch.prs[:1].unstage("%s joined to batch", pr.display_name)
 
             if 'message' in vals:
-                merge_method = vals['merge_method'] if 'merge_method' in vals else pr.merge_method
+                merge_method = vals.get('merge_method', pr.merge_method)
                 if merge_method not in (False, 'rebase-ff') and pr.message != vals['message']:
                     pr.unstage("merge message updated")
 
@@ -1693,10 +1695,11 @@ For your own safety I've ignored *everything in your entire comment*.
                     vals['reviewed_by'] = False
                     remover.create([{'pr_id': pr.id}])
                 case False if pr.closed and not pr.batch_id:
-                    vals['batch_id'] = self._get_batch(
+                    b = vals['batch_id'] = self._get_batch(
                         target=vals.get('target') or pr.target.id,
                         label=vals.get('label') or pr.label,
                     )
+                    b.prs[:1].unstage("%s joined to batch", pr.display_name)
                     remover.search([('pr_id', '=', pr.id)]).unlink()
 
         # if the PR's head is updated, detach (should split off the FP lines as this is not the original code)
