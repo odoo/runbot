@@ -316,15 +316,24 @@ _mb_app = pytest.fixture(
 
 _oauth_test_app = pytest.fixture(build_oauth(), scope='session', name='_oauth_test_app')
 
+
+# app for the "users" / test suite
 _gh_test_app = pytest.fixture(build_app(
     fake_github=True,
     permissions={
+        # create & fork repos
         'administration': 'write',
+        # add content to the repos
         'contents': 'write',
+        # check behaviour
         'deployments': 'read',
         'issues': 'read',
+        # create PRs
         'pull_requests': 'write',
+        # simulate runbot sending statuses
         'statuses': 'write',
+        # read and disable repo hooks
+        'repository_hooks': 'write',
     }
 ), scope='session', name='_gh_test_app')
 
