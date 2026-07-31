@@ -184,7 +184,6 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1</field>
         <field name="layer_type">reference_layer</field>
         <field name="name">Install external_dependencies deps</field>
         <field name="packages">
-            ebaysdk==2.1.5  # no debian package but needed in odoo requirements
             pdf417gen==0.7.1  # needed by l10n_cl_edi
         </field>
         <field name="reference_docker_layer_id" ref="runbot.docker_layer_pip_packages_template"/>
