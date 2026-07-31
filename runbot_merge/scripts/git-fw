@@ -50,8 +50,8 @@ DESCRIPTION
 \tproviding the ability to interactively fix conflicts then push the result
 \tback onto the forward-port branch.
 
-\tIf used with the git-cherry-pick(1) subcommands, forwards them to the
-\tcurrent cherry-pick.
+\tSupports the git-cherry-pick(1) subcommands so that it can properly rewrite
+\tcommit messages when resuming.
 """
 
 
@@ -62,9 +62,11 @@ def main() -> int:
         #     return do(pr)
         case ["redo", pr]:
             threading.Thread(target=check_version, args=(__file__,), daemon=True).start()
-            return redo(pr)
+            exit(redo(pr))
         case [("--continue" | "--skip" | "--abort" | "--quit") as subcommand]:
-            r = run(["git", "cherry-pick", subcommand], env=ENV)
+            r = run(["git", "cherry-pick", subcommand], env=ENV, stderr=PIPE)
+            if r.stderr:
+                sys.stderr.buffer.write(r.stderr.replace(b'git cherry-pick', b'git fw'))
             exit(r.returncode)
         case ["edit", msgpath]:
             return edit(msgpath)
@@ -78,13 +80,13 @@ def main() -> int:
             exit(0)
 
 
-def redo(pr: str) -> int:
+def redo(pr: str) -> int | str:
     repo, number = parse_pr(pr)
 
     print(f"Resolving {repo}#{number}")
     res = info(f"https://mergebot.odoo.com/{repo}/pull/{number}.json")
     if not res["parent"]:
-        exit("not a forward port")
+        return "not a forward port"
     print(".", end="", flush=True)
     parent = info(res["parent"])
     print(".", end="", flush=True)
@@ -106,7 +108,7 @@ def redo(pr: str) -> int:
         devname = res['repository'].replace('odoo/', 'odoo-dev/')
         dev_url, reflist = ls_remote(devname, res['ref'])
         if not reflist:
-            exit(f"\nunable to find ref {res['ref']!r} in {res['repository']!r} or {devname!r}")
+            return f"\nunable to find ref {res['ref']!r} in {res['repository']!r} or {devname!r}"
 
     urls = tuple(
         f"{root}{devname}{ext}"
@@ -119,7 +121,7 @@ def redo(pr: str) -> int:
             remotename = name
             break
     else:
-        exit(f"\nfound {res['ref']!r} in {devname!r} but no configured remote for it")
+        return f"\nfound {res['ref']!r} in {devname!r} but no configured remote for it"
     print(".", end="", flush=True)
 
     r = run(
@@ -127,7 +129,7 @@ def redo(pr: str) -> int:
         stdout=DEVNULL,
     )
     if r.returncode:
-        exit(f"\nunable to retrieve commits of interest from {remotename!r}")
+        return f"\nunable to retrieve commits of interest from {remotename!r}"
     print(".", end="", flush=True)
 
     # list the source's commits
@@ -144,7 +146,7 @@ def redo(pr: str) -> int:
         encoding="utf-8",
     )
     if r.returncode:
-        exit(r.returncode)
+        return r.returncode
     print(".")
     commits = r.stdout.splitlines(keepends=False)
     commitsmap = GIT_DIR.joinpath("FW_CMAP")
@@ -165,10 +167,13 @@ def redo(pr: str) -> int:
         check=True,
     )
     run(["git", "reset", "--hard", merge_base.stdout.strip()], check=True)
-    return run(
+    r = run(
         ["git", "cherry-pick", "-e", f"{commits[0]}~..{commits[-1]}"],
-        env=ENV,
-    ).returncode
+        env=ENV, stderr=PIPE,
+    )
+    if r.stderr:
+        sys.stderr.buffer.write(r.stderr.replace(b'git cherry-pick', b'git fw'))
+    return r.returncode
 
 
 def parse_pr(pr: str) -> tuple[str, str]:
