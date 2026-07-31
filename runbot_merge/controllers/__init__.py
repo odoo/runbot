@@ -133,7 +133,12 @@ class MergebotController(Controller):
                 )
                 return Response(status=403, mimetype="text/plain")
         elif req.headers.get('X-Hub-Signature-256'):
-            _logger.info("No secret for %s but received a signature in:\n%s", repo, req.headers)
+            _logger.warning(
+                "Ignored hook %s with signature but no secret on %s",
+                req.headers.get('X-Github-Delivery'),
+                repo,
+            )
+            return Response(status=501, mimetype="text/plain")
         else:
             _logger.info("No secret or signature for %s", repo)
 
