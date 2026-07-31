@@ -187,6 +187,7 @@ def config(users_file: pathlib.Path) -> dict[str, dict[str, str]]:
             'login': k,
             'token': (e.get('token') or [None])[0],
         }
+        val.setdefault('name', k)
         match r := e.get('role'):
             case 'user' | 'owner':
                 cnf[f'role_{r}'] = val
