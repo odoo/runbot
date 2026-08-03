@@ -106,6 +106,7 @@ class BuildParameters(models.Model):
 
     upgrade_to_build_id = fields.Many2one('runbot.build', index=True)  # use to define sources to use with upgrade script
     upgrade_from_build_id = fields.Many2one('runbot.build', index=True)  # use to download db
+    upgrade_from_slot_id = fields.Many2one('runbot.batch.slot', index=True)  # replaces upgrade_from_build_id when build is not created yet
     dump_db = fields.Many2one('runbot.database', index=True)  # use to define db to download
 
     fingerprint = fields.Char('Fingerprint', compute='_compute_fingerprint', store=True, index=True)
@@ -1395,7 +1396,7 @@ class BuildResult(models.Model):
                 if os.path.isdir(commit._source_path(upgrade_path)):
                     yield os.sep.join([repo_folder, upgrade_path]).strip(os.sep)
 
-    def _upgrade_builds_references(self, refs_batches=None):
+    def _upgrade_slot_references(self, refs_batches=None):
         params = self.params_id
         params.ensure_one()
         trigger = params.trigger_id
@@ -1408,7 +1409,7 @@ class BuildResult(models.Model):
                 self._log('upgrade_builds_references', 'Missing reference batches for %s, getting latest ones: %s' % (', '.join(missing_batches.bundle_id.version_id.mapped('name')), ', '.join([str(b.id) for b in missing_batches])))
                 refs_batches |= missing_batches
 
-        template_builds = self.env['runbot.build']
+        template_slots = self.env['runbot.batch_slots']
         for batch in refs_batches:
             template_build = None
             for slot in batch.slot_ids:
@@ -1416,18 +1417,18 @@ class BuildResult(models.Model):
                     template_build = slot.build_id
                     if not template_build or template_build.local_state != 'done':
                         self._log('', 'Template build in reference batch %s for trigger %s is not done yet', batch.id, template_trigger_id.id)
-                    template_build = slot.build_id
-                    template_builds |= template_build
+                    template_slot = slot.build_id
+                    template_slots |= template_slot
                     break
 
-        return template_builds
+        return template_slots
 
     def get_current_batch_template(self):
         current_batch = self.params_id.create_batch_id
-        template_builds = self._upgrade_builds_references(current_batch)
-        if not template_builds:
+        template_slot = self._upgrade_slot_references(current_batch)
+        if not template_slot:
             self._log('', f'No build template found in batch [{current_batch.id}](/runbot/batch/{current_batch.id})', level='WARNING', log_type='markdown')
-        return template_builds
+        return template_slot
 
     def _get_server_info(self, commit=None):
         commit = commit or self._get_server_commit()
