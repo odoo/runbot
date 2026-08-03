@@ -403,7 +403,7 @@
                             </span>
                         </li>
                     </t>
-                    <li t-attf-t-if="host and log_list[0]"><hr class="dropdown-divider"/></li>
+                    <li t-attf-t-if="host and log_list"><hr class="dropdown-divider"/></li>
                     <li t-attf-t-if="host" t-attf-t-foreach="log_list" t-attf-t-as="log_name">
                         <a class="dropdown-item" href="http://{{host}}/runbot/static/build/{{dest}}/logs/{{log_name}}.txt">
                             <i class="fa fa-fw fa-file-text-o"/> Full {{log_name}} logs
@@ -443,7 +443,7 @@
                 t-att-data-bundle_id="bu.create_batch_id.bundle_id.id or ''"
                 t-att-data-description="bu.description or ''"
                 t-att-data-log_list="json.dumps(bu.log_list.split(',') if bu.log_list else [])"
-                t-att-data-host="bu.host"
+                t-att-data-host="bu.host or ''"
             >
                 <i t-attf-class="fa {{'fa-spinner' if bu.global_state == 'pending' else 'fa-cog'}} fa-fw"/>
             </build-options-dropdown>
