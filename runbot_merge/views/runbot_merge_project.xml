@@ -65,6 +65,8 @@
                                     <field name="lateness_limit"/>
                                     <field name="uniquifier" widget="boolean_toggle"/>
                                     <field name="request_missing_statuses" widget="boolean_toggle"/>
+                                    <field name="staging_pattern"/>
+                                    <field name="staging_sub_pattern"/>
                                 </group>
                             </group>
                         </page>

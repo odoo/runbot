@@ -36,9 +36,12 @@ def make_basic(
         case "runbot":
             staging_statuses = False
             def _post_status(repo, ref, status, context='default', **kw):
-                if ref.startswith(('staging.', 'heads/staging.')):
-                    branchname = ref.removeprefix('heads/').removeprefix('staging.')
-                    st = env['runbot_merge.stagings'].search([('target.name', '=', branchname)])
+                if m := re.search(project.staging_pattern % {
+                    'stage': 'staging',
+                    'target': '(.*?)',
+                    'sub': '',
+                } + '$', ref):
+                    st = env['runbot_merge.stagings'].search([('target.name', '=', m[1])])
                     oid = st.id
                 else:
                     if re.fullmatch(r'[a-z0-9]{40}', ref, flags=re.IGNORECASE):
@@ -69,7 +72,7 @@ def make_basic(
             raise ValueError(f"Unknown staging mode {request.param!r}")
 
     project_name = "someproject"
-    env['runbot_merge.project'].create({
+    project = env['runbot_merge.project'].create({
         'name': project_name,
         'github_token': config['github']['token'],
         'github_prefix': 'hansen',
@@ -111,7 +114,11 @@ class MakeBasic(typing.Protocol):
 #   - a github user to create a repo with
 #   - a github owner to create a repo *for*
 #   - provide ability to create commits, branches, prs, ...
-def test_straightforward_flow(env, config, users, make_basic):
+@pytest.mark.parametrize('staging_pattern', [
+    "%(stage)s.%(target)s%(sub)s",
+    "%(target)s%(sub)s-%(stage)s",
+])
+def test_straightforward_flow(env, config, users, make_basic, staging_pattern):
     # TODO: ~all relevant data in users when creating partners
     # get reviewer's name
     reviewer_name = env['res.partner'].search([
@@ -119,6 +126,9 @@ def test_straightforward_flow(env, config, users, make_basic):
     ]).name
 
     prod, other = make_basic()
+    env['runbot_merge.project'].search([]).write({
+        'staging_pattern': staging_pattern,
+    })
     other_user = config['role_other']
     other_user_repo = prod.fork(token=other_user['token'])
 
@@ -147,7 +157,11 @@ def test_straightforward_flow(env, config, users, make_basic):
 
     env.run_crons()
     with prod:
-        prod.post_status('staging.a', 'success')
+        prod.post_status(staging_pattern % {
+            'stage': 'staging',
+            'target': 'a',
+            'sub': ''
+        }, 'success')
 
     # should merge the staging then create the FP PR
     env.run_crons()
@@ -272,8 +286,16 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     assert pr1.staging_id != pr2.staging_id
     # validate
     with prod:
-        prod.post_status('staging.b', 'success')
-        prod.post_status('staging.c', 'success')
+        prod.post_status(staging_pattern % {
+            'stage': 'staging',
+            'target': 'b',
+            'sub': ''
+        }, 'success')
+        prod.post_status(staging_pattern % {
+            'stage': 'staging',
+            'target': 'c',
+            'sub': ''
+        }, 'success')
 
     # and trigger merge
     env.run_crons()
@@ -284,7 +306,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         message='p_1',
         repo=prod.name,
         number='%s',
-        headers='X-original-commit: {}\n'.format(p_1_merged.id),
+        headers=f'X-original-commit: {p_1_merged.id}\n',
         name=reviewer_name,
         email=config['role_reviewer']['email'],
     )

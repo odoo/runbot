@@ -69,8 +69,20 @@ def get_local(repository, *, clone: bool = True) -> 'Optional[Repo]':
         # but not sure it's worth removing?
         repo = git(repo_dir)
         repo.config('--add', 'remote.origin.fetch', '+refs/heads/*:refs/heads/*')
-        repo.config('--add', 'remote.origin.fetch', '^refs/heads/tmp.*')
-        repo.config('--add', 'remote.origin.fetch', '^refs/heads/staging.*')
+        repo.config('--add', 'remote.origin.fetch', '^refs/heads/{}'.format(
+            repository.project_id.staging_pattern % {
+                'stage': 'tmp',
+                'target': '*',
+                'sub': '',
+            }
+        ))
+        repo.config('--add', 'remote.origin.fetch', '^refs/heads/{}'.format(
+            repository.project_id.staging_pattern % {
+                'stage': 'staging',
+                'target': '*',
+                'sub': '',
+            }
+        ))
         return repo
     else:
         _logger.warning(

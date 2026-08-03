@@ -33,7 +33,7 @@ def status_mode(request, env, project, repo, port, RepoType) -> Iterator[Literal
     # apparently side_effect + wraps on unbound method don't work correctly,
     # the wrapped method does get called when returning DEFAULT but *the
     # instance (subject) is not sent along for the ride* so the call fails.
-    post_status = RepoType.post_status
+    # post_status = RepoType.post_status
     match request.param:
         case "statuses":
             project.write({"staging_statuses": True})
@@ -42,9 +42,12 @@ def status_mode(request, env, project, repo, port, RepoType) -> Iterator[Literal
         case "runbot":
             project.write({"staging_statuses": False})
             def _post_status(repo, ref, status, context='default', **kw):
-                if ref.startswith(('staging.', 'heads/staging.')):
-                    branchname = ref.removeprefix('heads/').removeprefix('staging.')
-                    st = env['runbot_merge.stagings'].search([('target.name', '=', branchname)])
+                if m := re.search(project.staging_pattern % {
+                    'stage': 'staging',
+                    'target': '(.*?)',
+                    'sub': '',
+                } + '$', ref):
+                    st = env['runbot_merge.stagings'].search([('target.name', '=', m[1])])
                     oid = st.id
                 else:
                     if re.fullmatch(r'[a-z0-9]{40}', ref, flags=re.IGNORECASE):
@@ -77,8 +80,13 @@ def status_mode(request, env, project, repo, port, RepoType) -> Iterator[Literal
         yield request.param
 
 
-def test_trivial_flow(env, repo, page, users, config, project, partners, status_mode):
+@pytest.mark.parametrize('staging_pattern,staging_branch', [
+    ("%(stage)s.%(target)s%(sub)s", "staging.master"),
+    ("%(target)s%(sub)s-%(stage)s", "master-staging"),
+])
+def test_trivial_flow(env, repo, page, users, config, project, partners, status_mode, staging_pattern, staging_branch):
     project.repo_ids.required_statuses = 'legal/cla,ci/runbot'
+    project.staging_pattern = staging_pattern
     # create base branch
     with repo:
         [m] = repo.make_commits(None, Commit("initial", tree={'a': 'some content'}), ref='heads/master')
@@ -136,16 +144,15 @@ def test_trivial_flow(env, repo, page, users, config, project, partners, status_
     assert pr_id.state == 'ready'
 
     # can't check labels here as running the cron will stage it
-
     env.run_crons()
     assert pr_id.staging_id
     assert pr_page(page, pr).cssselect('.alert-primary')
 
     with repo:
-        repo.post_status('staging.master', 'success', 'ci/runbot', target_url='http://foo.com/pog')
-        repo.post_status('staging.master', 'success', 'legal/cla')
+        repo.post_status(staging_branch, 'success', 'ci/runbot', target_url='http://foo.com/pog')
+        repo.post_status(staging_branch, 'success', 'legal/cla')
         # the should not block the merge because it's not part of the requirements
-        repo.post_status('staging.master', 'failure', 'ci/lint', target_url='http://ignored.com/whocares')
+        repo.post_status(staging_branch, 'failure', 'ci/lint', target_url='http://ignored.com/whocares')
     # need to store this because after the crons have run the staging will
     # have succeeded and been disabled
     st = pr_id.staging_id

@@ -547,6 +547,8 @@ def test_prestage(env, project, repo, users, config):
     """If prestaging is enabled, and the threshold is passed, the mergebot
     should immediately create a sub-staging (3) for the still-available PRs
     """
+    project.staging_pattern = "%(target)s%(sub)s-%(stage)s"
+    project.staging_sub_pattern = '-%(sub)s'
     project.batch_limit = 1
     project.branch_ids.optimistic_staging_threshold = 1
     with repo:
@@ -557,8 +559,8 @@ def test_prestage(env, project, repo, users, config):
     env.run_crons()
 
     with repo:
-        repo.post_status('staging.master', 'success')
-        next_tree = repo.commit('staging.master.3').tree
+        repo.post_status('master-staging', 'success')
+        next_tree = repo.commit('master-3-staging').tree
     env.run_crons()
 
     staging = env['runbot_merge.stagings'].search([])

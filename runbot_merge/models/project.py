@@ -28,6 +28,20 @@ class Project(models.Model):
         "target branches of PR this project handles."
     )
     staging_enabled = fields.Boolean(default=True)
+    staging_pattern = fields.Char(
+        required=True,
+        default="%(stage)s.%(target)s%(sub)s",
+        help="""\
+Pattern for the naming of the staging branches. Editing this will switch over
+every staging branch instantaneously, so any existing staging will be extremely
+confused (and will probably timeout).
+
+- `stage` is either tmp or staging, it must be either at the start or end of the pattern
+- `target` is the target branch
+- `sub` is the sub-staging, used for presplits and optimistic secondary stagings
+"""
+    )
+    staging_sub_pattern = fields.Char(required=True, default=".%(sub)s")
     staging_priority = fields.Selection([
         ('default', "Splits over ready PRs"),
         ('largest', "Largest of split and ready PRs"),
@@ -59,7 +73,8 @@ class Project(models.Model):
              " (default=always staged), on large project when a PR is too old"
              " it's increasingly likely that it will have logical (even if not"
              " physical) conflicts with the target causing staging failures."
-             " WARNING: because in Odoo null ~ 0, the comparison is done via `<`"
+             "\n\n"
+             "WARNING: because in Odoo null ~ 0, the comparison is done via `<`"
              " to support a strict \"PR must be up to date\" policy.",
     )
 

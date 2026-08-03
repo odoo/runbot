@@ -215,26 +215,37 @@ For-Commit-Id: {it.head}
         'losses': list(originals - set(staged.ids)) or None,
     })
 
+    pattern = branch.project_id.staging_pattern
+    tmpname = pattern % {
+        'stage': 'tmp',
+        'target': branch.name,
+        'sub': '',
+    }
     # push all the new objects first via the tmp branches
     pushers = []
     for repo, it in staging_state.items():
         executor = it.repo.with_config(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         executor._config.pop('check', None)
         executor.runner = subprocess.Popen
-        pid = executor.push('-f', git.source_url(repo), f'{it.head}:refs/heads/tmp.{branch.name}')
+        pid = executor.push('-f', git.source_url(repo), f'{it.head}:refs/heads/{tmpname}')
         pushers.append(pid)
     for pid in pushers:
         pid.wait()
 
+    stagingname = pattern % {
+        'stage': 'staging',
+        'target': branch.name,
+        'sub': '',
+    }
     # then sync the staging refs (there might be a more efficient command than push but...)
     for repo, it in staging_state.items():
         _logger.info(
-            "%s: create staging for %s:%s at %s",
+            "%s: create staging for %s:%s = %s:%s",
             branch.project_id.name, repo.name, branch.name,
-            it.head
+            it.head, stagingname,
         )
         r = it.repo.with_config(stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False)\
-            .push('-f', git.source_url(repo), f'{it.head}:refs/heads/staging.{branch.name}')
+            .push('-f', git.source_url(repo), f'{it.head}:refs/heads/{stagingname}')
         if r.returncode:
             branch.staging_enabled = False
             st.write({
@@ -261,6 +272,11 @@ For-Commit-Id: {it.head}
         for batch in staged
     ), st.target.name)
 
+    subpattern = pattern % {
+        'stage': 'staging',
+        'target': branch.name,
+        'sub': branch.project_id.staging_sub_pattern,
+    }
     if branch.presplit and len(staged) > 1:
         _logger.info("Pre-splitting staging...")
         midpoint = len(staged) // 2
@@ -278,9 +294,10 @@ For-Commit-Id: {it.head}
                 break
             if staged_split != split:
                 _logger.warning("Failed to fully stage presplit %d of %s", i, st)
+            branchname = subpattern % {'sub': i}
             for repo, it in staging_state_split.items():
                 r = it.repo.with_config(stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False) \
-                    .push('-f', git.source_url(repo), f'{it.head}:refs/heads/staging.{branch.name}.{i}')
+                    .push('-f', git.source_url(repo), f'{it.head}:refs/heads/{branchname}')
                 if r.returncode:
                     _logger.warning("Failed to push presplit %d of %s:\n%s", i, st, r.stderr)
 
@@ -300,9 +317,10 @@ For-Commit-Id: {it.head}
             if not staged:
                 _logger.warning("Failed to stage successor of %s", st)
             else:
+                branchname = subpattern % {"sub": '3'}
                 for repo, it in staging_state.items():
                     r = it.repo.with_config(stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False) \
-                        .push('-f', git.source_url(repo), f'{it.head}:refs/heads/staging.{branch.name}.3')
+                        .push('-f', git.source_url(repo), f'{it.head}:refs/heads/{branchname}')
                     if r.returncode:
                         _logger.warning("Failed to push successor of %s:\n%s", st, r.stderr)
 
