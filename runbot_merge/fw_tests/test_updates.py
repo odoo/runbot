@@ -646,3 +646,37 @@ def test_descendant_squash(env, config, make_repo, users) -> None:
         'a': '2',
     }
     assert prc_id.squash
+
+def test_update_reset_state(env, config, make_repo, users) -> None:
+    """Forward-ports being updated should have their relevant state reset
+    normally.
+    """
+    prod, fork = make_basic(env, config, make_repo, statuses='default')
+    with prod:
+        [c] = prod.make_commits('a', Commit('p_0', tree={'0': '0'}), ref='heads/hugechange')
+        pr = prod.make_pr(target='a', head='hugechange')
+        prod.post_status(c, 'success')
+        pr.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+    with prod:
+        prod.post_status('staging.a', 'success')
+    env.run_crons()
+
+    _, prb_id = env['runbot_merge.pull_requests'].search([], order='number asc')
+    with prod:
+        prod.post_status(prb_id.head, 'success')
+    env.run_crons()
+
+    _, _, prc_id = env['runbot_merge.pull_requests'].search([], order='number asc')
+    assert prc_id.state == 'opened'
+    with prod:
+        prod.post_status(prc_id.head, 'success')
+    env.run_crons()
+    assert prc_id.state == "validated"
+
+    b_head = prod.commit('b')
+    with fork:
+        fork.make_commits(b_head.id, Commit('p_1', tree={'1': '1'}), ref=f'heads/{prb_id.refname}', make=False)
+    env.run_crons()
+    assert prb_id.state == 'opened'
+    assert prc_id.state == 'opened'

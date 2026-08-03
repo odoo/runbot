@@ -82,8 +82,10 @@ class UpdateQueue(models.Model):
                 # update child's head to the head we're going to push
                 child.with_context(ignore_head_update=True).write({
                     'head': new_head,
-                    # 'state': 'opened',
                     'squash': n == 1,
+                    'reviewed_by': False,
+                    'statuses': '{}',
+                    'error': False,
                 })
                 updates[child.repository].append((child.refname, old_head, new_head))
 
