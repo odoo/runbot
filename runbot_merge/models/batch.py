@@ -487,7 +487,6 @@ class Batch(models.Model):
                 continue
 
             if n := self.with_context(active_test=False).search([
-                ('target', '=', next_target.id),
                 ('parent_id', '=', batch.id),
             ], limit=1):
                 _logger.info('-> already forward-ported %s => %s', ident, n)
