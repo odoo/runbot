@@ -1,0 +1,7 @@
+[lint]
+ignore = [
+    # codebase (especially tests) is pretty inconsistent on formatting, maybe
+    # re-enable that after having rationalized things
+    "UP031",
+    "UP032",
+]
