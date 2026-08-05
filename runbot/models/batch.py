@@ -106,19 +106,17 @@ class Batch(models.Model):
                 build = slot.build_id
                 if build.global_state in ('running', 'done'):
                     continue
-                testing_slots = build.params_id.slot_ids.filtered(lambda s: not s.skipped)
-                if not testing_slots:
+                other_batches = build.params_id.slot_ids.filtered(lambda s: not s.skipped).mapped('batch_id')
+                if any(other_batches.bundle_id.mapped('is_base')):
+                    continue
+                testing_batches = other_batches.filtered(lambda b: b.state in ('preparing', 'ready'))
+                valid_batches = testing_batches.bundle_id.last_batch & testing_batches
+                if not valid_batches:
                     if build.global_state == 'pending':
                         build._skip('Newer build found')
                     elif build.global_state in ('waiting', 'testing'):
                         if not build.killable:
                             build.killable = True
-                elif slot.link_type == 'created':
-                    batches = testing_slots.mapped('batch_id')
-                    _logger.info('Cannot skip build %s build is still in use in batches %s', build.id, batches.ids)
-                    bundles = batches.mapped('bundle_id') - batch.bundle_id
-                    if bundles:
-                        batch._log('Cannot kill or skip build %s, build is used in another bundle: %s', build.id, bundles.mapped('name'))
 
     def _process(self):
         processed = self.browse()
