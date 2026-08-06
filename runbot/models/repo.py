@@ -576,6 +576,10 @@ class Repo(models.Model):
             return re.match(self.forbidden_regex, branch_name)
         return False
 
+    @api.model
+    def _branch_name_from_ref(self, ref_name):
+        return ref_name.split('/', 3)[-1]
+
     def _get_fetch_head_time(self):
         self.ensure_one()
         fname_fetch_head = self._path('FETCH_HEAD')
@@ -608,9 +612,9 @@ class Repo(models.Model):
                     return []
                 refs = [tuple(field for field in line.split('\x00')) for line in git_refs.split('\n')]
                 refs = [r for r in refs if not re.match(r'^refs/[\w-]+/heads/\d+$', r[0])]  # remove branches with interger names to avoid confusion with pr names
-                refs = [r for r in refs if int(r[2]) > commit_limit or self.env['runbot.branch']._match_is_base(r[0].split('/')[-1])]
+                refs = [r for r in refs if int(r[2]) > commit_limit or self.env['runbot.branch']._match_is_base(self._branch_name_from_ref(r[0]))]
                 if ignore:
-                    refs = [r for r in refs if r[0].split('/')[-1] not in ignore]
+                    refs = [r for r in refs if self._branch_name_from_ref(r[0]) not in ignore]
                 return refs
             except Exception:
                 _logger.exception('Fail to get refs for repo %s', self.name)
@@ -626,7 +630,7 @@ class Repo(models.Model):
         """
 
         # FIXME WIP
-        names = [r[0].split('/', 3)[-1] for r in refs]
+        names = [self._branch_name_from_ref(r[0]) for r in refs]
         branches = self.env['runbot.branch'].search([('name', 'in', names), ('remote_id', 'in', self.remote_ids.ids)])
         ref_branches = {branch._ref(): branch for branch in branches}
         new_branch_values = []

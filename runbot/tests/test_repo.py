@@ -461,7 +461,8 @@ class TestGetRefs(RunbotCase):
 
     def mock_git_helper(self, repo, cmd, input_data=None, raw=False):
         self.assertIn('for-each-ref', cmd)
-        self.assertIn('refs/*/pull/*', cmd)
+        if any(remote.fetch_pull for remote in repo.remote_ids):
+            self.assertIn('refs/*/pull/*', cmd)
         return '\n'.join(['\x00'.join(ref_data) for ref_data in self.test_refs])
 
     def test_get_refs(self):
@@ -504,3 +505,47 @@ class TestGetRefs(RunbotCase):
         self.assertIn(good_ref, refs, 'A valid branch should appear in refs')
         self.assertNotIn(bad_ref, refs, 'A branch name that is an integer should be filtered out')
         self.assertNotIn(to_ignore_ref, refs, 'An explicitely ignored branch should be filtered out')
+
+    def test_get_refs_slashes(self):
+        current = time.time()
+        commit_time = str(int(current) - 5000)
+        remote_name = self.remote_odoo_dev.remote_name
+        slash_refs = (
+            (
+                'refs/%s/heads/19.0/foo' % remote_name,
+                'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+                commit_time,
+                'foobarman',
+                '<foobarman@somewhere.com>',
+                '[IMP] mail: better tests',
+                'foobarman',
+                '<foobarman@somewhere.com>',
+            ),
+            (
+                'refs/%s/heads/19.0/tests/foo' % remote_name,
+                'e9b396d2dddffdb373bf2c6ad073696aa25b4f68',
+                commit_time,
+                'foobarman',
+                '<foobarman@somewhere.com>',
+                '[FIX] foo: bar',
+                'foobarman',
+                '<foobarman@somewhere.com>',
+            ),
+        )
+        self.test_refs.extend(slash_refs)
+        refs = self.repo_odoo._get_refs()
+        for slash_ref in slash_refs:
+            self.assertIn(slash_ref, refs, 'Slash branch ref should not be truncated')
+            self.assertEqual(
+                self.repo_odoo._branch_name_from_ref(slash_ref[0]),
+                slash_ref[0].split('/', 3)[-1],
+            )
+
+        ref_branches = self.repo_odoo._find_or_create_branches(refs)
+        for branch_name in ('19.0/foo', '19.0/tests/foo'):
+            branch = self.env['runbot.branch'].search([
+                ('name', '=', branch_name),
+                ('remote_id', '=', self.remote_odoo_dev.id),
+            ])
+            self.assertEqual(len(branch), 1, 'Branch %s should have been created' % branch_name)
+            self.assertIn(branch._ref(), ref_branches)
