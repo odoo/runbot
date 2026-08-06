@@ -41,7 +41,7 @@ NAME
 \tgit-fw - Apply the changes introduced by some existing PR
 
 SYNOPSYS
-\tgit fw redo <pr>
+\tgit fw redo [--exact] <pr>
 \tgit fw (--continue | --skip | --abort | --quit)
 
 DESCRIPTION
@@ -49,6 +49,14 @@ DESCRIPTION
 \tgithub or mergebot URL), re-execute its forward porting via git-cherry-pick(1),
 \tproviding the ability to interactively fix conflicts then push the result
 \tback onto the forward-port branch.
+
+\tBy default, the forward-port is redone on the current state of the target
+\tbranch (on the remote, not locally, so may include changes which have not
+\tbeen fetched yet), the conflicts might be different but it includes
+\teverything that would otherwise have to be rebased on.
+
+\t--exact can be passed to redo the forward-port exactly as it was done
+\toriginally instead.
 
 \tSupports the git-cherry-pick(1) subcommands so that it can properly rewrite
 \tcommit messages when resuming.
@@ -60,9 +68,9 @@ def main() -> int:
     match sys.argv[1:]:
         # case ['do', pr]:
         #     return do(pr)
-        case ["redo", pr]:
+        case ["redo", *flags, pr]:
             threading.Thread(target=check_version, args=(__file__,), daemon=True).start()
-            exit(redo(pr))
+            exit(redo(pr, exact='--exact' in flags))
         case [("--continue" | "--skip" | "--abort" | "--quit") as subcommand]:
             r = run(["git", "cherry-pick", subcommand], env=ENV, stderr=PIPE)
             if r.stderr:
@@ -80,7 +88,7 @@ def main() -> int:
             exit(0)
 
 
-def redo(pr: str) -> int | str:
+def redo(pr: str, *, exact: bool = False) -> int | str:
     repo, number = parse_pr(pr)
 
     print(f"Resolving {repo}#{number}")
@@ -166,7 +174,11 @@ def redo(pr: str) -> int | str:
         encoding="utf-8",
         check=True,
     )
-    run(["git", "reset", "--hard", merge_base.stdout.strip()], check=True)
+    if exact:
+        replay_base = merge_base.stdout.strip()
+    else:
+        replay_base = refs[f"refs/heads/{res['target']}"]
+    run(["git", "reset", "--hard", replay_base], check=True)
     r = run(
         ["git", "cherry-pick", "-e", f"{commits[0]}~..{commits[-1]}"],
         env=ENV, stderr=PIPE,
