@@ -569,6 +569,10 @@ section > section {
 }
 
 ul.todo {
+    /*
+    \20de is a combining box but it looks absolutely awful, emoji within are
+    misaligned and it completely fucks up any pretense of alignment
+    */
     list-style-type: '☐ ';
     & > li.ok {
         list-style-type: '☑ ';
@@ -578,6 +582,9 @@ ul.todo {
         background-color: var(--bg-danger);
         color: color-mix(in srgb, var(--color-danger) 40%, var(--color-foreground));
         --link-color: color-mix(in srgb, var(--color-danger) 40%, var(--color-foreground));
+    }
+    & > li.lazy {
+        list-style-type: '▶ '
     }
 }
 /* endregion */

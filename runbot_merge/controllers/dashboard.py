@@ -1,22 +1,23 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import base64
 import collections
 import colorsys
 import datetime
+import enum
 import hashlib
 import io
 import json
 import logging
 import pathlib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from email.utils import formatdate
 from enum import Flag, auto
 from functools import cached_property
 from itertools import chain, product
 from math import ceil
-from typing import cast, Mapping, Optional
+from typing import cast
 
 import markdown
 import markupsafe
@@ -24,7 +25,7 @@ import werkzeug.exceptions
 import werkzeug.wrappers
 from PIL import Image, ImageDraw, ImageFont
 
-from odoo.http import Controller, route, request, Response
+from odoo.http import Controller, Response, request, route
 from odoo.tools import file_open
 
 HORIZONTAL_PADDING = 20
@@ -266,7 +267,7 @@ def raster_render(pr):
 
     # last-modified should be in RFC2822 format, which is what
     # email.utils.formatdate does (sadly takes a timestamp but...)
-    last_modified = formatdate(max((
+    last_modified = formatdate(max(
         o.write_date or datetime.datetime.min
         for o in chain(
             project,
@@ -275,7 +276,7 @@ def raster_render(pr):
             genealogy,
             genealogy.all_prs | pr,
         )
-    )).timestamp())
+    ).timestamp())
     # The (304) response must not contain a body and must include the headers
     # that would have been sent in an equivalent 200 OK response
     headers = {**default_headers, 'Last-Modified': last_modified}
@@ -345,9 +346,17 @@ class Text:
             y = top + y1 + (y2 - y1) / 3
             image.line([(left + x1, y), (left + x2, y)], self.color)
 
+
+class CheckValue(enum.Enum):
+    PENDING = enum.auto()
+    SUCCESS = enum.auto()
+    FAILURE = enum.auto()
+    LAZY = enum.auto()  # not received a PENDING signal yet
+
+
 @dataclass(frozen=True)
 class Checkbox:
-    checked: Optional[bool]
+    value: CheckValue
     font: ImageFont.FreeTypeFont
     color: Color
     success: Color
@@ -366,11 +375,23 @@ class Checkbox:
         return sum(self.font.getmetrics())
 
     def draw(self, image: ImageDraw.ImageDraw, left: int, top: int):
-        image.text((left, top+5), BOX_EMPTY, fill=self.color, font=self.font)
-        if self.checked is True:
-            image.text((left, top+4), CHECK_MARK, fill=self.success, font=self.font)
-        elif self.checked is False:
-            image.text((left, top+4), CROSS, fill=self.error, font=self.font)
+        # icons don't fit in box, this looks cool for check and x marks but
+        # awful for play (and cog if it's ever used)
+        match self.value:
+            case CheckValue.LAZY:
+                icon, color, in_box = PLAY, self.color, False
+            case CheckValue.PENDING:
+                # icon = COG is way too busy so keep to empty box
+                icon, color, in_box = None, self.color, True
+            case CheckValue.SUCCESS:
+                icon, color, in_box = CHECK_MARK, self.success, True
+            case CheckValue.FAILURE:
+                icon, color, in_box = CROSS, self.error, True
+        if in_box:
+            image.text((left, top + 5), BOX_EMPTY, fill=self.color, font=self.font)
+        if icon:
+            image.text((left, top+4), icon, fill=color, font=self.font)
+
 
 @dataclass(frozen=True)
 class Line:
@@ -453,9 +474,8 @@ def render_full_table(pr, branches, repos, batches):
                 error = blend(ERROR, opacity, over=background)
 
                 boxes = {
-                    False: Checkbox(False, icons, foreground, success, error),
-                    True: Checkbox(True, icons, foreground, success, error),
-                    None: Checkbox(None, icons, foreground, success, error),
+                    v: Checkbox(v, icons, foreground, success, error)
+                    for v in CheckValue
                 }
                 prs = []
                 attached = True
@@ -482,10 +502,17 @@ def render_full_table(pr, branches, repos, batches):
                     # no need for details if closed or in error
                     if pr.state not in ('merged', 'closed', 'error') and not pr.staging_id:
                         if pr.draft:
-                            lines.append(Line([boxes[False], Text("is in draft", font, error)]))
+                            lines.append(Line([boxes[CheckValue.FAILURE], Text("is in draft", font, error)]))
+                        if pr.batch_id.skipchecks or pr.status == 'success':
+                            # TODO: also success if all the statuses are missing?
+                            ci_state = CheckValue.SUCCESS
+                        elif pr.status == 'failure':
+                            ci_state = CheckValue.FAILURE
+                        else:
+                            ci_state = CheckValue.PENDING
                         lines.extend([
                             Line([
-                                boxes[bool(pr.squash or pr.merge_method)],
+                                boxes[CheckValue.SUCCESS if pr.squash or pr.merge_method else CheckValue.FAILURE],
                                 Text(
                                     "merge method: {}".format('single' if pr.squash else (pr.merge_method or 'missing')),
                                     font,
@@ -493,7 +520,7 @@ def render_full_table(pr, branches, repos, batches):
                                 ),
                             ]),
                             Line([
-                                boxes[bool(pr.reviewed_by)],
+                                boxes[CheckValue.SUCCESS if pr.reviewed_by else CheckValue.FAILURE],
                                 Text(
                                     "Reviewed" if pr.reviewed_by else "Not Reviewed",
                                     font,
@@ -501,8 +528,8 @@ def render_full_table(pr, branches, repos, batches):
                                 )
                             ]),
                             Line([
-                                boxes[pr.batch_id.skipchecks or pr.status == 'success'],
-                                Text("CI", font, foreground if pr.batch_id.skipchecks or pr.status == 'success' else error),
+                                boxes[ci_state],
+                                Text("CI", font, error if ci_state == CheckValue.FAILURE else foreground),
                             ]),
                         ])
                         if not pr.batch_id.skipchecks:
@@ -511,16 +538,18 @@ def render_full_table(pr, branches, repos, batches):
                                 if (status := statuses.get(ci.context.strip())) is None:
                                     if ci.prs != 'required':
                                         continue
-                                    status = {'state': 'pending'}
+                                    status = {'state': None}
                                 color = foreground
                                 match status['state']:
                                     case 'error' | 'failure':
                                         color = error
-                                        box = boxes[False]
+                                        box = boxes[CheckValue.FAILURE]
                                     case 'success':
-                                        box = boxes[True]
-                                    case _:
-                                        box = boxes[None]
+                                        box = boxes[CheckValue.SUCCESS]
+                                    case 'pending':
+                                        box = boxes[CheckValue.PENDING]
+                                    case None:
+                                        box = boxes[CheckValue.LAZY]
 
                                 lines.append(Line([
                                     Text(" - ", font, color),
@@ -638,6 +667,8 @@ BG: Mapping[str | None, Color] = collections.defaultdict(lambda: (255, 255, 255)
 
 CHECK_MARK = "\uf00c"
 CROSS = "\uf00d"
+COG = "\uf013"
+PLAY = "\uf04b"
 BOX_EMPTY = "\uf096"
 
 

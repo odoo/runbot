@@ -486,15 +486,19 @@
             <li t-att-class="'ok' if pr._approved else 'fail'">
                 Review
             </li>
-            <li t-att-class="'ok' if pr.state not in ('opened', 'approved') else ''">
+            <li t-att-class="
+                'ok' if pr.batch_id.skipchecks or pr.status == 'success'
+                else 'failure' if pr.status == 'failure'
+                else ''
+            ">
                 CI
-                <ul class="todo">
+                <ul class="todo" t-if="not pr.batch_id.skipchecks">
                     <t t-foreach="pr.repository.status_ids._for_pr(pr)" t-as="ci">
                         <t t-set="st" t-value="statuses.get(ci.context.strip())"/>
                         <t t-set="result">
-                            <t t-if="not st or st['state'] == 'pending'"></t>
+                            <t t-if="not st">lazy</t>
+                            <t t-elif="st['state'] == 'success'">ok</t>
                             <t t-elif="st['state'] in ('error', 'failure')">fail</t>
-                            <t t-else="">ok</t>
                         </t>
                         <li t-if="ci.prs == 'required' or st" t-att-class="result">
                             <a t-att-href="st.get('target_url') if st else None"><t t-out="ci.context.strip()"/></a><t t-if="st and st.get('description')">: <t t-out="st['description']"/></t>

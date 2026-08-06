@@ -5,3 +5,6 @@ ignore = [
     "UP031",
     "UP032",
 ]
+
+[lint.isort]
+known-first-party = ["odoo"]
