@@ -1,8 +1,7 @@
 import logging
-import re
-from collections.abc import Iterator, Iterable
 
 from odoo import models
+from odoo.addons.runbot_merge import git
 
 
 _logger = logging.getLogger(__name__)
@@ -22,55 +21,20 @@ class BranchCleanup(models.TransientModel):
         )
         # loop around the repos first, so we can reuse the gh instance
         for r in deactivated.mapped('project_id.repo_ids'):
-            gh = r.github()
-            refs = gh('get', 'git/matching-refs/heads/')
-            if refs.status_code != 200:
-                _logger.warning("unable to fetch refs/heads for %s", r.name)
-                continue
-            head_pattern = re.compile(
-                'refs/heads/'
-                +
-                ''.join(pattern_to_filter(
-                    r.project_id.staging_pattern,
-                    {
-                        b.name
-                        for b in deactivated
-                        if b.project_id == r.project_id
-                    }),
-                )
+            ref_pattern = f'refs/heads/{r.project_id.staging_pattern}'
+            refs = (
+                ref_pattern % {'stage': stage, 'target': b.name, 'sub': sub}
+                for b in deactivated
+                if b.project_id == r.project_id
+                for stage in ('tmp', 'staging')
+                for sub in ('', '1', '2', '3')
+                # tmp doesn't have substages so generating those is never useful
+                if stage == 'staging' or sub == ''
             )
-            for ref in refs.json():
-                refname = ref['ref']
-                if not head_pattern.fullmatch(refname):
-                    continue
-
-                res = gh('delete', f'git/{refname}', check=False)
-                if res.status_code != 204:
-                    branchname = refname.removeprefix('refs/heads/')
-                    _logger.info("no branch found for %s:%s", r.name, branchname)
-
-
-def pattern_to_filter(pattern: str, branches: Iterable[str]) -> Iterator[str]:
-    pos = 0
-    while (idx := pattern.find('%', pos)) != -1:
-        if idx > pos:
-            yield re.escape(pattern[pos:idx])
-        match pattern[idx+1]:
-            case '%':
-                yield '%'
-                pos = idx+2
-            case '(':
-                conv = pattern.index(')', idx+2) + 1
-                assert pattern[conv] == 's'
-                match pattern[idx+2:conv-1]:
-                    case 'stage':
-                        yield '(tmp|staging)'
-                    case 'sub':
-                        yield ''
-                    case 'target':
-                        yield '(' + '|'.join(map(re.escape, branches)) + ')'
-                pos = conv+1
-            case p:
-                raise NotImplementedError(f"Unsupported printf form {p}")
-
-    yield re.escape(pattern[pos:])
+            # turns out if you delete fully qualified refs they're sent straigt
+            # to the remote, you don't get the info that they exist but...
+            git.get_local(r).push(
+                git.source_url(r),
+                '--delete',
+                *refs
+            )
