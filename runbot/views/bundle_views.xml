@@ -21,6 +21,7 @@
                     <field name="use_light_default"/>
                     <field name="use_light_draft"/>
                     <field name="use_light_no_pr"/>
+                    <field name="use_trigger_from_project_id"/>
                 </group>
             </form>
         </field>

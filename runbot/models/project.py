@@ -28,6 +28,7 @@ class Project(models.Model):
     use_light_default = fields.Boolean('Use light config by default', help="Use the light config when possible for all triggers")
     use_light_draft = fields.Boolean('Use light config for draft PRs', help="Use the light config when possible for bundle having draft pr")
     use_light_no_pr = fields.Boolean('Use light config when no PR', help="Use the light config when possible for all bundles not having any pr")
+    use_trigger_from_project_id = fields.Many2one('runbot.project', string="Copy config from project", help="Will use trigger from this project in addition to the current one")
 
     @api.constrains('process_delay')
     def _constraint_process_delay(self):
