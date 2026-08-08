@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 _logger = logging.getLogger(__name__)
 
-def fetch_local_logs_return_value(nb_logs=10, message='', log_type='server', level='INFO', build_dest='1234567-master-all'):
+def fetch_local_logs_return_value(nb_logs=10, message='', log_type='server', level='INFO', build_dest=None):
 
     log_date = datetime(2022, 8, 17, 21, 55)
     logs = []
@@ -25,6 +25,7 @@ def fetch_local_logs_return_value(nb_logs=10, message='', log_type='server', lev
             'line': '274',
             'type': log_type,
             'message': '75 modules loaded in 0.92s, 717 queries (+1 extra)' if message == '' else message,
+            'build_id': int(build_dest.split('-')[0]),
         }]
         cleanups.append(MagicMock())
         log_date += timedelta(seconds=20)

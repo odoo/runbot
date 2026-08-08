@@ -29,9 +29,6 @@
                       <field name="runbot_template"/>
                     </setting>
                     <setting>
-                      <field name="runbot_logdb_name"/>
-                    </setting>
-                    <setting>
                       <field name="runbot_use_ssl"/>
                     </setting>
                     <setting>
