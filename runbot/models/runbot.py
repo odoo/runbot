@@ -206,6 +206,8 @@ class Runbot(models.AbstractModel):
 
     def _fetch_loop_turn(self, host, pull_info_failures, default_sleep=1):
         with self._manage_host_exception(host) as manager:
+            self.env['runbot.repo.hook.payload']._process_all()
+
             repos = self.env['runbot.repo'].search([('mode', '!=', 'disabled')])
             processing_batch = self.env['runbot.batch'].search([('state', 'in', ('preparing', 'ready'))], order='id asc')
             preparing_batch = processing_batch.filtered(lambda b: b.state == 'preparing')
