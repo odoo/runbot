@@ -10,44 +10,56 @@ This repository contains the source code of Odoo testing bot [runbot.odoo.com](h
 
 **Runbot changes some default odoo behaviours** Runbot database may work with other modules, but without any guarantee.
 
-**Runbot is not safe by itself** This tutorial describes the minimal way to deploy runbot, without too many security considerations. Only trusted code should be executed with this single machine setup. For more security the builder should be deployed separately with minimal access.
+**Runbot is not safe by itself** This tutorial describes the minimal way to deploy runbot, without security considerations. Only trusted code should be executed with this single machine setup. For more security the builder should be deployed separately with minimal access.
 
 ## Glossary/models
 Runbot use a set of concept in order to cover all the use cases we need
 
-- **Project**: regroups a set of repositories that works together. Usually one project is enough and a default *R&D* project exists.
-- **Repository**: A repository name regrouping repo and forks Ex: odoo, enterprise
-- **Remote**: A remote for a repository. Example: odoo/odoo, odoo-dev/odoo
-- **Build**: A test instance, using a set of commits and parameters to run some code and produce a result.
-- **Trigger**: Indicates that a build should be created when a new commit is pushed on a repo. A trigger has both trigger repos, and dependency repo. Ex: new commit on runbot-> build with runbot and a dependency with odoo.
-- **Bundle**: A set or branches that work together: all the branches with the same name and all linked pr in the same project.
-- **Batch**: A container for builds and commits of a bundle. When a new commit is pushed on a branch, if a trigger exists for the repo of that branch, a new batch is created with this commit. After 60 seconds, if no other commit is added to the batch, a build is created by trigger having a new commit in this batch.
+- **Project**: Logical grouping of repositories that are related to each other. Usually one project is enough and a default *R&D* project is automatically created.
+- **Repository**: Logical grouping of remotes. Usually you create *odoo* and *enterprise*.
+- **Remote**: A location to find (Git) repository information. Example: odoo/odoo, odoo-dev/odoo
+- **Bundle**: A group of matched[^1] branches across repositories eg, odoo/odoo/19.0 matches odoo/enterprise/19.0. Usually you see one bundle for every discovered branch (including PRs).
+- **Batch**: A group of commits, for all branches defined by the parent bundle. These commits build together.[^2]
+- **Trigger**: Logic to automate creation of build instances. At a minimum you need one trigger per project to build new code eg, a new commit on odoo/odoo -[automatic batch creation]-> new batch -[trigger]-> new build to run odoo tests.
+- **Build**: Represents the execution of odoo, in practice this is when testing happens (`odoo-bin --tests-enabled <..>` is invoked).[^3] Builds generally run code and produce output (logs, build artifacts, running odoo instance for testing).
+
+
+[^1]: Matching only links related repositories within the same project.  
+[^2]: Batches are created automatically by the parent bundle after detection of new commits.  
+[^3]: By default, build creation is delayed until 60 seconds (debounce) after the most recent commit on the linked batch. This debounce value is part of the project configuration.  
 
 ## Processes
 
-Mainly to allow to distribute runbot on multiple machine and avoid cron worker limitations, the runbot is using 2 process besides the main server.
+Mainly to allow to distribute runbot on multiple machine and avoid cron worker limitations, the runbot is using 2 processes besides the main server.
 
 - **runbot process**: the main runbot process, serving the frontend. This is the odoo-bin process.
 - **leader process**: this process should only be started once, detect new commits and creates builds for builders.
-- **builder process**: this process can run at most once per physical host, will pick unassigned builds and execute them.
+- **builder process**: this process can run at most once per physical host, will execute the builds assigned to themselves.
 
-## HOW TO
+## Operational requirements
 
-This section give the basic steps to follow to configure the runbot. The configuration may differ from one use to another, this one will describe how to test addons for odoo, needing to fetch odoo core but without testing vanilla odoo. As an example, the runbot odoo addon will be used as a test case. Runbotception. 
+You can safely skip ahead to [Setup Runbot](#setup-runbot) if you are interested in trying out Runbot.  
+This section lists Runbot's expectations for the platform it's running on and configuration examples.
 
 ### DNS
 
 You may configure a DNS entry for your runbot domain as well as a CNAME for all subdomain.
 
 ```
-*        IN CNAME  runbot.domain.com.
+;; The documentation writer assumes the reader knows how to interpret this fragment of code.
+;; The reader can also skip DNS configuration to use Runbot with a limited feature set.
+
+$ORIGIN domain.com.
+runbot.domain.com.  IN A      127.0.0.1
+*                   IN CNAME  runbot.domain.com.
 ```
-This is mainly useful to access running build but will also give more freedom for future configurations. 
-This is not needed but many features won't work without that.
+
+This configuration is not necessary for a minimal setup.  
+You need similar domain setup to deploy Runbot in a production environment that gives access to running test database and test artifacts.
 
 ### nginx
 
-An exemple of config is given in the `example_scripts` folder.
+An example of config is given in the `example_scripts` folder.
 
 This may be adapted depending on your setup, mainly for domain names. This can be adapted during the install but serving at least the runbot frontend (proxy pass `80` to `8069`) is the minimal config needed.
 Note that runbot also has a dynamic nginx config listening on the `8080` port, mainly for running build.
@@ -56,11 +68,23 @@ This config is an `ir_ui_view` (runbot.nginx_config) and can be edited if needed
 
 It is also advised to adapt this config to work in `https`.
 
+## Runbot up and running
+
+This section explains how to configure Runbot. You most likely want to divert to support your own use case. Follow along to get a new Runbot instance configured that tests code from this (Runbot) repository. Runbotception!  
+Note that Runbot runs on top of Odoo community and we'll not be testing Odoo community itself.
+
 ### Requirements
 
-Runbot is an addon for odoo, meaning that both odoo and runbot code are needed to run. Some tips to configure odoo are available in [odoo setup documentation](https://www.odoo.com/documentation/19.0/setup/install.html#setup-install-source) (requirements, postgres, ...) This page will mainly focus on runbot specificities.
+Runbot is an addon for odoo, meaning that both odoo and runbot repositories are needed to launch Runbot. The information below guides you through installation of git, python+dependencies, postgresql as those are Odoo dependencies.
 
-You will also need to install docker and other requirements before running runbot.
+1. [Prepare - Odoo source install](https://www.odoo.com/documentation/19.0/administration/on_premise/source.html#prepare)
+2. [Run the server - Odoo setup guide](https://www.odoo.com/documentation/19.0/developer/tutorials/setup_guide.html#run-the-server)
+
+Can you create and launch a new (empty) Odoo database from the command-line?  
+If yes, let's focus now on Runbot itself!
+
+
+Install Runbot requirements.
 
 ```bash
 sudo apt-get install docker.io python3-unidiff python3-docker python3-matplotlib
@@ -68,12 +92,14 @@ sudo apt-get install docker.io python3-unidiff python3-docker python3-matplotlib
 
 ### Setup
 
-Choose a workspace to clone both repositories and checkout the right branch in both of them.
+Choose a workspace to clone both repositories and checkout the default branch in both of them.
 The directory used in example scripts is `/home/$USER/odoo/` 
 
-Note: It is highly advised to create a user for runbot. This example creates a new user `runbot`
+Note: It is highly advised to create a user for runbot.
 
 ```bash
+# This example creates a new user `runbot` with the right environment permissions
+
 sudo adduser runbot
 
 # needed access rights, docker, postgress
@@ -89,9 +115,9 @@ mkdir odoo
 cd odoo
 ```
 
-You may [add valid ssh key linked to a github account](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account)
- to this user in order to clone the different repositories. You could clone in `https` but this may be a problem later to access your private repositories. 
-It is important to clone the repo with the runbot user:
+You may [add a valid ssh key to a github account](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account)
+ to be used by user `runbot` to clone the next repositories. You could clone in `https` but this may be a problem later to access your private repositories.  
+It is important to clone the repositories as the runbot user:
 
 ```bash
 git clone --depth=1 --branch=19.0 git@github.com:odoo/odoo.git
@@ -103,15 +129,16 @@ git -C runbot checkout 19.0
 mkdir logs
 ```
 
-Note: `--depth=1 --branch=19.0 ` is optionnal but will help to reduce the disc usage for the odoo repo.
+Note: `--depth=1 --branch=19.0 ` is optional but this approach requires less available disk space. The odoo community and odoo enterprises repositories are large, monitor your free disk space regularly when you use them inside Runbot. (50+ GiB at minimum)
 
-Finally, check that you have acess to docker, listing the dockers should work without error (but will be empty).
+Finally, check that you have access to docker, listing the docker containers should work without error (but the list will be empty).
 
 ```bash
 docker ps 
 ```
-If it is not working, ensure you have the docker group and logout if needed.
+If the command returns an error, ensure the unix user is part of the docker group and logout/login again.
 
+# --- TODO
 ### Install and start runbot
 
 This part is only consist in configuring and starting the 3 services.
