@@ -1168,6 +1168,22 @@ class ConfigStep(models.Model):
                     build._log('_run_restore', f'No dump with suffix {dump_suffix} found in build [{reference_build.id}]({reference_build.build_url})', log_type='markdown', level='ERROR')
                     build._kill(result='ko')
                     return
+            if not dump_db:
+                # No reference build was found, e.g. because the bundle is
+                # based on a commit that is not the head of a base batch and
+                # has therefore no base reference batch. A dump producing
+                # trigger started manually to prepare the restore is not
+                # necessarily `dump_trigger`, but it sits in the current batch
+                # and builds a database that is just as good. Without this, the
+                # restore falls back on `reference_build_id`, which never
+                # created a database when that build only creates children, and
+                # ends up on an url pointing to a dump that never existed.
+                dump_suffix = config_data.get('dump_suffix', self.restore_download_db_suffix or 'all')
+                batch_builds = params.create_batch_id.slot_ids.mapped('build_id')
+                finished_builds = batch_builds.filtered(lambda b: b.local_state in ('done', 'running'))
+                dump_db = finished_builds.mapped('database_ids').filtered(lambda d: d.db_suffix == dump_suffix)[:1]
+                if dump_db:
+                    build._log('_run_restore', f'Using the dump of build [{dump_db.build_id.id}]({dump_db.build_id.build_url}) found in the current batch', log_type='markdown')
             if dump_db:
                 download_db_suffix = dump_db.db_suffix
                 dump_build = dump_db.build_id
