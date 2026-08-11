@@ -32,9 +32,9 @@ Runbot use a set of concept in order to cover all the use cases we need
 
 Mainly to allow to distribute runbot on multiple machine and avoid cron worker limitations, the runbot is using 2 processes besides the main server.
 
-- **runbot process**: the main runbot process, serving the frontend. This is the odoo-bin process.
-- **leader process**: this process should only be started once, detect new commits and creates builds for builders.
-- **builder process**: this process can run at most once per physical host, will execute the builds assigned to themselves.
+- **runbot web process**: The main runbot process serving web requests. A typical Odoo instance (odoo-bin process).
+- **leader process**: This process should only be started once, detect new commits and creates builds for builders.
+- **builder process**: This process can run at most once per physical host, will execute the builds assigned to themselves.
 
 ## Operational requirements
 
@@ -68,10 +68,57 @@ This config is an `ir_ui_view` (runbot.nginx_config) and can be edited if needed
 
 It is also advised to adapt this config to work in `https`.
 
+### Unattended run
+
+The directory [./runbot/runbot/example_scripts]() has example configuration to launch every Runbot process. This section explains how to configure Systemd to run Runbot unattended.
+
+NOTE: This part assumes a dedicated user 'runbot' exists for running Runbot and accessing docker and postgresql.
+
+Copy the runbot launch scripts to a known static location on the system.  
+If you want to store your launch scripts elsewhere, update the `ExecStart` parameter inside the systemd service unit files to match.
+
+```bash
+workspace="/home/runbot/odoo/"
+
+su runbot
+mkdir ~/bin
+cp -r "${workspace}/runbot/runbot/example_scripts/runbot" ~/bin/runbot
+```
+
+Create the corresponding services. You can copy them from the example scripts and adapt them:
+
+```bash
+exit # go back to a sudoer user
+
+runbot_user="runbot"
+sudo cp "${workspace}/runbot/runbot/example_scripts/services/*" /etc/systemd/system/
+sudo sed -i "s/runbot_user/${runbot_user}/" /etc/systemd/system/runbot.service
+sudo sed -i "s/runbot_user/${runbot_user}/" /etc/systemd/system/leader.service
+sudo sed -i "s/runbot_user/${runbot_user}/" /etc/systemd/system/builder.service
+```
+
+Enable all services and start the runbot frontend.
+
+```bash
+sudo systemctl daemon-reload
+
+sudo systemctl enable runbot
+sudo systemctl enable leader
+sudo systemctl enable builder
+
+sudo systemctl start runbot
+sudo systemctl status runbot
+```
+
+Ensure startup completed succesfully, then start and verify the other runbot processes too.  
+Several log files should have been created in `/home/runbot/odoo/logs/`, one per service.
+
 ## Runbot up and running
 
-This section explains how to configure Runbot. You most likely want to divert to support your own use case. Follow along to get a new Runbot instance configured that tests code from this (Runbot) repository. Runbotception!  
+Follow along to get a new Runbot instance configured that tests code from this (Runbot) repository. Runbotception!  
 Note that Runbot runs on top of Odoo community and we'll not be testing Odoo community itself.
+
+You most likely want to divert from these instructions to better support your own use case.
 
 ### Requirements
 
@@ -79,9 +126,6 @@ Runbot is an addon for odoo, meaning that both odoo and runbot repositories are 
 
 1. [Prepare - Odoo source install](https://www.odoo.com/documentation/19.0/administration/on_premise/source.html#prepare)
 2. [Run the server - Odoo setup guide](https://www.odoo.com/documentation/19.0/developer/tutorials/setup_guide.html#run-the-server)
-
-Can you create and launch a new (empty) Odoo database from the command-line?  
-If yes, let's focus now on Runbot itself!
 
 
 Install Runbot requirements.
@@ -95,10 +139,10 @@ sudo apt-get install docker.io python3-unidiff python3-docker python3-matplotlib
 Choose a workspace to clone both repositories and checkout the default branch in both of them.
 The directory used in example scripts is `/home/$USER/odoo/` 
 
-Note: It is highly advised to create a user for runbot.
+Note: It is highly advised to create a dedicated user for runbot.
 
 ```bash
-# This example creates a new user `runbot` with the right environment permissions
+# This example creates a new unix user `runbot` with permissions to use docker and postgresql.
 
 sudo adduser runbot
 
@@ -136,21 +180,61 @@ Finally, check that you have access to docker, listing the docker containers sho
 ```bash
 docker ps 
 ```
-If the command returns an error, ensure the unix user is part of the docker group and logout/login again.
+If the command returns an error, add the unix user to the 'docker' group and logout/login again.
 
-# --- TODO
+
 ### Install and start runbot
 
-This part is only consist in configuring and starting the 3 services.
-
-Some example scripts are given in `runbot/runbot/example_scripts`
+Initialise a new Odoo database with Runbot automatically installed.
 
 ```bash
-mkdir ~/bin # if does not exist
-cp -r ~/odoo/runbot/runbot/example_scripts/runbot ~/bin/runbot
+workspace="/home/$USER/odoo/"
+
+"$workspace/odoo/odoo-bin" --addons-path "$workspace/odoo/addons,$workspace/runbot" -d runbot -i runbot --stop-after-init
 ```
 
-Scripts should be adapted, mainly for the  `--forced-host-name parameter` in `builder.sh`:
+This is all the preparation necessary to start every runbot process. Usually you'll start each of them in the proper order.
+
+#### Runbot web
+
+All requirements are met, go ahead and launch!
+
+```bash
+# Launch the Runbot web service
+"$workspace/runbot/runbot/example_scripts/runbot/runbot.sh"
+```
+
+Navigate your browser to [http://127.0.0.1:8069]() to land on the bundle overview page. This page is empty because nothing is configured yet.  
+Navigate to [http://127.0.0.1:8069/odoo/settings]()
+
+You can now connect to your running instance and configure runbot.
+- Page [http://127.0.0.1:8069]() shows an empty bundle overview page. Nothing is configured yet.
+- Log into the backend as admin (default password: admin).
+- Visit page [Runbot > Settings > Settings](http://127.0.0.1:8069/odoo/settings) to update your instance settings:
+     Default number of workers should be the max number of parallel build, consider having max `#cpu - 1`
+    - Modify `Default odoorc for builds` to change the running build master password to something unique ([ideally a hashed one](https://github.com/odoo/odoo/blob/19.0/odoo/tools/config.py#L787)).
+    - Tweak the garbage collection settings, if you have limited disk space.
+    - The `number of running build` is the number of parallel running builds.
+    - `Max commit age (in days)` will limt the max age of commit to detect. Increase this limit to detect older branches.
+
+If you intend to have this instance running in a production environment, read through the Odoo documentation to secure your instance.  
+- Update the instance master password, which is used at the `/web/database/manager` endpoint. ([More info here](https://www.odoo.com/documentation/19.0/administration/on_premise/deploy.html#reset-the-master-password))
+- Change the login credentials of the admin user
+
+##### Leader
+
+All requirements are met, go ahead and launch!
+
+```bash
+# Launch the Runbot leader process
+"$workspace/runbot/runbot/example_scripts/runbot/leader.sh"
+```
+
+# -- TODO
+
+##### Builder
+
+The launch script `builder.sh` should be adapted, mainly for the  `--forced-host-name` parameter value:
 
 ```bash
 sed -i "s/runbot.domain.com/runbot.my_real_domain.com/" ~/bin/runbot/builder.sh
@@ -160,54 +244,6 @@ sed -i "s/runbot.domain.com/runbot.my_real_domain.com/" ~/bin/runbot/builder.sh
 
 *The most important one is the builder hostname since it will be used to define running build, zip download and logs urls. We recommand setting your main domain name on this process. The nginx config given in example should be adapted if not.*
 
-
-Create the corresponding services. You can copy them from the example scripts and adapt them:
-
-```bash
-exit # go back to a sudoer user
-runbot_user="runbot"
-sudo bash -c "cp /home/${runbot_user}/odoo/runbot/runbot/example_scripts/services/* /etc/systemd/system/"
-sudo sed -i "s/runbot_user/${runbot_user}/" /etc/systemd/system/runbot.service
-sudo sed -i "s/runbot_user/${runbot_user}/" /etc/systemd/system/leader.service
-sudo sed -i "s/runbot_user/${runbot_user}/" /etc/systemd/system/builder.service
-```
-
-Enable all services and start runbot frontend
-
-```bash
-sudo systemctl enable runbot
-sudo systemctl enable leader
-sudo systemctl enable builder
-sudo systemctl daemon-reload
-sudo systemctl start runbot
-sudo systemctl status runbot
-```
-
-Runbot service should be running
-
-You can now connect to your backend and preconfigure runbot. 
-- Install runbot module, if it wasn't done before.
-- Navigate to `/web` to leave the website configurator.
-- Connect as admin (default password: admin).
-
-Check odoo documentation for other needed security configuration (master password). This is mainly needed for production purpose.
-You can check that in the `/web/database/manager` page. ([more info here](https://www.odoo.com/documentation/19.0/administration/on_premise/deploy.html#reset-the-master-password)) \
-Change your admin user login and password
-You may want to check the runbot settings (`Runbot > Setting > setting`):
-- Default number of workers should be the max number of parallel build, consider having max `#cpu - 1`
-- Modify `Default odoorc for builds` to change the running build master password to something unique ([ideally a hashed one](https://github.com/odoo/odoo/blob/19.0/odoo/tools/config.py#L787)).
-- Tweak the garbage collection settings, if you have limited disk space.
-- The `number of running build` is the number of parallel running builds.
-- `Max commit age (in days)` will limt the max age of commit to detect. Increase this limit to detect older branches.
-
-Finally, start the two other services:
-
-```bash
-systemctl start leader
-systemctl start builder
-```
-
-Several log files should have been created in `/home/runbot/odoo/logs/`, one per service.
 
 #### Bootstrap
 Once launched, the leader process should start to do basic work and bootstrap will start to setup some directories in static.
