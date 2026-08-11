@@ -22,6 +22,7 @@ from odoo.tools.safe_eval import safe_eval
 
 _logger = logging.getLogger(__name__)
 
+
 class ModuleFilter(models.Model):
     _name = 'runbot.module.filter'
     _description = 'Module filter'
@@ -38,6 +39,7 @@ class TriggerDependency(models.Model):
 
     dependency_id = fields.Many2one('runbot.trigger', string="Dependency", required=True)
     dependant_id = fields.Many2one('runbot.trigger', string="Dependant", required=True)
+
 
 class Trigger(models.Model):
     """
@@ -72,6 +74,7 @@ class Trigger(models.Model):
         column2='dependency_id',
         column1='dependant_id',
     )
+    starts_after_failure = fields.Boolean('Starts after failures', help="If checked, the trigger will also start after a failure", default=False)
     module_filters = fields.One2many('runbot.module.filter', 'trigger_id', string="Module filters", help='Will be combined with repo module filters when used with this trigger')
     config_id = fields.Many2one('runbot.build.config', string="Config", required=True)
     light_config_id = fields.Many2one('runbot.build.config', string="Light config", help="Alternative config to use when light mode is enabled")

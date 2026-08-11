@@ -186,6 +186,22 @@ class TestBuildParams(RunbotCaseMinimalSetup):
             self.assertEqual(batch.state, 'done')
             sp.rollback()
 
+        with self.env.cr.savepoint() as sp:
+            # same failure, but the dependant trigger opts in to start anyway
+            self.trigger_server.starts_after_failure = True
+            minimal_check_build.local_result = 'ko'
+            minimal_check_build.local_state = 'done'
+            batch._process()
+            all_builds = batch.slot_ids.build_id
+            self.assertEqual(
+                all_builds.trigger_id.mapped('name'),
+                ['minimal_check', 'Server trigger'],
+                'Server trigger should have started despite the failed dependency',
+            )
+            self.assertEqual(all_builds.mapped('local_state'), ['done', 'pending'])
+            self.assertEqual(batch.state, 'ready')
+            sp.rollback()
+
         minimal_check_build.local_result = 'ok'
         minimal_check_build.local_state = 'done'
         batch._process()
