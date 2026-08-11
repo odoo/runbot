@@ -1152,15 +1152,14 @@ class ConfigStep(models.Model):
                 if config_data.get('dump_from_current_batch'):
                     reference_batch = build.params_id.create_batch_id
                 else:
-                    reference_batch = build.params_id.create_batch_id.base_reference_batch_id
-                reference_build = reference_batch.slot_ids.filtered(lambda s: s.trigger_id == dump_trigger).mapped('build_id')
-            if reference_build:
-                dump_suffix = config_data.get('dump_suffix', 'all')
-                reference_build = reference_batch.slot_ids.filtered(lambda s: s.trigger_id == dump_trigger).mapped('build_id')
+                    reference_batch = build.params_id.create_batch_id.base_reference_batch_id or build.params_id.create_batch_id
+                reference_build = reference_batch.slot_ids.filtered(lambda s: s.trigger_id == dump_trigger).build_id
                 if not reference_build:
                     build._log('_run_restore', f'No reference build found in batch {reference_batch.id} for trigger {dump_trigger.name}', log_type='markdown', level='ERROR')
                     build._kill(result='ko')
                     return
+            if reference_build:
+                dump_suffix = config_data.get('dump_suffix', 'all')
                 if reference_build.local_state not in ('done', 'running'):
                     build._log('_run_restore', f'Reference build [{reference_build.id}]({reference_build.build_url}) is not yet finished, database may not exist', log_type='markdown', level='WARNING')
                 dump_db = reference_build.database_ids.filtered(lambda d: d.db_suffix == dump_suffix)

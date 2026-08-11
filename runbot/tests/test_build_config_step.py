@@ -1645,7 +1645,6 @@ Initiating shutdown
         self.assertEqual(str(self.build.job_end), '1970-01-01 02:00:00')
         self.assertEqual(self.build.local_result, 'warn')
 
-
     @patch('odoo.addons.runbot.models.build_config.ConfigStep._make_odoo_results')
     def test_make_python_result(self, mock_make_odoo_results):
         config_step = self.ConfigStep.create({
