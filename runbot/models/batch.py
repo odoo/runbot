@@ -459,6 +459,7 @@ class Batch(models.Model):
         self.ensure_one()
         bundle = self.bundle_id
         bundle_repos = bundle.branch_ids.filtered('alive').mapped('remote_id.repo_id')
+        finished_trigger = self.slot_ids.filtered(lambda s: s.build_id.global_state in ('running', 'done')).trigger_id
         success_trigger = self.slot_ids.filtered(lambda s: s.build_id.global_state in ('running', 'done') and s.build_id.global_result == "ok").trigger_id
         trigger_customs = {}
         for trigger_custom in self.bundle_id.all_trigger_custom_ids:
@@ -481,7 +482,10 @@ class Batch(models.Model):
                 continue
             trigger = slot.trigger_id
             trigger_custom = trigger_customs.get(trigger, self.env['runbot.bundle.trigger.custom'])
-            missing_triggers = trigger.starts_after_ids - success_trigger
+            if trigger.starts_after_failure:
+                missing_triggers = trigger.starts_after_ids - finished_trigger
+            else:
+                missing_triggers = trigger.starts_after_ids - success_trigger
             if missing_triggers:
                 if not trigger_custom or (missing_triggers - disabled_triggers):
                     continue

@@ -49,6 +49,7 @@
                       domain="[('category_id', '=', category_id), ('manual', '=', False), ('project_id', '=', project_id), ('id', '!=', id), ('id', 'not in', starts_before_ids)]"
                       widget="many2many_tags">
                   </field>
+                  <field name="starts_after_failure" invisible="manual or not starts_after_ids"/>
                 </group>
                 <group string="Starts before" invisible="manual" colspan="2">
                   <field 
