@@ -15,11 +15,11 @@
 
     <menuitem name="Hosts" id="runbot_menu_host_tree" parent="runbot_menu_root" sequence="300" action="open_view_host_tree" groups="runbot.group_runbot_admin"/>
 
-    <menuitem id="runbot_menu_trigger_root" parent="runbot_menu_root" sequence="500" name="Triggers" groups="runbot.group_runbot_admin"/>
+    <menuitem id="runbot_menu_trigger_root" parent="runbot_menu_root" sequence="500" name="Triggers" groups="runbot.group_runbot_admin,runbot.group_runbot_advanced_user"/>
 
-    <menuitem id="runbot_menu_trigger" parent="runbot_menu_trigger_root" sequence="501" action="runbot_triggers_action" groups="runbot.group_runbot_admin"/>
+    <menuitem id="runbot_menu_trigger" parent="runbot_menu_trigger_root" sequence="501" action="runbot_triggers_action"/>
 
-    <menuitem id="runbot_menu_trigger_dependency" parent="runbot_menu_trigger_root" sequence="502" action="runbot_triggers_dependency_action" groups="runbot.group_runbot_admin"/>
+    <menuitem id="runbot_menu_trigger_dependency" parent="runbot_menu_trigger_root" sequence="502" action="runbot_triggers_dependency_action"/>
 
 
     
