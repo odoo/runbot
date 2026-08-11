@@ -56,7 +56,7 @@
    
     <menuitem name="Warnings" id="runbot_menu_warning_root" parent="runbot_menu_root" sequence="1200" action="open_view_warning_tree" groups="runbot.group_runbot_admin"/>
 
-    <menuitem name="Settings" id="menu_runbot_settings" parent="runbot_menu_root" sequence="9000" groups="runbot.group_runbot_admin"/>
+    <menuitem name="Settings" id="menu_runbot_settings" parent="runbot_menu_root" sequence="9000" groups="runbot.group_runbot_admin,runbot.group_runbot_advanced_user"/>
     <menuitem id="menu_runbot_global_settings" parent="menu_runbot_settings" action="action_runbot_configuration" groups="base.group_system"/>
     <menuitem id="menu_bundle_project" action="action_bundle_project"  sequence="10" parent="menu_runbot_settings"/>
     <menuitem id="menu_bundle_version" action="action_bundle_version"  sequence="20" parent="menu_runbot_settings"/>
