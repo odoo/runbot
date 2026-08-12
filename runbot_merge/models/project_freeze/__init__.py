@@ -22,6 +22,7 @@ class FreezeWizard(models.Model):
     _description = "Wizard for freezing a project('s master)"
 
     project_id = fields.Many2one('runbot_merge.project', required=True)
+    disable_forwardport = fields.Boolean(related='project_id.forwardport_disabled')
     errors = fields.Text(compute='_compute_errors')
     branch_name = fields.Char(required=True, help="Name of the new branches to create")
 
@@ -179,7 +180,7 @@ class FreezeWizard(models.Model):
         # if there are still errors, reopen the wizard
         if self.errors:
             return self.action_open()
-        self.env.ref('runbot_merge.port_forward').active = False
+        self.project_id.disable_forwardport = True
 
         conflict_crons = self.env.ref('runbot_merge.merge_cron')\
                        | self.env.ref('runbot_merge.staging_cron')\
