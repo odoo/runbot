@@ -81,6 +81,9 @@ class ForwardPortTasks(models.Model):
             if descendant.parent_id:
                 descendant.parent_id = pr.id
 
+    def _search_domain(self):
+        return [('pr_id.repository.project_id.disable_forwardport', '=', False)]
+
     def _complete_batches(self):
         source = pr = self.pr_id
         source_id = pr.source_id or pr

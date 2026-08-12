@@ -61,6 +61,7 @@
                                 </group>
                                 <group>
                                     <field name="fw_nice" widget="boolean_toggle"/>
+                                    <field name="disable_forwardport" widget="boolean_toggle"/>
                                     <field name="use_mergiraf" widget="boolean_toggle"/>
                                     <field name="lateness_limit"/>
                                     <field name="uniquifier" widget="boolean_toggle"/>
