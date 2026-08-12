@@ -18,15 +18,15 @@ Runbot encodes concepts that cover all the testing and validation use-cases for 
 - **Project**: Logical grouping of repositories that are related to each other. Usually one project is enough and a default *R&D* project is automatically created.
 - **Repository**: Logical grouping of remotes. Usually you create *odoo* and *enterprise*.
 - **Remote**: A location to find (Git) repository information. Example: odoo/odoo, odoo-dev/odoo
-- **Bundle**: A group of matched[^1] branches across repositories eg, odoo/odoo/19.0 matches odoo/enterprise/19.0. Usually you see one bundle for every discovered branch (including PRs).
-- **Batch**: A group of commits, for all branches defined by the parent bundle. These commits build together.[^2]
+- **Bundle**: A group of matched[^branch-matching] branches across repositories eg, odoo/odoo/19.0 matches odoo/enterprise/19.0. Usually you see one bundle for every discovered branch (including PRs).
+- **Batch**: A group of commits, for all branches defined by the parent bundle. These commits build together.[^batches]
 - **Trigger**: Logic to automate creation of build instances. At a minimum you need one trigger per project to build new code eg, a new commit on odoo/odoo -[automatic batch creation]-> new batch -[trigger]-> new build to run odoo tests.
-- **Build**: Represents the execution of odoo, in practice this is when testing happens (`odoo-bin --tests-enabled <..>` is launched).[^3] Builds generally execute code and produce output (logs, build artifacts, running odoo instance for testing).
+- **Build**: Represents the execution of odoo, in practice this is when testing happens (`odoo-bin --tests-enabled <..>` is launched).[^build-start-delay] Builds generally execute code and produce output (logs, build artifacts, running odoo instance for testing).
 
 
-[^1]: Matching only links related repositories within the same project.  
-[^2]: Batches are created automatically by the parent bundle after detection of new commits.  
-[^3]: By default, build creation is delayed until 60 seconds (debounce) after the most recent commit on the linked batch. This debounce value is part of the project configuration.  
+[^branch-matching]: Matching only links related repositories within the same project.  
+[^batches]: Batches are created automatically by the parent bundle after detection of new commits.  
+[^build-start-delay]: By default, build creation is delayed until 60 seconds (debounce) after the most recent commit on the linked batch. This debounce value is part of the project configuration.  
 
 ## Processes
 
@@ -246,71 +246,78 @@ sed -i "s/runbot.domain.com/runbot.my_real_domain.com/" ~/bin/runbot/builder.sh
 Note: The host name of the builder process must match your DNS configuration (resolvable domain name). Runbot uses the host name to construct URLs for running builds (live test-instances), artifact downloads and log files. This value should be a fully qualified domain name that includes your real domain.  
 The example nginx configuration file demonstrates how to accept and proxy incoming connections on the builder process host.
 
-#### DOCKER images
-A default docker image (name 'DockerDefault') record is present in the database. The corresponding docker image should be built automatically by builder processes.  
-The code you're trying to build/test may require additional preinstalled dependencies. The recommended approach is to modify the default Dockerfile to match your situation.
+#### Docker images
+Builder processes run builds inside docker containers. These containers are instantiations from docker images defined inside Runbot model 'Docker file', a common docker file is provisioned by default. Builders will fetch (see Remote Registries) or build (see [Dockerfiles](#dockerfiles)) the images for every docker file automatically.
 
-The Odoo Runbot team maintains a set of prebuilt docker images that are compatible with actively supported Odoo versions. Ask them for a link to use in your own Runbot.
+#### Local data
 
-#### Bootstrap
-# --- TODO
-
-Once launched, the leader process should start to do basic work and bootstrap will start to setup some directories in static.
+The processes attempt to cache as much data as possible to reduce total wait time until builds finish. This data is stored inside the directory 'static'.
 
 ```bash
 su runbot
+
 ls ~/odoo/runbot/runbot/static
+> build  docker  nginx  repo  sources  src
+
 ```
 
->build  docker  nginx  repo  sources  src
-
-- **repo** contains the bare repositories
+- **repo** contains bare git repositories for each remote
 - **sources** contains the exported sources needed for each build
-- **build** contains the different workspaces for dockers, containing logs/ filestore, ...
+- **build** contains the run-environments (r/w volume mount into docker container) for builds, containing logs/ filestore, ...
 - **docker** contains DockerFile and docker build logs
 - **nginx** contains the nginx config used to access running instances
-All of them are empty for now.
 
-A database defined by *runbot.runbot_db_template* icp will be created. By default, runbot use template0. This database will be used as a template for testing builds. You can change this database for more customisation.
+All of the above directories are empty right now, we haven't configured Runbot to build anything.
+
+Runbot also supports picking specific database templates to be initialised before build launch. Runbot uses 'template0' by default, but can be overwritten through `Runbot > Settings > Settings` or instance parameter *runbot.runbot_db_template*.
 
 Other cron operations are still disabled for now.
 
 
 ## Test Runbot code
-All the Runbot processes are running and provisioned with basic configuration.  
-This section explains the configuration to achieve automated Runbot testing.
+All the Runbot processes are running and provisioned with basic configuration. Now it's time to perform some actual continuous integration (CI)!
 
 ### Repositories and remotes
-Access runbot app and go to the `Runbot>Setting>Repositories` menu
+Runbot needs code to build. It can retrieve code automatically through git repository synchronisation.
 
-Create a new repo for odoo
+Open the Runbot backend and open `Runbot > Setting > Repositories`.
+
+Create a new repository to represent the odoo git repository
 ![Odoo repo configuration](runbot/documentation/images/repo_odoo.png "Odoo repo configuration")
 
-- **Name**: `odoo` It will be used as the directory name to export the sources.
-- **Identity File** is only useful if you want to use another ssh key to access a repo.
+- **Name**: `odoo`, name of the target directory when source code is exported.
+- **Identity File** `<empty>` useful if you want to use a specific ssh key to access the repo.
 - **Project**: `R&D` by default.
-- **Modules to install**: `-*` in order to remove them from the default `-i`. This will speed up installation. To install and test all modules, leave this space empty or use `*`. Some modules may be blacklisted individually, by using `*-module,-other_module, l10n_*`.
-- **Server files**: `odoo-bin` will allow runbot to know the possible file to use to launch odoo. `odoo-bin` is the one to use for the last version, but you may want to add other server files for older versions (comma separated list). The same logic is used for manifest files.
+- **Modules to install**: `-*` to remove all from the default value for `-i`([odoo-bin cli](https://www.odoo.com/documentation/19.0/developer/reference/cli.html#cmdoption-odoo-bin-i)). This will speed up installation. [^modules-to-install]
+- **Server files**: `odoo-bin`, will instruct runbot how to launch odoo. [^bin-files]
 - **Manifest files**: `__manifest__.py`. This field is only useful to configure old versions of odoo.  
 - **Addons path**: `addons,odoo/addons`. The paths where addons are stored in this repository.
-- **Mode**: `poll` since github won't hook your runbot instance. Poll mode is limited to one update every 5 minutes. *It is advised to set it in hook mode later and hook it manually of from a cron or automated action to have more control*.
-- **Remotes**: `git@github.com:odoo/odoo.git` A single remote is added, the base odoo repo. Only branches will be fetched to limit disk usage and branches will be created in the backend. It is possible to add multiple remotes for forks.
+- **Mode**: `poll`, since integrating github hooks is out of scope for this guide.  
+    Poll mode is limited to one update every 5 minutes.
+- **Remotes**: `git@github.com:odoo/odoo.git`, the odoo community git repository.[^remotes]  
+    WARNING: Runbot will retrieve _all_ the repository data automatically! Downloading the entire odoo repository will take a long time.
 
-Create another project for your repositories `Runbot>Setting>Project`
+[^modules-to-install]: To install and test all modules, leave this space empty or use `*`. Some modules may be blacklisted individually, by using `*-module,-other_module, l10n_*`.
+[^bin-files]: `odoo-bin` is the entrypoint to use since Odoo v11, but you may want to add other server files for older versions (comma separated list). All the entrypoint names are tried in definition order.
+[^remotes]: You can add more remotes to logically combine the work saved on (private) forks of the project, or to simply have redundancy.
 
-This is optionnal you could use the R&D one, but this may be more noisy since every update in odoo/odoo will be displayed on the same page as your own repo one. Splitting by project also allows to manage access rights. 
 
-Create a repo for your custom addons repo
+Create a new repository to represent the runbot git repository
 ![Odoo repo configuration](runbot/documentation/images/repo_runbot.png "Odoo repo configuration")
 - **Name**: `runbot`
-- **Project**: `runbot`.
-- **Modules to install**: `-*,runbot` to only install the runbot module.
-- **Addons path**: No `addons_path` given to use repo root as default.
-- (optionnal) For your custom repo, it is advised to configure the repo in `hook` mode if possible, adding a webhook on `/runbot/hook`. Use `/runbot/hook/<repo_id>` to do it manually.
+- **Project**: `R&D`.
+- **Modules to install**: `-*,runbot`, only install the runbot module (and module dependencies of course).
+- **Addons path**: `\<empty>`, without addons path Runbot uses the repository root to find modules.
+- **Mode**: `poll`, since integrating github hooks is out of scope for this scope.
 - **Remotes**: `git@github.com:odoo/runbot.git` 
 - The remote *PR* option can be checked if needed to fetch pull request too. Will work only if a github token is given for this repo.
 
-A config file with your remotes should be created for each repo. You can check the content in `/runbot/static/repo/(runbot|odoo)/config`. The repo will be fetched, this operation may take some time too. After that, you should start seeing empty batches in both projects on the frontend (`/` or `/runbot`)
+If you link your own repository, it is advised to set **mode** to `hook`. The endpoint `/runbot/hook` becomes available to process incoming webhooks from Github. Other systems, like cron, can call endpoint `/runbot/hook/<repo_id>` to refresh the repository.  
+*It is advised to change the mode to 'hook' for all repositories to reduce end-to-end test latency.*
+
+A config file with your remotes should be created for each repository. Verify the file contents at `/runbot/static/repo/(runbot|odoo)/config`.  
+The repositories will be fetched automatically, this operation may take some time too.  
+After fetching finishes you should see empty batches in both projects on the website frontend (`/` or `/runbot`)
 
 ### Triggers and linked config
 At this point, runbot will discover new branches, new commits, create bundle, but no build will be created.
@@ -377,18 +384,19 @@ createdb template_runbot -T template0
 
 ## Dockerfiles
 
-Runbot is using a Dockerfile Odoo model to define the Dockerfile used for builds and is shipped with a default one. This default Dockerfile is based on Ubuntu Bionic and is intended to build recent supported versions of Odoo.
+Runbot is using odoo model 'docker file' to define the Dockerfile used for builds and is shipped with a default record. This default Dockerfile is based on Ubuntu Noble (24.04) and is capable of building (supported versions of) Odoo.
 
-The model is using Odoo QWeb views as templates.
+The model uses Odoo QWeb views to compile Dockerfile contents.
 
 A new Dockerfile can be created as needed either by duplicating the default one and adapt parameters in the view. e.g.: changing the key `'from': 'ubuntu:jammy'` to `'from': 'debian:buster'` will create a new Dockerfile based on Debian instead of ubuntu.
 Or by providing a plain Dockerfile in the template.
 
 Once the Dockerfile is created and the `to_build` field is checked, the Dockerfile will be built (pay attention that no other operations will occur during the build).
 
-A version or a bundle can be assigned a specific Dockerfile.
+A specific docker file can be assigned to the models version and bundle.
 
+The Odoo Runbot team maintains a set of prebuilt docker images that are compatible with actively supported Odoo versions. Ask them for a link to use in your own Runbot.
 
 ## User documentation
 
- You can find a more detailed user documentation [here](./runbot/documentation/readme.md)
+You can find a more detailed user documentation [here](./runbot/documentation/readme.md)
