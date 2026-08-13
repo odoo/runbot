@@ -414,4 +414,4 @@ The Odoo Runbot team also maintains a set of prebuilt docker images that are com
 
 ## User documentation
 
-You can find a more detailed user documentation [here](./runbot/documentation/readme.md)
+You can find a more detailed user documentation [here](./runbot/documentation/readme.md).
