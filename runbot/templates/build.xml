@@ -4,7 +4,7 @@
     <template id="runbot.build">
       <t t-call='runbot.layout'>
         <t t-set="nav_form">
-          <form class="form-inline">
+          <form>
             <div class="btn-group">
               <t t-call="runbot.build_button">
                 <t t-set="bu" t-value="build"/>
