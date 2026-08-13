@@ -7,7 +7,7 @@
                     <t t-set="commit" t-value="commit_link.commit_id"/>
                     <t t-set="collapse" t-value="'collapse' + str(commit_link.id)"/>
                     <t t-set="href" t-value="'#' + collapse"/>
-                    <div class="container sticky-top bg-white" style="margin-left: 50%;">
+                    <div class="container sticky-top bg-body" style="margin-left: 50%;">
                         <p>
                             <span type="button" data-bs-toggle="collapse" t-att-data-bs-target="href" role="button" aria-expanded="true" t-att-aria-controls="collapse"><i class="fa fa-toggle-up"/></span>
                                 <a t-attf-href="/runbot/commit/#{commit.id}">
