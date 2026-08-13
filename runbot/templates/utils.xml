@@ -100,15 +100,15 @@
                                                     <span t-out="user_id.name[:23] + '...' if user_id.name and len(user_id.name) &gt; 25 else user_id.name"/>
                                                 </b>
                                             </a>
-                                            <div class="dropdown-menu dropdown-menu-end js_usermenu" role="menu">
-                                                <a class="dropdown-item" id="o_logout" role="menuitem" t-attf-href="/web/session/logout?redirect=/">Logout</a>
-                                                <a class="dropdown-item" role="menuitem" t-attf-href="/odoo">Backend</a>
-                                                <div t-if="user_id.runbot_team_ids" class="dropdown-divider"/>
-                                                <div t-if="user_id.runbot_team_ids" class="dropdown-header">Teams</div>
-                                                <a t-foreach="user_id.runbot_team_ids" t-as="team" class="dropdown-item" role="menuitem" t-attf-href="/runbot/teams/{{team.id}}">
+                                            <ul class="dropdown-menu dropdown-menu-end js_usermenu" role="menu">
+                                                <li><a class="dropdown-item" id="o_logout" role="menuitem" t-attf-href="/web/session/logout?redirect=/">Logout</a></li>
+                                                <li><a class="dropdown-item" role="menuitem" t-attf-href="/odoo">Backend</a></li>
+                                                <li><div t-if="user_id.runbot_team_ids" class="dropdown-divider"/></li>
+                                                <li><div t-if="user_id.runbot_team_ids" class="dropdown-header">Teams</div></li>
+                                                <li><a t-foreach="user_id.runbot_team_ids" t-as="team" class="dropdown-item" role="menuitem" t-attf-href="/runbot/teams/{{team.id}}">
                                                     <t t-out="team.name.capitalize()"/>
-                                                </a>
-                                            </div>
+                                                </a></li>
+                                            </ul>
                                         </li>
                                     </t>
                                     <t t-else="">
@@ -447,14 +447,14 @@
           <button t-attf-class="{{btn_classes or 'btn btn-default btn-ssm'}} dropdown-toggle" data-bs-toggle="dropdown" title="Github links" aria-label="Github links" aria-expanded="false">
             <i t-attf-class="fa fa-github {{'text-primary' if any(branch_id.is_pr and branch_id.alive for branch_id in bundle.branch_ids) else 'text-secondary' if all(not branch_id.alive for branch_id in bundle.branch_ids) else ''}}"/>
           </button>
-          <div  class="dropdown-menu" role="menu">
-            <t t-foreach="bundle.branch_ids.sorted(key=lambda b: (not b.alive, b.remote_id.repo_id.sequence, b.remote_id.repo_id.id, b.is_pr, b.id))" t-as="branch">
+          <ul class="dropdown-menu" role="menu">
+            <li t-foreach="bundle.branch_ids.sorted(key=lambda b: (not b.alive, b.remote_id.repo_id.sequence, b.remote_id.repo_id.id, b.is_pr, b.id))" t-as="branch">
               <t t-set="link_title" t-value="'View %s %s on Github' % ('PR' if branch.is_pr else 'Branch', branch.name)"/>
               <a t-att-href="branch.branch_url" class="dropdown-item" t-att-title="link_title">
                 <span class="fst-italic text-muted" t-out="branch.remote_id.short_name"/> <span t-att-class="'' if branch.alive else 'line-through'" t-out="branch.name"/> <i t-if="not branch.alive" title="deleted/closed" class="fa fa-ban text-danger"/>
               </a>
-            </t>
-          </div>
+            </li>
+          </ul>
         </template>
 
         <template id="runbot.branch_copy_button">
