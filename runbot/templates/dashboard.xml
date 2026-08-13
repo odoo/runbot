@@ -245,7 +245,7 @@
             </div>
             <div class="col-md-9 col-lg-10">
               <div class="table-responsive">
-                <table class="table table-condensed">
+                <table class="table table-sm">
                   <t t-foreach="builds" t-as="build">
                     <t t-set="rowclass">
                       <t t-call="runbot.build_class">

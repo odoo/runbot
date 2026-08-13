@@ -276,7 +276,7 @@
           </div>
           <div class="col-md-6" t-if="build.children_ids or build.linked_children_build_ids">
             Children:
-            <table class="table table-condensed">
+            <table class="table table-sm">
               <t t-foreach="(build.children_ids | build.linked_children_build_ids).sorted(lambda b: b.id)" t-as="child">
                 <t t-set="rowclass">
                   <t t-call="runbot.build_class">
@@ -326,7 +326,7 @@
           </div>
           <t t-set="nb_subbuild" t-value="len(build.children_ids)"/>
           <div class="col-md-12">
-            <table class="table table-condensed">
+            <table class="table table-sm">
               <tr>
                 <th>Date (UTC)</th>
                 <th>Level</th>
@@ -404,7 +404,7 @@
       <t t-call='runbot.layout'>
         <div class="row g-0">
           <div class="col-md-12">
-            <table class="table table-condensed">
+            <table class="table table-sm">
               <t t-foreach="builds" t-as="build">
                 <t t-set="rowclass">
                   <t t-call="runbot.build_class">

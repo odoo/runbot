@@ -243,10 +243,6 @@ a, .btn-link {
 	background-color: #aaa;
 }
 
-.table-condensed td {
-	padding: 0.25rem;
-}
-
 .line-through {
 	text-decoration: line-through;
 }
@@ -421,7 +417,7 @@ code {
 	text-decoration: underline;
 }
 
-.table-condensed .log-server td, .table-condensed .log-details td {
+.table-sm .log-server td, .table-sm .log-details td {
 	padding-top: 0;
 	padding-bottom: 0;
 	border: none;
