@@ -35,7 +35,7 @@
         <template id="runbot.bundles_by_tag">
             <t t-call='runbot.layout'>
                 <div class="container-fluid">
-                    <table class="table table-condensed table-group table-filter caption-top text-body-secondary">
+                    <table class="table table-sm table-group table-filter caption-top text-body-secondary">
                         <caption>
                             <div class="row align-items-center">
                                 <h1 class="col-12 col-md-auto text-capitalize">

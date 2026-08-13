@@ -28,7 +28,7 @@
             </table>
           </div>
           <!-- Commits -->
-          <table class="table table-condensed" style="table-layout: initial;">
+          <table class="table table-sm" style="table-layout: initial;">
             <thead>
               <tr>
                 <th colspan="6">Commits:</th>
@@ -59,7 +59,7 @@
             </tr>
           </table>
           <!-- Bundles / Batches -->
-          <table class="table table-condensed" style="table-layout: initial;">
+          <table class="table table-sm" style="table-layout: initial;">
             <thead>
               <tr>
                 <th colspan="3">Batches:</th>
