@@ -1675,6 +1675,37 @@ Initiating shutdown
         config_step._make_results(build)
         self.assertEqual(build.local_result, 'warn')
 
+    @patch('odoo.addons.runbot.models.build_config.ConfigStep._make_odoo_results')
+    def test_make_python_result_traceback(self, mock_make_odoo_results):
+        config_step = self.ConfigStep.create({
+            'name': 'all',
+            'job_type': 'python',
+            'test_tags': '/module,:class.method',
+            'python_result_code': """a = 2*5\nreturn_value = {'local_result': 'ok'}"""
+        })
+        build = self.Build.create({
+            'params_id': self.base_params.id,
+        })
+        build.local_state = 'testing'
+        self.patchers['isfile'].return_value = False
+        config_step._make_results(build)
+        self.assertEqual(build.local_result, 'ok')
+
+        # invalid result code (no return_value set)
+        config_step.python_result_code = """a = 2*5\nr = {'a': 'ok'}\nreturn_value = 'ko'"""
+        with self.assertRaises(RunbotException):
+            config_step._make_results(build)
+
+        # no result defined
+        config_step.python_result_code = ""
+        def make_warn(build):
+            build.local_result = "warn"
+
+        mock_make_odoo_results.side_effect = make_warn
+        config_step._make_results(build)
+        self.assertEqual(build.local_result, 'warn')
+
+
     def test_check_exit_status_ok(self):
         self.config_step.write({'check_exit_status': True})
         file_content = """
