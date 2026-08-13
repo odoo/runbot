@@ -66,14 +66,11 @@
                                             </li>
                                         </t>
                                     </t>
-                                    <li class="nav-item divider"/>
-
                                     <li class="nav-item">
                                         <button command="show-modal" commandfor="collapsePreference" type="button" class="nav-link">
                                             <i class="fa fa-gear"/>
                                         </button>
                                     </li>
-                                    <li class="nav-item divider" t-ignore="true"/>
                                     <t t-if="not user_id._is_public()">
                                         <t t-if="env.user.has_group('runbot.group_runbot_admin')">
                                             <t t-set="docker_files" t-value="env['runbot.dockerfile'].search([])"/>
@@ -227,7 +224,6 @@
 
         <template id="runbot.build_errors_link">
             <t t-if="nb_assigned_errors">
-                <li class="nav-item divider"/>
                 <li class="nav-item">
                     <a href="/runbot/errors" class="nav-link text-danger" t-attf-title="You have {{nb_assigned_errors}} random bug assigned">
                         <i class="fa fa-bug"/>
@@ -237,7 +233,6 @@
                 </li>
             </t>
             <t t-elif="nb_team_errors">
-                <li class="nav-item divider"/>
                 <li class="nav-item">
                     <a href="/runbot/errors" class="nav-link text-warning" t-attf-title="Your team has {{nb_team_errors}} random bug assigned">
                         <i class="fa fa-bug"/>
@@ -246,7 +241,6 @@
                 </li>
             </t>
             <t t-elif="nb_build_errors">
-                <li class="nav-item divider"/>
                 <li class="nav-item">
                     <a href="/runbot/errors" class="nav-link" title="Random Bugs"><i class="fa fa-bug"/></a>
                 </li>
@@ -452,7 +446,6 @@
         <template id="runbot.branch_github_menu">
           <button t-attf-class="{{btn_classes or 'btn btn-default btn-ssm'}} dropdown-toggle" data-bs-toggle="dropdown" title="Github links" aria-label="Github links" aria-expanded="false">
             <i t-attf-class="fa fa-github {{'text-primary' if any(branch_id.is_pr and branch_id.alive for branch_id in bundle.branch_ids) else 'text-secondary' if all(not branch_id.alive for branch_id in bundle.branch_ids) else ''}}"/>
-            <span class="caret"/>
           </button>
           <div  class="dropdown-menu" role="menu">
             <t t-foreach="bundle.branch_ids.sorted(key=lambda b: (not b.alive, b.remote_id.repo_id.sequence, b.remote_id.repo_id.id, b.is_pr, b.id))" t-as="branch">

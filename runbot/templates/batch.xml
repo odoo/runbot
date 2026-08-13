@@ -96,7 +96,7 @@
                                     </t>
                                     <a t-attf-href="/runbot/commit/#{commit.id}" t-att-title="commit_title">
                                         <i t-attf-class="fa fa-fw {{commit_icon}}"/>
-                                        <span class="label" t-out="commit.dname"/>
+                                        <span t-out="commit.dname"/>
                                     </a>
                                     <a t-att-href="'https://%s/commit/%s' % (commit_link.branch_id.remote_id.base_url, commit_link.commit_id.name)" title="View Commit on Github"><i class="fa fa-github"/></a>
                                     <small t-if="commit_link.match_type and commit_link.match_type.startswith('base')">
