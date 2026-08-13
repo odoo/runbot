@@ -39,7 +39,7 @@ Runbot functionality is split to allow some horizontal scaling of the platform a
 
 ## Operational requirements
 
-You can skip ahead to [First steps with Runbot](#first-steps-with-runbot) if you are interested to try Runbot.  
+You can skip ahead to [User guide](#user-guide) if you are interested to try Runbot.  
 This section describes Runbot's expectations of its host with configuration examples.
 
 ### DNS
@@ -57,7 +57,7 @@ runbot.domain.com.  IN A      127.0.0.1
 
 ### nginx
 
-An example of config is given in the [./runbot/runbot/example_scripts]() directory.
+An example of config is given in the [./runbot/runbot/example_scripts] directory.
 
 This may be adapted depending on your setup, mainly for domain names. This can be adapted during the install but serving at least the runbot frontend (proxy pass `80` to `8069`) is the minimal config needed.
 Note that runbot also has a dynamic nginx config listening on the `8080` port, mainly for running build.
@@ -68,7 +68,7 @@ It is also advised to adapt this config to work in `https`.
 
 ### Running unattended
 
-The directory [./runbot/runbot/example_scripts]() has example configuration to launch every Runbot process. This section explains how to configure Systemd to start Runbot unattended.
+The directory [./runbot/runbot/example_scripts] has example configuration to launch every Runbot process. This section explains how to configure Systemd to start Runbot unattended.
 
 NOTE: This part assumes a dedicated user 'runbot' exists to start Runbot and 'runbot' has write permissions to docker and postgresql.
 
@@ -201,7 +201,7 @@ All requirements are met, go ahead and launch!
 ```
 
 You can now connect to your running instance and configure runbot.
-- Page [http://127.0.0.1:8069]() shows an empty bundle overview page. Nothing is configured yet.
+- Page [http://127.0.0.1:8069] shows an empty bundle overview page. Nothing is configured yet.
 - Log into the backend as admin (default password: admin).
 - Visit page [Runbot > Settings > Settings](http://127.0.0.1:8069/odoo/settings) to update your instance settings:
     - **Default number of worker**, the maximum number of builds to run in parallel. Consider setting the value to `#cpu - 1`.
@@ -267,7 +267,7 @@ ls ~/odoo/runbot/runbot/static
 
 All of the above directories are empty right now, we haven't configured Runbot to build anything.
 
-Runbot also supports picking specific database templates to be initialised before build launch. By default template 'template0' is used (see [db template](#db template)).
+Runbot also supports picking specific database templates to be initialised before build launch. By default template 'template0' is used (see [db template](#db-template)).
 
 Other cron operations are still disabled for now.
 
