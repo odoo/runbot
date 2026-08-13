@@ -314,7 +314,7 @@
         </template>
 
         <template id="runbot.build_button">
-            <div t-attf-class="pull-right">
+            <div t-attf-class="float-end">
                 <div t-attf-class="btn-group {{klass}}">
                     <a t-if="bu.local_state == 'running' and bu.database_ids" t-attf-href="/runbot/run/{{bu.id}}" class="btn btn-info" title="Sign in on this build" aria-label="Sign in on this build">
                         <i class="fa fa-sign-in"/>
