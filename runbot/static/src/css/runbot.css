@@ -129,10 +129,6 @@
 	background-color: RGBA(var(--bs-body-bg-rgb), var(--bs-bg-opacity, 1)) !important;
 }
 
-.table-responsive {
-	display: block;  /* more condensed table, to replace */
-}
-
 .table {
 	--bs-table-bg: transparent; /* Forced to white in bootstrap latest version, hides the color of sub builds, batch commits, ...*/
 }
