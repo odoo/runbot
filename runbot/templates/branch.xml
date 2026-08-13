@@ -16,7 +16,7 @@
                   </div>
                 </h3>
               </div>
-              <table class="table table-condensed table-responsive">
+              <table class="table table-sm table-responsive">
                 <tr>
                   <td>Remote:</td>
                   <td t-out="branch.remote_id.name"></td>
@@ -58,7 +58,7 @@
                   </tr>
                 </t>
               </table>
-                <table t-if="branch.reflog_ids" class="table table-condensed table-striped" style="table-layout: initial;">
+                <table t-if="branch.reflog_ids" class="table table-sm table-striped" style="table-layout: initial;">
                   <thead>
                       <tr>
                           <th>Ref Date</th>
