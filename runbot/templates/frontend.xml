@@ -59,7 +59,9 @@
                         </t></div>
                       <div class="btn-group" role="group">
                         <t t-if="not bundle.sticky" t-call="runbot.branch_copy_button"/>
-                        <t t-call="runbot.branch_github_menu"/>
+                        <div class="btn-group" role="group">
+                          <t t-call="runbot.branch_github_menu"/>
+                        </div>
                       </div>
                     </div>
                     <div t-if="bundle.host_id">
