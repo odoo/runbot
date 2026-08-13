@@ -113,7 +113,7 @@ sudo systemctl status runbot
 Ensure startup completed succesfully, then start and verify the other runbot processes too.  
 Several log files should have been created in `/home/runbot/odoo/logs/`, one per service.
 
-## First steps with Runbot
+## User guide
 
 Follow along to get a new Runbot instance configured that tests code from this (Runbot) repository. Runbotception!  
 Note that Runbot runs on top of Odoo community and we'll not be testing Odoo community itself.
@@ -308,7 +308,7 @@ Create a new repository to represent the runbot git repository
 - **Project**: `R&D`.
 - **Modules to install**: `-*,runbot`, only install the runbot module (and module dependencies of course).
 - **Addons path**: `\<empty>`, without addons path Runbot uses the repository root to find modules.
-- **Mode**: `poll`, since integrating github hooks is out of scope for this scope.
+- **Mode**: `poll`, since integrating github hooks is out of scope for this guide.
 - **Remotes**: `git@github.com:odoo/runbot.git` 
 - The remote *PR* option can be checked if needed to fetch pull request too. Will work only if a github token is given for this repo.
 
@@ -316,86 +316,105 @@ If you link your own repository, it is advised to set **mode** to `hook`. The en
 *It is advised to change the mode to 'hook' for all repositories to reduce end-to-end test latency.*
 
 A config file with your remotes should be created for each repository. Verify the file contents at `/runbot/static/repo/(runbot|odoo)/config`.  
-The repositories will be fetched automatically, this operation may take some time too.  
+Data is fetched from the remotes automatically, the first fetch will take a long time.  
 After fetching finishes you should see empty batches in both projects on the website frontend (`/` or `/runbot`)
 
 ### Triggers and linked config
-At this point, runbot will discover new branches, new commits, create bundle, but no build will be created.
+At this point, runbot discovers new branches, new commits, creates bundles, but no builds.
 
-When a new commit is discovered, the branch is updated with a new commit. Then this commit is added in a batch, a container for new builds when they arrive, but only if a trigger corresponding to this repo exists. After one minute without a new commit update in the batch, the different triggers will create one build each.
-In this example, we want to create a new build when a new commit is pushed on runbot, and this build needs a commit in odoo as a dependency.
+To test the runbot code we want to create builds when the remote has new commits. To run runbot we also need a commit from the odoo repository. These requirements can be configured as a trigger.  
+When triggers activate, they take the linked config to create one or multiple builds. 
 
-By default the basic config will use the step `all` to test all addons. The installed addons will depends on the repo configuration, but all dependencies tests will be executed too.
-This may not be wanted because some `base` or `web` test may be broken. This is the case with runbot addons. Also, selecting only the test for the addons
-we are interested in will speedup the build a lot.
+Runbot has a couple of pre-configured configurations (config) that perform common operations like execute tests, keep test-build running, create coverage report, start multiple parallel builds for the same batch etc.
 
-Even if it would be better to create new Config and steps, we will modify the curent `all` config step.
+Configurations are composed of configuration steps. One of the default configuration steps is `all`, configured to test *all addons* including those from dependencies.  
+At the moment we're only interested in testing runbot, skipping tests from odoo `base` and `web` finishes our builds more quickly and doesn't give false positive errors in case some of those tests break.  
+We could duplicate an existing configuration but it's quicker to just modify the `all` config step.
 
-`Runbot > Configs > Build Config Steps`
+Open the Runbot backend and open `Runbot > Configs > Build Config Steps`
 
-Edit the `all` config step and set `/runbot` as **Test tags**
+Edit the config step `all` to restrict which tests to run
+- Open the record named `all`
+- **Test tags**: set to value `/runbot` ([More info about test tags](https://www.odoo.com/documentation/19.0/developer/reference/cli.html#cmdoption-odoo-bin-test-tags))
 
-We can also check the config were going to use:
+Open `Runbot > Configs > Build Config`
 
-`Runbot > Configs > Build Config`
+Remove the config step `base` from the config `Default no run`:
+- Open the record named `Default no run`
+- Inside the step order, remove config step `base`
 
-Optionnaly, edit `Default no run` config and remove the `base` step. It will only test the module base.
+Config and steps are powerful concepts, even allowing Python code to be executed. Advanced usage is out of scope for this guide.
 
-Config and steps can be usefull to create custom test behaviour but this is out of the scope of this tutorial.
+Open `Runbot > Triggers`
 
-Create a new trigger like this:
+Create a new trigger that will generate builds for the runbot repo:
+- *Name*: `Runbot`, just for display.
+- *Project id*: `runbot`, the trigger only reacts to repository updates linked to this project.
+- *Repositories*: Add link to `runbot`, commits from runbot are the main subject.
+- *Dependencies*: Add link to `odoo`, odoo source is required to run Runbot.
+- *Config*: `Default no run`, start a build but don't keep a test-build running at the end. You can still wake up a build.
 
-`Runbot>Triggers`
+You can either push new commits to the remote, or go on the frontend bundle page and use the `Force new batch` button (refresh icon) to test this new trigger. Build 'Runbot' is automatically created.
 
-- *Name*: `Runbot` Just for display 
-- *Project id*: `runbot` This is important since you can only chose repo triggering a new build in this project.
-- *Triggers*: `runbot` A new build will be created int the project when pushing on this repo.
-- *Dependencies*: `odoo` Runbot needs odoo to run
-- *Config*: `Default no run` Will start a build but don't make it running at the end. You can still wake up a build.
+If CI options are configured, triggers will send build status information to remotes that have a valid API token. This completes the CI feedback loop.
 
-When a branch is pushed, a new batch will be created, and after one minute the new build will be created if no other change is detected.
+Runbot is now configured to automatically test changes made to the runbot code. This is the end of the guide. Good luck!
 
-CI options will only be used to send status on remotes of trigger repositories having a valid token.
+## Bundles
 
-You can either push, or go on the frontend bundle page and use the `Force new batch` button (refresh icon) to test this new trigger.
+Bundles can be marked as `no_build`, so that new commit(s) won't create batches. The bundle won't be displayed on the overview page either.
 
-### Bundles
+## Hosts
+Runbot is able to automatically assign pending builds across multiple hosts. Currently, this action is performed by the leader process. The platform can run without a leader process or with exactly one active leader process.  
+A builder host will never assign a pending build to itself nor work-steal pending builds from other builders.
 
-Bundles can be marked as `no_build`, so that new commit(s) won't create batch creation and the bundle won't be displayed on the main page.
+To manually assign builds to your fleet, exclude your buildhosts from the assignment pool and assign your build records directly to a specific builder.
 
-### Hosts
-Runbot is able to share pending builds across multiple hosts. In the present case, there is only one. A new host will never assign a pending build to itself by default.
-Go to the "Build Hosts" menu and choose yours. Uncheck *Only accept assigned build*. You can also tweak the number of parallel builds for this host.
+Open `Runbot > Hosts`
+- Pick your desired builder
+- **Only accept assigned build**: `checked`, remove the current host from the assignment pool
 
-### Modules filters
-Modules to install can be filtered by repo, and by config step. The first filter to be applied is the repo one, creating the default list for a config step.
-Addon `-module` on a repo will remove the module from the default, it is advised to reflect the default case on repo. To test only a custom module, adding `-*` on odoo repo will disable all odoo addons. Only dependencies of custom modules will be installed. Some specific modules can also be filtered using `-module1,-module1` or somme specific modules can be kept using `-*,module1,module2`.
-Modules can also be filtered on a config step with the same logic as repo filter, except that repo's blacklist can be disabled to allow all modules by starting the list with `*` (all available modules)
-It is also possible to add test-tags to config step to allow more module to be installed but only testing some specific one. Test tags: `/module1,/module2`
+Open `Runbot > Objects > Builds`
+- Pick a build that the system created for you
+- (optional) Duplicate it
+- **Host name**: `<name of your builder>`, manually assign this build to the specified builder host
 
-### db template
-Db creation will use `template0` by default. It is possible to specify a specific template to use in runbot config *Postgresql template*. It is mainly used to add extensions. This will also avoid having issue if `template0` is used when creating a new database.
 
-It is recommended to generate a `template_runbot`  database based on `template0` and set this value in the runbot settings
+## Modules filters
+Modules to install can be filtered by repo, and by config step. The filter configured on the repository is applied first, resulting in a 'default modules list' for all configurations. The filter configured on config is applied on top of the default modules list.
 
-```
+Prefixing a module name with a minus `-` sign eg, `-base`, will exclude it from the modules list. The Odoo Runbot team suggests installing handpicked toplevel modules to prevent installation of unnecessary modules taking additional build time.  
+Use an asterisk to target all default modules eg, `-*` removes all modules from the list, and this can be suffixed with module name(s) we want to install eg, `-*,runbot` (comma seperated list).  
+Ofcourse this requires the manifest of module `runbot` is correctly declaring its own module dependencies.
+
+Tests can be filtered separately from modules, and an unconfigured value will run tests for all installed modules. You can restrict which test(s) to run using [the test-tags syntax](https://www.odoo.com/documentation/19.0/developer/reference/cli.html?highlight=cli#cmdoption-odoo-bin-test-tags) eg, `/runbot,/runbot_builder` will only run tests defined inside the modules runbot and runbot_builder.
+
+## db template
+Database creation before starting a build will use `template0` by default. It is possible to specify a specific template to use in the runbot settings field *Postgresql template*. A custom database is mainly used to add extensions.
+
+The Odoo Runbot team recommends generating a new template database `template_runbot` based on `template0`, prepare it according to your needs, and set its name in the runbot settings.
+
+```bash
+su postgres
+
 createdb template_runbot -T template0
+# Mark database as template
+psql --dbname postgres --command "update pg_database set datistemplate = true where datname = 'template_runbot'"
+
+# Activate extensions and other manipulations
+# psql --dbname template_runbot --command "CREATE EXTENSION <...>"
 ```
 
 ## Dockerfiles
 
-Runbot is using odoo model 'docker file' to define the Dockerfile used for builds and is shipped with a default record. This default Dockerfile is based on Ubuntu Noble (24.04) and is capable of building (supported versions of) Odoo.
+Runbot automatically installs a default 'docker file' model to represent the runtime environment of the builds. This Dockerfile is based on Ubuntu Noble (24.04) and is capable of testing/running (supported versions of) Odoo.
+DockerFile records  can be assigned to the models version and bundle.
 
-The model uses Odoo QWeb views to compile Dockerfile contents.
+The 'docker file' model uses Odoo QWeb views to compile Dockerfile text. You can construct the Dockerfile contents with reusable layer elements, and you can also paste your own Dockerfile text into a layer of type 'Raw'.  
+All Dockerfile records with `to_build` field checked are built automatically (pay attention that no other operations will occur during the build).
 
-A new Dockerfile can be created as needed either by duplicating the default one and adapt parameters in the view. e.g.: changing the key `'from': 'ubuntu:jammy'` to `'from': 'debian:buster'` will create a new Dockerfile based on Debian instead of ubuntu.
-Or by providing a plain Dockerfile in the template.
-
-Once the Dockerfile is created and the `to_build` field is checked, the Dockerfile will be built (pay attention that no other operations will occur during the build).
-
-A specific docker file can be assigned to the models version and bundle.
-
-The Odoo Runbot team maintains a set of prebuilt docker images that are compatible with actively supported Odoo versions. Ask them for a link to use in your own Runbot.
+The Odoo Runbot team suggests creating a new Dockerfile by duplicating the default one and adapt parameters in the view.  
+The Odoo Runbot team also maintains a set of prebuilt docker images that are compatible with actively supported Odoo versions. Ask them for a link to use in your own Runbot.
 
 ## User documentation
 
