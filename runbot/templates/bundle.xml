@@ -95,28 +95,30 @@
                                         <a t-if="needs_update" role="button" class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/force"><i class="fa fa-play"/> Apply</a>
                                         <div t-if="bundle.trigger_custom_ids" t-attf-class="collapse {{'show' if expand_custom else ''}}" id="customTriggers">
                                             <div class="card card-body mt-2">
-                                                <t t-foreach="bundle.trigger_custom_ids" t-as="trigger_custom">
-                                                    <t t-set="trigger_enabled_by_default" t-value="trigger_custom.trigger_id.repo_ids &amp; modified_repos"/>
-                                                    <t t-set="level_color" t-if="trigger_enabled_by_default and trigger_custom.start_mode == 'disabled'">danger</t>
-                                                    <t t-set="level_color" t-elif="trigger_enabled_by_default and trigger_custom.start_mode == 'light'">info</t>
-                                                    <t t-set="level_color" t-elif="not trigger_enabled_by_default and trigger_custom.start_mode == 'force'">warning</t>
-                                                    <t t-set="level_color" t-elif="trigger_enabled_by_default">success</t>
-                                                    <t t-set="level_color" t-else="">secondary</t>
-                                                    <div>
-                                                        <a href="#" t-attf-class="badge text-bg-{{level_color}} dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                                                            <t t-out="trigger_custom.start_mode"/>
-                                                            <i class="fa fa-caret-down ms-1"/>
-                                                        </a>
-                                                        <form class="dropdown-menu">
-                                                            <li t-foreach="['disabled', 'light', 'auto', 'force']" t-as="mode">
-                                                                <a class="dropdown-item" t-attf-href="/runbot/trigger_custom/{{trigger_custom.id}}/set_mode/{{mode}}" t-if="mode != trigger_custom.start_mode and (mode != 'light' or trigger_custom.trigger_id.light_config_id)">
-                                                                    <span t-out="mode"/>
-                                                                </a>
-                                                            </li>
-                                                        </form>
+                                                <div class="d-grid gap-1" style="grid-template-columns: 1fr 2fr;">
+                                                    <t t-foreach="bundle.trigger_custom_ids" t-as="trigger_custom">
+                                                        <t t-set="trigger_enabled_by_default" t-value="trigger_custom.trigger_id.repo_ids &amp; modified_repos"/>
+                                                        <t t-set="level_color" t-if="trigger_enabled_by_default and trigger_custom.start_mode == 'disabled'">danger</t>
+                                                        <t t-set="level_color" t-elif="trigger_enabled_by_default and trigger_custom.start_mode == 'light'">info</t>
+                                                        <t t-set="level_color" t-elif="not trigger_enabled_by_default and trigger_custom.start_mode == 'force'">warning</t>
+                                                        <t t-set="level_color" t-elif="trigger_enabled_by_default">success</t>
+                                                        <t t-set="level_color" t-else="">secondary</t>
+                                                        <div class="dropdown">
+                                                            <button type="button" t-attf-class="btn btn-ssm btn-{{level_color}} dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                                                <t t-out="trigger_custom.start_mode"/>
+                                                                <i class="fa fa-caret-down ms-1"/>
+                                                            </button>
+                                                            <ul class="dropdown-menu">
+                                                                <li t-foreach="['disabled', 'light', 'auto', 'force']" t-as="mode">
+                                                                    <a class="dropdown-item" t-attf-href="/runbot/trigger_custom/{{trigger_custom.id}}/set_mode/{{mode}}" t-if="mode != trigger_custom.start_mode and (mode != 'light' or trigger_custom.trigger_id.light_config_id)">
+                                                                        <span t-out="mode"/>
+                                                                    </a>
+                                                                </li>
+                                                            </ul>
+                                                        </div>
                                                         <span t-out="trigger_custom.trigger_id.name"/>
-                                                    </div>
-                                                </t>
+                                                    </t>
+                                                </div>
                                             </div>
                                         </div>
                                     </td>
