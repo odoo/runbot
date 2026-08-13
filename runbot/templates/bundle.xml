@@ -36,7 +36,7 @@
                                         </t>
                                 </div></h5>
                             
-                            <table class="table table-sm table-responsive">
+                            <table class="table table-sm d-block overflow-x-auto">
                                 <tr>
                                     <td>Version</td>
                                     <td>

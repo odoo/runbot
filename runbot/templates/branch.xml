@@ -16,7 +16,7 @@
                   </div>
                 </h3>
               </div>
-              <table class="table table-sm table-responsive">
+              <table class="table table-sm d-block overflow-x-auto">
                 <tr>
                   <td>Remote:</td>
                   <td t-out="branch.remote_id.name"></td>
