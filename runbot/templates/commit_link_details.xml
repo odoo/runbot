@@ -11,7 +11,7 @@
                         <p>
                             <span type="button" data-bs-toggle="collapse" t-att-data-bs-target="href" role="button" aria-expanded="true" t-att-aria-controls="collapse"><i class="fa fa-toggle-up"/></span>
                                 <a t-attf-href="/runbot/commit/#{commit.id}">
-                                    <span class="label" t-esc="commit.dname"/>
+                                    <span t-esc="commit.dname"/>
                                     <span t-esc="'+%s' % commit_link.diff_add" class="text-success"/>
                                     <span t-esc="'-%s' % commit_link.diff_remove" class="text-danger"/>
                                     <span class="text-info">
