@@ -6,7 +6,7 @@
         <div class="container-fluid">
           <div class="row">
             <div class='col-md-12'>
-              <div class="navbar navbar-default">
+              <div class="navbar">
                 <h3>
                   <span class="text-muted"><t t-out="branch.remote_id.short_name"/>:</span><t t-out="branch.name"/> <i t-if="not branch.alive" title="deleted/closed" class="fa fa-ban text-danger"/>
                   <div class="btn-group" role="group">
