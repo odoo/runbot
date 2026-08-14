@@ -86,7 +86,6 @@
 
             'web/static/src/module_loader.js',
             'web/static/src/core/py_js/*.js',
-            'runbot/static/lib/jquery/jquery.js',
             'runbot/static/lib/bootstrap/js/bootstrap.bundle.js',
             'runbot/static/src/js/polyfill_command_api.js',
             'runbot/static/src/js/utils/*',
