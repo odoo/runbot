@@ -1,4 +1,5 @@
 const js = require("@eslint/js");
+const compat = require("eslint-plugin-compat");
 const globals = require("globals");
 
 module.exports = [
@@ -6,6 +7,10 @@ module.exports = [
         ignores: ["**/lib/**"],
     },
     js.configs.recommended,
+    {
+        ...compat.configs["flat/recommended"],
+        files: ["runbot/**/*.js"],
+    },
     {
         files: ["runbot/**/*.js"],
         languageOptions: {
