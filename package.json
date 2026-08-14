@@ -1,5 +1,10 @@
 {
+    "engines": {
+        "node": ">=18.18.0"
+    },
     "devDependencies": {
-        "eslint": "^8.27.0"
+        "@eslint/js": "9.39.5",
+        "eslint": "9.39.5",
+        "globals": "16.5.0"
     }
 }
