@@ -44,8 +44,6 @@
     },
     "globals": {
         "diff_match_patch": "readonly",
-        "$": "readonly",
-        "jQuery": "readonly",
         "Chart": "readonly"
     }
 }
