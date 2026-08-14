@@ -35,8 +35,12 @@ class TableGroup {
         return group.querySelector(this.constructor.groupHeaderSelector);
     }
 
-    toggleGroup(group, force = false) {
-        group.classList.toggle(this.constructor.hiddenGroupClass, force ? true : undefined);
+    toggleGroup(group, force) {
+        if (force === undefined) {
+            group.classList.toggle(this.constructor.hiddenGroupClass);
+        } else {
+            group.classList.toggle(this.constructor.hiddenGroupClass, force);
+        }
     }
 
     toggleCollapse() {
