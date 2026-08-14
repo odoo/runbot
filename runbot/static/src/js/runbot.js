@@ -30,14 +30,17 @@
     });
 })(jQuery);
 
-
-function copyToClipboard(text) {
+document.addEventListener('click', function (e) {
+    const button = e.target.closest('[data-copy-text]');
+    if (!button) {
+        return;
+    }
     if (!navigator.clipboard) {
         console.error('Clipboard not supported');
         return;
     }
-    navigator.clipboard.writeText(text);
-}
+    navigator.clipboard.writeText(button.dataset.copyText);
+});
 
 document.addEventListener('DOMContentLoaded', function() {
     const collapseElement = document.getElementById('customTriggers');
