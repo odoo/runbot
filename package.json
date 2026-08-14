@@ -1,10 +1,14 @@
 {
+    "browserslist": [
+        "baseline widely available"
+    ],
     "engines": {
         "node": ">=18.18.0"
     },
     "devDependencies": {
         "@eslint/js": "9.39.5",
         "eslint": "9.39.5",
+        "eslint-plugin-compat": "6.0.2",
         "globals": "16.5.0"
     }
 }
