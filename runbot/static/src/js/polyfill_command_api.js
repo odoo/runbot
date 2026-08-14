@@ -3,7 +3,6 @@
     if (
         typeof HTMLButtonElement !== "undefined" &&
             "command" in HTMLButtonElement.prototype &&
-            // eslint-disable-next-line no-undef
             "source" in ((CommandEvent || {}).prototype || {})
     ) {
         return;

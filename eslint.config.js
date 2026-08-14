@@ -1,0 +1,68 @@
+const js = require("@eslint/js");
+const globals = require("globals");
+
+module.exports = [
+    {
+        ignores: ["**/lib/**"],
+    },
+    js.configs.recommended,
+    {
+        files: ["runbot/**/*.js"],
+        languageOptions: {
+            ecmaVersion: 2022,
+            sourceType: "module",
+            globals: {
+                ...globals.browser,
+                diff_match_patch: "readonly",
+                Chart: "readonly",
+            },
+        },
+        rules: {
+            "no-undef": ["error"],
+            "no-restricted-globals": ["error", "event", "self"],
+            "no-const-assign": ["error"],
+            "no-debugger": ["error"],
+            "no-dupe-class-members": ["error"],
+            "no-dupe-keys": ["error"],
+            "no-dupe-args": ["error"],
+            "no-dupe-else-if": ["error"],
+            "no-unsafe-negation": ["error"],
+            "no-duplicate-imports": ["error"],
+            "valid-typeof": ["error"],
+            "no-unused-vars": ["error", {
+                vars: "all",
+                args: "none",
+                ignoreRestSiblings: false,
+                caughtErrors: "all",
+            }],
+            curly: ["error", "all"],
+            "no-restricted-syntax": ["error", "PrivateIdentifier"],
+            "prefer-const": ["error", {
+                destructuring: "all",
+                ignoreReadBeforeAssign: true,
+            }],
+            "no-console": ["warn"],
+            "no-var": ["error"],
+            "arrow-body-style": ["error", "as-needed"],
+            "arrow-parens": ["error"],
+            "brace-style": ["error"],
+            "object-curly-spacing": ["error", "always"],
+            "array-bracket-spacing": ["error"],
+            "comma-dangle": ["error", "always-multiline"],
+            semi: ["error", "always"],
+            quotes: ["error", "double", { allowTemplateLiterals: true }],
+            indent: ["error", 4, { SwitchCase: 1 }],
+            "eol-last": ["error"],
+            "no-multiple-empty-lines": ["error"],
+            "no-trailing-spaces": ["error"],
+        },
+    },
+    {
+        files: ["eslint.config.js"],
+        languageOptions: {
+            ecmaVersion: 2022,
+            sourceType: "commonjs",
+            globals: globals.node,
+        },
+    },
+];
