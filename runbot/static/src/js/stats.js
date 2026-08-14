@@ -34,14 +34,12 @@ var config = {
   },
 };
 
-var shifted = false;
-
 config.options.onClick = function(event, activeElements) {
     if (activeElements.length === 0){
       return
     }
     const build_id = config.data.builds[activeElements[0].index];
-    if (shifted){ 
+    if (event.native.shiftKey){
       config.searchParams['center_build_id'] = build_id;
       fetchUpdateChart();
     } else {
@@ -284,8 +282,6 @@ window.onload = function() {
     for([key, value] of new URLSearchParams(window.location.hash.replace("#","?"))){
       config.searchParams[key] = value;
     }
-
-    $(document).on('keyup keydown', function(e){shifted = e.shiftKey} );
 
     document.getElementById('backward_button').onclick = function(){
       config.searchParams['center_build_id'] = Object.keys(config.result)[0];
