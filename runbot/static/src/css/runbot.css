@@ -434,7 +434,7 @@ body, .table {
 	display: none;
 }
 
-.limited-height-toggle:hover {
+[data-toggle="limited-height"]:hover {
 	background-color: #DDD;
 }
 
