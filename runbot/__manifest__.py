@@ -68,6 +68,7 @@
         'views/warning_views.xml',
         'views/custom_trigger_wizard_views.xml',
         'wizards/stat_regex_wizard_views.xml',
+        'wizards/codeowner_wizard_views.xml',
         'views/menus.xml',
         'views/user.xml',
     ],

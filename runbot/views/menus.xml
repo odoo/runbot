@@ -54,6 +54,7 @@
     <menuitem name="Modules" id="runbot_menu_module_tree" parent="runbot_menu_teams" sequence="70" action="open_view_runbot_module"/>
     <menuitem name="Modules ownership" id="runbot_menu_module_ownership_tree" parent="runbot_menu_teams" sequence="80" action="open_view_runbot_module_ownership"/>
     <menuitem name="CodeOwners" id="runbot_menu_codeowner_tree" parent="runbot_menu_teams" sequence="90" action="open_view_codeowner_tree"/>
+    <menuitem name="CodeOwner Test" id="runbot_menu_codeowner_wizard" parent="runbot_menu_teams" sequence="95" action="runbot_codeowner_wizard_action" groups="runbot.group_runbot_team_manager"/>
    
     <menuitem name="Warnings" id="runbot_menu_warning_root" parent="runbot_menu_root" sequence="1200" action="open_view_warning_tree" groups="runbot.group_runbot_admin"/>
 
