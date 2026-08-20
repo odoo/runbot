@@ -102,6 +102,7 @@ class BuildParameters(models.Model):
     build_ids = fields.One2many('runbot.build', 'params_id')
     builds_reference_ids = fields.Many2many('runbot.build', relation='runbot_build_params_references', copy=True)
     reference_build_id = fields.Many2one('runbot.build', 'Reference Build', index=True)
+    restore_db_suffix = fields.Char('Restore DB Suffix', help='Suffix of the database to restore from reference build')
     modules = fields.Char('Modules')
 
     upgrade_to_build_id = fields.Many2one('runbot.build', index=True)  # use to define sources to use with upgrade script
@@ -164,6 +165,8 @@ class BuildParameters(models.Model):
                 cleaned_vals['dynamic_config_position'] = param.dynamic_config_position
             if param.dynamic_config.dict:
                 cleaned_vals['dynamic_config'] = param.dynamic_config.dict
+            if param.restore_db_suffix:
+                cleaned_vals['restore_db_suffix'] = param.restore_db_suffix
 
             param.fingerprint = hashlib.sha256(str(cleaned_vals).encode('utf8')).hexdigest()
 

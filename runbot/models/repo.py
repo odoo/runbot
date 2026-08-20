@@ -75,6 +75,7 @@ class Trigger(models.Model):
         column1='dependant_id',
     )
     starts_after_failure = fields.Boolean('Starts after failures', help="If checked, the trigger will also start after a failure", default=False)
+    starts_after_pending = fields.Boolean('Starts after pending', help="If checked, the trigger will start before the build finishes", default=False)
     module_filters = fields.One2many('runbot.module.filter', 'trigger_id', string="Module filters", help='Will be combined with repo module filters when used with this trigger')
     config_id = fields.Many2one('runbot.build.config', string="Config", required=True)
     light_config_id = fields.Many2one('runbot.build.config', string="Light config", help="Alternative config to use when light mode is enabled")

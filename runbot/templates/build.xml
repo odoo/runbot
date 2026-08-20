@@ -99,6 +99,16 @@
               <t t-set="build" t-value="build"/>
             </t>
           </t>
+          <t t-if="build.params_id.reference_build_id and build.params_id.reference_build_id.local_state not in ('running', 'done')">
+            <div class="alert alert-warning py-10 my-2 text-center">
+              <i class="fa fa-exclamation-triangle me-1"/>
+              This build will not start before reference build
+              <a t-att-href="build.params_id.reference_build_id.build_url">
+              <t t-out="build.params_id.reference_build_id.id"/>
+              </a>
+              finishes.
+            </div>
+          </t>
           <div t-attf-class="bg-{{rowclass.strip()}}-subtle {{'col-md-6' if build.children_ids or build.linked_children_build_ids else 'col-md-12'}}">
             <div class="build_details text-truncate">
               <!-- Batch/bundles links-->
@@ -125,7 +135,7 @@
               </t>
 
               <!-- Commits -->
-              <t t-foreach="build.params_id.sudo()._get_batch_commit_link_ids(unique_batch)" t-as="build_commit">
+              <t t-foreach="build.params_id.sudo()._get_batch_commit_link_ids(main_batch)" t-as="build_commit">
                 <b>Commit:</b>
                 <a t-attf-href="/runbot/commit/{{build_commit.commit_id.id}}">
                   <t t-out="build_commit.commit_id.dname"/>
@@ -133,6 +143,11 @@
                 &amp;nbsp;
                 <a t-att-href="'https://%s/commit/%s' % (build_commit.branch_id.remote_id.base_url, build_commit.commit_id.name)" title="View Commit on Github"><i class="fa fa-github"/></a>
                 <div class="ms-3">
+                  <t t-if="more">
+                    <b>Treehash:</b>
+                    <a t-out="build_commit.commit_id.tree_hash" t-attf-href="/runbot/tree_hash/{{build_commit.commit_id.tree_hash}}"/>
+                    <br/>
+                  </t>
                   <b>Subject:</b>
                   <t t-out="build_commit.commit_id.subject"/>
                   <br/>
@@ -147,7 +162,7 @@
                 </div>
               </t>
               <t t-if="build.params_id.config_id==build.trigger_id.light_config_id">
-                <b>Mode:</b> <span class="badge btn btn-info">Light</span> <a t-if="unique_batch" t-attf-href="/runbot/bundle/{{unique_batch.bundle_id.id}}">Configure</a><br/>
+                <b>Mode:</b> <span class="badge btn btn-info">Light</span> <a t-if="main_batch" t-attf-href="/runbot/bundle/{{main_batch.bundle_id.id}}">Configure</a><br/>
               </t>
               <t t-if='more'>
                 <b>Version:</b>
@@ -188,6 +203,11 @@
                     <a t-attf-href="/runbot/build/{{build.params_id.reference_build_id.id}}">
                         <t t-out="build.params_id.reference_build_id.id"/>
                     </a>
+                    <br/>
+                </t>
+                <t t-if="build.params_id.restore_db_suffix">
+                    <b>Download db suffix:</b>
+                        <t t-out="build.params_id.restore_db_suffix"/>
                     <br/>
                 </t>
                 <t t-if="build.params_id.builds_reference_ids">
