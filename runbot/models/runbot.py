@@ -82,6 +82,7 @@ class Runbot(models.AbstractModel):
         non_allocated_domain = [('local_state', '=', 'pending'), ('host', '=', False)]
 
         build_to_assign = self.env['runbot.build'].search(non_allocated_domain, order='priority_level')
+        build_to_assign = build_to_assign.filtered(lambda b: not b.params_id.reference_build_id or b.params_id.reference_build_id.local_state in ('running', 'done'))
         priority_builds = build_to_assign.filtered(lambda b: b.build_type == 'priority' or b.config_id.use_extra_slot)
         scheduled_builds = build_to_assign.filtered(lambda b: b.build_type == 'scheduled')
         normal_builds = build_to_assign.filtered(lambda b: b.build_type not in ('priority', 'scheduled'))

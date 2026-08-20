@@ -6,7 +6,6 @@ from unittest.mock import patch, mock_open
 from odoo.exceptions import UserError
 from odoo.tools import mute_logger
 from .common import RunbotCase
-from odoo.tests import Like
 
 _logger = logging.getLogger(__name__)
 
@@ -361,8 +360,8 @@ class TestUpgradeFlow(RunbotCase):
                 self.assertEqual(build.params_id.dockerfile_id.name, target_build.params_id.dockerfile_id.name)
                 self.assertEqual(build.params_id.commit_ids, target_build.params_id.commit_ids + upgrade_commit)
                 self.assertEqual(build.params_id.upgrade_from_build_id, from_build)
-                self.assertEqual(build.params_id.dump_db.build_id, from_build)
-                self.assertEqual(build.params_id.dump_db.db_suffix, db_suffix)
+                self.assertEqual(build.params_id.reference_build_id, from_build)
+                self.assertEqual(build.params_id.restore_db_suffix, db_suffix)
                 self.assertEqual(build.params_id.config_id, self.test_upgrade_config)
             except:
                 _logger.error("Assertion failed for build %s", build.description)
@@ -394,9 +393,9 @@ class TestUpgradeFlow(RunbotCase):
 
         reference_master_template = self.template_per_version['master']
         reference_16_template = self.template_per_version['16.0']
-        self.assertEqual(b_16_17.description, f"Testing migration from **16.0** to **17.0** using db {reference_16_template.dest}-no-demo-all")
+        self.assertEqual(b_16_17.description, "Testing migration from **16.0** to **17.0** using db no-demo-all")
         assertOk(b_16_17, reference_16_template, template_build_17, 'no-demo-all')
-        self.assertEqual(b_17_master.description, f"Testing migration from **17.0** to **master** using db {template_build_17.dest}-no-demo-all")
+        self.assertEqual(b_17_master.description, "Testing migration from **17.0** to **master** using db no-demo-all")
         assertOk(b_17_master, template_build_17, reference_master_template, 'no-demo-all')
 
         # upgrade repos tests
@@ -491,7 +490,7 @@ class TestUpgradeFlow(RunbotCase):
             ['15.0']
         )
         b173_master = to_version_builds[-1].children_ids.sorted(lambda b: (b.params_id.upgrade_from_build_id.params_id.version_id.number))[-1].linked_children_build_ids
-        self.assertEqual(b173_master[0].description, Like('Testing migration from **saas-17.3** to **master** using db ...-base'))
+        self.assertEqual(b173_master[0].description, 'Testing migration from **saas-17.3** to **master** using db base')
         self.assertEqual(
             b173_master.mapped('params_id.version_id.name'),
             ['master'],
@@ -501,7 +500,7 @@ class TestUpgradeFlow(RunbotCase):
             ['saas-17.3'],
         )
         self.assertEqual(
-            [b.params_id.dump_db.db_suffix for b in b173_master],
+            [b.params_id.restore_db_suffix for b in b173_master],
             ['base', 'web', 'website'],
         )
         current_build = db_builds[0]
@@ -509,8 +508,8 @@ class TestUpgradeFlow(RunbotCase):
         self.start_patcher('docker_state', 'odoo.addons.runbot.models.build.docker_state', 'END')
         for current_build in db_builds:
             with self.subTest(current_build.description):
-                suffix = current_build.params_id.dump_db.db_suffix
-                source_dest = current_build.params_id.dump_db.build_id.dest
+                suffix = current_build.params_id.restore_db_suffix
+                source_dest = current_build.params_id.reference_build_id.dest
 
                 def docker_run_restore(cmd, *args, **kwargs):
                     dump_url = f'https://host.runbot.com/runbot/static/build/{source_dest}/logs/{source_dest}-{suffix}.zip'
