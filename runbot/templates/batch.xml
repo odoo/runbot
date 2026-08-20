@@ -126,7 +126,7 @@
                                     </small>
                                     <b t-if="commit.rebase_on_id">Automatic rebase on <t t-out="commit.rebase_on_id.name"/><br/></b>
                                     <t t-if="more or not (commit_link.match_type and commit_link.match_type.startswith('base'))">
-                                        <a t-attf-href="/runbot/tree_hash/#{commit.tree_hash}">
+                                        <a t-if="commit.tree_hash" t-attf-href="/runbot/tree_hash/#{commit.tree_hash}">
                                             <i t-attf-class="fa fa-fw fa-tree"/>
                                             <t t-out="commit.tree_hash[:8]"/>
                                         </a><br/>
