@@ -387,6 +387,8 @@ class Config(models.Model):
     def _default_uses_parent(self, param_values, has_restore=False):
         if param_values.get('reference_build_id'):
             return False
+        if param_values.get('upgrade_from_slot_id'):
+            return False
         if param_values.get('dump_db'):
             return False
         config_data = param_values.get('config_data', {}) or {}
@@ -912,23 +914,23 @@ class ConfigStep(models.Model):
         """
         assert len(build.parent_path.split('/')) < 6  # small security to avoid recursion loop, 6 is arbitrary
         param = build.params_id
-        source_builds_by_target = {}
-        template_builds = build._upgrade_builds_references()
-        template_builds_by_version_id = {b.params_id.version_id.id: b for b in template_builds}
+        source_slot_by_target = {}
+        template_slots = build._upgrade_slot_references().build_ids
+        template_slot_by_version_id = {slot.params_id.version_id.id: slot for slot in template_slots}
 
         target_builds = build.browse()
         only_current = self.upgrade_current
         upgrade_from_bellow = self.upgrade_from_bellow
         upgrade_to_above = self.upgrade_to_above
 
-        def get_reference_builds_for_versions(versions):
+        def get_reference_slots_for_versions(versions):
             refs = self.env['runbot.build'].browse()
             for version in versions:
-                ref_build = template_builds_by_version_id.get(version.id)
-                if ref_build:
-                    refs |= ref_build
+                ref_slot = template_slot_by_version_id.get(version.id)
+                if ref_slot:
+                    refs |= ref_slot
                 else:
-                    urls = [f'[{build_id}](/runbot/build/{build_id})' for build_id in template_builds.ids]
+                    urls = [f'[{batch_id}](/runbot/batch/{batch_id})' for batch_id in template_slots.batch_id.ids]
                     build._log('_run_configure_upgrade', f'No reference build found for version {version.name} in {",".join(urls)}', level='WARNING', log_type='markdown')
             return refs
 
@@ -939,19 +941,19 @@ class ConfigStep(models.Model):
             if only_current:
                 if upgrade_from_bellow or self.upgrade_from_base:
                     if param.version_id in valid_target_versions:
-                        target_builds |= build.get_current_batch_template()
+                        target_builds |= build.get_current_batch_template().build_id
                 if upgrade_to_above:
                     target_versions = self.upgrade_matrix_id._get_target_versions_from(param.version_id)
                     # for target version, we don't want a template build, but an upgrade one
-                    target_builds |= get_reference_builds_for_versions(target_versions)
+                    target_builds |= get_reference_slots_for_versions(target_versions).build_id
             else:
                 for version in valid_target_versions:
                     if self.skip_current and version == param.version_id:
                         continue
                     if version == param.version_id:
-                        target_builds |= build.get_current_batch_template()
+                        target_builds |= build.get_current_batch_template().build_id
                     else:
-                        target_builds |= get_reference_builds_for_versions([version])
+                        target_builds |= get_reference_slots_for_versions([version]).build_id
 
         if target_builds:
             build._log('', 'Testing upgrade targeting %s' % ', '.join(target_builds.mapped('params_id.version_id.name')))
@@ -967,48 +969,51 @@ class ConfigStep(models.Model):
             return
 
         for target_build in target_builds:
-            if param.upgrade_from_build_id:
-                source_builds_by_target[target_build] = param.upgrade_from_build_id
+            upgrade_from_slot_id = param.upgrade_from_slot_id
+            if not upgrade_from_slot_id and param.upgrade_from_build_id:
+                upgrade_from_slot_id = param.upgrade_from_build_id.params_id.slot_ids[0]
+            if upgrade_from_slot_id:
+                source_slot_by_target[target_build] = upgrade_from_slot_id
             else:
                 target_version = target_build.params_id.version_id
-                source_builds = build.browse()
+                source_slots = self.env['runbot.batch.slot']
                 valid_source_versions = self.upgrade_matrix_id._get_source_versions_to(target_version)
                 if only_current:
                     # we expect target_build to be a valid source for "current"
                     if param.version_id in valid_source_versions:
                         if upgrade_to_above:
-                            source_builds |= build.get_current_batch_template()
+                            source_slots |= build.get_current_batch_template()
                     if self.upgrade_from_base:
-                        source_builds |= get_reference_builds_for_versions(param.version_id)
+                        source_slots |= get_reference_slots_for_versions(param.version_id)
                     if upgrade_from_bellow and target_build.params_id.version_id == param.version_id:
-                        source_builds |= get_reference_builds_for_versions(valid_source_versions)
+                        source_slots |= get_reference_slots_for_versions(valid_source_versions)
                 else:
                     for version in valid_source_versions:
                         if self.skip_current and version == param.version_id:
                             continue
                         if version == param.version_id:
-                            source_builds |= build.get_current_batch_template()
+                            source_slots |= build.get_current_batch_template()
                         else:
-                            source_builds |= get_reference_builds_for_versions([version])
+                            source_slots |= get_reference_slots_for_versions([version])
 
-                if source_builds:
-                    build._log('', 'Defining source version(s) for %s: %s' % (target_version.name, ', '.join(source_builds.mapped('params_id.version_id.name'))))
-                if not source_builds:
+                if source_slots:
+                    build._log('', 'Defining source version(s) for %s: %s' % (target_version.name, ', '.join(source_slots.mapped('params_id.version_id.name'))))
+                if not source_slots:
                     build._log('_run_configure_upgrade', 'No source version found for %s, skipping' % target_version.name, level='WARNING')
                 elif not self.upgrade_flat:
-                    for source_build in source_builds:
-                        source_description = source_build.params_id.version_id.name
+                    for source_slot in source_slots:
+                        source_description = source_slot.params_id.version_id.name
                         target_description = target_build.params_id.version_id.name
-                        if source_build.create_batch_id == build.create_batch_id:
+                        if source_slot.batch_id == build.create_batch_id:
                             source_description += f'current ({source_description})'
                         if target_build.create_batch_id == build.create_batch_id:
                             target_description += f'current ({target_description})'
                         build._add_child(
-                            {'upgrade_to_build_id': target_build.id, 'upgrade_from_build_id': source_build.id},
+                            {'upgrade_to_build_id': target_build.id, 'upgrade_from_slot_id': source_slot.id},
                             description="Testing migration from %s to %s" % (source_description, target_description)
                         )
                     return
-                source_builds_by_target[target_build] = source_builds
+                source_slot_by_target[target_build] = source_slots
 
         assert not param.dump_db
         # we need to define the correct upgrade commits to use. They are not always the upgrade commits from the build itself
@@ -1030,59 +1035,42 @@ class ConfigStep(models.Model):
             if not repo_commit:
                 build._log('_run_configure_upgrade', f'No commit found for repo {repo.name} in batch {reference_batch.id}', level='ERROR')
             additional_commits_links |= repo_commit
-        for target, sources in source_builds_by_target.items():
+        for target, sources_slots in source_slot_by_target.items():
             if target != build:
                 build._log('', f'Using build [{target.id}](/runbot/build/{target.id}) to select {target.version_id.name} commits', log_type='markdown')
             target_commits_link = target.params_id.commit_link_ids.filtered(lambda cl: cl.commit_id.repo_id not in single_version_repos)
             # small note: in master additional_commits_links and target_commits_link both comme from the current batch
             target_commits_link |= additional_commits_links
-            for source in sources:
-                valid_databases = []
-                if not self.upgrade_dbs:  # TODO cleanup
-                    valid_databases = source.database_ids
-                for upgrade_db in self.upgrade_dbs:
-                    config_id = upgrade_db.config_id
-                    dump_builds = build.search([('id', 'child_of', source.id), ('params_id.config_id', '=', config_id.id), ('orphan_result', '=', False)])
-                    # this search is not optimal
-                    if not dump_builds:
-                        build._log('_run_configure_upgrade', 'No build found with config %s in %s' % (config_id.name, source.id), level='ERROR')
-                    dbs = dump_builds.database_ids.sorted('db_suffix')
-                    valid_databases += list(self._filter_upgrade_database(dbs, upgrade_db.db_pattern))
-                    if not valid_databases:
-                        build._log('_run_configure_upgrade', 'No database found for pattern %s' % (upgrade_db.db_pattern), level='ERROR')
+            for source_slot in sources_slots:
+                child = build._add_child({
+                    'upgrade_to_build_id': None,
+                    'upgrade_from_slot_id': source_slot.id,
+                    'config_id': self.upgrade_config_id,
+                    'builds_reference_ids': False,  # remove builds_reference_ids since now upgrade_to_build_id and upgrade_from_build_id are set
+                    'commit_link_ids': target_commits_link.ids,
+                    'version_id': target.params_id.version_id.id,
+                    'trigger_id': None,
+                    'dockerfile_id': target.params_id.dockerfile_id.id,
+                })
+                source_description = source_slot.params_id.version_id.name
+                target_description = target.params_id.version_id.name
+                if source_slot in build.create_batch_id.slot_ids:
+                    source_description += ' (current)'
+                if target in build.create_batch_id.slot_ids.build_id:
+                    target_description += ' (current)'
+                child.description = 'Testing migration from **%s** to **%s**' % (
+                    source_description,
+                    target_description,
+                )
 
-                for db in valid_databases:
-                    child = build._add_child({
-                        'upgrade_to_build_id': None,
-                        'upgrade_from_build_id': source.id,
-                        'dump_db': db.id,
-                        'config_id': self.upgrade_config_id,
-                        'builds_reference_ids': False,  # remove builds_reference_ids since now upgrade_to_build_id and upgrade_from_build_id are set
-                        'commit_link_ids': target_commits_link.ids,
-                        'version_id': target.params_id.version_id.id,
-                        'trigger_id': None,
-                        'dockerfile_id': target.params_id.dockerfile_id.id,
-                    })
-                    source_description = source.params_id.version_id.name
-                    target_description = target.params_id.version_id.name
-                    if source in build.create_batch_id.slot_ids.build_id:
-                        source_description += ' (current)'
-                    if target in build.create_batch_id.slot_ids.build_id:
-                        target_description += ' (current)'
-                    child.description = 'Testing migration from **%s** to **%s** using db %s' % (
-                        source_description,
-                        target_description,
-                        db.name,
-                    )
-
-                    if self.allow_similar_build_quick_result:
-                        existing_done_build = next((build for build in child.params_id.build_ids.sorted('id') if build.global_state == 'done' and build.global_result == 'ok'), None)
-                        if not existing_done_build and not build.create_batch_id.bundle_id.is_staging:
-                            existing_done_build = next((build for build in child.params_id.build_ids.sorted('id') if build.global_state == 'done' and build.local_result not in ('skipped', 'killed') and not build.orphan_result), None)
-                        if existing_done_build:
-                            child._log('', 'A similar [build](%s) has been found, marking as done directly', existing_done_build.build_url, log_type='markdown')
-                            child.local_state = 'done'
-                            child.local_result = existing_done_build.local_result
+                if self.allow_similar_build_quick_result:
+                    existing_done_build = next((build for build in child.params_id.build_ids.sorted('id') if build.global_state == 'done' and build.global_result == 'ok'), None)
+                    if not existing_done_build and not build.create_batch_id.bundle_id.is_staging:
+                        existing_done_build = next((build for build in child.params_id.build_ids.sorted('id') if build.global_state == 'done' and build.local_result not in ('skipped', 'killed') and not build.orphan_result), None)
+                    if existing_done_build:
+                        child._log('', 'A similar [build](%s) has been found, marking as done directly', existing_done_build.build_url, log_type='markdown')
+                        child.local_state = 'done'
+                        child.local_result = existing_done_build.local_result
 
     def _filter_upgrade_database(self, dbs, pattern):
         pat_list = pattern.split(',') if pattern else []
@@ -1171,8 +1159,18 @@ class ConfigStep(models.Model):
                 download_db_suffix = dump_db.db_suffix
                 dump_build = dump_db.build_id
             else:
-                download_db_suffix = config_data.get('dump_suffix', self.restore_download_db_suffix or 'all')
-                dump_build = params.reference_build_id or build.parent_id  # TODO cleanup parent_id
+                if build.params_id.upgrade_from_slot_id:
+                    dump_build = build.params_id.upgrade_from_slot_id.build_id
+                    if not dump_build.database_ids:
+                        build._log('_run_restore', f'No database found in build [{dump_build.id}]({dump_build.build_url})', log_type='markdown', level='ERROR')
+                        build._kill(result='ko')
+                        return
+                    if len(dump_build.database_ids) > 1:
+                        build._log('_run_restore', f'Multiple databases found in build [{dump_build.id}]({dump_build.build_url}), using the first one', log_type='markdown', level='WARNING')
+                    download_db_suffix = dump_build.database_ids[0].db_suffix
+                else:
+                    download_db_suffix = config_data.get('dump_suffix', self.restore_download_db_suffix or 'all')
+                    dump_build = params.reference_build_id or build.params_id.upgrade_from_slot_id.build_id or build.parent_id  # TODO cleanup parent_id
             if not (download_db_suffix and dump_build):
                 build._log('_run_restore', 'No dump suffix or reference build specified', level='ERROR')
                 build._kill(result='ko')
