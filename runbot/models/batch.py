@@ -529,9 +529,9 @@ class Batch(models.Model):
                     continue
 
                 # diff. Iter on --numstat, easier to parse than --shortstat summary
-                diff = commit.repo_id._git(['diff', '--numstat', merge_base_sha, commit.name]).strip()
-                if diff:
-                    for line in diff.split('\n'):
+                diff_stat = commit.repo_id._git(['diff', '--numstat', merge_base_sha, commit.name]).strip()
+                if diff_stat:
+                    for line in diff_stat.split('\n'):
                         link_commit.file_changed += 1
                         add, remove, _ = line.split(None, 2)
                         try:
@@ -539,6 +539,8 @@ class Batch(models.Model):
                             link_commit.diff_remove += int(remove)
                         except ValueError:  # binary files
                             pass
+                if link_commit.file_changed <= (self.bundle_id.file_limit or 450) and link_commit.base_ahead <= (self.bundle_id.commit_limit or 50):
+                    link_commit.diff = commit.repo_id._git(['diff', f'{merge_base_sha}..{commit.name}', '--', '*'], errors='ignore')
             except subprocess.CalledProcessError:
                 self._warning('Commit info failed between %s and %s', commit.name, base_head.name)
 

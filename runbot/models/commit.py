@@ -275,11 +275,22 @@ class CommitLink(models.Model):
     diff_add = fields.Integer('# line added')
     diff_remove = fields.Integer('# line removed')
     tree_hash = fields.Char('Tree hash', compute='_compute_tree_hash')
+    diff = fields.Text('Diff', prefetch=False)
 
     @api.depends('commit_id.tree_hash')
     def _compute_tree_hash(self):
         for link in self:
             link.tree_hash = link.commit_id.tree_hash
+
+    @api.model
+    def _gc_diff(self, delta_days=180):
+        delta_date = self.env.cr.now() - datetime.timedelta(days=delta_days)
+        commit_links = self.search([
+            ('diff', '!=', False),
+            ('create_date', '<', delta_date),
+        ])
+        commit_links.diff = False
+        _logger.info('Cleaned %s commit link diff', len(commit_links))
 
 
 class CommitStatus(models.Model):
