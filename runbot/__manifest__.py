@@ -21,7 +21,7 @@
         'data/runbot_data.xml',
         'data/runbot_error_regex_data.xml',
         'data/website_data.xml',
-
+        'data/gc_cron.xml',
 
         'templates/utils.xml',
         'templates/badge.xml',
