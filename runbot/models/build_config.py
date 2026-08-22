@@ -144,6 +144,12 @@ class Config(models.Model):
     dynamic_config_extension = fields.Text('Dynamic Config Extend File', tracking=True)
 
     use_extra_slot = fields.Boolean('Use extra slot', default=False, tracking=True, help="Allow to use an extra slot for this config, if available")
+    uses_referenced_batches = fields.Boolean('Uses references builds', compute='_compute_uses_referenced_batches', store=True)
+
+    @api.depends('step_order_ids.step_id.uses_referenced_batches')
+    def _compute_uses_referenced_batches(self):
+        for record in self:
+            record.uses_referenced_batches = any(step.uses_referenced_batches for step in record.step_order_ids.step_id)
 
     @api.constrains('default_dynamic_config', 'dynamic_config_extension')
     def _check_dynamic_config(self):
@@ -508,7 +514,7 @@ class ConfigStep(models.Model):
     file_limit = fields.Integer('File limit', default=450)
     break_before_if_ko = fields.Boolean('Break before this step if build is ko')
     break_after_if_ko = fields.Boolean('Break after this step if build is ko')
-
+    uses_referenced_batches = fields.Boolean('Uses references builds', compute='_compute_uses_referenced_batches', store=True, readonly=False)
 
     @api.constrains('python_code')
     def _check_python_code(self):
@@ -535,6 +541,11 @@ class ConfigStep(models.Model):
     def _compute_db_name(self):
         for step in self:
             step.db_name = step.custom_db_name or step.name
+
+    @api.depends('job_type')
+    def _compute_uses_referenced_batches(self):
+        for record in self:
+            record.uses_referenced_batches = record.job_type == 'configure_upgrade'
 
     def _get_db_name(self, build):
         db_name = self.custom_db_name or self.name
