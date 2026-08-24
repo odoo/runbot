@@ -121,7 +121,6 @@
     --bs-btn-disabled-border-color: #17a2b8;
 }
 
-
 .accordion {
 	--bs-accordion-btn-padding-y: 0.3rem; /* more condensed build error views */
 }
@@ -146,17 +145,6 @@
 .active_project {
 	color: var(--active-project-color);
 	margin-left: 15px;
-}
-
-body {
-	margin: 0;
-    font-weight: 400;
-    line-height: 1.5;
-    text-align: left;
-}
-
-form {
-    margin: 0;
 }
 
 dialog.modal {
@@ -336,7 +324,6 @@ a, .btn-link {
 	padding: 2px;
 }
 
-
 .batch_row .slot_container {
 	flex: 1 0 200px;
 	padding: 0 4px;
@@ -431,7 +418,6 @@ a, .btn-link {
 	margin-left: 0px !important;
 }
 
-
 code {
 	white-space: pre-wrap;
 }
@@ -477,7 +463,7 @@ code {
 	--runbot-tag-associated-color: color-mix(in lab, var(--runbot-tag-color), white 90%);
 	color: var(--runbot-tag-color);
 	background-color: var(--runbot-tag-associated-color);
-	
+
 	:root[data-bs-theme=dark] & {
 		color: var(--runbot-tag-associated-color);
 		background-color: var(--runbot-tag-color);
