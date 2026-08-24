@@ -36,7 +36,7 @@
               <div t-else="">
                 <div t-foreach="bundles" t-as="bundle" class="row bundle_row">
                   <div class="col-md-3 col-lg-2 cell">
-                    <div class="one_line">
+                    <div class="text-truncate">
                       <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e" />
                       <a t-attf-href="/runbot/bundle/#{bundle.id}" t-attf-title="View Bundle #{bundle.name}">
                         <b t-out="bundle.name"/>
