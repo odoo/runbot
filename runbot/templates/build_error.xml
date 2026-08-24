@@ -128,6 +128,9 @@
                     t-attf-href="/odoo/team/{{team.id}}" target="_blank" title="View in Backend">
                     <i class="fa fa-list"/>
                   </a>
+                  <a t-attf-href="/runbot/team_reviews/{{team.id}}" class="btn btn-sm btn-default align-middle" title="Files to review">
+                    <i class="fa fa-eye"/> Reviews
+                  </a>
                 </h2>
               </div>
               <div t-if="team.dashboard_id">

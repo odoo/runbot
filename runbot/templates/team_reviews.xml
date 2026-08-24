@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <template id="runbot.team_reviews">
+      <t t-call='runbot.layout'>
+        <div class="container-fluid">
+        </div>
+        <form method="post" t-attf-action="/runbot/team_reviews/{{team.id}}/reviewed">
+          <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+          <table class="table table-condensed table-group table-filter caption-top text-body-secondary">
+            <caption>
+              <div class="row align-items-center">
+                <h2 class="col-12 col-md-auto">
+                  Reviews for team <t t-out="team.name.capitalize()"/>
+                  <span t-attf-class="badge fs-6 align-middle text-bg-{{'success' if nb_reviews_reviewed == nb_reviews else 'primary'}}"
+                    title="Reviewed files">
+                    <t t-out="nb_reviews_reviewed"/> / <t t-out="nb_reviews"/>
+                  </span>
+                  <button t-if="is_team_member" type="submit" class="btn btn-sm btn-primary align-middle"
+                    title="Apply changes">Save Reviews</button>
+                  <button type="button" class="btn btn-sm btn-outline-primary align-middle" data-toggle="table-group-collapse">Collapse all</button>
+                </h2>
+              </div>
+            </caption>
+            <colgroup>
+              <col class="w-0"/>
+              <col class="w-75"/>
+              <col/>
+              <col/>
+            </colgroup>
+            <t t-foreach="reviews_by_bundle" t-as="bundle_reviews">
+              <t t-set="bundle" t-value="bundle_reviews[0]"/>
+              <t t-set="reviews" t-value="bundle_reviews[1]"/>
+              <tbody class="table-group-divider">
+                <tr class="table-active">
+                    <th colspan="4">
+                      <t t-set="pr_names" t-value="'/'.join(set(bundle.branch_ids.filtered(lambda rec: rec.is_pr).mapped('pr_title')))"/>
+                      <t t-out="pr_names"/>
+                      <a t-attf-href="/runbot/bundle_reviews/{{bundle.id}}" title="View all the files to review of this bundle">
+                        <i class="fa fa-list"/>
+                      </a>
+                      <t t-set="nb_files" t-value="len(reviews)"/>
+                      <t t-set="nb_files_reviewed" t-value="len(reviews.filtered('reviewed'))"/>
+                      <span t-attf-class="badge text-bg-{{'success' if nb_files_reviewed == nb_files else 'primary'}}"
+                        title="Reviewed files">
+                        <t t-out="nb_files_reviewed"/> / <t t-out="nb_files"/>
+                      </span>
+                    </th>
+                </tr>
+                <t t-foreach="reviews" t-as="review">
+                  <tr>
+                    <td>
+                      <input type="checkbox" class="form-check-input" name="reviewed_ids"
+                        t-att-value="review.id"
+                        t-att-checked="'checked' if review.reviewed else None"
+                        t-att-disabled="None if is_team_member else 'disabled'"
+                        t-att-title="'Reviewed' if review.reviewed else 'Mark as reviewed'"/>
+                      <input t-if="is_team_member and review.reviewed" type="hidden" name="already_reviewed_ids" t-att-value="review.id"/>
+                    </td>
+                    <td>
+                      <code t-out="review.filename" t-attf-class="{{'text-body-secondary' if review.reviewed or review.removal else ''}}"/>
+                      <span t-if="review.removal" class="badge text-bg-warning ms-1" title="File removed from the PR">removed</span>
+                      <span t-if="review.reviewer_id" class="text-body-secondary">
+                        (<t t-out="review.reviewer_id.name"/>)
+                      </span>
+                    </td>
+                    <td class="text-nowrap">
+                      <span class="badge text-bg-info" title="Review requested">
+                        <t t-out="review.team_id.github_team"/>
+                      </span>
+                    </td>
+                    <td class="text-nowrap">
+                      <a t-if="review.build_id" t-att-href="review.build_id.build_url"
+                        t-attf-title="View triggering build ({{review.build_id.id}})" target="_blank">
+                        <t t-out="review.build_id.id"/>
+                      </a>
+                    </td>
+                  </tr>
+                </t>
+              </tbody>
+            </t>
+          </table>
+        </form>
+      </t>
+    </template>
+  </data>
+</odoo>

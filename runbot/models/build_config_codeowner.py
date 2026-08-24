@@ -1,4 +1,6 @@
 import re
+from collections import defaultdict
+
 from odoo import models, fields
 from ..common import markdown_escape
 
@@ -30,20 +32,25 @@ class ConfigStep(models.Model):
         for codeowner in codeowners:
             github_teams = codeowner._get_github_teams()
             if github_teams and codeowner.regex and (codeowner._match_version(version_id)):
-                team_set = regexes.setdefault(codeowner.regex.strip(), set())
-                team_set |= set(t.strip() for t in github_teams)
-        return list(regexes.items())
+                regex = codeowner.regex.strip()
+                teams, codeowner_ids = regexes.get(regex) or (set(), self.env['runbot.codeowner'])
+                regexes[regex] = (teams | {t.strip() for t in github_teams}, codeowner_ids | codeowner)
+        return [(regex, teams, codeowner_ids) for regex, (teams, codeowner_ids) in regexes.items()]
 
-    def _reviewer_per_file(self, files, regexes, ownerships, repo, build):
+    def _reviewer_per_file(self, files, regexes, ownerships, repo, build=None):
         reviewer_per_file = {}
+        reasons_per_file = {}
         for file in files:
             file_reviewers = set()
-            for regex, teams in regexes:
+            reasons = defaultdict(list)
+            for regex, teams, codeowner_ids in regexes:
                 if re.match(regex, file):
                     if not teams or 'none' in teams:
                         file_reviewers = None
                         break  # blacklisted, break
                     file_reviewers |= teams
+                    for team in teams:
+                        reasons[team].append({'type': 'regex', 'codeowner_ids': codeowner_ids})
             if file_reviewers is None:
                 continue
 
@@ -51,18 +58,67 @@ class ConfigStep(models.Model):
             for ownership in ownerships:
                 if file_module == ownership.module_id.name and not ownership.is_fallback and ownership.team_id.github_team not in file_reviewers:
                     file_reviewers.add(ownership.team_id.github_team)
+                    reasons[ownership.team_id.github_team].append({'type': 'module', 'ownership_id': ownership})
             # fallback
             if not file_reviewers:
                 for ownership in ownerships:
                     if file_module == ownership.module_id.name:
                         file_reviewers.add(ownership.team_id.github_team)
+                        reasons[ownership.team_id.github_team].append({'type': 'fallback_module', 'ownership_id': ownership})
             if not file_reviewers:
                 if len(file.split('/')) <= 2:
-                    build._log('', 'File %s is at the root level and it looks like it could be a mistake, remove it or ensure that a codeowner rule is added for this file', file, log_type='markdown', level="ERROR")
+                    if build:
+                        build._log('', 'File %s is at the root level and it looks like it could be a mistake, remove it or ensure that a codeowner rule is added for this file', file, log_type='markdown', level="ERROR")
                 elif self.fallback_reviewer:
                     file_reviewers.add(self.fallback_reviewer)
+                    reasons[self.fallback_reviewer].append({'type': 'fallback_reviewer'})
             reviewer_per_file[file] = file_reviewers
-        return reviewer_per_file
+            reasons_per_file[file] = dict(reasons)
+        return reviewer_per_file, reasons_per_file
+
+    def _create_team_review_links(self, build, pr, new_reviewers, reviewer_per_file, restored_reviews=None):
+        teams = self.env['runbot.team'].search([('github_team', 'in', list(new_reviewers))])
+        restored_keys = {
+            (review.team_id.id, review.filename)
+            for review in (restored_reviews or self.env['runbot.team.review'])
+        }
+
+        vals_list = []
+        for team in teams:
+            for file in sorted(file for file, file_reviewers in reviewer_per_file.items() if team.github_team in file_reviewers and (team.id, file) not in restored_keys):
+                vals_list.append({
+                    'team_id': team.id,
+                    'branch_id': pr.id,
+                    'build_id': build.id,
+                    'filename': file,
+                })
+        return self.env['runbot.team.review'].create(vals_list)
+
+    def _update_removed_reviews(self, build, pr, files):
+        current_files = set(files)
+        review_model = self.env['runbot.team.review']
+        for review in review_model.search([
+            ('branch_id', '=', pr.id),
+            ('filename', 'not in', sorted(current_files)),
+            ('removal', '=', False),
+        ]):
+            review.write({'removal': True, 'reviewer_id': review.reviewer_id.id})
+
+        restored_reviews = review_model
+        restored_keys = set()
+        for review in review_model.search([
+            ('branch_id', '=', pr.id),
+            ('removal', '=', True),
+        ], order='build_id desc'):
+            if review.filename not in current_files:
+                continue
+            key = (review.team_id.id, review.filename)
+            if key in restored_keys:
+                continue
+            restored_keys.add(key)
+            restored_reviews |= review
+            review.write({'removal': False, 'build_id': build.id, 'reviewer_id': review.reviewer_id.id})
+        return restored_reviews
 
     def _run_codeowner(self, build):
         bundle = build.params_id.create_batch_id.bundle_id
@@ -118,13 +174,17 @@ class ConfigStep(models.Model):
         modified_files = self._modified_files(build, pr_by_commit.keys())
 
         if not modified_files:
+            for pr in pr_by_commit.values():
+                self._update_removed_reviews(build, pr, [])
             return
 
         skippable_teams = self.env['runbot.team'].search(['|', ('skip_team_pr', '=', True), ('skip_fw_pr', '=', True)])
         for commit_link, files in modified_files.items():
             build._log('', 'Checking %s codeowner regexed on %s files' % (len(regexes), len(files)))
+            pr = pr_by_commit[commit_link]
+            restored_reviews = self._update_removed_reviews(build, pr, files)
             reviewers = set()
-            reviewer_per_file = self._reviewer_per_file(files, regexes, ownerships, commit_link.commit_id.repo_id, build)
+            reviewer_per_file, _reasons_per_file = self._reviewer_per_file(files, regexes, ownerships, commit_link.commit_id.repo_id, build)
             for file, file_reviewers in reviewer_per_file.items():
                 href = 'https://%s/blob/%s/%s' % (commit_link.branch_id.remote_id.base_url, commit_link.commit_id.name, file.split('/', 1)[-1])
                 if file_reviewers:
@@ -134,7 +194,6 @@ class ConfigStep(models.Model):
                     build._log('', 'No reviewer for file [%s](%s)', file, href, log_type='markdown')
 
             if reviewers:
-                pr = pr_by_commit[commit_link]
                 new_reviewers = reviewers - set((pr.reviewers or '').split(','))
                 if new_reviewers:
                     author_skippable_teams = skippable_teams.filtered(lambda team: team.skip_team_pr and team.github_team in new_reviewers and pr.pr_author and pr.pr_author.lower() in team._get_members_logins())
@@ -155,5 +214,6 @@ class ConfigStep(models.Model):
                     response = pr.remote_id._github('/repos/:owner/:repo/pulls/%s/requested_reviewers' % pr.name, {"team_reviewers": list(new_reviewers)}, ignore_errors=False)
                     pr._update_branch_infos(response)
                     pr['reviewers'] = ','.join(sorted(reviewers))
+                    self._create_team_review_links(build, pr, new_reviewers, reviewer_per_file, restored_reviews=restored_reviews)
                 else:
                     build._log('', 'All reviewers are already on pull request [%s](%s)', pr.dname, pr.branch_url, log_type='markdown')

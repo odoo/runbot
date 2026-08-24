@@ -570,6 +570,114 @@ class Runbot(Controller):
         }
         return request.render('runbot.team', qctx)
 
+    @route(['/runbot/team_reviews/<int:team_id>'], type='http', auth='user', website=True, sitemap=False)
+    def team_reviews(self, team_id=None, **kwargs):
+        team = request.env['runbot.team'].browse(team_id)
+        if not team:
+            raise NotFound()
+
+        reviews = team.review_ids.filtered('branch_id.alive').sorted('filename')
+        reviews_by_bundle = defaultdict(lambda: request.env['runbot.team.review'])
+        for review in reviews:
+            reviews_by_bundle[review.branch_id.bundle_id] |= review
+
+        context = {
+            'team': team,
+            'reviews_by_bundle': sorted(reviews_by_bundle.items(), key=lambda bundle_reviews: bundle_reviews[0].name),
+            'nb_reviews': len(reviews),
+            'nb_reviews_reviewed': len(reviews.filtered(lambda rec: rec.reviewed)),
+            'is_team_member': team in request.env.user.runbot_team_ids,
+        }
+        return request.render('runbot.team_reviews', context)
+
+    def _apply_submitted_reviews(self, reviews, checked_ids, already_reviewed_ids):
+        to_review = reviews.filtered(lambda review: review.id in checked_ids - already_reviewed_ids and not review.reviewed)
+        to_review.write({'reviewed': True})
+        to_unreview = reviews.filtered(lambda review: review.id in already_reviewed_ids - checked_ids and review.reviewed)
+        to_unreview.write({'reviewed': False})
+
+    @route(['/runbot/team_reviews/<int:team_id>/reviewed'], type='http', auth='user', methods=['POST'], sitemap=False)
+    def team_review_reviewed(self, team_id=None, **kwargs):
+        team = request.env['runbot.team'].browse(team_id)
+        if not team:
+            raise NotFound()
+        if team not in request.env.user.runbot_team_ids:
+            raise Forbidden('Only members of the team can check those files as reviewed')
+
+        checked_ids = set(request.httprequest.form.getlist('reviewed_ids', int))
+        already_reviewed_ids = set(request.httprequest.form.getlist('already_reviewed_ids', int))
+        reviews = request.env['runbot.team.review'].browse(sorted(checked_ids | already_reviewed_ids))
+        if reviews.team_id - team:
+            raise Forbidden('Cannot review the files of another team')
+
+        self._apply_submitted_reviews(reviews, checked_ids, already_reviewed_ids)
+        return request.redirect(f'/runbot/team_reviews/{team.id}')
+
+    @route(['/runbot/bundle_reviews/<int:bundle_id>'], type='http', auth='user', website=True, sitemap=False)
+    def bundle_reviews(self, bundle_id=None, **kwargs):
+        bundle = request.env['runbot.bundle'].browse(bundle_id)
+        if not bundle.exists():
+            raise NotFound()
+
+        reviews = request.env['runbot.team.review'].search([
+            ('branch_id', 'in', bundle.branch_ids.filtered(lambda branch: branch.is_pr).ids),
+        ], order='build_id desc, id desc')
+        if not reviews:
+            raise NotFound()
+
+        latest_reviews = {}
+        for review in reviews:
+            latest_reviews.setdefault((review.branch_id.id, review.team_id.id, review.filename), review)
+        reviews = request.env['runbot.team.review'].browse([review.id for review in latest_reviews.values()])
+
+        step = reviews.build_id.params_id.config_id.step_ids.filtered(lambda config_step: config_step.job_type == 'codeowner')[:1]
+        codeowners = request.env['runbot.codeowner'].search([('project_id', '=', bundle.project_id.id)])
+        ownerships = request.env['runbot.module.ownership'].search([('team_id.github_team', '!=', False)])
+        regexes = step._codeowners_regexes(codeowners, bundle.version_id)
+        reasons_per_file = {}
+        for repo in reviews.branch_id.repo_id:
+            repo_reviews = reviews.filtered(lambda review: review.branch_id.repo_id == repo)
+            _, repo_reasons_per_file = step._reviewer_per_file(repo_reviews.mapped('filename'), regexes, ownerships, repo)
+            reasons_per_file.update(repo_reasons_per_file)
+
+        user_teams = request.env.user.runbot_team_ids
+        review_infos = [{
+            'review': review,
+            'github_team': review.team_id.github_team,
+            'reasons': reasons_per_file.get(review.filename, {}).get(review.team_id.github_team),
+            'editable': review.team_id in user_teams,
+        } for review in reviews]
+
+        context = {
+            'bundle': bundle,
+            'review_infos': review_infos,
+            'nb_reviews': len(review_infos),
+            'nb_reviews_reviewed': len(reviews.filtered(lambda rec: rec.reviewed)),
+            'has_editable_reviews': any(review_info['editable'] for review_info in review_infos),
+        }
+        return request.render('runbot.bundle_reviews', context)
+
+    @route(['/runbot/bundle_reviews/<int:bundle_id>/reviewed'], type='http', auth='user', methods=['POST'], sitemap=False)
+    def bundle_review_reviewed(self, bundle_id=None, **kwargs):
+        bundle = request.env['runbot.bundle'].browse(bundle_id)
+        if not bundle.exists():
+            raise NotFound()
+
+        branches = bundle.branch_ids.filtered(lambda branch: branch.is_pr)
+        if not branches:
+            raise NotFound()
+
+        checked_ids = set(request.httprequest.form.getlist('reviewed_ids', int))
+        already_reviewed_ids = set(request.httprequest.form.getlist('already_reviewed_ids', int))
+        reviews = request.env['runbot.team.review'].browse(sorted(checked_ids | already_reviewed_ids))
+        if reviews.branch_id - branches:
+            raise Forbidden('Cannot review the files of another bundle')
+        if reviews.team_id - request.env.user.runbot_team_ids:
+            raise Forbidden('Only members of the team can check this file as reviewed')
+
+        self._apply_submitted_reviews(reviews, checked_ids, already_reviewed_ids)
+        return request.redirect(f'/runbot/bundle_reviews/{bundle.id}')
+
     @route(['/runbot/dashboards/<model("runbot.dashboard"):dashboard>'], type='http', auth='user', website=True, sitemap=False)
     def dashboards(self, dashboard=None, hide_empty=False, **kwargs):
         qctx = {

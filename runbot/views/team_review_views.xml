@@ -1,0 +1,53 @@
+<odoo>
+  <data>
+    <record id="team_review_tree" model="ir.ui.view">
+      <field name="name">runbot.team.review.list</field>
+        <field name="model">runbot.team.review</field>
+        <field name="arch" type="xml">
+            <list string="Runbot team reviews" editable="bottom" multi_edit="1" decoration-muted="reviewed or removal">
+              <field name="team_id" readonly="1"/>
+              <field name="pr_url" widget="pull_request_url" readonly="1"/>
+              <field name="filename" readonly="1"/>
+              <field name="reviewed" widget="boolean_toggle"/>
+              <field name="reviewer_id" readonly="1"/>
+              <field name="build_url" widget="url" optional="hide" readonly="1"/>
+              <field name="removal" readonly="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="team_review_search_view" model="ir.ui.view">
+      <field name="name">runbot.team.review.search</field>
+      <field name="model">runbot.team.review</field>
+      <field name="arch" type="xml">
+        <search string="Search team reviews">
+          <field name="team_id"/>
+          <field name="branch_id"/>
+          <field name="filename"/>
+          <field name="reviewer_id"/>
+          <filter string="My teams" name="my_teams" domain="[('team_id.user_ids', 'in', uid)]"/>
+          <separator/>
+          <filter string="To review" name="to_review" domain="[('reviewed', '=', False), ('removal', '=', False)]"/>
+          <filter string="Reviewed" name="reviewed" domain="[('reviewed', '=', True)]"/>
+          <filter string="Removed" name="removed" domain="[('removal', '=', True)]"/>
+          <separator/>
+          <filter string="Alive pull requests" name="alive" domain="[('branch_id.alive', '=', True)]"/>
+          <separator/>
+          <filter string="Team" name="group_team" context="{'group_by': 'team_id'}"/>
+          <filter string="Pull Request" name="group_branch" context="{'group_by': 'branch_id'}"/>
+          <filter string="Reviewer" name="group_reviewer" context="{'group_by': 'reviewer_id'}"/>
+          <filter string="Reviewed" name="group_reviewed" context="{'group_by': 'reviewed'}"/>
+        </search>
+      </field>
+    </record>
+
+    <record id="open_view_runbot_team_review" model="ir.actions.act_window">
+      <field name="name">Runbot team reviews</field>
+      <field name="res_model">runbot.team.review</field>
+      <field name="view_mode">list</field>
+      <field name="path">team-review</field>
+      <field name="context">{'search_default_alive': 1}</field>
+    </record>
+
+  </data>
+</odoo>

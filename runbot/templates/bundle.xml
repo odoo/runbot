@@ -34,8 +34,11 @@
                                                 </a>
                                             </ul>
                                         </t>
-                                </div></h5>
-                            
+                                        <a t-if="bundle.has_pr" groups="runbot.group_user" t-attf-href="/runbot/bundle_reviews/{{bundle.id}}"
+                                            class="btn btn-default fa fa-list-ul text-start" title="View the files to review for this bundle"/>
+                                </div>
+                            </h5>
+
                             <table class="table table-condensed table-responsive">
                                 <tr>
                                     <td>Version</td>

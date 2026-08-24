@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <template id="runbot.bundle_reviews_reason">
+      <div>
+        <t t-if="reason['type'] == 'regex'">
+          <a t-foreach="reason['codeowner_ids']" t-as="codeowner" class="badge text-bg-light"
+            t-attf-href="/odoo/codeowner/{{codeowner.id}}" target="_blank"
+            t-attf-title="Assigned by the codeowner {{codeowner.id}}">
+            regex #<t t-out="codeowner.id"/><i class="fa fa-external-link ms-1"/>
+          </a>
+        </t>
+        <t t-elif="reason['type'] in ('module', 'fallback_module')">
+          <span t-attf-class="badge text-bg-{{'light' if reason['type'] == 'module' else 'warning'}}"
+            t-att-title="'Assigned by the ownership of the module' if reason['type'] == 'module' else 'Assigned by the fallback ownership of the module, no other team matched'">
+            module<t t-if="reason['type'] == 'fallback_module'"> fallback</t>
+          </span>
+          <a t-attf-href="/odoo/module-ownership/{{reason['ownership_id'].id}}" target="_blank" title="View Module Ownership in Backend">
+            <t t-out="reason['ownership_id'].module_id.name"/>
+          </a>
+        </t>
+        <t t-elif="reason['type'] == 'fallback_reviewer'">
+          <span class="badge text-bg-warning" title="Assigned by the fallback reviewer, no regex and no module matched">fallback</span>
+        </t>
+      </div>
+    </template>
+
+    <template id="runbot.bundle_reviews">
+      <t t-call='runbot.layout'>
+        <form method="post" t-attf-action="/runbot/bundle_reviews/{{bundle.id}}/reviewed">
+          <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+          <table class="table table-condensed table-filter caption-top text-body-secondary">
+            <caption>
+              <div class="row align-items-center">
+                <h2 class="col-12 col-md-auto">
+                  <t t-set="pr_names" t-value="'/'.join(set(bundle.branch_ids.filtered(lambda rec: rec.is_pr).mapped('pr_title')))"/>
+                  Reviews for <t t-out="pr_names"/>
+                  <span t-attf-class="badge fs-6 align-middle text-bg-{{'success' if nb_reviews_reviewed == nb_reviews else 'primary'}}"
+                    title="Reviewed files">
+                    <t t-out="nb_reviews_reviewed"/> / <t t-out="nb_reviews"/>
+                  </span>
+                  <button t-if="has_editable_reviews" type="submit" class="btn btn-sm btn-primary align-middle"
+                    title="Apply changes">Save Reviews</button>
+                </h2>
+              </div>
+              <div class="row">
+                <div class="col-12">
+                  Reviewers are recomputed from the current codeowners, module ownerships and fallbacks:
+                  they may differ from the reviews requested on github.
+                </div>
+              </div>
+            </caption>
+            <colgroup>
+              <col class="w-0"/>
+              <col class="w-50"/>
+              <col/>
+              <col/>
+              <col class="w-0"/>
+            </colgroup>
+            <thead>
+              <tr>
+                <th/>
+                <th>File</th>
+                <th>Reviewers</th>
+                <th>Reason</th>
+                <th class="text-nowrap">Triggering build</th>
+              </tr>
+            </thead>
+            <tbody class="table-group-divider">
+              <t t-foreach="review_infos" t-as="review_info">
+                <t t-set="review" t-value="review_info['review']"/>
+                <tr>
+                  <td>
+                    <input type="checkbox" class="form-check-input" name="reviewed_ids"
+                      t-att-value="review.id"
+                      t-att-checked="'checked' if review.reviewed else None"
+                      t-att-disabled="None if review_info['editable'] else 'disabled'"
+                      t-att-title="'Reviewed' if review.reviewed else 'Mark as reviewed'"/>
+                    <input t-if="review_info['editable'] and review.reviewed"
+                      type="hidden" name="already_reviewed_ids" t-att-value="review.id"/>
+                  </td>
+                  <td>
+                    <code t-out="review.filename" t-attf-class="{{'text-body-secondary' if review.reviewed or review.removal else ''}}"/>
+                    <span t-if="review.removal" class="badge text-bg-warning ms-1" title="File removed from the PR">removed</span>
+                    <span t-if="review.reviewer_id" class="text-body-secondary">
+                      (<t t-out="review.reviewer_id.name"/>)
+                    </span>
+                  </td>
+                  <td class="text-nowrap">
+                    <span class="badge text-bg-info" title="Review requested">
+                      <t t-out="review_info['github_team']"/>
+                    </span>
+                  </td>
+                  <td>
+                    <t t-if="review_info['reasons']" t-foreach="review_info['reasons']" t-as="reason">
+                      <t t-call="runbot.bundle_reviews_reason"/>
+                    </t>
+                  </td>
+                  <td>
+                    <a t-if="review.build_id" t-att-href="review.build_id.build_url"
+                      title="View the build that requested this review">
+                      <t t-out="review.build_id.id"/>
+                    </a>
+                  </td>
+                </tr>
+              </t>
+            </tbody>
+          </table>
+        </form>
+      </t>
+    </template>
+  </data>
+</odoo>
