@@ -179,10 +179,6 @@ dialog.modal {
     }
 }
 
-.fa {
-	line-height: inherit; /* reset fa icon line height to body height*/
-}
-
 a, .btn-link {
     text-decoration: none; /* until --bs-link-decoration is actually used, see twbs/bootstrap#41737 */
 }
@@ -228,17 +224,19 @@ a, .btn-link {
 }
 
 .btn-sm, .btn-group-sm > .btn {
-	padding: 0.25rem 0.5rem;
-	font-size: 0.89rem;
-	line-height: 1.5;
-	border-radius: 0.2rem;
+	--bs-btn-padding-y: 0.25rem;
+	--bs-btn-padding-x: 0.5rem;
+	--bs-btn-font-size: 0.89rem;
+	--bs-btn-line-height: 1.5;
+	--bs-btn-border-radius: 0.2rem;
 }
 
 .btn-ssm, .btn-group-ssm > .btn {
-	padding: 0.22rem 0.4rem;
-	font-size: 0.82rem;
-	line-height: 1;
-	border-radius: 0.2rem;
+	--bs-btn-padding-y: 0.22rem;
+	--bs-btn-padding-x: 0.4rem;
+	--bs-btn-font-size: 0.82rem;
+	--bs-btn-line-height: 1;
+	--bs-btn-border-radius: 0.2rem;
 }
 
 .killed, .bg-killed, .bg-killed-light {
