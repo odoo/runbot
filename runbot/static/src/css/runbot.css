@@ -6,6 +6,7 @@
 	--btn-default-border: #ccc;
 	--active-project-color: #777;
 	--text-color-link: #507279;
+	--bs-font-sans-serif: "Helvetica Neue", Helvetica, Arial, sans-serif;
 	/* FIXME: style all links, should be theme based */
 	--bs-link-color: #00A09D;
 	--bs-link-color-rgb: 0, 160, 157;
@@ -225,11 +226,6 @@ a, .btn-link {
 .separator {
 	border-top: 0.2em solid #666;
 }
-
-body, .table {
-	font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-}
-
 
 .btn-sm, .btn-group-sm > .btn {
 	padding: 0.25rem 0.5rem;
@@ -456,7 +452,7 @@ code {
 
 .pre {
 	display: block;
-    font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+	font-family: var(--bs-font-monospace);
     white-space: pre;
 	overflow: auto;
 	font-size: 0.875em;
