@@ -6,6 +6,7 @@
 	--active-project-color: #777;
 	--text-color-link: #507279;
 	--bs-font-sans-serif: "Helvetica Neue", Helvetica, Arial, sans-serif;
+	--bs-body-font-size: 0.875rem;
 	--bs-link-decoration: none;
 	/* FIXME: style all links, should be theme based */
 	--bs-link-color: #00A09D;
@@ -149,7 +150,6 @@
 
 body {
 	margin: 0;
-    font-size: 0.875rem;
     font-weight: 400;
     line-height: 1.5;
     text-align: left;
@@ -157,10 +157,6 @@ body {
 
 form {
     margin: 0;
-}
-
-table {
-    font-size: 0.875rem;
 }
 
 dialog.modal {
