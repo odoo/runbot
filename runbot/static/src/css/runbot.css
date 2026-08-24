@@ -1,5 +1,4 @@
 :root {
-	--gray:  #6c757d; /* used for batch limitation */
 	--btn-default-color: var(--bs-body-color);
 	--btn-default-bg: var(--bs-body-bg);
 	--btn-default-hover-bg: color-mix(in lab, var(--btn-default-bg), black 15%);
@@ -356,7 +355,7 @@ a, .btn-link {
 }
 
 .bundle_row {
-	border-bottom: 1px solid var(--gray);
+	border-bottom: 1px solid var(--bs-gray);
 }
 
 .bundle_row .batch_commits {
