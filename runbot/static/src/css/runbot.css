@@ -141,10 +141,6 @@
     table-layout: fixed;
 }
 
-/*.accordion-button:not(.collapsed) {
-	background-color: transparent; /* remove crappy color
-}*/
-
 .active_project {
 	color: var(--active-project-color);
 	margin-left: 15px;
@@ -382,23 +378,6 @@ body, .table {
 .bundle_row .more .batch_commits {
 	display: block;
 }
-
-/*.bundle_row .nomore .batch_commits {
-	display: none;
-	padding: 8px;
-}
-
-.bundle_row .nomore.batch_tile:hover .batch_commits {
-	display: block;
-	position: absolute;
-	bottom: 1px;
-	transform: translateY(100%);
-	z-index: 100;
-	border: 1px solid rgba(0, 0, 0, 0.125);
-	border-radius: 0.2rem;
-	box-sizing: border-box;
-	margin-left: -1px;
-}*/
 
 .chart-legend {
 	max-height: calc(100vh - 160px);
