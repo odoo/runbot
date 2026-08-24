@@ -121,10 +121,6 @@
     --bs-btn-disabled-border-color: #17a2b8;
 }
 
-.accordion {
-	--bs-accordion-btn-padding-y: 0.3rem; /* more condensed build error views */
-}
-
 .text-bg-default {
 	color: var(--bs-body-color) !important;
 	background-color: RGBA(var(--bs-body-bg-rgb), var(--bs-bg-opacity, 1)) !important;
@@ -241,21 +237,8 @@ a, .btn-link {
 	padding: 6px;
 }
 
-.branch_time {
-	float: right;
-	margin-left: 10px;
-}
-
 .text-info {
 	color: #096b72 !important;
-}
-
-.build_subject_buttons {
-	display: flex;
-}
-
-.build_buttons {
-	margin-left: auto;
 }
 
 .bg-killed {
@@ -350,10 +333,6 @@ a, .btn-link {
 
 .bundle_row .slot_filler {
 	flex: 1 0 50%;
-}
-
-.bundle_row .more .batch_commits {
-	display: block;
 }
 
 .chart-legend {
