@@ -227,12 +227,6 @@ a, .btn-link {
 	content: none;
 }
 
-.one_line {
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
 .batch_tile {
 	padding: 6px;
 }
