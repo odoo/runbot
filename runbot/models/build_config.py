@@ -52,6 +52,10 @@ _re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING .*'
 PYTHON_DEFAULT = "# type python code here\n\n\n\n\n\n"
 
 
+def echo(text):
+    return f'echo $(date -u "+%Y-%m-%d %H:%M:%S,%3N") "{text}"'
+
+
 def filter_all_modules(selector, build, dynamic_vars):
     if selector.split(',', 1)[0] != '*':
         selector = f'*,{selector}'
@@ -445,8 +449,8 @@ class ConfigStep(models.Model):
     dockerfile_id = fields.Many2one('runbot.dockerfile', string='Dockerfile')
     dockerfile_variant = fields.Char('Docker Variant')
     # install_odoo
-    create_db = fields.Boolean('Create Db', default=True, tracking=True)  # future
-    custom_db_name = fields.Char('Custom Db Name', tracking=True)  # future
+    create_db = fields.Boolean('Create Db', default=True, tracking=True)  # TODO remove
+    custom_db_name = fields.Char('Custom Db Name', tracking=True)
     install_modules = fields.Char('Modules to install', help="List of module patterns to install, use * to install all available modules, prefix the pattern with dash to remove the module.", default='', tracking=True)
     db_name = fields.Char('Db Name', compute='_compute_db_name', inverse='_inverse_db_name', tracking=True)
     cpu_limit = fields.Integer('Cpu limit', default=3600, tracking=True)
@@ -794,9 +798,8 @@ class ConfigStep(models.Model):
         db_suffix = config_data.get('db_name') or ((build.params_id.restore_db_suffix or build.params_id.dump_db.db_suffix) if not self.create_db else False) or self._get_db_name(build)
         db_suffix = re.sub(r'[^a-z0-9\-_]', '_', db_suffix.lower())
         db_name = '%s-%s' % (build.dest, db_suffix)
-        if modules_to_install and self.create_db:
-            build._local_pg_createdb(db_name)
         cmd += ['-d', db_name]
+        self.env['runbot.database'].create({'name': db_name, 'build_id': build.id})
 
         # Demo data behavior changed in 18.1 -> demo data became opt-in instead of opt-out
         available_options = build._parse_config()
@@ -857,15 +860,18 @@ class ConfigStep(models.Model):
 
         cmd.finals.extend(self._post_install_commands(build, config_data, py_version))  # coverage post, extra-checks, ...
 
+        env_variables = self.additionnal_env.split(';') if self.additionnal_env else []
+        if config_env_variables := config_data.get('env_variables', False):
+            env_variables += config_env_variables.split(';')
+
         if config_data.get('export_database', True):
             self._add_zip_generation(build, cmd, db_name)
+            env_variables.append('SAVE_CLUSTER=1')
+            env_variables.append(f'CLUSTER_BACKUP_NAME={db_name}-cluster.zip')
 
         if self.flamegraph:
             cmd.finals.append(['flamegraph.pl', '--title', 'Flamegraph %s for build %s' % (self.sanitized_name(build), build.id), self._perfs_data_path(build), '>', self._perfs_data_path(ext='svg')])
             cmd.finals.append(['gzip', '-f', self._perfs_data_path(build)])  # keep data but gz them to save disc space
-        env_variables = self.additionnal_env.split(';') if self.additionnal_env else []
-        if config_env_variables := config_data.get('env_variables', False):
-            env_variables += config_env_variables.split(';')
 
         if config_data.get('coverage_test_context', self.coverage_test_context):
             env_variables.append("COVERAGE_DYNAMIC_CONTEXT=test_function")
@@ -881,9 +887,13 @@ class ConfigStep(models.Model):
         filestore_path = '/data/build/datadir/filestore/%s' % db_name
         filestore_dest = '%s/filestore/' % dump_dir
         zip_path = '/data/build/logs/%s.zip' % db_name
+        cmd.finals.append([echo('### Generating dump')])
         cmd.finals.append(['pg_dump', db_name, '>', sql_dest])
+        cmd.finals.append([echo('### Copying filestore')])
         cmd.finals.append(['cp', '-r', filestore_path, filestore_dest])
+        cmd.finals.append([echo('### Generating zip')])
         cmd.finals.append(['cd', dump_dir, '&&', 'zip', '-rmq9', zip_path, '*'])
+        cmd.finals.append([echo('### Done')])
         infos = '{\n    "db_name": "%s",\n    "build_id": %s,\n    "shas": [%s]\n}' % (db_name, build.id, ', '.join(['"%s"' % build_commit.commit_id.dname for build_commit in build.params_id.commit_link_ids]))
         build._write_file('logs/%s/info.json' % db_name, infos)
 
@@ -1147,6 +1157,7 @@ class ConfigStep(models.Model):
         dump_db = params.dump_db
         if dump_url := config_data.get('dump_url'):
             zip_name = dump_url.split('/')[-1]
+            download_db_name = zip_name.replace('.zip', '')
             build._log('_run_restore', f'Restoring db [{zip_name}]({dump_url})', log_type='markdown')
         else:
             reference_build = None
@@ -1209,28 +1220,48 @@ class ConfigStep(models.Model):
         target_suffix = config_data.get('target_suffix', self.restore_rename_db_suffix or download_db_suffix)
         restore_db_name = '%s-%s' % (build.dest, target_suffix)
 
-        build._local_pg_createdb(restore_db_name)
-        cmd = ' && '.join([
-            'mkdir /data/build/restore',
-            'cd /data/build/restore',
-            'wget --retry-on-host-error %s' % dump_url,
-            'unzip -q %s' % zip_name,
-            'echo "### restoring filestore"',
-            'mkdir -p /data/build/datadir/filestore/%s' % restore_db_name,
-            'mv filestore/* /data/build/datadir/filestore/%s' % restore_db_name,
-            'echo "### restoring db"',
-            'psql -q %s < dump.sql' % (restore_db_name),
-            'echo "### performing an analyze"',
-            'psql -q -d %s -c "ANALYZE;"' % restore_db_name,
-            'cd /data/build',
-            'echo "### cleaning"',
-            'rm -r restore',
-            'echo "### listing modules"',
-            """psql %s -c "select name from ir_module_module where state = 'installed'" -t -A > /data/build/logs/restore_modules_installed.txt""" % restore_db_name,
-            'echo "### restore" "successful"',  # two part string to avoid miss grep
-            ])
+        icp = self.env['ir.config_parameter']
+        db_template = icp.get_param('runbot.runbot_db_template', default='template0')
+        self.env['runbot.database'].create({'name': restore_db_name, 'build_id': build.id})
+        restore_cluster = True  # todo define is it is applicable
+        env_variables = []
+        if restore_cluster:
+            cluster_zip_url = dump_url.replace('.zip', '-cluster.zip')
+            env_variables.append(f'RESTORE_ZIP_URL={cluster_zip_url}')
+            cmd = ' && '.join([
+                echo('### Moving filestore'),
+                f'mv /data/build/datadir/filestore/{download_db_name} /data/build/datadir/filestore/{restore_db_name}',
+                echo('### Renaming db'),
+                f'psql -q -d postgres -c \'ALTER DATABASE "{download_db_name}" RENAME TO "{restore_db_name}";\'',
+                echo('### Performing an analyze'),
+                f'psql -q -d {restore_db_name} -c "ANALYZE;"',
+                f"""psql {restore_db_name} -c "select name from ir_module_module where state = 'installed'" -t -A > /data/build/logs/restore_modules_installed.txt""",
+                echo('### restore" "successful'),  # two part string to avoid miss grep
+                ])
+        else:
+            cmd = ' && '.join([
+                'mkdir /data/build/restore',
+                'cd /data/build/restore',
+                echo('### getting archive'),
+                'wget --retry-on-host-error %s' % dump_url,
+                'unzip -q %s' % zip_name,
+                echo('### restoring filestore'),
+                'mkdir -p /data/build/datadir/filestore/%s' % restore_db_name,
+                'mv filestore/* /data/build/datadir/filestore/%s' % restore_db_name,
+                echo('### restoring db'),
+                'createdb %s -T %s' % (restore_db_name, db_template),
+                'psql -q %s < dump.sql' % (restore_db_name),
+                echo('### performing an analyze'),
+                'psql -q -d %s -c "ANALYZE;"' % restore_db_name,
+                'cd /data/build',
+                echo('### cleaning'),
+                'rm -r restore',
+                echo('### listing modules'),
+                """psql %s -c "select name from ir_module_module where state = 'installed'" -t -A > /data/build/logs/restore_modules_installed.txt""" % restore_db_name,
+                echo('### restore" "successful'),  # two part string to avoid miss grep
+                ])
 
-        return dict(cmd=cmd, network_enabled=True)
+        return dict(cmd=cmd, network_enabled=True, env_variables=env_variables)
 
     def _log_end(self, build):
         # TODO fixme config data are not the same as the run part in dynamic steps

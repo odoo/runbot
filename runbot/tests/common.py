@@ -227,7 +227,6 @@ class RunbotCase(TransactionCase):
         self.start_patcher('set_psql_conn_count', 'odoo.addons.runbot.models.host.Host._set_psql_conn_count', None)
         self.start_patcher('reload_nginx', 'odoo.addons.runbot.models.runbot.Runbot._reload_nginx', None)
         self.start_patcher('update_commits_infos', 'odoo.addons.runbot.models.batch.Batch._update_commits_infos', None)
-        self.start_patcher('_local_pg_createdb', 'odoo.addons.runbot.models.build.BuildResult._local_pg_createdb', True)
         self.start_patcher('getmtime', 'odoo.addons.runbot.common.os.path.getmtime', datetime.datetime.now().timestamp())
         self.start_patcher('file_exist', 'odoo.tools.misc.os.path.exists', True)
         self.start_patcher('_get_py_version', 'odoo.addons.runbot.models.build.BuildResult._get_py_version', 3)

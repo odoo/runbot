@@ -15,7 +15,6 @@ from pathlib import Path
 
 from dateutil import parser
 from markupsafe import Markup
-from psycopg2 import sql
 from psycopg2.extensions import TransactionRollbackError
 
 from odoo import api, fields, models
@@ -1372,15 +1371,6 @@ class BuildResult(models.Model):
             _logger.exception(msg)
             host_name = self.env['runbot.host']._get_current_name()
             self.env['runbot.runbot']._warning(f'Host {host_name}: {msg}')
-
-    def _local_pg_createdb(self, dbname):
-        icp = self.env['ir.config_parameter']
-        db_template = icp.get_param('runbot.runbot_db_template', default='template0')
-        self._local_pg_dropdb(dbname)
-        _logger.info("createdb %s", dbname)
-        with local_pgadmin_cursor() as local_cr:
-            local_cr.execute(sql.SQL("""CREATE DATABASE {} TEMPLATE %s LC_COLLATE 'C' ENCODING 'unicode'""").format(sql.Identifier(dbname)), (db_template,))
-        self.env['runbot.database'].create({'name': dbname, 'build_id': self.id})
 
     def _log(self, func, message, *args, level='INFO', log_type='runbot', path='runbot'):
         def truncate(message, maxlenght=300000):
