@@ -6,6 +6,7 @@
 	--active-project-color: #777;
 	--text-color-link: #507279;
 	--bs-font-sans-serif: "Helvetica Neue", Helvetica, Arial, sans-serif;
+	--bs-link-decoration: none;
 	/* FIXME: style all links, should be theme based */
 	--bs-link-color: #00A09D;
 	--bs-link-color-rgb: 0, 160, 157;
@@ -183,7 +184,7 @@ dialog.modal {
 }
 
 a, .btn-link {
-    text-decoration: none;
+    text-decoration: none; /* until --bs-link-decoration is actually used, see twbs/bootstrap#41737 */
 }
 
 .breadcrumb {
