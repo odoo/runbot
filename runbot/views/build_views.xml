@@ -128,6 +128,15 @@
             </pivot>
         </field>
     </record>
+     <record id="build_view_graph" model="ir.ui.view">
+        <field name="name">runbot.build.graph</field>
+        <field name="model">runbot.build</field>
+        <field name="arch" type="xml">
+            <graph string="Builds" type="bar" sample="1">
+                <field name="create_date" interval="month" type="row"/>
+            </graph>
+        </field>
+    </record>
     <record id="view_build_search" model="ir.ui.view">
         <field name="model">runbot.build</field>
         <field name="arch" type="xml">

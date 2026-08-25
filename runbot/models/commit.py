@@ -32,6 +32,7 @@ class Commit(models.Model):
     subject = fields.Text('Subject')
     dname = fields.Char('Display name', compute='_compute_dname')
     rebase_on_id = fields.Many2one('runbot.commit', 'Rebase on commit')
+    create_date = fields.Datetime('Created on', index=True)
 
     @api.model_create_multi
     def create(self, vals_list):

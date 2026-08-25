@@ -222,6 +222,16 @@
         </field>
     </record>
 
+    <record id="batch_view_graph" model="ir.ui.view">
+        <field name="name">runbot.batch.graph</field>
+        <field name="model">runbot.batch</field>
+        <field name="arch" type="xml">
+            <graph string="Batches" type="bar" sample="1">
+                <field name="create_date" interval="month"/>
+            </graph>
+        </field>
+    </record>
+
     <record id="view_runbot_batch_tree" model="ir.ui.view">
         <field name="model">runbot.batch</field>
         <field name="arch" type="xml">
@@ -299,7 +309,7 @@
         <field name="name">Batches</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">runbot.batch</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">list,form,graph</field>
         <field name="path">batch</field>
     </record>
     <record id="action_bundle_tag" model="ir.actions.act_window">
