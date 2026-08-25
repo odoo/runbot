@@ -956,8 +956,8 @@ class ConfigStep(models.Model):
                     else:
                         target_builds |= get_reference_builds_for_versions([version])
 
-        if target_builds:
-            build._log('', 'Testing upgrade targeting %s' % ', '.join(target_builds.mapped('params_id.version_id.name')))
+        #if target_builds:
+        #    build._log('', 'Testing upgrade targeting %s' % ', '.join(target_builds.mapped('params_id.version_id.name')))
         if not target_builds:
             build._log('_run_configure_upgrade', 'No reference build found with correct target in availables references, skipping. %s' % template_builds.mapped('params_id.version_id.name'))
             return
@@ -994,8 +994,8 @@ class ConfigStep(models.Model):
                         else:
                             source_builds |= get_reference_builds_for_versions([version])
 
-                if source_builds:
-                    build._log('', 'Defining source version(s) for %s: %s' % (target_version.name, ', '.join(source_builds.mapped('params_id.version_id.name'))))
+                #if source_builds:
+                #    build._log('', 'Defining source version(s) for %s: %s' % (target_version.name, ', '.join(source_builds.mapped('params_id.version_id.name'))))
                 if not source_builds:
                     build._log('_run_configure_upgrade', 'No source version found for %s, skipping' % target_version.name, level='WARNING')
                 elif not self.upgrade_flat:
@@ -1200,12 +1200,12 @@ class ConfigStep(models.Model):
                 for backup_host in self.env['runbot.host'].search([('is_backup', '=', True)]):
                     backup_url = f'{backup_host._backup_url()}{zip_name}'
                     if requests.head(backup_url, timeout=5).status_code == 200:
-                        build._log('_run_restore', 'Dump [%s](%s) from build [%s](%s) is missing, using [backup](%s)', zip_name, dump_url, dump_build.id, dump_build.build_url, backup_url, log_type='markdown')
+                        build._log('_run_restore', 'Template [%s](%s) from build [%s](%s) is missing, using [backup](%s)', zip_name, dump_url, dump_build.id, dump_build.build_url, backup_url, log_type='markdown')
                         dump_url = backup_url
                         use_backup = True
                         break
             if not use_backup:
-                build._log('_run_restore', 'Restoring dump [%s](%s) from build [%s](%s)', zip_name, dump_url, dump_build.id, dump_build.build_url, log_type='markdown')
+                build._log('_run_restore', 'Restoring template [%s](%s) from build [%s](%s)', zip_name, dump_url, dump_build.id, dump_build.build_url, log_type='markdown')
         target_suffix = config_data.get('target_suffix', self.restore_rename_db_suffix or download_db_suffix)
         restore_db_name = '%s-%s' % (build.dest, target_suffix)
 

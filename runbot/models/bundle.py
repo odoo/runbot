@@ -326,7 +326,8 @@ class Bundle(models.Model):
         if category_id:
             values['category_id'] = category_id
         new = self.env['runbot.batch'].create(values)
-        self.last_batch = new
+        if not category_id:
+            self.last_batch = new
         return new
 
     def _consistency_warning(self):

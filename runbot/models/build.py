@@ -375,6 +375,7 @@ class BuildResult(models.Model):
     build_error_link_ids = fields.One2many('runbot.build.error.link', 'build_id')
     build_error_ids = fields.Many2many('runbot.build.error', compute='_compute_build_error_ids', string='Errors')
     gc_running_date = fields.Date('GC Running Date', help='Running build cannot be killed before this date', index='btree_not_null')
+    create_date = fields.Datetime('Creation date', index=True)
     log_counter = fields.Integer('Log Lines counter', default=100)
 
     slot_ids = fields.One2many('runbot.batch.slot', 'build_id')

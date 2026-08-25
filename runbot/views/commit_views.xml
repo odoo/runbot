@@ -39,6 +39,17 @@
         </field>
     </record>
 
+    <record id="commit_view_graph" model="ir.ui.view">
+        <field name="name">runbot.commit.graph</field>
+        <field name="model">runbot.commit</field>
+        <field name="arch" type="xml">
+            <graph string="Commits" type="bar" sample="1">
+                <field name="create_date" interval="month"/>
+                <field name="repo_id"/>
+            </graph>
+        </field>
+    </record>
+
     <record id="runbot_commit_search_view" model="ir.ui.view">
       <field name="name">runbot.commit.filter</field>
       <field name="model">runbot.commit</field>
@@ -51,6 +62,21 @@
           <field name="committer"/>
           <field name="committer_email"/>
           <field name="subject"/>
+          <field name="repo_id"/>
+
+          <filter name="filter_date" string="Commit Date" date="date"/>
+          <separator/>
+          <filter name="filter_create_date" string="Seen by Runbot" date="create_date"/>
+
+          <separator/>
+          <filter name="group_repo" string="Repository"
+                  context="{'group_by': 'repo_id'}"/>
+          <filter name="group_author" string="Author"
+                  context="{'group_by': 'author'}"/>
+          <filter name="group_date" string="Commit Date"
+                  context="{'group_by': 'date'}"/>
+          <filter name="group_create_date" string="Seen by Runbot"
+                  context="{'group_by': 'create_date'}"/>
         </search>
       </field>
     </record>
@@ -58,7 +84,7 @@
     <record id="open_view_commit_tree" model="ir.actions.act_window">
         <field name="name">Commits</field>
         <field name="res_model">runbot.commit</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">list,form,graph</field>
         <field name="path">commit</field>
     </record>
 
@@ -93,7 +119,7 @@
     <record id="open_view_commit_links_tree" model="ir.actions.act_window">
         <field name="name">Commit Links</field>
         <field name="res_model">runbot.commit.link</field>
-        <field name="view_mode">list</field>
+        <field name="view_mode">list,form</field>
         <field name="path">commit-link</field>
     </record>
 
