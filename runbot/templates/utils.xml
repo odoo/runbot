@@ -10,6 +10,10 @@
 
                     <t t-call-assets="runbot.assets_frontend" t-js="False"/>
                     <t t-call-assets="runbot.assets_frontend" t-css="False" defer_load="True"/>
+                    <t t-if="'tests' in debug or test_mode_enabled">
+                        <t t-call-assets="web.assets_frontend" t-css="False" defer_load="True"/>
+                    </t>
+                    <t t-call="web.conditional_assets_tests" ignore_missing_deps="True"/>
 
                     <t t-if="refresh">
                         <meta http-equiv="refresh" t-att-content="refresh"/>
