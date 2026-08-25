@@ -77,6 +77,9 @@
             'runbot/static/src/js/fields/*',
             'runbot/static/src/js/components/*',
         ],
+        'web.assets_tests': [
+            'runbot/static/tests/tours/*.js',
+        ],
         'runbot.assets_frontend': [
             'web/static/lib/odoo_ui_icons/style.css',
             'runbot/static/lib/bootstrap/css/bootstrap.css',
