@@ -128,7 +128,7 @@
             </t>
           </div>
           <div t-if='more' class="batch_commits">
-            <div t-foreach="batch.commit_link_ids.sorted(lambda cl: (cl.commit_id.repo_id.sequence, cl.commit_id.repo_id.id))" t-as="commit_link" class="one_line">
+            <div t-foreach="batch.commit_link_ids.sorted(lambda cl: (cl.commit_id.repo_id.sequence, cl.commit_id.repo_id.id))" t-as="commit_link" class="text-truncate">
 
               <t t-set="match_class" t-value="'info' if commit_link.match_type == 'new' else 'secondary'"/>
               <a t-attf-href="/runbot/commit/#{commit_link.commit_id.id}" t-attf-class="badge text-bg-{{match_class}}">
