@@ -20,7 +20,10 @@ from utils import seen, Commit, make_basic as make_basic_utils, REF_PATTERN, MES
 FMT = '%Y-%m-%d %H:%M:%S'
 FAKE_PREV_WEEK = (datetime.now() + timedelta(days=1)).strftime(FMT)
 
-@pytest.fixture(params=["statuses", "runbot"])
+@pytest.fixture(
+    params=[("statuses", "pat"), ("statuses", "app"), ("runbot", "pat"), ("runbot", "app")],
+    ids=['github-pat', 'github-app', 'direct-pat', 'direct-app'],
+)
 def make_basic(
     request,
     port,
@@ -28,8 +31,11 @@ def make_basic(
     config,
     RepoType,
     make_repo,
+    mb_app,
+    installation,
 ) -> Iterator[MakeBasic]:
-    match request.param:
+    status_mode, github_mode = request.param
+    match status_mode:
         case "statuses":
             staging_statuses = True
             cm = contextlib.nullcontext()
@@ -72,13 +78,41 @@ def make_basic(
             raise ValueError(f"Unknown staging mode {request.param!r}")
 
     project_name = "someproject"
+    match github_mode:
+        case 'pat':
+            github_id = env['runbot_merge.github_connector'].create({
+                'name': "PAT",
+                'method': 'pat',
+                'main_pat': config['github']['token'],
+                'fp_pat': config['fp_github']['token'],
+            }).id
+        case 'app':
+            github_id = env["runbot_merge.github_connector"].create({
+                'name': "App",
+                "method": "app",
+                "client_id": mb_app.client_id,
+                "client_secret": mb_app.client_secret,
+                "private_key": mb_app.pem,
+                "webhook_secret": mb_app.webhook_secret,
+                "installations": [(0, 0, {
+                    "installation_id": installation.id,
+                    "owner_id": installation.account.id,
+                    "owner_login": installation.account.login,
+                    "repository_selection": "all",
+                })],
+                "auth_token": config['fp_github']['token'],
+                # "refresh_token": ...,
+                "auth_expires_at": datetime.fromisoformat(config['fp_github']["expires_at"]).replace(tzinfo=None).isoformat(' ', 'seconds')
+            }).id
+        case method:
+            raise ValueError(f"Unknown auth method {method!r}")
+
     project = env['runbot_merge.project'].create({
         'name': project_name,
-        'github_token': config['github']['token'],
+        'github_id': github_id,
         'github_prefix': 'hansen',
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",
-        'fp_github_token': config['fp_github']['token'],
         'fp_github_name': 'herbert',
         'branch_ids': [
             (0, 0, {'name': 'a', 'sequence': 100}),

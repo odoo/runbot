@@ -359,9 +359,12 @@ class AuthDict(dict):
             raise KeyError(key)
         if inst := getattr(self.app, 'get_or_install', None):
             inst(self['id'])
-        token = self['token'] = self.app.authorize(self['login']).token
+        match self.app:
+            case OAuthApp():
+                token = self['token'] = self.app.authorize(self['login'], ['repo', 'delete_repo']).token
+            case _:
+                token = self['token'] = self.app.authorize(self['login']).token
         return token
-
 
 @pytest.fixture(scope='session', autouse=True)
 def testsuite_app(
@@ -373,7 +376,7 @@ def testsuite_app(
         http_proxy: None,
 ) -> TestApp:
     # switch to the oauth app if we need to create cross-org private forks
-    if False and pytestconfig.getoption('--tunnel'):
+    if pytestconfig.getoption('--tunnel'):
         app = request.getfixturevalue('_oauth_test_app')
     else:
         app = request.getfixturevalue('_gh_test_app')
@@ -841,22 +844,12 @@ def _uat(pytestconfig: pytest.Config, mb_app: GithubApp, config: dict, rolemap: 
         # this means better match between gha and oaa
         auth = pytestconfig.stash[mb_uat] = mb_app.authorize(rolemap['fp']['login'])
 
-    created_at = datetime.datetime.fromisoformat(auth.created_at)
-    if (datetime.datetime.now(datetime.UTC) - created_at) > datetime.timedelta(hours=7):
-        r = requests.patch(
-            f'https://api.github.com/applications/{mb_app.client_id}/token',
-            auth=(mb_app.client_id, mb_app.client_secret),
-            headers={
-                'Accept': 'application/vnd.github+json'
-            },
-            json={'access_token': auth.token}
-        )
-        r.raise_for_status()
-        res = r.json()
-        auth.token = res['token']
-        auth.created_at = res['created_at']
+    expires_at = datetime.datetime.fromisoformat(auth.expires_at)
+    if (expires_at - datetime.datetime.now(datetime.UTC)) < datetime.timedelta(hours=1):
+        assert auth.refresh()
 
     rolemap["fp"]["token"] = config["fp_github"]["token"] = auth.token
+    rolemap["fp"]["expires_at"] = config['fp_github']["expires_at"] = auth.expires_at
 
 
 @pytest.fixture

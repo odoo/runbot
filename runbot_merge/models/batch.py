@@ -239,24 +239,33 @@ class Batch(models.Model):
             return
 
         proj = self.target.project_id
-        if not proj.fp_github_token:
-            _logger.warning(
-                "Can not forward-port %s (%s): no token on project %s",
-                self,
-                ', '.join(self.prs.mapped('display_name')),
-                proj.name
-            )
+        if not proj.fp_enabled:
+            remoteless = proj.repo_ids.filtered(lambda r: not r.fp_remote_target)
+            if remoteless == proj.repo_ids:
+                _logger.info(
+                    "Skipping forward-port of %s (%s): not enabled",
+                    self,
+                    ', '.join(self.prs.mapped('display_name')),
+                )
+            else:
+                _logger.warning(
+                    "Can not forward port %s (%s): repositories %s do not have a forward port remote configured",
+                    self,
+                    ', '.join(self.prs.mapped('display_name')),
+                    ", ".join(repr(r.name) for r in remoteless)
+                )
             return
 
-        notarget = [r.name for r in self.prs.repository if not r.fp_remote_target]
-        if notarget:
-            _logger.error(
-                "Can not forward-port %s (%s): repos %s don't have a forward port remote configured",
-                self,
-                ', '.join(self.prs.mapped('display_name')),
-                ', '.join(notarget),
-            )
-            return
+        for pr in self.prs:
+            repo = pr.repository
+            if not repo.project_id.github_id._fp_token(repo):
+                _logger.warning(
+                    "Can not forward-port %s (%s): no token for repository %s",
+                    self,
+                    ', '.join(self.prs.mapped('display_name')),
+                    repo.name
+                )
+                return
 
         all_targets = [p._find_next_target() for p in self.prs]
 
@@ -331,8 +340,6 @@ class Batch(models.Model):
                     f"Unable to push forward-port branch for {pr.display_name}:\n{r.stderr.decode()}"
                 )
 
-        gh = requests.Session()
-        gh.headers['Authorization'] = f'token {proj.fp_github_token}'
         has_conflicts = any(conflicts.values())
         # could create a batch here but then we'd have to update `_from_gh` to
         # take a batch and then `create` to not automatically resolve batches,
@@ -349,13 +356,18 @@ class Batch(models.Model):
                 for p in root | source
             )
 
+            token = proj.github_id._fp_token(pr.repository.name)
             title, body = re.fullmatch(r'(?P<title>[^\n]+)\n*(?P<body>.*)', message, flags=re.DOTALL).groups()
-            r = gh.post(f'https://api.github.com/repos/{pr.repository.name}/pulls', json={
-                'base': target.name,
-                'head': f'{owner}:{new_branch}',
-                'title': title,
-                'body': body
-            })
+            r = requests.post(
+                f'https://api.github.com/repos/{pr.repository.name}/pulls',
+                headers={'Authorization': f'token {token}'},
+                json={
+                    'base': target.name,
+                    'head': f'{owner}:{new_branch}',
+                    'title': title,
+                    'body': body
+                }
+            )
             if not r.ok:
                 _logger.warning("Failed to create forward-port PR for %s, deleting branches", pr.display_name)
                 # delete all the branches this should automatically close the

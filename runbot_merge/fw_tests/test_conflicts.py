@@ -235,11 +235,15 @@ def test_massive_conflict(env, config, make_repo):
     # region setup
     project = env['runbot_merge.project'].create({
         'name': "thing",
-        'github_token': config['github']['token'],
+        'github_id': env['runbot_merge.github_connector'].create({
+            'name': "PAT",
+            'method': 'pat',
+            'main_pat': config['github']['token'],
+            'fp_pat': config['fp_github']['token'],
+        }).id,
         'github_prefix': 'hansen',
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",
-        'fp_github_token': config['fp_github']['token'],
         'fp_github_name': 'herbert',
         'branch_ids': [
             (0, 0, {'name': 'a', 'sequence': 100}),
@@ -446,11 +450,15 @@ def test_conflict_deleted_deep(env, config, make_repo):
 
     project = env['runbot_merge.project'].create({
         'name': "test",
-        'github_token': config['github']['token'],
+        'github_id': env['runbot_merge.github_connector'].create({
+            'name': "PAT",
+            'method': 'pat',
+            'main_pat': config['github']['token'],
+            'fp_pat': config['fp_github']['token'],
+        }).id,
         'github_prefix': 'hansen',
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",
-        'fp_github_token': config['fp_github']['token'],
         'fp_github_name': 'herbert',
         'branch_ids': [
             (0, 0, {'name': 'a', 'sequence': 100}),
@@ -693,11 +701,15 @@ def foo():
 def setup_unstructured_conflict(env, config, make_repo):
     project = env['runbot_merge.project'].create({
         'name': "test",
-        'github_token': config['github']['token'],
+        'github_id': env['runbot_merge.github_connector'].create({
+            'name': "PAT",
+            'method': 'pat',
+            'main_pat': config['github']['token'],
+            'fp_pat': config['fp_github']['token'],
+        }).id,
         'github_prefix': 'hansen',
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",
-        'fp_github_token': config['fp_github']['token'],
         'fp_github_name': 'herbert',
         'branch_ids': [
             (0, 0, {'name': 'a', 'sequence': 100}),

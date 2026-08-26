@@ -37,7 +37,11 @@ def test_name_search(env):
     """
     p = env['runbot_merge.project'].create({
         'name': 'proj',
-        'github_token': 'no',
+        'github_id': env['runbot_merge.github_connector'].create({
+            'name': "PAT",
+            'method': 'pat',
+            'main_pat': 'no',
+        }).id,
         'github_name': "noo",
         'github_email': "nooo@example.org",
     })

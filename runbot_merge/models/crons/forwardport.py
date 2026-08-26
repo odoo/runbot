@@ -99,7 +99,7 @@ class ForwardPortTasks(models.Model):
 
         gh = requests.Session()
         repository = pr.repository
-        gh.headers['Authorization'] = f'token {repository.project_id.fp_github_token}'
+        gh.headers['Authorization'] = f'token {repository.project_id.github_id._fp_token(repository.name)}'
         PullRequests = self.env['runbot_merge.pull_requests']
         self.env.cr.execute('LOCK runbot_merge_pull_requests IN SHARE MODE')
 

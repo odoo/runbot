@@ -2838,8 +2838,7 @@ class TestReviewing:
             (users['user'], 'hansen r+'),
             (botname, f"@{users['user']} I must know your email before you can review PRs. Please contact an administrator."),
         ]
-        user_partner.fetch_github_email()
-        assert user_partner.email
+        user_partner.email = "foo@bar.com"
         with repo:
             pr.post_comment('hansen r+', config['role_user']['token'])
         env.run_crons()

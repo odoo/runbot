@@ -1168,7 +1168,11 @@ class TestSubstitutions:
     def test_substitution_patterns(self, env, port, config):
         p = env['runbot_merge.project'].create({
             'name': 'proj',
-            'github_token': 'wheeee',
+            'github_id': env['runbot_merge.github_connector'].create({
+                'name': "PAT",
+                'method': 'pat',
+                'main_pat': 'wheeee',
+            }).id,
             'github_name': "yyy",
             'github_email': "zzz@example.org",
             'repo_ids': [(0, 0, {'name': 'xxx/xxx'})],
@@ -1289,7 +1293,11 @@ def test_multi_project(env, make_repo, setreviewers, users, config,
     r1_dev = r1.fork()
     p1 = Projects.create({
         'name': 'Project 1',
-        'github_token': gh_token,
+        'github_id': env['runbot_merge.github_connector'].create({
+            'name': "PAT",
+            'method': 'pat',
+            'main_pat': gh_token,
+        }).id,
         'github_prefix': 'hansen',
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",
@@ -1312,7 +1320,11 @@ def test_multi_project(env, make_repo, setreviewers, users, config,
     r2_dev = r2.fork()
     p2 = Projects.create({
         'name': "Project 2",
-        'github_token': gh_token,
+        'github_id': env['runbot_merge.github_connector'].create({
+            'name': "PAT",
+            'method': 'pat',
+            'main_pat': gh_token,
+        }).id,
         'github_prefix': 'hansen',
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",

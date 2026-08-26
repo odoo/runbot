@@ -128,7 +128,7 @@ All substitutions are tentatively applied sequentially to the input.
         return super().write(vals)
 
     def github(self) -> github.GH:
-        return github.GH(self.project_id['github_token'], self.name)
+        return github.GH(self.project_id.github_id._main_token(self.name), self.name)
 
     def _auto_init(self):
         res = super()._auto_init()
@@ -2645,7 +2645,7 @@ class Stagings(models.Model):
             vals['staging_end'] = fields.Datetime.now()
             self.env.ref("runbot_merge.staging_cron")._trigger()
 
-            if self.state == 'success' and self.target.project_id.fp_github_token:
+            if self.state == 'success' and self.target.project_id.fp_enabled:
                 # check all batches to see if they should be forward ported
                 for b in self.with_context(active_test=False).batch_ids:
                     if b.fw_policy == 'no':

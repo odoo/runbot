@@ -38,12 +38,14 @@ except ImportError:
         return iter(())
 
 def source_url(repository) -> str:
-    if (token := repository.project_id.github_token).startswith('ghs_'):
+    token = repository.project_id.github_id._main_token(repository.name)
+    if token.startswith('ghs_'):
         token = f"x-access-token:{token}"
     return f'https://{token}@github.com/{repository.name}'
 
 def fw_url(repository) -> str:
-    if (token := repository.project_id.fp_github_token).startswith('ghs_'):
+    token = repository.project_id.github_id._fp_token(repository.name)
+    if token.startswith('ghs_'):
         token = f"x-access-token:{token}"
     return f'https://{token}@github.com/{repository.fp_remote_target}'
 

@@ -307,11 +307,15 @@ def test_duplicate_fw(env, make_repo, setreviewers, config, users):
 
     proj = env['runbot_merge.project'].create({
         'name': 'a project',
-        'github_token': config['github']['token'],
+        'github_id': env['runbot_merge.github_connector'].create({
+            'name': "PAT",
+            'method': 'pat',
+            'main_pat': config['github']['token'],
+            'fp_pat': config['fp_github']['token'],
+        }).id,
         'github_prefix': 'hansen',
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",
-        'fp_github_token': config['fp_github']['token'],
         'fp_github_name': 'herbert',
         'branch_ids': [
             (0, 0, {'name': 'master', 'sequence': 0}),

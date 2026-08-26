@@ -6,6 +6,7 @@ from . import res_partner
 
 from . import crons
 
+from . import github_connector
 from . import project
 from . import pull_requests
 from . import commands

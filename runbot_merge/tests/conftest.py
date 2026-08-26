@@ -1,11 +1,36 @@
 import pytest
 
 
-@pytest.fixture
-def project(env, config, rolemap):
+@pytest.fixture(params=['pat', 'app'])
+def project(env, config, rolemap, request, mb_app, installation):
+    match request.param:
+        case 'pat':
+            github_id = env['runbot_merge.github_connector'].create({
+                'name': "PAT",
+                'method': 'pat',
+                'main_pat': config['github']['token'],
+            }).id
+        case 'app':
+            github_id = env["runbot_merge.github_connector"].create({
+                'name': "App",
+                "method": "app",
+                "client_id": mb_app.client_id,
+                "client_secret": mb_app.client_secret,
+                "private_key": mb_app.pem,
+                "webhook_secret": mb_app.webhook_secret,
+                "installations": [(0, 0, {
+                    "installation_id": installation.id,
+                    "owner_id": installation.account.id,
+                    "owner_login": installation.account.login,
+                    "repository_selection": "all",
+                })],
+            }).id
+        case method:
+            raise ValueError(f"Unknown auth method {method!r}")
+
     return env['runbot_merge.project'].create({
         'name': 'odoo',
-        'github_token': config['github']['token'],
+        'github_id': github_id,
         'github_prefix': 'hansen',
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",

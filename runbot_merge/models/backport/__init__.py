@@ -31,11 +31,12 @@ class PullRequest(models.Model):
         if len(self.batch_id.prs) > 1:
             raise UserError("Automatic backport of multi-pr batches is not currently supported")
 
-        if not self.project.fp_github_token:
+        repo = self.repository
+        if not self.project.github_id._fp_token(repo.name):
             raise UserError(f"Can not backport {self.display_name}: no token on project {self.project.display_name}")
 
-        if not self.repository.fp_remote_target:
-            raise UserError(f"Can not backport {self.display_name}: no remote on {self.project.display_name}")
+        if not repo.fp_remote_target:
+            raise UserError(f"Can not backport {self.display_name}: no remote on {repo.name}")
 
         w = self.env['runbot_merge.pull_requests.backport'].create({
             'pr_id': self.id,
@@ -105,7 +106,7 @@ class PullRequestBackport(models.TransientModel):
 
         r = requests.post(
             f'https://api.github.com/repos/{repo_id.name}/pulls',
-            headers={'Authorization': f'token {project.fp_github_token}'},
+            headers={'Authorization': f'token {project.github_id._fp_token(repo_id.name)}'},
             json={
                 'base': self.target.name,
                 'head': f'{owner}:{bp_branch}',

@@ -603,11 +603,15 @@ def post_merge(env, config, users, make_repo, branches):
 
     proj = env['runbot_merge.project'].create({
         'name': prod.name,
-        'github_token': config['github']['token'],
+        'github_id': env['runbot_merge.github_connector'].create({
+            'name': "PAT",
+            'method': 'pat',
+            'main_pat': config['github']['token'],
+            'fp_pat': config['fp_github']['token'],
+        }).id,
         'github_prefix': 'hansen',
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",
-        'fp_github_token': config['fp_github']['token'],
         'fp_github_name': 'herbert',
         'branch_ids': [
             (0, 0, {'name': str(i), 'sequence': 1000 - (i * 10)})

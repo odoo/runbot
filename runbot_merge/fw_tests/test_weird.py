@@ -227,11 +227,15 @@ class TestNotAllBranches:
 
         project = env['runbot_merge.project'].create({
             'name': 'proj',
-            'github_token': config['github']['token'],
+            'github_id': env['runbot_merge.github_connector'].create({
+                'name': "PAT",
+                'method': 'pat',
+                'main_pat': config['github']['token'],
+                'fp_pat': config['fp_github']['token'],
+            }).id,
             'github_prefix': 'hansen',
             'github_name': config['github']['name'],
             'github_email': "foo@example.org",
-            'fp_github_token': config['fp_github']['token'],
             'fp_github_name': 'herbert',
             'branch_ids': [
                 (0, 0, {'name': 'a', 'sequence': 2}),
@@ -1076,11 +1080,15 @@ def test_disable_multitudes(env, config, make_repo, users, setreviewers, botname
     repo = make_repo("bob")
     project = env['runbot_merge.project'].create({
         "name": "bob",
-        "github_token": config['github']['token'],
+        'github_id': env['runbot_merge.github_connector'].create({
+            'name': "PAT",
+            'method': 'pat',
+            'main_pat': config['github']['token'],
+            'fp_pat': config['fp_github']['token'],
+        }).id,
         "github_prefix": "hansen",
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",
-        "fp_github_token": config['fp_github']['token'],
         "fp_github_name": "herbert",
         "branch_ids": [
             (0, 0, {'name': 'a', 'sequence': 90}),
@@ -1643,8 +1651,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
         (users['user'], 'hansen r+'),
         (botname, f"@{users['user']} I must know your email before you can review PRs. Please contact an administrator."),
     ]
-    user_partner.fetch_github_email()
-    assert user_partner.email
+    user_partner.email = "foo@bar.com"
     with repo:
         pr_c.post_comment('hansen r+', config['role_user']['token'])
     env.run_crons()
