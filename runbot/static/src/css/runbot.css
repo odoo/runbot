@@ -285,12 +285,8 @@ a, .btn-link {
 
 .batch_slots {
 	display: grid;
-	grid-template-columns: 1fr;
+	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 	padding: 6px;
-
-	@media (min-width: 576px) {
-		grid-template-columns: repeat(auto-fill, minmax(100px, 50%));
-	}
 }
 
 .batch_commits {
