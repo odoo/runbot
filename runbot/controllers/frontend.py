@@ -611,6 +611,7 @@ class Runbot(Controller):
             return {}
 
         builds = builds.search([('id', 'child_of', builds.ids)])
+        builds = builds | builds.linked_children_build_ids
 
         parents = {b.id: b.top_parent.id for b in builds.with_context(prefetch_fields=False)}
         dates = {b.top_parent.id: b.create_date for b in builds.with_context(prefetch_fields=False)}
@@ -647,6 +648,7 @@ class Runbot(Controller):
         all_builds = bundle.last_done_batch.slot_ids.build_id
         all_builds |= bundle.with_context(category_id=request.env.ref('runbot.nightly_category').id).last_done_batch.slot_ids.build_id
         all_builds = request.env['runbot.build'].search([('id', 'child_of', all_builds.ids)])
+        all_builds = all_builds | all_builds.linked_children_build_ids
         all_stats = all_builds.sudo().stat_ids
         category_per_trigger = {}
         step_per_trigger_category = {}
@@ -654,14 +656,17 @@ class Runbot(Controller):
         all_steps = set()
         all_triggers = set()
         for stat in all_stats:
-            stat_trigger = stat.build_id.params_id.trigger_id
-            if not stat_trigger.has_stats:  # skip, most likely a multi build or other noisy trigger
-                continue
-            all_categories.add(stat.category)
-            all_steps.add(stat.dynamic_step_name or stat.config_step_id.name)
-            all_triggers.add(stat_trigger)
-            category_per_trigger.setdefault(stat_trigger, set()).add(stat.category)
-            step_per_trigger_category.setdefault((stat_trigger, stat.category), set()).add(stat.dynamic_step_name or stat.config_step_id.name)
+            stat_triggers = stat.build_id.params_id.trigger_id | stat.build_id.linked_parent_build_ids.params_id.trigger_id
+            has_stats = False
+            for stat_trigger in stat_triggers:
+                if stat_trigger.has_stats:
+                    has_stats = True
+                    all_triggers.add(stat_trigger)
+                    category_per_trigger.setdefault(stat_trigger, set()).add(stat.category)
+                    step_per_trigger_category.setdefault((stat_trigger, stat.category), set()).add(stat.dynamic_step_name or stat.config_step_id.name)
+            if has_stats:
+                all_categories.add(stat.category)
+                all_steps.add(stat.dynamic_step_name or stat.config_step_id.name)
         all_triggers = sorted(all_triggers, key=lambda t: (t.category_id.id, t.sequence, t.id))
         main_trigger = all_triggers[0] if all_triggers else None
         context = {
