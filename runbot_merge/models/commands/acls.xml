@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo noupdate="1">
+    <record id="help" model="runbot_merge.acls">
+        <field name="command">Help</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="approve" model="runbot_merge.acls">
+        <field name="command">Approve</field>
+        <field name="predicate">rel.is_reviewer or rel.source_author</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="reject" model="runbot_merge.acls">
+        <field name="command">Reject</field>
+        <field name="predicate">rel.is_author or rel.source_author</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="retry" model="runbot_merge.acls">
+        <field name="command">Retry</field>
+        <field name="predicate">rel.is_author or rel.source_author</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="fw-no" model="runbot_merge.acls">
+        <field name="command">FW.NO</field>
+        <field name="predicate">rel.is_author or rel.source_author</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="fw-default" model="runbot_merge.acls">
+        <field name="command">FW.DEFAULT</field>
+        <field name="predicate">rel.is_author or rel.source_author</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="fw-skipci" model="runbot_merge.acls">
+        <field name="command">FW.SKIPCI</field>
+        <field name="predicate">rel.is_reviewer</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="fw-skipmerge" model="runbot_merge.acls">
+        <field name="command">FW.SKIPMERGE</field>
+        <field name="predicate">rel.is_reviewer</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="limit" model="runbot_merge.acls">
+        <field name="command">Limit</field>
+        <field name="predicate">rel.is_author</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="close" model="runbot_merge.acls">
+        <field name="command">Close</field>
+        <field name="predicate">rel.source_author</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="mergemethod-squash" model="runbot_merge.acls">
+        <field name="command">MergeMethod.SQUASH</field>
+        <field name="predicate">rel.is_reviewer or rel.is_employee</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="mergemethod-rebase-ff" model="runbot_merge.acls">
+        <field name="command">MergeMethod.REBASE_FF</field>
+        <field name="predicate">rel.is_reviewer or rel.is_employee</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="mergemethod-rebase-merge" model="runbot_merge.acls">
+        <field name="command">MergeMethod.REBASE_MERGE</field>
+        <field name="predicate">rel.is_reviewer or rel.is_employee</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="mergemethod-merge" model="runbot_merge.acls">
+        <field name="command">MergeMethod.MERGE</field>
+        <field name="predicate">rel.is_reviewer or rel.is_employee</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="delegate" model="runbot_merge.acls">
+        <field name="command">Delegate</field>
+        <field name="predicate">rel.is_reviewer</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="priority-nice" model="runbot_merge.acls">
+        <field name="command">Priority.NICE</field>
+        <field name="predicate">rel.is_admin</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="priority-default" model="runbot_merge.acls">
+        <field name="command">Priority.DEFAULT</field>
+        <field name="predicate">rel.is_admin</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="priority-priority" model="runbot_merge.acls">
+        <field name="command">Priority.PRIORITY</field>
+        <field name="predicate">rel.is_admin</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="priority-alone" model="runbot_merge.acls">
+        <field name="command">Priority.ALONE</field>
+        <field name="predicate">rel.is_admin</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="skipchecks" model="runbot_merge.acls">
+        <field name="command">SkipChecks</field>
+        <field name="predicate">rel.super_admin</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="cancelstaging" model="runbot_merge.acls">
+        <field name="command">CancelStaging</field>
+        <field name="predicate">rel.is_admin</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="override" model="runbot_merge.acls">
+        <field name="command">Override</field>
+        <field name="predicate">rel.can_override</field>
+        <field name="effect">add</field>
+        <field name="arg">*</field>
+    </record>
+    <record id="check" model="runbot_merge.acls">
+        <field name="command">Check</field>
+        <field name="predicate">rel.is_author</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="remindme" model="runbot_merge.acls">
+        <field name="command">RemindMe</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="reset-auto" model="runbot_merge.acls">
+        <field name="command">Reset.AUTO</field>
+        <field name="predicate">rel.super_admin</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="reset-staging" model="runbot_merge.acls">
+        <field name="command">Reset.STAGING</field>
+        <field name="predicate">rel.super_admin</field>
+        <field name="effect">add</field>
+    </record>
+    <record id="reset-splits" model="runbot_merge.acls">
+        <field name="command">Reset.SPLITS</field>
+        <field name="predicate">rel.super_admin</field>
+        <field name="effect">add</field>
+    </record>
+</odoo>
+

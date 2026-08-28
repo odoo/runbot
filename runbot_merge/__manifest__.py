@@ -1,6 +1,6 @@
 {
     'name': 'merge bot',
-    'version': '1.21',
+    'version': '1.21.1',
     'depends': ['contacts', 'mail', 'website'],
     'data': [
         'security/security.xml',
@@ -23,7 +23,7 @@
         'models/ir_cron/views.xml',
         'models/crons/forwardport.xml',
         'models/crons/forwardport_views.xml',
-        'models/commands/runbot_merge.acls.csv',
+        'models/commands/acls.xml',
         'models/commands/views.xml',
         'models/crons/validate.xml',
         'models/crons/status_request.xml',
