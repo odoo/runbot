@@ -330,7 +330,7 @@ class Runbot(Controller):
         build = Build.browse(build_id)
         if not build.exists():
             return request.not_found()
-        parent = route and (route[-2] if len(route) > 1 else build.parent_id)
+        parent = (route and (route[-2] if len(route) > 1 else build.parent_id)) or build.parent_id
         if parent:
             siblings = (parent.children_ids | parent.linked_children_build_ids).sorted('id')
         else:
