@@ -223,10 +223,6 @@ a, .btn-link {
 	content: none;
 }
 
-.batch_tile {
-	padding: 6px;
-}
-
 .text-info {
 	color: #096b72 !important;
 }
@@ -266,8 +262,16 @@ a, .btn-link {
 	text-align: left;
 }
 
-.batch_header {
-	padding: 6px;
+.batch_tile {
+	--batch-tile-padding-x: .25rem;
+	--batch-tile-padding-y: .25rem;
+	padding: var(--batch-tile-padding-y) var(--batch-tile-padding-x);
+}
+
+.batch_header,
+.batch_slots,
+.batch_commits {
+	padding: var(--batch-tile-padding-y) var(--batch-tile-padding-x);
 }
 
 .batch_header:hover {
@@ -285,17 +289,8 @@ a, .btn-link {
 
 .batch_slots {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-	padding: 6px;
-}
-
-.batch_commits {
-	padding: 2px;
-}
-
-.batch_row .slot_container {
-	flex: 1 0 200px;
-	padding: 0 4px;
+	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	gap: calc(var(--batch-tile-padding-y) / 2) calc(var(--batch-tile-padding-x) / 2);
 }
 
 .bundle_row {
