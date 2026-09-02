@@ -212,7 +212,12 @@ def config(users_file: pathlib.Path) -> dict[str, dict[str, str]]:
     return cnf
 
 @pytest.fixture(scope='session')
-def rolemap(request, config):
+def rolemap(
+        request: pytest.FixtureRequest,
+        config: dict[str, typing.Any],
+        # force the proxy (and thus DC) to run before we try to resolve users
+        http_proxy: None,
+):
     # only fetch github logins once per session
     rolemap = {}
     for k, data in config.items():
