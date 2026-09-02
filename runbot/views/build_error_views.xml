@@ -63,7 +63,8 @@
                   <field name="last_seen_date" widget="frontend_url" options="{'link_field': 'last_seen_build_id', 'numeric': True}"/>
                   <field name="first_seen_build_id" invisible="True"/>
                   <field name="last_seen_build_id" invisible="True"/>
-                  <field name="history_data" widget="history_graph" options="{'cell_size': 13, 'mouse_actions': True}"/>
+                  <label for="history_data" colspan="2"/>
+                  <field name="history_data" widget="history_graph" options="{'cell_size': 13, 'mouse_actions': True}" colspan="2" nolabel="1"/>
                   <button name="action_appearing_batches" string="Appearing Batches" type="object" class="btn btn-primary" invisible="not first_seen_batch_ids"/>
                   <button name="action_disappearing_batches" string="Disappearing Batches" type="object" class="btn btn-primary" invisible="not disappearing_batch_ids"/>
                 </group>
