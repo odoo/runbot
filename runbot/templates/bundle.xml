@@ -18,7 +18,7 @@
                                         <a groups="base.group_user" class="btn btn-default" t-attf-href="/runbot/stats/{{bundle.id}}" title="View stats">
                                             <i class="fa fa-bar-chart"/> Stats
                                         </a>
-                                        <t groups="runbot.group_runbot_advanced_user">
+                                        <t t-if="bundle.env.user.has_group('runbot.group_runbot_advanced_user') or (bundle.env.user.has_group('runbot.group_user') and can_auto_rebase)">
                                             <button type="button" class="btn btn-default dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                                                 <i class="fa fa-play"/> Actions <i class="fa fa-caret-down ms-1"/>
                                             </button>
@@ -29,7 +29,7 @@
                                                 <li><a groups="runbot.group_runbot_advanced_user" class="dropdown-item" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Create a new Batch, applies new trigger configurations and updates build references for upgrades if needed">
                                                     <i class="fa fa-play"/> Start a new batch
                                                 </a></li>
-                                                <li><a t-if="bundle.env.user.has_group('runbot.group_runbot_advanced_user') or (bundle.env.user.has_group('runbot.group_user') and ':' in bundle.name)" t-attf-href="/runbot/bundle/{{bundle.id}}/force?auto_rebase=1" class="dropdown-item"  title="Force A New Batch with automatic rebase, useful to test outdated branches without pushing before a merge">
+                                                <li><a t-if="bundle.env.user.has_group('runbot.group_runbot_advanced_user') or (bundle.env.user.has_group('runbot.group_user') and can_auto_rebase)" t-attf-href="/runbot/bundle/{{bundle.id}}/force?auto_rebase=1" class="dropdown-item"  title="Force A New Batch with automatic rebase, useful to test outdated branches without pushing before a merge">
                                                     <i class="fa fa-fast-forward"/> Start a batch with simulated autorebase
                                                 </a></li>
                                             </ul>
@@ -93,6 +93,7 @@
                                         </t>
                                         <button t-if="bundle.trigger_custom_ids" role="button" t-attf-class="btn btn-{{'primary' if current_mode in ('custom', 'force') else 'default'}} btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers" aria-expanded="false" aria-controls="customTriggers"> Custom <i class="fa fa-caret-down ms-1"/></button>
                                         <a t-if="needs_update" role="button" class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/force"><i class="fa fa-play"/> Apply</a>
+                                        <a t-if="can_auto_rebase" role="button" class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/force?auto_rebase=1"><i class="fa fa-fast-forward"/> Start a new batch with autorebase</a>
                                         <div t-if="bundle.trigger_custom_ids" t-attf-class="collapse {{'show' if expand_custom else ''}}" id="customTriggers">
                                             <div class="card card-body mt-2">
                                                 <div class="d-grid gap-1" style="grid-template-columns: 1fr 2fr;">

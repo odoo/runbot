@@ -193,6 +193,15 @@ class Batch(models.Model):
             groupby=['bundle_id'],
             aggregates=['id:max'],
         ))
+    
+    def needs_rebase(self):
+        self.ensure_one()
+        batch = self
+        reference_batch_ids = batch.reference_batch_ids or batch.base_reference_batch_id.reference_batch_ids
+        for reference_build in reference_batch_ids.slot_ids.build_id:
+            if reference_build.gc_date < batch.create_date:
+               return True
+        return False
 
     def _prepare(self, auto_rebase=False, use_base_commits=False):
         _logger.info('Preparing batch %s', self.id)

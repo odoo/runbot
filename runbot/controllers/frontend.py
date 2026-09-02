@@ -191,6 +191,7 @@ class Runbot(Controller):
             'page_info_state': bundle.last_batch._get_global_result(),
             'expand_custom': expand_custom,
             'needs_update': bundle.last_batch and bundle.last_batch.sudo().needs_update(),
+            'can_auto_rebase': ':' in bundle.name or (bundle.last_batch and bundle.last_batch.sudo().needs_rebase()),
         }
 
         return request.render('runbot.bundle', context)
@@ -200,7 +201,7 @@ class Runbot(Controller):
         '/runbot/bundle/<model("runbot.bundle"):bundle>/force/<int:auto_rebase>',
     ], type='http', auth="user", methods=['GET', 'POST'], csrf=False)
     def force_bundle(self, bundle, auto_rebase=False, use_base_commits=False, **_post):
-        if not request.env.user.has_group('runbot.group_runbot_advanced_user') and ':' not in bundle.name and not bundle.last_batch.needs_update():
+        if not request.env.user.has_group('runbot.group_runbot_advanced_user') and ':' not in bundle.name and not bundle.last_batch.needs_update() and not bundle.last_batch.needs_rebase():
             message = "Only users with a specific group can do that. Please contact runbot administrators"
             raise Forbidden(message)
         _logger.info('user %s forcing bundle %s', request.env.user.name, bundle.name)  # user must be able to read bundle
