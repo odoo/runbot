@@ -25,6 +25,7 @@ from odoo.tools.safe_eval import safe_eval
 
 from ..common import (
     RunbotException,
+    TestTagsParser,
     dest_reg,
     dt2time,
     findall,
@@ -1799,6 +1800,115 @@ class BuildResult(models.Model):
             for test_line in test_data:
                 title += f'\n{test_line}: {test_data[test_line]}'
         return title
+
+    @staticmethod
+    def _parse_canonical_tag(canonical_tag):
+        """Split a canonical test tag into its parts.
+
+        e.g. ``/auth_timeout/tests/test_auth_timeout.py:TestAuthTimeoutHttp.test_multiple_lock_timeouts_mfa``
+        returns::
+
+            {
+                'module': 'auth_timeout',
+                'test_class': 'TestAuthTimeoutHttp',
+                'test_method': 'test_multiple_lock_timeouts_mfa',
+                'class_tag': '/auth_timeout/tests/test_auth_timeout.py:TestAuthTimeoutHttp',
+                'test_tag': '/auth_timeout/tests/test_auth_timeout.py:TestAuthTimeoutHttp.test_multiple_lock_timeouts_mfa',
+            }
+
+        The module is taken from the tag module part when present, otherwise from
+        the first segment of the file path. Every part falls back to ``False``
+        when the tag is missing or cannot be parsed.
+        """
+        result = {
+            'module': False, 'test_class': False, 'test_method': False,
+            'class_tag': False, 'test_tag': canonical_tag or False,
+        }
+        if not canonical_tag:
+            return result
+        try:
+            specs = TestTagsParser(canonical_tag).include or TestTagsParser(canonical_tag).exclude
+        except ValueError:
+            return result
+        if not specs:
+            return result
+        _tag, module, test_class, test_method, file_path = next(iter(specs))
+        if not module and file_path:
+            parts = file_path.strip('/').split('/')
+            module = parts[0] if parts and parts[0] else False
+        result['module'] = module or False
+        result['test_class'] = test_class or False
+        result['test_method'] = test_method or False
+        if test_class:
+            location = file_path or (('/%s' % module) if module else '')
+            result['class_tag'] = '%s:%s' % (location, test_class)
+        return result
+
+    def _get_failing_logs(self):
+        """Failing (warning/error/critical) logs of this build and all its
+        descendants, ordered by subbuild execution order then log order."""
+        self.ensure_one()
+        logs = self.env['ir.logging'].sudo().search([
+            ('build_id', 'in', self.all_children_ids.ids),
+            ('level', 'in', ['WARNING', 'ERROR', 'CRITICAL']),
+        ])
+        # ordering by the build_id m2o would follow runbot.build._order ('id desc'),
+        # so sort explicitly by ascending build then log id to keep execution order
+        return logs.sorted(key=lambda log: (log.build_id.id, log.id))
+
+    def _get_failing_canonical_tags(self):
+        """Sorted unique canonical test tags of all failing logs in this build
+        and its children (handy to copy as ``test_tags`` for a rebuild)."""
+        tags = {log.metadata.get('test', {}).get('canonical_tag') for log in self._get_failing_logs()}
+        return sorted(tag for tag in tags if tag)
+
+    def _get_failures_rows(self):
+        """Ordered rows for the failures summary page.
+
+        A flat list mixing ``build`` / ``module`` / ``class`` / ``test`` header
+        rows and ``log`` rows, in subbuild execution order then log order. A new
+        header row is emitted whenever the subbuild, module, class or test
+        changes (no aggregation, just iterate). Logs that are not linked to a
+        test are gathered under a single ``other`` header (no module/class/test
+        levels). Each ``test`` / ``other`` and ``log`` row carries a ``group``
+        index so the front-end can collapse a whole test.
+        """
+        self.ensure_one()
+        sentinel = object()
+        prev_build = sentinel
+        prev_module = prev_class = prev_test = sentinel
+        prev_other = False
+        group = 0
+        rows = []
+        for log in self._get_failing_logs():
+            canonical_tag = log.metadata.get('test', {}).get('canonical_tag')
+            if log.build_id != prev_build:
+                rows.append({'type': 'build', 'build': log.build_id})
+                prev_build = log.build_id
+                prev_module = prev_class = prev_test = sentinel
+                prev_other = False
+            if canonical_tag:
+                prev_other = False
+                parsed = self._parse_canonical_tag(canonical_tag)
+                if parsed['module'] != prev_module:
+                    rows.append({'type': 'module', 'module': parsed['module']})
+                    prev_module = parsed['module']
+                    prev_class = prev_test = sentinel
+                if parsed['test_class'] != prev_class:
+                    rows.append({'type': 'class', 'test_class': parsed['test_class'], 'class_tag': parsed['class_tag']})
+                    prev_class = parsed['test_class']
+                    prev_test = sentinel
+                if parsed['test_method'] != prev_test:
+                    group += 1
+                    rows.append({'type': 'test', 'test_method': parsed['test_method'], 'test_tag': parsed['test_tag'], 'group': group})
+                    prev_test = parsed['test_method']
+            elif not prev_other:
+                group += 1
+                rows.append({'type': 'other', 'group': group})
+                prev_other = True
+                prev_module = prev_class = prev_test = sentinel
+            rows.append({'type': 'log', 'log': log, 'group': group})
+        return rows
 
     def _prepare_github_status(self):
         """Queue a github status recomputation on transaction precommit."""
