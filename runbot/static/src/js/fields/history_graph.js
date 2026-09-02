@@ -3,8 +3,8 @@ import { useRef, xml, Component, useEffect } from "@odoo/owl";
 
 export class HistoryGraph extends Component {
     static template = xml`
-        <div>
-            <canvas class="w-100" t-ref="canvas"/>
+        <div class="w-100">
+            <canvas t-ref="canvas"/>
         </div>
     `;
 
