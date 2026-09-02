@@ -332,6 +332,7 @@ class BuildResult(models.Model):
     docker_time = fields.Integer('Docker time', default=0, help='Accumulated time spent in Docker containers')
     job_time = fields.Integer(compute='_compute_job_time', string='Job time')
     build_time = fields.Integer(compute='_compute_build_time', string='Build time')
+    final_build_time = fields.Integer(string='Final Build time')
     wait_time = fields.Integer(compute='_compute_wait_time', string='Wait time')
     load_time = fields.Integer(compute='_compute_load_time', string='Load time')
     real_load_time = fields.Integer(compute='_compute_real_load_time', string='Real Load time')
@@ -602,6 +603,7 @@ class BuildResult(models.Model):
             for init_local_state, build in zip(init_local_states, self):
                 if init_local_state not in ('done', 'running') and build.local_state in ('done', 'running'):
                     build.build_end = now()
+                    build.final_build_time = build.build_time
 
         if "global_state" in values:
             for init_global_state, build in zip(init_global_states, self):
@@ -1425,8 +1427,6 @@ class BuildResult(models.Model):
         build.local_state = 'done'
         build.active_step = False
         build.job_end = now()
-        if not build.build_end:
-            build.build_end = now()
         if result:
             build.local_result = result
 
