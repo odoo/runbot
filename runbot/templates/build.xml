@@ -276,6 +276,9 @@
           </div>
           <div class="col-md-6" t-if="build.children_ids or build.linked_children_build_ids">
             Children:
+            <a groups="runbot.group_runbot_admin" t-attf-href="/runbot/build/{{build.id}}/summary" class="btn btn-sm btn-link" title="Summary of all logs in this build and its children">
+              <i class="fa fa-list-ul"/> Failures summary
+            </a>
             <table class="table table-sm">
               <t t-foreach="(build.children_ids | build.linked_children_build_ids).sorted(lambda b: b.id)" t-as="child">
                 <t t-set="rowclass">
@@ -512,6 +515,165 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+        </t>
+    </template>
+    <template id="runbot.build_failures">
+        <t t-call="runbot.layout">
+            <div class="container-fluid">
+                <t t-set="log_count" t-value="len([r for r in rows if r['type'] == 'log'])"/>
+                <h5 class="mt-2">
+                    <t t-out="log_count"/> failure(s) in build
+                    <a t-attf-href="/runbot/build/{{build.id}}" t-out="build.id"/>
+                    and its children
+                    <small class="text-muted ms-1" t-out="build.description or build.params_id.config_id.name"/>
+                </h5>
+                <t t-if="not rows">
+                    <div class="alert alert-success">No error or warning found in this build and its children.</div>
+                </t>
+                <t t-else="">
+                    <div t-if="tags" class="mb-2">
+                        <b><t t-out="len(tags)"/> failing test tag(s)</b>
+                        <button type="button" class="btn btn-sm btn-default ms-2" id="o_runbot_copy_tags" t-att-data-tags="','.join(tags)">
+                            <i class="fa fa-clipboard"/> Copy all tags
+                        </button>
+                    </div>
+                    <div class="mb-2">
+                        <button type="button" class="btn btn-sm btn-default" id="o_runbot_expand_all">Expand all</button>
+                        <button type="button" class="btn btn-sm btn-default" id="o_runbot_collapse_all">Collapse all</button>
+                    </div>
+                    <table class="table table-sm">
+                        <tr>
+                            <th>Date (UTC)</th>
+                            <th>Level</th>
+                            <th>Message</th>
+                        </tr>
+                        <t t-foreach="rows" t-as="row">
+                            <t t-if="row['type'] == 'build'">
+                                <t t-set="rowclass">
+                                    <t t-call="runbot.build_class">
+                                        <t t-set="build" t-value="row['build']"/>
+                                    </t>
+                                </t>
+                                <tr t-attf-class="bg-{{rowclass.strip()}}-subtle">
+                                    <td colspan="3">
+                                        <a t-attf-href="/runbot/build/{{row['build'].id}}">Build <t t-out="row['build'].id"/></a>
+                                        <span class="text-muted ms-1" t-out="row['build'].description or row['build'].params_id.config_id.name"/>
+                                    </td>
+                                </tr>
+                            </t>
+                            <tr t-elif="row['type'] == 'module'">
+                                <td colspan="3" class="ps-3"><b t-out="row['module'] or 'Unknown module'"/></td>
+                            </tr>
+                            <tr t-elif="row['type'] == 'class'">
+                                <td colspan="3" class="ps-4">
+                                    <b t-out="row['test_class'] or 'Unknown class'"/>
+                                    <small t-if="row['class_tag']" class="text-muted ms-2 font-monospace o_runbot_tag" style="user-select: all; -webkit-user-select: all;" t-out="row['class_tag']"/>
+                                </td>
+                            </tr>
+                            <tr t-elif="row['type'] == 'test'" class="o_runbot_test_toggle" t-att-data-test-target="row['group']" role="button">
+                                <td colspan="3" class="ps-5">
+                                    <i class="fa fa-caret-down o_runbot_caret"/>
+                                    <b t-out="row['test_method'] or 'Unknown test'"/>
+                                    <small t-if="row['test_tag']" class="text-muted ms-2 font-monospace o_runbot_tag" style="user-select: all; -webkit-user-select: all;" t-out="row['test_tag']"/>
+                                </td>
+                            </tr>
+                            <tr t-elif="row['type'] == 'other'" class="o_runbot_test_toggle" t-att-data-test-target="row['group']" role="button">
+                                <td colspan="3">
+                                    <i class="fa fa-caret-down o_runbot_caret"/>
+                                    <b>Other logs</b>
+                                </td>
+                            </tr>
+                            <t t-else="">
+                                <t t-set="l" t-value="row['log']"/>
+                                <t t-set="logclass" t-value="dict(CRITICAL='danger', ERROR='danger', WARNING='warning', OK='success', SEPARATOR='separator').get(l.level)"/>
+                                <tr t-att-class="'log-' + l.type" t-att-title="l.active_step_id.description or ''" t-att-data-test-group="row['group']">
+                                    <td style="white-space: nowrap; width:1%;">
+                                        <small t-out="l.create_date.strftime('%Y-%m-%d %H:%M:%S') if l.create_date else ''"/>
+                                    </td>
+                                    <td style="white-space: nowrap; width:1%;">
+                                        <t t-if="l.level != 'SEPARATOR' and l.type not in ['link', 'markdown']">
+                                            <t t-if="l.type == 'server'">
+                                                <t t-set="title" t-value="l.build_id._log_details(l)"/>
+                                                <t t-set="href" t-value="l.build_id._get_file_url(l.path, l.line)"/>
+                                                <b><a t-att-href="href" t-att-title="title"><t t-out="l.level"/></a></b>
+                                            </t>
+                                            <b t-else="" t-out="l.level"/>
+                                        </t>
+                                    </td>
+                                    <td t-attf-class="bg-{{logclass}}-subtle" style="max-width: 0; width: 100%;">
+                                        <span t-if="l.type == 'markdown'" t-out="l._markdown()"/>
+                                        <span t-elif="l.type == 'server'" t-out="l.build_id._format_message(l)" class="pre"/>
+                                        <span t-else="" t-out="l.message"/>
+                                    </td>
+                                </tr>
+                            </t>
+                        </t>
+                    </table>
+                    <script type="text/javascript">
+                        document.addEventListener('DOMContentLoaded', function () {
+                            function toggleGroup(idx, collapse) {
+                                document.querySelectorAll('[data-test-group="' + idx + '"]').forEach(function (el) {
+                                    if (collapse === undefined) {
+                                        el.classList.toggle('d-none');
+                                    } else {
+                                        el.classList.toggle('d-none', collapse);
+                                    }
+                                });
+                            }
+                            document.querySelectorAll('.o_runbot_tag').forEach(function (tag) {
+                                tag.addEventListener('click', function (ev) { ev.stopPropagation(); });
+                            });
+                            document.querySelectorAll('.o_runbot_test_toggle').forEach(function (header) {
+                                header.addEventListener('click', function () {
+                                    toggleGroup(header.getAttribute('data-test-target'));
+                                    var caret = header.querySelector('.o_runbot_caret');
+                                    if (caret) {
+                                        caret.classList.toggle('fa-caret-down');
+                                        caret.classList.toggle('fa-caret-right');
+                                    }
+                                });
+                            });
+                            function setAll(collapse) {
+                                document.querySelectorAll('.o_runbot_test_toggle').forEach(function (header) {
+                                    toggleGroup(header.getAttribute('data-test-target'), collapse);
+                                    var caret = header.querySelector('.o_runbot_caret');
+                                    if (caret) {
+                                        caret.classList.toggle('fa-caret-down', !collapse);
+                                        caret.classList.toggle('fa-caret-right', collapse);
+                                    }
+                                });
+                            }
+                            var expandBtn = document.getElementById('o_runbot_expand_all');
+                            var collapseBtn = document.getElementById('o_runbot_collapse_all');
+                            if (expandBtn) { expandBtn.addEventListener('click', function () { setAll(false); }); }
+                            if (collapseBtn) { collapseBtn.addEventListener('click', function () { setAll(true); }); }
+                            function copyText(text) {
+                                if (navigator.clipboard &amp;&amp; window.isSecureContext) {
+                                    return navigator.clipboard.writeText(text);
+                                }
+                                var ta = document.createElement('textarea');
+                                ta.value = text;
+                                ta.style.position = 'fixed';
+                                ta.style.opacity = '0';
+                                document.body.appendChild(ta);
+                                ta.focus();
+                                ta.select();
+                                try { document.execCommand('copy'); } finally { document.body.removeChild(ta); }
+                                return Promise.resolve();
+                            }
+                            var copyBtn = document.getElementById('o_runbot_copy_tags');
+                            if (copyBtn) {
+                                copyBtn.addEventListener('click', function () {
+                                    copyText(copyBtn.getAttribute('data-tags'));
+                                    var original = copyBtn.innerHTML;
+                                    copyBtn.innerHTML = '&lt;i class=&quot;fa fa-check&quot;&gt;&lt;/i&gt; Copied';
+                                    setTimeout(function () { copyBtn.innerHTML = original; }, 1500);
+                                });
+                            }
+                        });
+                    </script>
+                </t>
             </div>
         </t>
     </template>

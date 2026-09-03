@@ -390,6 +390,21 @@ class Runbot(Controller):
         })
 
     @route([
+        '/runbot/build/<int:build_id>/summary',
+        '/runbot/batch/<int:from_batch>/build/<int:build_id>/summary',
+    ], type='http', auth='public', website=True, sitemap=False)
+    def build_failures(self, build_id, from_batch=None, **post):
+        build = request.env['runbot.build'].browse(build_id)
+        if not build.exists():
+            return request.not_found()
+        return request.render('runbot.build_failures', {
+            'build': build,
+            'rows': build._get_failures_rows(),
+            'tags': build._get_failing_canonical_tags(),
+            'title': 'Failures summary for build %s' % build.id,
+        })
+
+    @route([
         '/runbot/branch/<model("runbot.branch"):branch>',
         ], website=True, auth='public', type='http', sitemap=False)
     def branch(self, branch=None, **kwargs):
