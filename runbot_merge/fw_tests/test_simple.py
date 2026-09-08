@@ -123,13 +123,14 @@ def make_basic(
     })
 
     with cm:
-        yield lambda name="proj": make_basic_utils(
+        yield lambda name="proj", *, private=False: make_basic_utils(
             env,
             config,
             make_repo,
             project_name=project_name,
             reponame=name,
             statuses='default',
+            private=private,
         )
 
 class MakeBasic(typing.Protocol):

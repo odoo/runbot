@@ -87,6 +87,7 @@ def make_basic(
         statuses,
         fp_token=True,
         fp_remote=True,
+        private=False,
 ):
     """ Creates a project ``project_name`` **if none exists**, otherwise
     retrieves the existing one and adds a new repository and its fork.
@@ -145,7 +146,7 @@ def make_basic(
             ],
         })
 
-    prod = make_repo(reponame)
+    prod = make_repo(reponame, private=private)
     env['runbot_merge.events_sources'].create({'repository': prod.name, 'secret': config['github']['secret']})
     with prod:
         _0, _1, a_2, _3, _4, = prod.make_commits(
@@ -168,7 +169,7 @@ def make_basic(
             Commit('111', tree={'h': 'a'}),
             ref='heads/c',
         )
-    other = prod.fork() if fp_remote else None
+    other = prod.fork(token=config['role_user']['token']) if fp_remote else None
     repo = env['runbot_merge.repository'].create({
         'project_id': project.id,
         'name': prod.name,

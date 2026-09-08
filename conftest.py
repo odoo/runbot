@@ -889,10 +889,11 @@ def make_repo(
         assert r.json()['login'] == owner
 
     repos = []
-    def repomaker(name: str) -> Repo:
+    def repomaker(name: str, *, private: bool = False) -> Repo:
         # create repo
         r = check(github.post(endpoint, json={
             'name': f'ignore_{name}_{secrets.token_urlsafe(6)}',
+            'private': private,
             'has_issues': True,
             'has_projects': False,
             'has_wiki': False,
