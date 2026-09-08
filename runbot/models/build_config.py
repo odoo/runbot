@@ -293,6 +293,7 @@ class Config(models.Model):
             'install_default_modules': OPTIONAL(DYNAMIC_VALUE),
             'test_tags': OPTIONAL(DYNAMIC_VALUE),
             'demo_mode': OPTIONAL(IN(['default', 'with_demo', 'without_demo'])),
+            'with_test_data': OPTIONAL(BOOL),
             'enable_auto_tags': OPTIONAL(BOOL),
             'extra_params': OPTIONAL(DYNAMIC_VALUE),
             'cpu_limit': OPTIONAL(INT),
@@ -469,6 +470,7 @@ class ConfigStep(models.Model):
         [('default', 'Default'), ('without_demo', 'Without Demo'), ('with_demo', 'With Demo')],
         "Install demo data", default='default', tracking=True, required=True,
     )
+    with_test_data = fields.Boolean("With test data")
     # python
     python_code = fields.Text('Python code', tracking=True, default=PYTHON_DEFAULT)
     python_result_code = fields.Text('Python code for result', tracking=True, default=PYTHON_DEFAULT)
@@ -807,6 +809,10 @@ class ConfigStep(models.Model):
             cmd.append('--with-demo')
         elif demo_mode == 'without_demo' and demo_installed_by_default:
             cmd.append('--without-demo=true')
+
+        with_test_data = config_data.get('with_test_data', self.with_test_data)
+        if with_test_data and '--with-test-data' in available_options:
+            cmd.append('--with-test-data')
 
         extra_params = config_data.get('extra_params', build.params_id.extra_params or self.extra_params or '')
         # list module to install
@@ -1719,7 +1725,7 @@ class ConfigStep(models.Model):
             if 'cpu_limit' in current_step:
                 config_data['cpu_limit'] = int(current_step.get('cpu_limit'))
 
-            for key in ('screencast', 'demo_mode', 'enable_auto_tags'):
+            for key in ('screencast', 'demo_mode', 'enable_auto_tags', 'with_test_data'):
                 if key in current_step:
                     value = current_step[key]
                     config_data[key] = value
