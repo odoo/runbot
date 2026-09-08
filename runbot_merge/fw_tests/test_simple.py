@@ -383,6 +383,46 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     with pytest.raises(AssertionError, match="Not Found"):
         other.get_ref(pr2_ref)
 
+def test_private(env, config, users, make_basic, botname):
+    """Technically this should probably be the case for every test to make sure
+    they work with private repos, but I kinda forgot about the issue
+    originally, and it does not really make a difference when using classic
+    PATs, so it never came up.
+
+    Using GHA it becomes a major concern, but refactoring the entire test suite
+    to work on private repositories is... challenging... so start small.
+    """
+    prod, dev = make_basic(private=True)
+    devowner, devname = dev.name.split('/')
+    with prod:
+        prod.add_collaborator(config['role_reviewer'])
+
+    with prod, dev:
+        [c] = dev.make_commits(prod.commit('a').id, Commit('c', tree={'x': '0'}), ref='heads/hugechange')
+
+        pra = prod.make_pr(
+            target='a',
+            title="very wow",
+            head=f"{devowner}:hugechange",
+        )
+        prod.post_status(c, 'success')
+        pra.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+
+    with prod:
+        prod.post_status('staging.a', 'success')
+    env.run_crons()
+
+    pra_id, prb_id = env['runbot_merge.pull_requests'].search([], order='number asc')
+    assert pra_id.state == 'merged'
+    assert prb_id.state == 'opened'
+    with prod:
+        prod.post_status(prb_id.head, 'success')
+    env.run_crons()
+    _pra_id, _prb_id, prc_id = env['runbot_merge.pull_requests'].search([], order='number asc')
+    assert prb_id.state == 'validated'
+    assert prc_id.state == 'opened'
+
 def test_empty(env, config, users, make_basic, botname):
     """ Cherrypick of an already cherrypicked (or separately implemented)
     commit -> conflicting pr.
