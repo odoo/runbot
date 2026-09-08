@@ -1142,7 +1142,8 @@ def test_reopen_merged_pr(env, repo, config, users, botname):
     assert prx.state == 'closed'
     assert pr.state == 'merged'
 
-    repo.add_collaborator(users['other'], config['role_other']['token'])
+    with repo:
+        repo.add_collaborator(config['role_other'])
     with repo:
         prx.open(config['role_other']['token'])
     env.run_crons()

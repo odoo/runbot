@@ -990,13 +990,14 @@ class Repo:
             'ignored': True,
         })
 
-    def add_collaborator(self, login, token):
+    def add_collaborator(self, role: dict):
+        assert self.hook
         # send invitation to user
-        r = check(self._session.put(f'https://api.github.com/repos/{self.name}/collaborators/{login}'))
+        r = check(self._session.put(f'https://api.github.com/repos/{self.name}/collaborators/{role['login']}'))
         if r.status_code == 201:
             # if an invitation was created, accept on behalf of user
             check(requests.patch(f'https://api.github.com/user/repository_invitations/{r.json()["id"]}', headers={
-                'Authorization': f'token {token}'
+                'Authorization': f'token {role['token']}'
             }))
         else:
             # otherwise check that user was added as collaborator (should be the
@@ -1004,7 +1005,7 @@ class Repo:
             assert r.status_code == 204, r.text
         # sanity check that user is part of collaborators
         r = check(self._session.get(f'https://api.github.com/repos/{self.name}/collaborators'))
-        assert any(login == c['login'] for c in r.json())
+        assert any(role['login'] == c['login'] for c in r.json())
 
     def _get_session(self, token):
         s = self._session
