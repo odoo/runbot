@@ -72,6 +72,7 @@
                         <field name="create_db" groups="base.group_no_one"/>
                         <field name="install_modules"/>
                         <field name="demo_mode"/>
+                        <field name="with_test_data"/>
                         <field name="db_name" groups="base.group_no_one"/>
                         <field name="coverage"/>
                         <field name="coverage_branch" invisible="not coverage"/>
