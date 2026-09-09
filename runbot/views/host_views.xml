@@ -55,18 +55,22 @@
         <field name="name">runbot.host.list</field>
         <field name="model">runbot.host</field>
         <field name="arch" type="xml">
-            <list string="Builds">
+            <list string="Hosts"
+                  default_order="is_leader desc, is_registry desc, is_backup desc, assigned_only desc, paused desc, disp_name, id"
+                  decoration-warning="assigned_only and (not is_leader and not paused)"
+                  decoration-success="is_leader"
+                  decoration-muted="paused">
                 <field name="name"/>
-                <field name="disp_name"/>
-                <field name="assigned_only" widget="boolean_toggle"/>
-                <field name="use_remote_docker_registry" widget="boolean_toggle"/>
-                <field name="nb_worker"/>
-                <field name="nb_run_slot"/>
-                <field name="is_leader"/>
-                <field name="is_assigner"/>
-                <field name="is_builder"/>
-                <field name="is_registry"/>
-                <field name="is_backup"/>
+                <field name="disp_name" optional="hide"/>
+                <field name="assigned_only" widget="boolean_toggle" string="Reserved"/>
+                <field name="use_remote_docker_registry" widget="boolean_toggle" string="Use Docker Registry"/>
+                <field name="nb_worker" string="# Testing"/>
+                <field name="nb_run_slot" string="# Running"/>
+                <field name="is_leader" string="Leader"/>
+                <field name="is_assigner" string="Assigner"/>
+                <field name="is_builder" string="Builder"/>
+                <field name="is_registry" string="Registry"/>
+                <field name="is_backup" string="Backup"/>
                 <field name="paused" widget="boolean_toggle"/>
             </list>
         </field>
