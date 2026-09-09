@@ -23,7 +23,7 @@ class TableFilter {
     onFilter() {
         const filters = this.filters.map((filter) => {
             const [key, val] = filter.dataset.filter.split("==");
-            return { checked: filter.checked, selector: `tr:has([data-${key}^="${val}"])` };
+            return { checked: filter.checked, selector: `tr:has([data-${key}="${val}"])` };
         });
         for (const row of this.rows) {
             const isFilteredOut = filters.some(({ checked, selector }) =>
