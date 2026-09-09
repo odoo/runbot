@@ -7,9 +7,9 @@ class TableFilter {
     constructor(el) {
         this.el = el;
         for (const filter of this.filters) {
-            this.onFilter(filter);
-            filter.addEventListener("change", () => this.onFilter(filter));
+            filter.addEventListener("change", () => this.onFilter());
         }
+        this.onFilter();
     }
 
     get filters() {
@@ -20,11 +20,16 @@ class TableFilter {
         return [...this.el.querySelectorAll("tbody > tr:not(:has(th))")];
     }
 
-    onFilter(filter) {
-        const [key, val] = filter.dataset.filter.split("==");
-        const filteredRows = this.rows.filter((r) => r.matches([`tr:has([data-${key}^="${val}"])`]));
-        for (const row of filteredRows) {
-            row.classList.toggle("d-none", !filter.checked);
+    onFilter() {
+        const filters = this.filters.map((filter) => {
+            const [key, val] = filter.dataset.filter.split("==");
+            return { checked: filter.checked, selector: `tr:has([data-${key}^="${val}"])` };
+        });
+        for (const row of this.rows) {
+            const isFilteredOut = filters.some(({ checked, selector }) =>
+                !checked && row.matches(selector),
+            );
+            row.classList.toggle("d-none", isFilteredOut);
         }
     }
 }
