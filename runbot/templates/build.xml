@@ -333,6 +333,7 @@
                 <th>Message</th>
               </tr>
               <t t-set="child_by_id" t-value="{child.id: child for child in build.children_ids}"/>
+              <t t-set="all_test_tags" t-value="set()"/>
               <t t-foreach="build.sudo().log_ids" t-as="l">
                 <t t-set="subbuild" t-value="child_by_id.get(int(l.path)) if l.type == 'subbuild' else False"/>
                 <t t-set="logclass" t-value="dict(CRITICAL='danger', ERROR='danger', WARNING='warning', OK='success', SEPARATOR='separator').get(l.level)"/>
@@ -365,7 +366,11 @@
                       <span t-out="l.message"/>
                     </t>
                     <span t-elif="l.type == 'markdown'" t-out="l._markdown()"/>
-                    <span t-elif="l.type == 'server'" t-out="build._format_message(l)" class="pre" />
+                    <t t-elif="l.type == 'server'">
+                      <t t-if="l.level.lower() != 'info'" t-set="new_current_test" t-value="l.metadata.get('test', {}).get('canonical_tag')"/>
+                      <t t-set="_dummy" t-value="all_test_tags.add(new_current_test)"/>
+                      <span t-out="build._format_message(l)" class="pre" />
+                    </t>
                     <span t-else="" t-out="l.message"/>
                   </td>
                   <td t-attf-class="bg-{{message_class.strip() or logclass}}-subtle">
@@ -397,6 +402,12 @@
               </t>
             </table>
           </div>
+        </div>
+        <div class="row g-0 m-2" t-if="all_test_tags">
+          <h5>All breaking tests:</h5>
+          <t t-foreach="all_test_tags" t-as="test_tag">
+            <t t-esc="test_tag"/>
+          </t>
         </div>
       </t>
     </template>
