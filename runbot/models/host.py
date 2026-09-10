@@ -1,6 +1,9 @@
 import datetime
 import json
 import logging
+import platform
+
+import psutil
 
 from collections import defaultdict
 from docker.errors import ImageNotFound
@@ -57,6 +60,11 @@ class Host(models.Model):
 
     use_remote_docker_registry = fields.Boolean('Use remote Docker Registry', default=False, help="Use docker registry for pulling images")
     docker_registry_url = fields.Char('Registry Url', help="Override global registry URL for this host.")
+
+    cpu_count = fields.Integer('CPU count', default=0)
+    memory = fields.Integer('Memory (GiB)', help="Host Total memory (GiB)", default=0)
+    os_version = fields.Char('OS Version')
+    psql_version = fields.Char('PSQL Version')
 
     def _compute_nb(self):
         # Array of tuple (host, state, count)
@@ -258,6 +266,16 @@ class Host(models.Model):
             local_cr.execute("SELECT sum(numbackends) FROM pg_stat_database;")
             res = local_cr.fetchone()
         self.psql_conn_count = res and res[0] or 0
+
+    def _set_host_infos(self):
+        self.ensure_one()
+        self.cpu_count = psutil.cpu_count() or 0
+        self.memory = round(psutil.virtual_memory().total / (1024**3))
+        self.os_version = platform.freedesktop_os_release().get('PRETTY_NAME', False)
+        with local_pgadmin_cursor() as local_cr:
+            local_cr.execute("SELECT version();")
+            res = local_cr.fetchone()
+        self.psql_version = res[0].split()[1] if res else False
 
     def _total_testing(self):
         return sum(host.nb_testing for host in self)
