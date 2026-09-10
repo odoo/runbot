@@ -1,9 +1,7 @@
 #!/usr/bin/python3
 import logging
 import threading
-
 from datetime import datetime
-from pathlib import Path
 
 from tools import RunbotClient, run, docker_monitoring_loop
 
@@ -19,6 +17,12 @@ class BuilderClient(RunbotClient):
             builds_path = self.env['runbot.runbot']._path('build')
             monitoring_thread = threading.Thread(target=docker_monitoring_loop, args=(builds_path,), daemon=True)
             monitoring_thread.start()
+            try:
+                self.host._set_host_infos()
+                self.env.cr.commit()
+            except Exception:
+                self.env.cr.rollback()
+                _logger.exception('Unable to set host system informations')
 
     def loop_turn(self):
         self.env['runbot.runbot']._reload_nginx()
