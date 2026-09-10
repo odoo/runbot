@@ -95,6 +95,7 @@
             'runbot/static/src/js/elements/*',
             'runbot/static/src/js/table_filter.js',
             'runbot/static/src/js/table_group.js',
+            'runbot/static/src/js/project_filter.js',
             'runbot/static/src/js/runbot.js',
         ],
     },

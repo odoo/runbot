@@ -51,16 +51,20 @@
                 <body>
                     <header>
                         <nav class="navbar navbar-expand-md bg-body-tertiary">
-                            <div t-if="project" class="dropdown">
+                            <div t-if="project" class="dropdown js_project_filter">
                                 <a href="#" class="active_project dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                                     <b t-out="project.name"/>
                                 </a>
                                 <ul t-if="projects" class="dropdown-menu">
+                                    <li class="px-2 pb-1">
+                                        <input type="text" class="form-control form-control-sm js_project_filter_input" placeholder="Search project..." autocomplete="off"/>
+                                    </li>
                                     <li t-foreach="projects" t-as="l_project">
-                                        <a t-att-href="qu('/runbot/%s' % slug(l_project), search=search)" t-attf-class="dropdown-item{{' active' if l_project == project else ''}}">
+                                        <a t-att-href="qu('/runbot/%s' % slug(l_project), search=search)" t-att-data-name="l_project.name" t-attf-class="dropdown-item js_project_filter_item{{' active' if l_project == project else ''}}">
                                             <t t-out="l_project.name"/>
                                         </a>
                                     </li>
+                                    <li class="js_project_filter_empty dropdown-item-text text-muted d-none">No project found</li>
                                 </ul>
                             </div>
                             <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#top_menu_collapse">
