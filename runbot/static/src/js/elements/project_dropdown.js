@@ -1,4 +1,4 @@
-// @odoo-module ignore
+import { BaseButton } from "./base_button";
 
 function fuzzyMatch(query, text) {
     query = query.toLowerCase();
@@ -12,26 +12,29 @@ function fuzzyMatch(query, text) {
     return queryIndex === query.length;
 }
 
-class ProjectFilter {
-    static selector = ".js_project_filter";
-    static inputSelector = ".js_project_filter_input";
-    static itemSelector = ".js_project_filter_item";
-    static emptySelector = ".js_project_filter_empty";
+class ProjectDropdown extends BaseButton {
+    connectedCallback() {
+        super.connectedCallback();
+        this.classList.add("dropdown-toggle");
+        this.setAttribute("data-bs-toggle", "dropdown");
+        this.setAttribute("aria-expanded", "false");
 
-    constructor(el) {
-        this.el = el;
-        this.input = el.querySelector(this.constructor.inputSelector);
-        this.empty = el.querySelector(this.constructor.emptySelector);
+        this.menu = this.nextElementSibling?.classList.contains("dropdown-menu")
+            ? this.nextElementSibling
+            : null;
+        this.input = this.menu?.querySelector(".js_project_filter_input");
+        this.empty = this.menu?.querySelector(".js_project_filter_empty");
         if (!this.input) {
             return;
         }
+
         this.input.addEventListener("input", () => this.onFilter());
         this.input.addEventListener("click", (ev) => ev.stopPropagation());
-        el.addEventListener("shown.bs.dropdown", () => this.reset());
+        this.addEventListener("shown.bs.dropdown", () => this.reset());
     }
 
     get items() {
-        return [...this.el.querySelectorAll(this.constructor.itemSelector)];
+        return [...this.menu.querySelectorAll(".js_project_filter_item")];
     }
 
     reset() {
@@ -48,14 +51,8 @@ class ProjectFilter {
             item.closest("li").classList.toggle("d-none", !visible);
             visibleCount += visible ? 1 : 0;
         }
-        if (this.empty) {
-            this.empty.classList.toggle("d-none", visibleCount > 0);
-        }
+        this.empty?.classList.toggle("d-none", visibleCount > 0);
     }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    for (const el of [...document.querySelectorAll(ProjectFilter.selector)]) {
-        new ProjectFilter(el);
-    }
-});
+customElements.define("project-dropdown", ProjectDropdown);

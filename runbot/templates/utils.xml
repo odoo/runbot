@@ -51,10 +51,10 @@
                 <body>
                     <header>
                         <nav class="navbar navbar-expand-md bg-body-tertiary">
-                            <div t-if="project" class="dropdown js_project_filter">
-                                <a href="#" class="active_project dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <b t-out="project.name"/>
-                                </a>
+                            <div t-if="project" class="dropdown">
+                                <project-dropdown class="active_project" title="Switch project" aria-label="Switch project">
+                                    <t t-out="project.name"/>
+                                </project-dropdown>
                                 <ul t-if="projects" class="dropdown-menu">
                                     <li class="px-2 pb-1">
                                         <input type="text" class="form-control form-control-sm js_project_filter_input" placeholder="Search project..." autocomplete="off"/>
