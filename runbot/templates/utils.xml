@@ -51,25 +51,23 @@
                 <body>
                     <header>
                         <nav class="navbar navbar-expand-md bg-body-tertiary">
-                            <a t-if="project" t-att-href="qu(search='')">
-                                <b class="active_project">
-                                    <t t-out="project.name"/>
-                                </b>
-                            </a>
+                            <div t-if="project" class="dropdown">
+                                <a href="#" class="active_project dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <b t-out="project.name"/>
+                                </a>
+                                <ul t-if="projects" class="dropdown-menu">
+                                    <li t-foreach="projects" t-as="l_project">
+                                        <a t-att-href="qu('/runbot/%s' % slug(l_project), search=search)" t-attf-class="dropdown-item{{' active' if l_project == project else ''}}">
+                                            <t t-out="l_project.name"/>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
                             <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#top_menu_collapse">
                                 <span class="navbar-toggler-icon"/>
                             </button>
                             <div class="collapse navbar-collapse" id="top_menu_collapse">
                                 <ul class="nav navbar-nav ms-auto text-end" id="top_menu">
-                                    <t t-if="projects">
-                                        <t t-foreach="projects" t-as="l_project">
-                                            <li class="nav-item">
-                                                <a class="nav-link" t-att-href="qu('/runbot/%s' % slug(l_project), search=search)">
-                                                    <t t-out="l_project.name"/>
-                                                </a>
-                                            </li>
-                                        </t>
-                                    </t>
                                     <li class="nav-item">
                                         <button command="show-modal" commandfor="collapsePreference" type="button" class="nav-link">
                                             <i class="fa fa-gear"/>

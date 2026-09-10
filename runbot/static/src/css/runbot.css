@@ -137,6 +137,7 @@
 .active_project {
 	color: var(--active-project-color);
 	margin-left: 15px;
+	cursor: pointer;
 }
 
 dialog.modal {
