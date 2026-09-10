@@ -60,6 +60,7 @@ class RunbotClient():
                 if self.env.registry != self.env.registry.check_signaling():
                     self.env.reset()
                     self.env = self.env()
+                    self.host = self.env['runbot.host']._get_current()
                 if str2bool(self.env['ir.config_parameter'].sudo().get_param('runbot.pause_all_hosts', 'False')):
                     self.env.cr.rollback()
                     self.env.clear()
