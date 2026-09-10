@@ -11,6 +11,7 @@
                         <field name="name" readonly='1'/>
                         <field name="disp_name"/>
                         <field name="active"/>
+                        <field name="paused"/>
                         <field name="use_remote_docker_registry"/>
                         <field name="is_leader"/>
                         <field name="is_assigner"/>
@@ -44,6 +45,12 @@
                                 </list>
                             </field>
                         </page>
+                        <page string="System">
+                            <field name="cpu_count" readonly="1"/>
+                            <field name="memory" readonly="1"/>
+                            <field name="os_version" readonly="1"/>
+                            <field name="psql_version" readonly="1"/>
+                        </page>
                     </notebook>
                 </sheet>
                 <chatter/>
@@ -62,10 +69,14 @@
                   decoration-muted="paused">
                 <field name="name"/>
                 <field name="disp_name" optional="hide"/>
+                <field name="os_version" optional="hide"/>
+                <field name="psql_version" optional="hide"/>
                 <field name="assigned_only" widget="boolean_toggle" string="Reserved"/>
                 <field name="use_remote_docker_registry" widget="boolean_toggle" string="Use Docker Registry"/>
-                <field name="nb_worker" string="# Testing"/>
-                <field name="nb_run_slot" string="# Running"/>
+                <field name="cpu_count" string="# CPU"/>
+                <field name="nb_worker" string="Max Testing"/>
+                <field name="memory"/>
+                <field name="nb_run_slot" string="Max Running"/>
                 <field name="is_leader" string="Leader"/>
                 <field name="is_assigner" string="Assigner"/>
                 <field name="is_builder" string="Builder"/>
