@@ -65,6 +65,7 @@
                                         </a>
                                     </li>
                                     <li class="js_project_filter_empty dropdown-item-text text-muted d-none">No project found</li>
+                                    <li class="js_project_filter_hint dropdown-item-text text-muted small d-none"/>
                                 </ul>
                             </div>
                             <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#top_menu_collapse">

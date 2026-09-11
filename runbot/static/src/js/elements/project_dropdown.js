@@ -1,5 +1,7 @@
 import { BaseButton } from "./base_button";
 
+const MAX_VISIBLE_PROJECTS = 10;
+
 function fuzzyMatch(query, text) {
     query = query.toLowerCase();
     text = text.toLowerCase();
@@ -24,6 +26,7 @@ class ProjectDropdown extends BaseButton {
             : null;
         this.input = this.menu?.querySelector(".js_project_filter_input");
         this.empty = this.menu?.querySelector(".js_project_filter_empty");
+        this.hint = this.menu?.querySelector(".js_project_filter_hint");
         if (!this.input) {
             return;
         }
@@ -31,6 +34,7 @@ class ProjectDropdown extends BaseButton {
         this.input.addEventListener("input", () => this.onFilter());
         this.input.addEventListener("click", (ev) => ev.stopPropagation());
         this.addEventListener("shown.bs.dropdown", () => this.reset());
+        this.onFilter();
     }
 
     get items() {
@@ -45,13 +49,21 @@ class ProjectDropdown extends BaseButton {
 
     onFilter() {
         const query = this.input.value.trim();
-        let visibleCount = 0;
+        const matches = this.items.filter(
+            (item) => !query || fuzzyMatch(query, item.dataset.name || item.textContent)
+        );
+        const visible = new Set(matches.slice(0, MAX_VISIBLE_PROJECTS));
         for (const item of this.items) {
-            const visible = !query || fuzzyMatch(query, item.dataset.name || item.textContent);
-            item.closest("li").classList.toggle("d-none", !visible);
-            visibleCount += visible ? 1 : 0;
+            item.closest("li").classList.toggle("d-none", !visible.has(item));
         }
-        this.empty?.classList.toggle("d-none", visibleCount > 0);
+        this.empty?.classList.toggle("d-none", matches.length > 0);
+        const hiddenCount = matches.length - visible.size;
+        if (this.hint) {
+            this.hint.classList.toggle("d-none", hiddenCount <= 0);
+            if (hiddenCount > 0) {
+                this.hint.textContent = `+${hiddenCount} more project${hiddenCount > 1 ? "s" : ""}, refine your search`;
+            }
+        }
     }
 }
 
