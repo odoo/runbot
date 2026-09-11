@@ -37,17 +37,36 @@
                     <notebook>
                         <page string="Configuration">
                             <group>
-                                <group string="Mergebot">
-<!--                                    <field string="token" name="github_token"/>-->
+                                <group>
                                     <field string="name" name="github_name" readonly="0"
                                            help="Identity when creating new commits, defaults to github name, falls back to login."/>
+                                    <field string="name" name="fp_github_name" readonly="0"/>
+                                </group>
+                                <group>
                                     <field name="github_email" readonly="0"
                                            help="Identity when creating new commits, defaults to public email, falls back to primary email."/>
-                                </group>
-                                <group string="Forwardport">
-<!--                                    <field string="token" name="fp_github_token"/>-->
-                                    <field string="name" name="fp_github_name" readonly="0"/>
                                     <field string="Reminder to show after freeze" name="freeze_reminder"/>
+                                </group>
+                            </group>
+                            <separator string="GitHub Auth"/>
+                            <group>
+                                <group><field name="github_id"/></group>
+                                <group><field name="method"/></group>
+                            </group>
+                            <group invisible="method != 'pat'">
+                                <group><field name="main_pat"/></group>
+                                <group><field name="fp_pat"/></group>
+                            </group>
+                            <group invisible="method != 'app'">
+                                <group>
+                                    <field name="client_id"/>
+                                    <field name="client_secret"/>
+                                    <field name="webhook_secret"/>
+                                </group>
+                                <group>
+                                    <field name="auth_token"/>
+                                    <field name="refresh_token"/>
+                                    <field name="auth_expires_at"/>
                                 </group>
                             </group>
                         </page>

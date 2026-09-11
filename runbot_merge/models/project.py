@@ -54,7 +54,9 @@ confused (and will probably timeout).
         help="Delay (in minutes) before a staging is considered timed out and failed"
     )
 
-    github_id = fields.Many2one("runbot_merge.github_connector", required=True)
+    github_id = fields.Many2one(
+        "runbot_merge.github_connector",
+        required=True, ondelete='restrict', delegate=True)
     github_name = fields.Char(store=True, compute="_compute_identity", required=True, copy=True)
     github_email = fields.Char(store=True, compute="_compute_identity", required=True, copy=True)
     github_prefix = fields.Char(

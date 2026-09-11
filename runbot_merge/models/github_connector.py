@@ -36,7 +36,7 @@ class Connector(models.Model):
     method = fields.Selection([
         ('pat', "Interact using Personal Access Tokens"),
         ('app', "Interact using a github app"),
-    ])
+    ], required=True)
 
     def _main_token(self, repository: str) -> str:
         match self.method:
