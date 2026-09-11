@@ -302,13 +302,25 @@ class Runbot(Controller):
         build = request.env['runbot.build'].sudo().browse(build_id)
         build.check_access('read')
         if operation == 'rebuild':
-            build = build._rebuild()
+            new_build = build._rebuild()
+            current_url = request.httprequest.headers.get('HX-Current-URL', '')
+            if urlsplit(current_url).path.endswith(f'/build/{build_id}'):
+                return Response(status=204, headers=[
+                    ('HX-Redirect', current_url.replace(f'/build/{build_id}', f'/build/{new_build.id}')),
+                ])
         elif operation == 'kill':
             build._ask_kill()
         elif operation == 'wakeup':
             build._wake_up()
 
-        return str(build.id)
+        return Response(status=204, headers=[('HX-Refresh', 'true')])
+
+    @o_route(['/runbot/build/<int:build_id>/menu'], type='http', auth='public', website=True, sitemap=False)
+    def build_menu(self, build_id, **kwargs):
+        build = request.env['runbot.build'].browse(build_id)
+        if not build.exists():
+            return request.not_found()
+        return request.render('runbot.build_menu_content', {'bu': build})
 
     @route([
         '/runbot/build/<int:build_id>',

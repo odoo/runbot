@@ -48,13 +48,13 @@ registry.category("web_tour.tours").add("runbot_frontend_main_flow", {
             },
         },
         {
-            content: "Open the accessible lazy build options",
-            trigger: `.bundle_row:has(a[title="View Bundle ui-tour-active"]) build-options-dropdown[role="button"][tabindex="0"]`,
+            content: "Open the build options dropdown",
+            trigger: `.bundle_row:has(a[title="View Bundle ui-tour-active"]) button[title="Build options"]`,
             run: "click",
         },
         {
-            content: "The build options are rendered lazily",
-            trigger: `.bundle_row:has(a[title="View Bundle ui-tour-active"]) build-options-dropdown + .dropdown-menu .dropdown-item:contains("Rebuild"):not(:visible)`,
+            content: "The build options menu is fetched lazily when the dropdown opens",
+            trigger: `.bundle_row:has(a[title="View Bundle ui-tour-active"]) button[title="Build options"] + .dropdown-menu .dropdown-item:contains("Rebuild")`,
         },
         {
             content: "Open the bundle from the bundles page",
