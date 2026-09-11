@@ -3,7 +3,6 @@
 	--btn-default-bg: var(--bs-body-bg);
 	--btn-default-hover-bg: color-mix(in lab, var(--btn-default-bg), black 15%);
 	--btn-default-border: #ccc;
-	--active-project-color: #777;
 	--text-color-link: #507279;
 	--bs-font-sans-serif: "Helvetica Neue", Helvetica, Arial, sans-serif;
 	--bs-body-font-size: 0.875rem;
@@ -38,7 +37,6 @@
 :root[data-bs-theme=dark] {
 	--btn-default-border: #333;
 	--btn-default-hover-bg: color-mix(in lab, var(--btn-default-bg), white 15%);
-	--active-project-color: #CCC;
 	--text-color-link: #97d4e0;
 }
 
@@ -135,9 +133,8 @@
 }
 
 .active_project {
-	color: var(--active-project-color);
 	margin-left: 15px;
-	cursor: pointer;
+	font-weight: bold;
 }
 
 dialog.modal {
