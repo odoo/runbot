@@ -3,7 +3,8 @@
     <data>
         <!-- base layout -->
         <template id="runbot.base_page">&lt;!DOCTYPE html&gt;
-            <t t-set="theme" t-value="request.httprequest.cookies.get('theme', 'legacy')"/>
+            <t t-set="theme" t-value="request.httprequest.cookies.get('theme', 'light')"/>
+            <t t-set="theme" t-value="'light' if theme == 'legacy' else theme"/>
             <t t-set="refresh" t-value="request.params.get('refresh')"/>
             <html t-att-data-bs-theme="theme">
                 <head>
@@ -145,17 +146,14 @@
                                     </div>
                                     <div class="row mb-2">
                                         <div id="label_pref_theme" class="col-md-2">Theme</div>
-                                        <user-preference class="col-md-10" data-default="legacy">
+                                        <user-preference class="col-md-10" data-default="light">
                                             <form class="text-nowrap btn-group btn-group-sm" role="group" aria-labelledby="label_pref_theme">
-                                                <input type="radio" class="btn-check" autocomplete="off" name="theme" id="pref_theme_legacy"
-                                                    value="legacy" t-att-checked="theme == 'legacy'"/>
-                                                <label class="btn btn-outline-primary" for="pref_theme_legacy">Legacy</label>
-                                                <input type="radio" class="btn-check" autocomplete="off" name="theme" id="pref_theme_dark"
-                                                    value="dark" t-att-checked="theme == 'dark'"/>
-                                                <label class="btn btn-outline-primary" for="pref_theme_dark">Dark</label>
                                                 <input type="radio" class="btn-check" autocomplete="off" name="theme" id="pref_theme_light"
                                                     value="light" t-att-checked="theme == 'light'"/>
                                                 <label class="btn btn-outline-primary" for="pref_theme_light">Light</label>
+                                                <input type="radio" class="btn-check" autocomplete="off" name="theme" id="pref_theme_dark"
+                                                    value="dark" t-att-checked="theme == 'dark'"/>
+                                                <label class="btn btn-outline-primary" for="pref_theme_dark">Dark</label>
                                                 <input type="radio" class="btn-check" autocomplete="off" name="theme" id="pref_theme_red404"
                                                     value="red404" t-att-checked="theme == 'red404'"/>
                                                 <label class="btn btn-outline-primary" for="pref_theme_red404">Red404</label>
