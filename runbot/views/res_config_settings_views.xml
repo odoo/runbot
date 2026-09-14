@@ -15,6 +15,12 @@
                     </setting>
                   </block>
 
+                  <block title="Pause Hosts">
+                    <setting>
+                      <field name="runbot_pause_all_hosts"/>
+                    </setting>
+                  </block>
+
                   <block title="Runbot Builders">
                     <setting>
                       <field name="runbot_workers"/>

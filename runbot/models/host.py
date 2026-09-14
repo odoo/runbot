@@ -1,6 +1,9 @@
 import datetime
 import json
 import logging
+import platform
+
+import psutil
 
 from collections import defaultdict
 from docker.errors import ImageNotFound
@@ -45,7 +48,7 @@ class Host(models.Model):
     host_message_ids = fields.One2many('runbot.host.message', 'host_id')
     build_ids = fields.One2many('runbot.build', compute='_compute_build_ids')
 
-    paused = fields.Boolean('Paused', help='Host will stop scheduling while paused')
+    paused = fields.Boolean('Paused', help='Host will stop scheduling while paused', tracking=True)
     profile = fields.Boolean('Profile', help='Enable profiling on this host')
 
     is_leader = fields.Boolean('Is leader', help='This host is the leader of the cluster', default=False)
@@ -57,6 +60,11 @@ class Host(models.Model):
 
     use_remote_docker_registry = fields.Boolean('Use remote Docker Registry', default=False, help="Use docker registry for pulling images")
     docker_registry_url = fields.Char('Registry Url', help="Override global registry URL for this host.")
+
+    cpu_count = fields.Integer('CPU count', default=0)
+    memory = fields.Integer('Memory (GiB)', help="Host Total memory (GiB)", default=0)
+    os_version = fields.Char('OS Version')
+    psql_version = fields.Char('PSQL Version')
 
     def _compute_nb(self):
         # Array of tuple (host, state, count)
@@ -259,6 +267,16 @@ class Host(models.Model):
             res = local_cr.fetchone()
         self.psql_conn_count = res and res[0] or 0
 
+    def _set_host_infos(self):
+        self.ensure_one()
+        self.cpu_count = psutil.cpu_count() or 0
+        self.memory = round(psutil.virtual_memory().total / (1024**3))
+        self.os_version = platform.freedesktop_os_release().get('PRETTY_NAME', False)
+        with local_pgadmin_cursor() as local_cr:
+            local_cr.execute("SELECT version();")
+            res = local_cr.fetchone()
+        self.psql_version = res[0].split()[1] if res else False
+
     def _total_testing(self):
         return sum(host.nb_testing for host in self)
 
@@ -406,6 +424,14 @@ class Host(models.Model):
 
     def _process_messages(self):
         return self.host_message_ids._process()
+
+    def _action_pause(self):
+        for host in self:
+            host.paused = True
+
+    def _action_unpause(self):
+        for host in self:
+            host.paused = False
 
 
 class MessageQueue(models.Model):
