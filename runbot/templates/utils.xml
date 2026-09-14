@@ -105,12 +105,12 @@
                                                 </b>
                                             </a>
                                             <ul class="dropdown-menu dropdown-menu-end js_usermenu" role="menu">
-                                                <li><a class="dropdown-item" id="o_logout" role="menuitem" t-attf-href="/web/session/logout?redirect=/">Logout</a></li>
-                                                <li><a class="dropdown-item" role="menuitem" t-attf-href="/odoo">Backend</a></li>
+                                                <li><a class="dropdown-item" id="o_logout" role="menuitem" t-attf-href="/web/session/logout?redirect=/"><i class="fa fa-sign-out fa-fw me-1"/>Logout</a></li>
+                                                <li><a class="dropdown-item" role="menuitem" t-attf-href="/odoo"><i class="fa fa-cogs fa-fw me-1"/>Backend</a></li>
                                                 <li><div t-if="user_id.runbot_team_ids" class="dropdown-divider"/></li>
                                                 <li><div t-if="user_id.runbot_team_ids" class="dropdown-header">Teams</div></li>
                                                 <li><a t-foreach="user_id.runbot_team_ids" t-as="team" class="dropdown-item" role="menuitem" t-attf-href="/runbot/teams/{{team.id}}">
-                                                    <t t-out="team.name.capitalize()"/>
+                                                    <i class="fa fa-users fa-fw me-1"/><t t-out="team.name.capitalize()"/>
                                                 </a></li>
                                             </ul>
                                         </li>
