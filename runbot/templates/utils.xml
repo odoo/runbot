@@ -165,7 +165,6 @@
                                     <div>
                                         <label for="theme_selection" style="min-width: 80px">Theme:</label>
                                         <div id="theme_selection" class="text-nowrap btn-group btn-group-sm" role="group">
-                                        <button onclick="document.cookie = 'theme=legacy; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='legacy' else 'secondary'}}">Legacy</button>
                                         <button onclick="document.cookie = 'theme=dark; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='dark' else 'secondary'}}">Dark</button>
                                         <button onclick="document.cookie = 'theme=light; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='light' else 'secondary'}}">Light</button>
                                         <button onclick="document.cookie = 'theme=red404; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/'; location.reload();" type="button" t-attf-class="btn btn-{{'primary' if theme=='red404' else 'secondary'}}">Red404</button>
