@@ -54,7 +54,9 @@ class RunbotClient():
             os.getpid(),
             ' (assigned only)' if self.host.assigned_only else ''
         )
+        previous_queries = self.env.cr.sql_log_count
         while True:
+            start = time.time()
             context_manager = Profiler(db=self.env.cr.dbname) if self.host.profile else nullcontext()
             with context_manager:
                 try:
@@ -72,6 +74,8 @@ class RunbotClient():
                     self.host.last_end_loop = fields.Datetime.now()
                     self.env.cr.commit()
                     self.env.clear()
+                    _logger.info('Work done in %.2fs and %s queries', time.time() - start, self.env.cr.sql_log_count - previous_queries)
+                    previous_queries = self.env.cr.sql_log_count
                     self.sleep(sleep_time)
                 except Exception as e:
                     _logger.exception('Builder main loop failed with: %s', e)
