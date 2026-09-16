@@ -21,6 +21,23 @@ from odoo.addons.website.controllers.main import QueryURL
 _logger = logging.getLogger(__name__)
 
 
+def _build_error_counters():
+    """Counters displayed in the navbar build error link (only logged in users)."""
+    counters = {'nb_build_errors': 0, 'nb_assigned_errors': 0, 'nb_team_errors': 0}
+    user = request.env.user
+    if user._is_public():
+        return counters
+    BuildError = request.env['runbot.build.error'].sudo()
+    counters['nb_assigned_errors'] = BuildError.search_count([('responsible', '=', user.id)])
+    team_ids = user.runbot_team_ids.ids
+    if team_ids:
+        counters['nb_team_errors'] = BuildError.search_count([('responsible', '=', False), ('team_id', 'in', team_ids)])
+    if not counters['nb_assigned_errors'] and not counters['nb_team_errors']:
+        # only used as a fallback to display the generic bug icon
+        counters['nb_build_errors'] = BuildError.search_count([])
+    return counters
+
+
 def route(routes, **kw):
     def decorator(f):
         @o_route(routes, **kw)
@@ -30,9 +47,6 @@ def route(routes, **kw):
             more = request.httprequest.cookies.get('more', False) == '1'
             filter_mode = request.httprequest.cookies.get('filter_mode', 'default')
             refresh = kwargs.get('refresh', False)
-            nb_build_errors = request.env['runbot.build.error'].sudo().search_count([])
-            nb_assigned_errors = request.env['runbot.build.error'].sudo().search_count([('responsible', '=', request.env.user.id)])
-            nb_team_errors = request.env['runbot.build.error'].sudo().search_count([('responsible', '=', False), ('team_id', 'in', request.env.user.runbot_team_ids.ids)])
             kwargs['more'] = more
             kwargs['projects'] = projects
 
@@ -54,9 +68,7 @@ def route(routes, **kw):
                 response.qcontext['qu'] = QueryURL('/runbot/%s' % (slug(project) if project else ''), search=search, refresh=refresh, has_pr=has_pr)
                 if 'title' not in response.qcontext:
                     response.qcontext['title'] = 'Runbot %s' % project.name or ''
-                response.qcontext['nb_build_errors'] = nb_build_errors
-                response.qcontext['nb_assigned_errors'] = nb_assigned_errors
-                response.qcontext['nb_team_errors'] = nb_team_errors
+                response.qcontext.update(_build_error_counters())
                 if 'page_info_state' not in response.qcontext:
                     response.qcontext['page_info_state'] = 'ok'
             return response
