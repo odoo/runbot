@@ -26,7 +26,6 @@ def route(routes, **kw):
         @functools.wraps(f)
         def response_wrap(*args, **kwargs):
             projects = request.env['runbot.project'].search([('hidden', '=', False)])
-            more = request.httprequest.cookies.get('more', False) == '1'
             filter_mode = request.httprequest.cookies.get('filter_mode', 'default')
             refresh = kwargs.get('refresh', False)
             nb_build_errors = request.env['runbot.build.error'].sudo().search_count([])
@@ -40,7 +39,6 @@ def route(routes, **kw):
                 project = response.qcontext.get('project') or (projects and projects[0])
 
                 response.qcontext['projects'] = projects
-                response.qcontext['more'] = more
                 response.qcontext['search'] = search
                 response.qcontext['refresh'] = refresh
                 response.qcontext['filter_mode'] = filter_mode
