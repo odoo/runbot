@@ -52,8 +52,6 @@ def route(routes, **kw):
                 response.qcontext['nb_build_errors'] = nb_build_errors
                 response.qcontext['nb_assigned_errors'] = nb_assigned_errors
                 response.qcontext['nb_team_errors'] = nb_team_errors
-                if 'page_info_state' not in response.qcontext:
-                    response.qcontext['page_info_state'] = 'ok'
             return response
         return response_wrap
     return decorator
