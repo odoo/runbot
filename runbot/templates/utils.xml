@@ -5,6 +5,7 @@
         <template id="runbot.base_page">&lt;!DOCTYPE html&gt;
             <t t-set="theme" t-value="request.httprequest.cookies.get('theme', 'legacy')"/>
             <t t-set="more" t-value="str2bool(request.httprequest.cookies.get('more', ''), False)"/>
+            <t t-set="refresh" t-value="request.params.get('refresh')"/>
             <html t-att-data-bs-theme="theme">
                 <head>
                     <meta charset="utf-8"/>

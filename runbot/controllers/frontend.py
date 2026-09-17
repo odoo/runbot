@@ -27,7 +27,6 @@ def route(routes, **kw):
         def response_wrap(*args, **kwargs):
             projects = request.env['runbot.project'].search([('hidden', '=', False)])
             filter_mode = request.httprequest.cookies.get('filter_mode', 'default')
-            refresh = kwargs.get('refresh', False)
             nb_build_errors = request.env['runbot.build.error'].sudo().search_count([])
             nb_assigned_errors = request.env['runbot.build.error'].sudo().search_count([('responsible', '=', request.env.user.id)])
             nb_team_errors = request.env['runbot.build.error'].sudo().search_count([('responsible', '=', False), ('team_id', 'in', request.env.user.runbot_team_ids.ids)])
@@ -35,12 +34,12 @@ def route(routes, **kw):
             response = f(*args, **kwargs)
             if isinstance(response, Response):
                 search = kwargs.get('search', '')
+                refresh = kwargs.get('refresh', False)
                 has_pr = kwargs.get('has_pr')
                 project = response.qcontext.get('project') or (projects and projects[0])
 
                 response.qcontext['projects'] = projects
                 response.qcontext['search'] = search
-                response.qcontext['refresh'] = refresh
                 response.qcontext['filter_mode'] = filter_mode
                 response.qcontext['default_category'] = request.env['ir.model.data']._xmlid_to_res_id('runbot.default_category')
                 slug = request.env['ir.http']._slug
