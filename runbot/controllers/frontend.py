@@ -32,8 +32,6 @@ def route(routes, **kw):
             nb_build_errors = request.env['runbot.build.error'].sudo().search_count([])
             nb_assigned_errors = request.env['runbot.build.error'].sudo().search_count([('responsible', '=', request.env.user.id)])
             nb_team_errors = request.env['runbot.build.error'].sudo().search_count([('responsible', '=', False), ('team_id', 'in', request.env.user.runbot_team_ids.ids)])
-            kwargs['more'] = more
-            kwargs['projects'] = projects
 
             response = f(*args, **kwargs)
             if isinstance(response, Response):
