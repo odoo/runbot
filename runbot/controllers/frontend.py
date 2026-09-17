@@ -3,7 +3,6 @@ import functools
 import logging
 from collections import OrderedDict, defaultdict
 from subprocess import CalledProcessError
-from urllib.parse import urlsplit
 
 import werkzeug
 import werkzeug.urls
@@ -46,7 +45,6 @@ def route(routes, **kw):
                 response.qcontext['projects'] = projects
                 response.qcontext['more'] = more
                 response.qcontext['search'] = search
-                response.qcontext['current_path'] = request.httprequest.full_path
                 response.qcontext['refresh'] = refresh
                 response.qcontext['filter_mode'] = filter_mode
                 response.qcontext['default_category'] = request.env['ir.model.data']._xmlid_to_res_id('runbot.default_category')
@@ -449,29 +447,6 @@ class Runbot(Controller):
             'title': 'monitoring',
         }
         return request.render(view_id if view_id else "runbot.monitoring", qctx)
-
-    @o_route([
-        '/runbot/submit',
-    ], type='http', auth="public", methods=['GET', 'POST'], csrf=False)
-    def submit(self, more=False, redirect='/', update_triggers=False, **kwargs):
-        assert redirect.startswith('/')
-        response = werkzeug.utils.redirect('/' + urlsplit(redirect)._replace(scheme='', netloc='').geturl().lstrip('/\\'))
-        response.set_cookie('more', '1' if more else '0', expires=datetime.datetime.now() + datetime.timedelta(days=365 * 10))
-        if update_triggers:
-            enabled_triggers = []
-            project_id = int(update_triggers)
-            for key in kwargs:
-                if key.startswith('trigger_'):
-                    enabled_triggers.append(key.replace('trigger_', ''))
-
-            key = 'trigger_display_%s' % project_id
-            default_trigger_ids = set(request.env['runbot.trigger'].search([('hide', '=', False), ('project_id', '=', project_id), ('manual', '=', False)]).ids)
-            selected_trigger_ids = set(map(int, enabled_triggers))
-            if default_trigger_ids == selected_trigger_ids:
-                response.delete_cookie(key)
-            else:
-                response.set_cookie(key, '-'.join(enabled_triggers), expires=datetime.datetime.now() + datetime.timedelta(days=365 * 10))
-        return response
 
     @route(['/runbot/errors/assign/<int:build_error_id>',
             ], type='http', auth='user', methods=['POST'], csrf=False, sitemap=False)
