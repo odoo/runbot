@@ -3,6 +3,7 @@
     <data>
         <!-- base layout -->
         <template id="runbot.base_page">&lt;!DOCTYPE html&gt;
+            <t t-set="theme" t-value="request.httprequest.cookies.get('theme', 'legacy')"/>
             <html t-att-data-bs-theme="theme">
                 <head>
                     <meta charset="utf-8"/>
