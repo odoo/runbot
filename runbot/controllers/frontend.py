@@ -3,8 +3,6 @@ import logging
 from collections import OrderedDict, defaultdict
 from subprocess import CalledProcessError
 
-import werkzeug
-import werkzeug.urls
 import werkzeug.utils
 from dateutil.relativedelta import relativedelta
 from werkzeug.exceptions import Forbidden, NotFound
@@ -66,7 +64,6 @@ class Runbot(Controller):
 
             if search:
                 search_domains = []
-                pr_numbers = []
                 for search_elem in search.split("|"):
                     if search_elem.isnumeric():
                         search_domains.append([('branch_ids', 'any', [('name', '=', search_elem)])])
@@ -104,8 +101,6 @@ class Runbot(Controller):
                 'search': search,
             })
 
-        context.update({'message': request.env['ir.config_parameter'].sudo().get_param('runbot.runbot_message')})
-        # request.is_frontend = False  # remove inherit branding
         return request.render('runbot.bundles', context)
 
     @route([
