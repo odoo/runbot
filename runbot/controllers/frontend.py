@@ -41,7 +41,6 @@ def route(routes, **kw):
                 has_pr = kwargs.get('has_pr')
                 project = response.qcontext.get('project') or (projects and projects[0])
 
-                response.qcontext['theme'] = kwargs.get('theme', request.httprequest.cookies.get('theme', 'legacy'))
                 response.qcontext['projects'] = projects
                 response.qcontext['more'] = more
                 response.qcontext['search'] = search
