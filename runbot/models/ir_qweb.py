@@ -11,6 +11,7 @@ class IrQweb(models.AbstractModel):
         values['s2human'] = s2human
         values['s2human_long'] = s2human_long
         values['precise_s2human'] = precise_s2human
+        values['str2bool'] = tools.str2bool
         return response
 
     @tools.conditional(

@@ -2,6 +2,7 @@
 <odoo>
   <data>
     <template id="runbot.build">
+      <t t-set="more" t-value="str2bool(request.httprequest.cookies.get('more', ''), False)"/>
       <t t-call='runbot.layout'>
         <t t-set="nav_form">
           <form>
