@@ -20,26 +20,9 @@
                         <meta http-equiv="refresh" t-att-content="refresh"/>
                     </t>
 
-                    <t t-if="not page_info_state or page_info_state == 'ok' or page_info_state not in ('warn', 'ko', 'skipped', 'killed')">
-                        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_ok.png"/>
-                        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_ok.svg"/>
-                    </t>
-                    <t t-elif="page_info_state == 'ko'">
-                        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_ko.png"/>
-                        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_ko.svg"/>
-                    </t>
-                    <t t-elif="page_info_state == 'warn'">
-                        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_warn.png"/>
-                        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_warn.svg"/>
-                    </t>
-                    <t t-elif="page_info_state == 'skipped'">
-                        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_skipped.png"/>
-                        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_skipped.svg"/>
-                    </t>
-                    <t t-elif="page_info_state == 'killed'">
-                        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_killed.png"/>
-                        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_killed.svg"/>
-                    </t>
+                    <t t-set="page_icon" t-value="page_info_state if page_info_state in ('warn', 'ko', 'skipped', 'killed') else 'ok'"/>
+                    <link rel="icon" type="image/png" t-attf-href="/runbot/static/src/img/icon_{{page_icon}}.png"/>
+                    <link rel="icon" type="image/svg+xml" t-attf-href="/runbot/static/src/img/icon_{{page_icon}}.svg"/>
                 </head>
                 <body>
                     <t t-out="0"/>
