@@ -26,7 +26,6 @@ def route(routes, **kw):
         @functools.wraps(f)
         def response_wrap(*args, **kwargs):
             projects = request.env['runbot.project'].search([('hidden', '=', False)])
-            more = request.httprequest.cookies.get('more', False) == '1'
             filter_mode = request.httprequest.cookies.get('filter_mode', 'default')
             refresh = kwargs.get('refresh', False)
             nb_build_errors = request.env['runbot.build.error'].sudo().search_count([])
@@ -40,7 +39,6 @@ def route(routes, **kw):
                 project = response.qcontext.get('project') or (projects and projects[0])
 
                 response.qcontext['projects'] = projects
-                response.qcontext['more'] = more
                 response.qcontext['search'] = search
                 response.qcontext['refresh'] = refresh
                 response.qcontext['filter_mode'] = filter_mode
@@ -773,7 +771,7 @@ class Runbot(Controller):
     @route([
         '/runbot/dockerfile_result/<int:dockerfile_result_id>',
         '/runbot/dockerfile_result/<dockerfile_tag>/<dockerfile_hash>',
-    ], type='http', auth='public', sitemap=False)
+    ], type='http', auth='public', website=True, sitemap=False)
     def dockerfile_result(self, dockerfile_result_id=None, dockerfile_tag=None, dockerfile_hash=None, **kwargs):
         dockerfile_result_sudo = request.env['runbot.docker_build_result'].sudo()
         if dockerfile_result_id:
