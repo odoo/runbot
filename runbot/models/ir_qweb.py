@@ -1,6 +1,5 @@
 from ..common import s2human, s2human_long, precise_s2human, transactioncache
 from odoo import models, tools
-from odoo.http import request
 
 class IrQweb(models.AbstractModel):
     _inherit = "ir.qweb"
