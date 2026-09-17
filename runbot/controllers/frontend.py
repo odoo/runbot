@@ -39,7 +39,6 @@ def route(routes, **kw):
                 project = response.qcontext.get('project') or (projects and projects[0])
 
                 response.qcontext['projects'] = projects
-                response.qcontext['search'] = search
                 response.qcontext['filter_mode'] = filter_mode
                 response.qcontext['default_category'] = request.env['ir.model.data']._xmlid_to_res_id('runbot.default_category')
                 slug = request.env['ir.http']._slug
