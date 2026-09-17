@@ -2,6 +2,8 @@
 <odoo>
   <data>
     <template id="runbot.bundles">
+      <t t-set="categories" t-value="env['runbot.category'].search([])"/>
+      <t t-set="filter_mode" t-value="request.params.get('filter_mode', 'default')"/>
       <t t-call='runbot.layout'>
         <t t-set="nav_form">
           <form class="my-2 my-lg-0" role="search" t-att-action="qu(search='')" method="get">
@@ -19,13 +21,24 @@
             </div>
           </form>
         </t>
+        <t t-set="page_nav">
+          <t t-call="runbot.category_selector"/>
+          <div class="d-flex align-items-center gap-1">
+            <span id="page_nav_filter_mode" class="small text-body-secondary">Show</span>
+            <div class="text-nowrap btn-group btn-group-ssm" role="group" aria-labelledby="page_nav_filter_mode">
+              <a t-foreach="{'default': 'Default', 'all': 'All', 'sticky': 'Sticky only', 'nosticky': 'Dev only'}" t-as="mode"
+                 t-attf-class="btn btn-outline-secondary{{' active' if filter_mode == mode else ''}}"
+                 t-att-aria-current="'page' if filter_mode == mode else None"
+                 t-att-title="'Only display sticky except if searching' if mode == 'default' else None"
+                 t-attf-href="?{{keep_query('*', filter_mode=mode if mode != 'default' else None)}}" t-out="mode_value"/>
+            </div>
+          </div>
+          <span class="ms-auto">
+            <t t-call="runbot.slots_infos"/>
+          </span>
+        </t>
         <div class="container-fluid frontend">
           <div class="row">
-            <div class='col-md-12'>
-              <span  class="float-end" >
-                <t t-call="runbot.slots_infos"/>
-              </span>
-            </div>
             <div class='col-md-12'>
               <div t-if="message" class="alert alert-warning" role="alert">
                 <t t-out="message" />

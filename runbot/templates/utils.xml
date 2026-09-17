@@ -113,38 +113,9 @@
                             </div>
                         </nav>
                     </header>
-                    <t t-set="not_default_category" t-value="active_category_id and default_category != active_category_id"/>
-                    <t t-set="not_default_filter_mode" t-value="filter_mode and filter_mode not in ('default', 'all')"/>
-                    <div class="container-fluid" t-if="not_default_category or not_default_filter_mode">
-                    <div class="row">
-                        <div class="col-12">
-                            <user-preference t-if="not_default_category">
-                                <form class="text-nowrap btn-group btn-group-sm" role="group" aria-label="Category">
-                                    <t t-foreach="categories" t-as="category">
-                                        <input type="radio" class="btn-check" autocomplete="off" name="category" t-attf-id="banner_category_{{category.id}}"
-                                            t-att-value="category.id" t-att-checked="category.id == active_category_id"/>
-                                        <label class="btn btn-outline-primary" t-attf-for="banner_category_{{category.id}}" t-out="category.name"/>
-                                    </t>
-                                </form>
-                            </user-preference>
-                            <user-preference t-if="not_default_filter_mode">
-                                <form class="text-nowrap btn-group btn-group-sm" role="group" aria-label="Sticky">
-                                    <input type="radio" class="btn-check" autocomplete="off" name="filter_mode" id="banner_filter_mode_default"
-                                        value="default" t-att-checked="filter_mode == 'default'"/>
-                                    <label class="btn btn-outline-primary" for="banner_filter_mode_default" title="Only display sticky except if searching">Default</label>
-                                    <input type="radio" class="btn-check" autocomplete="off" name="filter_mode" id="banner_filter_mode_all"
-                                        value="all" t-att-checked="filter_mode == 'all'"/>
-                                    <label class="btn btn-outline-primary" for="banner_filter_mode_all">All</label>
-                                    <input type="radio" class="btn-check" autocomplete="off" name="filter_mode" id="banner_filter_mode_sticky"
-                                        value="sticky" t-att-checked="filter_mode == 'sticky'"/>
-                                    <label class="btn btn-outline-primary" for="banner_filter_mode_sticky">Sticky only</label>
-                                    <input type="radio" class="btn-check" autocomplete="off" name="filter_mode" id="banner_filter_mode_nosticky"
-                                        value="nosticky" t-att-checked="filter_mode == 'nosticky'"/>
-                                    <label class="btn btn-outline-primary" for="banner_filter_mode_nosticky">Dev only</label>
-                                </form>
-                            </user-preference>
-                        </div>
-                    </div></div>
+                    <nav t-if="page_nav" class="container-fluid py-1 mb-2 d-flex gap-2 align-items-center bg-body-tertiary border-top" aria-label="Page">
+                        <t t-out="page_nav"/>
+                    </nav>
                     <dialog id="collapsePreference" class="modal modal-xl">
                         <div class="modal-dialog">
                             <div class="modal-content">
@@ -177,37 +148,6 @@
                                                 <input type="radio" class="btn-check" autocomplete="off" name="theme" id="pref_theme_red404"
                                                     value="red404" t-att-checked="theme == 'red404'"/>
                                                 <label class="btn btn-outline-primary" for="pref_theme_red404">Red404</label>
-                                            </form>
-                                        </user-preference>
-                                    </div>
-                                    <div class="row">
-                                        <div id="label_pref_filter_mode" class="col-md-1">Sticky</div>
-                                        <user-preference class="col-md-11">
-                                            <form class="text-nowrap btn-group btn-group-sm" role="group" aria-labelledby="label_pref_filter_mode">
-                                                <input type="radio" class="btn-check" autocomplete="off" name="filter_mode" id="pref_filter_mode_default"
-                                                    value="default" t-att-checked="filter_mode == 'default'"/>
-                                                <label class="btn btn-outline-primary" for="pref_filter_mode_default" title="Only display sticky except if searching">Default</label>
-                                                <input type="radio" class="btn-check" autocomplete="off" name="filter_mode" id="pref_filter_mode_all"
-                                                    value="all" t-att-checked="filter_mode == 'all'"/>
-                                                <label class="btn btn-outline-primary" for="pref_filter_mode_all">All</label>
-                                                <input type="radio" class="btn-check" autocomplete="off" name="filter_mode" id="pref_filter_mode_sticky"
-                                                    value="sticky" t-att-checked="filter_mode == 'sticky'"/>
-                                                <label class="btn btn-outline-primary" for="pref_filter_mode_sticky">Sticky only</label>
-                                                <input type="radio" class="btn-check" autocomplete="off" name="filter_mode" id="pref_filter_mode_nosticky"
-                                                    value="nosticky" t-att-checked="filter_mode == 'nosticky'"/>
-                                                <label class="btn btn-outline-primary" for="pref_filter_mode_nosticky">Dev only</label>
-                                            </form>
-                                        </user-preference>
-                                    </div>
-                                    <div class="row">
-                                        <div id="label_pref_category" class="col-md-1">Category</div>
-                                        <user-preference class="col-md-11">
-                                            <form class="text-nowrap btn-group btn-group-sm" role="group" aria-labelledby="label_pref_category">
-                                                <t t-foreach="categories" t-as="category">
-                                                    <input type="radio" class="btn-check" autocomplete="off" name="category" t-attf-id="pref_category_{{category.id}}"
-                                                        t-att-value="category.id" t-att-checked="category.id == active_category_id"/>
-                                                    <label class="btn btn-outline-primary" t-attf-for="pref_category_{{category.id}}" t-out="category.name"/>
-                                                </t>
                                             </form>
                                         </user-preference>
                                     </div>
@@ -245,6 +185,18 @@
                     <t t-out="0"/>
                 </body>
             </xpath>
+        </template>
+
+        <template id="runbot.category_selector">
+            <div class="d-flex align-items-center gap-1">
+                <span id="page_nav_category" class="small text-body-secondary">Category</span>
+                <div class="text-nowrap btn-group btn-group-ssm" role="group" aria-labelledby="page_nav_category">
+                    <a t-foreach="categories" t-as="category"
+                       t-attf-class="btn btn-outline-secondary{{' active' if category.id == active_category_id else ''}}"
+                       t-att-aria-current="'page' if category.id == active_category_id else None"
+                       t-attf-href="?{{keep_query('*', category=category.id)}}" t-out="category.name"/>
+                </div>
+            </div>
         </template>
 
         <template id="runbot.build_errors_link">

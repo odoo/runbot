@@ -2,7 +2,14 @@
 <odoo>
     <data>
         <template id="runbot.bundle">
+            <t t-set="categories" t-value="env['runbot.category'].search([])"/>
             <t t-call='runbot.layout'>
+                <t t-set="page_nav">
+                    <t t-call="runbot.category_selector"/>
+                    <span class="ms-auto">
+                        <t t-call="runbot.slots_infos"/>
+                    </span>
+                </t>
                 <div class="container-fluid">
                     <div class="row">
                         <div class='col-md-12'>
