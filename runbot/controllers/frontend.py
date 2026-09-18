@@ -15,8 +15,6 @@ from odoo.http import Controller, Response, request
 from odoo.http import route as o_route
 from odoo.fields import Domain
 
-from odoo.addons.website.controllers.main import QueryURL
-
 _logger = logging.getLogger(__name__)
 
 
@@ -28,14 +26,9 @@ def route(routes, **kw):
             projects = request.env['runbot.project'].search([('hidden', '=', False)])
             response = f(*args, **kwargs)
             if isinstance(response, Response):
-                search = kwargs.get('search', '')
-                refresh = kwargs.get('refresh', False)
-                has_pr = kwargs.get('has_pr')
                 project = response.qcontext.get('project') or (projects and projects[0])
 
                 response.qcontext['default_category'] = request.env['ir.model.data']._xmlid_to_res_id('runbot.default_category')
-                slug = request.env['ir.http']._slug
-                response.qcontext['qu'] = QueryURL('/runbot/%s' % (slug(project) if project else ''), search=search, refresh=refresh, has_pr=has_pr)
                 if 'title' not in response.qcontext:
                     response.qcontext['title'] = 'Runbot %s' % project.name or ''
             return response
