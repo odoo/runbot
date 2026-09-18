@@ -57,6 +57,8 @@ class Runbot(Controller):
                 domain.append(('sticky', '=', True))
             elif filter_mode == 'nosticky':
                 domain.append(('sticky', '=', False))
+            elif filter_mode == 'mine':
+                domain.append(('author_ids', 'in', request.env.user.id))
             elif filter_mode == 'default' and not search:
                 domain.append(('sticky', '=', True))
 
