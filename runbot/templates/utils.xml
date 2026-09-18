@@ -38,7 +38,7 @@
                     <header>
                         <nav class="navbar navbar-expand-md bg-body-tertiary">
                             <t t-set="projects" t-value="env['runbot.project'].search([('hidden', '=', False)])"/>
-                            <a t-if="project" t-att-href="qu(search='')">
+                            <a t-if="project" t-attf-href="/runbot/{{slug(project)}}?{{keep_query('*', search=None)}}">
                                 <b class="active_project">
                                     <t t-out="project.name"/>
                                 </b>
@@ -50,7 +50,7 @@
                                 <ul class="nav navbar-nav ms-auto text-end" id="top_menu">
                                     <t t-foreach="projects" t-as="l_project">
                                         <li class="nav-item">
-                                            <a class="nav-link" t-att-href="qu('/runbot/%s' % slug(l_project), search=search)">
+                                            <a class="nav-link" t-attf-href="/runbot/{{slug(l_project)}}?{{keep_query('*', search=search)}}">
                                                 <t t-out="l_project.name"/>
                                             </a>
                                         </li>

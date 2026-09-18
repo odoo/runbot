@@ -6,13 +6,13 @@
       <t t-set="filter_mode" t-value="request.params.get('filter_mode', 'default')"/>
       <t t-call='runbot.layout'>
         <t t-set="nav_form">
-          <form class="my-2 my-lg-0" role="search" t-att-action="qu(search='')" method="get">
+          <form class="my-2 my-lg-0" role="search" t-attf-action="/runbot/{{slug(project)}}" method="get">
             <div class="input-group ps-0">
               <input class="form-control my-0 py-1" type="text" placeholder="Search" aria-label="Search" name="search" t-att-value="search" autofocus="autofocus"/>
-              <a t-if="has_pr" class="btn btn-primary" title="All" t-att-href="qu(has_pr=None)">
+              <a t-if="has_pr" class="btn btn-primary" title="All" t-attf-href="?{{keep_query('*', has_pr=None)}}">
                 <i class="fa fa-github"/>
               </a>
-              <a t-else="" class="btn btn-default" title="Open pull requests" t-att-href="qu(has_pr=1)">
+              <a t-else="" class="btn btn-default" title="Open pull requests" t-attf-href="?{{keep_query('*', has_pr=1)}}">
                 <i class="fa fa-github"/>
               </a>
               <button type="submit" class="btn btn-default">
