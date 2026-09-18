@@ -101,7 +101,7 @@ def test_pseudo_version_tag(env, project, make_repo, setreviewers, config):
         ],
     })
     setreviewers(*project.repo_ids)
-    env['runbot_merge.events_sources'].create({'repository': repo.name, 'secret': config['github']['secret']})
+    env['runbot_merge.events_sources'].create({'repository': repo.name})
 
     with repo:
         [m] = repo.make_commits(None, Commit('c1', tree={'a': '1'}), ref='heads/master')

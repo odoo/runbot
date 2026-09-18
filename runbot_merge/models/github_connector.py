@@ -161,7 +161,8 @@ class Connector(models.Model):
     # endregion
 
     # region app
-    client_id = fields.Char()
+    app_id = fields.Integer(index=True)
+    client_id = fields.Char(index=True)
     client_secret = fields.Char(groups="base.group_system")
     private_key = fields.Text(groups="base.group_system")
     webhook_secret = fields.Char(groups="base.group_system")

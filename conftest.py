@@ -889,7 +889,7 @@ def make_repo(
         assert r.json()['login'] == owner
 
     repos = []
-    def repomaker(name: str, *, private: bool = False) -> Repo:
+    def repomaker(name: str, *, private: bool = False, hooks: bool = True) -> Repo:
         # create repo
         r = check(github.post(endpoint, json={
             'name': f'ignore_{name}_{secrets.token_urlsafe(6)}',
@@ -912,6 +912,19 @@ def make_repo(
                 break
 
         repo = Repo(github, r['full_name'], repos, installation=installation)
+
+        if hooks:
+            # create webhook
+            check(github.post(r['hooks_url'], json={
+                'name': 'web',
+                'config': {
+                    'url': '{}/runbot_merge/hooks'.format(tunnel),
+                    'content_type': 'json',
+                    'insecure_ssl': '1',
+                },
+                'events': ['pull_request', 'issue_comment', 'status', 'pull_request_review']
+            }))
+            time.sleep(1)
 
         check(github.put(r['contents_url'].replace('{+path}', 'a'), json={
             'path': 'a',

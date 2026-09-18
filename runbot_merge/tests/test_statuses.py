@@ -13,7 +13,7 @@ def test_optional_statuses(env, project, make_repo, users, setreviewers, config)
         'status_ids': [(0, 0, {'context': 'l/int', 'prs': 'optional'})]
     })
     setreviewers(*project.repo_ids)
-    env['runbot_merge.events_sources'].create({'repository': repository.name, 'secret': config['github']['secret']})
+    env['runbot_merge.events_sources'].create({'repository': repository.name})
 
     with repository:
         m = repository.make_commits(None, Commit('root', tree={'a': '1'}), ref='heads/master')
@@ -64,7 +64,7 @@ def test_incomplete_statuses_request(env, project, make_repo, users, setreviewer
         'status_ids': [(0, 0, {'context': 'l/azy'})]
     })
     setreviewers(*project.repo_ids)
-    env['runbot_merge.events_sources'].create({'repository': repo.name, 'secret': config['github']['secret']})
+    env['runbot_merge.events_sources'].create({'repository': repo.name})
 
     with repo:
         m = repo.make_commits(None, Commit('root', tree={'a': '1'}), ref='heads/master')
@@ -90,20 +90,20 @@ def test_incomplete_statuses_request(env, project, make_repo, users, setreviewer
     'success', 'failure', 'pending', 'error',
 ])
 def test_complete_statuses_norequest(
-    env, project, make_repo, users, setreviewers, config, status
-, botname):
+    env, project, make_repo, users, setreviewers, config, status, botname):
     """If *any* status has been sent on the status we don't trigger the
     request.
     """
     project.request_missing_statuses = True
-    repo = make_repo('repo')
+    repo = make_repo('repo', hooks=project.github_id.method == 'pat')
     env['runbot_merge.repository'].create({
         'project_id': project.id,
         'name': repo.name,
         'status_ids': [(0, 0, {'context': 'l/azy'}), (0, 0, {'context': 'o/ptional', 'prs': 'optional'})]
     })
     setreviewers(*project.repo_ids)
-    env['runbot_merge.events_sources'].create({'repository': repo.name, 'secret': config['github']['secret']})
+    if project.github_id.method == 'pat':
+        env['runbot_merge.events_sources'].create({'repository': repo.name})
 
     with repo:
         m = repo.make_commits(None, Commit('root', tree={'a': '1'}), ref='heads/master')

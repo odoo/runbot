@@ -389,12 +389,30 @@ Co-authored-by: Bob <bob@example.com>""".format(
         )
 
 class TestWebhookSecurity:
-    @pytest.mark.xfail(reason="""\
-to test the secretless mode (and probably the rest for consistency) we'd need\
- to set up a repository-level webhook on which we have full control: while\
- secrets are also optional on apps, they are automatically generated when\
- creating from a manifest, and can only be removed via the UI\
-""")
+    """Only uses repo hooks as there's no API to easily manipulate app hook
+    secrets
+    """
+    ACTUAL_SECRET = "abc"
+    @pytest.fixture
+    def project(self, config, env):
+        github_id = env['runbot_merge.github_connector'].create({
+            'name': "PAT",
+            'method': 'pat',
+            'main_pat': config['github']['token'],
+        }).id
+        return env['runbot_merge.project'].create({
+            'name': 'odoo',
+            'github_id': github_id,
+            'github_prefix': 'hansen',
+            'github_name': config['github']['name'],
+            'github_email': "foo@example.org",
+            'branch_ids': [(0, 0, {'name': 'master'})],
+        })
+    @pytest.fixture(autouse=True)
+    def _repo_hook_secret(self, repo):
+        with repo:
+            repo.set_secret(self.ACTUAL_SECRET)
+
     def test_no_secret(self, env, project, repo):
         """ Test 1: didn't add a secret to the source, should be ignored
         """
@@ -407,12 +425,13 @@ to test the secretless mode (and probably the rest for consistency) we'd need\
             [c0] = repo.make_commits(m, Commit('replace file contents', tree={'a': 'some other content'}))
             pr0 = repo.make_pr(title="gibberish", body="blahblah", target='master', head=c0)
 
-        to_pr(env, pr0)
+        with pytest.raises(TimeoutError):
+            to_pr(env, pr0)
 
     def test_wrong_secret(self, env, project, repo):
         env['runbot_merge.events_sources'].search([
             ('repository', '=', repo.name),
-        ]).secret = "wrong secret"
+        ]).secret = "not " + self.ACTUAL_SECRET
         with repo:
             [m] = repo.make_commits(None, Commit("initial", tree={'a': 'some content'}), ref='heads/master')
 
@@ -425,7 +444,7 @@ to test the secretless mode (and probably the rest for consistency) we'd need\
     def test_correct_secret(self, env, project, repo, installation):
         env['runbot_merge.events_sources'].search([
             ('repository', '=', repo.name),
-        ]).secret = installation.app.webhook_secret
+        ]).secret = self.ACTUAL_SECRET
         with repo:
             [m] = repo.make_commits(None, Commit("initial", tree={'a': 'some content'}), ref='heads/master')
 

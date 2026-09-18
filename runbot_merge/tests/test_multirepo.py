@@ -28,7 +28,7 @@ from utils import (
 
 @pytest.fixture
 def repo_a(env, project, make_repo, setreviewers, config):
-    repo = make_repo('a')
+    repo = make_repo('a', hooks=project.github_id.method == 'pat')
     r = env['runbot_merge.repository'].create({
         'project_id': project.id,
         'name': repo.name,
@@ -36,12 +36,13 @@ def repo_a(env, project, make_repo, setreviewers, config):
         'group_id': False,
     })
     setreviewers(r)
-    env['runbot_merge.events_sources'].create({'repository': r.name, 'secret': config['github']['secret']})
+    if project.github_id.method == 'pat':
+        env['runbot_merge.events_sources'].create({'repository': r.name})
     return repo
 
 @pytest.fixture
 def repo_b(env, project, make_repo, setreviewers, config):
-    repo = make_repo('b')
+    repo = make_repo('b', hooks=project.github_id.method == 'pat')
     r = env['runbot_merge.repository'].create({
         'project_id': project.id,
         'name': repo.name,
@@ -49,12 +50,13 @@ def repo_b(env, project, make_repo, setreviewers, config):
         'group_id': False,
     })
     setreviewers(r)
-    env['runbot_merge.events_sources'].create({'repository': r.name, 'secret': config['github']['secret']})
+    if project.github_id.method == 'pat':
+        env['runbot_merge.events_sources'].create({'repository': r.name})
     return repo
 
 @pytest.fixture
 def repo_c(env, project, make_repo, setreviewers, config):
-    repo = make_repo('c')
+    repo = make_repo('c', hooks=project.github_id.method == 'pat')
     r = env['runbot_merge.repository'].create({
         'project_id': project.id,
         'name': repo.name,
@@ -62,7 +64,8 @@ def repo_c(env, project, make_repo, setreviewers, config):
         'group_id': False,
     })
     setreviewers(r)
-    env['runbot_merge.events_sources'].create({'repository': r.name, 'secret': config['github']['secret']})
+    if project.github_id.method == 'pat':
+        env['runbot_merge.events_sources'].create({'repository': r.name})
     return repo
 
 def make_pr(repo, prefix, trees, *, target='master', user,
@@ -1178,7 +1181,7 @@ class TestSubstitutions:
             'repo_ids': [(0, 0, {'name': 'xxx/xxx'})],
             'branch_ids': [(0, 0, {'name': 'master'})]
         })
-        env['runbot_merge.events_sources'].create({'repository': 'xxx/xxx', 'secret': config['github']['secret']})
+        env['runbot_merge.events_sources'].create({'repository': 'xxx/xxx'})
         r = p.repo_ids
         # replacement pattern, pr label, stored label
         cases = [
@@ -1309,7 +1312,7 @@ def test_multi_project(env, make_repo, setreviewers, users, config,
         'branch_ids': [(0, 0, {'name': 'default'})],
     })
     setreviewers(*p1.repo_ids)
-    env['runbot_merge.events_sources'].create([{'repository': r1.name, 'secret': config['github']['secret']}])
+    env['runbot_merge.events_sources'].create([{'repository': r1.name}])
 
     r2 = make_repo('repo_b')
     with r2:
@@ -1336,7 +1339,7 @@ def test_multi_project(env, make_repo, setreviewers, users, config,
         'branch_ids': [(0, 0, {'name': 'default'})],
     })
     setreviewers(*p2.repo_ids)
-    env['runbot_merge.events_sources'].create([{'repository': r2.name, 'secret': config['github']['secret']}])
+    env['runbot_merge.events_sources'].create([{'repository': r2.name}])
 
     assert r1_dev.owner == r2_dev.owner
 

@@ -90,6 +90,7 @@ def make_basic(
             github_id = env["runbot_merge.github_connector"].create({
                 'name': "App",
                 "method": "app",
+                "app_id": mb_app.id,
                 "client_id": mb_app.client_id,
                 "client_secret": mb_app.client_secret,
                 "private_key": mb_app.pem,

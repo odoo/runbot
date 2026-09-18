@@ -146,8 +146,8 @@ def make_basic(
             ],
         })
 
-    prod = make_repo(reponame, private=private)
-    env['runbot_merge.events_sources'].create({'repository': prod.name, 'secret': config['github']['secret']})
+    prod = make_repo(reponame, private=private, hooks=project.github_id.method == 'pat')
+    env['runbot_merge.events_sources'].create({'repository': prod.name})
     with prod:
         _0, _1, a_2, _3, _4, = prod.make_commits(
             None,
@@ -326,10 +326,27 @@ def log_to_node(log):
 
 def fakehook(port, env, repository, data):
     assert isinstance(data, dict), f"webhook payloads are dicts (json objects), got {type(data)}"
-    headers = {"Content-Type": "application/json", "X-Github-Event": "pull_request"}
+    project = env['runbot_merge.project'].search([])
+    assert len(project) == 1, "fakehook can't handle multiple projects being configured"
+    headers = {
+        "Content-Type": "application/json",
+        "X-Github-Event": "pull_request",
+    }
+    match project.github_id.method:
+        case 'pat':
+            headers["X-Github-Hook-Installation-Target-Type"] = 'repository'
+            headers["X-Github-Hook-Installation-Target-Id"] = '1'
+            secret = env['runbot_merge.events_sources'].search([('repository', '=', repository.name)]).secret
+        case 'app':
+            headers["X-Github-Hook-Installation-Target-Type"] = 'integration'
+            headers["X-Github-Hook-Installation-Target-Id"] = str(project.github_id.app_id)
+            secret = project.github_id.webhook_secret
+        case m:
+            raise ValueError(f"unknown auth method {m!r}")
+
     payload = json.dumps(data)
-    if source := env['runbot_merge.events_sources'].search([('repository', '=', repository.name)]):
-        sig = hmac.new(source.secret.strip().encode(), payload.encode(), hashlib.sha256)
+    if s := (secret and secret.strip()):
+        sig = hmac.new(s.encode(), payload.encode(), hashlib.sha256)
         headers['X-Hub-Signature-256'] = f"sha256={sig.hexdigest()}"
 
     r = requests.post(

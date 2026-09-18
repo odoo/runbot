@@ -14,6 +14,7 @@ def project(env, config, rolemap, request, mb_app, installation):
             github_id = env["runbot_merge.github_connector"].create({
                 'name': "App",
                 "method": "app",
+                "app_id": mb_app.id,
                 "client_id": mb_app.client_id,
                 "client_secret": mb_app.client_secret,
                 "private_key": mb_app.pem,
@@ -47,7 +48,8 @@ def make_repo2(env, project, make_repo, users, setreviewers, config):
     - and creates an event source for the repo
     """
     def mr(name):
-        r = make_repo(name)
+        repo_hooks = project.github_id.method == 'pat'
+        r = make_repo(name, hooks=repo_hooks)
         rr = env['runbot_merge.repository'].create({
             'project_id': project.id,
             'name': r.name,
@@ -55,7 +57,8 @@ def make_repo2(env, project, make_repo, users, setreviewers, config):
             'required_statuses': 'default',
         })
         setreviewers(rr)
-        env['runbot_merge.events_sources'].create({'repository': r.name, 'secret': config['github']['secret']})
+        if repo_hooks:
+            env['runbot_merge.events_sources'].create({'repository': r.name})
         return r
     return mr
 

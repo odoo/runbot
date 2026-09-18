@@ -65,14 +65,15 @@ def test_basic(env, project, make_repo, users, setreviewers, config, setoverride
     * target url should be the comment (?)
     * description should be overridden by <user>
     """
-    repo = make_repo('repo')
+    repo = make_repo('repo', hooks=project.github_id.method == 'pat')
     repo_id = env['runbot_merge.repository'].create({
         'project_id': project.id,
         'name': repo.name,
         'status_ids': [(0, 0, {'context': 'l/int'})]
     })
     setreviewers(*project.repo_ids)
-    env['runbot_merge.events_sources'].create({'repository': repo.name, 'secret': config['github']['secret']})
+    if project.github_id.method == 'pat':
+        env['runbot_merge.events_sources'].create({'repository': repo.name})
     # "other" can override the lint
     partner = env['res.partner'].create({
         'name': config['role_other'].get('name', 'Other'),
@@ -120,14 +121,15 @@ def test_multiple(env, project, make_repo, users, setreviewers, config):
     """ Test that overriding multiple statuses in the same comment works
     """
 
-    repo = make_repo('repo')
+    repo = make_repo('repo', hooks=project.github_id.method == 'pat')
     repo_id = env['runbot_merge.repository'].create({
         'project_id': project.id,
         'name': repo.name,
         'status_ids': [(0, 0, {'context': 'l/int'}), (0, 0, {'context': 'c/i'})]
     })
     setreviewers(*project.repo_ids)
-    env['runbot_merge.events_sources'].create({'repository': repo.name, 'secret': config['github']['secret']})
+    if project.github_id.method == 'pat':
+        env['runbot_merge.events_sources'].create({'repository': repo.name})
     # "other" can override the lints
     env['res.partner'].create({
         'name': config['role_other'].get('name', 'Other'),
@@ -182,14 +184,15 @@ def test_multiple(env, project, make_repo, users, setreviewers, config):
 def test_no_repository(env, project, make_repo, users, setreviewers, config, botname):
     """ A repo missing from an override allows overriding the status in every repo
     """
-    repo = make_repo('repo')
+    repo = make_repo('repo', hooks=project.github_id.method == 'pat')
     env['runbot_merge.repository'].create({
         'project_id': project.id,
         'name': repo.name,
         'status_ids': [(0, 0, {'context': 'l/int'})]
     })
     setreviewers(*project.repo_ids)
-    env['runbot_merge.events_sources'].create({'repository': repo.name, 'secret': config['github']['secret']})
+    if project.github_id.method == 'pat':
+        env['runbot_merge.events_sources'].create({'repository': repo.name})
     # "other" can override the lint
     env['res.partner'].create({
         'name': config['role_other'].get('name', 'Other'),
