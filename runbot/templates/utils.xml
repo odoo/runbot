@@ -8,6 +8,7 @@
             <html t-att-data-bs-theme="theme">
                 <head>
                     <meta charset="utf-8"/>
+                    <meta name="csrf-token" t-att-content="request.csrf_token()"/>
                     <title t-out="title or ('Runbot %s' % project.name if project else 'Runbot')"/>
 
                     <t t-call-assets="runbot.assets_frontend" t-js="False"/>
