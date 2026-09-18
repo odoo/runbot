@@ -1,5 +1,4 @@
 import datetime
-import functools
 import logging
 from collections import OrderedDict, defaultdict
 from subprocess import CalledProcessError
@@ -11,21 +10,11 @@ from dateutil.relativedelta import relativedelta
 from werkzeug.exceptions import Forbidden, NotFound
 
 from odoo import fields
-from odoo.http import Controller, Response, request
-from odoo.http import route as o_route
+from odoo.http import Controller, Response, request, route
 from odoo.fields import Domain
 
 _logger = logging.getLogger(__name__)
 
-
-def route(routes, **kw):
-    def decorator(f):
-        @o_route(routes, **kw)
-        @functools.wraps(f)
-        def response_wrap(*args, **kwargs):
-            return f(*args, **kwargs)
-        return response_wrap
-    return decorator
 
 class Runbot(Controller):
 
@@ -263,7 +252,7 @@ class Runbot(Controller):
                 return request.render('runbot.tree_hash', context)
         raise NotFound
 
-    @o_route([
+    @route([
         '/runbot/build/<int:build_id>/<operation>',
     ], type='http', auth="user", methods=['POST'], csrf=False)
     def build_operations(self, build_id, operation, **post):
