@@ -249,6 +249,8 @@
         </template>
 
         <template id="runbot.build_errors_link">
+            <t t-set="nb_assigned_errors" t-value="env['runbot.build.error'].sudo().search_count([('responsible', '=', user_id.id)])"/>
+            <t t-set="nb_team_errors" t-value="env['runbot.build.error'].sudo().search_count([('responsible', '=', False), ('team_id', 'in', user_id.runbot_team_ids.ids)])"/>
             <t t-if="nb_assigned_errors">
                 <li class="nav-item">
                     <a href="/runbot/errors" class="nav-link text-danger" t-attf-title="You have {{nb_assigned_errors}} random bug assigned">
@@ -266,7 +268,7 @@
                     </a>
                 </li>
             </t>
-            <t t-elif="nb_build_errors">
+            <t t-elif="env['runbot.build.error'].sudo().search_count([])">
                 <li class="nav-item">
                     <a href="/runbot/errors" class="nav-link" title="Random Bugs"><i class="fa fa-bug"/></a>
                 </li>

@@ -27,10 +27,6 @@ def route(routes, **kw):
         def response_wrap(*args, **kwargs):
             projects = request.env['runbot.project'].search([('hidden', '=', False)])
             filter_mode = request.httprequest.cookies.get('filter_mode', 'default')
-            nb_build_errors = request.env['runbot.build.error'].sudo().search_count([])
-            nb_assigned_errors = request.env['runbot.build.error'].sudo().search_count([('responsible', '=', request.env.user.id)])
-            nb_team_errors = request.env['runbot.build.error'].sudo().search_count([('responsible', '=', False), ('team_id', 'in', request.env.user.runbot_team_ids.ids)])
-
             response = f(*args, **kwargs)
             if isinstance(response, Response):
                 search = kwargs.get('search', '')
@@ -45,9 +41,6 @@ def route(routes, **kw):
                 response.qcontext['qu'] = QueryURL('/runbot/%s' % (slug(project) if project else ''), search=search, refresh=refresh, has_pr=has_pr)
                 if 'title' not in response.qcontext:
                     response.qcontext['title'] = 'Runbot %s' % project.name or ''
-                response.qcontext['nb_build_errors'] = nb_build_errors
-                response.qcontext['nb_assigned_errors'] = nb_assigned_errors
-                response.qcontext['nb_team_errors'] = nb_team_errors
             return response
         return response_wrap
     return decorator
