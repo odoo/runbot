@@ -34,7 +34,6 @@ def route(routes, **kw):
                 has_pr = kwargs.get('has_pr')
                 project = response.qcontext.get('project') or (projects and projects[0])
 
-                response.qcontext['projects'] = projects
                 response.qcontext['filter_mode'] = filter_mode
                 response.qcontext['default_category'] = request.env['ir.model.data']._xmlid_to_res_id('runbot.default_category')
                 slug = request.env['ir.http']._slug
@@ -127,7 +126,6 @@ class Runbot(Controller):
 
             triggers = env['runbot.trigger'].search([('project_id', '=', project.id)])
             context.update({
-                'projects': projects,
                 'active_category_id': category_id,
                 'bundles': bundles,
                 'project': project,
