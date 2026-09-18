@@ -26,7 +26,8 @@
           <div class="d-flex align-items-center gap-1">
             <span id="page_nav_filter_mode" class="small text-body-secondary">Show</span>
             <div class="text-nowrap btn-group btn-group-ssm" role="group" aria-labelledby="page_nav_filter_mode">
-              <a t-foreach="{'default': 'Default', 'all': 'All', 'sticky': 'Sticky only', 'nosticky': 'Dev only'}" t-as="mode"
+              <a t-foreach="{'default': 'Default', 'all': 'All', 'sticky': 'Sticky only', 'nosticky': 'Dev only', 'mine': 'Mine'}" t-as="mode"
+                 t-if="mode != 'mine' or not user_id._is_public()"
                  t-attf-class="btn btn-outline-secondary{{' active' if filter_mode == mode else ''}}"
                  t-att-aria-current="'page' if filter_mode == mode else None"
                  t-att-title="'Only display sticky except if searching' if mode == 'default' else None"
