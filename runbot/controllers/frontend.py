@@ -10,6 +10,7 @@ from werkzeug.exceptions import Forbidden, NotFound
 from odoo import fields
 from odoo.http import Controller, Response, request, route
 from odoo.fields import Domain
+from odoo.tools import str2bool
 
 _logger = logging.getLogger(__name__)
 
@@ -171,7 +172,7 @@ class Runbot(Controller):
         _logger.info('user %s forcing bundle %s', request.env.user.name, bundle.name)  # user must be able to read bundle
         batch = bundle.sudo()._force() or bundle.sudo().last_batch
         batch._log('Batch forced by %s', request.env.user.name)
-        batch._prepare(auto_rebase=bool(auto_rebase), use_base_commits=bool(use_base_commits))
+        batch._prepare(auto_rebase=bool(auto_rebase), use_base_commits=str2bool(use_base_commits, False))
         batch._process()
         return werkzeug.utils.redirect('/runbot/batch/%s' % batch.id)
 
@@ -504,7 +505,7 @@ class Runbot(Controller):
             'team': team,
             'teams': teams,
             'assignment_ids': request.env['runbot.build.error'].search(domain, order=order),
-            'hide_empty': bool(hide_empty),
+            'hide_empty': str2bool(hide_empty, False),
             'searchbar_sortings': searchbar_sortings,
             'sortby': sortby,
             'searchbar_filters': OrderedDict(sorted(searchbar_filters.items())),
@@ -516,7 +517,7 @@ class Runbot(Controller):
     def dashboards(self, dashboard=None, hide_empty=False, **kwargs):
         qctx = {
             'dashboard': dashboard,
-            'hide_empty': bool(hide_empty),
+            'hide_empty': str2bool(hide_empty, False),
         }
         return request.render('runbot.dashboard_page', qctx)
 
