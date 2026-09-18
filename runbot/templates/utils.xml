@@ -9,7 +9,7 @@
             <html t-att-data-bs-theme="theme">
                 <head>
                     <meta charset="utf-8"/>
-                    <title t-out="title or 'Runbot'"/>
+                    <title t-out="title or ('Runbot %s' % project.name if project else 'Runbot')"/>
 
                     <t t-call-assets="runbot.assets_frontend" t-js="False"/>
                     <t t-call-assets="runbot.assets_frontend" t-css="False" defer_load="True"/>

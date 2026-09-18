@@ -23,14 +23,7 @@ def route(routes, **kw):
         @o_route(routes, **kw)
         @functools.wraps(f)
         def response_wrap(*args, **kwargs):
-            projects = request.env['runbot.project'].search([('hidden', '=', False)])
-            response = f(*args, **kwargs)
-            if isinstance(response, Response):
-                project = response.qcontext.get('project') or (projects and projects[0])
-
-                if 'title' not in response.qcontext:
-                    response.qcontext['title'] = 'Runbot %s' % project.name or ''
-            return response
+            return f(*args, **kwargs)
         return response_wrap
     return decorator
 
