@@ -28,7 +28,6 @@ def route(routes, **kw):
             if isinstance(response, Response):
                 project = response.qcontext.get('project') or (projects and projects[0])
 
-                response.qcontext['default_category'] = request.env['ir.model.data']._xmlid_to_res_id('runbot.default_category')
                 if 'title' not in response.qcontext:
                     response.qcontext['title'] = 'Runbot %s' % project.name or ''
             return response
