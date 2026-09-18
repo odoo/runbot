@@ -23,13 +23,13 @@
                                                 <i class="fa fa-play"/> Actions <i class="fa fa-caret-down ms-1"/>
                                             </button>
                                             <ul class="dropdown-menu">
-                                                <li><a groups="runbot.group_runbot_advanced_user" class="dropdown-item" t-attf-href="/runbot/bundle/{{bundle.id}}/force?use_base_commits=1" title="Force a new batch using base commits mainly for random errors debugging">
+                                                <li><a groups="runbot.group_runbot_advanced_user" data-runbot="force" class="dropdown-item" t-attf-href="/runbot/bundle/{{bundle.id}}/force?use_base_commits=1" title="Force a new batch using base commits mainly for random errors debugging">
                                                     <i class="fa fa-fast-backward"/> Start a batch without the branch commits
                                                 </a></li>
-                                                <li><a groups="runbot.group_runbot_advanced_user" class="dropdown-item" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Create a new Batch, applies new trigger configurations and updates build references for upgrades if needed">
+                                                <li><a groups="runbot.group_runbot_advanced_user" data-runbot="force" class="dropdown-item" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Create a new Batch, applies new trigger configurations and updates build references for upgrades if needed">
                                                     <i class="fa fa-play"/> Start a new batch
                                                 </a></li>
-                                                <li><a t-if="bundle.env.user.has_group('runbot.group_runbot_advanced_user') or (bundle.env.user.has_group('runbot.group_user') and ':' in bundle.name)" t-attf-href="/runbot/bundle/{{bundle.id}}/force?auto_rebase=1" class="dropdown-item"  title="Force A New Batch with automatic rebase, useful to test outdated branches without pushing before a merge">
+                                                <li><a t-if="bundle.env.user.has_group('runbot.group_runbot_advanced_user') or (bundle.env.user.has_group('runbot.group_user') and ':' in bundle.name)" t-attf-href="/runbot/bundle/{{bundle.id}}/force?auto_rebase=1" data-runbot="force" class="dropdown-item"  title="Force A New Batch with automatic rebase, useful to test outdated branches without pushing before a merge">
                                                     <i class="fa fa-fast-forward"/> Start a batch with simulated autorebase
                                                 </a></li>
                                             </ul>
@@ -92,7 +92,7 @@
                                             <a role="button" t-attf-class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/triggers/auto_all">Default</a>
                                         </t>
                                         <button t-if="bundle.trigger_custom_ids" role="button" t-attf-class="btn btn-{{'primary' if current_mode in ('custom', 'force') else 'default'}} btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers" aria-expanded="false" aria-controls="customTriggers"> Custom <i class="fa fa-caret-down ms-1"/></button>
-                                        <a t-if="needs_update" role="button" class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/force"><i class="fa fa-play"/> Apply</a>
+                                        <a t-if="needs_update" role="button" data-runbot="force" class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/force"><i class="fa fa-play"/> Apply</a>
                                         <div t-if="bundle.trigger_custom_ids" t-attf-class="collapse {{'show' if expand_custom else ''}}" id="customTriggers">
                                             <div class="card card-body mt-2">
                                                 <div class="d-grid gap-1" style="grid-template-columns: 1fr 2fr;">

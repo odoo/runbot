@@ -6,6 +6,7 @@
             <html t-att-data-bs-theme="theme">
                 <head>
                     <meta charset="utf-8"/>
+                    <meta name="csrf-token" t-att-content="request.csrf_token()"/>
                     <title t-out="title or 'Runbot'"/>
 
                     <t t-call-assets="runbot.assets_frontend" t-js="False"/>
@@ -151,6 +152,7 @@
                     <dialog id="collapsePreference" class="modal modal-xl">
                         <div class="modal-dialog">
                             <form class="modal-content" method="post" action="/runbot/submit" id="preferences_form">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                 <header class="modal-header">
                                     <h5 class="modal-title">Preferences</h5>
                                     <button type="button" class="btn-close" command="close" commandfor="collapsePreference"/>

@@ -13,12 +13,15 @@ document.addEventListener("click", function (e) {
     }
     var xhr = new XMLHttpRequest();
     let url = elem.href;
+    const csrfToken = document.querySelector(`meta[name="csrf-token"]`).content;
     if (data.runbotBuild) {
         url = '/runbot/build/' + data.runbotBuild + '/' + operation
     }
     xhr.addEventListener('load', function () {
         if (operation == 'rebuild' && window.location.href.split('?')[0].endsWith('/build/' + data.runbotBuild)){
             window.location.href = window.location.href.replace('/build/' + data.runbotBuild, '/build/' + xhr.responseText);
+        } else if (operation == "force") {
+            window.location.href = this.responseURL;
         } else if (operation == 'action') {
             elem.parentElement.innerText = this.responseText
         } else {
@@ -26,7 +29,7 @@ document.addEventListener("click", function (e) {
         }
     });
     xhr.open('POST', url);
-    xhr.send();
+    xhr.send(new URLSearchParams({ csrf_token: csrfToken }));
 });
 
 document.addEventListener('click', function (e) {
