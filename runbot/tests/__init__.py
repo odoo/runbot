@@ -17,3 +17,4 @@ from . import test_upgrade
 from . import test_dockerfile
 from . import test_host
 from . import test_ui
+from . import test_frontend
