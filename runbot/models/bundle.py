@@ -62,7 +62,7 @@ class Bundle(models.Model):
     # extra_info
     description = fields.Char('Description', compute='_compute_description', store=True, readonly=False)
     tag_ids = fields.Many2many('runbot.bundle.tag', string='Tags')
-    author_ids = fields.Many2many('res.users', string='Involved Users', compute='_compute_author_ids', domain=[('share', '=', False)])
+    author_ids = fields.Many2many('res.users', string='Involved Users', compute='_compute_author_ids', search='_search_author_ids', domain=[('share', '=', False)])
     team_ids = fields.Many2many('runbot.team', string='Involved Teams', compute='_compute_team_ids')
     team_id = fields.Many2one('runbot.team', string='Owning Team', compute='_compute_team_id', inverse='_inverse_team_id', store=True, tracking=True)
     manual_team_id = fields.Many2one('runbot.team', 'Manually set team')
@@ -261,6 +261,22 @@ class Bundle(models.Model):
                     user_ids.append(user_id)
 
             bundle.author_ids = user_ids
+
+    def _search_author_ids(self, operator, value):
+        if operator != 'in':
+            return NotImplemented
+        users = self.env['res.users'].browse(value)
+        logins = [login for login in users.mapped('github_login') if login]
+        authored = Domain('branch_ids', 'any', Domain('is_pr', '=', True) & Domain.OR([
+            Domain('forwardport_of_id', '=', False) & Domain('pr_author', 'in', logins),
+            Domain('forwardport_of_id.pr_author', 'in', logins),
+        ]))
+        named = Domain.OR([
+            Domain('name', '=like', f'%-{ngram}')
+            for name in users.mapped('complete_name')
+            for ngram in NGRAM_RE.findall(name or '')
+        ])
+        return Domain('is_base', '=', False) & Domain('is_staging', '=', False) & (authored | named)
 
     @api.depends('author_ids')
     def _compute_team_ids(self):

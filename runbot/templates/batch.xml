@@ -2,6 +2,7 @@
 <odoo>
     <data>
         <template id="runbot.batch">
+            <t t-set="more" t-value="str2bool(request.httprequest.cookies.get('more', ''), False)"/>
             <t t-call="runbot.layout">
                 <div class="row g-0">
                     <div class="col-lg-6">
@@ -35,7 +36,7 @@
                                 </t>
                             </td>
                         </tr>
-                        <tr t-if="batch.category_id.id != default_category">
+                        <tr>
                             <td>Category</td>
                             <td t-out="batch.category_id.name"></td>
                         </tr>
