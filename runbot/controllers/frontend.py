@@ -21,10 +21,9 @@ class Runbot(Controller):
         warn = int(ICP('runbot.pending.warning', 5))
         crit = int(ICP('runbot.pending.critical', 12))
         pending_count = request.env['runbot.build'].search_count([('local_state', '=', 'pending'), ('build_type', '!=', 'scheduled'), ('host', '=', False)])
-        scheduled_count = request.env['runbot.build'].search_count([('local_state', '=', 'pending'), ('build_type', '=', 'scheduled')])
         pending_assigned_count = request.env['runbot.build'].search_count([('local_state', '=', 'pending'), ('build_type', '!=', 'scheduled'), ('host', '!=', False)])
         level = ['info', 'warning', 'danger'][int(pending_count > warn) + int(pending_count > crit)]
-        return pending_count, level, scheduled_count, pending_assigned_count
+        return pending_count, level, pending_assigned_count
 
     @route(['/',
             '/runbot',
@@ -37,14 +36,13 @@ class Runbot(Controller):
         if not project and projects:
             project = projects[0]
 
-        pending_count, level, scheduled_count, pending_assigned_count = self._pending()
+        pending_count, level, pending_assigned_count = self._pending()
         context = {
             'search': search,
             'message': request.env['ir.config_parameter'].sudo().get_param('runbot.runbot_message'),
             'pending_count': pending_count,
             'pending_assigned_count': pending_assigned_count,
             'pending_level': level,
-            'scheduled_count': scheduled_count,
             'hosts_data': request.env['runbot.host'].search([('assigned_only', '=', False)]),
         }
         if project:
@@ -128,7 +126,7 @@ class Runbot(Controller):
         batchs = request.env['runbot.batch'].search(domain, limit=limit, offset=pager.get('offset', 0), order='id desc')
         last_batch = request.env['runbot.batch'].search(domain, limit=1, order='id desc')
 
-        pending_count, level, _scheduled_count, pending_assigned_count = self._pending()
+        pending_count, level, pending_assigned_count = self._pending()
         # compute if we should display the new batch button
         context = {
             'bundle': bundle,
@@ -365,7 +363,7 @@ class Runbot(Controller):
     def glances(self, project_id=None, **kwargs):
         project_ids = [project_id] if project_id else request.env['runbot.project'].search([]).ids  # search for access rights
         bundles = request.env['runbot.bundle'].search([('sticky', '=', True), ('project_id', 'in', project_ids)])
-        pending_count, level, _scheduled_count, pending_assigned_count = self._pending()
+        pending_count, level, pending_assigned_count = self._pending()
         qctx = {
             'pending_count': pending_count,
             'pending_assigned_count': pending_assigned_count,
@@ -379,7 +377,7 @@ class Runbot(Controller):
             '/runbot/monitoring/<int:category_id>',
             '/runbot/monitoring/<int:category_id>/<int:view_id>'], type='http', auth='user', website=True, sitemap=False)
     def monitoring(self, category_id=None, view_id=None, **kwargs):
-        pending_count, level, scheduled_count, pending_assigned_count = self._pending()
+        pending_count, level, pending_assigned_count = self._pending()
         hosts_data = request.env['runbot.host'].search([])
         if category_id:
             category = request.env['runbot.category'].browse(category_id)
@@ -393,7 +391,6 @@ class Runbot(Controller):
             'pending_count': pending_count,
             'pending_assigned_count': pending_assigned_count,
             'pending_level': level,
-            'scheduled_count': scheduled_count,
             'bundles': bundles,
             'hosts_data': hosts_data,
             'auto_tags': request.env['runbot.build.error']._disabling_tags(),
@@ -623,13 +620,12 @@ class Runbot(Controller):
 
         build_by_bundle = list(build_by_bundle.items())
         build_by_bundle.sort(key=lambda x: -len(x[1]))
-        pending_count, level, scheduled_count, pending_assigned_count = self._pending()
+        pending_count, level, pending_assigned_count = self._pending()
         context = {
             'build_by_bundle': build_by_bundle,
             'pending_count': pending_count,
             'pending_assigned_count': pending_assigned_count,
             'pending_level': level,
-            'scheduled_count': scheduled_count,
             'hosts_data': request.env['runbot.host'].search([('assigned_only', '=', False)]),
         }
 
