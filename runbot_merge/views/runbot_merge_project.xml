@@ -18,6 +18,12 @@
                     <button type="object" name="action_prepare_freeze"
                             string="View Freeze" class="oe_highlight"
                             invisible="not freeze_id"/>
+                    <button type="object" name="action_create_app"
+                            invisible="method == 'app'"
+                            string="Create Github App"/>
+                    <button type="object" name="action_authorize_app"
+                            invisible="method == 'pat' or auth_token"
+                            string="Authorize Github App"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -130,6 +136,21 @@
             <form>
                 <sheet>
                     <field name="freeze_reminder" nolabel="1" readonly="1"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="form_create_app" model="ir.ui.view">
+        <field name="name">Create App Dialog</field>
+        <field name="model">runbot_merge.github_connector.appwizard</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <field name="project_id"/>
+                    <form action="https://github.com" method="POST" target="_blank">
+                        <input type="submit" value="Send!"/>
+                    </form>
                 </sheet>
             </form>
         </field>

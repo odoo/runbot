@@ -169,11 +169,47 @@ class MergebotController(Controller):
 
         match req.headers['X-Github-Event']:
             case 'ping':
-                return handle_ping(env, request.get_json_data())
+                return handle_ping(env, data)
             case 'installation':
-                pass
+                installation = data['installation']
+                app = env['runbot_merge.github_connector'].search([
+                    ('client_id', '=', installation['client_id']),
+                ])
+                match data['action']:
+                    case 'created':
+                        _logger.info("created installation %s for %s", installation['id'], app)
+                        env['runbot_merge.github_connector.installation'].create({
+                            'connector_id': app.id,
+                            'installation_id': installation['id'],
+                            'owner_id': installation['account']['id'],
+                            'owner_login': installation['account']['login'],
+                            'repository_selection': installation['repository_selection'],
+                            # TODO: repositories
+                        })
+                    case 'deleted':
+                        _logger.info("deleted installation %s for %s", installation['id'], app)
+                        env['runbot_merge.github_connector.installation'].search([
+                            ('connector_id', '=', app.id),
+                            ('installation_id', '=', installation['id']),
+                        ]).unlink()
+                    case ('suspend' | 'unsuspend' | 'new_permissions_accepted') as act:
+                        _logger.info("ignored installation action %r", act)
+                    case act:
+                        _logger.warning("unknown installation action %r", act)
+                return Response(mimetype="text/plain", response="ok")
             case 'installation_repositories':
-                pass
+                # TODO note that this is kinda shit, needs to characterise but
+                #      - despite both `added` and `removed` having
+                #        `repositories_added` and `repositories_removed` keys,
+                #        only the corresponding key is non-empty
+                #      - when switching between repository selection modes, you
+                #        always get ADD, no indication of the actual change,
+                #        and the repos to which access is now granted
+                #      - in `selected` mode, both adding and removing repos
+                #        triggers both events one after the other
+                #      - if selection_mode=all, I think repos being created or
+                #        deleted triggers added/removed events, to check
+                return Response(mimetype="text/plain", response="ok")
             case 'pull_request':
                 return handle_pr(env, data)
             case 'status':

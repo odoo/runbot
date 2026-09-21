@@ -1,4 +1,5 @@
 import datetime
+import secrets
 import time
 
 import jwt
@@ -173,3 +174,11 @@ class Connector(models.Model):
 
     installations = fields.One2many('runbot_merge.github_connector.installation', 'connector_id')
     # endregion
+
+
+class AppWizard(models.TransientModel):
+    _name = 'runbot_merge.github_connector.appwizard'
+    _description = 'Github App Wizard'
+
+    project_id = fields.Many2one('runbot_merge.project', required=True)
+    secret = fields.Char(required=True, default=lambda _: secrets.token_hex(8))

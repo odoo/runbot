@@ -39,3 +39,4 @@ access_runbot_merge_pull_requests_fw_reminders,Admin access to FW reminders,mode
 access_runbot_merge_stagings_range,(lack of) access to staging ranges,model_runbot_merge_stagings_range,,0,0,0,0
 access_runbot_merge_github_connector,admin access to github connection config,model_runbot_merge_github_connector,base.group_system,1,1,1,1
 access_runbot_merge_github_connector_installation,admin access to github installation,model_runbot_merge_github_connector_installation,base.group_system,1,1,1,1
+access_runbot_merge_github_appwizard,admin access to appwizard,model_runbot_merge_github_connector_appwizard,base.group_system,1,1,1,1

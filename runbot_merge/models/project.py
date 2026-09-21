@@ -2,13 +2,14 @@ import logging
 import re
 import shutil
 from typing import List
+from urllib.parse import urlencode
 
 import requests
 
 from odoo import models, fields, api
 from odoo.exceptions import UserError
 from odoo.osv import expression
-from odoo.tools import reverse_order, groupby
+from odoo.tools import reverse_order, groupby, hmac
 
 _logger = logging.getLogger(__name__)
 class Project(models.Model):
@@ -398,3 +399,23 @@ confused (and will probably timeout).
                     'batch_id': cs[0].batch_id.id,
                     'source': 'insert',
                 })
+
+    def action_create_app(self):
+        r = self.env['runbot_merge.github_connector.appwizard'].create({
+            'project_id': self.id,
+        })
+        return {
+            'type': 'ir.actions.act_url',
+            'target': 'new',
+            'url': f'/runbot_merge/apps/create/{r.id}',
+        }
+
+    def action_authorize_app(self):
+        return {
+            'type': 'ir.actions.act_url',
+            'target': 'new',
+            'url': 'https://github.com/login/oauth/authorize?' + urlencode({
+                'client_id': self.github_id.client_id,
+                'state': f'{self.id}:{self.github_id.id}:{hmac(self.env, 'app', (self.id, self.github_id.id))}',
+            }),
+        }
