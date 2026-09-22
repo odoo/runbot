@@ -160,7 +160,7 @@
               <field name="name" readonly="has_xml_id"/>
               <field name="dockerfile_id" invisible="dockerfile_id" readonly="has_xml_id"/>
               <field name="layer_type" readonly="has_xml_id"/>
-              <field name="file_destination" invisible="layer_type not in ('file',)" readonly="has_xml_id"/>
+              <field name="scriptfile_id" invisible="layer_type not in ('file',)" readonly="has_xml_id"/>
               <field name="content" widget="ace" invisible="layer_type not in ('raw', 'template', 'file')" readonly="has_xml_id"/>
               <field name="reference_docker_layer_id" invisible="layer_type not in ('reference_layer')" readonly="has_xml_id"/>
               <field name="reference_dockerfile_id"  invisible="layer_type != 'reference_file'" readonly="has_xml_id"/>

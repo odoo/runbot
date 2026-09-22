@@ -1,0 +1,29 @@
+<odoo>
+  <data>
+    <record id="view_runbot_scriptfile_form" model="ir.ui.view">
+      <field name="name">runbot.scriptfile.form</field>
+      <field name="model">runbot.scriptfile</field>
+      <field name="arch" type="xml">
+        <form string="Script File">
+          <sheet>
+            <group>
+              <field name="dest_path"/>
+              <field name="chmod"/>
+            </group>
+            <group>
+              <field name="content" widget="code" options="{'mode': 'sh'}"/>
+            </group>
+          </sheet>
+          <chatter/>
+        </form>
+      </field>
+    </record>
+
+    <record id="action_scriptfile" model="ir.actions.act_window">
+      <field name="name">Script Files</field>
+      <field name="type">ir.actions.act_window</field>
+      <field name="res_model">runbot.scriptfile</field>
+      <field name="view_mode">form</field>
+    </record>
+  </data>
+</odoo>

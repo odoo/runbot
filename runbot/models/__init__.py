@@ -27,6 +27,7 @@ from . import res_config_settings
 from . import res_users
 from . import runbot
 from . import semgrep_rule
+from . import scriptfile
 from . import team
 from . import upgrade
 from . import user
