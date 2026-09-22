@@ -31,10 +31,7 @@ class BranchCleanup(models.TransientModel):
                 # tmp doesn't have substages so generating those is never useful
                 if stage == 'staging' or sub == ''
             )
+            url, user, token = r._git()
             # turns out if you delete fully qualified refs they're sent straigt
             # to the remote, you don't get the info that they exist but...
-            git.get_local(r).push(
-                git.source_url(r),
-                '--delete',
-                *refs
-            )
+            git.get_local(r).with_credentials(user, token).push(url, '--delete', *refs)

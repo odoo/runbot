@@ -56,7 +56,8 @@ class BatchValidate(models.Model):
             heads = tasks['heads']
             source = tasks['repo']
             # resolve and fetch separately because
-            r = source.check(True).ls_remote(git.source_url(repo), *tasks['branches'])
+            url, user, password = repo._git()
+            r = source.check(True).with_credentials(user, password).ls_remote(url, *tasks['branches'])
             for line in r.stdout.splitlines(keepends=False):
                 oid, _tab, ref = line.partition('\t')
                 heads.add(oid)

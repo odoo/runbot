@@ -86,7 +86,8 @@ class PullRequestBackport(models.TransientModel):
 
         bp_branch = f"{self.target.name}-{self.pr_id.refname}-{self.pr_id.batch_id.id}-bp"
         repo_id = self.pr_id.repository
-        repo = git.get_local(repo_id)
+        url, user, password = repo_id._fw_git()
+        repo = git.get_local(repo_id).with_credentials(user, password)
 
         old_map = self.pr_id.commits_map
         self.pr_id.commits_map = "{}"
@@ -96,7 +97,7 @@ class PullRequestBackport(models.TransientModel):
         if conflict:
             feedback = "\n".join(filter(None, conflict[1:3]))
             raise UserError(f"backport conflict:\n\n{feedback}")
-        repo.push(git.fw_url(repo_id), f"{head}:refs/heads/{bp_branch}")
+        repo.push(url, f"{head}:refs/heads/{bp_branch}")
 
         self.env.cr.execute('LOCK runbot_merge_pull_requests IN SHARE MODE')
 

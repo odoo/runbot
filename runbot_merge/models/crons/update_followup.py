@@ -89,9 +89,10 @@ class UpdateQueue(models.Model):
                 previouses[root] = child
 
         for repository, refs in updates.items():
+            url, user, password = repository._fw_git()
             # then update the child branches to the new heads
-            git.get_local(repository).push(
+            git.get_local(repository).with_credentials(user, password).push(
                 *(f'--force-with-lease={ref}:{old}' for ref, old, _new in refs),
-                git.fw_url(repository),
+                url,
                 *(f"{new}:refs/heads/{ref}" for ref, _old, new in refs)
             )

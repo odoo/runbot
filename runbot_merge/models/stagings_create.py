@@ -17,6 +17,7 @@ from difflib import Differ
 from operator import itemgetter
 from subprocess import CalledProcessError
 from typing import Dict, Union, Optional, Literal, Callable, Iterator, Tuple, List, TypeAlias, Any
+from urllib.parse import urlsplit
 
 from markupsafe import Markup
 from werkzeug.datastructures import Headers
@@ -159,6 +160,7 @@ def try_staging(branch: Branch, batches: Optional[Batch] = None) -> Optional[Sta
                 tree=f'{it.head}^{{tree}}',
                 parents=[it.head],
                 author=(project.github_name, project.github_email),
+                committer=(project.github_name, project.github_email),
                 message=f'''\
 force rebuild
 
@@ -224,13 +226,24 @@ For-Commit-Id: {it.head}
     # push all the new objects first via the tmp branches
     pushers = []
     for repo, it in staging_state.items():
-        executor = it.repo.with_config(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        url, user, password = repo._git()
+        executor = it.repo.with_config(stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)\
+            .with_credentials(user, password)
         executor._config.pop('check', None)
         executor.runner = subprocess.Popen
-        pid = executor.push('-f', git.source_url(repo), f'{it.head}:refs/heads/{tmpname}')
+        pid = executor.push('-f', url, f'{it.head}:refs/heads/{tmpname}')
         pushers.append(pid)
-    for pid in pushers:
-        pid.wait()
+    for repo, pid in zip(staging_state, pushers):
+        if pid.wait():
+            # wait until staging to actually fail (this might be an issue with
+            # the tmp ref...) but log the issue nonetheless
+            _logger.warning(
+                "Failed to pre-push staging %s to %s:tmp.%s:\n%s",
+                st,
+                repo.name,
+                branch.name,
+                pid.stderr.read()
+            )
 
     stagingname = pattern % {
         'stage': 'staging',
@@ -244,8 +257,10 @@ For-Commit-Id: {it.head}
             branch.project_id.name, repo.name, branch.name,
             it.head, stagingname,
         )
+        url, user, password = repo._git()
         r = it.repo.with_config(stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False)\
-            .push('-f', git.source_url(repo), f'{it.head}:refs/heads/{stagingname}')
+            .with_credentials(user, password)\
+            .push('-f', url, f'{it.head}:refs/heads/{stagingname}')
         if r.returncode:
             branch.staging_enabled = False
             st.write({
@@ -296,8 +311,10 @@ For-Commit-Id: {it.head}
                 _logger.warning("Failed to fully stage presplit %d of %s", i, st)
             branchname = subpattern % {'sub': i}
             for repo, it in staging_state_split.items():
+                url, user, password = repo._git()
                 r = it.repo.with_config(stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False) \
-                    .push('-f', git.source_url(repo), f'{it.head}:refs/heads/{branchname}')
+                    .with_credentials(user, password) \
+                    .push('-f', url, f'{it.head}:refs/heads/{branchname}')
                 if r.returncode:
                     _logger.warning("Failed to push presplit %d of %s:\n%s", i, st, r.stderr)
 
@@ -319,8 +336,10 @@ For-Commit-Id: {it.head}
             else:
                 branchname = subpattern % {"sub": '3'}
                 for repo, it in staging_state.items():
+                    url, user, password = repo._git()
                     r = it.repo.with_config(stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False) \
-                        .push('-f', git.source_url(repo), f'{it.head}:refs/heads/{branchname}')
+                        .with_credentials(user, password) \
+                        .push('-f', url, f'{it.head}:refs/heads/{branchname}')
                     if r.returncode:
                         _logger.warning("Failed to push successor of %s:\n%s", st, r.stderr)
 

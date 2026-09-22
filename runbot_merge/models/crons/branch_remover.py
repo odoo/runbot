@@ -52,10 +52,9 @@ class DeleteBranches(models.Model):
             self._logger.info('✘ PR owner != FP target owner (%s)', repo_owner)
             return # probably don't have access to arbitrary repos
 
-        r = git.get_local(repository).check(False).push(
-            git.fw_url(repository),
-            '--delete', branch,
-            f'--force-with-lease={branch}:{self.pr_id.head}',
+        url, user, password = repository._fw_git()
+        r = git.get_local(repository).with_credentials(user, password).check(False).push(
+            url, '--delete', branch, f'--force-with-lease={branch}:{self.pr_id.head}',
         )
         if r.returncode:
             self._logger.info(

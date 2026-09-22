@@ -137,9 +137,10 @@ class ForwardPortTasks(models.Model):
             ref = descendant.prs[:1].refname
             # NOTE: ports the new source everywhere instead of porting each
             #       PR to the next step as it does not *stop* on conflict
-            repo = git.get_local(source.repository)
+            url, user, password = source.repository._fw_git()
+            repo = git.get_local(source.repository).with_credentials(user, password)
             conflict, head, n = source._create_port_branch(repo, target, forward=True)
-            repo.push(git.fw_url(pr.repository), f'{head}:refs/heads/{ref}')
+            repo.push(url, f'{head}:refs/heads/{ref}')
 
             remote_target = repository.fp_remote_target
             owner, _ = remote_target.split('/', 1)

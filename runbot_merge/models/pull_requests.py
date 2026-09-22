@@ -132,6 +132,15 @@ All substitutions are tentatively applied sequentially to the input.
     def github(self) -> github.GH:
         return github.GH(self.project_id.github_id._main_token(self.name), self.name)
 
+    def _git(self) -> tuple[str, str, str]:
+        token = self.project_id.github_id._main_token(self.name)
+        return f'https://github.com/{self.name}', 'x-access-token', token
+
+    def _fw_git(self) -> tuple[str, str, str]:
+        assert self.fp_remote_target
+        token = self.project_id.github_id._fp_token(self.name)
+        return f'https://github.com/{self.fp_remote_target}', 'x-access-token', token
+
     def _auto_init(self):
         res = super()._auto_init()
         tools.create_unique_index(
@@ -3030,10 +3039,9 @@ class Stagings(models.Model):
         # first force-push the current targets to all tmps
         for head in self.heads:
             repo = head.repository_id
-            repo_url, r = repos[repo] = (
-                git.source_url(repo),
-                git.get_local(repo).stdout().with_config(encoding="utf-8", check=False),
-            )
+            repo_url, user, password = repo._git()
+            r = git.get_local(repo).stdout().with_config(encoding="utf-8", check=False).with_credentials(user, password)
+            repos[repo] = (repo_url, r)
             # can't push an object you don't have locally...
             branch_head = next((
                 h for h in r.fetch_heads(repo, f"refs/heads/{self.target.name}", head.commit_id.sha)

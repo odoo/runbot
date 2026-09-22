@@ -12,7 +12,7 @@ import resource
 import stat
 import subprocess
 from operator import methodcaller
-from typing import Optional, TypeVar, Union, Sequence, Tuple, Dict, Iterator
+from typing import Optional, Union, Sequence, Tuple, Dict, Iterator, Self
 from collections.abc import Iterable, Mapping, Callable
 
 from odoo.tools.appdirs import user_cache_dir
@@ -37,17 +37,6 @@ except ImportError:
     def git_tracing_params() -> Iterator[str]:
         return iter(())
 
-def source_url(repository) -> str:
-    token = repository.project_id.github_id._main_token(repository.name)
-    if token.startswith('ghs_'):
-        token = f"x-access-token:{token}"
-    return f'https://{token}@github.com/{repository.name}'
-
-def fw_url(repository) -> str:
-    token = repository.project_id.github_id._fp_token(repository.name)
-    if token.startswith('ghs_'):
-        token = f"x-access-token:{token}"
-    return f'https://{token}@github.com/{repository.fp_remote_target}'
 
 Authorship = Union[Tuple[str, str], Tuple[str, str, str]]
 
@@ -61,10 +50,15 @@ def get_local(repository, *, clone: bool = True) -> 'Optional[Repo]':
         return git(repo_dir)
     elif clone:
         _logger.info("Cloning out %s to %s", repository.name, repo_dir)
+        url, user, password = repository._git()
         subprocess.run([
-            'git', *git_tracing_params(), 'clone', '--bare',
-            source_url(repository), str(repo_dir)
-        ], check=True)
+            'git', *ALWAYS, *git_tracing_params(),
+            'clone', '--bare', url, str(repo_dir)
+        ], check=True, env={
+            **os.environ,
+            "GIT_USER": user,
+            "GIT_PASSWORD": password,
+        })
         # All this could probably be removed since the shift to explicit fetches
         # but not sure it's worth removing?
         repo = git(repo_dir)
@@ -94,7 +88,16 @@ def get_local(repository, *, clone: bool = True) -> 'Optional[Repo]':
         return None
 
 
-ALWAYS = ('gc.auto=0', 'maintenance.auto=0')
+ALWAYS = (
+    '-c', 'gc.auto=0',
+    '-c', 'maintenance.auto=0',
+    '-c', 'http.proactiveAuth=basic',
+    '-c', '''credential.helper=!f() {
+        sleep 1
+        echo "username=${GIT_USER}"
+        echo "password=${GIT_PASSWORD}"
+    }; f''',
+)
 
 
 def _bypass_limits():
@@ -110,6 +113,12 @@ class Repo:
     def __init__(self, directory: str, **config: object) -> None:
         self._directory = str(directory)
         config.setdefault('stderr', subprocess.PIPE)
+        config['env'] = {
+            **(os.environ if (env := config.get('env')) is None else env),
+            'GIT_CONFIG_NOSYSTEM': 'true',
+            'GIT_CONFIG_GLOBAL': '/dev/null',
+            'GIT_CONFIG_SYSTEM': '/dev/null',
+        }
         self._config = config
         self._params = ()
         self.runner = subprocess.run
@@ -121,7 +130,8 @@ class Repo:
         opts = {**self._config, **kwargs}
         args = tuple(itertools.chain(
             ('git', '-C', self._directory),
-            itertools.chain.from_iterable(('-c', p) for p in self._params + ALWAYS),
+            ALWAYS,
+            itertools.chain.from_iterable(('-c', p) for p in self._params),
             git_tracing_params(),
             args,
         ))
@@ -133,7 +143,7 @@ class Repo:
                 if isinstance(stream, bytes):
                     with contextlib.suppress(UnicodeDecodeError):
                         stream = stream.decode()
-                _logger.error("git call error: %s", stream)
+                _logger.error("git call error: %s", stream, exc_info=True)
             raise
 
     def stdout(self, flag: StdOutValue = True) -> Repo:
@@ -159,6 +169,12 @@ class Repo:
         r._params = args
         return r
 
+    def with_env(self, **env) -> Repo:
+        return self.with_config(env={**self._config['env'], **env})
+
+    def with_credentials(self, user, password) -> Repo:
+        return self.with_env(GIT_USER=user, GIT_PASSWORD=password)
+
     def clone(self, to: str, branch: Optional[str] = None) -> Repo:
         self._run(
             'clone',
@@ -171,7 +187,11 @@ class Repo:
         """Fetches the heads of all the specified revisions, and returns their
         oids.
         """
-        r = self.stdout().with_config(check=True, encoding="utf-8").fetch(
+        url, user, password = repo._git()
+        r = (self.stdout()
+        .with_config(check=True, encoding="utf-8")
+        .with_credentials(user, password)
+        .fetch(
             # as its name does not indicate, retrieves all relevant objects but
             # stops short of updating local refs, so
             # `fetch --dry-run refs/heads/master` will resolve and retrieve the
@@ -180,10 +200,10 @@ class Repo:
             '--dry-run',
             # parseable output (see below), returns info even when nothing happened
             '--porcelain',
-            source_url(repo),
+            url,
             *specs,
             no_tags=True,
-        )
+        ))
         # <flag> <old-object-id> <new-object-id> <local-reference>
         # flag:
         #   ` ` fast forward
@@ -252,6 +272,8 @@ class Repo:
                 tree=new_trees[-1],
                 parents=[parent, original['sha']],
                 message=f'temp rebase {original["sha"]}',
+                author=('temp', ''),
+                committer=('temp', ''),
             )).stdout.strip()
             prev_tree = new_trees[-1]
             prev_original_tree = original['commit']['tree']['sha']
@@ -287,6 +309,7 @@ class Repo:
             message=msg,
             parents=[c1, c2],
             author=author,
+            committer=author,
         )
         if c.returncode:
             raise MergeError(c.stderr)
@@ -295,20 +318,18 @@ class Repo:
     def commit_tree(
         self, *, tree: str, message: str,
         parents: Sequence[str] = (),
-        author: Optional[Authorship] = None,
-        committer: Optional[Authorship] = None,
+        author: Authorship,
+        committer: Authorship,
     ) -> subprocess.CompletedProcess:
         authorship = {}
-        if author:
-            authorship['GIT_AUTHOR_NAME'] = author[0]
-            authorship['GIT_AUTHOR_EMAIL'] = author[1]
-            if len(author) > 2:
-                authorship['GIT_AUTHOR_DATE'] = author[2]
-        if committer:
-            authorship['GIT_COMMITTER_NAME'] = committer[0]
-            authorship['GIT_COMMITTER_EMAIL'] = committer[1]
-            if len(committer) > 2:
-                authorship['GIT_COMMITTER_DATE'] = committer[2]
+        authorship['GIT_AUTHOR_NAME'] = author[0]
+        authorship['GIT_AUTHOR_EMAIL'] = author[1]
+        if len(author) > 2:
+            authorship['GIT_AUTHOR_DATE'] = author[2]
+        authorship['GIT_COMMITTER_NAME'] = committer[0]
+        authorship['GIT_COMMITTER_EMAIL'] = committer[1]
+        if len(committer) > 2:
+            authorship['GIT_COMMITTER_DATE'] = committer[2]
 
         return self.with_config(
             input=message,

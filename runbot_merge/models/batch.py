@@ -10,7 +10,7 @@ from markupsafe import Markup
 from psycopg2 import sql
 
 from odoo import models, fields, api
-from .pull_requests import ForwardPortError, PullRequests
+from .pull_requests import ForwardPortError, PullRequests, Repository
 from .utils import EnumSelection
 from .. import git
 
@@ -330,9 +330,10 @@ class Batch(models.Model):
         conflicts = {}
         commits_count = {}
         for pr in prs:
-            repo = git.get_local(pr.repository)
+            url, user, password = pr.repository._fw_git()
+            repo = git.get_local(pr.repository).with_credentials(user, password)
             conflicts[pr], head, commits_count[pr] = pr._create_port_branch(repo, target, forward=True)
-            r = repo.check(False).push(git.fw_url(pr.repository), f"{head}:refs/heads/{new_branch}")
+            r = repo.check(False).push(url, f"{head}:refs/heads/{new_branch}")
             if r.returncode:
                 self._delete_fw_branches(conflicts.keys(), new_branch)
 
@@ -433,9 +434,11 @@ class Batch(models.Model):
 
     def _delete_fw_branches(self, previous_prs: Reversible[PullRequests], new_branch: str) -> None:
         for pr in reversed(previous_prs):
+            url, user, password = pr.repository._fw_git()
             r = git.get_local(pr.repository) \
                 .with_config(check=False) \
-                .push(git.fw_url(pr.repository), f":refs/heads/{new_branch}")
+                .with_credentials(user, password) \
+                .push(url, f":refs/heads/{new_branch}")
             if r.returncode:
                 _logger.warning("Deleting %s:%s=%s", pr.repository.fp_remote_target, new_branch, r.stderr.decode())
                 self.with_context(mail_post_autofollow=True).message_post(
