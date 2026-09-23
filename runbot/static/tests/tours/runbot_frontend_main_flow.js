@@ -4,14 +4,19 @@ import { registry } from "@web/core/registry";
 registry.category("web_tour.tours").add("runbot_frontend_main_flow", {
     steps: () => [
         {
-            content: "Open the frontend tour project from the main Runbot page",
-            trigger: `#top_menu .nav-link:contains("Runbot UI Tour Project")`,
+            content: "Open the project switcher on the main Runbot page",
+            trigger: `.navbar-brand`,
+            run: "click",
+        },
+        {
+            content: "Select the frontend tour project from the dropdown",
+            trigger: `[data-project-filter="item"]:contains("Runbot UI Tour Project")`,
             run: "click",
             expectUnloadPage: true,
         },
         {
             content: "The project frontend is selected",
-            trigger: `.active_project:contains("Runbot UI Tour Project")`,
+            trigger: `.navbar-brand:contains("Runbot UI Tour Project")`,
         },
         {
             content: "Search for the frontend tour bundle",
