@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates xml:space="preserve">
-    <t t-inherit="mail.Message" t-inherit-mode="extension">
+    <!--t t-inherit="mail.Message" t-inherit-mode="extension">
         <xpath expr="//li[hasclass('o-mail-Message-tracking')]" position="replace">
             <li class="o-mail-Message-tracking mb-1" role="group">
                 <t t-if="isMultiline(trackingValue)">
@@ -30,5 +30,5 @@
                 </t>
             </li>
         </xpath>
-    </t>
+    </t-->
 </templates>

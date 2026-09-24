@@ -1,26 +1,36 @@
 import { registry } from "@web/core/registry";
-import { useRef, xml, Component, useEffect } from "@odoo/owl";
+import { standardFieldProps } from "@web/views/fields/standard_field_props";
+import { Component, signal, t, useEffect, useProps, xml } from "@odoo/owl";
 
 export class HistoryGraph extends Component {
     static template = xml`
         <div class="w-100 overflow-auto">
-            <canvas t-ref="canvas"/>
+            <canvas t-ref="this.canvasRef"/>
         </div>
     `;
+    props = useProps({
+        ...standardFieldProps,
+        cellSize: t.number().optional(5),
+        mouseActions: t.boolean().optional(false),
+    });
+
+    canvasRef = signal.ref();
 
     setup() {
-        this.canvasRef = useRef("canvas");
         useEffect(() => this.renderErrorGraph());
     }
 
     renderErrorGraph(activeCell) {
+        const canvas = this.canvasRef();
+        if (!canvas) {
+            return;
+        }
         const data = this.props.record.data[this.props.name] || {};
         const errorId = data.error_id;
         const projectId = data.project_id;
         const categoryId = data.category_id;
         const breaking_pr_close_dates = data.breaking_pr_close_dates;
         const fixing_pr_close_dates = data.fixing_pr_close_dates;
-        const canvas = this.canvasRef.el;
         const ctx = canvas.getContext("2d");
         const maxValue = data.max_count;
         const canvasBorder = 1;
@@ -138,7 +148,7 @@ export class HistoryGraph extends Component {
 
     getCellFromEvent(event) {
         const data = this.props.record.data[this.props.name] || {};
-        const rect = this.canvasRef.el.getBoundingClientRect();
+        const rect = this.canvasRef().getBoundingClientRect();
         const x = event.clientX - rect.left - 1; // Adjust for canvas border
         const y = event.clientY - rect.top - 1; // Adjust for canvas border
         const col = Math.floor(x / this.props.cellSize);
@@ -156,10 +166,10 @@ export class HistoryGraph extends Component {
 
 registry.category("fields").add("history_graph", {
     component: HistoryGraph,
-    extractProps({ attrs, options }, dynamicInfo) {
+    extractProps({ options }) {
         return {
-            cellSize: options.cell_size || 5, // Default cell size if not specified
-            mouseActions: options.mouse_actions || false, // Default to false if not specified
+            cellSize: options.cell_size, // Default cell size is defined in the props
+            mouseActions: options.mouse_actions,
         };
     },
 });

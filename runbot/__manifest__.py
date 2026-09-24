@@ -75,7 +75,6 @@
             'runbot/static/lib/diff_match_patch/diff_match_patch.js',
             'runbot/static/src/js/views/**/*',
             'runbot/static/src/js/fields/*',
-            'runbot/static/src/js/components/*',
         ],
         'web.assets_tests': [
             'runbot/static/tests/tours/*.js',

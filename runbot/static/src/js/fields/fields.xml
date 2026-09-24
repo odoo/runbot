@@ -6,14 +6,14 @@
             <thead>
                 <tr>
                     <th></th>
-                    <th class="thead-dark" t-foreach="toVersions" t-as="toVersion" t-out="toVersion" t-key="toVersion"/>
+                    <th class="thead-dark" t-foreach="this.toVersions" t-as="toVersion" t-out="toVersion" t-key="toVersion"/>
                 </tr>
             </thead>
             <tbody>
-                <tr t-foreach="fromVersions" t-as="fromVersion" t-key="fromVersion">
+                <tr t-foreach="this.fromVersions" t-as="fromVersion" t-key="fromVersion">
                     <th class="thead-dark" t-out="fromVersion"/>
-                    <t t-foreach="toVersions" t-as="toVersion" t-key="toVersion">
-                        <t t-set="entry" t-value="getEntry(fromVersion, toVersion)"/>
+                    <t t-foreach="this.toVersions" t-as="toVersion" t-key="toVersion">
+                        <t t-set="entry" t-value="this.getEntry(fromVersion, toVersion)"/>
                         <td t-att-style="entry and entry.data.manually_edited ? 'background-color: #CCC'  : ''">
                             <BooleanToggleField t-if="entry" name="'enabled'" record="entry"/>
                         </td>
