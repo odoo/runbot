@@ -2502,8 +2502,7 @@ class Stagings(models.Model):
         )
         self.env.cr.execute(f"SELECT s.id FROM runbot_merge_stagings s {joins}", heads)
         stagings = self.browse(id for [id] in self.env.cr.fetchall())
-        stagings.check_access_rights('read')
-        stagings.check_access_rule('read')
+        stagings.check_access('read')
         return stagings
 
     @api.returns('runbot_merge.stagings')
@@ -2521,8 +2520,7 @@ class Stagings(models.Model):
         )
         self.env.cr.execute(f"SELECT s.id FROM runbot_merge_stagings s {joins}", heads)
         stagings = self.browse(id for [id] in self.env.cr.fetchall())
-        stagings.check_access_rights('read')
-        stagings.check_access_rule('read')
+        stagings.check_access('read')
         return stagings
 
 class Split(models.Model):

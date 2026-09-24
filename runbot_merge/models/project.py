@@ -209,8 +209,7 @@ class Project(models.Model):
     def action_prepare_freeze(self):
         """ Initialises the freeze wizard and returns the corresponding action.
         """
-        self.check_access_rights('write')
-        self.check_access_rule('write')
+        self.check_access('write')
         Freeze = self.env['runbot_merge.project.freeze'].sudo()
 
         w = Freeze.search([('project_id', '=', self.id)]) or Freeze.create({

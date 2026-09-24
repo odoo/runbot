@@ -5,7 +5,7 @@
     'depends': ['contacts', 'mail', 'website'],
     'data': [
         'security/security.xml',
-        'security/ir.model.access.csv',
+        'security/ir.access.csv',
 
         'data/merge_cron.xml',
         'models/crons/git_maintenance.xml',

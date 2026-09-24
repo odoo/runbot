@@ -155,8 +155,7 @@ class FreezeWizard(models.Model):
         self.errors = '\n'.join(errors) or False
 
     def action_cancel(self):
-        self.project_id.check_access_rights('write')
-        self.project_id.check_access_rule('write')
+        self.project_id.check_access('write')
         self.sudo().unlink()
 
         return {'type': 'ir.actions.act_window_close'}

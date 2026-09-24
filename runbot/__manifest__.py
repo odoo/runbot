@@ -11,8 +11,7 @@
     'depends': ['base', 'base_automation', 'website', 'auth_oauth'],
     'data': [
         'security/runbot_security.xml',
-        'security/ir.model.access.csv',
-        'security/ir.rule.csv',
+        'security/ir.access.csv',
 
         'data/dockerfile_data.xml',
         'data/build_parse.xml',
