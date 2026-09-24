@@ -517,7 +517,7 @@ class PullRequests(models.Model):
 
     @api.depends('repository.name', 'number')
     def _compute_url(self):
-        base = werkzeug.urls.url_parse(self.env['ir.config_parameter'].sudo().get_param('web.base.url', 'http://localhost:8069'))
+        base = werkzeug.urls.url_parse(self.env['ir.config_parameter'].sudo().get_str('web.base.url', 'http://localhost:8069'))
         gh_base = werkzeug.urls.url_parse('https://github.com')
         for pr in self:
             path = f'/{werkzeug.urls.url_quote(pr.repository.name)}/pull/{pr.number}'

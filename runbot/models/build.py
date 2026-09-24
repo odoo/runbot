@@ -450,8 +450,8 @@ class BuildResult(models.Model):
     @api.depends('gc_delay', 'job_end')
     def _compute_gc_date(self):
         icp = self.env['ir.config_parameter'].sudo()
-        max_days_main = int(icp.get_param('runbot.db_gc_days', default=30))
-        max_days_child = int(icp.get_param('runbot.db_gc_days_child', default=15))
+        max_days_main = int(icp.get_int('runbot.db_gc_days', default=30))
+        max_days_child = int(icp.get_int('runbot.db_gc_days_child', default=15))
         for build in self:
             ref_date = fields.Datetime.from_string(build.job_end or build.create_date or datetime.datetime.now())
             max_days = max_days_main if not (build.parent_id or build.parent_link_ids) else max_days_child
@@ -538,7 +538,7 @@ class BuildResult(models.Model):
         if self.env.user._is_internal():
             token, token_info = self._get_run_token()
             db_suffix = f'{db_suffix}-{token}-{token_info}'
-        use_ssl = self.env['ir.config_parameter'].sudo().get_param('runbot.use_ssl', default=True)
+        use_ssl = self.env['ir.config_parameter'].sudo().get_bool('runbot.use_ssl', default=True)
         scheme = 'https' if use_ssl else 'http'
         return f'{scheme}://{self.dest}-{db_suffix}.{self.host}'
 
@@ -849,7 +849,7 @@ class BuildResult(models.Model):
         dest_by_builds_ids = defaultdict(list)
         ignored = set()
         icp = self.env['ir.config_parameter']
-        hide_in_logs = icp.get_param('runbot.runbot_db_template', default='template0')
+        hide_in_logs = icp.get_str('runbot.runbot_db_template', default='template0')
 
         for dest in dest_list:
             build = self._build_from_dest(dest)
@@ -895,7 +895,7 @@ class BuildResult(models.Model):
                 additionnal_conditions.append("datname like '%s-%%'" % _id)
 
         # TODO cleanup remove
-        log_db = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
+        log_db = self.env['ir.config_parameter'].get_str('runbot.logdb_name')
         existing_db = [db for db in list_local_dbs(additionnal_conditions=additionnal_conditions) if db != log_db]
 
         for db in _filter(dest_list=existing_db, label='db'):
@@ -909,7 +909,7 @@ class BuildResult(models.Model):
             dest_list = (p.name for p in builds_dir.iterdir())
 
         icp = self.env['ir.config_parameter']
-        full_gc_days = int(icp.get_param('runbot.full_gc_days', default=365))
+        full_gc_days = int(icp.get_int('runbot.full_gc_days', default=365))
         full_gc_secondes = full_gc_days * 24 * 60 * 60
         now = time.time()
 
@@ -958,7 +958,7 @@ class BuildResult(models.Model):
 
         # starting port
         icp = self.env['ir.config_parameter']
-        port = int(icp.get_param('runbot.runbot_starting_port', default=2000))
+        port = int(icp.get_int('runbot.runbot_starting_port', default=2000))
 
         # find next free port
         while port in ports:
@@ -1057,7 +1057,7 @@ class BuildResult(models.Model):
             _docker_state = docker_state(build._get_docker_name(), build._path())
             if _docker_state == 'RUNNING':
                 build_limit = build.cpu_limit or build.active_step.cpu_limit
-                timeout = min(build_limit, int(icp.get_param('runbot.runbot_timeout', default=10000)))
+                timeout = min(build_limit, int(icp.get_int('runbot.runbot_timeout', default=10000)))
                 if build.local_state != 'running' and build.job_time > timeout:
                     build.active_step._make_stats(build)
                     build._log('_schedule', '%s time exceeded (%ss)' % (build.active_step._get_display_name(self) if build.active_step else "?", build.job_time))
@@ -1209,7 +1209,7 @@ class BuildResult(models.Model):
         # network is disabled by default, can be enabled via kwargs['network_enabled'] (run, restore) or config_data['network_enabled'] (external, nightly,...)
         kwargs['network_enabled'] = kwargs.get('network_enabled') or self.params_id.config_data.get('network_enabled') or self.params_id.trigger_id.network_enabled or False
 
-        containers_memory_limit = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_containers_memory', 0)
+        containers_memory_limit = self.env['ir.config_parameter'].sudo().get_float('runbot.runbot_containers_memory', 0)
         if containers_memory_limit and 'memory' not in kwargs:
             memory_limit_factor = float(self.params_id.config_data.get('memory_limit_factor', 1))
             containers_memory_limit = int(float(containers_memory_limit) * 1024 ** 3) * memory_limit_factor
@@ -1221,7 +1221,7 @@ class BuildResult(models.Model):
             if start_step_time > 60:
                 _logger.info('Step took %s seconds before starting docker', start_step_time)
 
-        starting_config = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_default_odoorc')
+        starting_config = self.env['ir.config_parameter'].sudo().get_str('runbot.runbot_default_odoorc')
         if isinstance(cmd, Command):
             rc_content = cmd.get_config(starting_config=starting_config)
             if step.check_exit_status:
@@ -1648,7 +1648,7 @@ class BuildResult(models.Model):
   }
 }""" % self.active_step.sanitized_name(self)
             # TODO cleanup remove
-            log_db = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
+            log_db = self.env['ir.config_parameter'].get_str('runbot.logdb_name')
             if "--log-db" in available_options:
                 command.add_config_tuple("log_db", log_db)
                 if "--log-db-level" in available_options:
@@ -1697,7 +1697,7 @@ class BuildResult(models.Model):
 
     def _read_file(self, file, mode='r'):
         file_path = self._path(file)
-        max_log_file_size = int(self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_max_log_size', DEFAULT_MAX_FILE_SIZE))
+        max_log_file_size = int(self.env['ir.config_parameter'].sudo().get_int('runbot.runbot_max_log_size', DEFAULT_MAX_FILE_SIZE))
         if os.path.getsize(file_path) > max_log_file_size:
             self._log('readfile', f"File size exceeds {max_log_file_size} limit", level="ERROR")
             return False

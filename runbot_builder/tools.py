@@ -105,7 +105,7 @@ class RunbotClient():
 
     def update_next_git_gc_date(self):
         now = datetime.now()
-        gc_hour = int(self.env['ir.config_parameter'].sudo().get_param('runbot.git_gc_hour', '23'))
+        gc_hour = int(self.env['ir.config_parameter'].sudo().get_int('runbot.git_gc_hour', 23))
         gc_minutes = self.host.id % 60  # deterministic minutes
         self.next_git_gc_date = datetime(now.year, now.month, now.day, gc_hour, gc_minutes)
         while self.next_git_gc_date <= now:

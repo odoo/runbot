@@ -84,10 +84,10 @@
                                                 <a class="nav-link" href="/odoo/docker">
                                                     <i class="fa fa-warning"/>
                                                     <t t-if="in_error_docker_files">
-                                                        <span class="text-danger" t-esc="len(in_error_docker_files)" title="In error docker files"/>
+                                                        <span class="text-danger" t-out="len(in_error_docker_files)" title="In error docker files"/>
                                                     </t>
                                                     <t t-if="out_of_sync_docker_files">
-                                                        <span class="text-warning" t-esc="len(out_of_sync_docker_files)" title="Out of sync docker files"/>
+                                                        <span class="text-warning" t-out="len(out_of_sync_docker_files)" title="Out of sync docker files"/>
                                                     </t>
                                                 </a>
                                             </li>

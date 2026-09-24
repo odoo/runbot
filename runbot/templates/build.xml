@@ -52,7 +52,7 @@
                         </a>
                       </li>
                       <li t-if="len(batches) > 30">
-                        <span class="dropdown-item text-muted">+ <t t-esc="len(batches) - 30"/> more</span>
+                        <span class="dropdown-item text-muted">+ <t t-out="len(batches) - 30"/> more</span>
                       </li>
                       <li>
                          <a class="dropdown-item" t-attf-href="/runbot/build/{{build.id}}/routes">
@@ -210,7 +210,7 @@
                 <t t-if="build.params_id.builds_reference_ids">
                   <b>Other builds reference:</b>
                   <div t-foreach="build.params_id.builds_reference_ids" t-as="reference">
-                    <a t-attf-href="/runbot/build/{{reference.id}}"><t t-esc="reference.id"/></a> - <em t-out="reference.params_id.version_id.name"/>
+                    <a t-attf-href="/runbot/build/{{reference.id}}"><t t-out="reference.id"/></a> - <em t-out="reference.params_id.version_id.name"/>
                   </div>
                 </t>
                 <t t-if="build.params_id.upgrade_to_build_id">

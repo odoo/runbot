@@ -1,6 +1,6 @@
 import logging
 import re
-from odoo import models, fields, api, tools
+from odoo import models, fields, api
 from odoo.exceptions import ValidationError
 
 
@@ -38,7 +38,7 @@ class Version(models.Model):
     @api.constrains("name")
     def _check_match_is_base(self):
         icp = self.env['ir.config_parameter'].sudo()
-        regex = icp.get_param('runbot.runbot_is_base_regex', False)
+        regex = icp.get_str('runbot.runbot_is_base_regex', False)
         if regex:
             for record in self:
                 if not re.match(regex, record.name):
@@ -65,7 +65,7 @@ class Version(models.Model):
     def _get(self, name):
         return self.browse(self._get_id(name))
 
-    @tools.ormcache('name')
+    @api.ormcache('name')
     def _get_id(self, name):
         version = self.search([('name', '=', name)])
         if not version:

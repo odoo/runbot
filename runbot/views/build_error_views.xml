@@ -178,7 +178,7 @@
                         <field name="responsible"/>
                         <field name="fixing_commit"/>
                         <field name="id"/>
-                        <button type="object" name="get_formview_action" icon="fa-arrow-right" title="View similar error"/>
+                        <button type="object" name="get_record_default_action" icon="fa-arrow-right" title="View similar error"/>
                       </list>
                     </field>
                   </page>

@@ -14,7 +14,7 @@ class Project(models.Model):
     dockerfile_id = fields.Many2one('runbot.dockerfile', index=True, help="Project Default Dockerfile")
     repo_ids = fields.One2many('runbot.repo', 'project_id', string='Repos')
     sequence = fields.Integer('Sequence')
-    organisation = fields.Char('organisation', default=lambda self: self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_organisation'))
+    organisation = fields.Char('organisation', default=lambda self: self.env['ir.config_parameter'].sudo().get_str('runbot.runbot_organisation'))
     token = fields.Char("Github token", groups="runbot.group_runbot_admin")
     master_bundle_id = fields.Many2one('runbot.bundle', string='Master bundle')
     dummy_bundle_id = fields.Many2one('runbot.bundle', string='Dummy bundle')

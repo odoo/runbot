@@ -66,7 +66,7 @@ def route(routes, **kw):
 class Runbot(Controller):
 
     def _pending(self):
-        ICP = request.env['ir.config_parameter'].sudo().get_param
+        ICP = request.env['ir.config_parameter'].sudo().get_int
         warn = int(ICP('runbot.pending.warning', 5))
         crit = int(ICP('runbot.pending.critical', 12))
         pending_count = request.env['runbot.build'].search_count([('local_state', '=', 'pending'), ('build_type', '!=', 'scheduled'), ('host', '=', False)])
@@ -91,7 +91,7 @@ class Runbot(Controller):
         context = {
             'categories': categories,
             'search': search,
-            'message': request.env['ir.config_parameter'].sudo().get_param('runbot.runbot_message'),
+            'message': request.env['ir.config_parameter'].sudo().get_str('runbot.runbot_message'),
             'pending_count': pending_count,
             'pending_assigned_count': pending_assigned_count,
             'pending_level': level,
@@ -155,7 +155,7 @@ class Runbot(Controller):
                 'search': search,
             })
 
-        context.update({'message': request.env['ir.config_parameter'].sudo().get_param('runbot.runbot_message')})
+        context.update({'message': request.env['ir.config_parameter'].sudo().get_str('runbot.runbot_message')})
         # request.is_frontend = False  # remove inherit branding
         return request.render('runbot.bundles', context)
 

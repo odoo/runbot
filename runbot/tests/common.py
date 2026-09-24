@@ -133,7 +133,7 @@ class RunbotCase(TransactionCase):
             'author': 'purply',
             'author_email': 'puprly@somewhere.com'
         })
-        self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_is_base_regex', r'^((master)|(saas-)?\d+\.\d+)$')
+        self.env['ir.config_parameter'].sudo().set_str('runbot.runbot_is_base_regex', r'^((master)|(saas-)?\d+\.\d+)$')
 
         self.branch_odoo = self.Branch.create({
             'name': 'master',

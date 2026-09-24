@@ -90,7 +90,7 @@ class ConfigStep(models.Model):
         # remove forwardport pr
         ICP = self.env['ir.config_parameter'].sudo()
 
-        fw_bot = ICP.get_param('runbot.runbot_forwardport_author')
+        fw_bot = ICP.get_str('runbot.runbot_forwardport_author')
         fw_prs = prs.filtered(lambda pr: pr.pr_author == fw_bot and len(pr.reflog_ids) <= 1)
         if fw_prs:
             build._log('', 'Ignoring forward port pull request: %s' % ','.join([pr.name for pr in fw_prs]))

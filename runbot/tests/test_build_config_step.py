@@ -1434,7 +1434,7 @@ docker_params = dict(cmd=cmd, network_enabled=True)
                 'name': 'default',
                 'job_type': 'install_odoo',
             })
-            self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_containers_memory', 10)
+            self.env['ir.config_parameter'].sudo().set_float('runbot.runbot_containers_memory', 10)
             config_step._run_step(self.parent_build)()
             self.assertEqual(self.docker_run_calls[0][3]['memory'], 10 * 1024 ** 3)
 
@@ -1778,7 +1778,7 @@ Initiating shutdown
 
     def test_make_result_large_file(self):
         custom_limit = 1024
-        self.env['ir.config_parameter'].sudo().set_param('runbot.runbot_max_log_size', custom_limit)
+        self.env['ir.config_parameter'].sudo().set_int('runbot.runbot_max_log_size', custom_limit)
         self.patchers['get_size'].return_value = custom_limit + 1
         self.config_step._make_results(self.build)
         self.assertEqual(str(self.build.job_end), '1970-01-01 02:00:00')

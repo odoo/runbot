@@ -519,7 +519,7 @@ class Repo(models.Model):
         if input_data is not None and isinstance(input_data, str):
             input_data = input_data.encode('utf-8')
 
-        fetch_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_fetch_timeout', default=30))
+        fetch_timeout = int(self.env['ir.config_parameter'].get_int('runbot.runbot_fetch_timeout', default=30))
         for i in range(3):  # retry in case of timeout
             if not quiet:
                 _logger.info("git command: %s", shlex.join(cmd))
@@ -710,7 +710,7 @@ class Repo(models.Model):
         updated = False
         for repo in self:
             if repo.remote_ids and self._update(poll_delay=30 if force else 60*5):
-                max_age = int(self.env['ir.config_parameter'].get_param('runbot.runbot_max_age', default=30))
+                max_age = int(self.env['ir.config_parameter'].get_int('runbot.runbot_max_age', default=30))
                 ref = repo._get_refs(max_age, ignore=ignore)
                 ref_branches = repo._find_or_create_branches(ref)
                 repo._find_new_commits(ref, ref_branches)

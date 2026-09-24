@@ -611,19 +611,19 @@ class ConfigStep(models.Model):
         return result
 
     def _run_step(self, build, **kwargs):
-        build.log_counter = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_maxlogs', 100)
+        build.log_counter = self.env['ir.config_parameter'].sudo().get_int('runbot.runbot_maxlogs', 100)
         run_method = getattr(self, '_run_%s' % self.job_type)
         docker_params = run_method(build, **kwargs)
         if docker_params:
             if 'cpu_limit' not in docker_params:
-                max_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_timeout', default=10000))
+                max_timeout = int(self.env['ir.config_parameter'].get_int('runbot.runbot_timeout', default=10000))
                 docker_params['cpu_limit'] = min(self.cpu_limit, max_timeout)
 
             config_data = {**kwargs.get('config_data', {}), **build.params_id.config_data}
             if docker_params['cpu_limit'] and config_data.get('cpu_limit_factor'):
                 docker_params['cpu_limit'] = int(docker_params['cpu_limit'] * min(float(config_data['cpu_limit_factor']), 3))
 
-            container_cpus = float(self.container_cpus or self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_containers_cpus', 0))
+            container_cpus = float(self.container_cpus or self.env['ir.config_parameter'].sudo().get_float('runbot.runbot_containers_cpus', 0))
             if 'cpus' not in docker_params and container_cpus:
                 logical_cpu_count = psutil.cpu_count(logical=True)
                 physical_cpu_count = psutil.cpu_count(logical=False)
@@ -752,7 +752,7 @@ class ConfigStep(models.Model):
 
         if "--db-template" in available_options:
             icp = self.env['ir.config_parameter']
-            db_template = icp.get_param('runbot.runbot_db_template', default='template0')
+            db_template = icp.get_str('runbot.runbot_db_template', default='template0')
             cmd += ['--db-template', db_template]
 
         extra_params = self.extra_params or ''
@@ -845,10 +845,10 @@ class ConfigStep(models.Model):
 
         if "--db-template" in available_options:
             icp = self.env['ir.config_parameter']
-            db_template = icp.get_param('runbot.runbot_db_template', default='template0')
+            db_template = icp.get_str('runbot.runbot_db_template', default='template0')
             cmd.add_config_tuple('db_template', db_template)
 
-        if "--screencasts" in available_options and (self.env['ir.config_parameter'].sudo().get_param('runbot.enable_screencast', False) or config_data.get('screencast', False)):
+        if "--screencasts" in available_options and (self.env['ir.config_parameter'].sudo().get_bool('runbot.enable_screencast', False) or config_data.get('screencast', False)):
             cmd.add_config_tuple('screencasts', '/data/build/tests')
 
         cmd.append('--stop-after-init')  # install job should always finish
@@ -1214,7 +1214,7 @@ class ConfigStep(models.Model):
         restore_db_name = '%s-%s' % (build.dest, target_suffix)
 
         icp = self.env['ir.config_parameter']
-        db_template = icp.get_param('runbot.runbot_db_template', default='template0')
+        db_template = icp.get_str('runbot.runbot_db_template', default='template0')
         cmd = ' && '.join([
             'mkdir /data/build/restore',
             'cd /data/build/restore',
@@ -1395,7 +1395,7 @@ class ConfigStep(models.Model):
         if not os.path.isfile(log_path):
             build._log('_make_tests_results', "Log file not found at the end of test job", level="ERROR")
             return 'ko'
-        max_log_file_size = int(self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_max_log_size', DEFAULT_MAX_FILE_SIZE))
+        max_log_file_size = int(self.env['ir.config_parameter'].sudo().get_int('runbot.runbot_max_log_size', DEFAULT_MAX_FILE_SIZE))
         if os.path.getsize(log_path) > max_log_file_size:
             build._log('_make_tests_results', f"Log file exceeds {max_log_file_size} limit", level="ERROR")
             return 'ko'
@@ -1969,7 +1969,7 @@ class ConfigStepOrder(models.Model):
         for vals in vals_list:
             if 'sequence' not in vals and vals.get('step_id'):
                 vals['sequence'] = self.env['runbot.build.config.step'].browse(vals.get('step_id')).default_sequence
-            if self.pool._init:  # do not duplicate entry on install
+            if self.pool.init:  # do not duplicate entry on install
                 existing = self.search([('sequence', '=', vals.get('sequence')), ('config_id', '=', vals.get('config_id')), ('step_id', '=', vals.get('step_id'))])
                 if existing:
                     return

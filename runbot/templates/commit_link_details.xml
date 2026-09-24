@@ -11,31 +11,31 @@
                         <p>
                             <span type="button" data-bs-toggle="collapse" t-att-data-bs-target="href" role="button" aria-expanded="true" t-att-aria-controls="collapse"><i class="fa fa-toggle-up"/></span>
                                 <a t-attf-href="/runbot/commit/#{commit.id}">
-                                    <span t-esc="commit.dname"/>
-                                    <span t-esc="'+%s' % commit_link.diff_add" class="text-success"/>
-                                    <span t-esc="'-%s' % commit_link.diff_remove" class="text-danger"/>
+                                    <span t-out="commit.dname"/>
+                                    <span t-out="'+%s' % commit_link.diff_add" class="text-success"/>
+                                    <span t-out="'-%s' % commit_link.diff_remove" class="text-danger"/>
                                     <span class="text-info">
                                         (
-                                        <span t-esc="commit_link.file_changed"/>
+                                        <span t-out="commit_link.file_changed"/>
                                         <i class="fa fa-file"/>
                                         )
                                         <span io="behind">(
-                                            <span t-esc="'%s ahead' % commit_link.base_ahead" class="text-success"/>
+                                            <span t-out="'%s ahead' % commit_link.base_ahead" class="text-success"/>
                                             ,
-                                            <span t-esc="'%s behind' % commit_link.base_behind" class="text-danger"/>
+                                            <span t-out="'%s behind' % commit_link.base_behind" class="text-danger"/>
                                         )</span>
                                     </span>
                                 </a>
                                 <br/>
-                                Branch: <span t-esc="commit_link.branch_id.name"/><br/>
-                                Version: <span t-esc="commit_link.branch_id.bundle_id.version_id.name"/><br/>
-                                Base head:<span t-esc="commit_link.base_commit_id.name"/><br/>
-                                Merge base:<span t-esc="commit_link.merge_base_commit_id.name"/><br/>
+                                Branch: <span t-out="commit_link.branch_id.name"/><br/>
+                                Version: <span t-out="commit_link.branch_id.bundle_id.version_id.name"/><br/>
+                                Base head:<span t-out="commit_link.base_commit_id.name"/><br/>
+                                Merge base:<span t-out="commit_link.merge_base_commit_id.name"/><br/>
                         </p>
                     </div>
                     <div t-att-id="collapse" class="collapsed show" style="background-color:#223;color:CCC;padding:10px;">
                         <t t-set="diff_command" t-value="str(commit_link.merge_base_commit_id.name) +'..'+commit.name"/>
-                        <i> &gt; git -C <t t-esc="commit.repo_id.name"/> show <t t-esc="diff_command"/> </i>
+                        <i> &gt; git -C <t t-out="commit.repo_id.name"/> show <t t-out="diff_command"/> </i>
                         <t t-set="diff" t-value="diff_by_commit_link_ids.get(int(commit_link.id),'')"/>
                         <t t-set="commits" t-value="diff.split('\ncommit ')"/>
                         <div>
@@ -51,10 +51,10 @@
                                     <t t-set="color" t-value="'#faa'" t-if="line.startswith('-')"/>
                                     <t t-set="color" t-value="'#afa'" t-if="line.startswith('+')"/>
                                     <t t-if="line_first">
-                                        <div t-esc="line" class="sticky-top bg-dark" t-attf-style="margin-right: 50%; font-family:SFMono-Regular, Menlo, Monaco, Consolas,monospace;white-space-collapse: preserve;color:{{color}}"/>
+                                        <div t-out="line" class="sticky-top bg-dark" t-attf-style="margin-right: 50%; font-family:SFMono-Regular, Menlo, Monaco, Consolas,monospace;white-space-collapse: preserve;color:{{color}}"/>
                                     </t>
                                     <t t-else="">
-                                        <div t-esc="line" t-attf-style="font-family:SFMono-Regular, Menlo, Monaco, Consolas,monospace;white-space-collapse: preserve;color:{{color}}"/>
+                                        <div t-out="line" t-attf-style="font-family:SFMono-Regular, Menlo, Monaco, Consolas,monospace;white-space-collapse: preserve;color:{{color}}"/>
                                     </t>
                                 </t>
                             </div>

@@ -301,7 +301,7 @@ class Runbot(models.AbstractModel):
 
     def _source_cleanup(self):
         try:
-            if self.pool._init:
+            if self.pool.init:
                 return
             _logger.info('Source cleaning')
 
@@ -401,7 +401,7 @@ class Runbot(models.AbstractModel):
 
     def _backup_databases(self):
         icp = self.env['ir.config_parameter'].sudo()
-        db_gc_days = int(icp.get_param('runbot.db_gc_days', default=30))
+        db_gc_days = int(icp.get_int('runbot.db_gc_days', default=30))
         min_create_date = datetime.now() - timedelta(days=db_gc_days)
         batches_to_backup = self.env['runbot.batch'].search([('bundle_id.sticky', '=', True), ('create_date', '>', min_create_date)])
         builds_to_backup = batches_to_backup.slot_ids.filtered('trigger_id.backup_databases').build_id
