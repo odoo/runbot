@@ -75,13 +75,12 @@
             'runbot/static/lib/diff_match_patch/diff_match_patch.js',
             'runbot/static/src/js/views/**/*',
             'runbot/static/src/js/fields/*',
-            'runbot/static/src/js/components/*',
         ],
         'web.assets_tests': [
             'runbot/static/tests/tours/*.js',
         ],
         'runbot.assets_frontend': [
-            'web/static/lib/odoo_ui_icons/style.css',
+            ('include', 'web.odoo_ui_icons'),
             'runbot/static/lib/bootstrap/css/bootstrap.css',
             'runbot/static/lib/fontawesome/css/font-awesome.css',
             'runbot/static/src/css/table_group.css',

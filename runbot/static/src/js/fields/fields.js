@@ -1,16 +1,16 @@
 import { TextField } from "@web/views/fields/text/text_field";
 import { CharField } from "@web/views/fields/char/char_field";
-import { Many2OneField } from "@web/views/fields/many2one/many2one_field";
 
 import { formatDateTime } from "@web/core/l10n/dates";
 import { registry } from "@web/core/registry";
 import { useInputField } from "@web/views/fields/input_field_hook";
+import { standardFieldProps } from "@web/views/fields/standard_field_props";
 
-import { useRef, xml, Component, markup } from "@odoo/owl";
+import { Component, markup, t, useProps, xml } from "@odoo/owl";
 import { useAutoresize } from "@web/core/utils/autoresize";
 import { getFormattedValue } from "@web/views/utils";
 import { UrlField } from "@web/views/fields/url/url_field";
-import { X2ManyField , x2ManyField } from "@web/views/fields/x2many/x2many_field";
+import { X2ManyField, x2ManyField } from "@web/views/fields/x2many/x2many_field";
 import { BooleanToggleField } from "@web/views/fields/boolean_toggle/boolean_toggle_field";
 
 // https://stackoverflow.com/questions/4810841/pretty-print-json-using-javascript
@@ -35,33 +35,24 @@ function stringify(obj) {
 
 export class JsonField extends TextField {
     static template = xml`
-        <t t-if="props.readonly">
-            <span t-out="colorizedValue"/>
+        <t t-if="this.props.readonly">
+            <span t-out="this.colorizedValue"/>
         </t>
         <t t-else="">
-            <div t-ref="div">
-                <textarea
-                    class="o_input"
-                    t-att-class="{'o_field_translate': props.isTranslatable}"
-                    t-att-id="props.id"
-                    t-att-placeholder="props.placeholder"
-                    t-att-rows="rowCount"
-                    t-ref="textarea"
-                />
-            </div>
+            <textarea
+                class="o_input"
+                t-att-id="this.props.id"
+                t-att-placeholder="this.props.placeholder"
+                t-att-rows="this.rowCount"
+                t-ref="this.textareaRef"
+            />
         </t>
     `;
 
     setup() {
-        this.divRef = useRef("div");
-        this.textareaRef = useRef("textarea");
-        //if (this.props.dynamicPlaceholder) {
-        //    this.dynamicPlaceholder = useDynamicPlaceholder(this.textareaRef);
-        //}
-
         useInputField({
+            ref: this.textareaRef,
             getValue: () => this.value,
-            refName: "textarea",
             parse: JSON.parse,
         });
         useAutoresize(this.textareaRef, { minimumHeight: 50 });
@@ -82,13 +73,12 @@ registry.category("fields").add("runbotjsonb", {
 
 export class FrontendUrl extends Component {
     static template = xml`
-        <div><a t-att-href="route" t-on-click.stop="" t-on-auxclick.stop="" target="_blank"><t t-out="displayValue"/></a></div>
+        <div><a t-att-href="this.route" t-on-click.stop="" t-on-auxclick.stop="" target="_blank"><t t-out="this.displayValue"/></a></div>
     `;
-    static components = { Many2OneField };
-    static props = {
-        ...Many2OneField.props,
-        linkField: { type: String, optional: true },
-    };
+    props = useProps({
+        ...standardFieldProps,
+        linkField: t.string().optional(),
+    });
 
     get displayValue() {
         if (this.props.record.data[this.props.name].isLuxonDateTime){
@@ -116,7 +106,7 @@ export class FrontendUrl extends Component {
 registry.category("fields").add("frontend_url", {
     supportedTypes: ["many2one", "datetime"],
     component: FrontendUrl,
-    extractProps({ attrs, options }, dynamicInfo) {
+    extractProps({ options }) {
         return {
             linkField: options.link_field,
         };
@@ -126,11 +116,12 @@ registry.category("fields").add("frontend_url", {
 export class FieldCharFrontendUrl extends Component {
     static template = xml`
         <div class="o_field_many2one_selection">
-            <div class="o_field_widget"><CharField t-props="props" /></div>
-            <div><a t-att-href="route" target="_blank"><span class="fa fa-play ms-2"/></a></div>
+            <div class="o_field_widget"><CharField t-props="this.props"/></div>
+            <div><a t-att-href="this.route" target="_blank"><span class="fa fa-play ms-2"/></a></div>
         </div>
     `;
     static components = { CharField };
+    props = useProps(standardFieldProps);
 
     get route() {
         const model = this.props.record.resModel;
@@ -150,23 +141,27 @@ registry.category("fields").add("char_frontend_url", {
 
 // Pull Request URL Widget
 const pullRequestRegex = /\/([a-zA-Z-_]+\/[a-zA-Z-_]+)\/pull\/(\d+)/;
-class PullRequestUrlField extends UrlField {
+class PullRequestUrlField extends Component {
     static template = xml`
-        <UrlField t-props="fieldProps"/>
+        <UrlField t-props="this.fieldProps"/>
     `;
     static components = { UrlField };
+    props = useProps({
+        ...standardFieldProps,
+        placeholder: t.string().optional(),
+        text: t.string().optional(),
+        websitePath: t.boolean().optional(),
+    });
 
     get fieldProps() {
         const props = { ...this.props };
-        const parts = pullRequestRegex.exec(this.props.record.data[props.name]);
+        const parts = pullRequestRegex.exec(this.props.record.data[this.props.name]);
         if (parts) {
             props.text = `${parts[1]}#${parts[2]}`;
         }
         return props;
     }
 }
-
-PullRequestUrlField.supportedTypes = ["char"];
 
 registry.category("fields").add("pull_request_url", {
     supportedTypes: ["char"],
