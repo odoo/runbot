@@ -7,13 +7,13 @@
                     <div class="row">
                         <h5>
                             <t t-if="batches_date">
-                                <t t-esc="category.name"/>Batches on <t t-esc="batches_date"/>
+                                <t t-out="category.name"/>Batches on <t t-out="batches_date"/>
                             </t>
                             <t t-if="title">
-                                <t t-esc="title"/>
+                                <t t-out="title"/>
                             </t>
                             <t t-if="build_error">
-                                <em>Error <a t-attf-href="/odoo/error/{{build_error.id}}" t-esc="build_error.id"/></em>
+                                <em>Error <a t-attf-href="/odoo/error/{{build_error.id}}" t-out="build_error.id"/></em>
                             </t>
                         </h5>
                         <div>
@@ -33,7 +33,7 @@
                         </div>
                         <t t-foreach="batches" t-as="batch">
                             <div class="col-md-1">
-                                <t t-esc="batch.bundle_id.name" />
+                                <t t-out="batch.bundle_id.name" />
                                 <t t-set="batch_diff_url" t-value="'/runbot/commit_link/details/' + ','.join(map(str, batch.commit_link_ids.ids))"/>
                                 <a t-att-href="batch_diff_url" class="btn btn-sm text-start" title="Compare batch with its base" groups="runbot.group_runbot_advanced_user">
                                     <i class="fa fa-arrows-v"/>

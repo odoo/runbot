@@ -168,7 +168,7 @@
         <div class="container-fluid">
           <div class="row">
             <div class='col-md-12'>
-              <h4><t t-esc="dockerfile.image_tag"/></h4>
+              <h4><t t-out="dockerfile.image_tag"/></h4>
               <t t-if="dockerfile_result.identifier not in (dockerfile.image_identifier, dockerfile.image_future_identifier)">
                 <div class="alert alert-warning">
                   This version of the docker image is outdated and was modified since, latest version <a t-attf-href="/runbot/dockerfile_result/{{dockerfile.last_successful_result.id}}">here</a>
@@ -201,9 +201,9 @@
           </div>
           <div class="row">
             <div class='col-md-12'>
-              <b>Identifier</b>: <t t-esc="dockerfile_result.identifier"></t><br/>
+              <b>Identifier</b>: <t t-out="dockerfile_result.identifier"></t><br/>
               <b>Dockerfile</b>: <a t-attf-href="/runbot/dockerfile/result/{{current_result.id}}">raw</a><br/>
-              <b>Metadata</b>: <pre><t t-esc="json.dumps((dockerfile_result.metadata.dict), indent=3)"></t></pre>
+              <b>Metadata</b>: <pre><t t-out="json.dumps((dockerfile_result.metadata.dict), indent=3)"></t></pre>
             </div>
           </div>
         </div>
