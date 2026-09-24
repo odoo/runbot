@@ -135,7 +135,7 @@ class Bundle(models.Model):
         for bundle in self:
             bundle.has_active_pr = any(branch.is_pr and branch.alive for branch in bundle.branch_ids)
 
-    @tools.ormcache('project_id')
+    @api.ormcache('project_id')
     def _get_base_ids(self, project_id):
         return [(b.id, b.name) for b in self.search([('is_base', '=', True), ('project_id', '=', project_id)])]
 

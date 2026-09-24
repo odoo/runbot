@@ -14,7 +14,7 @@ from werkzeug.urls import url_join
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.fields import Domain
-from odoo.tools import SQL, lazy, ormcache
+from odoo.tools import SQL, lazy
 
 from ..common import TestTagsParser, transactioncache
 from ..fields import JsonDictField
@@ -170,7 +170,7 @@ class BuildErrorSeenMixin(models.AbstractModel):
                 'project_id': project_id if error.first_seen_build_id else 1,
             }
 
-    @ormcache('tuple(self.ids)', 'start_date', 'end_date')  # not sure that this is a good idea. Could be a stored field recomputed after scanning the errors?
+    @api.ormcache('tuple(self.ids)', 'start_date', 'end_date')  # not sure that this is a good idea. Could be a stored field recomputed after scanning the errors?
     def _get_log_dates(self, start_date: datetime.datetime, end_date: datetime.datetime):
         """
         Returns an count of build_error per hour for the last 30 days.

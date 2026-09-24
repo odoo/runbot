@@ -1,6 +1,6 @@
 import logging
 import re
-from odoo import models, fields, api, tools
+from odoo import models, fields, api
 from odoo.exceptions import ValidationError
 
 
@@ -65,7 +65,7 @@ class Version(models.Model):
     def _get(self, name):
         return self.browse(self._get_id(name))
 
-    @tools.ormcache('name')
+    @api.ormcache('name')
     def _get_id(self, name):
         version = self.search([('name', '=', name)])
         if not version:

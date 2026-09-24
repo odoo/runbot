@@ -6,7 +6,7 @@ from collections import defaultdict
 from docker.errors import ImageNotFound
 
 from odoo import models, fields, api
-from odoo.tools import config, ormcache
+from odoo.tools import config
 from ..common import fqdn, local_pgadmin_cursor, os, list_local_dbs, local_pg_cursor
 from ..container import docker_push, docker_pull, docker_prune, docker_images, docker_remove, docker_tag
 
@@ -231,7 +231,7 @@ class Host(models.Model):
             _logger.info(f"Space reclaimed: {result['SpaceReclaimed']}")
         _logger.info('Done...')
 
-    @ormcache()
+    @api.ormcache()
     def _host_list(self):
         return {host.name: host.id for host in self.search([])}
 
