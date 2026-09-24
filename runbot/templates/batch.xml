@@ -235,8 +235,7 @@
 
         <template id="runbot.trigger_report">
             <t t-call="runbot.layout">
-                <t t-call="{{trigger.report_view_id.id}}">
-                </t>
+                <t t-call="{{trigger.report_view_id.id}}"/>
             </t>
         </template>
     </data>

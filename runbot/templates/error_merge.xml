@@ -2,8 +2,7 @@
 <odoo>
     <data>
       <template id="runbot.error_merge_result">
-        <t t-call='runbot.layout'>
-            <t t-set="title">Error Merge</t>
+        <t t-call='runbot.layout' title.translate="Error Merge">
             <h3>Error merge rule: <t t-esc="merger.name"/> (<t t-esc="len(results)"/>)</h3>
             <div class="row">
                 <t t-foreach="results" t-as="result">

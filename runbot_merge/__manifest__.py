@@ -5,7 +5,6 @@
     'depends': ['contacts', 'mail', 'website'],
     'data': [
         'security/security.xml',
-        'security/ir.model.access.csv',
 
         'data/merge_cron.xml',
         'models/crons/git_maintenance.xml',
@@ -22,6 +21,7 @@
         'models/project_freeze/views.xml',
         'models/staging_cancel/views.xml',
         'models/backport/views.xml',
+        'security/ir.access.csv',
     ],
     'assets': {
        'web._assets_primary_variables': [

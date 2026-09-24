@@ -8,9 +8,7 @@
                         <div class='col-md-12'>
                             <h5><t t-out="bundle.name"/> <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e" />
                                 <div class="btn-group btn-group-sm" role="group">
-                                        <t t-call="runbot.branch_copy_button">
-                                            <t t-set="btn_size" t-value="'btn'"/>
-                                        </t>
+                                        <t t-call="runbot.branch_copy_button" btn_size.f="btn"/>
                                         <a groups="runbot.group_runbot_advanced_user"
                                             t-attf-href="/odoo/bundle/{{bundle.id}}" class="btn btn-default" title="View in Backend">
                                         <i class="fa fa-list"/> Form view

@@ -59,7 +59,7 @@ class Version(models.Model):
     def create(self, vals_list):
         res = super().create(vals_list)
         self.invalidate_model()
-        self.env.registry.clear_cache()
+        self.env.transaction.invalidate_ormcache()
         return res
 
     def _get(self, name):

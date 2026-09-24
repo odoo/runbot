@@ -16,9 +16,7 @@
             </t>
             <tr>
                 <td>
-                    <t t-call="runbot.branch_github_menu">
-                        <t t-set="btn_classes" t-value="'btn btn-link btn-ssm'"/>
-                    </t>
+                    <t t-call="runbot.branch_github_menu" btn_classes.f="btn btn-link btn-ssm"/>
                 </td>
                 <td>
                     <a t-out="bundle.description or bundle.name" t-att-href="bundle.frontend_url" t-att-class="link_class" t-att-title="link_title" target="_blank"/>

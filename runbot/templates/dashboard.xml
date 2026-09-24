@@ -2,12 +2,12 @@
 <odoo>
   <data>
     <template id="runbot.glances">
-      <t t-call="runbot.layout">
-        <t t-set="head">
-          <t t-if="refresh">
-            <meta http-equiv="refresh" t-att-content="refresh"/>
-          </t>
+      <t t-set="head">
+        <t t-if="refresh">
+          <meta http-equiv="refresh" t-att-content="refresh"/>
         </t>
+      </t>
+      <t t-call="runbot.layout" head="head">
         <div class="container-fluid">
           <div class="row">
             <div class='col-md-12'>
@@ -43,29 +43,28 @@
     </template>
 
     <template id="runbot.config_monitoring">
-      <t t-call="runbot.frontend_no_nav">
-        <t t-set="head">
-          <t t-if="refresh">
-            <meta http-equiv="refresh" t-att-content="refresh"/>
-          </t>
+      <t t-set="head">
+        <t t-if="refresh">
+          <meta http-equiv="refresh" t-att-content="refresh"/>
         </t>
       </t>
+      <t t-call="runbot.frontend_no_nav" head="head"/>
     </template>
 
     <template id="runbot.monitoring">
-      <t t-call="runbot.frontend_no_nav">
-        <t t-set="head">
-          <t t-if="refresh">
-            <meta http-equiv="refresh" t-att-content="refresh"/>
-          </t>
-          <style>
-            h4 {
-            padding: 3px 0;
-            border-bottom: 1px solid grey;
-            }
-            .r-mb02 { margin-bottom: 0.2em; }
-          </style>
+      <t t-set="head">
+        <t t-if="refresh">
+          <meta http-equiv="refresh" t-att-content="refresh"/>
         </t>
+        <style>
+          h4 {
+          padding: 3px 0;
+          border-bottom: 1px solid grey;
+          }
+          .r-mb02 { margin-bottom: 0.2em; }
+        </style>
+      </t>
+      <t t-call="runbot.frontend_no_nav" head="head">
         <div class="container-fluid">
           <div class="row">
             <div class="col-md-12">
@@ -211,12 +210,12 @@
     </template>
 
     <template id="runbot.dashboard_page">
-      <t t-call="runbot.frontend_no_nav">
-        <t t-set="head">
-          <t t-if="refresh">
-            <meta http-equiv="refresh" t-att-content="refresh"/>
-          </t>
+      <t t-set="head">
+        <t t-if="refresh">
+          <meta http-equiv="refresh" t-att-content="refresh"/>
         </t>
+      </t>
+      <t t-call="runbot.frontend_no_nav" head="head">
         <t t-call="runbot.dashboard"/>
       </t>
     </template>
@@ -248,9 +247,7 @@
                 <table class="table table-sm">
                   <t t-foreach="builds" t-as="build">
                     <t t-set="rowclass">
-                      <t t-call="runbot.build_class">
-                        <t t-set="build" t-value="build"/>
-                      </t>
+                      <t t-call="runbot.build_class" build="build"/>
                     </t>
                     <tr t-attf-class="bg-{{rowclass.strip()}}-subtle {{'line-through' if build.orphan_result else ''}}">
                       <td> Batch: <a t-attf-href="/runbot/batch/{{build.params_id.create_batch_id.id}}"><t t-out="build.params_id.create_batch_id.id"/></a></td>
@@ -259,10 +256,7 @@
                       <td t-out="build.host"/>
                       <td t-out="build.config_id.name"/>
                       <td>
-                        <t t-call="runbot.build_button">
-                          <t t-set="bu" t-value="build"/>
-                          <t t-set="klass" t-value="'btn-group-ssm'"/>
-                        </t>
+                        <t t-call="runbot.build_button" bu="build" klass.f="btn-group-ssm"/>
                       </td>
                     </tr>
                   </t>

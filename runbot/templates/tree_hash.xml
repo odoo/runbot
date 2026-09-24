@@ -2,7 +2,7 @@
 <odoo>
   <data>
     <template id="runbot.tree_hash">
-      <t t-call='runbot.layout'>
+      <t t-call='runbot.layout' prev_commit_id="ref_log.commit_id.id">
         <div class="row g-0">
           <!-- Tree hash informations -->
           <div class="col-md-6">
@@ -55,7 +55,6 @@
               </t>
               <td t-out="ref_log.branch_id.name"/>
               <td t-out="ref_log.date"/>
-              <t t-set="prev_commit_id" t-value="ref_log.commit_id.id"/>
             </tr>
           </table>
           <!-- Bundles / Batches -->

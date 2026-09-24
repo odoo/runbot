@@ -76,40 +76,36 @@
           <div class="row">
             <div class='col-md-12'>
               <t t-if="page==1 and current_user_errors">
-                <t t-call="runbot.build_error_cards">
-                  <t t-set="table_title">Your assigned build errors</t>
-                  <t t-set="build_errors" t-value="current_user_errors"/>
-                  <t t-set="build_errors_counter" t-value="len(current_user_errors)"/>
-                </t>
+                <t t-call="runbot.build_error_cards"
+                    table_title.translate="Your assigned build errors"
+                    build_errors="current_user_errors"
+                    build_errors_counter="len(current_user_errors)"/>
               </t>
               <t t-if="page==1 and current_team_errors">
-                <t t-call="runbot.build_error_cards">
-                  <t t-set="table_title">Team unassigned build errors</t>
-                  <t t-set="build_errors" t-value="current_team_errors"/>
-                  <t t-set="build_errors_counter" t-value="len(current_team_errors)"/>
-                </t>
+                <t t-call="runbot.build_error_cards"
+                    table_title.translate="Team unassigned build errors"
+                    build_errors="current_team_errors"
+                    build_errors_counter="len(current_team_errors)"/>
               </t>
               <t t-if="build_errors">
-                <t t-call="runbot.build_error_cards">
-                  <t t-set="table_title">All builds errors</t>
-                  <t t-set="build_errors" t-value="build_errors"/>
-                  <t t-set="build_errors_counter" t-value="current_user_errors.search_count([])"/>
-                  <t t-set="additional_buttons">
-                    <div class="dropdown">
-                      <button type="button" class="dropdown-toggle btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
-                        Sort By: <t t-out="sort_order_choices.get(sort_order)"/>
-                      </button>
-                      <ul class="dropdown-menu" aria-labelledby="sortMenuButton" role="menu">
-                        <li t-foreach="sort_order_choices" t-as="sort_choice">
-                          <a role="menuitem" class="dropdown-item" t-attf-href="/runbot/errors?sort={{sort_choice}}"><t t-out="sort_order_choices[sort_choice]"/></a>
-                        </li>
-                      </ul>
-                    </div>
-                    <t t-call="website.pager">
-                      <t t-set="classname" t-valuef="pagination-sm"/>
-                    </t>
-                  </t>
+                <t t-set="additional_buttons">
+                  <div class="dropdown">
+                    <button type="button" class="dropdown-toggle btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
+                      Sort By: <t t-out="sort_order_choices.get(sort_order)"/>
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="sortMenuButton" role="menu">
+                      <li t-foreach="sort_order_choices" t-as="sort_choice">
+                        <a role="menuitem" class="dropdown-item" t-attf-href="/runbot/errors?sort={{sort_choice}}"><t t-out="sort_order_choices[sort_choice]"/></a>
+                      </li>
+                    </ul>
+                  </div>
+                  <t t-call="website.pager" classname.f="pagination-sm"/>
                 </t>
+                <t t-call="runbot.build_error_cards"
+                    table_title.translate="All builds errors"
+                    build_errors="build_errors"
+                    build_errors_counter="current_user_errors.search_count([])"
+                    additional_buttons="additional_buttons"/>
               </t>
             </div>
           </div>
@@ -132,21 +128,17 @@
               </div>
               <div t-if="team.dashboard_id">
                 <h3 t-if="team.dashboard_id.dashboard_tile_ids">Dashboards</h3>
-                <t t-call="runbot.dashboard">
-                  <t t-set="dashboard" t-value="team.dashboard_id"/>
-                </t>
+                <t t-call="runbot.dashboard" dashboard="team.dashboard_id"/>
               </div>
               <div class="d-flex">
                 <h3 t-if="assignment_ids">Team assigned Errors</h3>
-                <t t-call="portal.portal_searchbar">
-                  <t t-set="classes" t-valuef="o_runbot_team_searchbar border-0"/>
-                  <t t-set="title">&amp;nbsp;</t>
-                </t>
+                <t t-call="portal.portal_searchbar"
+                    classes.f="o_runbot_team_searchbar border-0"
+                    title.translate="&amp;nbsp;"/>
               </div>
-              <t t-call="runbot.build_error_cards">
-                <t t-set="build_errors" t-value="assignment_ids"/>
-                <t t-set="accordion_id">team_errors</t>
-              </t>
+              <t t-call="runbot.build_error_cards"
+                  build_errors="assignment_ids"
+                  accordion_id.translate="team_errors"/>
             </div>
             <!-- Display list of teams of no team is supplied -->
             <div t-if="not team" class='col-md-12'>
@@ -201,9 +193,9 @@
           </div>
           <div class="row">
             <div class='col-md-12'>
-              <b>Identifier</b>: <t t-esc="dockerfile_result.identifier"></t><br/>
+              <b>Identifier</b>: <t t-esc="dockerfile_result.identifier"/><br/>
               <b>Dockerfile</b>: <a t-attf-href="/runbot/dockerfile/result/{{current_result.id}}">raw</a><br/>
-              <b>Metadata</b>: <pre><t t-esc="json.dumps((dockerfile_result.metadata.dict), indent=3)"></t></pre>
+              <b>Metadata</b>: <pre><t t-esc="json.dumps((dockerfile_result.metadata.dict), indent=3)"/></pre>
             </div>
           </div>
         </div>

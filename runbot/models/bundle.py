@@ -294,7 +294,7 @@ class Bundle(models.Model):
         for record in records:
             if records.is_base:
                 model = self.browse()
-                model.env.registry.clear_cache()
+                model.env.transaction.invalidate_ormcache()
                 for matrix in self.env['runbot.upgrade.matrix'].search([('project_id', '=', record.project_id.id)]):
                     matrix._update_matrix_entries()
             elif record.project_id.tmp_prefix and record.name.startswith(record.project_id.tmp_prefix):
@@ -311,7 +311,7 @@ class Bundle(models.Model):
         res = super().write(values)
         if 'is_base' in values:
             model = self.browse()
-            model.env.registry.clear_cache()
+            model.env.transaction.invalidate_ormcache()
         return res
 
     def _force(self, category_id=None):

@@ -187,9 +187,7 @@
                 <t t-set="title">
                     <t t-if="staging.state == 'success'"/>
                     <t t-else="">
-                        <t t-if="staging.state == 'pending'">last status</t
-                        ><t t-elif="staging.state == 'ff_failed'">fast forward failed (<t t-out="(staging.reason or '').replace('\'', '')"/>)</t
-                        ><t t-else="" t-out="(staging.reason or '').replace('\'', '')"
+                        <t t-if="staging.state == 'pending'">last status</t><t t-elif="staging.state == 'ff_failed'">fast forward failed (<t t-out="(staging.reason or '').replace('\'', '')"/>)</t><t t-else="" t-out="(staging.reason or '').replace('\'', '')"
                         /> at <t t-out="(staging.staging_end or staging.write_date).replace(microsecond=0)"/>Z
                     </t>
                 </t>
@@ -295,10 +293,7 @@
                                             </button>
                                             <div class="dropdown-menu">
                                                 <t t-foreach="batch.prs" t-as="pr">
-                                                    <t t-call="runbot_merge.link-pr">
-                                                        <t t-set="target">new</t>
-                                                        <t t-set="classes">dropdown-item</t>
-                                                    </t>
+                                                    <t t-call="runbot_merge.link-pr" target.translate="new" classes.translate="dropdown-item"/>
                                                 </t>
                                             </div>
                                         </li>
@@ -310,7 +305,7 @@
                 </table>
                 <t t-if="next">
                     <a t-attf-href="/runbot_merge/{{branch.id}}?until={{next}}&amp;state={{state}}">
-                        Next >
+                        Next &gt;
                     </a>
                 </t>
             </div></div>
@@ -405,7 +400,7 @@
                     <t t-foreach="pr.repository.status_ids._for_pr(pr)" t-as="ci">
                         <t t-set="st" t-value="statuses.get(ci.context.strip())"/>
                         <t t-set="result">
-                            <t t-if="not st or st['state'] == 'pending'"></t>
+                            <t t-if="not st or st['state'] == 'pending'"/>
                             <t t-elif="st['state'] in ('error', 'failure')">fail</t>
                             <t t-else="">ok</t>
                         </t>
@@ -464,10 +459,10 @@
         <field name="name">Preparation for the preparation of the PR dashboard content</field>
         <field name="state">code</field>
         <field name="model_id" ref="base.model_ir_qweb"/>
-        <field name="code"><![CDATA[
+        <field name="code">
 project = pr.repository.project_id
 genealogy = pr.batch_id.genealogy_ids
-repos = project.repo_ids & genealogy.all_prs.repository
+repos = project.repo_ids &amp; genealogy.all_prs.repository
 targets = genealogy.all_prs.target
 if not genealogy:
     # if a PR is closed, it may not have a batch to get a genealogy from,
@@ -475,7 +470,7 @@ if not genealogy:
     branches = pr.target
     repos = pr.repository
 elif all(p.state in ('merged', 'closed') for p in genealogy[-1].all_prs):
-    branches = (project.branch_ids & targets)[::-1]
+    branches = (project.branch_ids &amp; targets)[::-1]
 elif pr.batch_id.fw_policy == 'no':
     branches = pr.target
 else:
@@ -490,14 +485,14 @@ else:
     branches = project.branch_ids[limit_high:limit_low+1].filtered(lambda b: b.active or b in targets)[::-1]
 
 action = (project, repos, branches, genealogy)
-        ]]></field>
+        </field>
     </record>
 
     <record id="dashboard-prep" model="ir.actions.server">
         <field name="name">Preparation of the PR dashboard content</field>
         <field name="state">code</field>
         <field name="model_id" ref="base.model_ir_qweb"/>
-        <field name="code"><![CDATA[
+        <field name="code">
 batches = {}
 for branch in [*branches, branches.browse(())]:
     if genealogy:
@@ -512,7 +507,7 @@ for branch in [*branches, branches.browse(())]:
         detached = False
         pr_fmt = []
         for p in prs:
-            st |= (bool(p.error) << 2 | (p.state == 'merged') << 1 | bool(p.blocked) << 0)
+            st |= (bool(p.error) &lt;&lt; 2 | (p.state == 'merged') &lt;&lt; 1 | bool(p.blocked) &lt;&lt; 0)
 
             done = p.state in ('closed', 'merged')
             # this will hide the detachment signal when the PRs are merged/closed, cleaner but less correct?
@@ -525,7 +520,7 @@ for branch in [*branches, branches.browse(())]:
                 'number': p.number,
                 'label': label,
                 'closed': p.closed,
-                'backend_url': "/web#view_type=form&model=runbot_merge.pull_requests&id=%d" % p.id,
+                'backend_url': "/web#view_type=form&amp;model=runbot_merge.pull_requests&amp;id=%d" % p.id,
                 'github_url': p.github_url,
                 'checked': done or p.status == 'success',
                 'reviewed': done or bool(p.reviewed_by),
@@ -533,7 +528,7 @@ for branch in [*branches, branches.browse(())]:
             })
         state = None
         for i, s in zip(range(2, -1, -1), ['danger', 'success', 'warning']):
-            if st & (1 << i):
+            if st &amp; (1 &lt;&lt; i):
                 state = s
                 break
 
@@ -546,7 +541,7 @@ for branch in [*branches, branches.browse(())]:
         }
 
 action = batches
-        ]]></field>
+        </field>
     </record>
     <template id="dashboard-table">
         <t t-set="pre" t-value="pr.env.ref('runbot_merge.dashboard-pre').sudo()._run_action_code_multi({'pr': pr})"/>

@@ -41,9 +41,8 @@
                             </div>
                             <div class="col-md-11">
                                 <div class="batch_row" >
-                                    <t t-call="runbot.batch_tile">
-                                        <t t-set="batch_builds" t-value="builds_by_batch_id and builds_by_batch_id[batch.id]"/>
-                                    </t>
+                                    <t t-call="runbot.batch_tile"
+                                        batch_builds="builds_by_batch_id and builds_by_batch_id[batch.id]"/>
                                 </div>
                             </div>
                         </t>

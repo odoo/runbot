@@ -2,18 +2,17 @@
 <odoo>
   <data>
     <template id="runbot.build">
-      <t t-call='runbot.layout'>
-        <t t-set="nav_form">
-          <form>
-            <div class="btn-group">
-              <t t-call="runbot.build_button">
-                <t t-set="bu" t-value="build"/>
-                <t t-set="klass" t-value="''"/>
-                <t t-set="show_commit_button" t-value="True"/>
-              </t>
-            </div>
-          </form>
-        </t>
+      <t t-set="nav_form">
+        <form>
+          <div class="btn-group">
+            <t t-call="runbot.build_button"
+                bu="build"
+                klass.f=""
+                show_commit_button="True"/>
+          </div>
+        </form>
+      </t>
+      <t t-call='runbot.layout' nav_form="nav_form" nb_subbuild="len(build.children_ids)">
         <div class="row g-0">
           <div class="col-md-12">
             <t t-set="slots" t-value="build.top_parents_ids.with_context(active_test=False).slot_ids.sorted('active')"/>
@@ -95,9 +94,7 @@
           </div>
           <!-- Build details-->
           <t t-set="rowclass">
-            <t t-call="runbot.build_class">
-              <t t-set="build" t-value="build"/>
-            </t>
+            <t t-call="runbot.build_class" build="build"/>
           </t>
           <t t-if="build.params_id.reference_build_id and build.params_id.reference_build_id.local_state not in ('running', 'done')">
             <div class="alert alert-warning py-10 my-2 text-center">
@@ -177,14 +174,14 @@
                 <t t-if="build.params_id.dynamic_config.dict">
                     <b>Dynamic config:</b>
                     <details>
-                        <summary><t t-out="str(build.params_id.dynamic_config.dict.get('name', '&lt;unnamed&gt;'))"></t></summary>
+                        <summary><t t-out="str(build.params_id.dynamic_config.dict.get('name', '&lt;unnamed&gt;'))"/></summary>
                         <span style="white-space: pre-wrap;"><t t-out="json.dumps(build.params_id.dynamic_config.dict, indent=4).encode('utf8').decode()"/></span>
                     </details>
                 </t>
                 <t t-if="build.params_id.config_data.dict">
                     <b>Config data:</b>
                     <details>
-                        <summary><t t-out="', '.join(list(build.params_id.config_data.dict.keys()))"></t></summary>
+                        <summary><t t-out="', '.join(list(build.params_id.config_data.dict.keys()))"/></summary>
                         <span style="white-space: pre-wrap;"><t t-out="json.dumps(build.params_id.config_data.dict, indent=4).encode('utf8').decode()"/></span>
                     </details>
                 </t>
@@ -279,9 +276,7 @@
             <table class="table table-sm">
               <t t-foreach="(build.children_ids | build.linked_children_build_ids).sorted(lambda b: b.id)" t-as="child">
                 <t t-set="rowclass">
-                  <t t-call="runbot.build_class">
-                    <t t-set="build" t-value="child"/>
-                  </t>
+                  <t t-call="runbot.build_class" build="child"/>
                 </t>
                 <tr t-attf-class="bg-{{rowclass.strip()}}-subtle{{' line-through' if child.orphan_result else ''}}">
                   <td class="text-truncate" style="max-width: 0; width: 100%;">
@@ -314,17 +309,13 @@
                     <span t-attf-class="badge text-bg-info" t-out="s2human(child.build_time)"/>
                   </td>
                   <td>
-                    <t t-call="runbot.build_button">
-                      <t t-set="bu" t-value="child"/>
-                      <t t-set="klass" t-value="'btn-group-ssm'"/>
-                    </t>
+                    <t t-call="runbot.build_button" bu="child" klass.f="btn-group-ssm"/>
 
                   </td>
                 </tr>
               </t>
             </table>
           </div>
-          <t t-set="nb_subbuild" t-value="len(build.children_ids)"/>
           <div class="col-md-12">
             <table class="table table-sm">
               <tr>
@@ -352,9 +343,7 @@
                   </td>
                   <t t-set="message_class" t-value="''"/>
                   <t t-if="subbuild" t-set="message_class">
-                    <t t-call="runbot.build_class">
-                      <t t-set="build" t-value="subbuild"/>
-                    </t>
+                    <t t-call="runbot.build_class" build="subbuild"/>
                   </t>
                   <td t-attf-class="bg-{{message_class.strip() or logclass}}-subtle" style="max-width: 0; width: 100%;">
                     <t t-if="l.type == 'subbuild'">
@@ -407,9 +396,7 @@
             <table class="table table-sm">
               <t t-foreach="builds" t-as="build">
                 <t t-set="rowclass">
-                  <t t-call="runbot.build_class">
-                    <t t-set="build" t-value="build"/>
-                  </t>
+                  <t t-call="runbot.build_class" build="build"/>
                 </t>
                 <tr t-attf-class="bg-{{rowclass.strip()}}-subtle{{' line-through' if build.orphan_result else ''}}">
                   <td>
@@ -441,10 +428,7 @@
                     <span t-out="s2human(build.build_time)"/>
                   </td>
                   <td>
-                    <t t-call="runbot.build_button">
-                      <t t-set="bu" t-value="build"/>
-                      <t t-set="klass" t-value="'btn-group-ssm'"/>
-                    </t>
+                    <t t-call="runbot.build_button" bu="build" klass.f="btn-group-ssm"/>
                   </td>
                   <td>
                     <t t-set="commits" t-value="build.params_id.commit_link_ids.commit_id.sorted(key=lambda c: c.repo_id.id)"/>

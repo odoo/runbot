@@ -79,9 +79,7 @@
                 <t t-set="status" t-value="last_status_by_context[context]"/>
                 <td t-out="status.sent_date and status.sent_date.strftime('%Y-%m-%d %H:%M:%S') or '—'"/>
                 <td t-out="context"/>
-                <t t-call="runbot.commit_status_state_td">
-                  <t t-set="state" t-value="status.state"/>
-                </t>
+                <t t-call="runbot.commit_status_state_td" state="status.state"/>
                 <td>
                   <a t-att-href="status.target_url">
                     build
@@ -114,9 +112,7 @@
               <tr t-foreach='status_list' t-as='status'>
                 <td t-out="status.sent_date and status.sent_date.strftime('%Y-%m-%d %H:%M:%S') or '—'"/>
                 <td t-out="status.context"/>
-                <t t-call="runbot.commit_status_state_td">
-                  <t t-set="state" t-value="status.state"/>
-                </t>
+                <t t-call="runbot.commit_status_state_td" state="status.state"/>
                 <td>
                   <a t-attf-href="/runbot/build/{{status.build_id.id}}">
                     build

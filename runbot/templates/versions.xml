@@ -2,8 +2,7 @@
 <odoo>
 <data>
     <template id="runbot.versions">
-        <t t-call='runbot.layout'>
-            <t t-set="title">Docker versions</t>
+        <t t-call='runbot.layout' title.translate="Docker versions">
             <table class="table">
                 <thead>
                 <tr>

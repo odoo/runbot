@@ -6,10 +6,10 @@
     'summary': "A port which forward ports successful PRs.",
     'depends': ['runbot_merge'],
     'data': [
-        'data/security.xml',
         'data/crons.xml',
         'data/views.xml',
         'data/queues.xml',
+        'ir.access.csv',
     ],
     'license': 'LGPL-3',
 }

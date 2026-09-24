@@ -123,8 +123,7 @@
                                         </li>
                                     </t>
                                 </ul>
-                                <t t-out="nav_form or ''">
-                                </t>
+                                <t t-out="nav_form or ''"/>
                             </div>
                         </nav>
                     </header>

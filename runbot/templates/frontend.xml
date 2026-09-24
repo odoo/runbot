@@ -2,23 +2,23 @@
 <odoo>
   <data>
     <template id="runbot.bundles">
-      <t t-call='runbot.layout'>
-        <t t-set="nav_form">
-          <form class="my-2 my-lg-0" role="search" t-att-action="qu(search='')" method="get">
-            <div class="input-group ps-0">
-              <input class="form-control my-0 py-1" type="text" placeholder="Search" aria-label="Search" name="search" t-att-value="search" autofocus="autofocus"/>
-              <a t-if="has_pr" class="btn btn-primary" title="All" t-att-href="qu(has_pr=None)">
-                <i class="fa fa-github"/>
-              </a>
-              <a t-else="" class="btn btn-default" title="Open pull requests" t-att-href="qu(has_pr=1)">
-                <i class="fa fa-github"/>
-              </a>
-              <button type="submit" class="btn btn-default">
-                <i class="fa fa-search"/>
-              </button>
-            </div>
-          </form>
-        </t>
+      <t t-set="nav_form">
+        <form class="my-2 my-lg-0" role="search" t-att-action="qu(search='')" method="get">
+          <div class="input-group ps-0">
+            <input class="form-control my-0 py-1" type="text" placeholder="Search" aria-label="Search" name="search" t-att-value="search" autofocus="autofocus"/>
+            <a t-if="has_pr" class="btn btn-primary" title="All" t-att-href="qu(has_pr=None)">
+              <i class="fa fa-github"/>
+            </a>
+            <a t-else="" class="btn btn-default" title="Open pull requests" t-att-href="qu(has_pr=1)">
+              <i class="fa fa-github"/>
+            </a>
+            <button type="submit" class="btn btn-default">
+              <i class="fa fa-search"/>
+            </button>
+          </div>
+        </form>
+      </t>
+      <t t-call='runbot.layout' nav_form="nav_form">
         <div class="container-fluid frontend">
           <div class="row">
             <div class='col-md-12'>

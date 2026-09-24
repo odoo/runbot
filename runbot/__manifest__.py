@@ -11,7 +11,6 @@
     'depends': ['base', 'base_automation', 'website', 'auth_oauth'],
     'data': [
         'security/runbot_security.xml',
-        'security/ir.model.access.csv',
         'security/ir.rule.csv',
 
         'data/dockerfile_data.xml',
@@ -67,6 +66,7 @@
         'wizards/stat_regex_wizard_views.xml',
         'views/menus.xml',
         'views/user.xml',
+        'security/ir.access.csv',
     ],
     'license': 'LGPL-3',
 
