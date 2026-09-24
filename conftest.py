@@ -355,16 +355,28 @@ class AuthDict(dict):
         self.update(other, **kwds)
 
     def __missing__(self, key: str) -> str:
-        if key != 'token':
-            raise KeyError(key)
-        if inst := getattr(self.app, 'get_or_install', None):
-            inst(self['id'])
-        match self.app:
-            case OAuthApp():
-                token = self['token'] = self.app.authorize(self['login'], ['repo', 'delete_repo']).token
+        match key:
+            case 'authorization':
+                if inst := getattr(self.app, 'get_or_install', None):
+                    inst(self['id'])
+                match self.app:
+                    case OAuthApp():
+                        auth = self['authorization'] = self.app.authorize(self['login'], ['repo', 'delete_repo'])
+                    case _:
+                        auth = self['authorization'] = self.app.authorize(self['login'])
+                return auth
+            case 'token':
+                auth = self['authorization']
+                if auth.expires_at:
+                    # since a UAT is valid for 8h, reset after 7 (we could have a lower
+                    # margin of safety but why bother?)
+                    threshold = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1)
+                    if datetime.datetime.fromisoformat(auth.expires_at) < threshold:
+                        auth.refresh()
+                return auth.token
             case _:
-                token = self['token'] = self.app.authorize(self['login']).token
-        return token
+                raise KeyError(key)
+
 
 @pytest.fixture(scope='session', autouse=True)
 def testsuite_app(
