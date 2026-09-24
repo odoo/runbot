@@ -28,7 +28,7 @@ class Host(models.Model):
     assigned_only = fields.Boolean('Only accept assigned build', default=False, tracking=True)
     nb_worker = fields.Integer(
         'Number of max parallel build',
-        default=lambda self: self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_workers', default=2),
+        default=lambda self: self.env['ir.config_parameter'].sudo().get_int('runbot.runbot_workers', 2),
         tracking=True,
     )
     nb_run_slot = fields.Integer(
@@ -75,7 +75,7 @@ class Host(models.Model):
             host.build_ids = self.env['runbot.build'].search([('host', '=', host.name), ('local_state', 'in', ('pending', 'testing', 'running'))])
 
     def _static_url(self):
-        use_ssl = self.env['ir.config_parameter'].get_param('runbot.use_ssl', default=True)
+        use_ssl = self.env['ir.config_parameter'].get_bool('runbot.use_ssl', True)
         scheme = 'https' if use_ssl else 'http'
         return f'{scheme}://{self.name}/runbot/static/'
 
@@ -95,7 +95,7 @@ class Host(models.Model):
     def _bootstrap_local_logs_db(self):
         # TODO cleanup remove
         """ bootstrap a local database that will collect logs from builds """
-        logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
+        logs_db_name = self.env['ir.config_parameter'].get_str('runbot.logdb_name')
         if logs_db_name not in list_local_dbs():
             _logger.info('Logging database %s not found. Creating it ...', logs_db_name)
             with local_pgadmin_cursor() as local_cr:
@@ -132,7 +132,7 @@ class Host(models.Model):
     def _bootstrap_db_template(self):
         """ boostrap template database if needed """
         icp = self.env['ir.config_parameter']
-        db_template = icp.get_param('runbot.runbot_db_template', default='template0')
+        db_template = icp.get_str('runbot.runbot_db_template', 'template0')
         if db_template and db_template != 'template0':
             with local_pgadmin_cursor() as local_cr:
                 local_cr.execute("""SELECT datname FROM pg_catalog.pg_database WHERE datname = '%s';""" % db_template)
@@ -155,10 +155,10 @@ class Host(models.Model):
         if self.docker_registry_url:
             return self.docker_registry_url
         icp = self.env['ir.config_parameter']
-        docker_registry_url = icp.get_param('runbot.docker_registry_url', default=None)
+        docker_registry_url = icp.get_str('runbot.docker_registry_url', None)
         if docker_registry_url:
             return docker_registry_url.strip('/')
-        docker_registry_host = self.browse(int(icp.get_param('runbot.docker_registry_host_id', default=0)))
+        docker_registry_host = self.browse(icp.get_int('runbot.docker_registry_host_id'))
         if docker_registry_host:
             return f'dockerhub.{docker_registry_host.name}'.strip('/')
 
@@ -166,7 +166,7 @@ class Host(models.Model):
         """ build docker images needed by locally pending builds"""
         self.ensure_one()
         icp = self.env['ir.config_parameter']
-        docker_registry_host = self.browse(int(icp.get_param('runbot.docker_registry_host_id', default=0)))
+        docker_registry_host = self.browse(icp.get_int('runbot.docker_registry_host_id'))
         docker_registry_url = self._get_docker_registry_url()
         # pull all images from the runbot docker registry
         is_main_registry = docker_registry_host == self
@@ -249,7 +249,7 @@ class Host(models.Model):
 
     def _get_running_max(self):
         icp = self.env['ir.config_parameter']
-        return self.nb_run_slot or int(icp.get_param('runbot.runbot_running_max', default=5))
+        return self.nb_run_slot or icp.get_int('runbot.runbot_running_max', 5)
 
     def _set_psql_conn_count(self):
         _logger.info('Updating psql connection count...')
@@ -320,7 +320,7 @@ class Host(models.Model):
             # TODO cleanup remove
             log_to_delete = []
             build_ids = build.ids
-            logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
+            logs_db_name = self.env['ir.config_parameter'].get_str('runbot.logdb_name')
             with local_pg_cursor(logs_db_name) as local_cr:
                 where_clause = "WHERE split_part(dbname, '-', 1) IN %s" if build_ids else ''
                 query = f"""
@@ -343,7 +343,7 @@ class Host(models.Model):
                     log_to_delete.append(int(vals.pop('id')))
             if log_to_delete:
                 def cleanup(log_to_delete=log_to_delete):
-                    logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
+                    logs_db_name = self.env['ir.config_parameter'].get_str('runbot.logdb_name')
                     with local_pg_cursor(logs_db_name) as local_cr:
                         local_cr.execute("DELETE FROM ir_logging WHERE id in %s", [tuple(log_to_delete)])
                 cleanups.append(cleanup)

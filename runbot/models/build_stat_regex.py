@@ -53,7 +53,7 @@ class BuildStatRegex(models.Model):
         """
         if not os.path.exists(file_path):
             return {}
-        max_log_file_size = int(self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_max_log_size', DEFAULT_MAX_FILE_SIZE))
+        max_log_file_size = self.env['ir.config_parameter'].sudo().get_int('runbot.runbot_max_log_size', DEFAULT_MAX_FILE_SIZE)
         if os.path.getsize(file_path) > max_log_file_size:
             _logger.warning("Log file '%s' exceeds %s limit", file_path, max_log_file_size)
             return {}

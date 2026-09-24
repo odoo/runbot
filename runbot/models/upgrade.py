@@ -39,7 +39,7 @@ class UpgradeExceptions(models.Model):
 
     @api.depends('create_date')
     def _compute_message(self):
-        message_layout = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_upgrade_exception_message')
+        message_layout = self.env['ir.config_parameter'].sudo().get_str('runbot.runbot_upgrade_exception_message')
         for exception in self:
             exception.message = message_layout.format(exception=exception, base_url=exception.get_base_url())
 

@@ -38,7 +38,7 @@ class Version(models.Model):
     @api.constrains("name")
     def _check_match_is_base(self):
         icp = self.env['ir.config_parameter'].sudo()
-        regex = icp.get_param('runbot.runbot_is_base_regex', False)
+        regex = icp.get_str('runbot.runbot_is_base_regex')
         if regex:
             for record in self:
                 if not re.match(regex, record.name):

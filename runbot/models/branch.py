@@ -299,7 +299,7 @@ class Branch(models.Model):
         if not name:
             return False
         icp = self.env['ir.config_parameter'].sudo()
-        regex = icp.get_param('runbot.runbot_is_base_regex', False)
+        regex = icp.get_str('runbot.runbot_is_base_regex')
         if regex:
             return re.match(regex, name)
 

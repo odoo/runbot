@@ -162,7 +162,7 @@ class Dockerfile(models.Model):
         help='This field is used to define variants of docker images. Variants implicitly inherit from the parent and have an implicit reference_file layer.'
     )
     active = fields.Boolean('Active', default=True, tracking=True)
-    auto_sync = fields.Boolean('Auto sync', help='Automatically sync the identifier with the future identifier', default=lambda self: not self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_dockerfile_disable_auto_sync_by_default', False), tracking=True)
+    auto_sync = fields.Boolean('Auto sync', help='Automatically sync the identifier with the future identifier', default=lambda self: not self.env['ir.config_parameter'].sudo().get_bool('runbot.runbot_dockerfile_disable_auto_sync_by_default'), tracking=True)
     pull_on_build = fields.Boolean('Pull on build ', help='Add pull option when building to get the latest version of the FROM', default=False, tracking=True)
     image_identifier = fields.Char('Identifier', tracking=True)
     image_future_identifier = fields.Char('Future Identifier', tracking=True)
@@ -191,7 +191,7 @@ class Dockerfile(models.Model):
     # maybe we should have global values here? branch version, chrome version, ... then use a os layer when possible (jammy, ...)
     # we could also have a variant param, to use the version image in a specific trigger? Add a layer or change a param?
 
-    public_visibility = fields.Boolean('Public', default=lambda self: self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_dockerfile_public_by_default'), help="Dockerfile is public and can be accessed by anyone with /runbot/dockerfile route")
+    public_visibility = fields.Boolean('Public', default=lambda self: self.env['ir.config_parameter'].sudo().get_bool('runbot.runbot_dockerfile_public_by_default'), help="Dockerfile is public and can be accessed by anyone with /runbot/dockerfile route")
     variant_ids = fields.One2many('runbot.dockerfile', 'parent_id', string='Variants', help="Variants of this dockerfile, they inherit the parent dockerfile layers and can add their own layers.")
     message = fields.Text('Message', compute='_compute_message')
 

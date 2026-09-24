@@ -414,7 +414,7 @@ class TestRepoScheduler(RunbotCase):
     @patch('odoo.addons.runbot.models.build.BuildResult._init_pendings')
     def test_repo_scheduler(self, mock_init_pendings, mock_schedule, mock_kill):
 
-        self.env['ir.config_parameter'].set_param('runbot.runbot_workers', 6)
+        self.env['ir.config_parameter'].set_int('runbot.runbot_workers', 6)
         builds = []
         # create 6 builds that are testing on the host to verify that
         # workers are not overfilled

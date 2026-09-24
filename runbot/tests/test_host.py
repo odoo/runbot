@@ -125,9 +125,9 @@ class TestHost(RunbotCase):
         self.env.ref('runbot.docker_default').active = False
 
         icp = self.env['ir.config_parameter']
-        icp.set_param('runbot.docker_registry_host_id', self.test_host.id)
+        icp.set_int('runbot.docker_registry_host_id', self.test_host.id)
         self.test_host.is_registry = True
-        icp.set_param('runbot.docker_registry_url', 'registryhost_nowhere')
+        icp.set_str('runbot.docker_registry_url', 'registryhost_nowhere')
         dockerfile = self.env['runbot.dockerfile'].create({
             'name': 'DockerTest',
             'to_build': True,
