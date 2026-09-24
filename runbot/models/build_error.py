@@ -83,6 +83,10 @@ class BuildErrorSeenMixin(models.AbstractModel):
 
     @api.depends('build_error_link_ids')
     def _compute_seen_batch(self):
+        if not self.ids:
+            self.first_seen_batch_ids = False
+            self.last_seen_batch_ids = False
+            return
         from_clause, content_table = self.get_log_dates_from_clause()
         query = f"""
             SELECT record.id, bundle.version_id, MIN(batch.id) AS first_batch_id, MAX(batch.id) AS last_batch_id
