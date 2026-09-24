@@ -15,6 +15,7 @@ from odoo import fields
 from odoo.http import Controller, Response, request
 from odoo.http import route as o_route
 from odoo.fields import Domain
+from odoo.tools import SQL
 
 from odoo.addons.website.controllers.main import QueryURL
 
@@ -128,11 +129,17 @@ class Runbot(Controller):
                 domain = Domain.AND([domain, search_domain])
 
             query = request.env['runbot.bundle']._search(domain)
-            query.order = """
-             (case when "runbot_bundle".sticky then 1 when "runbot_bundle".sticky is null then 2 else 2 end),
-                    case when "runbot_bundle".sticky then "runbot_bundle".version_number end collate "C" desc,
-                    "runbot_bundle".last_batch desc
-            """
+            table = query.table
+            query.order = SQL(
+                """
+                (case when %(sticky)s then 1 when %(sticky)s is null then 2 else 2 end),
+                       case when %(sticky)s then %(version_number)s end collate "C" desc,
+                       %(last_batch)s desc
+                """,
+                sticky=table.sticky,
+                version_number=table.version_number,
+                last_batch=table.last_batch,
+            )
             query.limit = min(int(limit), 200)
             bundles = env['runbot.bundle'].browse(query)
 

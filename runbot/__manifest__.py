@@ -81,7 +81,8 @@
             'runbot/static/tests/tours/*.js',
         ],
         'runbot.assets_frontend': [
-            'web/static/lib/odoo_ui_icons/style.css',
+            'web/static/lib/odoo_ui_icons/fonts/odoo_ui_icons.woff2',
+            'web/static/lib/odoo_ui_icons/odoo_ui_icons.css',
             'runbot/static/lib/bootstrap/css/bootstrap.css',
             'runbot/static/lib/fontawesome/css/font-awesome.css',
             'runbot/static/src/css/table_group.css',
