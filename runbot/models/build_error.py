@@ -83,26 +83,27 @@ class BuildErrorSeenMixin(models.AbstractModel):
 
     @api.depends('build_error_link_ids')
     def _compute_seen_batch(self):
-        from_clause, content_table = self.get_log_dates_from_clause()
-        query = f"""
-            SELECT record.id, bundle.version_id, MIN(batch.id) AS first_batch_id, MAX(batch.id) AS last_batch_id
-            {from_clause}
-            JOIN runbot_build_error_link AS link ON link.error_content_id = {content_table}.id
-            JOIN runbot_build AS build ON link.build_id = build.id
-            JOIN runbot_build_params AS params ON params.id = build.params_id
-            JOIN runbot_batch AS batch ON build.create_batch_id = batch.id
-            JOIN runbot_bundle AS bundle ON bundle.id = batch.bundle_id
-            WHERE record.id IN %s
-            GROUP BY record.id, bundle.version_id
-        """
-        self.env.cr.execute(query, (tuple(self.ids),))
         first_batch_ids_by_record_id = {}
         last_batch_ids_by_record_id = {}
-        res = self.env.cr.fetchall()
-        for row in res:
-            record_id, _version_id, first_batch_id, last_batch_id = row
-            first_batch_ids_by_record_id.setdefault(record_id, []).append(first_batch_id)
-            last_batch_ids_by_record_id.setdefault(record_id, []).append(last_batch_id)
+        if self.ids:
+            from_clause, content_table = self.get_log_dates_from_clause()
+            query = f"""
+                SELECT record.id, bundle.version_id, MIN(batch.id) AS first_batch_id, MAX(batch.id) AS last_batch_id
+                {from_clause}
+                JOIN runbot_build_error_link AS link ON link.error_content_id = {content_table}.id
+                JOIN runbot_build AS build ON link.build_id = build.id
+                JOIN runbot_build_params AS params ON params.id = build.params_id
+                JOIN runbot_batch AS batch ON build.create_batch_id = batch.id
+                JOIN runbot_bundle AS bundle ON bundle.id = batch.bundle_id
+                WHERE record.id IN %s
+                GROUP BY record.id, bundle.version_id
+            """
+            self.env.cr.execute(query, (tuple(self.ids),))
+            res = self.env.cr.fetchall()
+            for row in res:
+                record_id, _version_id, first_batch_id, last_batch_id = row
+                first_batch_ids_by_record_id.setdefault(record_id, []).append(first_batch_id)
+                last_batch_ids_by_record_id.setdefault(record_id, []).append(last_batch_id)
         for record in self:
             record.first_seen_batch_ids = self.env['runbot.batch'].browse(sorted(first_batch_ids_by_record_id.get(record.id, [])))
             record.last_seen_batch_ids = self.env['runbot.batch'].browse(sorted(last_batch_ids_by_record_id.get(record.id, [])))
