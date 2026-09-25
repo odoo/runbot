@@ -80,19 +80,11 @@ def batch_key(batch: Batch) -> tuple:
     )
     return -priority, batch.unblocked_at or datetime.max, batch.id
 
-def prepare_split(
-        split: Split,
-        priority: Literal['splits', 'ready', 'largest'],
-) -> tuple[Batch, int, set[int]]:
+def prepare_split(split: Split) -> tuple[Batch, int, set[int]]:
     batches = split.batch_ids.sorted(batch_key)
     parent_id = split.staging_id.id
     originals = set(split.original_batches or ())
     split.with_context(staging_split=True).unlink()
-    _logger.info(
-        "staging split PRs %s (prioritising %s)",
-        ', '.join(batches.mapped('prs.display_name')),
-        priority,
-    )
     return batches, parent_id, originals
 
 
@@ -102,8 +94,8 @@ def try_staging(branch: Branch, batches: Optional[Batch] = None) -> Optional[Sta
     is nothing to stage, the newly created staging otherwise.
     """
     _logger.info(
-        "Checking %s (%s) for staging: %s, skip? %s",
-        branch, branch.name,
+        "Checking %s:%s for staging: %s, skip? %s",
+        branch.project_id.name, branch.name,
         branch.active_staging_id,
         bool(branch.active_staging_id)
     )
@@ -117,40 +109,45 @@ def try_staging(branch: Branch, batches: Optional[Batch] = None) -> Optional[Sta
     originals = set()
     split = None
     if batches:
-        log("staging retried PRs %s", batches)
+        reason = "retried"
     else:
         alone, batches = ready_batches(for_branch=branch)
 
         if alone:
-            log("staging high-priority PRs %s", batches)
+            reason = "high-priority"
         elif branch.project_id.staging_priority == 'default':
             if split := branch.first_split:
-                batches, parent_id, originals = prepare_split(split, 'splits')
+                reason = "prioritising splits"
+                batches, parent_id, originals = prepare_split(split)
             else:
                 # priority, normal; priority = sorted ahead of normal, so always picked
                 # first as long as there's room
-                log("staging ready PRs %s (prioritising splits)", batches)
+                reason = "prioritising splits, no splits"
         elif branch.project_id.staging_priority == 'ready':
             if batches:
-                log("staging ready PRs %s (prioritising ready)", batches)
+                reason = "prioritising ready PRs"
             else:
+                reason = "prioritising ready PRs, no ready PRs"
                 split = branch.first_split
-                batches, parent_id, originals = prepare_split(split, 'ready')
+                batches, parent_id, originals = prepare_split(split)
         else:
             assert branch.project_id.staging_priority == 'largest'
             split = max(branch.split_ids, key=lambda s: len(s.batch_ids), default=branch.env['runbot_merge.split'])
-            _logger.info("largest split = %d, ready = %d", len(split.batch_ids), len(batches))
             # bias towards splits if len(ready) = len(batch_ids)
             if len(split.batch_ids) >= len(batches):
-                batches, parent_id, originals = prepare_split(split, 'largest')
+                reason = f"prioritising largest set: split ({len(split.batch_ids)} > {len(batches)})"
+                batches, parent_id, originals = prepare_split(split)
             else:
-                log("staging ready PRs %s (prioritising largest)", batches)
+                reason = f"prioritising largest set: ready PRs ({len(batches)} > {len(split.batch_ids)})"
+
 
     if not batches:
+        log(f"nothing to stage%s ({reason})", batches)
         if split:  # in case of empty split, re-run staging Soon©
             branch.env.ref('runbot_merge.staging_cron')._trigger()
         return None
 
+    log(f"staging PRs %s ({reason})", batches)
     original_heads, staging_state = staging_setup(branch, batches)
     staged = stage_batches(branch, batches, staging_state)
     if not staged:
