@@ -42,7 +42,12 @@ def route(routes, **kw):
                 has_pr = kwargs.get('has_pr')
                 project = response.qcontext.get('project') or (projects and projects[0])
 
-                response.qcontext['theme'] = kwargs.get('theme', request.httprequest.cookies.get('theme', 'legacy'))
+                theme = kwargs.get('theme', request.httprequest.cookies.get('theme', 'light'))
+                if theme == 'legacy':
+                    theme = 'light'
+                    # migrate stale cookies from the now-removed legacy theme so they stop being sent
+                    response.set_cookie('theme', 'light', expires=datetime.datetime.now() + datetime.timedelta(days=365 * 10))
+                response.qcontext['theme'] = theme
                 response.qcontext['projects'] = projects
                 response.qcontext['more'] = more
                 response.qcontext['search'] = search

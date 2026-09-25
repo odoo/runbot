@@ -5,6 +5,8 @@
 	--btn-default-border: #ccc;
 	--active-project-color: #777;
 	--text-color-link: #507279;
+	--text-color-info: #096b72;
+	--batch-header-hover-bg: rgba(0, 0, 0, 0.3);
 	--bs-font-sans-serif: "Helvetica Neue", Helvetica, Arial, sans-serif;
 	--bs-body-font-size: 0.875rem;
 	--bs-link-decoration: none;
@@ -16,10 +18,10 @@
 }
 
 /*
- * Legacy theme
+ * Light theme
  */
 
-:root[data-bs-theme=legacy] { /* to match initial runbot style*/
+:root[data-bs-theme=light] { /* to match initial runbot style*/
 	--bs-success-bg-subtle: #dff0d8;
 	--bs-danger-bg-subtle: #f2dede;
 	--bs-warning-bg-subtle: #fff9e6;
@@ -36,29 +38,28 @@
 }
 
 :root[data-bs-theme=dark] {
-	--btn-default-border: #333;
+	--bs-success-bg-subtle: #234730;
+	--bs-danger-bg-subtle: #6c2b34;
+	--bs-warning-bg-subtle: #474023;
+	--bs-info-bg-subtle: #1e464e;
+	--bs-link-color: #3fc9c6;
+	--bs-link-color-rgb: 63, 201, 198;
+	--bs-link-hover-color: #7fdedb;
+	--bs-link-hover-color-rgb: 127, 222, 219;
+	--btn-default-border: var(--bs-border-color);
 	--btn-default-hover-bg: color-mix(in lab, var(--btn-default-bg), white 15%);
 	--active-project-color: #CCC;
 	--text-color-link: #97d4e0;
+	--text-color-info: #6edff6;
+	--batch-header-hover-bg: rgba(255, 255, 255, 0.15);
 }
 
-[data-bs-theme=legacy] .text-bg-info {
+[data-bs-theme=light] .text-bg-info,
+[data-bs-theme=red404] .text-bg-info {
 	color: #fff !important; /* black by default, changes from previous version, color forced to fit with --bs-info-rgb*/
 }
 
-[data-bs-theme=legacy] .btn-success {
-	--bs-btn-color: #fff;
-	--bs-btn-bg: #198754;
-	--bs-btn-border-color: #198754;
-	--bs-btn-hover-color: #fff;
-	--bs-btn-hover-bg: #157347;
-	--bs-btn-hover-border-color: #146c43;
-	--bs-btn-focus-shadow-rgb: 60, 153, 110;
-	--bs-btn-active-color: #fff;
-	--bs-btn-active-bg: #146c43;
-	--bs-btn-active-border-color: #13653f;
-	--bs-btn-active-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125);
-	--bs-btn-disabled-color: #fff;
+[data-bs-theme=light] .btn-success {
 	--bs-btn-disabled-bg: #28a745;
 	--bs-btn-disabled-border-color: #28a745;
   }
@@ -224,7 +225,7 @@ a, .btn-link {
 }
 
 .text-info {
-	color: #096b72 !important;
+	color: var(--text-color-info) !important;
 }
 
 .bg-killed {
@@ -276,7 +277,7 @@ a, .btn-link {
 
 .batch_header:hover {
 	color: var(--bs-body-color);
-	background-color: rgba(0, 0, 0, 0.3)
+	background-color: var(--batch-header-hover-bg)
 }
 
 .header_hover {
@@ -352,7 +353,7 @@ a, .btn-link {
 	position: absolute;
 	left: 0;
 	bottom: 0;
-	background: linear-gradient(transparent 0px, white 27px);
+	background: linear-gradient(transparent 0px, var(--bs-body-bg) 27px);
 }
 
 .limited-height::-webkit-scrollbar {
@@ -360,7 +361,7 @@ a, .btn-link {
 }
 
 [data-toggle="limited-height"]:hover {
-	background-color: #DDD;
+	background-color: var(--btn-default-hover-bg);
 }
 
 .o_runbot_team_searchbar .nav {
