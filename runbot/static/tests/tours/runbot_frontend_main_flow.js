@@ -87,13 +87,21 @@ registry.category("web_tour.tours").add("runbot_frontend_main_flow", {
             trigger: `.breadcrumb:has(a:contains("ui-tour-active")):has(a:contains("Frontend tour trigger")):has(a:contains("Frontend UI tour build"))`,
         },
         {
+            content: "The successful children are shown by default",
+            trigger: `.build_child:contains("Frontend UI tour child ok"):visible`,
+        },
+        {
             content: "Hide successful build rows",
-            trigger: `button[data-toggle="hide-success"][aria-expanded="true"]`,
+            trigger: `expander-button[aria-expanded="true"] .fa-compress`,
             run: "click",
         },
         {
-            content: "The build page records the successful-row preference",
-            trigger: `html.hide-success button[data-toggle="hide-success"][aria-expanded="false"]`,
+            content: "The successful build rows expander is collapsed",
+            trigger: `expander-button[aria-expanded="false"] .fa-expand`,
+        },
+        {
+            content: "Only the successful children are hidden",
+            trigger: `.build_children:has(.build_child:contains("Frontend UI tour child ok"):not(:visible)):has(.build_child:contains("Frontend UI tour child ko"):visible)`,
         },
     ],
 });
