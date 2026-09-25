@@ -219,7 +219,7 @@
                          t-att-title="None if branch.staging_enabled else 'staging disabled'"
                          t-att-class="None if branch.staging_enabled else 'disabled'"
                 >
-                    <h2 t-att-class="None if branch.staging_enabled else 'fold'">
+                    <h2 t-att-class="None if branch.staging_enabled else 'fold'" onclick="void(0)">
                         <a t-attf-href="/runbot_merge/{{branch.id}}">
                             <t t-out="branch.name"/>
                         </a>

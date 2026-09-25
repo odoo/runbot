@@ -86,10 +86,3 @@ window.addEventListener("click", e => {
         title.classList.toggle('fold');
     }
 });
-window.addEventListener('touchstart', e => {
-    const title = e.target.tagName !== 'A' && e.target.closest('section>section>h2');
-    if (title) {
-        title.classList.toggle('fold');
-        return false;
-    }
-});
