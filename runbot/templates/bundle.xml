@@ -64,7 +64,7 @@
                                         <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e"/>
                                         <i t-if="bundle.project_id.next_freeze_tag_id and bundle.project_id.next_freeze_tag_id in bundle.tag_ids" class="fa fa-snowflake-o text-info" t-attf-title="Tagged for next freeze {{bundle.project_id.next_freeze_tag_id.name}}"/>
                                         <span t-out="bundle.name"/>
-                                        <button type="button" class="border-0 bg-transparent p-0 link-primary ms-1" title="Copy branch name" aria-label="Copy branch name" t-att-data-copy-text="bundle.name"><i class="fa fa-clone"/></button>
+                                        <copy-button class="border-0 bg-transparent p-0 link-primary ms-1" title="Copy branch name" aria-label="Copy branch name" t-att-data-copy-text="bundle.name"><i class="fa fa-clone"/></copy-button>
                                     </span>
                                     <div class="btn-group btn-group-ssm" role="group">
                                         <a groups="base.group_user" class="btn btn-default" t-attf-href="/runbot/stats/{{bundle.id}}" title="View stats">
