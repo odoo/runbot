@@ -496,9 +496,10 @@ remote: Review all repository rules at https://github.com/{repo.name}/rules?ref=
 remote: 
 remote: - Cannot create ref due to creations being restricted.        
 remote: 
-To https://github.com/{repo.name}
- ! [remote rejected] $$ -&gt; staging.master (push declined due to repository rule violations)
 error: failed to push some refs to 'https://github.com/{repo.name}'
+To https://github.com/{repo.name}
+! $$:refs/heads/staging.master [remote rejected] (push declined due to repository rule violations)
+Done
 </pre>\
 """),
         # not sure why the tracking values don't appear...

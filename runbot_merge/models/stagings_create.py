@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 import typing
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import datetime, timedelta
 from difflib import Differ
 from operator import itemgetter
 from subprocess import CalledProcessError
@@ -30,6 +30,21 @@ from ..github import PrCommit
 
 WAIT_FOR_VISIBILITY = [10, 10, 10, 10]
 _logger = logging.getLogger(__name__)
+# see push [OUTPUT]
+PUSH_REJECTION_PATTERN = re.compile(
+    r'''
+    ^
+    (?P<flag>[ +*!=-])
+    \t
+    (?P<from>.*):(?P<to>.*)
+    \t
+    \[(?P<summary>.*)]
+    \s*
+    \((?P<reason>.*)\)
+    $
+    ''',
+    flags=re.VERBOSE | re.MULTILINE,
+)
 
 
 class Project(models.Model):
@@ -244,26 +259,38 @@ For-Commit-Id: {it.head}
             branch.project_id.name, repo.name, branch.name,
             it.head, stagingname,
         )
-        r = it.repo.with_config(stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False)\
-            .push('-f', git.source_url(repo), f'{it.head}:refs/heads/{stagingname}')
+        r = it.repo.with_config(stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, encoding="utf-8")\
+            .push('--porcelain', '-f', git.source_url(repo), f'{it.head}:refs/heads/{stagingname}')
         if r.returncode:
-            branch.staging_enabled = False
             st.write({
                 'active': False,
                 'state': 'failure',
                 'reason': f"Failed pushing to {repo.name}",
             })
+            _logger.error("Failed to create staging for branch %r:\n%s%s", branch.name, r.stderr, r.stdout.replace('\t', ' '))
+            # likely transient github errors, abort staging but resume some time later
+            icp = env['ir.config_parameter'].get_param('runbot_merge.github_benign.remote_rejected', None)
+            if icp is None:
+                icp = 'failure,Internal Server Error'
+                env['ir.config_parameter'].set_param('runbot_merge.github_benign.remote_rejected', icp)
+            transients = icp.split(',')
+            if all(
+                m['reason'] in transients
+                for m in PUSH_REJECTION_PATTERN.finditer(r.stdout)
+                if m['summary'] == 'remote rejected'
+            ):
+                env.ref('runbot_merge.staging_cron')._trigger(
+                    fields.Datetime.now() + timedelta(minutes=5)
+                )
+                return None
+
+            branch.staging_enabled = False
             st.with_context(mail_post_autofollow=True).message_post(
                 body=Markup(
                     "<p>Staging on {} has been disabled because pushing to {} failed:</p>"
-                    "<pre>{}</pre>"
-                ).format(branch.name, repo.name, r.stderr),
+                    "<pre>{}{}</pre>"
+                ).format(branch.name, repo.name, r.stderr, r.stdout.replace('\t', ' ')),
                 partner_ids=branch.env.ref("runbot_merge.group_admin").users.partner_id.ids,
-            )
-            _logger.error(
-                "Failed to create staging for branch %r:\n%s",
-                branch.name,
-                r.stderr
             )
             return None
 
