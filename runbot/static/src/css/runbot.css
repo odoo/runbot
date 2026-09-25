@@ -375,10 +375,6 @@ code {
     display: none !important;
 }
 
-.hide-success tr.bg-success-subtle {
-    display: none;
-}
-
 .pre {
 	display: block;
 	font-family: var(--bs-font-monospace);

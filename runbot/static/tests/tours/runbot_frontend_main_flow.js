@@ -88,12 +88,12 @@ registry.category("web_tour.tours").add("runbot_frontend_main_flow", {
         },
         {
             content: "Hide successful build rows",
-            trigger: `button[data-toggle="hide-success"][aria-expanded="true"]`,
+            trigger: `expander-button.fa-compress[aria-expanded="true"]`,
             run: "click",
         },
         {
-            content: "The build page records the successful-row preference",
-            trigger: `html.hide-success button[data-toggle="hide-success"][aria-expanded="false"]`,
+            content: "The successful build rows expander is collapsed",
+            trigger: `expander-button.fa-expand[aria-expanded="false"]`,
         },
     ],
 });
