@@ -462,9 +462,9 @@
         </template>
 
         <template id="runbot.branch_copy_button">
-            <button type="button" t-attf-class="btn btn-default {{btn_size or 'btn-ssm'}}" title="Copy Bundle name" aria-label="Copy Bundle name" t-att-data-copy-text="bundle.name.split(':')[-1]">
+            <copy-button t-attf-class="btn btn-default {{btn_size or 'btn-ssm'}}" title="Copy Bundle name" aria-label="Copy Bundle name" t-att-data-copy-text="bundle.name.split(':')[-1]">
               <i t-attf-class="fa fa-clipboard"/>
-            </button>
+            </copy-button>
         </template>
 
     </data>

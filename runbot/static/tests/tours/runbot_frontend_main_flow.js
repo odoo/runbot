@@ -30,7 +30,7 @@ registry.category("web_tour.tours").add("runbot_frontend_main_flow", {
         },
         {
             content: "Copy the bundle name",
-            trigger: `.bundle_row:has(a[title="View Bundle ui-tour-active"]) button[data-copy-text="ui-tour-active"]`,
+            trigger: `.bundle_row:has(a[title="View Bundle ui-tour-active"]) copy-button[data-copy-text="ui-tour-active"]`,
             async run() {
                 const expected = "ui-tour-active";
                 const origWriteText = browser.navigator.clipboard.writeText;
