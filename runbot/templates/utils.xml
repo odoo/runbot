@@ -98,20 +98,22 @@
                                             </a>
                                         </li>
                                         <t t-call="runbot.build_errors_link"/>
-                                        <li class="nav-item dropdown" t-ignore="true">
-                                            <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">
-                                                <b>
-                                                    <span t-out="user_id.name[:23] + '...' if user_id.name and len(user_id.name) &gt; 25 else user_id.name"/>
-                                                </b>
-                                            </a>
-                                            <ul class="dropdown-menu dropdown-menu-end js_usermenu" role="menu">
-                                                <li><a class="dropdown-item" id="o_logout" role="menuitem" t-attf-href="/web/session/logout?redirect=/"><i class="fa fa-sign-out fa-fw me-1"/>Logout</a></li>
-                                                <li><a class="dropdown-item" role="menuitem" t-attf-href="/odoo"><i class="fa fa-list fa-fw me-1"/>Backend</a></li>
-                                                <li><div t-if="user_id.runbot_team_ids" class="dropdown-divider"/></li>
-                                                <li><div t-if="user_id.runbot_team_ids" class="dropdown-header">Teams</div></li>
-                                                <li><a t-foreach="user_id.runbot_team_ids" t-as="team" class="dropdown-item" role="menuitem" t-attf-href="/runbot/teams/{{team.id}}">
-                                                    <i class="fa fa-users fa-fw me-1"/><t t-out="team.name.capitalize()"/>
-                                                </a></li>
+                                        <li class="nav-item dropdown">
+                                            <button type="button" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <b t-out="user_id.name[:23] + '...' if user_id.name and len(user_id.name) &gt; 25 else user_id.name"/>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end" role="menu">
+                                                <li><a class="dropdown-item" role="menuitem" href="/web/session/logout?redirect=/"><i class="fa fa-sign-out fa-fw me-1"/>Logout</a></li>
+                                                <li><a class="dropdown-item" role="menuitem" href="/odoo"><i class="fa fa-list fa-fw me-1"/>Backend</a></li>
+                                                <t t-if="user_id.runbot_team_ids">
+                                                    <li><hr class="dropdown-divider"/></li>
+                                                    <li><div class="dropdown-header">Teams</div></li>
+                                                    <li t-foreach="user_id.runbot_team_ids" t-as="team">
+                                                        <a class="dropdown-item" role="menuitem" t-attf-href="/runbot/teams/{{team.id}}">
+                                                            <i class="fa fa-users fa-fw me-1"/><t t-out="team.name.capitalize()"/>
+                                                        </a>
+                                                    </li>
+                                                </t>
                                             </ul>
                                         </li>
                                     </t>
