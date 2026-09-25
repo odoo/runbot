@@ -264,17 +264,12 @@ dialog.modal {
 	display: none;
 }
 
-[data-toggle="limited-height"]:hover {
+expander-button.card-header:hover {
 	background-color: var(--bs-tertiary-bg);
 }
 
 .d-empty-none:empty {
     display: none !important;
-}
-
-.hide-success tr.bg-success-subtle,
-.hide-success .build_children .build_child:has(.text-bg-success) {
-    display: none !important; /* over the d-flex of the children */
 }
 
 .pre {

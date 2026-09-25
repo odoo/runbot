@@ -86,7 +86,19 @@ class TestRunbotUi(HttpCase):
             'config_id': self.env.ref('runbot.runbot_build_config_default').id,
             'batch_dependent': True,
         })
-        self._create_done_build(bundle, 'Frontend UI tour build', trigger)
+        build = self._create_done_build(bundle, 'Frontend UI tour build', trigger)
+        for description, result in (('Frontend UI tour child ok', 'ok'), ('Frontend UI tour child ko', 'ko')):
+            child = self.env['runbot.build'].create({
+                'params_id': build.params_id.id,
+                'parent_id': build.id,
+                'description': description,
+            })
+            child.write({
+                'local_state': 'done',
+                'local_result': result,
+            })
+        # children updates are not propagated, parent would stay waiting
+        build._update_globals()
 
         self.start_tour('/runbot', 'runbot_frontend_main_flow', login='admin')
 

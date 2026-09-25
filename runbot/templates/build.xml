@@ -80,9 +80,10 @@
                  t-attf-class="{{'' if prev_bu else 'disabled '}}btn btn-default">
                 <i class="fa fa-chevron-left"/>
               </a>
-              <button type="button" class="btn btn-default" data-toggle="hide-success" title="Toggle successful rows" aria-label="Toggle successful rows" aria-expanded="true">
+              <expander-button t-if="has_children" class="btn btn-default" data-target=".build_children .build_child:has(.text-bg-success)" data-label="successful rows"
+                  title="Collapse successful rows" aria-label="Collapse successful rows" aria-expanded="true">
                 <i class="fa fa-compress"/>
-              </button>
+              </expander-button>
               <a t-att-href="next_bu.build_url" role="button" t-attf-title="Next {{next_bu.display_name}}"
                  t-attf-class="{{'' if next_bu else 'disabled '}}btn btn-default">
                 <i class="fa fa-chevron-right"/>
