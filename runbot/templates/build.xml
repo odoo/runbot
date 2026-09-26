@@ -401,9 +401,9 @@
                       <td t-attf-class="bg-{{message_class or logclass}}-subtle">
                         <t t-if="l.level in ('CRITICAL', 'ERROR', 'WARNING') and not l.with_context(active_test=False).error_content_id">
                           <small>
-                            <a groups="runbot.group_runbot_admin" t-attf-href="/runbot/parse_log/{{l.id}}" class="sm" title="Parse this log line to follow this error.">
+                            <action-button groups="runbot.group_runbot_admin" t-attf-data-url="/runbot/parse_log/{{l.id}}" class="sm link-primary" title="Parse this log line to follow this error.">
                               <i t-attf-class="fa fa-magic"/>
-                            </a>
+                            </action-button>
                           </small>
                         </t>
                       </td>

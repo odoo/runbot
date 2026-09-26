@@ -90,9 +90,9 @@
                   </a>
                 </td>
                 <td groups="base.group_user">
-                  <a t-attf-href="/runbot/commit/resend/{{status.id}}" title="Resend github status">
+                  <action-button class="link-primary" t-attf-data-url="/runbot/commit/resend/{{status.id}}" title="Resend github status">
                     <i class="fa fa-repeat"/>
-                  </a>
+                  </action-button>
                 </td>
               </tr>
             </table>
