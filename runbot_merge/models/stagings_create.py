@@ -10,10 +10,9 @@ import re
 import shutil
 import subprocess
 import tempfile
-import typing
 from collections.abc import Mapping
 from datetime import datetime, timedelta
-from difflib import Differ
+from itertools import chain
 from operator import itemgetter
 from subprocess import CalledProcessError
 from typing import Dict, Union, Optional, Literal, Callable, Iterator, Tuple, List, TypeAlias, Any
@@ -21,8 +20,8 @@ from typing import Dict, Union, Optional, Literal, Callable, Iterator, Tuple, Li
 from markupsafe import Markup
 from werkzeug.datastructures import Headers
 
-from odoo import api, models, fields, Command, addons
-from odoo.tools import OrderedSet, groupby, Reverse
+from odoo import api, models, fields, Command
+from odoo.tools import OrderedSet, groupby
 from .pull_requests import Branch, Stagings, PullRequests, Repository, Split
 from .batch import Batch
 from .. import exceptions, utils, github, git
@@ -236,11 +235,11 @@ For-Commit-Id: {it.head}
     # push all the new objects first via the tmp branches
     pushers = []
     for repo, it in staging_state.items():
-        executor = it.repo.with_config(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        executor._config.pop('check', None)
-        executor.runner = subprocess.Popen
-        pid = executor.push('-f', git.source_url(repo), f'{it.head}:refs/heads/{tmpname}')
-        pushers.append(pid)
+        pushers.append(
+            it.repo.with_config(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+               .lazy()
+               .push('-f', git.source_url(repo), f'{it.head}:refs/heads/{tmpname}')
+        )
     for pid in pushers:
         pid.wait()
 
@@ -573,7 +572,7 @@ def stage(pr: PullRequests, info: StagingSlice, related_prs: PullRequests) -> Tu
     try:
         new_head = fn(pr, info, pr_commits, related_prs=related_prs)
     except git.MergeError as e:
-        if 'fatal: failure to merge' in str(e) and 'merge.mergiraf.name=mergiraf' in info.repo._params:
+        if 'fatal: failure to merge' in str(e) and 'merge.mergiraf.name=mergiraf' in info.repo.params:
             _logger.warning(
                 "mergiraf likely crashed staging %s, switching to default merge driver",
                 pr.display_name,

@@ -11,9 +11,11 @@ import re
 import resource
 import stat
 import subprocess
-from operator import methodcaller
-from typing import Optional, TypeVar, Union, Sequence, Tuple, Dict, Iterator
+import types
+import typing
 from collections.abc import Iterable, Mapping, Callable
+from operator import methodcaller
+from typing import Sequence, Iterator, Any, Self, Protocol
 
 from odoo.tools.appdirs import user_cache_dir
 from .github import MergeError, PrCommit
@@ -49,9 +51,9 @@ def fw_url(repository) -> str:
         repository.fp_remote_target,
     )
 
-Authorship = Union[Tuple[str, str], Tuple[str, str, str]]
+Authorship = tuple[str, str] | tuple[str, str, str]
 
-def get_local(repository, *, clone: bool = True) -> 'Optional[Repo]':
+def get_local(repository, *, clone: bool = True) -> Repo[subprocess.CompletedProcess[bytes]] | None:
     repos_dir = pathlib.Path(user_cache_dir('mergebot'))
     repos_dir.mkdir(parents=True, exist_ok=True)
     # NB: `repository.name` is `$org/$name` so this will be a subdirectory, probably
@@ -101,27 +103,44 @@ def _bypass_limits():
     resource.setrlimit(resource.RLIMIT_AS, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
 
 
-def git(directory: str) -> 'Repo':
+def git(directory: str) -> Repo[subprocess.CompletedProcess[bytes]]:
     return Repo(directory, check=True)
 
 
-StdOutValue = Union[bool, int, None, io.IOBase]
-class Repo:
-    def __init__(self, directory: str, **config: object) -> None:
-        self._directory = str(directory)
+StdOutValue = bool | int | None | io.IOBase
+
+
+class ProcessRunner[T](Protocol):
+    def __call__(self, args: Iterable[str], **opts: Any) -> T:
+        pass
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Repo[T]:
+    directory: str
+    config_: Mapping[str, Any]
+    params: tuple[str]
+    runner: ProcessRunner[T]
+
+    def __init__(self, directory: str, config_: Mapping[str, Any] | None = None, params: tuple[str] = (), runner: ProcessRunner[T] = subprocess.run, **config: Any) -> None:
+        object.__setattr__(self, 'directory', str(directory))
         config.setdefault('stderr', subprocess.PIPE)
-        self._config = config
-        self._params = ()
-        self.runner = subprocess.run
+        object.__setattr__(self, 'config_', types.MappingProxyType({
+            'stderr': subprocess.PIPE,
+            **(config_ or {}),
+            **config,
+        }))
+        object.__setattr__(self, 'params', params)
+        object.__setattr__(self, 'runner', runner)
 
     def __getattr__(self, name: str) -> GitCommand:
         return GitCommand(self, name.replace('_', '-'))
 
-    def _run(self, *args, **kwargs) -> subprocess.CompletedProcess:
-        opts = {**self._config, **kwargs}
+    def _run(self, *args, **kwargs) -> T:
+        opts = {**self.config_, **kwargs}
         args = tuple(itertools.chain(
-            ('git', '-C', self._directory),
-            itertools.chain.from_iterable(('-c', p) for p in self._params + ALWAYS),
+            ('git', '-C', self.directory),
+            itertools.chain.from_iterable(('-c', p) for p in self.params + ALWAYS),
             git_tracing_params(),
             args,
         ))
@@ -136,7 +155,7 @@ class Repo:
                 _logger.error("git call error: %s", stream)
             raise
 
-    def stdout(self, flag: StdOutValue = True) -> Repo:
+    def stdout(self, flag: StdOutValue = True) -> Self:
         match flag:
             case True:
                 return self.with_config(stdout=subprocess.PIPE)
@@ -145,25 +164,43 @@ class Repo:
             case f:
                 return self.with_config(stdout=f)
 
-    def check(self, flag: bool) -> Repo:
+    def lazy(self) -> Repo[subprocess.Popen[bytes]]:
+        return dataclasses.replace(
+            self,
+            runner=subprocess.Popen,
+            # remove config and any conf which enables text mode (so Popen
+            # resets to bytes mode)
+            config_=types.MappingProxyType({
+                k: v for k, v in self.config_.items()
+                if k not in ('check', 'encoding', 'text', 'errors', 'universal_newlines')
+            })
+        )
+
+    def check(self, flag: bool) -> Self:
         return self.with_config(check=flag)
 
-    def with_config(self, **kw) -> Repo:
-        opts = {**self._config, **kw}
-        r = Repo(self._directory, **opts)
-        r._params = self._params
-        return r
+    def with_config(self, **kw) -> Self:
+        return dataclasses.replace(self, config_=types.MappingProxyType({**self.config_, **kw}))
 
-    def with_params(self, *args) -> Repo:
-        r = self.with_config()
-        r._params = args
-        return r
+    def with_params(self, *args) -> Self:
+        return dataclasses.replace(self, params=args)
 
-    def clone(self, to: str, branch: Optional[str] = None) -> Repo:
+    @typing.overload
+    def text(self: Repo[subprocess.CompletedProcess[bytes]]) -> Repo[subprocess.CompletedProcess[str]]:
+        ...
+
+    @typing.overload
+    def text(self: Repo[subprocess.Popen[bytes]]) -> Repo[subprocess.Popen[str]]:
+        ...
+
+    def text(self):
+        return self.with_config(encoding='utf-8')
+
+    def clone(self, to: str, branch: str | None = None) -> Repo:
         self._run(
             'clone',
             *([] if branch is None else ['-b', branch]),
-            self._directory, to,
+            self.directory, to,
         )
         return Repo(to)
 
@@ -210,7 +247,7 @@ class Repo:
             .rev_parse(f'{rev}^{{tree}}')\
             .stdout.strip()
 
-    def rebase(self, dest: str, commits: Sequence[PrCommit]) -> Tuple[str, Dict[str, str]]:
+    def rebase(self, dest: str, commits: Sequence[PrCommit]) -> tuple[str, dict[str, str]]:
         """Implements rebase by hand atop plumbing so:
 
         - we can work without a working copy
@@ -275,7 +312,7 @@ class Repo:
 
         return dest, mapping
 
-    def merge(self, c1: str, c2: str, msg: str, *, author: Tuple[str, str]) -> str:
+    def merge(self, c1: str, c2: str, msg: str, *, author: tuple[str, str]) -> str:
         repo = self.stdout().with_config(text=True, check=False)
 
         t = repo.merge_tree(c1, c2)
@@ -295,8 +332,8 @@ class Repo:
     def commit_tree(
         self, *, tree: str, message: str,
         parents: Sequence[str] = (),
-        author: Optional[Authorship] = None,
-        committer: Optional[Authorship] = None,
+        author: Authorship | None = None,
+        committer: Authorship | None = None,
     ) -> subprocess.CompletedProcess:
         authorship = {}
         if author:

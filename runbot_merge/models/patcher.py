@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import collections
 import contextlib
+import dataclasses
 import logging
 import pathlib
 import re
@@ -18,6 +19,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from email import message_from_string, policy
 from email.utils import parseaddr
+from itertools import chain
 from typing import Union
 
 from markupsafe import Markup
@@ -266,7 +268,7 @@ class Patch(models.Model):
 
         repo_info = {
             r: {
-                'local': git.get_local(r).check(True).with_config(encoding="utf-8"),
+                'local': git.get_local(r).text(),
                 'with_commit': self.browse(),
                 'target_head': None,
             }
@@ -370,7 +372,7 @@ class Patch(models.Model):
         return True
 
     def _apply_commit(self, r: git.Repo, parent: str) -> str:
-        r = r.check(True).stdout().with_config(encoding="utf-8")
+        r = r.check(True).stdout().text()
         target = r.show('--no-patch', '--pretty=%an%n%ae%n%ai%n%cn%n%ce%n%ci%n%B', self.commit)
         # retrieve metadata of cherrypicked commit
         author_name, author_email, author_date, committer_name, committer_email, committer_date, body =\
@@ -405,14 +407,12 @@ class Patch(models.Model):
                 read.add(m['file_from'])
             patched[m['file_to']] = reader
 
-        archiver = r.stdout(True).with_config(encoding=None)
-        # if the parent is checked then we can't get rid of the kwarg and popen doesn't support it
-        archiver._config.pop('check', None)
+        archiver = r.stdout()
 
         res = archiver.ls_tree('--name-only', parent, *read)
         if res.returncode:
-            raise PatchFailure(res.stderr.decode())
-        if missing := read.difference(res.stdout.decode().splitlines(keepends=False)):
+            raise PatchFailure(res.stderr)
+        if missing := read.difference(res.stdout.splitlines(keepends=False)):
             raise PatchFailure(Markup(
                 "<p>Files to patch not found in {}:{} (at {}):</p>\n<ul>\n{}</ul>"
             ).format(
@@ -425,7 +425,7 @@ class Patch(models.Model):
                 )
             ))
 
-        archiver.runner = subprocess.Popen
+        archiver = archiver.lazy()
         with contextlib.ExitStack() as stack,\
              tempfile.TemporaryDirectory() as tmpdir:
             # if there's no file to *update*, `archive` will extract the entire
@@ -453,4 +453,3 @@ class Patch(models.Model):
             author=p.author,
             committer=p.committer,
         ).stdout.strip()
-
