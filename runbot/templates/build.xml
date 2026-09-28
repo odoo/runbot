@@ -274,6 +274,9 @@
                 <t t-att-tile='build.load_time' t-out="precise_s2human(build.load_time)"/>
                 <i t-if='more'>(<t t-out="build.load_time"/>s)</i>
               </div>
+              <div t-if="build.oom_killed">
+                <b>A process was OOM Killed</b>
+              </div>
             </div>
           </div>
           <div class="col-md-6" t-if="build.children_ids or build.linked_children_build_ids">

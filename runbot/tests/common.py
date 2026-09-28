@@ -219,6 +219,7 @@ class RunbotCase(TransactionCase):
         self.start_patcher('docker_ps', 'odoo.addons.runbot.container._docker_ps', [])
         self.start_patcher('docker_stop', 'odoo.addons.runbot.container._docker_stop')
         self.start_patcher('docker_get_gateway_ip', 'odoo.addons.runbot.models.build_config.docker_get_gateway_ip', None)
+        self.start_patcher('docker_inspect_container', 'odoo.addons.runbot.container._docker_inspect_container')
 
         self.start_patcher('repo_commit', 'odoo.addons.runbot.models.runbot.Runbot._commit', None)
         self.start_patcher('_local_cleanup_patcher', 'odoo.addons.runbot.models.build.BuildResult._local_cleanup')

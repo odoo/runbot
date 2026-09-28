@@ -17,7 +17,7 @@ from odoo.exceptions import UserError
 from odoo.tools import config, file_open
 
 from ..common import dest_reg, os, sanitize
-from ..container import docker_ps, docker_stop
+from ..container import docker_ps, docker_stop, docker_inspect_container
 
 _logger = logging.getLogger(__name__)
 
@@ -56,6 +56,8 @@ class Runbot(models.AbstractModel):
             self._commit()
         testing_builds = host._get_builds([('local_state', '=', 'testing')])
         host._process_logs(testing_builds)
+        self._commit()
+        self._docker_check_oom_kills(testing_builds)
         self._commit()
         for build in host._get_builds([('local_state', 'in', ['testing', 'running'])]) | self._get_builds_to_init(host):
             build = build.browse(build.id)  # remove preftech ids, manage build one by one
@@ -363,6 +365,15 @@ class Runbot(models.AbstractModel):
         ignored = {dc for dc in docker_ps_result if not dest_reg.match(dc)}
         if ignored:
             _logger.info('docker (%s) not deleted because not dest format', list(ignored))
+
+    def _docker_check_oom_kills(self, builds):
+        for build in builds:
+            if not build.oom_killed:
+                container_name = build._get_docker_name()
+                inspection = docker_inspect_container(container_name)
+                if inspection.get('State', {}).get('OOMKilled', False):
+                    build.oom_killed = True
+                    build._log('oom', 'A process was killed by the OOM killer in container')
 
     def _start_docker_registry(self):
         """

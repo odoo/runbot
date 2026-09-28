@@ -414,6 +414,22 @@ def _docker_ps():
     return [c.name for c in docker_client.containers.list()]
 
 
+def docker_inspect_container(container_name):
+    return _docker_inspect_container(container_name)
+
+
+def _docker_inspect_container(container_name):
+    container_name = sanitize_container_name(container_name)
+    try:
+        low_level_client = docker.APIClient()
+        return low_level_client.inspect_container(container_name)
+    except docker.errors.DockerException as e:
+        _logger.warning('Cannot inspect container %s: %s', container_name, e)
+        return {}
+    except docker.errors.APIError:
+        return {}
+
+
 def docker_images():
     return _docker_images()
 
