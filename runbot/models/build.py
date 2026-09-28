@@ -303,6 +303,8 @@ class BuildResult(models.Model):
     global_result = fields.Selection(make_selection(result_order), string='Result', default='ok')
     local_result = fields.Selection(make_selection(result_order), string='Build Result', default='ok')
 
+    oom_killed = fields.Boolean('OOM Killed', help='A process in the Docker container was OOM killed')
+
     requested_action = fields.Selection([('wake_up', 'To wake up'), ('deathrow', 'To kill')], string='Action requested', index=True)
     to_kill = fields.Boolean('To kill', compute='_compute_to_kill')
     message_ids = fields.One2many('runbot.host.message', 'build_id', string='Messages')

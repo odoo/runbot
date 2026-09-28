@@ -426,6 +426,22 @@ class TestRepoScheduler(RunbotCase):
                 'host': 'host.runbot.com'
             })
             builds.append(build)
+
+        # test oomkill detection
+        def inspect_side_effect(container_name):
+            if container_name.endswith('test_mem_leak_step'):
+                return {'Id': 'xyz', 'State': {'OOMKilled': True}}
+            return {}
+
+        self.patchers['docker_inspect_container'].side_effect = inspect_side_effect
+
+        mem_leak_config_step = self.env['runbot.build.config.step'].create({
+            'name': 'test_mem_leak_step',
+            'job_type': 'python',
+        })
+        mem_leak_build = builds[-1]
+        mem_leak_build.active_step = mem_leak_config_step
+
         # now the pending build that should stay unasigned
         scheduled_build = self.Build.create({
             'params_id': self.base_params.id,
@@ -442,6 +458,9 @@ class TestRepoScheduler(RunbotCase):
         builds.append(build)
         host = self.env['runbot.host']._get_current()
         self.Runbot._scheduler(host)
+
+        self.assertTrue(mem_leak_build.oom_killed)
+        self.assertFalse(builds[0].oom_killed)
 
         build.invalidate_recordset()
         scheduled_build.invalidate_recordset()
