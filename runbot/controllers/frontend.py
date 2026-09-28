@@ -25,6 +25,15 @@ class Runbot(Controller):
         level = ['info', 'warning', 'danger'][int(pending_count > warn) + int(pending_count > crit)]
         return pending_count, level, pending_assigned_count
 
+    def _slots_infos(self):
+        pending_count, level, pending_assigned_count = self._pending()
+        return {
+            'pending_count': pending_count,
+            'pending_assigned_count': pending_assigned_count,
+            'pending_level': level,
+            'hosts_data': request.env['runbot.host'].search([('assigned_only', '=', False)]),
+        }
+
     @route(['/',
             '/runbot',
             '/runbot/<model("runbot.project"):project>',
@@ -36,14 +45,10 @@ class Runbot(Controller):
         if not project and projects:
             project = projects[0]
 
-        pending_count, level, pending_assigned_count = self._pending()
         context = {
             'search': search,
             'message': request.env['ir.config_parameter'].sudo().get_param('runbot.runbot_message'),
-            'pending_count': pending_count,
-            'pending_assigned_count': pending_assigned_count,
-            'pending_level': level,
-            'hosts_data': request.env['runbot.host'].search([('assigned_only', '=', False)]),
+            **self._slots_infos(),
         }
         if project:
             domain = [('last_batch', '!=', False), ('project_id', '=', project.id)]
@@ -128,14 +133,10 @@ class Runbot(Controller):
         batchs = request.env['runbot.batch'].search(domain, limit=limit, offset=pager.get('offset', 0), order='id desc')
         last_batch = request.env['runbot.batch'].search(domain, limit=1, order='id desc')
 
-        pending_count, level, pending_assigned_count = self._pending()
         # compute if we should display the new batch button
         context = {
             'bundle': bundle,
-            'pending_count': pending_count,
-            'pending_assigned_count': pending_assigned_count,
-            'pending_level': level,
-            'hosts_data': request.env['runbot.host'].search([('assigned_only', '=', False)]),
+            **self._slots_infos(),
             'batchs': batchs,
             'pager': pager,
             'project': bundle.project_id,
@@ -171,6 +172,7 @@ class Runbot(Controller):
             'project': batch.bundle_id.project_id,
             'title': 'Batch %s (%s)' % (batch.id, batch.bundle_id.name),
             'page_info_state': batch._get_global_result(),
+            **self._slots_infos(),
         }
         return request.render('runbot.batch', context)
 
@@ -291,7 +293,7 @@ class Runbot(Controller):
         context = {
             'build': build,
             'from_batch': from_batch,
-            'project': build.params_id.trigger_id.project_id,
+            'project': build.params_id.project_id,
             'title': 'Build %s' % build.id,
             'siblings': siblings,
             'page_info_state': build.global_result,
@@ -300,6 +302,7 @@ class Runbot(Controller):
             'prev_bu': next((b for b in reversed(siblings) if b.id < build.id), Build),
             'next_bu': next((b for b in siblings if b.id > build.id), Build),
             'next_ko': next((b for b in siblings if b.id > build.id and b.global_result != 'ok'), Build),
+            **self._slots_infos(),
         }
         return request.render("runbot.build", context)
 
