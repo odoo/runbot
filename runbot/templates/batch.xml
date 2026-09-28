@@ -4,21 +4,27 @@
         <template id="runbot.batch">
             <t t-set="more" t-value="str2bool(request.httprequest.cookies.get('more', ''), False)"/>
             <t t-call="runbot.layout">
+                <t t-set="page_nav">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a t-att-href="batch.bundle_id._url()" class="btn btn-link" t-out="batch.bundle_id.name"/>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page">
+                            <a t-att-href="batch._url()" class="btn btn-link">batch-<t t-out="batch.id"/></a>
+                        </li>
+                    </ol>
+                    <a groups="runbot.group_runbot_advanced_user" t-attf-href="/odoo/batch/{{batch.id}}"
+                       class="btn btn-default btn-ssm" target="_blank" title="View Batch in Backend">
+                        <i class="fa fa-list"/>
+                    </a>
+                    <span class="ms-auto">
+                        <t t-call="runbot.slots_infos"/>
+                    </span>
+                </t>
                 <div class="row g-0">
                     <div class="col-lg-6">
                     <t t-set="batch_class" t-value="'bg-info-subtle' if batch.state=='preparing' else 'bg-success-subtle' if not any(log.level != 'INFO' for log in batch.log_ids) else 'bg-warning-subtle'"/>
                     <table class="table">
-                        <tr>
-                            <td>Bundle</td>
-                            <td>
-                                <a t-out="batch.bundle_id.name" t-attf-href="/runbot/bundle/{{batch.bundle_id.id}}"/>
-                                &amp;emsp;
-                                <a groups="runbot.group_runbot_advanced_user"
-                                    t-attf-href="/odoo/batch/{{batch.id}}" class="btn btn-default btn-sm" target="_blank" title="View Batch in Backend">
-                                          <i class="fa fa-list"/>
-                                </a>
-                            </td>
-                        </tr>
                         <tr t-if="batch.priority_level">
                             <td>Priority</td>
                             <td>
