@@ -38,8 +38,9 @@ class Runbot(Controller):
             '/runbot',
             '/runbot/<model("runbot.project"):project>',
             '/runbot/<model("runbot.project"):project>/search/<search>'], website=True, auth='public', type='http')
-    def bundles(self, project=None, search='', refresh=False, limit=40, has_pr=None, category=None, filter_mode='default', **kwargs):
+    def bundles(self, project=None, search='', refresh=False, limit=40, has_pr=None, category=None, filter_mode=None, **kwargs):
         search = search if len(search) < 60 else search[:200]
+        filter_mode = filter_mode or ('all' if search else 'sticky')
         env = request.env
         projects = self.env['runbot.project'].search([('hidden', '=', False)])
         if not project and projects:
@@ -47,6 +48,7 @@ class Runbot(Controller):
 
         context = {
             'search': search,
+            'filter_mode': filter_mode,
             'message': request.env['ir.config_parameter'].sudo().get_param('runbot.runbot_message'),
             **self._slots_infos(),
         }
@@ -64,8 +66,6 @@ class Runbot(Controller):
                 domain.append(('sticky', '=', False))
             elif filter_mode == 'mine':
                 domain.append(('author_ids', 'in', request.env.user.id))
-            elif filter_mode == 'default' and not search:
-                domain.append(('sticky', '=', True))
 
             if search:
                 search_domains = []
