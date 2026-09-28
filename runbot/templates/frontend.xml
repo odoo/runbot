@@ -3,12 +3,11 @@
   <data>
     <template id="runbot.bundles">
       <t t-set="categories" t-value="env['runbot.category'].search([])"/>
-      <t t-set="filter_mode" t-value="request.params.get('filter_mode', 'default')"/>
       <t t-call='runbot.layout'>
         <t t-set="nav_form">
           <form t-if="project" class="my-2 my-lg-0" role="search" t-attf-action="/runbot/{{slug(project)}}" method="get">
             <input t-if="request.params.get('category')" type="hidden" name="category" t-att-value="request.params.get('category')"/>
-            <input t-if="filter_mode != 'default'" type="hidden" name="filter_mode" t-att-value="filter_mode"/>
+            <input t-if="request.params.get('filter_mode')" type="hidden" name="filter_mode" t-att-value="request.params.get('filter_mode')"/>
             <div class="input-group ps-0">
               <input class="form-control my-0 py-1" type="text" placeholder="Search" aria-label="Search" name="search" t-att-value="search" autofocus="autofocus"/>
               <a t-if="has_pr" class="btn btn-primary" title="All" t-attf-href="?{{keep_query('*', has_pr=None)}}">
@@ -28,12 +27,11 @@
           <div class="d-flex align-items-center gap-1">
             <span id="page_nav_filter_mode" class="small text-body-secondary">Show</span>
             <div class="text-nowrap btn-group btn-group-ssm" role="group" aria-labelledby="page_nav_filter_mode">
-              <a t-foreach="{'default': 'Default', 'all': 'All', 'sticky': 'Sticky only', 'nosticky': 'Dev only', 'mine': 'Mine'}" t-as="mode"
+              <a t-foreach="{'all': 'All', 'sticky': 'Sticky only', 'nosticky': 'Dev only', 'mine': 'Mine'}" t-as="mode"
                  t-if="mode != 'mine' or user_id._is_internal()"
                  t-attf-class="btn btn-outline-secondary{{' active' if filter_mode == mode else ''}}"
                  t-att-aria-current="'page' if filter_mode == mode else None"
-                 t-att-title="'Only display sticky except if searching' if mode == 'default' else None"
-                 t-attf-href="?{{keep_query('*', filter_mode=mode if mode != 'default' else None)}}" t-out="mode_value"/>
+                 t-attf-href="?{{keep_query('*', filter_mode=mode)}}" t-out="mode_value"/>
             </div>
           </div>
           <span class="ms-auto">
