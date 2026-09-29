@@ -116,6 +116,23 @@
         <field name="protected" eval="True"/>
     </record>
 
+    <!-- Sequential ids-->
+    <record id="runbot_build_config_step_test_sequential_ids" model="runbot.build.config.step">
+        <field name="name">sequential_ids</field>
+        <field name="install_modules"></field>
+        <field name="test_enable" eval="True"/>
+        <field name="additionnal_env">ODOO_TEST=</field>
+        <field name="protected" eval="True"/>
+        <field name="default_sequence">40</field>
+    </record>
+
+    <record id="runbot_build_config_sequential_ids" model="runbot.build.config">
+        <field name="name">Sequential ids</field>
+        <field name="description">Used for nightly, test all with the random serial disabled.</field>
+        <field name="step_order_ids" eval="[(5,0,0), (0, 0, {'step_id': ref('runbot_build_config_step_test_sequential_ids')})]"/>
+        <field name="protected" eval="True"/>
+    </record>
+
     <record id="runbot_build_config_step_restore" model="runbot.build.config.step">
         <field name="name">restore</field>
         <field name="job_type">restore</field>

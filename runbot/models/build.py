@@ -1241,6 +1241,8 @@ class BuildResult(models.Model):
         self.env.flush_all()
         env_variables = env_variables or []
         env_variables.append('ODOO_RUNBOT=1')
+        if not any(env_variable.startswith('ODOO_TEST=') for env_variable in env_variables):
+            env_variables.append('ODOO_TEST=1')
         self.cpu_limit = kwargs.get('cpu_limit')
         def start_docker():
             docker_run(
