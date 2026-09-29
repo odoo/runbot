@@ -56,6 +56,7 @@
                   <field name="trigger_ids" widget="many2many_tags"/>
                   <field name="tag_ids" widget="many2many_tags"/>
                   <field name="random"/>
+                  <field name="oomkills_count" string="OOM Kills" decoration-danger="oomkills_count > 0" invisible="oomkills_count == 0"/>
                   <field name="breaking_pr_id" options="{'no_create': True}"/>
                   <field name="breaking_pr_url"  widget="pull_request_url" invisible="not breaking_pr_id"/>
                   <field name="breaking_bundle_url" invisible="not breaking_pr_id"/>
