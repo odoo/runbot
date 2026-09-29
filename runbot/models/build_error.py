@@ -265,6 +265,7 @@ class BuildError(models.Model):
     trigger_ids = fields.Many2many('runbot.trigger', string='Triggers', compute=_compute_related_error_content_ids('trigger_ids'), store=True)
     tag_ids = fields.Many2many('runbot.build.error.tag', string='Tags', compute=_compute_related_error_content_ids('tag_ids'), search=_search_related_error_content_ids('tag_ids'))
     random = fields.Boolean('Random', compute="_compute_random", store=True)
+    oomkills_count = fields.Integer('OOM Killed builds count', compute='_compute_oomkills_count')
 
     disappearing_batch_ids = fields.Many2many('runbot.batch', compute='_compute_disappearing_batch_ids', string='Fixing batches')
 
@@ -378,6 +379,11 @@ class BuildError(models.Model):
     def _compute_only_version_ids(self):
         for record in self:
             record.only_version_ids = record.version_ids[0] if record.version_ids else False
+
+    @api.depends('error_content_ids.build_ids')
+    def _compute_oomkills_count(self):
+        for record in self:
+            record.oomkills_count = len(record.unique_build_error_link_ids.build_id.filtered('oom_killed'))
 
     def _search_only_version_ids(self, operator, value):
         if operator == 'any':
