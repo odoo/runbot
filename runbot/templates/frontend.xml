@@ -99,6 +99,7 @@
 
     <template id="runbot.batch_tile">
       <t t-set="more" t-value="str2bool(request.httprequest.cookies.get('more', ''), False)"/>
+      <t t-set="show_failed_triggers" t-value="str2bool(request.httprequest.cookies.get('show_failed_triggers', '1'), False)"/>
       <t t-set="klass">info</t>
       <t t-if="batch.state=='skipped'" t-set="klass">killed</t>
       <t t-if="batch.state=='done' and all(slot.build_id.global_result == 'ok' for slot in batch.slot_ids if slot.build_id)" t-set="klass">success</t>
@@ -134,7 +135,7 @@
             <t t-else="">
               <t t-foreach="batch.slot_ids" t-as="slot">
                 <t t-if="slot.build_id">
-                  <div t-if="((not slot.trigger_id.hide and trigger_display is None) or (trigger_display and slot.trigger_id.id in trigger_display)) or slot.build_id.global_result != 'ok'"
+                  <div t-if="((not slot.trigger_id.hide and trigger_display is None) or (trigger_display and slot.trigger_id.id in trigger_display)) or (show_failed_triggers and slot.build_id.global_result != 'ok')"
                      class="slot_container">
                     <t t-call="runbot.slot_button"/>  
                   </div>

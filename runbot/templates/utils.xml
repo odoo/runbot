@@ -130,8 +130,16 @@
                                     <div class="row mb-2">
                                         <user-preference class="col-12">
                                             <form class="form-check form-switch">
-                                                <label for="more" class="form-check-label" >More info</label>
+                                                <label for="more" class="form-check-label">Show more info</label>
                                                 <input class="form-check-input" type="checkbox" role="switch" id="more" name="more" value="1" t-att-checked="str2bool(request.httprequest.cookies.get('more', ''), False)"/>
+                                            </form>
+                                        </user-preference>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <user-preference class="col-12" data-default="1">
+                                            <form class="form-check form-switch">
+                                                <label for="show_failed_triggers" class="form-check-label">Show failed triggers</label>
+                                                <input class="form-check-input" type="checkbox" role="switch" id="show_failed_triggers" name="show_failed_triggers" value="1" t-att-checked="str2bool(request.httprequest.cookies.get('show_failed_triggers', '1'), False)"/>
                                             </form>
                                         </user-preference>
                                     </div>
