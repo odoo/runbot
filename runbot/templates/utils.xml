@@ -127,7 +127,7 @@
                                     <button type="button" class="btn-close" command="close" commandfor="collapsePreference"/>
                                 </header>
                                 <div class="modal-body">
-                                    <div class="row">
+                                    <div class="row mb-2">
                                         <user-preference class="col-12">
                                             <form class="form-check form-switch">
                                                 <label for="more" class="form-check-label" >More info</label>
@@ -135,9 +135,9 @@
                                             </form>
                                         </user-preference>
                                     </div>
-                                    <div class="row">
-                                        <div id="label_pref_theme" class="col-md-1">Theme</div>
-                                        <user-preference class="col-md-11" data-default="legacy">
+                                    <div class="row mb-2">
+                                        <div id="label_pref_theme" class="col-md-2">Theme</div>
+                                        <user-preference class="col-md-10" data-default="legacy">
                                             <form class="text-nowrap btn-group btn-group-sm" role="group" aria-labelledby="label_pref_theme">
                                                 <input type="radio" class="btn-check" autocomplete="off" name="theme" id="pref_theme_legacy"
                                                     value="legacy" t-att-checked="theme == 'legacy'"/>
@@ -151,6 +151,21 @@
                                                 <input type="radio" class="btn-check" autocomplete="off" name="theme" id="pref_theme_red404"
                                                     value="red404" t-att-checked="theme == 'red404'"/>
                                                 <label class="btn btn-outline-primary" for="pref_theme_red404">Red404</label>
+                                            </form>
+                                        </user-preference>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div id="label_pref_filter_mode" class="col-md-2">Default filter</div>
+                                        <user-preference class="col-md-10" data-default="sticky">
+                                            <t t-set="default_filter_mode" t-value="request.httprequest.cookies.get('filter_mode', 'sticky')"/>
+                                            <form class="text-nowrap btn-group btn-group-sm" role="group" aria-labelledby="label_pref_filter_mode">
+                                                <t t-foreach="{'all': 'All', 'sticky': 'Sticky only', 'nosticky': 'Dev only', 'mine': 'Mine', 'team': 'My Team'}" t-as="mode">
+                                                    <t t-if="mode not in ('mine', 'team') or user_id._is_internal()">
+                                                        <input type="radio" class="btn-check" autocomplete="off" name="filter_mode" t-attf-id="pref_filter_mode_{{mode}}"
+                                                            t-att-value="mode" t-att-checked="default_filter_mode == mode"/>
+                                                        <label class="btn btn-outline-primary" t-attf-for="pref_filter_mode_{{mode}}" t-out="mode_value"/>
+                                                    </t>
+                                                </t>
                                             </form>
                                         </user-preference>
                                     </div>
