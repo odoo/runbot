@@ -40,7 +40,10 @@ class Runbot(Controller):
             '/runbot/<model("runbot.project"):project>/search/<search>'], website=True, auth='public', type='http')
     def bundles(self, project=None, search='', refresh=False, limit=40, has_pr=None, category=None, filter_mode=None, **kwargs):
         search = search if len(search) < 60 else search[:200]
-        filter_mode = filter_mode or ('all' if search else 'sticky')
+        default_filter_mode = request.httprequest.cookies.get('filter_mode', 'sticky')
+        if default_filter_mode in ('mine', 'team') and not request.env.user._is_internal():
+            default_filter_mode = 'sticky'
+        filter_mode = filter_mode or ('all' if search else default_filter_mode)
         env = request.env
         projects = self.env['runbot.project'].search([('hidden', '=', False)])
         if not project and projects:
