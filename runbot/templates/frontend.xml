@@ -27,8 +27,8 @@
           <div class="d-flex align-items-center gap-1">
             <span id="page_nav_filter_mode" class="small text-body-secondary">Show</span>
             <div class="text-nowrap btn-group btn-group-ssm" role="group" aria-labelledby="page_nav_filter_mode">
-              <a t-foreach="{'all': 'All', 'sticky': 'Sticky only', 'nosticky': 'Dev only', 'mine': 'Mine'}" t-as="mode"
-                 t-if="mode != 'mine' or user_id._is_internal()"
+              <a t-foreach="{'all': 'All', 'sticky': 'Sticky only', 'nosticky': 'Dev only', 'mine': 'Mine', 'team': 'My Team'}" t-as="mode"
+                 t-if="mode not in ('mine', 'team') or user_id._is_internal()"
                  t-attf-class="btn btn-outline-secondary{{' active' if filter_mode == mode else ''}}"
                  t-att-aria-current="'page' if filter_mode == mode else None"
                  t-attf-href="?{{keep_query('*', filter_mode=mode)}}" t-out="mode_value"/>
