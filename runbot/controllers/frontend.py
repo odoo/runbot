@@ -135,6 +135,10 @@ class Runbot(Controller):
         batchs = request.env['runbot.batch'].search(domain, limit=limit, offset=pager.get('offset', 0), order='id desc')
         last_batch = request.env['runbot.batch'].search(domain, limit=1, order='id desc')
 
+        trigger_display = request.httprequest.cookies.get('trigger_display_%s' % bundle.project_id.id, None)
+        if trigger_display is not None:
+            trigger_display = [int(td) for td in trigger_display.split('-') if td]
+
         # compute if we should display the new batch button
         context = {
             'bundle': bundle,
@@ -147,6 +151,8 @@ class Runbot(Controller):
             'page_info_state': last_batch._get_global_result(),
             'expand_custom': expand_custom,
             'needs_update': bundle.last_batch and bundle.last_batch.sudo().needs_update(),
+            'triggers': request.env['runbot.trigger'].search([('project_id', '=', bundle.project_id.id)]),
+            'trigger_display': trigger_display,
         }
 
         return request.render('runbot.bundle', context)
