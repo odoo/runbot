@@ -66,6 +66,8 @@ class Runbot(Controller):
                 domain.append(('sticky', '=', False))
             elif filter_mode == 'mine':
                 domain.append(('author_ids', 'in', request.env.user.id))
+            elif filter_mode == 'team':
+                domain.append(('team_id', 'in', request.env.user.runbot_team_ids.ids))
 
             if search:
                 search_domains = []
