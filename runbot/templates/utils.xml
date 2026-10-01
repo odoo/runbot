@@ -225,6 +225,19 @@
             </div>
         </template>
 
+        <template id="runbot.search_dropdown">
+            <div class="dropdown">
+                <button type="button" class="dropdown-toggle btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
+                    <t t-out="label"/>: <t t-out="options[value]"/>
+                </button>
+                <ul class="dropdown-menu" role="menu">
+                    <li t-foreach="options" t-as="option">
+                        <a role="menuitem" t-attf-class="dropdown-item{{' active' if option == value else ''}}" t-attf-href="?{{keep_query('*', **{param: option})}}" t-out="option_value"/>
+                    </li>
+                </ul>
+            </div>
+        </template>
+
         <template id="runbot.build_errors_link">
             <t t-set="nb_assigned_errors" t-value="env['runbot.build.error'].sudo().search_count([('responsible', '=', user_id.id)])"/>
             <t t-set="nb_team_errors" t-value="env['runbot.build.error'].sudo().search_count([('responsible', '=', False), ('team_id', 'in', user_id.runbot_team_ids.ids)])"/>
