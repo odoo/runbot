@@ -38,7 +38,7 @@ class DockerLayer(models.Model):
         ('reference_file', "Reference file"),
         ('file', "File"),
     ], string="Layer type", default='raw', tracking=True)
-    file_destination = fields.Char("File destination", help="Destination path of the file in the docker image, only used when layer_type is 'file'", tracking=True)
+    scriptfile_id = fields.Many2one('runbot.scriptfile', tracking=True)
     content = fields.Text("Content", tracking=True)
     packages = fields.Text("Packages", help="List of package, can be on multiple lines with comments", tracking=True)
     rendered = fields.Text("Rendered", compute="_compute_rendered", recursive=True)
@@ -61,32 +61,17 @@ class DockerLayer(models.Model):
         for record in self:
             record.has_xml_id = record.id and record.id in existing_xml_id
 
-    @api.depends('layer_type', 'content', 'reference_docker_layer_id.rendered', 'reference_dockerfile_id.layer_ids.rendered', 'values', 'packages', 'name')
+    @api.depends('layer_type', 'scriptfile_id', 'reference_docker_layer_id.rendered', 'reference_dockerfile_id.layer_ids.rendered', 'values', 'packages', 'name')
     def _compute_rendered(self):
         for layer in self:
             if layer.layer_type == 'file':
-                rendered = f'-> FILE {layer.file_destination}\n' + layer._render_file_content(layer._get_values({}))
+                rendered = f'COPY --chmod {layer.scriptfile_id.chmod} {layer.scriptfile_id.copy_name} {layer.scriptfile_id.dest_path}'
             else:
                 rendered = layer._render_layer({})
             layer.rendered = rendered
 
-    def _render_file_content(self, values):
-        if not self.content:
-            return f'# No content for file layer {self.name}'
-        content = self._render_template(values, header=False)
-        return content
-
-    def _render_file_layer(self, values):
-        content = self._render_file_content(values)
-        lines = content.splitlines()
-        quoted_lines = ["'" + line.replace("'", "'\"'\"'") + "'" for line in lines]
-
-        rendered = (
-            "RUN printf '%s\\n' \\\n"
-            + " \\\n".join(quoted_lines)
-            + f" \\\n> {self.file_destination}"
-        )
-        return rendered
+    def _render_file_layer(self):
+        return f'COPY --chmod {self.scriptfile_id.chmod} {self.scriptfile_id.copy_name} {self.scriptfile_id.dest_path}'
 
     def _get_values(self, custom_values=None):
         base_values = {
@@ -118,7 +103,7 @@ class DockerLayer(models.Model):
         elif self.layer_type == 'template':
             rendered = self._render_template(values)
         elif self.layer_type == 'file':
-            rendered = self._render_file_layer(values)
+            rendered = self._render_file_layer()
         if not rendered or rendered[0] != '#':
             rendered = f'# {self.name}\n{rendered}'
         return rendered
@@ -373,6 +358,17 @@ class Dockerfile(models.Model):
                 return {'error': str(e)}
         return metadata
 
+    def _get_scriptfiles(self):
+        scriptfiles = self.env['runbot.scriptfile']
+        for layer in self.layer_ids:
+            if layer.layer_type == 'reference_layer' and layer.reference_docker_layer_id:
+                scriptfiles |= layer.reference_docker_layer_id.scriptfile_id
+            elif layer.layer_type == 'reference_file' and layer.reference_dockerfile_id:
+                scriptfiles |= layer.reference_dockerfile_id._get_scriptfiles()
+            elif layer.scriptfile_id:
+                scriptfiles |= layer.scriptfile_id
+        return scriptfiles
+
     def _get_cached_content(self, docker_build_path):
         self.ensure_one()
         cache_dir = Path(self.env['runbot.runbot']._path('docker', 'cache'))
@@ -419,6 +415,9 @@ class Dockerfile(models.Model):
         content = ''
         image_id = None
         try:
+            for scriptfile in self._get_scriptfiles():
+                with open(self.env['runbot.runbot']._path('docker', tag_dir, scriptfile.copy_name), 'w', encoding="utf-8") as script:
+                    script.write(scriptfile.content)
             content = self._get_cached_content(docker_build_path)
             with open(self.env['runbot.runbot']._path('docker', tag_dir, 'Dockerfile'), 'w', encoding="utf-8") as Dockerfile:
                 Dockerfile.write(content)
