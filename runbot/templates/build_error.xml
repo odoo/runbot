@@ -101,8 +101,8 @@
                       <t t-set="options" t-value="sort_order_choices"/>
                       <t t-set="value" t-value="sort_order"/>
                     </t>
-                    <t t-call="website.pager">
-                      <t t-set="classname" t-valuef="pagination-sm"/>
+                    <t t-call="runbot.pager">
+                      <t t-set="classes" t-valuef="pagination-sm"/>
                     </t>
                   </t>
                 </t>
