@@ -3,13 +3,14 @@
     <data>
         <!-- base layout -->
         <template id="runbot.base_page">&lt;!DOCTYPE html&gt;
-            <t t-set="theme" t-value="request.httprequest.cookies.get('theme', 'light')"/>
+            <t t-set="theme" t-value="request.httprequest.cookies.get('theme', 'system')"/>
             <t t-set="theme" t-value="'light' if theme == 'legacy' else theme"/>
             <t t-set="refresh" t-value="request.params.get('refresh')"/>
             <html t-att-data-bs-theme="theme">
                 <head>
                     <meta charset="utf-8"/>
                     <title t-out="title or ('Runbot %s' % project.name if project else 'Runbot')"/>
+                    <t t-if="theme == 'system'" t-call-assets="runbot.assets_system_theme" t-css="False"/>
 
                     <t t-call-assets="runbot.assets_frontend" t-js="False"/>
                     <t t-call-assets="runbot.assets_frontend" t-css="False" defer_load="True"/>
@@ -146,8 +147,11 @@
                                     </div>
                                     <div class="row mb-2">
                                         <div id="label_pref_theme" class="col-md-2">Theme</div>
-                                        <user-preference class="col-md-10" data-default="light">
+                                        <user-preference class="col-md-10" data-default="system">
                                             <form class="text-nowrap btn-group btn-group-sm" role="group" aria-labelledby="label_pref_theme">
+                                                <input type="radio" class="btn-check" autocomplete="off" name="theme" id="pref_theme_system"
+                                                    value="system" t-att-checked="theme == 'system'"/>
+                                                <label class="btn btn-outline-primary" for="pref_theme_system">System</label>
                                                 <input type="radio" class="btn-check" autocomplete="off" name="theme" id="pref_theme_light"
                                                     value="light" t-att-checked="theme == 'light'"/>
                                                 <label class="btn btn-outline-primary" for="pref_theme_light">Light</label>
