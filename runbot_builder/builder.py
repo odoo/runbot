@@ -20,15 +20,27 @@ class BuilderClient(RunbotClient):
             monitoring_thread = threading.Thread(target=docker_monitoring_loop, args=(builds_path,), daemon=True)
             monitoring_thread.start()
 
+    def docker_ident(self):
+        if self.is_registry:
+            return self.env['runbot.dockerfile'].search_read(
+                ['|', ('to_build', '=', True), ('is_template', '=', True)],
+                ['write_date']
+            )
+        else:
+            return self.env['runbot.dockerfile'].search_read(
+                [('to_build', '=', True)],
+                ['image_identifier', 'image_future_identifier']
+            )
+
     def loop_turn(self):
         self.env['runbot.runbot']._reload_nginx()
         if self.host.is_registry:
             self.env['runbot.runbot']._start_docker_registry()
         if self.host.is_registry or self.host.is_builder:
-            last_docker_updates = self.env['runbot.dockerfile'].search(['|', ('to_build', '=', True), ('is_template', '=', True)], order='id').read(['image_identifier', 'image_future_identifier'])
-            if self.count == 1 or self.last_docker_updates != last_docker_updates:
-                self.last_docker_updates = last_docker_updates
+            last_docker_ident = self.docker_ident()
+            if self.count == 1 or self.last_docker_ident != last_docker_ident:
                 self.host._docker_update_images()
+                self.last_docker_ident = self.docker_ident()  # recompute in case _docker_update_images made some changes
                 self.env.cr.commit()
         if self.host.is_backup:
             self.env['runbot.runbot']._backup_databases()
