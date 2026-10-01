@@ -4,10 +4,11 @@
         <template id="runbot.batch">
             <t t-set="more" t-value="str2bool(request.httprequest.cookies.get('more', ''), False)"/>
             <t t-call="runbot.layout">
+                <t t-set="active_category_id" t-value="batch.category_id.id"/>
                 <t t-set="page_nav">
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item">
-                            <a t-att-href="batch.bundle_id._url()" class="btn btn-link" t-out="batch.bundle_id.name"/>
+                            <a t-attf-href="{{batch.bundle_id._url()}}?category={{active_category_id}}" class="btn btn-link" t-out="batch.bundle_id.name"/>
                         </li>
                         <li class="breadcrumb-item active" aria-current="page">
                             <a t-att-href="batch._url()" class="btn btn-link">batch-<t t-out="batch.id"/></a>

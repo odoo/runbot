@@ -11,6 +11,7 @@
 
         <t t-set="main_batch" t-value="from_batch or batches[:1]"/>
         <t t-set="main_bundle" t-value="main_batch.bundle_id"/>
+        <t t-if="main_batch" t-set="active_category_id" t-value="main_batch.category_id.id"/>
         <t t-set="route" t-value="build._get_route_from_batch(main_batch) if main_batch else build.browse()"/>
         <t t-if="not route" t-set="route" t-value="build.ancestors"/>
         <t t-set="main_slot" t-value="main_batch.with_context(active_test=False).slot_ids.filtered(lambda slot: slot.build_id == route[:1]).sorted('active', reverse=True)[:1]"/>
@@ -44,7 +45,7 @@
                   </li>
                 </ul>
               </t>
-              <a t-att-href="main_bundle._url()" class="btn btn-link">
+              <a t-attf-href="{{main_bundle._url()}}?category={{active_category_id}}" class="btn btn-link">
                 <t t-out="main_bundle.name"/>
               </a>
             </li>
