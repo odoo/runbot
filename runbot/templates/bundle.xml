@@ -134,11 +134,11 @@
                                 </tr>
                             </table>
                             <div t-foreach="bundle._consistency_warning()" t-as="warning" t-out="warning[1]" t-attf-class="alert alert-{{warning[0]}}"/>
-                            <t t-call="website.pager" />
+                            <t t-call="runbot.pager"/>
                             <div class="batch_row" t-foreach="batchs" t-as="batch">
                                 <t t-call="runbot.batch_tile"/>
                             </div>
-                            <t t-call="website.pager" />
+                            <t t-call="runbot.pager"/>
                         </div>
                     </div>
                 </div>
