@@ -254,8 +254,8 @@ class TestRepo(RunbotCaseMinimalSetup):
 
         self.patchers['github_patcher'].side_effect = github2
 
-        self.repo_odoo.project_id.process_delay = 0
-        bundle.last_batch._process()
+        last_batch.process_delay = 0
+        last_batch._process()
         self.assertEqual(last_batch.commit_link_ids.commit_id.mapped('subject'), ['Server subject', 'Addons subject'])
 
         self.assertEqual(last_batch.state, 'ready')

@@ -17,6 +17,33 @@ class TestBatch(RunbotCase):
         batch._process()
         self.assertEqual(batch.state, 'ready')
 
+    def test_process_delay_backoff(self):
+        self.project.write({'process_delay': 60, 'process_delay_window': 3600, 'process_delay_max': 300})
+        bundle = self.Bundle.create({'name': 'master-dev-backoff', 'project_id': self.project.id})
+
+        self.assertEqual(bundle._get_process_delay(), 60)
+        self.assertEqual(self.master_bundle._get_process_delay(), 60)
+
+        delays = []
+        for _ in range(4):
+            self.env['runbot.batch'].create({'bundle_id': bundle.id, 'state': 'done'})
+            delays.append(bundle._get_process_delay())
+        self.assertEqual(delays, [120, 240, 300, 300])
+        self.assertEqual(self.master_bundle._get_process_delay(), 60)
+
+        bundle.priority = True
+        self.assertEqual(bundle._get_process_delay(), 60)
+        bundle.priority = False
+
+        self.env.flush_all()
+        self.env.cr.execute("UPDATE runbot_batch SET create_date = create_date - interval '1 hour' WHERE bundle_id = %s", [bundle.id])
+        self.env.invalidate_all()
+        self.assertEqual(bundle._get_process_delay(), 60)
+
+        self.env['runbot.batch'].create({'bundle_id': bundle.id, 'state': 'done'})
+        self.project.process_delay_max = 0
+        self.assertEqual(bundle._get_process_delay(), 60)
+
     def test_build_link(self):
         self.trigger_addons.unlink()
         self.trigger_server.ci_context = "test"

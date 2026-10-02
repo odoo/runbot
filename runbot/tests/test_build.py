@@ -121,7 +121,7 @@ class TestBuildParams(RunbotCaseMinimalSetup):
             'config_id': custom_config.id
         })
 
-        self.repo_odoo.project_id.process_delay = 0
+        bundle.last_batch.process_delay = 0
         bundle.last_batch._process()
         build_slot = bundle.last_batch.slot_ids.filtered(lambda rec: rec.trigger_id == self.trigger_server)
         self.assertEqual(build_slot.build_id.params_id.config_id, custom_config)
@@ -143,7 +143,7 @@ class TestBuildParams(RunbotCaseMinimalSetup):
             })]
         })
         self.assertEqual(bundle.all_trigger_custom_ids, bundle_b.all_trigger_custom_ids)
-        self.repo_odoo.project_id.process_delay = 0
+        bundle_b.last_batch.process_delay = 0
         bundle_b.last_batch._process()
         build_slot = bundle_b.last_batch.slot_ids.filtered(lambda rec: rec.trigger_id == self.trigger_server)
         self.assertEqual(build_slot.build_id.params_id.config_id, custom_config)
@@ -238,7 +238,7 @@ class TestBuildParams(RunbotCaseMinimalSetup):
         # create a custom trigger for the bundle
         bundle = self.Bundle.search([('name', '=', branch_a_name), ('project_id', '=', self.project.id)])
 
-        self.repo_odoo.project_id.process_delay = 0
+        bundle.last_batch.process_delay = 0
         bundle.last_batch._process()
         build_slot = bundle.last_batch.slot_ids.filtered(lambda rec: rec.trigger_id == self.trigger_server)
         self.assertIn(
@@ -271,7 +271,7 @@ class TestBuildParams(RunbotCaseMinimalSetup):
             'config_data': {'moc_var': 'foo'},
         })
 
-        self.repo_odoo.project_id.process_delay = 0
+        bundle.last_batch.process_delay = 0
         bundle.last_batch._process()
         build_slot = bundle.last_batch.slot_ids.filtered(lambda rec: rec.trigger_id == self.trigger_server)
         self.assertIn(

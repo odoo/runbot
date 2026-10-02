@@ -694,8 +694,12 @@ class Repo(models.Model):
                     continue
 
                 if bundle.last_batch.state != 'preparing':
+                    process_delay = bundle._get_process_delay()
+                    if process_delay > bundle.project_id.process_delay:
+                        _logger.info('Delaying batch of bundle %s by %ss', bundle.name, process_delay)
                     preparing = self.env['runbot.batch'].create({
                         'last_update': datetime.datetime.now(),
+                        'process_delay': process_delay,
                         'bundle_id': bundle.id,
                         'state': 'preparing',
                     })

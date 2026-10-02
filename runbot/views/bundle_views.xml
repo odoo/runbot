@@ -18,6 +18,8 @@
                     <field name="hidden"/>
                     <field name="active"/>
                     <field name="process_delay"/>
+                    <field name="process_delay_window"/>
+                    <field name="process_delay_max"/>
                     <field name="use_light_default"/>
                     <field name="use_light_draft"/>
                     <field name="use_light_no_pr"/>
@@ -196,6 +198,7 @@
             <form string="Batch">
                 <group>
                     <field name="last_update" options="{'numeric': true}"/>
+                    <field name="process_delay"/>
                     <field name="bundle_id"/>
                     <field name="state"/>
                     <field name="commit_link_ids">

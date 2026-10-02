@@ -24,14 +24,16 @@ class Project(models.Model):
     hidden = fields.Boolean('Hidden', help='Hide this project from the main page')
     active = fields.Boolean("Active", default=True)
     process_delay = fields.Integer('Process delay', default=60, required=True, help="Delay between a push and a batch starting its process.")
+    process_delay_window = fields.Integer('Process delay window', default=3600, required=True, help="Period during which previous batches of a bundle double its process delay.", groups="runbot.group_runbot_admin")
+    process_delay_max = fields.Integer('Max process delay', default=0, required=True, help="Upper bound of the doubled process delay, no doubling if lower than the process delay.", groups="runbot.group_runbot_admin")
     next_freeze_tag_id = fields.Many2one('runbot.bundle.tag', string="Next freeze tag")
     use_light_default = fields.Boolean('Use light config by default', help="Use the light config when possible for all triggers")
     use_light_draft = fields.Boolean('Use light config for draft PRs', help="Use the light config when possible for bundle having draft pr")
     use_light_no_pr = fields.Boolean('Use light config when no PR', help="Use the light config when possible for all bundles not having any pr")
 
-    @api.constrains('process_delay')
+    @api.constrains('process_delay', 'process_delay_window', 'process_delay_max')
     def _constraint_process_delay(self):
-        if any(project.process_delay < 0 for project in self):
+        if any(min(project.process_delay, project.process_delay_window, project.process_delay_max) < 0 for project in self):
             raise ValidationError("Process delay should be positive.")
 
     @api.model_create_multi

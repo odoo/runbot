@@ -14,6 +14,7 @@ class Batch(models.Model):
     _description = "Bundle batch"
 
     last_update = fields.Datetime('Last ref update')
+    process_delay = fields.Integer('Process delay', groups="runbot.group_runbot_admin")
     bundle_id = fields.Many2one('runbot.bundle', required=True, index=True, ondelete='cascade')
     build_all = fields.Boolean('Force all triggers')
     commit_link_ids = fields.Many2many('runbot.commit.link')
@@ -121,10 +122,9 @@ class Batch(models.Model):
     def _process(self):
         processed = self.browse()
         for batch in self:
-            process_delay = batch.bundle_id.project_id.process_delay
             if batch.state == 'preparing' and (
-                process_delay == 0 or
-                batch.last_update <= datetime.datetime.now() - datetime.timedelta(seconds=process_delay)
+                batch.process_delay == 0 or
+                batch.last_update <= datetime.datetime.now() - datetime.timedelta(seconds=batch.process_delay)
             ):
                 batch._prepare()
                 processed |= batch

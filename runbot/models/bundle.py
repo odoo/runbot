@@ -336,6 +336,7 @@ class Bundle(models.Model):
             return
         values = {
             'last_update': datetime.datetime.now(),
+            'process_delay': self.project_id.process_delay,
             'bundle_id': self.id,
             'state': 'preparing',
         }
@@ -345,6 +346,19 @@ class Bundle(models.Model):
         if not category_id:
             self.last_batch = new
         return new
+
+    def _get_process_delay(self):
+        self.ensure_one()
+        project = self.project_id
+        delay = project.process_delay
+        if not delay or project.process_delay_max <= delay or self.is_base or self.is_staging or self.priority:
+            return delay
+        recent = self.env['runbot.batch'].search_count([
+            ('bundle_id', '=', self.id),
+            ('category_id', '=', self.env.ref('runbot.default_category').id),
+            ('create_date', '>', datetime.datetime.now() - datetime.timedelta(seconds=project.process_delay_window)),
+        ])
+        return min(delay * 2 ** recent, project.process_delay_max)
 
     def _consistency_warning(self):
         if self.defined_base_id:
