@@ -509,7 +509,6 @@ class Runbot(Controller):
             'sortby': sortby,
             'searchbar_filters': OrderedDict(sorted(searchbar_filters.items())),
             'filterby': filterby,
-            'default_url': request.httprequest.path,
         }
         return request.render('runbot.team', qctx)
 

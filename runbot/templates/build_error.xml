@@ -95,18 +95,14 @@
                   <t t-set="build_errors" t-value="build_errors"/>
                   <t t-set="build_errors_counter" t-value="current_user_errors.search_count([])"/>
                   <t t-set="additional_buttons">
-                    <div class="dropdown">
-                      <button type="button" class="dropdown-toggle btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
-                        Sort By: <t t-out="sort_order_choices.get(sort_order)"/>
-                      </button>
-                      <ul class="dropdown-menu" aria-labelledby="sortMenuButton" role="menu">
-                        <li t-foreach="sort_order_choices" t-as="sort_choice">
-                          <a role="menuitem" class="dropdown-item" t-attf-href="/runbot/errors?sort={{sort_choice}}"><t t-out="sort_order_choices[sort_choice]"/></a>
-                        </li>
-                      </ul>
-                    </div>
-                    <t t-call="website.pager">
-                      <t t-set="classname" t-valuef="pagination-sm"/>
+                    <t t-call="runbot.search_dropdown">
+                      <t t-set="label">Sort By</t>
+                      <t t-set="param" t-valuef="sort"/>
+                      <t t-set="options" t-value="sort_order_choices"/>
+                      <t t-set="value" t-value="sort_order"/>
+                    </t>
+                    <t t-call="runbot.pager">
+                      <t t-set="classes" t-valuef="pagination-sm"/>
                     </t>
                   </t>
                 </t>
@@ -138,10 +134,20 @@
               </div>
               <div class="d-flex">
                 <h3 t-if="assignment_ids">Team assigned Errors</h3>
-                <t t-call="portal.portal_searchbar">
-                  <t t-set="classes" t-valuef="o_runbot_team_searchbar border-0"/>
-                  <t t-set="title">&amp;nbsp;</t>
-                </t>
+                <div class="d-flex gap-2 ms-2 mb-4">
+                  <t t-call="runbot.search_dropdown">
+                    <t t-set="label">Sort By</t>
+                    <t t-set="param" t-valuef="sortby"/>
+                    <t t-set="options" t-value="{key: sorting['label'] for key, sorting in searchbar_sortings.items()}"/>
+                    <t t-set="value" t-value="sortby"/>
+                  </t>
+                  <t t-call="runbot.search_dropdown">
+                    <t t-set="label">Filter By</t>
+                    <t t-set="param" t-valuef="filterby"/>
+                    <t t-set="options" t-value="{key: filter['label'] for key, filter in searchbar_filters.items()}"/>
+                    <t t-set="value" t-value="filterby"/>
+                  </t>
+                </div>
               </div>
               <t t-call="runbot.build_error_cards">
                 <t t-set="build_errors" t-value="assignment_ids"/>

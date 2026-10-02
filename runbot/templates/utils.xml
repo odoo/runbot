@@ -225,6 +225,37 @@
             </div>
         </template>
 
+        <template id="runbot.search_dropdown">
+            <div class="dropdown">
+                <button type="button" class="dropdown-toggle btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
+                    <t t-out="label"/>: <t t-out="options[value]"/>
+                </button>
+                <ul class="dropdown-menu" role="menu">
+                    <li t-foreach="options" t-as="option">
+                        <a role="menuitem" t-attf-class="dropdown-item{{' active' if option == value else ''}}" t-attf-href="?{{keep_query('*', **{param: option})}}" t-out="option_value"/>
+                    </li>
+                </ul>
+            </div>
+        </template>
+
+        <template id="runbot.pager">
+            <ul t-if="pager['page_count'] > 1" t-attf-class="pagination m-0 {{classes or ''}}">
+                <li t-attf-class="page-item{{' disabled' if pager['page']['num'] == 1 else ''}}">
+                    <a class="page-link" t-att-href="pager['page_previous']['url'] if pager['page']['num'] != 1 else None" title="Previous" aria-label="Previous">
+                        <i class="fa fa-chevron-left"/>
+                    </a>
+                </li>
+                <li t-foreach="pager['pages']" t-as="page" t-attf-class="page-item{{' active' if page['is_current'] else ''}}{{' disabled' if not page['url'] else ''}}">
+                    <a class="page-link" t-att-href="page['url']" t-att-aria-current="'page' if page['is_current'] else None" t-out="page['num']"/>
+                </li>
+                <li t-attf-class="page-item{{' disabled' if pager['page']['num'] == pager['page_count'] else ''}}">
+                    <a class="page-link" t-att-href="pager['page_next']['url'] if pager['page']['num'] != pager['page_count'] else None" title="Next" aria-label="Next">
+                        <i class="fa fa-chevron-right"/>
+                    </a>
+                </li>
+            </ul>
+        </template>
+
         <template id="runbot.build_errors_link">
             <t t-set="nb_assigned_errors" t-value="env['runbot.build.error'].sudo().search_count([('responsible', '=', user_id.id)])"/>
             <t t-set="nb_team_errors" t-value="env['runbot.build.error'].sudo().search_count([('responsible', '=', False), ('team_id', 'in', user_id.runbot_team_ids.ids)])"/>
