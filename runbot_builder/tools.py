@@ -40,6 +40,7 @@ class RunbotClient():
     def main_loop(self):
         from odoo import fields
         from odoo.tools.profiler import Profiler
+        from odoo.tools.misc import str2bool  # ruff: ignore[import-outside-top-level]
         self.on_start()
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
@@ -56,17 +57,28 @@ class RunbotClient():
         )
         previous_queries = self.env.cr.sql_log_count
         while True:
-            start = time.time()
-            context_manager = Profiler(db=self.env.cr.dbname) if self.host.profile else nullcontext()
-            with context_manager:
-                try:
+            try:
+                if self.env.registry != self.env.registry.check_signaling():
+                    self.env.reset()
+                    self.env = self.env()
+                    self.host = self.env['runbot.host']._get_current()
+                if str2bool(self.env['ir.config_parameter'].sudo().get_param('runbot.pause_all_hosts', 'False')):
+                    self.env.cr.rollback()
+                    self.env.clear()
+                    # don't even access hosts to make upgrades possible
+                    _logger.info('All hosts are paused, sleeping 10s')
+                    self.sleep(10)
+                    if self.ask_interrupt.is_set():
+                        return
+                    continue
+                start = time.time()
+                context_manager = Profiler(db=self.env.cr.dbname) if self.host.profile else nullcontext()
+                with context_manager:
                     self.host.last_start_loop = fields.Datetime.now()
                     self.env.cr.commit()
-                    if self.env.registry != self.env.registry.check_signaling():
-                        self.env.reset()
-                        self.env = self.env()
                     self.count = self.count % self.max_count
                     if self.host.paused:
+                        _logger.info('Host is paused')
                         sleep_time = 5
                     else:
                         sleep_time = self.loop_turn()
@@ -77,13 +89,13 @@ class RunbotClient():
                     _logger.info('Work done in %.2fs and %s queries', time.time() - start, self.env.cr.sql_log_count - previous_queries)
                     previous_queries = self.env.cr.sql_log_count
                     self.sleep(sleep_time)
-                except Exception as e:
-                    _logger.exception('Builder main loop failed with: %s', e)
-                    self.env.cr.rollback()
-                    self.env.clear()
-                    self.sleep(10)
-                if self.ask_interrupt.is_set():
-                    return
+            except Exception:
+                _logger.exception('Builder main loop failed')
+                self.env.cr.rollback()
+                self.env.clear()
+                self.sleep(10)
+            if self.ask_interrupt.is_set():
+                return
 
     def loop_turn(self):
         raise NotImplementedError()
