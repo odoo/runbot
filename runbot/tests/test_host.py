@@ -8,22 +8,22 @@ from datetime import datetime, timedelta
 
 _logger = logging.getLogger(__name__)
 
-def fetch_local_logs_return_value(nb_logs=10, message='', log_type='server', level='INFO', build_dest='1234567-master-all'):
+def fetch_local_logs_return_value(build, nb_logs=10, message='', log_type='server', level='INFO'):
 
     log_date = datetime(2022, 8, 17, 21, 55)
     logs = []
     cleanups = []
-    for i in range(nb_logs):
+    for _i in range(nb_logs):
         logs += [{
-            'id': i,
             'create_date': log_date,
             'name': 'odoo.modules.loading',
             'level': level,
-            'dbname': build_dest,
+            'dbname': build.dest,
             'func': 'runbot',
             'path': '/data/build/odoo/odoo/netsvc.py',
             'line': '274',
             'type': log_type,
+            'build_id': build.id,
             'message': '75 modules loaded in 0.92s, 717 queries (+1 extra)' if message == '' else message,
         }]
         cleanups.append(MagicMock())
@@ -69,7 +69,7 @@ class TestHost(RunbotCase):
         })
 
         # check that local logs are inserted in leader ir.logging
-        logs = fetch_local_logs_return_value(build_dest=build.dest)
+        logs = fetch_local_logs_return_value(build)
         self.patchers['fetch_local_logs'].return_value = logs
         self.test_host._process_logs(build)
         logs[1][0].assert_called()
@@ -82,7 +82,7 @@ class TestHost(RunbotCase):
         )
 
         # check that a warn log sets the build in warning
-        logs = fetch_local_logs_return_value(nb_logs=1, build_dest=build.dest, level='WARNING')
+        logs = fetch_local_logs_return_value(build, nb_logs=1, level='WARNING')
         self.patchers['fetch_local_logs'].return_value = logs
         self.test_host._process_logs(build)
         logs[1][0].assert_called()
@@ -97,7 +97,7 @@ class TestHost(RunbotCase):
         self.assertEqual(build.local_result, 'warn', 'A warning log should sets the build in warn')
 
         # now check that error logs sets the build in ko
-        logs = fetch_local_logs_return_value(nb_logs=1, build_dest=build.dest, level='ERROR')
+        logs = fetch_local_logs_return_value(build, nb_logs=1, level='ERROR')
         self.patchers['fetch_local_logs'].return_value = logs
         self.test_host._process_logs(build)
         logs[1][0].assert_called()
@@ -113,7 +113,7 @@ class TestHost(RunbotCase):
 
         build.log_counter = 10
         # Test log limit
-        logs = fetch_local_logs_return_value(nb_logs=11, message='test log limit', build_dest=build.dest)
+        logs = fetch_local_logs_return_value(build, nb_logs=11, message='test log limit')
         self.patchers['fetch_local_logs'].return_value = logs
         self.test_host._process_logs(build)
         logs[1][0].assert_called()
