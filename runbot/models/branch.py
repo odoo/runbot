@@ -47,6 +47,7 @@ class Branch(models.Model):
     alive = fields.Boolean('Alive', default=True)
     draft = fields.Boolean('Draft', store=True)
     close_date = fields.Datetime('Close date')
+    merge_date = fields.Datetime('Merge date')
 
     forwardport_of_id = fields.Many2one('runbot.branch', compute='_compute_forwardport_of_id', string='Forwardport of', store=True, index=True)
     forwardport_ids = fields.One2many('runbot.branch', 'forwardport_of_id', string='Forwardports')
