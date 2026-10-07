@@ -229,7 +229,7 @@
                 <field name="name"/>
                 <field name="sequence"/>
                 <field name="repo_id"/>
-                <field name="token"/>
+                <field name="token" password="True"/>
                 <field name="fetch_pull"/>
                 <field name="fetch_heads"/>
                 <field name="send_status"/>
