@@ -100,43 +100,6 @@ class Host(models.Model):
                 vals['disp_name'] = vals['name']
         return super().create(vals_list)
 
-    def _bootstrap_local_logs_db(self):
-        # TODO cleanup remove
-        """ bootstrap a local database that will collect logs from builds """
-        logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
-        if logs_db_name not in list_local_dbs():
-            _logger.info('Logging database %s not found. Creating it ...', logs_db_name)
-            with local_pgadmin_cursor() as local_cr:
-                local_cr.execute(f"""CREATE DATABASE "{logs_db_name}" TEMPLATE template0 LC_COLLATE 'C' ENCODING 'unicode'""")
-            try:
-                with local_pg_cursor(logs_db_name) as local_cr:
-                    # create_date, type, dbname, name, level, message, path, line, func
-                    local_cr.execute("""CREATE TABLE ir_logging (
-                        id bigserial NOT NULL,
-                        create_date timestamp without time zone,
-                        name character varying NOT NULL,
-                        level character varying,
-                        dbname character varying,
-                        func character varying NOT NULL,
-                        path character varying NOT NULL,
-                        line character varying NOT NULL,
-                        type character varying NOT NULL,
-                        metadata jsonb,
-                        message text NOT NULL);
-                    """)
-            except Exception as e:
-                _logger.exception('Failed to create local logs database: %s', e)
-        else:
-            # TODO cleanup remove in 20.0
-            with local_pg_cursor(logs_db_name) as local_cr:
-                local_cr.execute("""SELECT 1
-                FROM information_schema.columns
-                WHERE table_name='ir_logging' and column_name='metadata'""")
-                if not local_cr.fetchone():
-                    _logger.info('Adding metadata column to ir_logging table')
-                    local_cr.execute("""ALTER TABLE ir_logging ADD COLUMN metadata jsonb""")
-
-
     def _bootstrap_db_template(self):
         """ boostrap template database if needed """
         icp = self.env['ir.config_parameter']
@@ -157,7 +120,6 @@ class Host(models.Model):
         for dir, path in static_dirs.items():
             os.makedirs(path, exist_ok=True)
         self._bootstrap_db_template()
-        self._bootstrap_local_logs_db()
 
     def _get_docker_registry_url(self):
         if self.docker_registry_url:
@@ -291,7 +253,7 @@ class Host(models.Model):
         if nb_reserved < (nb_hosts / 2):
             self.assigned_only = True
 
-    def _fetch_local_logs(self, builds=None):
+    def _fetch_local_logs(self, builds):
         res = []
         cleanups = []
         for build in builds:
@@ -335,37 +297,6 @@ class Host(models.Model):
                     cleanups.append(cleanup)
                 continue
 
-            # TODO cleanup remove
-            log_to_delete = []
-            build_ids = build.ids
-            logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
-            with local_pg_cursor(logs_db_name) as local_cr:
-                where_clause = "WHERE split_part(dbname, '-', 1) IN %s" if build_ids else ''
-                query = f"""
-                        SELECT *
-                        FROM (
-                                SELECT id, create_date, name, level, dbname, func, path, line, type, message, metadata
-                                FROM ir_logging
-                                )
-                            AS ir_logs
-                        {where_clause}
-                    ORDER BY id
-                    LIMIT 10000
-                    """
-                build_ids = [tuple(str(build) for build in build_ids)]
-                local_cr.execute(query, build_ids)
-                col_names = [col.name for col in local_cr.description]
-                for row in local_cr.fetchall():
-                    vals = dict(zip(col_names, row))
-                    res.append(vals)
-                    log_to_delete.append(int(vals.pop('id')))
-            if log_to_delete:
-                def cleanup(log_to_delete=log_to_delete):
-                    logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
-                    with local_pg_cursor(logs_db_name) as local_cr:
-                        local_cr.execute("DELETE FROM ir_logging WHERE id in %s", [tuple(log_to_delete)])
-                cleanups.append(cleanup)
-
         return res, cleanups
 
     def _process_logs(self, testing_builds):
@@ -374,15 +305,8 @@ class Host(models.Model):
         logs_by_build_id = defaultdict(list)
 
         local_log_ids = []
-        for log in ir_logs:
-            if not log.get('build_id'):  # TODO cleanup remove condition, not needed once using only json log
-                try:
-                    log['build_id'] = int(log['dbname'].split('-', maxsplit=1)[0])
-                except (ValueError, AttributeError, KeyError):
-                    if log.get('id'):
-                        local_log_ids.append(log['id'])  # TODO cleanup remove not needed once using only json log
-            if log.get('build_id'):
-                logs_by_build_id[log['build_id']].append(log)
+        for log in ir_logs:  # TODO cleanup this could be avoided by keeping them grouped in _fetch_local_logs
+            logs_by_build_id[log['build_id']].append(log)
 
         logs_to_send = []
         for build in testing_builds:
