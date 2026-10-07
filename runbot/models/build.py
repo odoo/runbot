@@ -896,9 +896,7 @@ class BuildResult(models.Model):
             for _id in self.exists().ids:
                 additionnal_conditions.append("datname like '%s-%%'" % _id)
 
-        # TODO cleanup remove
-        log_db = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
-        existing_db = [db for db in list_local_dbs(additionnal_conditions=additionnal_conditions) if db != log_db]
+        existing_db = list(list_local_dbs(additionnal_conditions=additionnal_conditions))
 
         for db in _filter(dest_list=existing_db, label='db'):
             self._logger('Removing database')
@@ -1624,11 +1622,10 @@ class BuildResult(models.Model):
             else:
                 command.add_config_tuple("http_interface", "0.0.0.0")
 
-        if enable_log_db:
-            if '--log-config' in available_options:
-                command.add_config_tuple("log_config", '/data/build/logconfig.json')
-                command.files['odoo_log.seek'] = "0"
-                command.files['logconfig.json'] = """{
+        if enable_log_db and '--log-config' in available_options:
+            command.add_config_tuple("log_config", '/data/build/logconfig.json')
+            command.files['odoo_log.seek'] = "0"
+            command.files['logconfig.json'] = """{
   "version": 1,
   "keep_odoo_default": true,
   "formatters": {
@@ -1649,12 +1646,6 @@ class BuildResult(models.Model):
     "handlers": ["runbot"]
   }
 }""" % self.active_step.sanitized_name(self)
-            # TODO cleanup remove
-            log_db = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
-            if "--log-db" in available_options:
-                command.add_config_tuple("log_db", log_db)
-                if "--log-db-level" in available_options:
-                    command.add_config_tuple("log_db_level", '25')
 
         if "--data-dir" in available_options:
             datadir = build._path('datadir')
