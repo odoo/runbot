@@ -17,7 +17,7 @@ from odoo.exceptions import UserError
 from odoo.tools import config, file_open
 
 from ..common import dest_reg, os, sanitize
-from ..container import docker_ps, docker_stop, docker_inspect_container
+from ..container import docker_ps, docker_stop, docker_remove_container
 
 _logger = logging.getLogger(__name__)
 
@@ -56,8 +56,6 @@ class Runbot(models.AbstractModel):
             self._commit()
         testing_builds = host._get_builds([('local_state', '=', 'testing')])
         host._process_logs(testing_builds)
-        self._commit()
-        self._docker_check_oom_kills(testing_builds)
         self._commit()
         for build in host._get_builds([('local_state', 'in', ['testing', 'running'])]) | self._get_builds_to_init(host):
             build = build.browse(build.id)  # remove preftech ids, manage build one by one
@@ -349,31 +347,29 @@ class Runbot(models.AbstractModel):
 
     def _docker_cleanup(self):
         _logger.info('Docker cleaning')
-        docker_ps_result = [container for container in docker_ps() if container != "runbot-registry"]
+        containers = [container for container in docker_ps() if container.name != "runbot-registry"]
 
-        containers = {}
         ignored = []
-        for dc in docker_ps_result:
-            build = self.env['runbot.build']._build_from_dest(dc)
+        for dc in containers:
+            build = self.env['runbot.build']._build_from_dest(dc.name)
             if build:
-                containers[build.id] = dc
-        if containers:
-            candidates = self.env['runbot.build'].search([('id', 'in', list(containers.keys())), ('local_state', '=', 'done')])
-            for c in candidates:
-                _logger.info('container %s found running with build state done', containers[c.id])
-                docker_stop(containers[c.id], c._path())
-        ignored = {dc for dc in docker_ps_result if not dest_reg.match(dc)}
-        if ignored:
-            _logger.info('docker (%s) not deleted because not dest format', list(ignored))
-
-    def _docker_check_oom_kills(self, builds):
-        for build in builds:
-            if not build.oom_killed:
-                container_name = build._get_docker_name()
-                inspection = docker_inspect_container(container_name)
-                if inspection.get('State', {}).get('OOMKilled', False):
+                docker_state = dc.attrs.get('State', {})
+                if build.local_state == 'done' and docker_state.get('Running'):
+                    _logger.info('container %s found running with build %s state done', dc.name, build.id)
+                    docker_stop(dc.name, build._path())
+                    continue
+                if docker_state.get('OOMKilled') and not build.oom_killed:
                     build.oom_killed = True
                     build._log('oom', 'A process was killed by the OOM killer in container')
+                exit_code = docker_state.get('ExitCode', 0)
+                if exit_code != 0:
+                    build._log('oom', 'The main process exited with exit code %s', exit_code)
+                docker_remove_container(dc.name)
+            elif not dest_reg.match(dc.name):
+                ignored.append(dc.name)
+
+        if ignored:
+            _logger.info('docker (%s) not managed because not dest format', ignored)
 
     def _start_docker_registry(self):
         """

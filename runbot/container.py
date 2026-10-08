@@ -309,7 +309,7 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
         init=True,
         command=['/bin/bash', '-c',
                  f'exec &>> /data/buildlogs.txt ;{run_cmd}'],
-        auto_remove=True,
+        auto_remove=False,
         detach=True,
         user=USERNAME,
         network_mode=None if network_enabled else 'none'
@@ -345,6 +345,7 @@ def _docker_stop(container_name, build_dir):
     try:
         container = docker_client.containers.get(container_name)
         container.stop(timeout=1)
+        container.remove()
         return
     except docker.errors.NotFound:
         _logger.error('Cannnot stop container %s. Container not found', container_name)
@@ -409,25 +410,23 @@ def docker_ps():
 
 
 def _docker_ps():
-    """Return a list of running containers names"""
+    """Return a list of all containers objects (including exited)"""
     docker_client = docker.client.from_env()
-    return [c.name for c in docker_client.containers.list()]
+    return docker_client.containers.list(all=True)
 
 
-def docker_inspect_container(container_name):
-    return _docker_inspect_container(container_name)
+def docker_remove_container(container_name):
+    return _docker_remove_container(container_name)
 
 
-def _docker_inspect_container(container_name):
+def _docker_remove_container(container_name):
     container_name = sanitize_container_name(container_name)
+    docker_client = docker.from_env()
     try:
-        low_level_client = docker.APIClient()
-        return low_level_client.inspect_container(container_name)
-    except docker.errors.DockerException as e:
-        _logger.warning('Cannot inspect container %s: %s', container_name, e)
-        return {}
-    except docker.errors.APIError:
-        return {}
+        container = docker_client.containers.get(container_name)
+        container.remove()
+    except docker.errors.APIError as e:
+        _logger.error('Cannnot remove container %s. API Error "%s"', container_name, e)
 
 
 def docker_images():
