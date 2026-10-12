@@ -21,9 +21,8 @@
                     <button type="object" name="action_create_app"
                             invisible="method == 'app'"
                             string="Create Github App"/>
-                    <button type="object" name="action_authorize_app"
-                            invisible="method == 'pat' or auth_token"
-                            string="Authorize Github App"/>
+                    <button type="object" name="action_connectors"
+                            string="Manage Github Connectors"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -154,5 +153,69 @@
                 </sheet>
             </form>
         </field>
+    </record>
+
+    <record id="view-list-connector" model="ir.ui.view">
+        <field name="name">Github Connector List</field>
+        <field name="model">runbot_merge.github_connector</field>
+        <field name="arch" type="xml">
+            <tree>
+                <header>
+                    <button name="action_create_app" type="object" string="Create Github App"/>
+                </header>
+                <field name="name"/>
+                <field name="method"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view-form-connector" model="ir.ui.view">
+        <field name="name">Github Connector Form</field>
+        <field name="model">runbot_merge.github_connector</field>
+       <field name="arch" type="xml">
+           <form>
+               <header>
+                    <button type="object" name="action_authorize_app"
+                            invisible="method == 'pat' or auth_token"
+                            string="Authorize Github App"/>
+               </header>
+               <sheet>
+                   <group>
+                       <group>
+                           <field name="name"/>
+                           <field name="method"/>
+                       </group>
+                       <group invisible="method != 'pat'">
+                           <field name="main_pat"/>
+                           <field name="fp_pat"/>
+                       </group>
+                       <group invisible="method != 'app'">
+                           <field name="app_url" widget="url"/>
+                           <field name="app_id" options="{'enable_formatting': false}"/>
+                           <field name="client_id"/>
+                           <field name="client_secret"/>
+                           <field name="webhook_secret"/>
+                           <field name="auth_token"/>
+                           <field name="auth_expires_at"/>
+                           <field name="refresh_token"/>
+                       </group>
+                   </group>
+                   <group invisible="method != 'app'" string="Private Key">
+                       <field name="private_key" nolabel="1" colspan="2"/>
+                   </group>
+                   <group invisible="method != 'app'" string="Installations">
+                       <field name="installations" nolabel="1" colspan="2">
+                           <tree>
+                               <field name="installation_id" options="{'enable_formatting': false}"/>
+                               <field name="owner_login"/>
+                               <field name="owner_id" options="{'enable_formatting': false}"/>
+                               <field name="repository_selection"/>
+                               <field name="repositories"/>
+                           </tree>
+                       </field>
+                   </group>
+               </sheet>
+           </form>
+       </field>
     </record>
 </odoo>

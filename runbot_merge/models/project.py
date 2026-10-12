@@ -401,21 +401,14 @@ confused (and will probably timeout).
                 })
 
     def action_create_app(self):
-        r = self.env['runbot_merge.github_connector.appwizard'].create({
+        return self.env['runbot_merge.github_connector.appwizard'].create({
             'project_id': self.id,
-        })
-        return {
-            'type': 'ir.actions.act_url',
-            'target': 'new',
-            'url': f'/runbot_merge/apps/create/{r.id}',
-        }
+        }).open()
 
-    def action_authorize_app(self):
+    def action_connectors(self):
         return {
-            'type': 'ir.actions.act_url',
-            'target': 'new',
-            'url': 'https://github.com/login/oauth/authorize?' + urlencode({
-                'client_id': self.github_id.client_id,
-                'state': f'{self.id}:{self.github_id.id}:{hmac(self.env, 'app', (self.id, self.github_id.id))}',
-            }),
+            'type': 'ir.actions.act_window',
+            'name': 'Github Connectors',
+            'res_model': 'runbot_merge.github_connector',
+            'view_mode': 'tree,form',
         }

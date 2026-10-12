@@ -100,20 +100,25 @@ class AppController(Controller):
             return Response("Incorrect state", status=400)
         appinfo = r.json()
 
-        project.github_id = request.env['runbot_merge.github_connector'].create({
+        obj = request.env['runbot_merge.github_connector'].create({
             'method': 'app',
             'app_id': appinfo['id'],
             'name': appinfo['name'],
+            'slug': appinfo['slug'],
             'client_id': appinfo['client_id'],
             'client_secret': appinfo['client_secret'],
             'private_key': appinfo['pem'],
             'webhook_secret': appinfo['webhook_secret'],
-        }).id
+        })
+
+        if project:
+            project.github_id = obj.id
+            obj = project
 
         return request.redirect(
-            project.get_base_url() + '/web#' + urlencode({
-                'model': 'runbot_merge.project',
-                'id': project.id,
+            obj.get_base_url() + '/web#' + urlencode({
+                'model': obj._name,
+                'id': obj.id,
                 'view_type': 'form',
             })
         )
@@ -124,10 +129,9 @@ class AppController(Controller):
         methods=['GET'],
     )
     def authorized(self, code: str, state: str, **_kwargs) -> str | Response:
-        pid, gid, mac = state.split(':', 2)
-        pid = int(pid)
+        gid, mac = state.split(':', 1)
         gid = int(gid)
-        if not secrets.compare_digest(mac, hmac(request.env, 'app', (pid, gid))):
+        if not secrets.compare_digest(mac, hmac(request.env, 'app', gid)):
             return Response("Incorrect state", status=400)
 
         app = request.env['runbot_merge.github_connector'].browse(gid)
@@ -147,11 +151,10 @@ class AppController(Controller):
                 seconds=int(res['expires_in']) - 660
             )
 
-        project = request.env['runbot_merge.project'].browse(pid)
         return request.redirect(
-            project.get_base_url() + '/web#' + urlencode({
-                'model': 'runbot_merge.project',
-                'id': project.id,
+            app.get_base_url() + '/web#' + urlencode({
+                'model': app._name,
+                'id': app.id,
                 'view_type': 'form',
             })
         )

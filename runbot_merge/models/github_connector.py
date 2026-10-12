@@ -1,12 +1,15 @@
 import datetime
 import secrets
 import time
+from urllib.parse import urlencode
 
 import jwt
 import requests
 
-from odoo import models, fields
+from odoo import models, fields, api
+from odoo.exceptions import UserError
 from odoo.sql_db import db_connect
+from odoo.tools import hmac
 
 #: {owner: (iat, expiry)}
 iats: dict[str, tuple[str, int]] = {}  # TODO: per repo?
@@ -163,6 +166,7 @@ class Connector(models.Model):
 
     # region app
     app_id = fields.Integer(index=True)
+    slug = fields.Char()
     client_id = fields.Char(index=True)
     client_secret = fields.Char(groups="base.group_system")
     private_key = fields.Text(groups="base.group_system")
@@ -173,12 +177,40 @@ class Connector(models.Model):
     auth_expires_at = fields.Datetime()
 
     installations = fields.One2many('runbot_merge.github_connector.installation', 'connector_id')
+
+    app_url = fields.Char(compute="_compute_app_url")
+    @api.depends('slug')
+    def _compute_app_url(self):
+        for record in self:
+            record.app_url = f'https://github.com/apps/{record.slug}' if record.slug else ''
     # endregion
 
+    def action_create_app(self):
+        return self.env['runbot_merge.github_connector.appwizard'].create({}).open()
+
+    def action_authorize_app(self):
+        if self.method != 'app':
+            raise UserError("Only app-mode connections can be authorized")
+
+        return {
+            'type': 'ir.actions.act_url',
+            'target': 'new',
+            'url': 'https://github.com/login/oauth/authorize?' + urlencode({
+                'client_id': self.client_id,
+                'state': f'{self.id}:{hmac(self.env, "app", self.id)}',
+            }),
+        }
 
 class AppWizard(models.TransientModel):
     _name = 'runbot_merge.github_connector.appwizard'
     _description = 'Github App Wizard'
 
-    project_id = fields.Many2one('runbot_merge.project', required=True)
+    project_id = fields.Many2one('runbot_merge.project')
     secret = fields.Char(required=True, default=lambda _: secrets.token_hex(8))
+
+    def open(self):
+        return {
+            'type': 'ir.actions.act_url',
+            'target': 'new',
+            'url': f'/runbot_merge/apps/create/{self.id}',
+        }

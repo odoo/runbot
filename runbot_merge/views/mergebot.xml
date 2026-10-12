@@ -112,7 +112,7 @@
         <field name="arch" type="xml">
             <tree>
                 <field name="repository"/>
-                <field name="number"/>
+                <field name="number" options="{'enable_formatting': false}"/>
                 <field name="target"/>
                 <field name="state"/>
                 <field name="author"/>
@@ -138,7 +138,7 @@
                     <field name="target_sequence" invisible="1"/>
                     <div class="oe_title" colspan="2">
                         <h1>
-                            <field name="repository" readonly="True"/>#<field name="number" readonly="True"/>
+                            <field name="repository" readonly="True"/>#<field name="number" readonly="True" options="{'enable_formatting': false}"/>
                         </h1>
                         <h2>
                             <field name="state"/>
