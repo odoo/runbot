@@ -150,6 +150,8 @@ def try_staging(branch: Branch, batches: Optional[Batch] = None) -> Optional[Sta
     original_heads, staging_state = staging_setup(branch, batches)
     staged = stage_batches(branch, batches, staging_state)
     if not staged:
+        log(f"nothing staged%s (all candidates skipped or failed)", staged)
+        # branch.env.ref("runbot_merge.staging_cron")._trigger()
         return None
 
     env = branch.env

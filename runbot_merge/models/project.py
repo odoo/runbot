@@ -167,6 +167,7 @@ confused (and will probably timeout).
             except Exception:
                 _logger.exception("Failed to check staging for branch %r (staging %s)",
                                   branch.name, staging)
+                self.env.ref("runbot_merge.merge_cron")._trigger()
             else:
                 if commit:
                     self.env.cr.commit()
@@ -199,6 +200,7 @@ confused (and will probably timeout).
                     try_staging(branch)
             except Exception:
                 _logger.exception("Failed to create staging for branch %r", branch.name)
+                self.env.ref("runbot_merge.staging_cron")._trigger()
             else:
                 if commit:
                     self.env.cr.commit()
