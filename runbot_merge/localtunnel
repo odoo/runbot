@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import os
 import re
 import signal
 import subprocess
@@ -11,7 +12,8 @@ r = p.stdout.readline()
 m = re.match(r'your url is: (https://.*\.localtunnel\.me)', r)
 assert m, "could not get the localtunnel URL"
 print(m[1], flush=True)
-sys.stdout.close()
+# sys.stdout is close_fds=False, so need to close the underlying fd manually
+os.close(sys.stdout.fileno())
 
 shutdown = threading.Event()
 def cleanup(_sig, _frame):
