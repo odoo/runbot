@@ -1,7 +1,10 @@
 matplotlib==3.5.1; python_version < '3.12'
-matplotlib==3.6.3; python_version >= '3.12'
+matplotlib==3.6.3; python_version >= '3.12' and python_version < '3.14'
+matplotlib==3.10.7; python_version >= '3.14'  # Rsolute
 numpy==1.22.0; python_version < '3.12' # for matplotlib compatibility, 1.21.5 on jammy, but this version is not available on some distributions because of CVE
-numpy==1.26.4; python_version >= '3.12'
+numpy==1.26.4; python_version >= '3.12'  and python_version < '3.14'
+numpy==2.3.5; python_version >= '3.14'
 unidiff==0.5.5; python_version < '3.12'
 unidiff==0.7.3; python_version >= '3.12'
-docker==5.0.3;
+docker==5.0.3; python_version < '3.14'
+docker==7.1.0; python_version >= '3.14'
