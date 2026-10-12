@@ -180,16 +180,20 @@ class Batch(models.Model):
         slot.build_id = build
         build._prepare_github_status()
 
-    def _get_latest_batch_per_version(self, skip_versions):
+    def _get_latest_batch_per_version(self, skip_versions, done=True):
+        domain = [
+            ('bundle_id.project_id', '=', self.bundle_id.project_id.id),
+            ('bundle_id.is_base', '=', True),
+            ('bundle_id.sticky', '=', True),
+            ('category_id', '=', self.category_id.id),
+            ('bundle_id.version_id', 'not in', skip_versions.ids),
+        ]
+
+        if done:
+            domain += [('state', '=', 'done')]
+
         return self.env['runbot.batch'].browse(result[1] for result in self.env['runbot.batch']._read_group(
-            domain=[
-                ('state', '=', 'done'),
-                ('bundle_id.project_id', '=', self.bundle_id.project_id.id),
-                ('bundle_id.is_base', '=', True),
-                ('bundle_id.sticky', '=', True),
-                ('category_id', '=', self.category_id.id),
-                ('bundle_id.version_id', 'not in', skip_versions.ids),
-            ],
+            domain=domain,
             groupby=['bundle_id'],
             aggregates=['id:max'],
         ))
@@ -294,7 +298,7 @@ class Batch(models.Model):
         if bundle.is_base or auto_rebase:
             existing = self.reference_batch_ids
             existing_versions = existing.mapped('bundle_id.version_id')
-            self.reference_batch_ids = self.reference_batch_ids | self._get_latest_batch_per_version(skip_versions=existing_versions)
+            self.reference_batch_ids = self.reference_batch_ids | self._get_latest_batch_per_version(skip_versions=existing_versions, done=False)
         if not bundle.is_base:
             merge_base_commits = self.commit_link_ids.mapped('merge_base_commit_id')
             if self.base_reference_batch_id:
@@ -483,6 +487,7 @@ class Batch(models.Model):
                 continue
             trigger = slot.trigger_id
             trigger_custom = trigger_customs.get(trigger, self.env['runbot.bundle.trigger.custom'])
+
             if trigger.starts_after_pending:
                 missing_triggers = trigger.starts_after_ids - started_trigger
             elif trigger.starts_after_failure:
@@ -491,6 +496,21 @@ class Batch(models.Model):
                 missing_triggers = trigger.starts_after_ids - success_trigger
             if missing_triggers:
                 if not trigger_custom or (missing_triggers - disabled_triggers):
+                    continue
+
+            if trigger.upgrade_dumps_trigger_id and trigger.config_id.uses_referenced_batches:
+                missing_template = False
+                for ref_batch in self.reference_batch_ids | self:
+                    if ref_batch.state in ('done', 'skipped'):
+                        continue
+                    if ref_batch.state == 'preparing':
+                        missing_template = True
+                        break
+                    needed_slot = ref_batch.slot_ids.filtered(lambda s: s.trigger_id in trigger.upgrade_dumps_trigger_id)
+                    if not needed_slot or not needed_slot.build_id:
+                        missing_template = True
+                        break
+                if missing_template:
                     continue
             force_trigger = trigger_custom and trigger_custom.start_mode == 'force'
             skip_trigger = (trigger_custom and trigger_custom.start_mode == 'disabled') or trigger.manual
