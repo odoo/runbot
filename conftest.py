@@ -39,6 +39,7 @@ import pytest
 import requests
 
 from pytest_github_apps import GithubApp, build_app, OAuthApp, build_oauth, Authorization, Installation
+from werkzeug.serving import BaseWSGIServer
 
 
 pytest_plugins = [
@@ -402,10 +403,38 @@ def testsuite_app(
 
 
 @pytest.fixture(scope='session')
-def tunnel(pytestconfig: pytest.Config, port: int) -> Iterator[str]:
+def tunnel(
+        pytestconfig: pytest.Config,
+        port: int,
+) -> Iterator[str]:
     """ Creates a tunnel to localhost:<port>, should yield the
     publicly routable address & terminate the process at the end of the session
     """
+    if tunnel := pytestconfig.getoption('--tunnel'):
+        with subprocess.Popen(
+            [tunnel, str(port)],
+            stdout=subprocess.PIPE,
+            encoding="utf-8",
+        ) as p:
+            # read() blocks forever and I don't know why, read things about the
+            # write end of the stdout pipe still being open here?
+            result = p.stdout.readline().strip()
+            url = urlsplit(result)
+            assert url.scheme and url.netloc
+
+            yield url.geturl()
+            p.terminate()
+            p.wait(30)
+    else:
+        yield f'http://localhost:{port}'
+
+@pytest.fixture(scope='session')
+def github_app_tunnel(
+    pytestconfig: pytest.Config,
+    github_app_server: BaseWSGIServer,
+) -> Iterator[str]:
+    server_name = github_app_server.server_name
+    port = github_app_server.server_port
     if tunnel := pytestconfig.getoption('--tunnel'):
         with subprocess.Popen(
             [tunnel, str(port)],
@@ -421,7 +450,8 @@ def tunnel(pytestconfig: pytest.Config, port: int) -> Iterator[str]:
             p.terminate()
             p.wait(30)
     else:
-        yield f'http://localhost:{port}'
+        yield f"http://{server_name}:{port}"
+
 
 @pytest.fixture(scope='session', autouse=True)
 def http_proxy(pytestconfig: pytest.Config, users_file: pathlib.Path) -> Iterator[None]:
@@ -833,11 +863,9 @@ def _iat(pytestconfig: pytest.Config, installation: Installation, config: dict, 
             config['github']['token'] = rolemap['bot']['token'] = token
             return
 
-    # FIXME: sometimes .token() fails with a 401 unauthorized, might be some delay
-    #        is needed for installation to propagate and the token to be available
     # iat expire after 60mn, so renew them at 50 (assuming a test can last
     # several minutes but probably less than 10)
-    token, _ = pytestconfig.stash[mb_iat] = (installation.token(), int(time.time()) + 50 * 60)
+    token, _ = pytestconfig.stash[mb_iat] = (installation.token(lifetime=600), int(time.time()) + 50 * 60)
     config["github"]["token"] = rolemap["bot"]["token"] = token
 
 
