@@ -30,6 +30,13 @@ runbot_merge.pr.merge.failed,{pr.ping}unable to stage: {reason},"Notifies that t
 pr: pr object we tried to merge
 reason: error message
 exc: exception object"
+runbot_merge.pr.merge.conflict,"{pr.ping}this PR conflicts with {pr.target.name} ({head}), please rebase or fix the conflicts:
+
+{files}","Notifies that the PR conflicts with its target branch, and thus can not be staged.
+
+pr: pull request in question
+head: commit of the target branch the PR was checked against
+files: markdown list of conflicting files"
 runbot_merge.pr.fetch.unmanaged,I'm sorry. Branch `{branch}` is not within my remit.,"Responds to a request to fetch a PR to an unmanaged branch.
 
 repository: pr repository

@@ -297,6 +297,11 @@ For-Commit-Id: {it.head}
         for batch in staged
     ), st.target.name)
 
+    check_conflicts(branch, staged, {
+        repo: dataclasses.replace(state, head=original_heads[repo])
+        for repo, state in staging_state.items()
+    })
+
     subpattern = pattern % {
         'stage': 'staging',
         'target': branch.name,
@@ -379,6 +384,61 @@ def ready_batches(for_branch: Branch) -> Tuple[bool, Batch]:
     )
 
 
+def check_conflicts(branch: Branch, staged: Batch, staging_state: StagingState) -> None:
+    env = branch.env
+    candidates = env['runbot_merge.batch'].search([
+        ('target', '=', branch.id),
+        ('blocked', '=', False),
+        ('id', 'not in', staged.ids),
+    ]).prs.filtered(lambda p: not p.error and p.repository in staging_state)
+    if not candidates:
+        return
+
+    with merge_driver(branch, staging_state):
+        for repo, prs in groupby(candidates, lambda p: p.repository):
+            info = staging_state[repo]
+            git_repo = info.repo.stdout().with_config(text=True, check=False)
+            try:
+                for _ in git_repo.fetch_heads(repo, *(pr.head for pr in prs)):
+                    pass
+            except CalledProcessError as e:
+                _logger.warning("Failed to fetch heads for conflict check on %s: %s", repo.name, e.stderr)
+                continue
+
+            for pr in prs:
+                r = git_repo.merge_tree('--name-only', info.head, pr.head)
+                if r.returncode and 'merge.mergiraf.name=mergiraf' in git_repo.params and 'fatal: failure to merge' in r.stderr:
+                    r = git_repo.with_params().merge_tree('--name-only', info.head, pr.head)
+                match r.returncode:
+                    case 0:
+                        continue
+                    case 1:
+                        pass
+                    case _:
+                        _logger.warning(
+                            "Failed to check %s for conflicts with %s:\n%s",
+                            pr.display_name, branch.name, r.stderr,
+                        )
+                        continue
+
+                # tree
+                # conflicted_files (one per line, unique)
+                #
+                # informational_messages (for end user)
+                _, *files = r.stdout.split('\n\n', 1)[0].splitlines()
+                pr._message_log(body=f"Conflicts with {branch.name} ({info.head}): {', '.join(files)}")
+                pr.error = True
+                env.ref('runbot_merge.pr.merge.conflict')._send(
+                    repository=pr.repository,
+                    pull_request=pr.number,
+                    format_args={
+                        'pr': pr,
+                        'head': info.head,
+                        'files': ''.join(f'* `{f}`\n' for f in files),
+                    },
+                )
+
+
 def staging_setup(
         target: Branch,
         batches: Batch,
@@ -416,7 +476,11 @@ def staging_setup(
 
     return original_heads, staging_state
 
-def stage_batches(branch: Branch, batches: Batch | Any, staging_state: dict[Repository, StagingSlice]) -> Batch:
+@contextlib.contextmanager
+def merge_driver(branch: Branch, staging_state: StagingState) -> Iterator[None]:
+    """Configures the repositories of ``staging_state`` with the merge driver
+    selected for the project (if any) for the duration of the context.
+    """
     if branch.project_id.use_mergiraf and shutil.which('mergiraf'):
         with tempfile.NamedTemporaryFile(buffering=0) as attrs:
             attrs.write(b'* merge=mergiraf\n')
@@ -427,8 +491,12 @@ def stage_batches(branch: Branch, batches: Batch | Any, staging_state: dict[Repo
                     'merge.mergiraf.driver=mergiraf merge --git %O %A %B -s %S -x %X -y %Y -p %P -l %L',
                     f'core.attributesfile={attrs.name}',
                 )
-            return _stage_batches(branch, batches, staging_state)
+            yield
     else:
+        yield
+
+def stage_batches(branch: Branch, batches: Batch | Any, staging_state: dict[Repository, StagingSlice]) -> Batch:
+    with merge_driver(branch, staging_state):
         return _stage_batches(branch, batches, staging_state)
 
 def _stage_batches(branch: Branch, batches: Batch, staging_state: StagingState) -> Batch:

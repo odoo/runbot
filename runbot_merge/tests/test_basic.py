@@ -611,6 +611,44 @@ def test_staging_conflict_second(env, repo, users, config):
     assert pr1_id.state == 'error', "now pr1 should be in error"
 
 
+def test_staging_conflict_target(env, repo, users, config):
+    """ If a non-first batch conflicts with the target branch itself, it can
+    not be staged until it's fixed, so it should be put in error immediately
+    rather than when it gets to the head of the queue.
+    """
+    with repo:
+        [m] = repo.make_commits(None, Commit('initial', tree={'a': '1', 'b': '1'}), ref='heads/master')
+
+    with repo:
+        repo.make_commits(m, Commit('first pr', tree={'b': '2'}), ref='heads/pr0')
+        pr0 = repo.make_pr(target='master', head='pr0')
+        repo.post_status(pr0.head, 'success')
+        pr0.post_comment('hansen r+', config['role_reviewer']['token'])
+
+        repo.make_commits(m, Commit('second pr', tree={'a': '3'}), ref='heads/pr1')
+        pr1 = repo.make_pr(target='master', head='pr1')
+        repo.post_status(pr1.head, 'success')
+        pr1.post_comment('hansen r+', config['role_reviewer']['token'])
+
+        [m2] = repo.make_commits(m, Commit('update', tree={'a': '2'}), ref='heads/master', make=False)
+    env.run_crons()
+
+    pr0_id = to_pr(env, pr0)
+    pr1_id = to_pr(env, pr1)
+    assert pr0_id.staging_id, "pr0 should have been staged"
+    assert not pr1_id.staging_id, "pr1 should not have been staged (due to conflict)"
+    assert pr1_id.state == 'error', "pr1 conflicts with master so should be in error"
+    assert pr1.comments == [
+        (users['reviewer'], 'hansen r+'),
+        seen(env, pr1, users),
+        (users['user'], f"@{users['user']} @{users['reviewer']} this PR conflicts with master ({m2}), please rebase or fix the conflicts:\n\n* `a`\n"),
+    ]
+    assert pr0.comments == [
+        (users['reviewer'], 'hansen r+'),
+        seen(env, pr0, users),
+    ]
+
+
 @pytest.mark.parametrize('update_op', [
     pytest.param(
         lambda _: {'timeout_limit': datetime.datetime.now().isoformat(" ", "seconds")},
