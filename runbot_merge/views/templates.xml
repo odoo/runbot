@@ -169,7 +169,8 @@
             <t t-call="runbot_merge.alerts"/>
             <nav>
                 <ul>
-                    <li t-foreach="projects" t-as="project">
+                    <li t-foreach="projects" t-as="project"
+                        t-att-class="'disabled' if any(branch.active and not branch.staging_enabled for branch in project.branch_ids) else None">
                         <a t-attf-href="#project-{{project.id}}">
                             <t t-out="project.name"/>
                         </a>
