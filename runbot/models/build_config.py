@@ -53,7 +53,7 @@ PYTHON_DEFAULT = "# type python code here\n\n\n\n\n\n"
 
 
 def echo(text):
-    return f'echo $(date -u "+%Y-%m-%d %H:%M:%S,%3N") {text}'
+    return f'echo $(date -u "+%Y-%m-%d %H:%M:%S,%3N") "{text}"'
 
 
 def filter_all_modules(selector, build, dynamic_vars):
@@ -894,7 +894,7 @@ class ConfigStep(models.Model):
         cmd.finals.append(['pg_dump', db_name, '>', sql_dest])
         cmd.finals.append([echo('### Copying filestore')])
         cmd.finals.append(['cp', '-r', filestore_path, filestore_dest])
-        cmd.finals.append([echo('### Generaing zip')])
+        cmd.finals.append([echo('### Generating zip')])
         cmd.finals.append(['cd', dump_dir, '&&', 'zip', '-rmq9', zip_path, '*'])
         cmd.finals.append([echo('### Done')])
         infos = '{\n    "db_name": "%s",\n    "build_id": %s,\n    "shas": [%s]\n}' % (db_name, build.id, ', '.join(['"%s"' % build_commit.commit_id.dname for build_commit in build.params_id.commit_link_ids]))
