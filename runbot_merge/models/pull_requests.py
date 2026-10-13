@@ -2926,12 +2926,12 @@ class Stagings(models.Model):
         """
         logger = _logger.getChild('cron')
         if not self.active:
-            logger.info("Staging %s is not active, ignoring status check", self)
+            logger.info("%s not active, ignoring status check", self)
             return
 
-        logger.info("Checking active staging %s (state=%s)", self, self.state)
         project = self.target.project_id
         if self.state == 'success':
+            logger.info("%s successful, integrating", self)
             self.env.cr.execute('''
             SELECT 1 FROM runbot_merge_pull_requests
             WHERE id in %s
@@ -2941,9 +2941,11 @@ class Stagings(models.Model):
                 self._safety_dance()
             except exceptions.FastForwardError as e:
                 logger.warning(
-                    "Could not fast-forward successful staging on %s:%s: %s",
-                    e.args[0], self.target.name,
-                    e,
+                    "%s could not fast-forward on %s:%s: %s",
+                    self,
+                    e.args[0],
+                    self.target.name,
+                    e.__cause__,
                 )
                 self.write({
                     'state': 'ff_failed',
@@ -2951,23 +2953,40 @@ class Stagings(models.Model):
                 })
             except exceptions.InconsistentIntegration as e:
                 merged, failed = e.args
-                merged_repos = merged.repository_id
+                pushed_repos = merged.repository_id
                 failed_repos = failed.repository_id
-
-                merged_batches = self.batch_ids.filtered(lambda b: b.prs.repository <= merged_repos)
-                skipped_batches = self.batch_ids.filtered(lambda b: b.prs.repository <= failed_repos)
-                error_batches = self.batch_ids - (merged_batches | skipped_batches)
-
-                merged_batches.merge_date = fields.Datetime.now()
-                self.target.staging_enabled = False
-                self.fail(
-                    "inconsistent integration - "
-                    f"succeeded for {', '.join(r.name for r in merged_repos)} "
-                    f"but failed for {', '.join(r.name for r in failed_repos)}.",
-                    prs=error_batches.prs,
+                logger.warning(
+                    "%s inconsistent integration on %s:%s: %s",
+                    self,
+                    failed_repos[0].name,
+                    self.target.name,
+                    e.__cause__,
                 )
+
+                self.batch_ids.prs.error = True
+                self.target.staging_enabled = False
+                self.write({
+                    'state': 'ff_failed',
+                    'reason': f"inconsistent integration: push failed on {failed_repos[0].name}"
+                })
                 self.with_context(mail_post_autofollow=True).message_post(
-                    body=f"Staging on {self.target.name} has been disabled pending investigation.",
+                    body=Markup(
+                        """\
+<p>Inconsistent integration, staging on {} has been disabled for investigation.</p>
+<p>All PRs set to error.</p>
+<p>
+    push error: {}<br>
+    pushed: {}<br>
+    not pushed: {}
+</p>
+<pre><code>{}</code></pre>
+""").format(
+                        self.target.name,
+                        failed_repos[0].name,
+                        ', '.join(r.name for r in pushed_repos),
+                        ', '.join(r.name for r in failed_repos[1:]),
+                        e.__cause__,
+                    ),
                     partner_ids=self.env.ref("runbot_merge.group_admin").users.partner_id.ids,
                 )
             else:
@@ -3003,7 +3022,10 @@ class Stagings(models.Model):
             finally:
                 self.write({'active': False})
         elif self.state == 'failure' or self.is_timed_out():
+            logger.info("%s failed, processing", self)
             self.try_splitting()
+        else:
+            logger.info("%s %s", self, self.state)
 
     def is_timed_out(self):
         return fields.Datetime.from_string(self.timeout_limit) < datetime.datetime.now()

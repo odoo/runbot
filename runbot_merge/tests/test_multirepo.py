@@ -15,7 +15,7 @@ import pytest
 import requests
 from lxml.etree import XPath
 
-from utils import seen, get_partner, pr_page, to_pr, Commit, read_tracking_value
+from utils import seen, get_partner, pr_page, to_pr, Commit, read_tracking_value, matches
 
 
 @pytest.fixture
@@ -686,7 +686,7 @@ def test_ff_fail_second_step(env, project, repo_a, repo_b, config, users):
     r.raise_for_status()
 
     env.run_crons()
-    assert staging.state == 'failure'
+    assert staging.state == 'ff_failed'
 
     # project state is now inconsistent
     assert [c['commit']['message'].split('\n')[0] for c in repo_a.log('master')] \
@@ -696,21 +696,15 @@ def test_ff_fail_second_step(env, project, repo_a, repo_b, config, users):
 
     assert project.branch_ids.staging_enabled is False, \
         "branch should have been disabled"
-    # since the error was on repo b, batches on just repo a should be marked merged
-    assert to_pr(env, pr_a).state == 'merged'
-    # batches on just b should be unmarked (they're basically unaffected)
-    assert to_pr(env, pr_b).state == "ready"
-    # batches on both should be in error
+    # no matter where the error is and what was or wasn't pushed, everything is
+    # considered in error and to be reviewed manually
+    assert to_pr(env, pr_a).state == 'error'
+    assert to_pr(env, pr_b).state == "error"
     assert to_pr(env, pr_ab_a).state == "error"
     assert to_pr(env, pr_ab_b).state == "error"
     assert pr_ab_a.comments == [
         (users['reviewer'], "hansen r+"),
         seen(env, pr_ab_a, users),
-        (users['user'], "@{user} @{reviewer} staging failed: inconsistent integration - succeeded for {repo_a} but failed for {repo_b}.".format(
-            **users,
-            repo_a=repo_a.name,
-            repo_b=repo_b.name,
-        )),
     ]
 
     assert staging.message_ids[::-1].mapped(
@@ -718,11 +712,11 @@ def test_ff_fail_second_step(env, project, repo_a, repo_b, config, users):
     ) == [
         "<p>A set of batches being tested for integration created</p>",
         [('state', 'Pending', 'Success')],
-        "<p>Staging on master has been disabled pending investigation.</p>",
+        matches("<p>Inconsistent integration, staging on master has been disabled for investigation.</p>$$"),
         [
             ('active', 1, 0),
-            ('reason', False, f'inconsistent integration - succeeded for {repo_a.name} but failed for {repo_b.name}.'),
-            ('state', 'Success', 'Failure'),
+            ('reason', False, f'inconsistent integration: push failed on {repo_b.name}'),
+            ('state', 'Success', 'Fast forward failed'),
         ],
     ]
 
