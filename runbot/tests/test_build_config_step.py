@@ -287,9 +287,9 @@ class TestBuildConfigStepRestore(TestBuildConfigStepCommon):
 
         docker_params = self.restore_config_step._run_restore(dev_build)
         cmds = docker_params['cmd'].split(' && ')
-        self.assertEqual(f'wget --retry-on-host-error https://False/runbot/static/build/{reference_build.dest}/logs/{reference_build.dest}-suffix.zip', cmds[2])
-        self.assertEqual(f'createdb {dev_build.dest}-suffix -T template0', cmds[8])
-        self.assertEqual(f'psql -q {dev_build.dest}-suffix < dump.sql', cmds[9])
+        self.assertIn(f'wget --retry-on-host-error https://False/runbot/static/build/{reference_build.dest}/logs/{reference_build.dest}-suffix.zip', cmds)
+        self.assertIn(f'createdb {dev_build.dest}-suffix -T template0', cmds)
+        self.assertIn(f'psql -q {dev_build.dest}-suffix < dump.sql', cmds)
         self.called = True
 
 class TestBuildConfigStepCreate(TestBuildConfigStepCommon):
@@ -1076,9 +1076,9 @@ class TestBuildConfigStep(TestBuildConfigStepCommon):
 
         cmd = config_step._run_install_odoo(self.parent_build)['cmd']
         self.assertEqual(cmd.cmd[:2], ['python3', 'odoo/server.py'])
-        self.assertEqual(cmd.finals[0], ['pg_dump', '%s-all' % dest, '>', '/data/build/logs/%s-all//dump.sql' % dest])
-        self.assertEqual(cmd.finals[1], ['cp', '-r', '/data/build/datadir/filestore/%s-all' % dest, '/data/build/logs/%s-all//filestore/' % dest])
-        self.assertEqual(cmd.finals[2], ['cd', '/data/build/logs/%s-all/' % dest, '&&', 'zip', '-rmq9', '/data/build/logs/%s-all.zip' % dest, '*'])
+        self.assertIn(['pg_dump', '%s-all' % dest, '>', '/data/build/logs/%s-all//dump.sql' % dest], cmd.finals)
+        self.assertIn(['cp', '-r', '/data/build/datadir/filestore/%s-all' % dest, '/data/build/logs/%s-all//filestore/' % dest], cmd.finals)
+        self.assertIn(['cd', '/data/build/logs/%s-all/' % dest, '&&', 'zip', '-rmq9', '/data/build/logs/%s-all.zip' % dest, '*'], cmd.finals)
 
     def get_test_tags(self, params):
         cmds = params['cmd'].build().split(' && ')

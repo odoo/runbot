@@ -260,23 +260,51 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
         run_cmd = cmd.build()
     else:
         run_cmd = cmd
-    run_cmd = f'cd /data/build;touch start-{container_name};{run_cmd};cd /data/build;touch end-{container_name}'
+    run_cmd = f'cd /data/build;{run_cmd};'
+    entrypoint = f"""#!/bin/bash
+set -e
+
+mkdir -p "/data/build/logs"
+mkdir -p "/data/build/signals"
+exec &>> /data/build/docker.txt
+touch /data/build/signals/start-{container_name}
+
+set +e
+if [ -f /entrypoint.sh ]; then
+    echo "Executing dockerfile entrypoint:"
+    bash /entrypoint.sh "$@"
+    TEST_EXIT_CODE=$?
+else
+    echo "Executing test command: $@"
+    "$@"
+    TEST_EXIT_CODE=$?
+fi
+set -e
+touch /data/build/signals/end-{container_name}
+exit $TEST_EXIT_CODE
+"""
     run_cmd_repr = str(run_cmd)
-    if len(run_cmd_repr) > 250:
-        run_cmd_repr = run_cmd_repr[:250] + '...'
+    if len(run_cmd_repr) > 300:
+        run_cmd_repr = run_cmd_repr[:250] + '...' + run_cmd_repr[-50:]
     _logger.info('Docker run command: %s', run_cmd_repr)
     docker_clear_state(container_name, build_dir)  # ensure that no state are remaining
     build_dir = file_path(build_dir)
 
+    entrypoint_path = os.path.join(build_dir, 'entrypoint.sh')
+    with open(entrypoint_path, 'w+') as f:
+        f.write(entrypoint)
+    os.chmod(entrypoint_path, 0o755)
+
     file_path(os.path.dirname(log_path))
-    open(os.path.join(build_dir, 'exist-%s' % container_name), 'w+').close()
+    os.makedirs(os.path.join(build_dir, 'signals'), exist_ok=True)
+    open(os.path.join(build_dir, 'signals', 'exist-%s' % container_name), 'w+').close()
     logs = open(log_path, 'w')
     logs.write("Docker command:\n%s\n=================================================\n" % cmd_str)
     # create start script
     volumes = {
         '/var/run/postgresql': {'bind': '/var/run/postgresql', 'mode': 'rw'},
         f'{build_dir}': {'bind': '/data/build', 'mode': 'rw'},
-        f'{log_path}': {'bind': '/data/buildlogs.txt', 'mode': 'rw'}
+        f'{log_path}': {'bind': '/data/buildlogs.txt', 'mode': 'rw'},
     }
 
     if ro_volumes:
@@ -297,6 +325,7 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
     docker_client = docker.from_env()
     container = docker_client.containers.run(
         image_tag,
+        entrypoint='/data/build/entrypoint.sh',
         name=container_name,
         volumes=volumes,
         shm_size='128m',
@@ -304,7 +333,7 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
         ports=ports,
         ulimits=ulimits,
         cpu_period=cpu_period,
-        cpu_quota=int(cpus * cpu_period ) if cpus else None,
+        cpu_quota=int(cpus * cpu_period) if cpus else None,
         environment=env_variables,
         init=True,
         command=['/bin/bash', '-c',
@@ -312,7 +341,7 @@ def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False
         auto_remove=True,
         detach=True,
         user=USERNAME,
-        network_mode=None if network_enabled else 'none'
+        network_mode=None if network_enabled else 'none',
     )
     if container.status not in ('running', 'created') :
         _logger.error('Container %s started but status is not running or created:  %s', container_name, container.status)
@@ -338,7 +367,7 @@ def _docker_stop(container_name, build_dir):
             return
     docker_client = docker.from_env()
     if build_dir:
-        end_file = os.path.join(build_dir, 'end-%s' % container_name)
+        end_file = os.path.join(build_dir, 'signals', 'end-%s' % container_name)
         subprocess.run(['touch', end_file])
     else:
         _logger.info('Stopping docker without defined build_dir')
@@ -359,13 +388,14 @@ def docker_state(container_name, build_dir):
     except FileNotFoundError:
         return 'VOID'
     container_name = sanitize_container_name(container_name)
-    exist = os.path.exists(os.path.join(build_dir, 'exist-%s' % container_name))
-    started = os.path.exists(os.path.join(build_dir, 'start-%s' % container_name))
+    exist = os.path.exists(os.path.join(build_dir, 'signals/exist-%s' % container_name)) or os.path.exists(os.path.join(build_dir, 'exist-%s' % container_name))  # TODO cleanup outside signals
+    started = os.path.exists(os.path.join(build_dir, 'signals/start-%s' % container_name)) or os.path.exists(os.path.join(build_dir, 'start-%s' % container_name))  # TODO cleanup outside signals
 
     if not exist:
         return 'VOID'
 
-    if os.path.exists(os.path.join(build_dir, f'end-{container_name}')):
+    if os.path.exists(os.path.join(build_dir, f'signals/end-{container_name}')) or os.path.exists(os.path.join(build_dir, 'end-%s' % container_name)):  # TODO cleanup outside signals
+
         return 'END'
 
     state = 'UNKNOWN'
@@ -377,8 +407,7 @@ def docker_state(container_name, build_dir):
             state = 'RUNNING' if container.status in ('created', 'running', 'paused') else 'GHOST'
         except docker.errors.NotFound:
             state = 'GHOST'
-        # check if the end- file has been written in between time
-        if state == 'GHOST' and os.path.exists(os.path.join(build_dir, f'end-{container_name}')):
+        if state == 'GHOST' and (os.path.exists(os.path.join(build_dir, f'signals/end-{container_name}')) or os.path.exists(os.path.join(build_dir, 'end-%s' % container_name))):  # TODO cleanup outside signals
             state = 'END'
     return state
 
@@ -386,12 +415,18 @@ def docker_state(container_name, build_dir):
 def docker_clear_state(container_name, build_dir):
     """Return True if container is still running"""
     container_name = sanitize_container_name(container_name)
-    if os.path.exists(os.path.join(build_dir, 'start-%s' % container_name)):
-        os.remove(os.path.join(build_dir, 'start-%s' % container_name))
-    if os.path.exists(os.path.join(build_dir, 'end-%s' % container_name)):
-        os.remove(os.path.join(build_dir, 'end-%s' % container_name))
-    if os.path.exists(os.path.join(build_dir, 'exist-%s' % container_name)):
-        os.remove(os.path.join(build_dir, 'exist-%s' % container_name))
+    if os.path.exists(os.path.join(build_dir, 'start-%s' % container_name)):  # TODO cleanup outside signals
+        os.remove(os.path.join(build_dir, 'start-%s' % container_name))  # TODO cleanup outside signals
+    if os.path.exists(os.path.join(build_dir, 'end-%s' % container_name)):  # TODO cleanup outside signals
+        os.remove(os.path.join(build_dir, 'end-%s' % container_name))  # TODO cleanup outside signals
+    if os.path.exists(os.path.join(build_dir, 'exist-%s' % container_name)):  # TODO cleanup outside signals
+        os.remove(os.path.join(build_dir, 'exist-%s' % container_name))  # TODO cleanup outside signals
+    if os.path.exists(os.path.join(build_dir, 'signals/start-%s' % container_name)):
+        os.remove(os.path.join(build_dir, 'signals/start-%s' % container_name))
+    if os.path.exists(os.path.join(build_dir, 'signals/end-%s' % container_name)):
+        os.remove(os.path.join(build_dir, 'signals/end-%s' % container_name))
+    if os.path.exists(os.path.join(build_dir, 'signals/exist-%s' % container_name)):
+        os.remove(os.path.join(build_dir, 'signals/exist-%s' % container_name))
 
 
 def docker_get_gateway_ip():
