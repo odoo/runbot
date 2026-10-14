@@ -1143,6 +1143,7 @@ class ConfigStep(models.Model):
 
     def _run_restore(self, build, config_data=None):
         # exports = build._checkout()
+        download_db_suffix = None
         params = build.params_id
         if config_data:
             config_data = {**config_data, **params.config_data}
@@ -1210,7 +1211,7 @@ class ConfigStep(models.Model):
                         break
             if not use_backup:
                 build._log('_run_restore', 'Restoring template [%s](%s) from build [%s](%s)', zip_name, dump_url, dump_build.id, dump_build.build_url, log_type='markdown')
-        target_suffix = config_data.get('target_suffix', self.restore_rename_db_suffix or download_db_suffix)
+        target_suffix = config_data.get('target_suffix', self.restore_rename_db_suffix or download_db_suffix or 'all')
         restore_db_name = '%s-%s' % (build.dest, target_suffix)
 
         icp = self.env['ir.config_parameter']
