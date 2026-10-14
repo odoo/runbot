@@ -63,16 +63,11 @@
               </a>
             </li>
           </ol>
-          <t t-call="runbot.build_button">
-            <t t-set="bu" t-value="build"/>
-            <t t-set="klass" t-value="'btn-group-ssm'"/>
-            <t t-set="show_commit_button" t-value="True"/>
-          </t>
           <span class="ms-auto">
             <t t-call="runbot.slots_infos"/>
           </span>
           <div class="btn-toolbar gap-2" role="toolbar">
-            <span class="btn-group btn-group-ssm">
+            <span class="btn-group btn-group-sm">
               <a t-att-href="prev_ko.build_url" role="button" t-attf-title="Previous ko {{prev_ko.display_name}}"
                  t-attf-class="{{'' if prev_ko else 'disabled '}}btn btn-default">
                 <i class="fa fa-angle-double-left"/>
@@ -93,6 +88,11 @@
                 <i class="fa fa-angle-double-right"/>
               </a>
             </span>
+            <t t-call="runbot.build_button">
+              <t t-set="bu" t-value="build"/>
+              <t t-set="klass" t-value="'btn-group-sm'"/>
+              <t t-set="show_commit_button" t-value="True"/>
+            </t>
           </div>
         </t>
         <div class="row g-0">
