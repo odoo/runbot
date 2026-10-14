@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from odoo import fields
 from odoo.exceptions import AccessError, ValidationError
-from odoo.tests import new_test_user
+from odoo.tests import HttpCase, new_test_user, tagged
 
 from .common import RunbotCase
 
@@ -914,6 +914,20 @@ class TestBuildError(TestBuildErrorCommon):
         error.with_user(runbot_manager).test_tags = False
 
 
+    def test_build_error_public_fields(self):
+        error = self.BuildError.create({'name': 'test-public-fields', 'test_tags': 'test-public-tags'})
+        self.BuildErrorContent.create({'content': RTE_ERROR, 'error_id': error.id})
+        public_error = error.with_user(self.env.ref('base.public_user'))
+
+        self.assertEqual(public_error.name, 'test-public-fields')
+        self.assertEqual(public_error.test_tags, 'test-public-tags')
+        self.assertEqual(public_error.error_content_ids.content, RTE_ERROR)
+        with self.assertRaises(AccessError):
+            public_error.responsible
+        with self.assertRaises(AccessError):
+            public_error.error_content_ids.qualifiers
+
+
 class TestErrorMerge(TestBuildErrorCommon):
 
     @classmethod
@@ -1086,3 +1100,128 @@ class TestCodeOwner(RunbotCase):
                 'regex': '*debian.*',
                 'github_teams': 'rd-test',
             })
+
+
+@tagged('-at_install', 'post_install')
+class TestBuildErrorController(TestBuildErrorCommon, HttpCase):
+
+    def test_error_details_json(self):
+        build = self.create_test_build({'local_result': 'ko'})
+        self.create_log({'create_date': fields.Datetime.from_string('2023-08-29 00:46:21'), 'message': RTE_ERROR, 'build_id': build.id})
+        build._parse_logs()
+        error = build.build_error_ids
+        error.write({
+            'responsible': self.env.user.id,
+            'fixing_pr_id': self.dev_pr.id,
+            'test_tags': '-/website:TestUiTranslate.test_admin_tour_rte_translator',
+        })
+
+        response = self.url_open(f'/runbot/error/{error.id}', headers={'Accept': 'application/json'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {
+            'id': error.id,
+            'display_name': error.display_name,
+            'name': error.name,
+            'active': True,
+            'test_tags': error.test_tags,
+            'tags_min_version_excluded_id': False,
+            'tags_min_version_id': False,
+            'tags_max_version_id': False,
+            'fixing_pr_id': {'id': self.dev_pr.id, 'display_name': self.dev_pr.display_name},
+            'fixing_pr_url': self.dev_pr.branch_url,
+            'error_content_ids': [{
+                'id': error.error_content_ids.id,
+                'display_name': error.error_content_ids.display_name,
+                'content': RTE_ERROR,
+                'module_name': 'test-build-error-name',
+                'file_path': '/data/build/odoo/addons/web_studio/tests/test_ui.py',
+                'function': 'test-build-error-func',
+                'error_id': {'id': error.id, 'display_name': error.display_name},
+            }],
+        })
+
+        self.authenticate('admin', 'admin')
+        response = self.url_open(f'/runbot/error/{error.id}', headers={'Accept': 'application/json'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers['Content-Type'], 'application/json; charset=utf-8')
+        details = response.json()
+        self.assertEqual(details['id'], error.id)
+        self.assertEqual(details['test_tags'], error.test_tags)
+        self.assertEqual(details['responsible'], {'id': self.env.user.id, 'display_name': self.env.user.display_name})
+        self.assertEqual(details['fixing_pr_id'], {'id': self.dev_pr.id, 'display_name': self.dev_pr.display_name})
+        self.assertEqual(details['last_seen_date'], '2023-08-29 00:46:21')
+        self.assertEqual(details['last_seen_build_id'], {'id': build.id, 'display_name': build.display_name})
+        self.assertEqual([content['content'] for content in details['error_content_ids']], [RTE_ERROR])
+        self.assertEqual([version['id'] for version in details['version_ids']], error.version_ids.ids)
+        last_seen_batch = details['last_seen_batch_ids'][0]
+        self.assertEqual(last_seen_batch['id'], self.dev_batch.id)
+        self.assertEqual(last_seen_batch['bundle_id']['id'], self.dev_bundle.id)
+        self.assertEqual(last_seen_batch['bundle_id']['version_id']['id'], self.dev_bundle.version_id.id)
+
+        response = self.url_open(f'/runbot/error/{error.id + 1000}', headers={'Accept': 'application/json'})
+        self.assertEqual(response.status_code, 404)
+
+    def test_error_details_page(self):
+        build = self.create_test_build({'local_result': 'ko'})
+        self.create_log({'message': RTE_ERROR, 'build_id': build.id})
+        build._parse_logs()
+        error = build.build_error_ids
+        error.write({
+            'name': 'test-error-details-page',
+            'test_tags': 'test-error-details-tags',
+            'responsible': self.env.ref('base.user_admin').id,
+        })
+
+        response = self.url_open(f'/runbot/error/{error.id}')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('TestUiTranslate.test_admin_tour_rte_translator', response.text)
+        self.assertIn(error.name, response.text)
+        self.assertIn(error.test_tags, response.text)
+        self.assertNotIn(error.responsible.name, response.text)
+
+        self.authenticate('admin', 'admin')
+        response = self.url_open(f'/runbot/error/{error.id}')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('TestUiTranslate.test_admin_tour_rte_translator', response.text)
+        self.assertIn(error.name, response.text)
+        self.assertIn(error.test_tags, response.text)
+
+        response = self.url_open(f'/runbot/error/{error.id + 1000}')
+        self.assertEqual(response.status_code, 404)
+
+    def test_build_search_by_error(self):
+        build = self.create_test_build({'local_result': 'ko'})
+        self.create_log({'message': RTE_ERROR, 'build_id': build.id})
+        other_build = self.create_test_build({'local_result': 'ko'})
+        self.create_log({'message': 'Fail: foo bar error', 'build_id': other_build.id})
+        (build | other_build)._parse_logs()
+
+        self.authenticate('admin', 'admin')
+        response = self.url_open(f'/runbot/build/search?build_error_id={build.build_error_ids.id}')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(f'/runbot/build/{build.id}"', response.text)
+        self.assertNotIn(f'/runbot/build/{other_build.id}"', response.text)
+
+    def test_build_page_links_error_details(self):
+        build = self.create_test_build({'local_result': 'ko'})
+        self.create_log({'message': RTE_ERROR, 'build_id': build.id})
+        build._parse_logs()
+
+        response = self.url_open(f'/runbot/build/{build.id}')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(f'/runbot/error/{build.build_error_ids.id}"', response.text)
+
+    def test_last_batches_infos_autotags(self):
+        self.BuildError.create({'test_tags': 'test-autotags'})
+        self.env['runbot.batch.slot'].create({
+            'batch_id': self.dev_batch.id,
+            'trigger_id': self.trigger_server.id,
+            'params_id': self.base_params.id,
+            'build_id': self.create_test_build({}).id,
+        })
+        self.dev_batch.state = 'done'
+        self.dev_bundle.last_batch = self.dev_batch
+
+        response = self.url_open(f'/runbot/json/last_batches_infos/{self.project.id}?bundle_name={self.dev_bundle.name}')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('-test-autotags', response.json()[self.dev_bundle.name]['autotags'])

@@ -16,6 +16,11 @@ _logger = logging.getLogger(__name__)
 class Commit(models.Model):
     _name = 'runbot.commit'
     _description = "Commit"
+    _inherit = 'runbot.public.fields.mixin'
+    _public_fields = (
+        'id', 'display_name', 'dname', 'name', 'tree_hash', 'repo_id', 'date', 'author', 'author_email', 'committer',
+        'committer_email', 'subject', 'rebase_on_id',
+    )
 
     _commit_unique = models.Constraint(
         'unique (name, repo_id, rebase_on_id)',

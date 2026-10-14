@@ -16,6 +16,7 @@ from collections import OrderedDict
 from datetime import timedelta
 from markupsafe import Markup, escape
 
+from odoo import models
 from odoo.fields import Domain
 from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT, file_open, html_escape, OrderedSet
 
@@ -48,6 +49,34 @@ def transactioncache(method):
         return cache[method_key][params_key]
     wrapper.clear_transaction_cache = lambda self: self.env.cr.cache.pop(method, None)
     return wrapper
+
+def _details_spec(model, include=None):
+    include_paths = {}
+    for path in getattr(model, '_details_include', ()) if include is None else include:
+        name, _, subpath = path.partition('.')
+        include_paths.setdefault(name, []).extend([subpath] if subpath else [])
+    exclude = {
+        *getattr(model, '_details_exclude', ()),
+        *model.env['mail.thread']._fields, *model.env['mail.activity.mixin']._fields, *models.MAGIC_COLUMNS,
+    }
+    spec = {'display_name': {}}
+    for name, field in model._fields.items():
+        if name in exclude or not (field.store or field.related or name in include_paths) or not model._has_field_access(field, 'read'):
+            continue
+        if field.relational and not model.env['ir.model.access'].check(field.comodel_name, 'read', raise_exception=False):
+            continue
+        if field.relational and name in include_paths:
+            spec[name] = {'fields': _details_spec(model.env[field.comodel_name], include_paths[name])}
+        elif field.type != 'one2many':
+            spec[name] = {'fields': {'display_name': {}}} if field.relational else {}
+    return spec
+
+
+def get_details(records):
+    """Stored and related fields readable by the current user, plus `_details_include` paths, minus `_details_exclude`."""
+    records = records.sudo(False)
+    return records.web_read(_details_spec(records))
+
 
 class RunbotException(Exception):
     pass
