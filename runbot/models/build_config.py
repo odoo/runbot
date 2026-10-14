@@ -1143,6 +1143,7 @@ class ConfigStep(models.Model):
 
     def _run_restore(self, build, config_data=None):
         # exports = build._checkout()
+        download_db_suffix = 'all'
         params = build.params_id
         if config_data:
             config_data = {**config_data, **params.config_data}
