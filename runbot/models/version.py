@@ -11,6 +11,8 @@ class Version(models.Model):
     _name = 'runbot.version'
     _description = "Version"
     _order = 'sequence desc, number desc,id'
+    _inherit = 'runbot.public.fields.mixin'
+    _public_fields = ('id', 'display_name', 'name', 'number', 'sequence')
 
     name = fields.Char('Version name')
     number = fields.Char('Version number', compute='_compute_version_number', store=True, help="Usefull to sort by version")

@@ -47,10 +47,14 @@ class Trigger(models.Model):
     """
 
     _name = 'runbot.trigger'
-    _inherit = 'mail.thread'
+    _inherit = ('mail.thread', 'runbot.public.fields.mixin')
     _description = 'Triggers'
 
     _order = 'sequence, id'
+    _public_fields = (
+        'id', 'display_name', 'name', 'active', 'sequence', 'project_id', 'category_id', 'hide', 'manual', 'light_config_id',
+        'report_view_id', 'starts_after_ids',
+    )
 
     sequence = fields.Integer('Sequence')
     name = fields.Char("Name")
@@ -223,7 +227,10 @@ class Remote(models.Model):
     _name = 'runbot.remote'
     _description = 'Remote'
     _order = 'sequence, id'
-    _inherit = 'mail.thread'
+    _inherit = ('mail.thread', 'runbot.public.fields.mixin')
+    _public_fields = (
+        'id', 'display_name', 'name', 'repo_id', 'repo_domain', 'owner', 'repo_name', 'base_url', 'short_name', 'sequence',
+    )
 
     name = fields.Char('Url', required=True, tracking=True)
     repo_id = fields.Many2one('runbot.repo', required=True, tracking=True)
@@ -413,7 +420,8 @@ class Repo(models.Model):
     _name = 'runbot.repo'
     _description = "Repo"
     _order = 'sequence, id'
-    _inherit = 'mail.thread'
+    _inherit = ('mail.thread', 'runbot.public.fields.mixin')
+    _public_fields = ('id', 'display_name', 'name', 'main_remote_id', 'project_id', 'sequence', 'enforce_version')
 
     name = fields.Char("Name", tracking=True)  # odoo/enterprise/upgrade/security/runbot/design_theme
     identity_file = fields.Char("Identity File", help="Identity file to use with git/ssh", groups="runbot.group_runbot_admin")

@@ -199,6 +199,7 @@ class BuildErrorSeenMixin(models.AbstractModel):
             result[self.browse(d['record_id'])][d['bundle_create_date'], d['version_id']] = d['count']
         return result
 
+
 def _compute_related_error_content_ids(field_name):
     @api.depends(f'error_content_ids.{field_name}')
     def _compute(self):
@@ -215,8 +216,13 @@ class BuildError(models.Model):
     _name = "runbot.build.error"
     _description = "Build error"
     # An object to manage a group of errors log that fit together and assign them to a team
-    _inherit = ('mail.thread', 'mail.activity.mixin', 'runbot.build.error.seen.mixin')
-    _mail_post_access = 'read'
+    _inherit = ('mail.thread', 'mail.activity.mixin', 'runbot.build.error.seen.mixin', 'runbot.public.fields.mixin')
+    _mail_post_access = 'write'
+    _public_fields = (
+        'id', 'display_name', 'name', 'active', 'error_content_ids', 'fixing_pr_id', 'fixing_pr_url',
+        'test_tags', 'tags_min_version_excluded_id', 'tags_min_version_id', 'tags_max_version_id',
+    )
+    _details_include = ('error_content_ids', 'last_seen_batch_ids.bundle_id.version_id', 'version_ids', 'tag_ids', 'tags_min_version_id')
 
     name = fields.Char("Name")
     active = fields.Boolean('Open (not fixed)', default=True, tracking=True)
@@ -897,8 +903,9 @@ class BuildErrorContent(models.Model):
     _name = 'runbot.build.error.content'
     _description = "Build error content"
 
-    _inherit = ('mail.thread', 'mail.activity.mixin', 'runbot.build.error.seen.mixin')
+    _inherit = ('mail.thread', 'mail.activity.mixin', 'runbot.build.error.seen.mixin', 'runbot.public.fields.mixin')
     _rec_name = "id"
+    _public_fields = ('id', 'display_name', 'error_id', 'content', 'module_name', 'file_path', 'function')
 
     error_active = fields.Boolean('Active', related='error_id.active')
     error_id = fields.Many2one('runbot.build.error', 'Linked to', index=True, required=True, tracking=True, ondelete='cascade')

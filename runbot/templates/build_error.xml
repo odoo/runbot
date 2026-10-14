@@ -36,7 +36,7 @@
             <tr>
               <td t-out="build_error.last_seen_date" t-options='{"widget": "datetime"}'/>
               <th>
-                <code t-out="build_error.name"/>
+                <a t-attf-href="/runbot/error/{{build_error.id}}" title="View error details"><code t-out="build_error.name"/></a>
               </th>
               <td>
                 <t t-foreach="build_error.trigger_ids" t-as="trigger">
@@ -107,6 +107,154 @@
                   </t>
                 </t>
               </t>
+            </div>
+          </div>
+        </div>
+      </t>
+    </template>
+
+    <template id="runbot.build_error_details">
+      <t t-call="runbot.layout">
+        <t t-set="page_nav">
+          <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+              <a href="/runbot/errors" class="btn btn-link">Errors</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+              <a t-attf-href="/runbot/error/{{details['id']}}" class="btn btn-link">error-<t t-out="details['id']"/></a>
+            </li>
+          </ol>
+          <a t-attf-href="/odoo/error/{{details['id']}}"
+             class="btn btn-default btn-ssm" target="_blank" title="View in Backend">
+            <i class="fa fa-list"/>
+          </a>
+        </t>
+        <div class="container-fluid">
+          <div class="row">
+            <div class="col-lg-6">
+              <table class="table">
+                <tr>
+                  <td>Name</td>
+                  <td><code t-out="details['name']"/></td>
+                </tr>
+                <tr t-if="'active' in details">
+                  <td>Status</td>
+                  <td>
+                    <span t-if="details['active']" class="badge text-bg-danger">Open</span>
+                    <span t-else="" class="badge text-bg-success">Fixed</span>
+                    <span t-if="details.get('random')" class="badge text-bg-warning"><i class="fa fa-random"/> Random</span>
+                  </td>
+                </tr>
+                <tr t-if="'responsible' in details">
+                  <td>Assigned to</td>
+                  <td>
+                    <t t-if="details['responsible']" t-out="details['responsible']['display_name']"/>
+                    <a t-else="" t-attf-href="/runbot/errors/assign/{{details['id']}}" data-runbot="action" role="button" class="btn btn-primary btn-sm">Assign to me</a>
+                  </td>
+                </tr>
+                <tr t-if="'team_id' in details">
+                  <td>Team</td>
+                  <td t-out="details['team_id'] and details['team_id']['display_name']"/>
+                </tr>
+                <tr t-if="'trigger_ids' in details">
+                  <td>Triggers</td>
+                  <td>
+                    <span t-foreach="details['trigger_ids']" t-as="trigger" class="badge text-bg-info" t-out="trigger['display_name']"/>
+                  </td>
+                </tr>
+                <tr t-if="'version_ids' in details">
+                  <td>Versions</td>
+                  <td>
+                    <span t-foreach="details['version_ids']" t-as="version" class="badge text-bg-secondary" t-out="version['display_name']"/>
+                  </td>
+                </tr>
+                <tr t-if="details.get('tag_ids')">
+                  <td>Tags</td>
+                  <td>
+                    <span t-foreach="details['tag_ids']" t-as="tag" class="badge text-bg-secondary" t-out="tag['display_name']"/>
+                  </td>
+                </tr>
+                <tr t-if="details.get('test_tags')">
+                  <td>Test tags</td>
+                  <td>
+                    <code t-out="details['test_tags']"/>
+                    <span t-if="details.get('tags_min_version_id')" class="badge text-bg-secondary">from <t t-out="details['tags_min_version_id']['display_name']"/></span>
+                    <span t-if="details.get('tags_max_version_id')" class="badge text-bg-secondary">up to <t t-out="details['tags_max_version_id']['display_name']"/></span>
+                  </td>
+                </tr>
+                <tr t-if="details.get('breaking_pr_id')">
+                  <td>Breaking PR</td>
+                  <td><a t-att-href="details['breaking_pr_url']" target="_blank" t-out="details['breaking_pr_id']['display_name']"/></td>
+                </tr>
+                <tr t-if="details.get('fixing_pr_id')">
+                  <td>Fixing PR</td>
+                  <td>
+                    <a t-att-href="details['fixing_pr_url']" target="_blank" t-out="details['fixing_pr_id']['display_name']"/>
+                    <a t-if="details.get('fixing_bundle_id')" t-att-href="details['fixing_bundle_url']" t-out="details['fixing_bundle_id']['display_name']"/>
+                  </td>
+                </tr>
+                <tr t-if="details.get('fixing_commit')">
+                  <td>Fixing commit</td>
+                  <td><code t-out="details['fixing_commit']"/></td>
+                </tr>
+                <tr t-if="details.get('previous_error_id')">
+                  <td>Already seen error</td>
+                  <td><a t-attf-href="/runbot/error/{{details['previous_error_id']['id']}}">error-<t t-out="details['previous_error_id']['id']"/></a></td>
+                </tr>
+                <tr t-if="'first_seen_date' in details">
+                  <td>First seen</td>
+                  <td>
+                    <t t-out="details['first_seen_date']" t-options='{"widget": "datetime"}'/>
+                    <a t-if="details.get('first_seen_build_id')" t-attf-href="/runbot/build/{{details['first_seen_build_id']['id']}}">build <t t-out="details['first_seen_build_id']['id']"/></a>
+                  </td>
+                </tr>
+                <tr t-if="'last_seen_date' in details">
+                  <td>Last seen</td>
+                  <td>
+                    <t t-out="details['last_seen_date']" t-options='{"widget": "datetime"}'/>
+                    <a t-if="details.get('last_seen_build_id')" t-attf-href="/runbot/build/{{details['last_seen_build_id']['id']}}">build <t t-out="details['last_seen_build_id']['id']"/></a>
+                  </td>
+                </tr>
+                <tr t-if="'build_count' in details">
+                  <td>Seen</td>
+                  <td><a t-attf-href="/runbot/build/search?build_error_id={{details['id']}}"><t t-out="details['build_count']"/> builds</a></td>
+                </tr>
+              </table>
+            </div>
+            <div t-if="'last_seen_batch_ids' in details" class="col-lg-6">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Version</th>
+                    <th>Last seen batch</th>
+                    <th>Bundle</th>
+                  </tr>
+                </thead>
+                <tr t-foreach="details['last_seen_batch_ids']" t-as="batch">
+                  <td t-out="batch['bundle_id']['version_id'] and batch['bundle_id']['version_id']['display_name']"/>
+                  <td><a t-attf-href="/runbot/batch/{{batch['id']}}">batch-<t t-out="batch['id']"/></a></td>
+                  <td><a t-attf-href="/runbot/bundle/{{batch['bundle_id']['id']}}" t-out="batch['bundle_id']['display_name']"/></td>
+                </tr>
+              </table>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-12">
+              <h3>Contents</h3>
+              <div t-foreach="details['error_content_ids']" t-as="error_content" class="mb-3">
+                <div class="small text-body-secondary">
+                  <code t-out="error_content['module_name']"/>
+                  <t t-if="error_content['function']">in <code t-out="error_content['function']"/></t>
+                  <t t-if="error_content['file_path']">(<code t-out="error_content['file_path']"/>)</t>
+                  <t t-if="'build_count' in error_content">
+                    · seen <t t-out="error_content['build_count']"/> times,
+                    last <t t-out="error_content['last_seen_date']" t-options='{"widget": "datetime"}'/>
+                  </t>
+                </div>
+                <div class="overflow-x-auto">
+                  <pre class="bg-danger-subtle p-2" t-out="error_content['content'].strip()"/>
+                </div>
+              </div>
             </div>
           </div>
         </div>

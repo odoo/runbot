@@ -14,7 +14,12 @@ NGRAM_RE = re.compile(r'.+\(([a-z]{2,5})\)$')
 class Bundle(models.Model):
     _name = 'runbot.bundle'
     _description = "Bundle"
-    _inherit = 'mail.thread'
+    _inherit = ('mail.thread', 'runbot.public.fields.mixin')
+    _public_fields = (
+        'id', 'display_name', 'name', 'project_id', 'version_id', 'host_id', 'branch_ids',
+        'sticky', 'is_base', 'no_build', 'base_id', 'defined_base_id', 'has_active_pr',
+        'last_batch', 'last_batchs', 'last_done_batch',
+    )
 
     name = fields.Char('Bundle name', required=True, help="Name of the base branch")
     project_id = fields.Many2one('runbot.project', required=True, index=True)

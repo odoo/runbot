@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from . import public_fields
 from . import batch
 from . import branch
 from . import build

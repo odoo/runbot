@@ -13,6 +13,11 @@ class Branch(models.Model):
     _description = "Branch"
     _order = 'name'
     _rec_name = 'dname'
+    _inherit = 'runbot.public.fields.mixin'
+    _public_fields = (
+        'id', 'display_name', 'dname', 'name', 'remote_id', 'repo_id', 'bundle_id', 'head_name', 'branch_url', 'alive',
+        'is_pr', 'pr_title', 'pull_head_name', 'target_branch_name', 'reflog_ids',
+    )
 
     _branch_repo_uniq = models.Constraint(
         'unique (name,remote_id)',

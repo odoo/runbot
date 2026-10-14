@@ -271,6 +271,15 @@ class BuildResult(models.Model):
 
     _name = 'runbot.build'
     _description = "Build"
+    _inherit = 'runbot.public.fields.mixin'
+    _public_fields = (
+        'id', 'display_name', 'description', 'md_description', 'params_id', 'version_id', 'config_id', 'trigger_id', 'create_batch_id',
+        'global_state', 'local_state', 'global_result', 'local_result', 'oom_killed', 'requested_action', 'to_kill', 'message_ids',
+        'host', 'dest', 'domain', 'log_list', 'active_step', 'job', 'create_date', 'build_start', 'build_end',
+        'build_time', 'wait_time', 'load_time', 'real_load_time', 'last_update', 'parent_id', 'parent_path', 'parent_link_ids',
+        'child_link_ids', 'children_ids', 'linked_children_build_ids', 'top_parents_ids', 'ancestors',
+        'orphan_result', 'build_url', 'slot_ids', 'database_ids', 'static_run',
+    )
 
     _parent_store = True
     _order = 'id desc'

@@ -13,7 +13,10 @@
                                 <t t-esc="title"/>
                             </t>
                             <t t-if="build_error">
-                                <em>Error <a t-attf-href="/odoo/error/{{build_error.id}}" t-esc="build_error.id"/></em>
+                                <em>Error <a t-attf-href="/runbot/error/{{build_error.id}}" t-esc="build_error.id"/></em>
+                                <a groups="base.group_user" t-attf-href="/odoo/error/{{build_error.id}}" target="_blank" title="View in Backend">
+                                    <i class="fa fa-list"/>
+                                </a>
                             </t>
                         </h5>
                         <div>

@@ -6,6 +6,8 @@ class Project(models.Model):
     _name = 'runbot.project'
     _description = 'Project'
     _order = 'sequence, id'
+    _inherit = 'runbot.public.fields.mixin'
+    _public_fields = ('id', 'display_name', 'name', 'active', 'sequence', 'hidden', 'next_freeze_tag_id')
 
     name = fields.Char('Project name', required=True)
     group_ids = fields.Many2many('res.groups', string='Required groups', default=lambda self: self.env.ref('runbot.group_user'))
@@ -62,6 +64,8 @@ class Project(models.Model):
 class Category(models.Model):
     _name = 'runbot.category'
     _description = 'Trigger category'
+    _inherit = 'runbot.public.fields.mixin'
+    _public_fields = ('id', 'display_name', 'name', 'icon', 'view_id', 'active')
 
     name = fields.Char("Name")
     icon = fields.Char("Font awesome icon")

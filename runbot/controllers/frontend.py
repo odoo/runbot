@@ -1,4 +1,5 @@
 import datetime
+import functools
 import logging
 from collections import OrderedDict, defaultdict
 from subprocess import CalledProcessError
@@ -12,7 +13,25 @@ from odoo.http import Controller, Response, request, route
 from odoo.fields import Domain
 from odoo.tools import str2bool
 
+from ..common import get_details
+
 _logger = logging.getLogger(__name__)
+
+
+def json_variant(serialize):
+    """Serve the rendered page as `serialize(qcontext)` when the client prefers JSON."""
+    def decorator(endpoint):
+        @functools.wraps(endpoint)
+        def wrapper(self, *args, **kwargs):
+            response = endpoint(self, *args, **kwargs)
+            if not getattr(response, 'is_qweb', False):
+                return response
+            if request.httprequest.accept_mimetypes.best_match(['text/html', 'application/json']) == 'application/json':
+                response = request.make_json_response(serialize(response.qcontext))
+            response.headers['Vary'] = 'Accept'
+            return response
+        return wrapper
+    return decorator
 
 
 class Runbot(Controller):
@@ -35,6 +54,7 @@ class Runbot(Controller):
             'hosts_data': request.env['runbot.host'].search([('assigned_only', '=', False)]),
         }
 
+    @json_variant(lambda qcontext: get_details(qcontext['bundles']) if 'bundles' in qcontext else [])
     @route(['/',
             '/runbot',
             '/runbot/<model("runbot.project"):project>',
@@ -114,6 +134,7 @@ class Runbot(Controller):
 
         return request.render('runbot.bundles', context)
 
+    @json_variant(lambda qcontext: {'bundle': get_details(qcontext['bundle'])[0], 'batches': get_details(qcontext['batchs'])})
     @route([
         '/runbot/bundle/<model("runbot.bundle"):bundle>',
         '/runbot/bundle/<model("runbot.bundle"):bundle>/page/<int:page>',
@@ -176,6 +197,7 @@ class Runbot(Controller):
         batch._process()
         return werkzeug.utils.redirect('/runbot/batch/%s' % batch.id)
 
+    @json_variant(lambda qcontext: get_details(qcontext['batch'])[0])
     @route(['/runbot/batch/<int:batch_id>'], website=True, auth='public', type='http', sitemap=False)
     def batch(self, batch_id=None, **kwargs):
         batch = request.env['runbot.batch'].browse(batch_id)
@@ -199,6 +221,7 @@ class Runbot(Controller):
         build = slot.sudo()._create_missing_build()
         return werkzeug.utils.redirect(f'/runbot/batch/{slot.batch_id.id}/build/{build.id}')
 
+    @json_variant(lambda qcontext: get_details(qcontext['commit'])[0])
     @route([
         '/runbot/commit/<model("runbot.commit"):commit>',
         '/runbot/commit/<string(minlength=6, maxlength=40):commit_hash>',
@@ -238,6 +261,7 @@ class Runbot(Controller):
             _logger.info('github status %s resent by %s', status_id, request.env.user.name)
         return werkzeug.utils.redirect('/runbot/commit/%s' % status.commit_id.id)
 
+    @json_variant(lambda qcontext: get_details(qcontext['batches']))
     @route([
         '/runbot/tree_hash/<string(minlength=6, maxlength=40):tree_hash>',
         '/runbot/<model("runbot.project"):project>/tree_hash/<string(minlength=6, maxlength=40):tree_hash>',
@@ -277,6 +301,7 @@ class Runbot(Controller):
 
         return str(build.id)
 
+    @json_variant(lambda qcontext: get_details(qcontext['build'])[0])
     @route([
         '/runbot/build/<int:build_id>',
         '/runbot/batch/<int:from_batch>/build/<int:build_id>',
@@ -318,6 +343,7 @@ class Runbot(Controller):
         }
         return request.render("runbot.build", context)
 
+    @json_variant(lambda qcontext: get_details(qcontext['builds']))
     @route([
     '/runbot/build/search',
     ], website=True, auth='public', type='http', sitemap=False)
@@ -340,12 +366,17 @@ class Runbot(Controller):
                 operator = 'ilike' if '%' in value else '='
                 domain.append((f'{key}', operator, value))
 
+        build_error_id = kwargs.get('build_error_id')
+        if build_error_id:
+            domain.append(('build_error_link_ids.error_content_id.error_id', '=', int(build_error_id)))
+
         context = {
             'builds': request.env['runbot.build'].search(domain, limit=limit),
         }
 
         return request.render('runbot.build_search', context)
 
+    @json_variant(lambda qcontext: {'build': get_details(qcontext['build'])[0], 'routes': [route.ids for route in qcontext['routes']]})
     @route(['/runbot/build/<int:build_id>/routes'], type='http', auth='public', website=True, sitemap=False)
     def build_routes(self, build_id, limit=200, **post):
         build = request.env['runbot.build'].browse(build_id)
@@ -357,6 +388,7 @@ class Runbot(Controller):
             'title': 'Routes to build %s' % build.id,
         })
 
+    @json_variant(lambda qcontext: get_details(qcontext['branch'])[0])
     @route([
         '/runbot/branch/<model("runbot.branch"):branch>',
         ], website=True, auth='public', type='http', sitemap=False)
@@ -373,6 +405,7 @@ class Runbot(Controller):
 
         return request.render('runbot.branch', context)
 
+    @json_variant(lambda qcontext: get_details(qcontext['bundles']))
     @route([
         '/runbot/glances',
         '/runbot/glances/<int:project_id>',
@@ -471,6 +504,17 @@ class Runbot(Controller):
             'pager': pager,
         }
         return request.render('runbot.build_error', qctx)
+
+    @json_variant(lambda qcontext: qcontext['details'])
+    @route(['/runbot/error/<int:build_error_id>'], type='http', auth='public', website=True, sitemap=False)
+    def build_error_details(self, build_error_id=None, **kwargs):
+        build_error = request.env['runbot.build.error'].browse(build_error_id).exists()
+        if not build_error:
+            raise NotFound()
+        return request.render('runbot.build_error_details', {
+            'details': get_details(build_error)[0],
+            'title': 'Error %s' % build_error.id,
+        })
 
     @route(['/runbot/teams', '/runbot/teams/<model("runbot.team"):team>'], type='http', auth='user', website=True, sitemap=False)
     def team_dashboards(self, team=None, hide_empty=False, **kwargs):
@@ -742,6 +786,7 @@ class Runbot(Controller):
             _logger.error('Trying to access a non public docker image')
         raise NotFound
 
+    @json_variant(lambda qcontext: get_details(qcontext['dockerfile_result'])[0])
     @route([
         '/runbot/dockerfile_result/<int:dockerfile_result_id>',
         '/runbot/dockerfile_result/<dockerfile_tag>/<dockerfile_hash>',
@@ -775,6 +820,7 @@ class Runbot(Controller):
             'future_diff': current_result._getdocker_metadata_diff(future_result.id),
         })
 
+    @json_variant(lambda qcontext: get_details(qcontext['batches']))
     @route([
         '/runbot/batches/ids/<string:batch_ids>',
         '/runbot/batches/ids/<string:batch_ids>/<model("runbot.build.error"):build_error>',
@@ -884,7 +930,7 @@ class Runbot(Controller):
                     }
                     for commit_link in batch.commit_link_ids
                 ],
-                "autotags": request.env["runbot.build.error"].sudo()._disabling_tags(build_id=batch.slot_ids.build_id[0]),
+                "autotags": request.env["runbot.build.error"]._disabling_tags(build_id=batch.slot_ids.build_id[0]),
             }
         return request.make_json_response(last_batches_infos)
 
@@ -910,6 +956,7 @@ class Runbot(Controller):
         }
         return request.render('runbot.bundles_by_tag', qctx)
 
+    @json_variant(lambda qcontext: get_details(qcontext['bundles']))
     @route([
         '/runbot/versions',
         ], website=True, auth='public', type='http', sitemap=False)

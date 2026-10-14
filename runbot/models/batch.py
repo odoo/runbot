@@ -12,6 +12,12 @@ _logger = logging.getLogger(__name__)
 class Batch(models.Model):
     _name = 'runbot.batch'
     _description = "Bundle batch"
+    _inherit = 'runbot.public.fields.mixin'
+    _public_fields = (
+        'id', 'display_name', 'bundle_id', 'category_id', 'state', 'hidden', 'create_date', 'last_update', 'age', 'priority_level',
+        'slot_ids', 'commit_link_ids', 'log_ids', 'has_warning', 'base_reference_batch_id', 'reference_batch_ids',
+    )
+    _details_include = ('slot_ids',)
 
     last_update = fields.Datetime('Last ref update')
     bundle_id = fields.Many2one('runbot.bundle', required=True, index=True, ondelete='cascade')
