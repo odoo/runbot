@@ -11,6 +11,7 @@ import re
 import resource
 import stat
 import subprocess
+import time
 import types
 import typing
 from collections.abc import Iterable, Mapping, Callable
@@ -138,14 +139,17 @@ class Repo[T]:
 
     def _run(self, *args, **kwargs) -> T:
         opts = {**self.config_, **kwargs}
-        args = tuple(itertools.chain(
+        if self.runner is subprocess.run:
+            opts['timeout'] = 10*60
+        command = tuple(itertools.chain(
             ('git', '-C', self.directory),
             itertools.chain.from_iterable(('-c', p) for p in self.params + ALWAYS),
             git_tracing_params(),
             args,
         ))
+        start = time.time()
         try:
-            return self.runner(args, preexec_fn=_bypass_limits, **opts)
+            return self.runner(command, preexec_fn=_bypass_limits, **opts)
         except subprocess.CalledProcessError as e:
             stream = e.stderr or e.stdout
             if stream:
@@ -154,6 +158,10 @@ class Repo[T]:
                         stream = stream.decode()
                 _logger.error("git call error: %s", stream)
             raise
+        finally:
+            if self.runner is subprocess.run:
+                end = time.time()
+                _logger.info("%s executed in %.1f seconds", args, (end - start))
 
     def stdout(self, flag: StdOutValue = True) -> Self:
         match flag:
