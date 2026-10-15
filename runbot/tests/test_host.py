@@ -58,6 +58,78 @@ class TestHost(RunbotCase):
 
         self.start_patcher('find_patcher', 'odoo.addons.runbot.common.find', 0)
         self.start_patcher('host_bootstrap', 'odoo.addons.runbot.models.host.Host._bootstrap', None)
+        self.start_patcher('docker_remove_container', 'odoo.addons.runbot.container._docker_remove_container')
+
+    def _get_mock_container(self, name, running=False, oom_killed=False, exit_code=0):
+        container = MagicMock()
+        container.name = name
+        container.attrs = {'State': {'Running': running, 'OOMKilled': oom_killed, 'ExitCode': exit_code}}
+        return container
+
+    def _create_test_build(self, local_state='done'):
+        return self.Build.create({
+            'params_id': self.server_params.id,
+            'port': '1234',
+            'local_state': local_state,
+        })
+
+    def test_docker_cleanup(self):
+
+        # containers not managed because not dest format
+        self.patchers['docker_ps'].return_value = [
+            self._get_mock_container('not-a-dest', running=True),
+            self._get_mock_container('1234-test', running=True),
+        ]
+        self.Runbot._docker_cleanup()
+        self.patchers['docker_stop'].assert_not_called()
+        self.patchers['docker_remove_container'].assert_not_called()
+
+        # container in dest format but without any matching build is silently skipped
+        self.patchers['docker_ps'].return_value = [self._get_mock_container('9999999999-20-0', running=True)]
+        self.Runbot._docker_cleanup()
+        self.patchers['docker_stop'].assert_not_called()
+        self.patchers['docker_remove_container'].assert_not_called()
+
+        # build done with a running container: the container must be stopped but not removed
+        done_build = self._create_test_build(local_state='done')
+        self.patchers['docker_ps'].return_value = [self._get_mock_container(done_build.dest, running=True)]
+        self.Runbot._docker_cleanup()
+        self.patchers['docker_stop'].assert_called_once_with(done_build.dest, done_build._path())
+        self.patchers['docker_remove_container'].assert_not_called()
+
+        # build done with a stopped container exiting cleanly: removed without any log
+        self.patchers['docker_stop'].reset_mock()
+        self.patchers['docker_ps'].return_value = [self._get_mock_container(done_build.dest, running=False, exit_code=0)]
+        self.Runbot._docker_cleanup()
+        self.patchers['docker_stop'].assert_not_called()
+        self.patchers['docker_remove_container'].assert_called_once_with(done_build.dest)
+        self.assertFalse(done_build.oom_killed)
+        self.assertFalse(done_build.log_ids)
+
+        # build done with a stopped container exiting with an error: removed and a log is created
+        self.patchers['docker_remove_container'].reset_mock()
+        self.patchers['docker_ps'].return_value = [self._get_mock_container(done_build.dest, running=False, exit_code=1)]
+        self.Runbot._docker_cleanup()
+        self.patchers['docker_remove_container'].assert_called_once_with(done_build.dest)
+        self.assertIn('The main process exited with exit code 1', done_build.log_ids.mapped('message'))
+        done_build.log_ids.unlink()
+
+        # build done with a stopped container OOM killed: flag the build, log it and remove
+        self.patchers['docker_remove_container'].reset_mock()
+        self.patchers['docker_ps'].return_value = [self._get_mock_container(done_build.dest, running=False, oom_killed=True, exit_code=0)]
+        self.Runbot._docker_cleanup()
+        self.patchers['docker_remove_container'].assert_called_once_with(done_build.dest)
+        self.assertTrue(done_build.oom_killed)
+        self.assertIn('A process was killed by the OOM killer in container', done_build.log_ids.mapped('message'))
+
+        # build not done: the container is left untouched when running
+        self.patchers['docker_stop'].reset_mock()
+        self.patchers['docker_remove_container'].reset_mock()
+        running_build = self._create_test_build(local_state='running')
+        self.patchers['docker_ps'].return_value = [self._get_mock_container(running_build.dest, running=True)]
+        self.Runbot._docker_cleanup()
+        self.patchers['docker_stop'].assert_not_called()
+        self.patchers['docker_remove_container'].assert_not_called()
 
     def test_build_logs(self):
 
