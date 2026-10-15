@@ -65,8 +65,8 @@ class Bundle(models.Model):
     author_ids = fields.Many2many('res.users', string='Involved Users', compute='_compute_author_ids', search='_search_author_ids', domain=[('share', '=', False)])
     team_ids = fields.Many2many('runbot.team', string='Involved Teams', compute='_compute_team_ids')
     team_id = fields.Many2one('runbot.team', string='Owning Team', compute='_compute_team_id', inverse='_inverse_team_id', store=True, tracking=True)
-    manual_team_id = fields.Many2one('runbot.team', 'Manually set team')
-    auto_team_id = fields.Many2one('runbot.team', 'Automatically set team', compute='_compute_auto_team_id', readonly=True)
+    manual_team_id = fields.Many2one('runbot.team', 'Manually set owning team')
+    auto_team_id = fields.Many2one('runbot.team', 'Automatically set owning team', compute='_compute_auto_team_id', readonly=True)
 
     priority_offset = fields.Integer("Priority offset", help="Offset in seconds to remove from the create date of a batch to define priority, positive value means higher priority, negative value means lower priority.")
 
@@ -281,7 +281,7 @@ class Bundle(models.Model):
     @api.depends('author_ids')
     def _compute_team_ids(self):
         for bundle in self:
-            bundle.team_ids = bundle.author_ids.runbot_team_ids.filtered(lambda rec: rec.module_ownership_ids).sorted('id')
+            bundle.team_ids = bundle.author_ids.runbot_team_ids.sorted('id')
 
     @api.depends('manual_team_id', 'auto_team_id')
     def _compute_team_id(self):
@@ -291,7 +291,8 @@ class Bundle(models.Model):
     @api.depends('name', 'team_ids', 'author_ids')
     def _compute_auto_team_id(self):
         for bundle in self:
-            bundle.auto_team_id = bundle.team_ids and bundle.team_ids[0]
+            owning_teams = bundle.team_ids.filtered(lambda team: team.module_ownership_ids)
+            bundle.auto_team_id = owning_teams and owning_teams[0]
 
     def _inverse_team_id(self):
         self.manual_team_id = self.team_id
