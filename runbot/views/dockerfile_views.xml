@@ -41,7 +41,7 @@
                   <field name="layer_ids">
                     <list default_order="sequence,id">
                       <field name="sequence" widget="handle"/>
-                      <field name="rendered" decoration-it="layer_type in ('reference_layer', 'reference_file')" decoration-bg-info="layer_type == 'template' or (layer_type == 'reference_layer' and (packages or values))" decoration-bg-success="layer_type == 'raw'" decoration-bg-dark="layer_type == 'file'"/>
+                      <field name="rendered" widget="dockerfile" decoration-it="layer_type in ('reference_layer', 'reference_file')" decoration-bg-info="layer_type == 'template' or (layer_type == 'reference_layer' and (packages or values))" decoration-bg-success="layer_type == 'raw'" decoration-bg-dark="layer_type == 'file'"/>
                       <field name="reference_count" string="#" decoration="True" decoration-bg-danger="referencing_dockerlayer_ids" decoration-bg-warning="reference_count != 0"/>
                       <field name="referencing_dockerlayer_ids" column_invisible="True"/>
                       <field name="layer_type" column_invisible="True"/>
@@ -51,7 +51,7 @@
                   </field>
                 </page>
                 <page string="Dockerfile">
-                  <field name="dockerfile"/>
+                  <field name="dockerfile" widget="dockerfile"/>
                 </page>
                 <page string="Used in ">
                   <field name="bundle_ids" widget="one2many">
@@ -170,7 +170,7 @@
               <field name="all_referencing_dockerlayer_ids"  widget="many2many_tags" readonly="1"/>
             </group>
             <group>
-              <field name="rendered"/>
+              <field name="rendered" widget="dockerfile"/>
             </group>
           </sheet>
           <chatter/>
@@ -191,7 +191,7 @@
           <field name="values" column_invisible="True"/>
           <field name="reference_count" string="#refs" decoration-danger="referencing_dockerlayer_ids" decoration-warning="reference_count != 0"/>
           <field name="all_referencing_dockerlayer_ids" string="#referencing" widget="many2many_tags"/>
-          <field name="rendered" decoration-it="layer_type in ('reference_layer', 'reference_file')" decoration-bg-info="layer_type == 'template' or (layer_type == 'reference_layer' and (packages or values))" decoration-bg-success="layer_type == 'raw'" decoration-bg-dark="layer_type == 'file'"/>
+          <field name="rendered" widget="dockerfile" decoration-it="layer_type in ('reference_layer', 'reference_file')" decoration-bg-info="layer_type == 'template' or (layer_type == 'reference_layer' and (packages or values))" decoration-bg-success="layer_type == 'raw'" decoration-bg-dark="layer_type == 'file'"/>
         </list>
       </field>
     </record>
@@ -219,7 +219,7 @@
                 <field name="output"  readonly="1"/>
               </page>
               <page string="Content">
-                <field name="content"  readonly="1"/>
+                <field name="content" widget="dockerfile" readonly="1"/>
               </page>
               <page string="Metadata">
                 <field name="metadata" widget="runbotjsonb" readonly="1"/>

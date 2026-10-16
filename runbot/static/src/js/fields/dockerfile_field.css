@@ -1,0 +1,109 @@
+/* colors are checked for WCAG AA contrast (>= 4.5:1) on every background below */
+
+/* notebook pages don't constrain the field, long lines would widen the whole form */
+.o_field_widget.o_field_dockerfile {
+    width: 100%;
+}
+
+/* the frame comes from the html_editor default pre style, only removing its horizontal padding for the line numbers */
+.o_runbot_dockerfile {
+    counter-reset: dockerfile-line;
+    margin: 0;
+    padding: 0.5rem 0;
+    white-space: pre;
+}
+
+.o_runbot_dockerfile_line::before {
+    counter-increment: dockerfile-line;
+    content: counter(dockerfile-line);
+    display: inline-block;
+    width: 3.5em;
+    padding-right: 1em;
+    margin-right: 0.5em;
+    text-align: right;
+    color: var(--secondary-color);
+    border-right: 1px solid var(--border-color);
+    user-select: none;
+}
+
+/* compact display in list views: no frame nor line numbers */
+.o_list_renderer .o_runbot_dockerfile {
+    padding: 0;
+    background-color: transparent;
+    border: none;
+    white-space: pre-wrap;
+}
+
+.o_list_renderer .o_runbot_dockerfile_line::before {
+    content: none;
+}
+
+/* same box for all rows, so that decorated and plain ones are aligned */
+.o_list_renderer .o_field_dockerfile {
+    padding: 0.25rem 0.5rem;
+    border-left: 3px solid transparent;
+    border-radius: var(--border-radius);
+}
+
+/* replace the saturated layer type decorations by light tints, keeping the syntax colors readable */
+.o_list_renderer .o_field_dockerfile[class*="text-bg-"] {
+    color: inherit !important;
+}
+
+.o_list_renderer .o_field_dockerfile.text-bg-info {
+    background-color: var(--info-bg-subtle) !important;
+    border-left-color: var(--info);
+}
+
+.o_list_renderer .o_field_dockerfile.text-bg-success {
+    background-color: var(--success-bg-subtle) !important;
+    border-left-color: var(--success);
+}
+
+.o_list_renderer .o_field_dockerfile.text-bg-dark {
+    background-color: var(--secondary-bg) !important;
+    border-left-color: var(--gray-600);
+}
+
+/* Prism docker grammar tokens, keyword, property and flag: the matching variables (--primary, --code-color) fail AA on the tints */
+.o_runbot_dockerfile_keyword {
+    color: #0550ae;
+    font-weight: bold;
+}
+
+.o_runbot_dockerfile_property,
+.o_runbot_dockerfile_flag {
+    color: #6639ba;
+}
+
+.o_runbot_dockerfile_string {
+    color: var(--info-text-emphasis);
+}
+
+.o_runbot_dockerfile_variable {
+    color: var(--warning-text-emphasis);
+}
+
+.o_runbot_dockerfile_comment,
+.o_runbot_dockerfile_operator,
+.o_runbot_dockerfile_punctuation {
+    color: var(--secondary-color);
+}
+
+.o_runbot_dockerfile_comment {
+    font-style: italic;
+}
+
+/* runbot extensions of the grammar (flag above), shell-operator and file: --danger fails AA on the tints */
+.o_runbot_dockerfile_key {
+    color: var(--success-text-emphasis);
+}
+
+.o_runbot_dockerfile_shell-operator,
+.o_runbot_dockerfile_file {
+    color: #b31d28;
+}
+
+.o_runbot_dockerfile_file {
+    font-weight: bold;
+}
