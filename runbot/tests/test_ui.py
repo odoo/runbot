@@ -128,3 +128,30 @@ class TestRunbotUi(HttpCase):
             error.test_tags,
             '/runbot:new_failure\n/runbot:shared_context',
         )
+
+    def test_docker_main_flow(self):
+        self.env['runbot.dockerfile'].create({
+            'name': 'UiTourDockerfile',
+            'layer_ids': [
+                (0, 0, {
+                    'name': 'UI tour base',
+                    'sequence': 1,
+                    'content': 'FROM ubuntu:noble AS base\nCOPY --from=base /etc/os-release /tmp/',
+                }),
+                (0, 0, {
+                    'name': 'UI tour packages',
+                    'sequence': 2,
+                    'content': 'RUN apt-get update && \\\n'
+                        '    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl',
+                }),
+                (0, 0, {
+                    'name': 'UI tour file',
+                    'sequence': 3,
+                    'layer_type': 'file',
+                    'file_destination': '/etc/ui_tour.conf',
+                    'content': 'ui_tour = true',
+                }),
+            ],
+        })
+
+        self.start_tour('/odoo', 'runbot_docker_main_flow', login='admin')
