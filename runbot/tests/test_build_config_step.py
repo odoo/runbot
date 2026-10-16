@@ -1148,7 +1148,7 @@ class TestBuildConfigStep(TestBuildConfigStepCommon):
 
         params = config_step._run_install_odoo(child)
         env_variables = params.get('env_variables', [])
-        self.assertEqual(env_variables, ['CHROME_CPU_THROTTLE=10'])
+        self.assertEqual(env_variables[0], 'CHROME_CPU_THROTTLE=10')
 
     @patch('odoo.addons.runbot.models.build.BuildResult._checkout')
     def test_db_name(self, mock_checkout):

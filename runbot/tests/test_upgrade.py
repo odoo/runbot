@@ -508,6 +508,7 @@ class TestUpgradeFlow(RunbotCase):
         self.start_patcher('docker_state', 'odoo.addons.runbot.models.build.docker_state', 'END')
         for current_build in db_builds:
             with self.subTest(current_build.description):
+                self.docker_run_calls.clear()
                 suffix = current_build.params_id.restore_db_suffix
                 source_dest = current_build.params_id.reference_build_id.dest
 
@@ -526,9 +527,9 @@ class TestUpgradeFlow(RunbotCase):
                             f'mv filestore/* /data/build/datadir/filestore/{db_name}',
                             f'createdb {db_name} -T template0',
                             f'psql -q {db_name} < dump.sql',
-                            f'psql -q -d {db_name} -c "ANALYZE;"',
                             'cd /data/build',
                             'rm -r restore',
+                            f'psql -q -d {db_name} -c "ANALYZE;"',
                             f'psql {db_name} -c "select name from ir_module_module where state = \'installed\'" -t -A > /data/build/logs/restore_modules_installed.txt',
                         ]
                     )

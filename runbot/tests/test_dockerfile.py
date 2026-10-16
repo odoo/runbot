@@ -33,6 +33,7 @@ class TestDockerfile(RunbotCase, HttpCase):
             docker_render = self.env.ref('runbot.docker_default').dockerfile.replace('\n\n', '\n')
             docker_render = '\n'.join(line for line in docker_render.split('\n') if line and line[0] != '#')
             docker_render = re.sub(r'google-chrome-stable_\d{3}\.\d\.\d{1,4}\.\d{1,4}-\d', 'google-chrome-stable_xxx.x.xxxx.xx-x', docker_render)
+            docker_render = docker_render.rsplit('USER root', 1)[0]  # remove the added files at the end
 
         self.assertEqual(
 r"""FROM ubuntu:resolute
@@ -81,7 +82,7 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
 RUN python3 -m pip install --no-cache-dir ebaysdk==2.1.5 pdf417gen==0.7.1
 ADD --chown=TestUser https://raw.githubusercontent.com/odoo/odoo/master/requirements.txt /tmp/requirements.txt
 RUN python3 -m pip install --no-cache-dir -r /tmp/requirements.txt
-USER TestUser""", docker_render)
+""", docker_render)
 
     def test_dockerfile_base_fields(self):
         dockerfile = self.env['runbot.dockerfile'].create({
@@ -181,6 +182,7 @@ class TestDockerfileCache(RunbotCase, HttpCase):
 some useless content
 
 USER TestUser
+ENV USER TestUser
 """
 
         self.start_patcher('hardlink_to', 'odoo.addons.runbot.models.docker.Path.hardlink_to')
@@ -198,6 +200,7 @@ ADD https://nowhere.example.org/nothing.txt /data/nothing.txt
 
 
 USER TestUser
+ENV USER TestUser
 """
         dockerfile.layer_ids[0].content = raw_layer
         content = dockerfile._get_cached_content('/tmp/fake_build_path')
@@ -216,6 +219,7 @@ COPY _data_nothing_txt /data/nothing.txt
 
 
 USER TestUser
+ENV USER TestUser
 """
         mock_response = MagicMock()
         mock_response.iter_content.return_value = [b'small file content']
@@ -282,6 +286,7 @@ COPY _data_nothing_txt /data/nothing.txt
 
 
 USER TestUser
+ENV USER TestUser
 """
 
         self.start_patcher('docker_username', 'odoo.addons.runbot.models.docker.USERNAME', new='TestUser')

@@ -898,7 +898,7 @@ class BuildResult(models.Model):
 
         # TODO cleanup remove
         log_db = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
-        existing_db = [db for db in list_local_dbs(additionnal_conditions=additionnal_conditions) if db != log_db]
+        existing_db = [db for db in list_local_dbs(additionnal_conditions=additionnal_conditions) if db != log_db]  # TODO cleanup remove
 
         for db in _filter(dest_list=existing_db, label='db'):
             self._logger('Removing database')
@@ -1244,9 +1244,12 @@ class BuildResult(models.Model):
         env_variables = env_variables or []
         env_variables.append('ODOO_RUNBOT=1')
         self.cpu_limit = kwargs.get('cpu_limit')
+        docker_file = self.env['runbot.dockerfile'].search([('image_tag', '=', kwargs['image_tag'].split('.')[0])], limit=1)    # TODO cleanup postgres remove
+
         def start_docker():
             docker_run(
                 cmd=cmd,
+                use_host_postgres=docker_file and docker_file.use_host_postgres,    # TODO cleanup postgres remove
                 container_name=container_name,
                 build_dir=build_dir,
                 log_path=log_path,
