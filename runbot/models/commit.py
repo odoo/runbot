@@ -2,7 +2,7 @@
 import datetime
 import subprocess
 
-from ..common import os, RunbotException, make_github_session, transactioncache
+from ..common import os, RunbotException, make_github_session, s2human_long, transactioncache
 import shutil
 
 from odoo import models, fields, api
@@ -218,6 +218,11 @@ class Commit(models.Model):
     def _compute_dname(self):
         for commit in self:
             commit.dname = '%s:%s' % (commit.repo_id.name, commit.name[:8])
+
+    def _get_formated_age(self):
+        if not self.date:
+            return ''
+        return s2human_long((self.env.cr.now() - self.date).total_seconds())
 
     def _github_status(self, build, context, state, target_url, description=None, ci_strategy="all"):
         if state == 'failure':

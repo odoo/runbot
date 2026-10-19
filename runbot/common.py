@@ -66,6 +66,10 @@ def dt2time(datetime):
     return time.mktime(datetime.timetuple())
 
 
+def dt2str(datetime):
+    return time2str(datetime.timetuple())
+
+
 def now():
     return time.strftime(DEFAULT_SERVER_DATETIME_FORMAT)
 

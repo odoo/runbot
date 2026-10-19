@@ -74,11 +74,11 @@ registry.category("web_tour.tours").add("runbot_frontend_main_flow", {
         },
         {
             content: "The batch page renders the bundle and build",
-            trigger: `table:has(td:contains("Builds")) .slot_name:contains("Frontend tour trigger")`,
+            trigger: `.batch_builds .slot_name:contains("Frontend tour trigger")`,
         },
         {
             content: "Open the build from the batch page",
-            trigger: `table:has(td:contains("Builds")) .slot_name:contains("Frontend tour trigger")`,
+            trigger: `.batch_builds .slot_name:contains("Frontend tour trigger")`,
             run: "click",
             expectUnloadPage: true,
         },

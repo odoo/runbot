@@ -14,230 +14,144 @@
                             <a t-att-href="batch._url()" class="btn btn-link">batch-<t t-out="batch.id"/></a>
                         </li>
                     </ol>
-                    <a groups="runbot.group_runbot_advanced_user" t-attf-href="/odoo/batch/{{batch.id}}"
-                       class="btn btn-default btn-ssm" target="_blank" title="View Batch in Backend">
-                        <i class="fa fa-list"/>
-                    </a>
                     <span class="ms-auto">
                         <t t-call="runbot.slots_infos"/>
                     </span>
                 </t>
-                <div class="row g-0">
-                    <div class="col-lg-6">
-                    <t t-set="batch_class" t-value="'bg-info-subtle' if batch.state=='preparing' else 'bg-success-subtle' if not any(log.level != 'INFO' for log in batch.log_ids) else 'bg-warning-subtle'"/>
-                    <table class="table">
-                        <tr t-if="batch.priority_level">
-                            <td>Priority</td>
-                            <td>
-                                <t t-if="batch.priority_level &lt; int(batch.create_date.timestamp())">
-                                    <span class="badge text-bg-success">High</span>
-                                </t>
-                                <t t-else="">
-                                    <t t-if="batch.priority_level &gt; int(batch.create_date.timestamp())">
-                                        <span class="badge text-bg-secondary">Low</span>
-                                    </t>
-                                    <t t-else="">
-                                        Normal
-                                    </t>
-                                    <a groups="runbot.group_user" role="button" class="btn btn-ssm btn-info" t-attf-href="/runbot/batch/{{batch.id}}/prioritize">Set to high</a>
-                                </t>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>Category</td>
-                            <td t-out="batch.category_id.name"></td>
-                        </tr>
-                        <tr>
-                            <td>Version</td>
-                            <td t-out="batch.slot_ids[0].params_id.version_id.name if batch.slot_ids else batch.bundle_id.version_id.name"/>
-                        </tr>
-                        <tr>
-                            <td>Create date</td>
-                            <td t-out="batch.create_date"/>
-                        </tr>
-                        <t t-if="more">
-                            <tr>
-                                <td>Last update</td>
-                                <td>
-                                    <t t-out="batch.last_update"/>
-                                    <span class="badge text-bg-info" t-out="s2human(batch.last_update - batch.create_date)"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Estimated total load time (with matched)</td>
-                                <td>
-                                    <t t-set="load_time" t-value="sum(build.load_time for build in batch.slot_ids.filtered(lambda s: s.link_type != 'rebuild').build_id)"/>
-                                    <t t-out="precise_s2human(load_time)"/>
-                                    <i>(<t t-out="load_time"/>s)</i>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Real load time</td>
-                                <td>
-                                    <t t-set="real_load_time" t-value="sum(build.real_load_time for build in batch.slot_ids.filtered(lambda s: s.link_type != 'matched').build_id)"/>
-                                    <t t-out="precise_s2human(real_load_time)"/>
-                                    <i>(<t t-out="real_load_time"/>s)</i>
-                                </td>
-                            </tr>
+                <div class="container-fluid">
+                    <div class="row">
+                        <t t-set="color" t-value="batch._get_color_class()"/>
+                        <t t-set="auto_slots" t-value="batch.slot_ids.filtered(lambda s: not s.trigger_id.manual)"/>
+                        <t t-set="manual_slots" t-value="batch.slot_ids.filtered(lambda s: s.trigger_id.manual and (s.build_id or (user_id._is_internal() and ((not s.trigger_id.team_ids) or (user_id in s.trigger_id.team_ids.user_ids)))))"/>
+                        <t t-set="old_slots" t-value="more and batch.with_context(active_test=False).slot_ids.filtered(lambda s: not s.active)"/>
+                        <t t-set="has_checks" t-value="auto_slots or manual_slots or old_slots"/>
+                        <!-- in the header of the checks card if any, else of the batch card -->
+                        <t t-set="batch_toolbar">
+                            <a groups="runbot.group_runbot_advanced_user" t-attf-href="/odoo/batch/{{batch.id}}"
+                               class="btn btn-default btn-ssm" target="_blank" title="View Batch in Backend">
+                                <i class="fa fa-list"/>
+                            </a>
                         </t>
-                        <tr>
-                            <td t-att-class="batch_class" >Commits</td>
-                            <td t-att-class="batch_class" >
-                                <div t-foreach="batch.commit_link_ids.sorted(key=lambda lc: (lc.commit_id.repo_id.sequence, lc.commit_id.repo_id.id))" t-as="commit_link">
-                                    <t t-set="commit" t-value="commit_link.commit_id"/>
-                                    <span/>
-                                    <t t-if="commit_link.match_type == 'new'">
-                                        <t t-set="commit_icon">fa-hashtag</t>
-                                        <t t-set="commit_title">This commit is a new head</t>
-                                    </t>
-                                    <t t-elif="commit_link.match_type == 'head'">
-                                        <t t-set="commit_icon">fa-link</t>
-                                        <t t-set="commit_title">This commit is an existing head from bundle branches</t>
-                                    </t>
-                                    <t t-elif="commit_link.match_type == 'base_match'">
-                                        <t t-set="commit_icon">fa-code-fork</t>
-                                        <t t-set="commit_title">This commit is matched from a base batch with matching merge_base</t>
-                                    </t>
-                                    <t t-elif="commit_link.match_type == 'base_head'">
-                                        <t t-set="commit_icon">fa-clock-o</t>
-                                        <t t-set="commit_title">This commit is the head of a base branch</t>
-                                    </t>
-                                    <a t-attf-href="/runbot/commit/#{commit.id}" t-att-title="commit_title">
-                                        <i t-attf-class="fa fa-fw {{commit_icon}}"/>
-                                        <span t-out="commit.dname"/>
-                                    </a>
-                                    <a t-att-href="'https://%s/commit/%s' % (commit_link.branch_id.remote_id.base_url, commit_link.commit_id.name)" title="View Commit on Github"><i class="fa fa-github"/></a>
-                                    <small t-if="commit_link.match_type and commit_link.match_type.startswith('base')">
-                                        from base:
-                                        <span t-out="commit_link.branch_id.name"/>
-                                        <br/>
-                                    </small>
-                                    <small t-else="">
-                                        found in branch
-                                        <span t-out="commit_link.branch_id.name"/>
-                                        <t t-if="batch.state != 'preparing'">
-                                            <span t-out="'+%s' % commit_link.diff_add" class="text-success"/>
-                                            <span t-out="'-%s' % commit_link.diff_remove" class="text-danger"/>
-                                            <span class="text-info">
-                                                (
-                                                <span t-out="commit_link.file_changed"/>
-                                                <i class="fa fa-file"/>
-                                                )
-                                                <span io="behind">(
-                                                    <span t-out="'%s ahead' % commit_link.base_ahead" class="text-success"/>
-                                                    ,
-                                                    <span t-out="'%s behind' % commit_link.base_behind" class="text-danger"/>
-                                                )</span>
-                                            </span>
+                        <div class="card-group">
+                            <div t-attf-class="card border-{{color}} batch_details">
+                                <header class="card-header d-flex align-items-center gap-2">
+                                    <span class="h6 mb-1 me-auto">
+                                        <i t-if="batch.state in ('preparing', 'ready')" t-attf-class="fa fa-hourglass-half fa-fw text-{{color}} me-1"/>
+                                        <i t-else="" t-attf-class="fa fa-{{batch._fa_result()}} fa-fw text-{{color}} me-1"/>
+                                        batch-<t t-out="batch.id"/>
+                                        <small class="text-body-secondary ms-1" t-att-title="dt2str(batch.create_date)" t-out="batch._get_formated_age()"/>
+                                    </span>
+                                    <t t-if="not has_checks" t-out="batch_toolbar"/>
+                                </header>
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item">
+                                        <dl>
+                                            <t t-if="batch.priority_level">
+                                                <dt>Priority</dt>
+                                                <dd>
+                                                    <t t-if="batch.priority_level &lt; int(batch.create_date.timestamp())">
+                                                        <span class="badge text-bg-success">High</span>
+                                                    </t>
+                                                    <t t-else="">
+                                                        <t t-if="batch.priority_level &gt; int(batch.create_date.timestamp())">
+                                                            <span class="badge text-bg-secondary">Low</span>
+                                                        </t>
+                                                        <t t-else="">
+                                                            Normal
+                                                        </t>
+                                                        <a groups="runbot.group_user" role="button" class="btn btn-ssm btn-info" t-attf-href="/runbot/batch/{{batch.id}}/prioritize">Set to high</a>
+                                                    </t>
+                                                </dd>
+                                            </t>
+                                            <dt>Category</dt>
+                                            <dd t-out="batch.category_id.name"/>
+                                            <dt>Version</dt>
+                                            <dd t-out="batch.slot_ids[0].params_id.version_id.name if batch.slot_ids else batch.bundle_id.version_id.name"/>
+                                            <dt>Create date</dt>
+                                            <dd t-out="dt2str(batch.create_date)"/>
+                                            <t t-if="more">
+                                                <dt>Last update</dt>
+                                                <dd>
+                                                    <t t-if="batch.last_update" t-out="dt2str(batch.last_update)"/>
+                                                    <span class="badge text-bg-info" t-out="s2human(batch.last_update - batch.create_date)"/>
+                                                </dd>
+                                                <t t-set="load_time" t-value="sum(build.load_time for build in batch.slot_ids.filtered(lambda s: s.link_type != 'rebuild').build_id)"/>
+                                                <dt title="With the matched builds">Estimated total load time</dt>
+                                                <dd t-att-title="'%ss' % load_time" t-out="precise_s2human(load_time)"/>
+                                                <t t-set="real_load_time" t-value="sum(build.real_load_time for build in batch.slot_ids.filtered(lambda s: s.link_type != 'matched').build_id)"/>
+                                                <dt>Real load time</dt>
+                                                <dd t-att-title="'%ss' % real_load_time" t-out="precise_s2human(real_load_time)"/>
+                                            </t>
+                                        </dl>
+                                    </li>
+                                    <!-- Commits -->
+                                    <t t-set="commit_links" t-value="batch.commit_link_ids.sorted(key=lambda lc: (lc.commit_id.repo_id.sequence, lc.commit_id.repo_id.id))"/>
+                                    <t t-if="commit_links">
+                                        <li class="list-group-item fw-bold">Commits</li>
+                                        <t t-foreach="commit_links" t-as="commit_link">
+                                            <t t-call="runbot.commit_link_item">
+                                                <t t-set="hide_stats" t-value="batch.state == 'preparing'"/>
+                                            </t>
                                         </t>
-                                        <br/>
-                                        <t t-if="more">
-                                            Base head:
-                                            <span t-out="commit_link.base_commit_id.name"/>
-                                            <br/>
-                                            Merge base:
-                                            <span t-out="commit_link.merge_base_commit_id.name"/>
-                                            <br/>
-                                        </t>
-                                    </small>
-                                    <b t-if="commit.rebase_on_id">Automatic rebase on <t t-out="commit.rebase_on_id.name"/><br/></b>
-                                    <t t-if="more or not (commit_link.match_type and commit_link.match_type.startswith('base'))">
-                                        <a t-if="commit.tree_hash" t-attf-href="/runbot/tree_hash/#{commit.tree_hash}">
-                                            <i t-attf-class="fa fa-fw fa-tree"/>
-                                            <t t-out="commit.tree_hash[:8]"/>
-                                        </a><br/>
-                                        Subject:
-                                        <span t-out="commit.subject"/>
-                                        <br/>
-                                        Author:
-                                        <span t-out="commit.author"/>
-                                        (
-                                        <span t-out="commit.author_email"/>
-                                        )
-                                        <br/>
-                                        <t t-if="commit.author != commit.committer">
-                                            Committer:
-                                            <span t-out="commit.committer"/>
-                                            (
-                                            <span t-out="commit.committer_email"/>
-                                            )
-                                            <br/>
-                                        </t>
-                                        Commit date:
-                                        <span t-out="commit.date"/>
-                                        <br/>
                                     </t>
-                                    <hr/>
+                                    <!-- Reference batches -->
+                                    <li t-if="more" class="list-group-item">
+                                        <t t-set="reference_batch_ids" t-value="batch.reference_batch_ids"/>
+                                        <dl>
+                                            <dt>
+                                                Reference batches
+                                                <t t-if="batch.bundle_id.is_base">(is base)</t>
+                                                <t t-elif="reference_batch_ids">(custom, not using base)</t>
+                                                <t t-else="">
+                                                    <t t-set="reference_batch_ids" t-value="batch.base_reference_batch_id.reference_batch_ids"/>
+                                                    (from base)
+                                                </t>
+                                            </dt>
+                                            <dd>
+                                                <div t-foreach="reference_batch_ids.sorted(lambda b: b.bundle_id.version_id.number, reverse=True)" t-as="reference_batch" t-attf-title="Created {{s2human(reference_batch.create_date - batch.create_date)}} before this one">
+                                                    <a t-attf-href="/runbot/batch/{{reference_batch.id}}"><t t-out="reference_batch.bundle_id.version_id.name"/> (<t t-out="reference_batch.id"/>)</a>
+                                                </div>
+                                            </dd>
+                                        </dl>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div t-if="has_checks" t-attf-class="card border-{{color}} batch_builds">
+                                <header class="card-header d-flex align-items-center gap-2">
+                                    <span class="h6 mb-1 me-auto">Checks</span>
+                                    <t t-out="batch_toolbar"/>
+                                </header>
+                                <div class="card-body">
+                                    <t t-foreach="[('Builds', auto_slots, ''), ('Manual', manual_slots, ''), ('Old builds', old_slots, 'line-through')]" t-as="group">
+                                        <t t-if="group[1]">
+                                            <div class="slots_title fw-bold text-body-secondary" t-out="group[0]"/>
+                                            <div t-foreach="group[1]" t-as="slot" t-att-class="group[2] or None">
+                                                <t t-call="runbot.slot_button"/>
+                                            </div>
+                                        </t>
+                                    </t>
                                 </div>
-                            </td>
-                        </tr>
-                        <tr t-if="more">
-                            <t t-set="reference_batch_ids" t-value="batch.reference_batch_ids"/>
-                            <td>
-                                <t t-if="batch.bundle_id.is_base">
-                                    Reference batches (is base)
-                                </t>
-                                <t t-else="">
-                                    <t t-if="reference_batch_ids">
-                                        Reference batches (custom, not using base)
-                                    </t>
-                                    <t t-else="">
-                                        <t t-set="reference_batch_ids" t-value="batch.base_reference_batch_id.reference_batch_ids"/>
-                                        Reference batches (from base)
-                                    </t>
-                                </t>
-                            </td>
-                            <td>
-                                <t t-foreach="reference_batch_ids.sorted(lambda b: b.bundle_id.version_id.number, reverse=True)" t-as="reference_batch">
-                                    <div t-attf-title="Created {{s2human(reference_batch.create_date - batch.create_date)}} before this one">
-                                         <a t-attf-href="/runbot/batch/{{reference_batch.id}}"><t t-out="reference_batch.bundle_id.version_id.name"/> (<t t-out="reference_batch.id"/>)</a>
-                                    </div>
-                                </t>
-                            </td>
-                        </tr>
-                    </table>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-lg-6">
-                    <table class="table">
-                        <tr>
-                            <td>Builds</td>
-                            <td>
-                                <t t-foreach="batch.slot_ids.filtered(lambda s: not s.trigger_id.manual)" t-as="slot">
-                                    <t t-call="runbot.slot_button"/>
-                                </t>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>Manual</td>
-                            <td>
-                                <t t-foreach="batch.slot_ids.filtered(lambda s: s.trigger_id.manual)" t-as="slot">
-                                    <t t-if="slot.build_id or (user_id._is_internal() and ((not slot.trigger_id.team_ids) or (user_id in slot.trigger_id.team_ids.user_ids)))">
-                                        <t t-call="runbot.slot_button"/>
+                    <div t-if="batch.log_ids" class="row">
+                        <div class="col-md-12">
+                            <div class="card mt-2">
+                                <header class="card-header">Logs</header>
+                                <ul class="list-group list-group-flush">
+                                    <t t-foreach="batch.log_ids" t-as="log">
+                                        <t t-set="logclass" t-value="dict(ERROR='danger', WARNING='warning', INFO='info').get(log.level, 'warning')"/>
+                                        <li t-attf-class="list-group-item list-group-item-{{logclass}}">
+                                            <b t-out="log.level"/>
+                                            --
+                                            <t t-out="log._markdown()"/>
+                                        </li>
                                     </t>
-                                </t>
-                            </td>
-                        </tr>
-                        <tr t-if="more">
-                            <td>Old builds</td>
-                            <td>
-                                <t t-foreach="batch.with_context(active_test=False).slot_ids.filtered(lambda s: not s.active)" t-as="slot">
-                                    <s>
-                                        <t t-call="runbot.slot_button"/>
-                                    </s>
-                                </t>
-                            </td>
-                        </tr>
-                    </table>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <t t-foreach="batch.log_ids" t-as="log">
-                    <t t-set="logclass" t-value="dict(ERROR='danger', WARNING='warning', INFO='info').get(log.level, 'warning')"/>
-                    <div t-attf-class="alert alert-{{logclass}}">
-                        <b t-out="log.level"/>
-                        --
-                        <t t-out="log._markdown()"/>
-                    </div>
-                </t>
             </t>
         </template>
 

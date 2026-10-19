@@ -46,6 +46,27 @@ _logger = logging.getLogger(__name__)
 
 result_order = ['ok', 'warn', 'ko', 'skipped', 'killed', 'manually_killed']  # TODO remove manually_killed
 state_order = ['pending', 'testing', 'waiting', 'running', 'done']
+fa_results = {'ok': 'check', 'warn': 'exclamation-triangle', 'skipped': 'ban', 'ko': 'times', 'killed': 'ban'}
+
+
+def get_color_class(state, result):
+    if result == 'ko':
+        return 'danger'
+    if result == 'warn':
+        return 'warning'
+
+    if state == 'pending':
+        return 'default'
+    if state in ('testing', 'waiting'):
+        return 'info'
+
+    if result == 'ok':
+        return 'success'
+
+    if result in ('skipped', 'killed'):
+        return 'secondary'
+    return 'default'
+
 
 COPY_WHITELIST = [
     "params_id",
@@ -1727,23 +1748,10 @@ class BuildResult(models.Model):
             return False
 
     def _get_color_class(self):
+        return get_color_class(self.global_state, self.global_result)
 
-        if self.global_result == 'ko':
-            return 'danger'
-        if self.global_result == 'warn':
-            return 'warning'
-
-        if self.global_state == 'pending':
-            return 'default'
-        if self.global_state in ('testing', 'waiting'):
-            return 'info'
-
-        if self.global_result == 'ok':
-            return 'success'
-
-        if self.global_result in ('skipped', 'killed'):
-            return 'secondary'
-        return 'default'
+    def _fa_result(self):
+        return fa_results.get(self.global_result, '')
 
     def _get_file_url(self, path, line=None):
         repo_name = path.replace('/data/build/', '').split('/')[0]
