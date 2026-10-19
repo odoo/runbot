@@ -14,9 +14,14 @@
                 </t>
                 <div class="container-fluid">
                     <div class="row">
-                        <div class='col-md-12'>
-                            <h5><t t-out="bundle.name"/> <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e" />
-                                <div class="btn-group btn-group-sm" role="group">
+                        <div class="col-md-12">
+                            <div class="card bundle_details">
+                                <header class="card-header d-flex flex-wrap align-items-center gap-2">
+                                    <span class="h6 mb-1 me-auto">
+                                        <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e"/>
+                                        <span t-out="bundle.name"/>
+                                    </span>
+                                    <div class="btn-group btn-group-ssm" role="group">
                                         <t t-call="runbot.branch_copy_button">
                                             <t t-set="btn_size" t-value="'btn'"/>
                                         </t>
@@ -43,102 +48,112 @@
                                                 </a></li>
                                             </ul>
                                         </t>
-                                </div></h5>
-                            
-                            <table class="table table-sm d-block overflow-x-auto">
-                                <tr>
-                                    <td>Version</td>
-                                    <td>
-                                        <t t-out="bundle.version_id.name"/>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Branches</td>
-                                    <td>
-                                        <t t-foreach="bundle._branch_groups().items()" t-as="group">
-                                            <t t-foreach="group[1]" t-as="branch">
-                                                <small>
-                                                    <div class="btn-toolbar mb-1" role="toolbar">
-                                                        <div class="btn-group btn-group-ssm" role="group">
-                                                            <a t-att-href="branch.branch_url" class="btn btn-default text-start" title="View Branch on Github"><i class="fa fa-github"/></a>
-                                                            <a groups="runbot.group_runbot_admin" class="btn btn-default fa fa-list text-start"
-                                                                t-attf-href="/odoo/branch/{{branch.id}}" target="_blank" title="View Branch in Backend"/>
-                                                            <a href="#" t-out="branch.remote_id.short_name" class="btn btn-default disabled text-start"/>
-                                                            <a t-attf-href="/runbot/branch/{{branch.id}}" class="btn btn-default text-start" title="View Branch Details"><span t-att-class="'' if branch.alive else 'line-through'" t-out="branch.name"/> <i t-if="not branch.alive" title="deleted/closed" class="fa fa-ban text-danger"/></a>
-                                                            <t t-if="not any (b.is_pr and b.alive for b in group[1]) and not branch.is_pr">
-                                                                <a t-attf-href="https://{{group[0].main_remote_id.base_url}}/compare/{{bundle.version_id.name}}...{{branch.remote_id.owner}}:{{branch.name}}?expand=1" class="btn btn-default text-start" title="Create pr"><i class="fa fa-code-fork"/> Create pr</a>
-                                                            </t>
+                                    </div>
+                                </header>
+                                <ul class="list-group list-group-flush">
+                                    <li t-foreach="bundle._consistency_warning()" t-as="warning" t-attf-class="list-group-item list-group-item-{{warning[0]}}" t-out="warning[1]"/>
+                                    <li class="list-group-item">
+                                        <dl>
+                                            <dt>Version</dt>
+                                            <dd t-out="bundle.version_id.name"/>
+                                            <dt>Branches</dt>
+                                            <dd class="overflow-x-auto">
+                                            <t t-foreach="bundle._branch_groups().items()" t-as="group">
+                                                <t t-foreach="group[1]" t-as="branch">
+                                                    <small>
+                                                        <div class="btn-toolbar mb-1" role="toolbar">
+                                                            <div class="btn-group btn-group-ssm" role="group">
+                                                                <a t-att-href="branch.branch_url" class="btn btn-default text-start" title="View Branch on Github"><i class="fa fa-github"/></a>
+                                                                <a groups="runbot.group_runbot_admin" class="btn btn-default fa fa-list text-start"
+                                                                    t-attf-href="/odoo/branch/{{branch.id}}" target="_blank" title="View Branch in Backend"/>
+                                                                <a href="#" t-out="branch.remote_id.short_name" class="btn btn-default disabled text-start"/>
+                                                                <a t-attf-href="/runbot/branch/{{branch.id}}" class="btn btn-default text-start" title="View Branch Details"><span t-att-class="'' if branch.alive else 'line-through'" t-out="branch.name"/> <i t-if="not branch.alive" title="deleted/closed" class="fa fa-ban text-danger"/></a>
+                                                                <t t-if="not any (b.is_pr and b.alive for b in group[1]) and not branch.is_pr">
+                                                                    <a t-attf-href="https://{{group[0].main_remote_id.base_url}}/compare/{{bundle.version_id.name}}...{{branch.remote_id.owner}}:{{branch.name}}?expand=1" class="btn btn-default text-start" title="Create pr"><i class="fa fa-code-fork"/> Create pr</a>
+                                                                </t>
+                                                            </div>
+                                                        </div>
+                                                    </small>
+                                                </t>
+                                            </t>
+                                            </dd>
+                                            <t groups="base.group_user" t-if="not bundle.sticky and not bundle.is_base">
+                                                <dt>Configuration</dt>
+                                                <dd>
+                                                    <t t-set="current_mode" t-value="'custom'"/>
+                                                    <t t-set="modified_repos" t-value="bundle.branch_ids.remote_id.repo_id"/>
+                                                    <t t-if="not bundle.trigger_custom_ids"> <t t-set="current_mode" t-value="'none'"/></t>
+                                                    <t t-elif="all(trigger_custom.start_mode == 'disabled' for trigger_custom in bundle.trigger_custom_ids)"> <t t-set="current_mode" t-value="'disabled'"/></t>
+                                                    <t t-elif="all(trigger_custom.start_mode == 'force' for trigger_custom in bundle.trigger_custom_ids)"> <t t-set="current_mode" t-value="'force'"/></t>
+                                                    <t t-elif="all(trigger_custom.start_mode == 'auto' for trigger_custom in bundle.trigger_custom_ids)"> <t t-set="current_mode" t-value="'auto'"/></t>
+                                                    <t t-elif="all(trigger_custom.start_mode in ('light', 'auto') for trigger_custom in bundle.trigger_custom_ids)"> <t t-set="current_mode" t-value="'light'"/></t>
+                                                    <t t-if="current_mode=='disabled'">
+                                                        <button role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers">Disable all</button>
+                                                    </t><t t-else="">
+                                                        <a role="button" t-attf-class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/triggers/disable_all"> Disable all</a>
+                                                    </t>
+                                                    <t t-if="current_mode=='light'">
+                                                        <button role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers">Light</button>
+                                                    </t><t t-else="">
+                                                        <a role="button" t-attf-class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/triggers/light_all">Light</a>
+                                                    </t>
+                                                    <t t-if="current_mode=='auto'">
+                                                        <button role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers">Default</button>
+                                                    </t><t t-else="">
+                                                        <a role="button" t-attf-class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/triggers/auto_all">Default</a>
+                                                    </t>
+                                                    <button t-if="bundle.trigger_custom_ids" role="button" t-attf-class="btn btn-{{'primary' if current_mode in ('custom', 'force') else 'default'}} btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers" aria-expanded="false" aria-controls="customTriggers"> Custom <i class="fa fa-caret-down ms-1"/></button>
+                                                    <a t-if="needs_update" role="button" class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/force"><i class="fa fa-play"/> Apply</a>
+                                                    <div t-if="bundle.trigger_custom_ids" t-attf-class="collapse {{'show' if expand_custom else ''}}" id="customTriggers">
+                                                        <div class="card card-body mt-2">
+                                                            <div class="d-grid gap-1" style="grid-template-columns: 1fr 2fr;">
+                                                                <t t-foreach="bundle.trigger_custom_ids" t-as="trigger_custom">
+                                                                    <t t-set="trigger_enabled_by_default" t-value="trigger_custom.trigger_id.repo_ids &amp; modified_repos"/>
+                                                                    <t t-set="level_color" t-if="trigger_enabled_by_default and trigger_custom.start_mode == 'disabled'">danger</t>
+                                                                    <t t-set="level_color" t-elif="trigger_enabled_by_default and trigger_custom.start_mode == 'light'">info</t>
+                                                                    <t t-set="level_color" t-elif="not trigger_enabled_by_default and trigger_custom.start_mode == 'force'">warning</t>
+                                                                    <t t-set="level_color" t-elif="trigger_enabled_by_default">success</t>
+                                                                    <t t-set="level_color" t-else="">secondary</t>
+                                                                    <div class="dropdown">
+                                                                        <button type="button" t-attf-class="btn btn-ssm btn-{{level_color}} dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                                                            <t t-out="trigger_custom.start_mode"/>
+                                                                            <i class="fa fa-caret-down ms-1"/>
+                                                                        </button>
+                                                                        <ul class="dropdown-menu">
+                                                                            <li t-foreach="['disabled', 'light', 'auto', 'force']" t-as="mode">
+                                                                                <a class="dropdown-item" t-attf-href="/runbot/trigger_custom/{{trigger_custom.id}}/set_mode/{{mode}}" t-if="mode != trigger_custom.start_mode and (mode != 'light' or trigger_custom.trigger_id.light_config_id)">
+                                                                                    <span t-out="mode"/>
+                                                                                </a>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </div>
+                                                                    <span t-out="trigger_custom.trigger_id.name"/>
+                                                                </t>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </small>
+                                                </dd>
                                             </t>
-                                        </t>
-                                    </td>
-                                </tr>
-                                <tr groups="base.group_user" t-if="not bundle.sticky and not bundle.is_base">
-                                    <td>Configuration</td>
-                                    <td>
-                                        <t t-set="current_mode" t-value="'custom'"/>
-                                        <t t-set="modified_repos" t-value="bundle.branch_ids.remote_id.repo_id"/>
-                                        <t t-if="not bundle.trigger_custom_ids"> <t t-set="current_mode" t-value="'none'"/></t>
-                                        <t t-elif="all(trigger_custom.start_mode == 'disabled' for trigger_custom in bundle.trigger_custom_ids)"> <t t-set="current_mode" t-value="'disabled'"/></t>
-                                        <t t-elif="all(trigger_custom.start_mode == 'force' for trigger_custom in bundle.trigger_custom_ids)"> <t t-set="current_mode" t-value="'force'"/></t>
-                                        <t t-elif="all(trigger_custom.start_mode == 'auto' for trigger_custom in bundle.trigger_custom_ids)"> <t t-set="current_mode" t-value="'auto'"/></t>
-                                        <t t-elif="all(trigger_custom.start_mode in ('light', 'auto') for trigger_custom in bundle.trigger_custom_ids)"> <t t-set="current_mode" t-value="'light'"/></t>
-                                        <t t-if="current_mode=='disabled'">
-                                            <button role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers">Disable all</button>
-                                        </t><t t-else="">
-                                            <a role="button" t-attf-class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/triggers/disable_all"> Disable all</a>
-                                        </t>
-                                        <t t-if="current_mode=='light'">
-                                            <button role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers">Light</button>
-                                        </t><t t-else="">
-                                            <a role="button" t-attf-class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/triggers/light_all">Light</a>
-                                        </t>
-                                        <t t-if="current_mode=='auto'">
-                                            <button role="button" t-attf-class="btn btn-primary btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers">Default</button>
-                                        </t><t t-else="">
-                                            <a role="button" t-attf-class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/triggers/auto_all">Default</a>
-                                        </t>
-                                        <button t-if="bundle.trigger_custom_ids" role="button" t-attf-class="btn btn-{{'primary' if current_mode in ('custom', 'force') else 'default'}} btn-ssm" data-bs-toggle="collapse" data-bs-target="#customTriggers" aria-expanded="false" aria-controls="customTriggers"> Custom <i class="fa fa-caret-down ms-1"/></button>
-                                        <a t-if="needs_update" role="button" class="btn btn-default btn-ssm" t-attf-href="/runbot/bundle/{{bundle.id}}/force"><i class="fa fa-play"/> Apply</a>
-                                        <div t-if="bundle.trigger_custom_ids" t-attf-class="collapse {{'show' if expand_custom else ''}}" id="customTriggers">
-                                            <div class="card card-body mt-2">
-                                                <div class="d-grid gap-1" style="grid-template-columns: 1fr 2fr;">
-                                                    <t t-foreach="bundle.trigger_custom_ids" t-as="trigger_custom">
-                                                        <t t-set="trigger_enabled_by_default" t-value="trigger_custom.trigger_id.repo_ids &amp; modified_repos"/>
-                                                        <t t-set="level_color" t-if="trigger_enabled_by_default and trigger_custom.start_mode == 'disabled'">danger</t>
-                                                        <t t-set="level_color" t-elif="trigger_enabled_by_default and trigger_custom.start_mode == 'light'">info</t>
-                                                        <t t-set="level_color" t-elif="not trigger_enabled_by_default and trigger_custom.start_mode == 'force'">warning</t>
-                                                        <t t-set="level_color" t-elif="trigger_enabled_by_default">success</t>
-                                                        <t t-set="level_color" t-else="">secondary</t>
-                                                        <div class="dropdown">
-                                                            <button type="button" t-attf-class="btn btn-ssm btn-{{level_color}} dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                                                                <t t-out="trigger_custom.start_mode"/>
-                                                                <i class="fa fa-caret-down ms-1"/>
-                                                            </button>
-                                                            <ul class="dropdown-menu">
-                                                                <li t-foreach="['disabled', 'light', 'auto', 'force']" t-as="mode">
-                                                                    <a class="dropdown-item" t-attf-href="/runbot/trigger_custom/{{trigger_custom.id}}/set_mode/{{mode}}" t-if="mode != trigger_custom.start_mode and (mode != 'light' or trigger_custom.trigger_id.light_config_id)">
-                                                                        <span t-out="mode"/>
-                                                                    </a>
-                                                                </li>
-                                                            </ul>
-                                                        </div>
-                                                        <span t-out="trigger_custom.trigger_id.name"/>
-                                                    </t>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </table>
-                            <div t-foreach="bundle._consistency_warning()" t-as="warning" t-out="warning[1]" t-attf-class="alert alert-{{warning[0]}}"/>
-                            <t t-call="runbot.pager"/>
-                            <div class="batch_row" t-foreach="batchs" t-as="batch">
-                                <t t-call="runbot.batch_tile"/>
+                                        </dl>
+                                    </li>
+                                </ul>
                             </div>
-                            <t t-call="runbot.pager"/>
+                            <div class="mt-2">
+                                <div class="d-flex flex-wrap align-items-center gap-2 px-1">
+                                    <span class="me-auto fw-bold text-body-secondary">Batches</span>
+                                    <t t-call="runbot.pager">
+                                        <t t-set="classes" t-valuef="pagination-sm"/>
+                                    </t>
+                                </div>
+                                <div class="batch_row" t-foreach="batchs" t-as="batch">
+                                    <t t-call="runbot.batch_tile"/>
+                                </div>
+                                <div t-if="pager['page_count'] > 1" class="d-flex justify-content-end px-1">
+                                    <t t-call="runbot.pager">
+                                        <t t-set="classes" t-valuef="pagination-sm"/>
+                                    </t>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -246,12 +246,8 @@
                   </td>
                 </tr>
                 <t t-foreach="builds" t-as="build">
-                  <t t-set="rowclass">
-                    <t t-call="runbot.build_class">
-                      <t t-set="build" t-value="build"/>
-                    </t>
-                  </t>
-                  <tr t-attf-class="bg-{{rowclass.strip()}}-subtle {{'line-through' if build.orphan_result else ''}}">
+                  <t t-set="rowclass" t-value="build._get_color_class()"/>
+                  <tr t-attf-class="bg-{{rowclass}}-subtle {{'line-through' if build.orphan_result else ''}}">
                     <td>
                         <t t-set="batch" t-value="build.params_id.create_batch_id"/>
                         Batch: <a t-attf-href="/runbot/batch/{{batch.id}}"><t t-out="batch.id"/></a>

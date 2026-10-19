@@ -29,7 +29,7 @@
             <div class="text-nowrap btn-group btn-group-ssm" role="group" aria-labelledby="page_nav_filter_mode">
               <a t-foreach="{'all': 'All', 'sticky': 'Sticky only', 'nosticky': 'Dev only', 'mine': 'Mine', 'team': 'My Team'}" t-as="mode"
                  t-if="mode not in ('mine', 'team') or user_id._is_internal()"
-                 t-attf-class="btn btn-outline-secondary{{' active' if filter_mode == mode else ''}}"
+                 t-attf-class="btn btn-default {{'active' if filter_mode == mode else ''}}"
                  t-att-aria-current="'page' if filter_mode == mode else None"
                  t-attf-href="?{{keep_query('*', filter_mode=mode)}}" t-out="mode_value"/>
             </div>
@@ -48,7 +48,7 @@
                 <h3>No project</h3>
               </div>
               <div t-else="">
-                <div t-foreach="bundles" t-as="bundle" class="row bundle_row">
+                <div t-foreach="bundles" t-as="bundle" class="row bundle_row border-bottom">
                   <div class="col-md-3 col-lg-2 cell">
                     <div class="text-truncate">
                       <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e" />
@@ -100,50 +100,50 @@
     <template id="runbot.batch_tile">
       <t t-set="more" t-value="str2bool(request.httprequest.cookies.get('more', ''), False)"/>
       <t t-set="show_failed_triggers" t-value="str2bool(request.httprequest.cookies.get('show_failed_triggers', '1'), False)"/>
-      <t t-set="klass">info</t>
-      <t t-if="batch.state=='skipped'" t-set="klass">killed</t>
-      <t t-if="batch.state=='done' and all(slot.build_id.global_result == 'ok' for slot in batch.slot_ids if slot.build_id)" t-set="klass">success</t>
-      <t t-if="batch.state=='done' and any(slot.build_id.global_result in ('ko', 'warn') for slot in batch.slot_ids)" t-set="klass">danger</t>
+      <t t-set="color" t-value="batch._get_color_class()"/>
 
       <div t-attf-class="batch_tile">
-        <div t-attf-class="card bg-{{klass}}-subtle">
-          <a t-attf-href="/runbot/batch/#{batch.id}" t-att-title="batch.create_date.strftime('%Y-%m-%d %H:%M:%S')">
-            <div class="batch_header">
-              <span t-attf-class="badge text-bg-{{'warning' if batch.has_warning else 'default'}}">
-                <t t-out="batch._get_formated_age()"/>
-                <i class="fa fa-exclamation-triangle" t-if="batch.has_warning"/>
-              </span>
-              <span class="float-end header_hover">View batch...</span>
-            </div>
+        <div t-attf-class="card border-{{color}}">
+          <a t-attf-href="/runbot/batch/#{batch.id}" class="card-header" t-att-title="dt2str(batch.create_date)">
+            <i t-if="batch.state in ('preparing', 'ready')" t-attf-class="fa fa-hourglass-half fa-fw text-{{color}}"/>
+            <i t-else="" t-attf-class="fa fa-{{batch._fa_result()}} fa-fw text-{{color}}"/>
+            <t t-out="batch._get_formated_age()"/>
+            <i class="fa fa-exclamation-triangle text-warning" t-if="batch.has_warning and batch.state in ('preparing', 'ready')"/>
+            <span class="float-end header_hover">View batch...</span>
           </a>
-          <t t-if="batch.state=='preparing'">
-            <span><i class="fa fa-cog fa-spin fa-fw"/> preparing</span>
-          </t>
-          <div class="batch_slots">
-            <t t-if="batch_builds is not None">
-              <t t-foreach="batch_builds" t-as="build">
-                <div class="slot_container">
-                  <div class="btn-group btn-group-ssm slot_button_group">
-                    <span t-attf-class="btn btn-{{build._get_color_class()}}" t-out="build.id"/>
-                    <a t-attf-href="/runbot/build/{{build.id}}" class="btn btn-default slot_name" target="new" t-att-title="build.trigger_id.name">
-                        <span t-out="build.trigger_id.name"/>
-                    </a>
-                  </div>
+          <div class="card-body">
+            <div class="batch_slots">
+              <div t-if="batch.state=='preparing'" class="slot_container">
+                <div class="input-group input-group-ssm slot_button_group">
+                  <span class="input-group-text text-bg-secondary border-secondary"><i class="fa fa-cog fa-fw"/></span>
+                  <span class="input-group-text bg-body flex-grow-1 justify-content-start">Preparing</span>
                 </div>
-              </t>
-            </t>
-            <t t-else="">
-              <t t-foreach="batch.slot_ids" t-as="slot">
-                <t t-if="slot.build_id">
-                  <div t-if="((not slot.trigger_id.hide and trigger_display is None) or (trigger_display and slot.trigger_id.id in trigger_display)) or (show_failed_triggers and slot.build_id.global_result != 'ok')"
-                     class="slot_container">
-                    <t t-call="runbot.slot_button"/>  
+              </div>
+              <t t-if="batch_builds is not None">
+                <t t-foreach="batch_builds" t-as="build">
+                  <div class="slot_container">
+                    <div class="input-group input-group-ssm slot_button_group">
+                      <span t-attf-class="input-group-text text-bg-{{build._get_color_class()}} border-{{build._get_color_class()}}" t-out="build.id"/>
+                      <a t-attf-href="/runbot/build/{{build.id}}" class="btn btn-default slot_name" target="new" t-att-title="build.trigger_id.name">
+                          <span t-out="build.trigger_id.name"/>
+                      </a>
+                    </div>
                   </div>
                 </t>
               </t>
-            </t>
+              <t t-else="">
+                <t t-foreach="batch.slot_ids" t-as="slot">
+                  <t t-if="slot.build_id">
+                    <div t-if="((not slot.trigger_id.hide and trigger_display is None) or (trigger_display and slot.trigger_id.id in trigger_display)) or (show_failed_triggers and slot.build_id.global_result != 'ok')"
+                       class="slot_container">
+                      <t t-call="runbot.slot_button"/>
+                    </div>
+                  </t>
+                </t>
+              </t>
+            </div>
           </div>
-          <div t-if='more' class="batch_commits">
+          <div t-if='more' class="card-footer batch_commits">
             <div t-foreach="batch.commit_link_ids.sorted(lambda cl: (cl.commit_id.repo_id.sequence, cl.commit_id.repo_id.id))" t-as="commit_link" class="text-truncate">
 
               <t t-set="match_class" t-value="'info' if commit_link.match_type == 'new' else 'secondary'"/>

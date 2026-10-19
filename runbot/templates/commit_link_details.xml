@@ -14,7 +14,7 @@
                                     <span t-esc="commit.dname"/>
                                     <span t-esc="'+%s' % commit_link.diff_add" class="text-success"/>
                                     <span t-esc="'-%s' % commit_link.diff_remove" class="text-danger"/>
-                                    <span class="text-info">
+                                    <span class="text-info-emphasis">
                                         (
                                         <span t-esc="commit_link.file_changed"/>
                                         <i class="fa fa-file"/>

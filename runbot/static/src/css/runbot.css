@@ -1,143 +1,12 @@
 :root {
-	--btn-default-color: var(--bs-body-color);
-	--btn-default-bg: var(--bs-body-bg);
-	--btn-default-hover-bg: color-mix(in lab, var(--btn-default-bg), black 15%);
-	--btn-default-border: #ccc;
 	--active-project-color: #777;
 	--text-color-link: #507279;
-	--text-color-info: #096b72;
-	--batch-header-hover-bg: rgba(0, 0, 0, 0.3);
-	--bs-font-sans-serif: "Helvetica Neue", Helvetica, Arial, sans-serif;
-	--bs-body-font-size: 0.875rem;
-	--bs-link-decoration: none;
-	/* FIXME: style all links, should be theme based */
-	--bs-link-color: #00A09D;
-	--bs-link-color-rgb: 0, 160, 157;
-	--bs-link-hover-color: #005452;
-	--bs-link-hover-color-rgb: 0, 84, 82;
-}
-
-/*
- * Light theme
- */
-
-:root[data-bs-theme=light] { /* to match initial runbot style*/
-	--bs-success-bg-subtle: #dff0d8;
-	--bs-danger-bg-subtle: #f2dede;
-	--bs-warning-bg-subtle: #fff9e6;
-	--bs-info-bg-subtle: #d9edf7;
-	--bs-info-rgb: 23, 162, 184;
-}
-
-:root[data-bs-theme=red404] {
-	--bs-success-bg-subtle: #cdffb9;
-	--bs-danger-bg-subtle: #e67ecf;
-	--bs-warning-bg-subtle: #fae9b1;
-	--bs-info-bg-subtle: #b6e2f8;
-	--bs-info-rgb: 23, 162, 184;
+	--border-emphasis-width: .375rem;
 }
 
 :root[data-bs-theme=dark] {
-	--bs-success-bg-subtle: #234730;
-	--bs-danger-bg-subtle: #6c2b34;
-	--bs-warning-bg-subtle: #474023;
-	--bs-info-bg-subtle: #1e464e;
-	--bs-info-rgb: 75, 179, 200;
-	--bs-secondary-rgb: 90, 98, 104;
-	--bs-link-color: #3fc9c6;
-	--bs-link-color-rgb: 63, 201, 198;
-	--bs-link-hover-color: #7fdedb;
-	--bs-link-hover-color-rgb: 127, 222, 219;
-	--btn-default-border: var(--bs-border-color);
-	--btn-default-hover-bg: color-mix(in lab, var(--btn-default-bg), white 15%);
 	--active-project-color: #CCC;
 	--text-color-link: #97d4e0;
-	--text-color-info: #6edff6;
-	--batch-header-hover-bg: rgba(255, 255, 255, 0.15);
-}
-
-[data-bs-theme=light] .text-bg-info,
-[data-bs-theme=red404] .text-bg-info {
-	color: #fff !important; /* black by default, changes from previous version, color forced to fit with --bs-info-rgb*/
-}
-
-[data-bs-theme=light] .btn-success {
-	--bs-btn-disabled-bg: #28a745;
-	--bs-btn-disabled-border-color: #28a745;
-  }
-
-[data-bs-theme=red404] .btn-danger {
-	--bs-btn-color: #fff;
-	--bs-btn-bg: #990a59;
-	--bs-btn-border-color: #990a59;
-	--bs-btn-hover-color: #fff;
-	--bs-btn-hover-bg: #740442;
-	--bs-btn-hover-border-color: #740442;
-	--bs-btn-focus-shadow-rgb: 60, 153, 110;
-	--bs-btn-active-color: #fff;
-	--bs-btn-active-bg: #740442;
-	--bs-btn-active-border-color: #740442;
-	--bs-btn-active-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125);
-	--bs-btn-disabled-color: #fff;
-	--bs-btn-disabled-bg: #b90e6c;
-	--bs-btn-disabled-border-color: #b90e6c;
-}
-
-.btn-default {
-	--bs-btn-color: var(--btn-default-color);
-	--bs-btn-bg: var(--btn-default-bg);
-	--bs-btn-border-color: var(--btn-default-border);
-	--bs-btn-hover-color: var(--btn-default-color);
-	--bs-btn-hover-bg: color-mix(in lab, var(--btn-default-bg), black 15%);
-	--bs-btn-hover-border-color: color-mix(in lab, var(--btn-default-border), black 10%);
-	--bs-btn-focus-shadow-rgb: 60, 153, 110;
-	--bs-btn-active-color: var(--btn-default-color);
-	--bs-btn-active-bg: color-mix(in lab, var(--btn-default-bg), black 20%);
-	--bs-btn-active-border-color: color-mix(in lab, var(--btn-default-border), black 15%);
-	--bs-btn-active-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125);
-	--bs-btn-disabled-color: var(--btn-default-color);
-	--bs-btn-disabled-bg: var(--btn-default-bg);
-	--bs-btn-disabled-border-color: var(--btn-default-border);
-}
-
-[data-bs-theme=dark] .btn-default {
-	--bs-btn-hover-bg: color-mix(in lab, var(--btn-default-bg), white 15%);
-	--bs-btn-hover-border-color: color-mix(in lab, var(--btn-default-border), white 10%);
-	--bs-btn-active-bg: color-mix(in lab, var(--btn-default-bg), white 20%);
-	--bs-btn-active-border-color: color-mix(in lab, var(--btn-default-border), white 15%);
-}
-
-[data-bs-theme=dark] .btn-outline-secondary {
-	--bs-btn-color: #8c959d;
-	--bs-btn-border-color: #8c959d;
-	--bs-btn-disabled-color: #8c959d;
-	--bs-btn-disabled-border-color: #8c959d;
-}
-
-.btn-info {
-    --bs-btn-color: #FFF;
-    --bs-btn-bg: #17a2b8;
-    --bs-btn-border-color: #17a2b8;
-    --bs-btn-hover-color: #FFF;
-    --bs-btn-hover-bg: #31d2f2;
-    --bs-btn-hover-border-color: #25cff2;
-    --bs-btn-focus-shadow-rgb: 11, 172, 204;
-    --bs-btn-active-color: #FFF;
-    --bs-btn-active-bg: #3dd5f3;
-    --bs-btn-active-border-color: #25cff2;
-    --bs-btn-active-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125);
-    --bs-btn-disabled-color: #FFF;
-    --bs-btn-disabled-bg: #17a2b8;
-    --bs-btn-disabled-border-color: #17a2b8;
-}
-
-.text-bg-default {
-	color: var(--bs-body-color) !important;
-	background-color: RGBA(var(--bs-body-bg-rgb), var(--bs-bg-opacity, 1)) !important;
-}
-
-.table {
-	--bs-table-bg: transparent; /* Forced to white in bootstrap latest version, hides the color of sub builds, batch commits, ...*/
 }
 
 .table-layout-fixed {
@@ -164,14 +33,8 @@ dialog.modal {
     }
 }
 
-a, .btn-link {
-    text-decoration: none; /* until --bs-link-decoration is actually used, see twbs/bootstrap#41737 */
-}
-
 .breadcrumb {
-	--bs-body-font-size: 0.875rem;
 	--bs-breadcrumb-font-size: calc(var(--bs-body-font-size) * 1.15);
-	--bs-breadcrumb-item-active-color: var(--gray);
 	--bs-breadcrumb-margin-bottom: 0;
 
 	.btn {
@@ -195,53 +58,77 @@ a, .btn-link {
 	}
 }
 
-.dropdown-menu {
-	--bs-dropdown-link-active-color: var(--btn-default-color);
-	--bs-dropdown-link-active-bg: var(--btn-default-hover-bg);
+.build_details,
+.batch_details {
+	border-inline-start-width: var(--border-emphasis-width) !important;
+
+	.list-group {
+		--bs-list-group-item-padding-y: .3rem;
+	}
+
+	@media (min-width: 576px) { /* side by side in the card group */
+		.card-group > &:not(:last-child) {
+			border-inline-end-color: var(--bs-card-border-color) !important; /* over the border-* color */
+		}
+	}
 }
 
-.build_details {
-	padding: 5px;
+.build_details,
+.batch_details,
+.bundle_details {
+	.list-group {
+		--bs-list-group-border-width: 0; /* no separator between the sections */
+	}
+
+	dl {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: .25rem 1rem;
+		margin-bottom: 0;
+	}
+
+	dd {
+		margin-bottom: 0;
+	}
+
+	@media (min-width: 576px) { /* side by side in the card group */
+		dl {
+			grid-template-columns: min(33%, 12rem) minmax(0, 1fr);
+		}
+	}
+}
+
+.commit_link_item > .card {
+	--bs-card-cap-padding-x: .75rem;
+	--bs-card-cap-padding-y: .25rem;
+	--bs-card-spacer-x: .75rem;
+	--bs-card-spacer-y: .375rem;
+}
+
+/* the checks and children stacked like the slots of the batch tiles */
+.batch_builds,
+.build_children {
+	--bs-card-spacer-x: .5rem;
+	--bs-card-spacer-y: .5rem;
+
+	> .card-body {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr); /* not wider than the card, so that the contents can be truncated */
+		align-content: start; /* at the top when the card group makes the card taller */
+		gap: .125rem; /* as between the slots of the batch tiles */
+	}
+
+	.slots_title:not(:first-child) {
+		margin-top: .5rem;
+	}
+}
+
+.build_logs > .table tr:last-child > * {
+	border-bottom-width: 0; /* the card border is enough */
 }
 
 .separator {
-	border-top: 0.2em solid #666;
-}
-
-.btn-sm, .btn-group-sm > .btn {
-	--bs-btn-padding-y: 0.25rem;
-	--bs-btn-padding-x: 0.5rem;
-	--bs-btn-font-size: 0.89rem;
-	--bs-btn-line-height: 1.5;
-	--bs-btn-border-radius: 0.2rem;
-}
-
-.btn-ssm, .btn-group-ssm > .btn {
-	--bs-btn-padding-y: 0.22rem;
-	--bs-btn-padding-x: 0.4rem;
-	--bs-btn-font-size: 0.82rem;
-	--bs-btn-line-height: 1;
-	--bs-btn-border-radius: 0.2rem;
-}
-
-.killed, .bg-killed, .bg-killed-light {
-	background-color: #aaa;
-}
-
-.dropdown-toggle:after {
-	content: none;
-}
-
-.text-info {
-	color: var(--text-color-info) !important;
-}
-
-.bg-killed {
-	background-color: #aaa;
-}
-
-.text-bg-killed {
-	background-color: #aaa;
+	border-top: 0.2em solid var(--bs-body-color);
 }
 
 .line-through {
@@ -249,7 +136,7 @@ a, .btn-link {
 }
 
 .slot_button_group {
-	display: flex;
+	flex-wrap: nowrap;
 	padding: 0 1px;
 }
 
@@ -258,8 +145,13 @@ a, .btn-link {
 	font-style: italic;
 }
 
-.slot_button_group .btn {
+.slot_button_group .btn,
+.slot_button_group .input-group-text {
 	flex: 0 0 25px;
+}
+
+.slot_button_group .input-group-text {
+	justify-content: center;
 }
 
 .slot_button_group .btn.slot_name {
@@ -275,25 +167,37 @@ a, .btn-link {
 	--batch-tile-padding-x: .25rem;
 	--batch-tile-padding-y: .25rem;
 	padding: var(--batch-tile-padding-y) var(--batch-tile-padding-x);
-}
 
-.batch_header,
-.batch_slots,
-.batch_commits {
-	padding: var(--batch-tile-padding-y) var(--batch-tile-padding-x);
-}
+	> .card {
+		--bs-card-cap-padding-x: var(--batch-tile-padding-x);
+		--bs-card-cap-padding-y: var(--batch-tile-padding-y);
+		--bs-card-spacer-x: var(--batch-tile-padding-x);
+		--bs-card-spacer-y: var(--batch-tile-padding-y);
 
-.batch_header:hover {
-	color: var(--bs-body-color);
-	background-color: var(--batch-header-hover-bg)
-}
+		border-inline-start-width: var(--border-emphasis-width);
 
-.header_hover {
-	visibility: hidden;
-}
+		.card-header:first-child {
+			border-start-start-radius: 0;
+		}
+	}
 
-.batch_header:hover .header_hover {
-	visibility: visible;
+	.card-header {
+		.header_hover {
+			visibility: hidden;
+		}
+
+		&:hover {
+			--bs-card-cap-bg: var(--bs-secondary-bg);
+
+			.header_hover {
+				visibility: visible;
+			}
+		}
+	}
+
+	.card-footer {
+		background-color: var(--bs-card-bg); /* like the card body, only the header gets the cap background */
+	}
 }
 
 .batch_slots {
@@ -302,16 +206,8 @@ a, .btn-link {
 	gap: calc(var(--batch-tile-padding-y) / 2) calc(var(--batch-tile-padding-x) / 2);
 }
 
-.bundle_row {
-	border-bottom: 1px solid var(--bs-gray);
-}
-
 .bundle_row .batch_commits {
 	font-size: 80%;
-}
-
-.bundle_row .slot_container {
-	flex: 1 0 50%;
 }
 
 .chart-legend {
@@ -369,19 +265,16 @@ a, .btn-link {
 }
 
 [data-toggle="limited-height"]:hover {
-	background-color: var(--btn-default-hover-bg);
-}
-
-code {
-	white-space: pre-wrap;
+	background-color: var(--bs-tertiary-bg);
 }
 
 .d-empty-none:empty {
     display: none !important;
 }
 
-.hide-success tr.bg-success-subtle {
-    display: none;
+.hide-success tr.bg-success-subtle,
+.hide-success .build_children .build_child:has(.text-bg-success) {
+    display: none !important; /* over the d-flex of the children */
 }
 
 .pre {
