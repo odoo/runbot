@@ -1,0 +1,12 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_forwardport_batches_admin,Admin access to batches,model_forwardport_batches,runbot_merge.group_admin,1,1,1,1
+access_forwardport_batches,No normal access to batches,model_forwardport_batches,"",0,0,0,0
+access_forwardport_updates_admin,Admin access to updates,model_forwardport_updates,runbot_merge.group_admin,1,1,1,1
+access_forwardport_updates,No normal access to updates,model_forwardport_updates,"",0,0,0,0
+access_forwardport_branch_remover_admin,Admin access to branch remover,model_forwardport_branch_remover,runbot_merge.group_admin,1,1,1,1
+access_issue_closer,Access to issues closer is useless,model_runbot_merge_issues_closer,"",0,0,0,0
+access_branch_cleanup,Access to branch cleanup is useless,model_runbot_merge_branch_cleanup,"",0,0,0,0
+access_check_commits,Access to commits checker is useless,model_runbot_merge_pull_requests_check_commits,"",0,0,0,0
+access_validate,Access to branch cleanup is useless,model_runbot_merge_batch_validate,"",0,0,0,0
+status_request,Access to status request is useless,model_runbot_merge_pull_requests_status_request,"",0,0,0,0
+access_patch_callback,Access to patch callbacks is useless,model_runbot_merge_patch_callback,"",0,0,0,0

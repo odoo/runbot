@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-import builtins
 import collections
 import contextlib
 import datetime
@@ -16,26 +15,29 @@ import statistics
 import subprocess
 import tempfile
 import typing
+from collections.abc import Iterable, Iterator
 from enum import IntEnum
 from functools import reduce
 from operator import itemgetter
-from typing import Optional, Union, List, Iterator, Tuple
 
 import psycopg2.errors
 import werkzeug
 import werkzeug.urls
 from markupsafe import Markup, escape
 
-from odoo import api, fields, models, tools, Command
+from odoo import Command, api, fields, models, tools
 from odoo.addons.base.controllers.rpc import OdooMarshaller
 from odoo.exceptions import UserError, ValidationError
 from odoo.osv import expression
-from odoo.tools import html_escape, Reverse, mute_logger, groupby
+from odoo.tools import Reverse, groupby, html_escape, mute_logger
 from odoo.tools.safe_eval import safe_eval
 
-from .commands import commands, AccessFailure, Rel
-from .. import github, exceptions, controllers, utils, git
-from .utils import readonly, dfm, EnumSelection
+from .. import controllers, exceptions, git, github, utils
+from .commands import AccessFailure, Rel, commands
+from .utils import EnumSelection, dfm, readonly
+
+if typing.TYPE_CHECKING:
+    from .batch import Batch
 
 Conflict = tuple[str, str, str, list[str]]
 
@@ -127,8 +129,17 @@ All substitutions are tentatively applied sequentially to the input.
             vals['status_ids'] = [(5, 0, {})] + [(0, 0, {'context': c}) for c in st.split(',')]
         return super().write(vals)
 
-    def github(self, token_field='github_token') -> github.GH:
-        return github.GH(self.project_id[token_field], self.name)
+    def github(self) -> github.GH:
+        return github.GH(self.project_id.github_id._main_token(self.name), self.name)
+
+    def _git(self) -> tuple[str, str, str]:
+        token = self.project_id.github_id._main_token(self.name)
+        return f'https://github.com/{self.name}', 'x-access-token', token
+
+    def _fw_git(self) -> tuple[str, str, str]:
+        assert self.fp_remote_target
+        token = self.project_id.github_id._fp_token(self.name)
+        return f'https://github.com/{self.fp_remote_target}', 'x-access-token', token
 
     def _auto_init(self):
         res = super()._auto_init()
@@ -841,7 +852,7 @@ class PullRequests(models.Model):
             return 'ok'
 
         fedback = False
-        def feedback(message: Optional[str] = None, close: bool = False):
+        def feedback(message: str | None = None, close: bool = False):
             nonlocal fedback
             if message:
                 fedback = True
@@ -882,7 +893,7 @@ class PullRequests(models.Model):
             return "\n".join(s)
 
         try:
-            cmds: List[commands.Command] = list(acls.commands_check(
+            cmds: list[commands.Command] = list(acls.commands_check(
                 ps
                 for line in commandlines
                 for ps in commands.Parser(line.rstrip())
@@ -1174,7 +1185,7 @@ For your own safety I've ignored *everything in your entire comment*.
             feedback(message=f"@{login}{rejections}{footer}")
         return 'rejected'
 
-    def _maybe_update_limit(self, limit: str) -> Tuple[Ping, str]:
+    def _maybe_update_limit(self, limit: str) -> tuple[Ping, str]:
         limit_id = self.env['runbot_merge.branch'].with_context(active_test=False).search([
             ('project_id', '=', self.repository.project_id.id),
             ('name', '=', limit),
@@ -1264,7 +1275,6 @@ For your own safety I've ignored *everything in your entire comment*.
                 'repository': p.repository.id,
                 'pull_request': p.number,
                 'message': root_msg,
-                'token_field': 'fp_github_token',
             }
             # send messages to source and root unless root is self (as it
             # already gets the normal message)
@@ -1274,7 +1284,7 @@ For your own safety I've ignored *everything in your entire comment*.
         return Ping.NO, msg
 
 
-    def _find_next_target(self) -> Optional[Branch]:
+    def _find_next_target(self) -> Branch | None:
         """ Finds the branch between target and limit_id which follows
         reference
         """
@@ -1512,7 +1522,6 @@ For your own safety I've ignored *everything in your entire comment*.
             self.env.ref('runbot_merge.forwardport.ci.failed')._send(
                 repository=self.repository,
                 pull_request=self.number,
-                token_field='fp_github_token',
                 format_args={'pr': self, 'ci': ci},
             )
 
@@ -1742,7 +1751,6 @@ For your own safety I've ignored *everything in your entire comment*.
                     self.env.ref('runbot_merge.forwardport.update.detached')._send(
                         repository=p.repository,
                         pull_request=p.number,
-                        token_field='fp_github_token',
                         format_args={'pr': p.with_context(
                             suppress_ping=p.source_id.batch_id.fw_policy=='skipmerge',
                         )},
@@ -1751,7 +1759,6 @@ For your own safety I've ignored *everything in your entire comment*.
                     self.env.ref('runbot_merge.forwardport.update.parent')._send(
                         repository=parent.repository,
                         pull_request=parent.number,
-                        token_field='fp_github_token',
                         format_args={
                             'pr': parent.with_context(
                                 suppress_ping=p.source_id.batch_id.fw_policy=='skipmerge',
@@ -1853,7 +1860,7 @@ For your own safety I've ignored *everything in your entire comment*.
             if commit:
                 self.env.cr.commit()
 
-    def _build_message(self, message: Union['PullRequests', str], related_prs: 'PullRequests' = (), merge: bool = True) -> 'Message':
+    def _build_message(self, message: PullRequests | str, related_prs: Iterable[PullRequests] = (), merge: bool = True) -> Message:
         # handle co-authored commits (https://help.github.com/articles/creating-a-commit-with-multiple-authors/)
         m = Message.from_message(message)
         if not is_mentioned(message, self):
@@ -1990,7 +1997,6 @@ For your own safety I've ignored *everything in your entire comment*.
         self.env.ref(template)._send(
             repository=self.repository,
             pull_request=self.number,
-            token_field='fp_github_token',
             format_args=format_args,
         )
 
@@ -2031,7 +2037,7 @@ For your own safety I've ignored *everything in your entire comment*.
             target_branch: Branch,
             *,
             forward: bool,
-    ) -> tuple[typing.Optional[Conflict], str]:
+    ) -> tuple[Conflict | None, str]:
         """ Creates a forward-port for the current PR to ``target_branch`` under
         ``fp_branch_name``.
 
@@ -2146,7 +2152,7 @@ For your own safety I've ignored *everything in your entire comment*.
         # <xxx>.cherrypick.<number>
         logger = _logger.getChild(str(self.id)).getChild('cherrypick')
 
-        commits = self.repository.github('fp_github_token').commits(self.number)
+        commits = self.repository.github().commits(self.number)
         logger.info(
             "%s: copy %s commits to %s (%s)%s",
             self, len(commits), branch.name, head,
@@ -2279,7 +2285,6 @@ For your own safety I've ignored *everything in your entire comment*.
                 self.env.ref('runbot_merge.forwardport.reminder')._send(
                     repository=pr.repository,
                     pull_request=pr.number,
-                    token_field='fp_github_token',
                     format_args={'pr': pr, 'source': pr.source_id},
                 )
 
@@ -2651,7 +2656,7 @@ class Stagings(models.Model):
             vals['staging_end'] = fields.Datetime.now()
             self.env.ref("runbot_merge.staging_cron")._trigger()
 
-            if self.state == 'success' and self.target.project_id.fp_github_token:
+            if self.state == 'success' and self.target.project_id.fp_enabled:
                 # check all batches to see if they should be forward ported
                 for b in self.with_context(active_test=False).batch_ids:
                     if b.fw_policy == 'no':
@@ -3056,10 +3061,9 @@ class Stagings(models.Model):
         # first force-push the current targets to all tmps
         for head in self.heads:
             repo = head.repository_id
-            repo_url, r = repos[repo] = (
-                git.source_url(repo),
-                git.get_local(repo).stdout().with_config(encoding="utf-8", check=False),
-            )
+            repo_url, user, password = repo._git()
+            r = git.get_local(repo).stdout().with_config(encoding="utf-8", check=False).with_credentials(user, password)
+            repos[repo] = (repo_url, r)
             # can't push an object you don't have locally...
             branch_head = next((
                 h for h in r.fetch_heads(repo, f"refs/heads/{self.target.name}", head.commit_id.sha)

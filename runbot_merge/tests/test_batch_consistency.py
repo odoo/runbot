@@ -303,7 +303,7 @@ def test_reopen_pr_in_staged_batch(env, project, make_repo2, config, users):
     assert staging.state == 'cancelled'
     assert staging.reason == f"{pr2_id.display_name} reopened by {users['user']}"
 
-def test_reopen_pr_in_merged_batch(env, project, make_repo2, config, users):
+def test_reopen_pr_in_merged_batch(env, project, make_repo2, config, users, botname):
     """If the batch is merged, the pr should just be re-closed with a message
     """
     repo1 = make_repo2('a')
@@ -358,6 +358,6 @@ def test_reopen_pr_in_merged_batch(env, project, make_repo2, config, users):
     assert pr2_id.closed
     assert pr2_id.state == 'closed'
     assert pr2.comments == [
-        seen(env, pr2, users),
-        (users['user'], 'Reopening a PR in a merged batch is not allowed, create a new PR.'),
+        (botname, seen(env, pr2)),
+        (botname, 'Reopening a PR in a merged batch is not allowed, create a new PR.'),
     ]

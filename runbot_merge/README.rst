@@ -245,20 +245,25 @@ Tunnels
 '''''''
 
 The test suite has first-class support for tunnels via the ``--tunnel``
-parameter which should link to a tunnel script. The repository bundles an
-``ngrok`` script which adapts the tunnel protocol for ngrok agents (ideally ran
-as a daemon, that avoids startup synchronisation issues)::
+parameter which should link to a tunnel script. The repository bundles tunnel
+scripts for ``ngrok``, ``localtunnel``, and ``cloudflared`` e.g.::
 
     pytest --tunnel runbot/odoo/addons/runbot_merge/ngrok
 
 should automatically create and teardown tunnels from github, and create
 webhooks to the remote end of the tunnel.
 
-A tunnel script simply takes the local port as first argument, should print
-the remote address of the tunnel on stdout (don't forget to flush so the test
-suite can read it), then close the tunnel on SIGTERM and SIGINT (the test suite
-uses SIGTERM to close tunnels, but when testing a tunnel script Ctrl+C sends
-SIGINT).
+A tunnel script simply takes the local port as first argument, it should then:
+
+- establish a tunnel to that port on stdout
+- wait for the tunnel to be available if needed
+- write the tunnel to stdout, followed by a newline
+- flush stdout
+- close stdout **ensuring the underlying fd is properly closed** e.g. in python
+  standard streams are wrapped with ``closefd=False`` so it's necessary to
+  ``os.close`` the underlying ``fileno()``
+- wait until SIGTERM (test suite) or SIGINT (Ctrl+C from a terminal)
+- close the tunnel and exit
 
 Accounts
 ''''''''

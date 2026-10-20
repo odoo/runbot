@@ -3,7 +3,7 @@ import datetime
 import pytest
 import requests
 
-from utils import Commit, to_pr, seen, read_tracking_value, matches
+from utils import Commit, to_pr, seen, read_tracking_value, matches, fakehook
 
 
 def test_partner_merge(env):
@@ -37,7 +37,11 @@ def test_name_search(env):
     """
     p = env['runbot_merge.project'].create({
         'name': 'proj',
-        'github_token': 'no',
+        'github_id': env['runbot_merge.github_connector'].create({
+            'name': "PAT",
+            'method': 'pat',
+            'main_pat': 'no',
+        }).id,
         'github_name': "noo",
         'github_email': "nooo@example.org",
     })
@@ -180,7 +184,7 @@ def test_merge_empty_commits(env, repo, users, config):
     assert commits[2]['commit']['message'] == 'initial'
 
 
-def test_merge_emptying_commits(env, repo, users, config):
+def test_merge_emptying_commits(env, repo, users, config, botname):
     """The mergebot should *not* allow merging non-empty commits which become
     empty as part of the staging (rebasing)
     """
@@ -223,7 +227,7 @@ def test_merge_emptying_commits(env, repo, users, config):
     pr1_id = to_pr(env, pr1)
     assert not pr1_id.staging_id
     assert pr1.comments[3:] == [
-        (users['user'], f"{ping} unable to stage: commit {c1} results in an empty tree when merged, it is likely a duplicate of a merged commit, rebase and remove.")
+        (botname, f"{ping} unable to stage: commit {c1} results in an empty tree when merged, it is likely a duplicate of a merged commit, rebase and remove.")
     ]
     assert pr1_id.error
     assert pr1_id.state == 'error'
@@ -232,7 +236,7 @@ def test_merge_emptying_commits(env, repo, users, config):
     pr2_id = to_pr(env, pr2)
     assert not pr2_id.staging_id
     assert pr2.comments[3:] == [
-        (users['user'], f"{ping} unable to stage: commit {c2} results in an empty tree when merged, it is likely a duplicate of a merged commit, rebase and remove.")
+        (botname, f"{ping} unable to stage: commit {c2} results in an empty tree when merged, it is likely a duplicate of a merged commit, rebase and remove.")
     ]
     assert pr2_id.error
     assert pr2_id.state == 'error'
@@ -241,7 +245,7 @@ def test_merge_emptying_commits(env, repo, users, config):
     pr3_id = to_pr(env, pr3)
     assert not pr3_id.staging_id
     assert pr3.comments[3:] == [
-        (users['user'], f"{ping} unable to stage: results in an empty tree when merged, might be the duplicate of a merged PR.")
+        (botname, f"{ping} unable to stage: results in an empty tree when merged, might be the duplicate of a merged PR.")
     ]
     assert pr3_id.error
     assert pr3_id.state == 'error'
@@ -250,7 +254,7 @@ def test_merge_emptying_commits(env, repo, users, config):
     # (it's the only one)
     env.run_crons()
     assert pr1.comments[3:] == [
-        (users['user'], f"{ping} unable to stage: commit {c1} results in an empty tree when merged, it is likely a duplicate of a merged commit, rebase and remove.")
+        (botname, f"{ping} unable to stage: commit {c1} results in an empty tree when merged, it is likely a duplicate of a merged commit, rebase and remove.")
     ]
     assert len(pr2.comments) == 4
     assert len(pr3.comments) == 4
@@ -271,7 +275,7 @@ def test_force_ready(env, repo, config):
     reviewer = env['res.users'].browse([env._uid]).partner_id
     assert pr_id.reviewed_by == reviewer
 
-def test_help(env, repo, config, users, partners):
+def test_help(env, repo, config, users, partners, botname):
     with repo:
         [m] = repo.make_commits(None, Commit('initial', tree={'m': 'm'}), ref="heads/master")
 
@@ -301,21 +305,21 @@ def test_help(env, repo, config, users, partners):
     env.run_crons()
 
     assert pr.comments == [
-        seen(env, pr, users),
+        (botname, seen(env, pr)),
         (users['reviewer'], "hansen help"),
         (users['self_reviewer'], "hansen help"),
         (users['user'], "hansen help"),
         (users['other'], "hansen help"),
         (users['reviewer'], "hansen r+ help"),
         (users['reviewer'], "hansen help"),
-        (users['user'], REVIEWER.format(user=users['reviewer'], skip="", reset="")),
-        (users['user'], RANDO.format(user=users['self_reviewer'])),
-        (users['user'], AUTHOR.format(user=users['user'])),
-        (users['user'], RANDO.format(user=users['other'])),
-        (users['user'],
+        (botname, REVIEWER.format(user=users['reviewer'], skip="", reset="")),
+        (botname, RANDO.format(user=users['self_reviewer'])),
+        (botname, AUTHOR.format(user=users['user'])),
+        (botname, RANDO.format(user=users['other'])),
+        (botname,
          REVIEWER.format(user=users['reviewer'], skip='', reset='')
          + "\n\nWarning: in invoking help, every other command has been ignored."),
-        (users['user'], REVIEWER.format(
+        (botname, REVIEWER.format(
             user=users['reviewer'],
             skip='|`skipchecks`|bypasses both statuses and review|\n',
             reset="""\
@@ -506,7 +510,7 @@ Done
     ]
     assert project.branch_ids.staging_enabled is False
 
-def test_outdated_pr(env, project, repo, config, users):
+def test_outdated_pr(env, project, repo, config, users, botname):
     """ If a PR is too old (in number of commits), skip staging it and send a
     message.
     """
@@ -539,8 +543,8 @@ def test_outdated_pr(env, project, repo, config, users):
     assert pr2_id.state == 'error'
     assert pr2.comments == [
         (users['reviewer'], "hansen r+"),
-        seen(env, pr2, users),
-        (users['user'], f"@{users['user']} @{users['reviewer']} unable to stage: too old (1 commits behind), please rebase."),
+        (botname, seen(env, pr2)),
+        (botname, f"@{users['user']} @{users['reviewer']} unable to stage: too old (1 commits behind), please rebase."),
     ]
 
 def test_not_outdated_pr(env, project, repo, config, users):
@@ -683,12 +687,11 @@ def test_create_commits_count(
     with pytest.raises(TimeoutError):
         to_pr(env, pr)
 
-    r = requests.post(
-        f"http://localhost:{port}/runbot_merge/hooks",
-        headers={
-            "X-Github-Event": "pull_request",
-        },
-        json={
+    fakehook(
+        port,
+        env,
+        repo,
+        {
             'action': 'opened',
             'sender': {'login': users['user']},
             'repository': {'full_name': repo.name},
@@ -704,7 +707,6 @@ def test_create_commits_count(
             }
         }
     )
-    r.raise_for_status()
 
     pr_id = to_pr(env, pr)
     assert not pr_id.squash
@@ -720,12 +722,11 @@ def test_sync_commits_count(port, env, project, repo, users, config) -> None:
     env.run_crons()
 
     # simulate github being stupid
-    r = requests.post(
-        f"http://localhost:{port}/runbot_merge/hooks",
-        headers={
-            "X-Github-Event": "pull_request",
-        },
-        json={
+    fakehook(
+        port,
+        env,
+        repo,
+        {
             'action': 'labeled',
             'sender': {
                 'login': users['user'],
@@ -747,7 +748,6 @@ def test_sync_commits_count(port, env, project, repo, users, config) -> None:
             }
         }
     )
-    r.raise_for_status()
 
     pr_id = to_pr(env, pr)
     assert not pr_id.squash

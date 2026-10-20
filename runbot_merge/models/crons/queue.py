@@ -83,6 +83,12 @@ class Queue(models.BaseModel):
 
 class Retryable(models.BaseModel):
     _name = 'runbot_merge.queue.retryable'
+    _description = (
+        "Common behaviour for retriable queue-type crons, queues whose task can"
+        " experience temporary failure but automatically recover after a while"
+        " e.g. attempts to retrieve a git object which was created but which"
+        " github may not have propagated to every API server yet"
+    )
     _inherit = ['runbot_merge.queue']
     _order = 'sequence, retry_after, id'
     # retry every 10mn for 2h

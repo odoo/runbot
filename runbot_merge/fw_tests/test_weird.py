@@ -123,7 +123,7 @@ def test_failed_staging(env, config, make_repo):
     assert pr3_id.state == 'ready'
     assert pr3_id.staging_id
 
-def test_fw_retry(env, config, make_repo, users):
+def test_fw_retry(env, config, make_repo, users, botname):
     prod, _ = make_basic(env, config, make_repo, statuses='default')
     other_token = config['role_other']['token']
     fork = prod.fork(token=other_token)
@@ -170,13 +170,13 @@ def test_fw_retry(env, config, make_repo, users):
     assert pr2_id.state == 'ready'
 
     assert pr2.comments == [
-        seen(env, pr2, users),
-        (users['user'], "This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.\n\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n"),
+        (botname, seen(env, pr2)),
+        (botname, "This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.\n\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n"),
         (users['other'], 'hansen r+'),
-        (users['user'], "@{other} @{reviewer} staging failed: default".format_map(users)),
+        (botname, "@{other} @{reviewer} staging failed: default".format_map(users)),
 
         (users['other'], 'hansen r+'),
-        (users['user'], "This PR is already reviewed, it's in error, you might want to `retry` it instead (if you have already confirmed the error is not legitimate)."),
+        (botname, "This PR is already reviewed, it's in error, you might want to `retry` it instead (if you have already confirmed the error is not legitimate)."),
 
         (users['other'], 'hansen retry'),
     ]
@@ -227,11 +227,15 @@ class TestNotAllBranches:
 
         project = env['runbot_merge.project'].create({
             'name': 'proj',
-            'github_token': config['github']['token'],
+            'github_id': env['runbot_merge.github_connector'].create({
+                'name': "PAT",
+                'method': 'pat',
+                'main_pat': config['github']['token'],
+                'fp_pat': config['fp_github']['token'],
+            }).id,
             'github_prefix': 'hansen',
             'github_name': config['github']['name'],
             'github_email': "foo@example.org",
-            'fp_github_token': config['github']['token'],
             'fp_github_name': 'herbert',
             'branch_ids': [
                 (0, 0, {'name': 'a', 'sequence': 2}),
@@ -337,7 +341,7 @@ class TestNotAllBranches:
         assert pr1.state == 'merged'
         assert b.read_tree(b.commit('c')) == {'a': 'y', 'c': 'x', 'pr': '1'}
 
-    def test_both_first(self, env, repos, config, users):
+    def test_both_first(self, env, repos, config, users, botname):
         """ A merge in A.a, B.a should... not be forward-ported at all?
         """
         _project, a, a_dev, b, b_dev = repos
@@ -366,8 +370,8 @@ class TestNotAllBranches:
         # different next target
         assert pr_a.comments == [
             (users['reviewer'], 'hansen r+'),
-            seen(env, pr_a, users),
-            (users['user'], "@%s @%s this pull request can not be forward-ported:"
+            (botname, seen(env, pr_a)),
+            (botname, "@%s @%s this pull request can not be forward-ported:"
                             " next branch is 'b' but linked pull request %s "
                             "has a next branch 'c'." % (
                 users['user'], users['reviewer'], pr_b_id.display_name,
@@ -375,8 +379,8 @@ class TestNotAllBranches:
         ]
         assert pr_b.comments == [
             (users['reviewer'], 'hansen r+'),
-            seen(env, pr_b, users),
-            (users['user'], "@%s @%s this pull request can not be forward-ported:"
+            (botname, seen(env, pr_b)),
+            (botname, "@%s @%s this pull request can not be forward-ported:"
                             " next branch is 'c' but linked pull request %s "
                             "has a next branch 'b'." % (
                 users['user'], users['reviewer'], pr_a_id.display_name,
@@ -747,7 +751,7 @@ def test_retarget_after_freeze(env, config, make_repo, users):
     assert new_pr_id.parent_id == port_id
     assert new_pr_id.target == branch_c
 
-def test_approve_draft(env, config, make_repo, users):
+def test_approve_draft(env, config, make_repo, users, botname):
     prod, _ = make_basic(env, config, make_repo, statuses='default')
 
     with prod:
@@ -760,8 +764,8 @@ def test_approve_draft(env, config, make_repo, users):
     assert pr_id.state == 'opened'
     assert pr.comments == [
         (users['reviewer'], 'hansen r+'),
-        seen(env, pr, users),
-        (users['user'], f"@{users['reviewer']} draft PRs can not be approved."),
+        (botname, seen(env, pr)),
+        (botname, f"@{users['reviewer']} draft PRs can not be approved."),
     ]
 
     with prod:
@@ -956,7 +960,7 @@ def test_missing_magic_ref(env, config, make_repo):
     # as a result it doesn't forwardport our fake, we'd have to reset the PR's
     # branch for that to happen
 
-def test_disable_branch_with_batches(env, config, make_repo, users):
+def test_disable_branch_with_batches(env, config, make_repo, users, botname):
     """We want to avoid losing pull requests, so when deactivating a branch,
     if there are *forward port* batches targeting that branch which have not
     been forward ported yet port them over, as if their source had been merged
@@ -1052,13 +1056,13 @@ def test_disable_branch_with_batches(env, config, make_repo, users):
     assert PullRequests.search_count([('parent_id', '=', pr3_b_id.id)])
 
     assert repo.get_pr(pr1_b_id.number).comments == [
-        seen(env, repo.get_pr(pr1_b_id.number), users),
-        (users['user'], "This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.\n\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n"),
-        (users['user'], "@{user} @{reviewer} the target branch 'b' has been disabled, you may want to close this PR.\n\nAs this was not its limit, it will automatically be forward ported to the next active branch.".format_map(users)),
+        (botname, seen(env, repo.get_pr(pr1_b_id.number))),
+        (botname, "This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.\n\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n"),
+        (botname, "@{user} @{reviewer} the target branch 'b' has been disabled, you may want to close this PR.\n\nAs this was not its limit, it will automatically be forward ported to the next active branch.".format_map(users)),
     ]
     assert repo2.get_pr(pr2_b_id.number).comments == [
-        seen(env, repo2.get_pr(pr2_b_id.number), users),
-        (users['user'], """\
+        (botname, seen(env, repo2.get_pr(pr2_b_id.number))),
+        (botname, """\
 @{user} @{reviewer} this PR targets b and is the last of the forward-port chain.
 
 To merge the full chain, use
@@ -1066,21 +1070,25 @@ To merge the full chain, use
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """.format_map(users)),
-        (users['user'], "@{user} @{reviewer} the target branch 'b' has been disabled, you may want to close this PR.".format_map(users)),
+        (botname, "@{user} @{reviewer} the target branch 'b' has been disabled, you may want to close this PR.".format_map(users)),
     ]
 
-def test_disable_multitudes(env, config, make_repo, users, setreviewers):
+def test_disable_multitudes(env, config, make_repo, users, setreviewers, botname):
     """Ensure that deactivation ports can jump over other deactivated branches.
     """
     # region setup
     repo = make_repo("bob")
     project = env['runbot_merge.project'].create({
         "name": "bob",
-        "github_token": config['github']['token'],
+        'github_id': env['runbot_merge.github_connector'].create({
+            'name': "PAT",
+            'method': 'pat',
+            'main_pat': config['github']['token'],
+            'fp_pat': config['fp_github']['token'],
+        }).id,
         "github_prefix": "hansen",
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",
-        "fp_github_token": config['github']['token'],
         "fp_github_name": "herbert",
         "branch_ids": [
             (0, 0, {'name': 'a', 'sequence': 90}),
@@ -1146,9 +1154,9 @@ def test_disable_multitudes(env, config, make_repo, users, setreviewers):
 
     prb = repo.get_pr(prb_id.number)
     assert prb.comments == [
-        seen(env, prb, users),
-        (users['user'], 'This PR targets b and is part of the forward-port chain. Further PRs will be created up to d.\n\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'),
-        (users['user'], """\
+        (botname, seen(env, prb)),
+        (botname, 'This PR targets b and is part of the forward-port chain. Further PRs will be created up to d.\n\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'),
+        (botname, """\
 @{user} @{reviewer} the target branch 'b' has been disabled, you may want to close this PR.
 
 As this was not its limit, it will automatically be forward ported to the next active branch.\
@@ -1156,8 +1164,8 @@ As this was not its limit, it will automatically be forward ported to the next a
     ]
     prd = repo.get_pr(prd_id.number)
     assert prd.comments == [
-        seen(env, prd, users),
-        (users['user'], """\
+        (botname, seen(env, prd)),
+        (botname, """\
 @{user} @{reviewer} this PR targets d and is the last of the forward-port chain.
 
 To merge the full chain, use
@@ -1169,7 +1177,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 
 FMT = '%Y-%m-%d %H:%M:%S'
 FAKE_PREV_WEEK = (datetime.now() + timedelta(days=1)).strftime(FMT)
-def test_reminder_detached(env, config, make_repo, users):
+def test_reminder_detached(env, config, make_repo, users, botname):
     """On detached forward ports, both sides of the detachment should be notified.
     """
     # region setup
@@ -1209,16 +1217,16 @@ def test_reminder_detached(env, config, make_repo, users):
     env.run_crons('runbot_merge.reminder')
 
     assert pr_b.comments == [
-        seen(env, pr_b, users),
-        (users['user'], """\
+        (botname, seen(env, pr_b)),
+        (botname, """\
 This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """)], "the intermediate PR should not be reminded"
 
     assert pr_c.comments == [
-        seen(env, pr_c, users),
-        (users['user'], """\
+        (botname, seen(env, pr_c)),
+        (botname, """\
 @%s @%s this PR targets c and is the last of the forward-port chain containing:
 * %s
 
@@ -1230,7 +1238,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
             users['user'], users['reviewer'],
             pr_b_id.display_name,
     )),
-        (users['user'], "@%s @%s this forward port of %s is awaiting action (not merged or closed)." % (
+        (botname, "@%s @%s this forward port of %s is awaiting action (not merged or closed)." % (
             users['user'],
             users['reviewer'],
             pr_a_id.display_name,
@@ -1244,19 +1252,19 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     env.run_crons('runbot_merge.reminder')
 
     assert pr_b.comments[2:] == [
-        (users['user'], "@%s @%s child PR %s has become a normal PR because because. This PR (and any of its parents) will need to be merged independently as approvals won't cross." % (
+        (botname, "@%s @%s child PR %s has become a normal PR because because. This PR (and any of its parents) will need to be merged independently as approvals won't cross." % (
             users['user'],
             users['reviewer'],
             pr_c_id.display_name,
         )),
-        (users['user'], "@%s @%s this forward port of %s is awaiting action (not merged or closed)." % (
+        (botname, "@%s @%s this forward port of %s is awaiting action (not merged or closed)." % (
             users['user'],
             users['reviewer'],
             pr_a_id.display_name,
         ))
     ], "the detached-from intermediate PR should now be reminded"
     assert pr_c.comments[3:] == [
-        (users['user'], "@%s @%s this forward port of %s is awaiting action (not merged or closed)." % (
+        (botname, "@%s @%s this forward port of %s is awaiting action (not merged or closed)." % (
             users['user'],
             users['reviewer'],
             pr_a_id.display_name,
@@ -1600,7 +1608,7 @@ def f():
     }
 
 
-def test_approve_fw_no_email(env, make_repo, users, config, partners):
+def test_approve_fw_no_email(env, make_repo, users, config, partners, botname):
     """Even if there are multiple outstanding forward ports getting approved,
     each error should be posted only once, no need to tell the user that we
     don't know their email for every forward port we attempted to approve.
@@ -1630,8 +1638,8 @@ def test_approve_fw_no_email(env, make_repo, users, config, partners):
     env.run_crons()
 
     assert pr_c.comments == [
-        seen(env, pr_c, users),
-        (users['user'], f"""\
+        (botname, seen(env, pr_c)),
+        (botname, f"""\
 @{users['user']} @{users['reviewer']} this PR targets c and is the last of the forward-port chain containing:
 * {pr_b_id.display_name}
 
@@ -1641,10 +1649,9 @@ To merge the full chain, use
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """),
         (users['user'], 'hansen r+'),
-        (users['user'], f"@{users['user']} I must know your email before you can review PRs. Please contact an administrator."),
+        (botname, f"@{users['user']} I must know your email before you can review PRs. Please contact an administrator."),
     ]
-    user_partner.fetch_github_email()
-    assert user_partner.email
+    user_partner.email = "foo@bar.com"
     with repo:
         pr_c.post_comment('hansen r+', config['role_user']['token'])
     env.run_crons()

@@ -31,11 +31,12 @@ class PullRequest(models.Model):
         if len(self.batch_id.prs) > 1:
             raise UserError("Automatic backport of multi-pr batches is not currently supported")
 
-        if not self.project.fp_github_token:
+        repo = self.repository
+        if not self.project.github_id._fp_token(repo.name):
             raise UserError(f"Can not backport {self.display_name}: no token on project {self.project.display_name}")
 
-        if not self.repository.fp_remote_target:
-            raise UserError(f"Can not backport {self.display_name}: no remote on {self.project.display_name}")
+        if not repo.fp_remote_target:
+            raise UserError(f"Can not backport {self.display_name}: no remote on {repo.name}")
 
         w = self.env['runbot_merge.pull_requests.backport'].create({
             'pr_id': self.id,
@@ -85,7 +86,8 @@ class PullRequestBackport(models.TransientModel):
 
         bp_branch = f"{self.target.name}-{self.pr_id.refname}-{self.pr_id.batch_id.id}-bp"
         repo_id = self.pr_id.repository
-        repo = git.get_local(repo_id)
+        url, user, password = repo_id._fw_git()
+        repo = git.get_local(repo_id).with_credentials(user, password)
 
         old_map = self.pr_id.commits_map
         self.pr_id.commits_map = "{}"
@@ -95,7 +97,7 @@ class PullRequestBackport(models.TransientModel):
         if conflict:
             feedback = "\n".join(filter(None, conflict[1:3]))
             raise UserError(f"backport conflict:\n\n{feedback}")
-        repo.push(git.fw_url(repo_id), f"{head}:refs/heads/{bp_branch}")
+        repo.push(url, f"{head}:refs/heads/{bp_branch}")
 
         self.env.cr.execute('LOCK runbot_merge_pull_requests IN SHARE MODE')
 
@@ -105,7 +107,7 @@ class PullRequestBackport(models.TransientModel):
 
         r = requests.post(
             f'https://api.github.com/repos/{repo_id.name}/pulls',
-            headers={'Authorization': f'token {project.fp_github_token}'},
+            headers={'Authorization': f'token {project.github_id._fp_token(repo_id.name)}'},
             json={
                 'base': self.target.name,
                 'head': f'{owner}:{bp_branch}',

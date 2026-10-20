@@ -9,6 +9,7 @@ import errno
 import fcntl
 import functools
 import http.client
+import io
 import itertools
 import json
 import os
@@ -28,14 +29,22 @@ import typing
 import uuid
 import warnings
 import xmlrpc.client
-from collections.abc import Iterator
+from collections.abc import Iterator, Generator
 from contextlib import closing
 from dataclasses import dataclass
 from typing import Optional
-from urllib.parse import urlsplit, quote
+from urllib.parse import urlsplit
 
 import pytest
 import requests
+
+from pytest_github_apps import GithubApp, build_app, OAuthApp, build_oauth, Authorization, Installation
+from werkzeug.serving import BaseWSGIServer
+
+
+pytest_plugins = [
+    "pytest_github_apps",
+]
 
 collect_ignore = [
     p.name
@@ -194,8 +203,10 @@ def config(users_file: pathlib.Path) -> dict[str, dict[str, str]]:
             case _ if e['type'] == 'User':
                 picks.append(val)
     cnf['github'] = dict(cnf['role_user'])
+    cnf['fp_github'] = dict(cnf['role_user'])
     if owner := cnf.get('role_owner'):
         cnf['github']['owner'] = owner['login']
+        cnf['fp_github']['owner'] = owner['login']
 
     cnf.update(zip(
         ('role_reviewer', 'role_self_reviewer', 'role_other'),
@@ -208,7 +219,12 @@ def config(users_file: pathlib.Path) -> dict[str, dict[str, str]]:
     return cnf
 
 @pytest.fixture(scope='session')
-def rolemap(request, config):
+def rolemap(
+        request: pytest.FixtureRequest,
+        config: dict[str, typing.Any],
+        # force the proxy (and thus DC) to run before we try to resolve users
+        http_proxy: None,
+):
     # only fetch github logins once per session
     rolemap = {}
     for k, data in config.items():
@@ -219,8 +235,13 @@ def rolemap(request, config):
         r.raise_for_status()
 
         user = rolemap[k[5:]] = r.json()
+        data['id'] = user['id']
         n = data['user'] = user['login']
         data.setdefault('name', n)
+    # `user` is the primary user for the test suite, `bot` is the primary user
+    # for mergebot, and `fp` is the secondary (forward-port) user for mergebot,
+    # by default they are identical but in app mode they very much aren't...
+    rolemap['bot'] = rolemap['fp'] = rolemap['user']
     return rolemap
 
 @pytest.fixture
@@ -263,14 +284,157 @@ def setreviewers(partners):
     return _
 
 @pytest.fixture
-def users(partners, rolemap) -> dict[str, str]:
+def users(partners, rolemap, botname) -> dict[str, str]:
     return {k: v['login'] for k, v in rolemap.items()}
 
 @pytest.fixture(scope='session')
-def tunnel(pytestconfig: pytest.Config, port: int) -> Iterator[str]:
+def fake_github_url(pytestconfig: pytest.Config)-> str | None:
+    if pytestconfig.getoption('--tunnel'):
+        return None
+
+    return 'https://api.github.com'
+
+@pytest.fixture(scope='session')
+def github_app_owner(config) -> str:
+    return config['role_owner']['login']
+
+
+_mb_app = pytest.fixture(
+    build_app(
+        fake_github=True,
+        permissions={
+            'contents': 'write',
+            'deployments': 'write',
+            'issues': 'write',
+            'pull_requests': 'write',
+            'statuses': 'read',
+        },
+        events=['pull_request', 'issue_comment', 'status', 'pull_request_review']
+    ),
+    scope='session',
+    name='mb_app',
+)
+
+_oauth_test_app = pytest.fixture(build_oauth(), scope='session', name='_oauth_test_app')
+
+
+# app for the "users" / test suite
+_gh_test_app = pytest.fixture(build_app(
+    fake_github=True,
+    permissions={
+        # create & fork repos
+        'administration': 'write',
+        # add content to the repos
+        'contents': 'write',
+        # check behaviour
+        'deployments': 'read',
+        'issues': 'read',
+        # create PRs
+        'pull_requests': 'write',
+        # simulate runbot sending statuses
+        'statuses': 'write',
+        # read and disable repo hooks
+        'repository_hooks': 'write',
+    }
+), scope='session', name='_gh_test_app')
+
+
+class TestApp(typing.Protocol):
+    def authorize(self, login: str) -> Authorization:
+        ...
+
+
+class AuthDict(dict):
+    """Automatically requests authorization when a test needs a token.
+
+    Tokens should probably be split out of the mess (in fact config should
+    probably be reworked or removed) but this should do as a temporary measure.
+    """
+    def __init__(self, app: TestApp, /, other=(), **kwds) -> None:
+        super().__init__()
+        self.app = app
+        self.update(other, **kwds)
+
+    def __missing__(self, key: str) -> str:
+        match key:
+            case 'authorization':
+                if inst := getattr(self.app, 'get_or_install', None):
+                    inst(self['id'])
+                match self.app:
+                    case OAuthApp():
+                        auth = self['authorization'] = self.app.authorize(self['login'], ['repo', 'delete_repo'])
+                    case _:
+                        auth = self['authorization'] = self.app.authorize(self['login'])
+                return auth
+            case 'token':
+                auth = self['authorization']
+                if auth.expires_at:
+                    # since a UAT is valid for 8h, reset after 7 (we could have a lower
+                    # margin of safety but why bother?)
+                    threshold = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1)
+                    if datetime.datetime.fromisoformat(auth.expires_at) < threshold:
+                        auth.refresh()
+                return auth.token
+            case _:
+                raise KeyError(key)
+
+
+@pytest.fixture(scope='session', autouse=True)
+def testsuite_app(
+        request: pytest.FixtureRequest,
+        pytestconfig: pytest.Config,
+        config: dict,
+        rolemap: dict,
+        # make sure DC is running or we're in trouble
+        http_proxy: None,
+) -> TestApp:
+    # switch to the oauth app if we need to create cross-org private forks
+    if pytestconfig.getoption('--tunnel'):
+        app = request.getfixturevalue('_oauth_test_app')
+    else:
+        app = request.getfixturevalue('_gh_test_app')
+        app.install(rolemap['owner']['id'])
+    for key, entry in config.items():
+        if not key.startswith('role_'):
+            continue
+        del entry['token']
+        config[key] = AuthDict(app, entry)
+    return app
+
+
+@pytest.fixture(scope='session')
+def tunnel(
+        pytestconfig: pytest.Config,
+        port: int,
+) -> Iterator[str]:
     """ Creates a tunnel to localhost:<port>, should yield the
     publicly routable address & terminate the process at the end of the session
     """
+    if tunnel := pytestconfig.getoption('--tunnel'):
+        with subprocess.Popen(
+            [tunnel, str(port)],
+            stdout=subprocess.PIPE,
+            encoding="utf-8",
+        ) as p:
+            # read() blocks forever and I don't know why, read things about the
+            # write end of the stdout pipe still being open here?
+            result = p.stdout.readline().strip()
+            url = urlsplit(result)
+            assert url.scheme and url.netloc
+
+            yield url.geturl()
+            p.terminate()
+            p.wait(30)
+    else:
+        yield f'http://localhost:{port}'
+
+@pytest.fixture(scope='session')
+def github_app_tunnel(
+    pytestconfig: pytest.Config,
+    github_app_server: BaseWSGIServer,
+) -> Iterator[str]:
+    server_name = github_app_server.server_name
+    port = github_app_server.server_port
     if tunnel := pytestconfig.getoption('--tunnel'):
         with subprocess.Popen(
             [tunnel, str(port)],
@@ -286,7 +450,8 @@ def tunnel(pytestconfig: pytest.Config, port: int) -> Iterator[str]:
             p.terminate()
             p.wait(30)
     else:
-        yield f'http://localhost:{port}'
+        yield f"http://{server_name}:{port}"
+
 
 @pytest.fixture(scope='session', autouse=True)
 def http_proxy(pytestconfig: pytest.Config, users_file: pathlib.Path) -> Iterator[None]:
@@ -307,7 +472,7 @@ def http_proxy(pytestconfig: pytest.Config, users_file: pathlib.Path) -> Iterato
 
         portfile = datadir / 'dcportfile'
         gh = cleanup.enter_context(subprocess.Popen(
-            ['dummy_central', users_file, '-p', '0', '--portfile', portfile],
+            ['dummy_central', users_file, '-p', '0', '--portfile', portfile, '--log', 'info'],
             stdout=sys.stdout.fileno(),
             stderr=sys.stderr.fileno(),
             env={**os.environ, 'RUST_BACKTRACE': '1'},
@@ -660,6 +825,80 @@ def check(response):
     assert response.ok, response.text or response.reason
     return response
 
+@pytest.fixture(scope='session')
+def installation(
+        config: dict,
+        rolemap: dict,
+        port: int,
+        mb_app: GithubApp,
+) -> Installation:
+    inst = mb_app.install(rolemap['owner']['id'])
+    config['github']['login'] = config['github']['name'] = f"{inst.app.slug}[bot]"
+    config['github']['secret'] = mb_app.webhook_secret
+    @mb_app._app.passthrough_handlers.append
+    def _bounce_hooks(headers, data: bytes, s=requests.Session()) -> None:
+        # since there is no dependency between the two, the odoo server likely
+        # shuts down first, preventing bouncing the end-of-app lifecycle hooks
+        # (which it doesn't care about anyway) to it
+        #
+        # - installation_repositories.removed
+        # - installation.deleted
+        # - github_app_authorization.revoked
+        with contextlib.suppress(requests.RequestException):
+            s.post(
+                f"http://localhost:{port}/runbot_merge/hooks",
+                headers=headers,
+                data=data,
+            )
+    return inst
+
+
+# (token, expires_at)
+mb_iat = pytest.StashKey[tuple[str, int]]()
+@pytest.fixture(autouse=True)
+def _iat(pytestconfig: pytest.Config, installation: Installation, config: dict, rolemap: dict) -> None:
+    if iat := pytestconfig.stash.get(mb_iat, None):
+        token, expiration = iat
+        if expiration < time.time():
+            config['github']['token'] = rolemap['bot']['token'] = token
+            return
+
+    # iat expire after 60mn, so renew them at 50 (assuming a test can last
+    # several minutes but probably less than 10)
+    token, _ = pytestconfig.stash[mb_iat] = (installation.token(lifetime=600), int(time.time()) + 50 * 60)
+    config["github"]["token"] = rolemap["bot"]["token"] = token
+
+
+mb_uat = pytest.StashKey[Authorization]()
+@pytest.fixture(autouse=True)
+def _uat(pytestconfig: pytest.Config, mb_app: GithubApp, config: dict, rolemap: dict) -> None:
+    auth = pytestconfig.stash.get(mb_uat, None)
+    if auth is None:
+        # fp_github is a copy of user, which is the (default) fork target, so
+        # auth-ing that makes sense (for now)
+        #
+        # alternative: install when we configure the fp_remote_target, but then
+        # we need to delay the token resolution until then, and also `make_basic`
+        # now needs access to the application / installation / IAT somehow...
+        # (which is not impossible, repomaker could be updated to do it), but
+        # this means better match between gha and oaa
+        auth = pytestconfig.stash[mb_uat] = mb_app.authorize(rolemap['fp']['login'])
+
+    expires_at = datetime.datetime.fromisoformat(auth.expires_at)
+    if (expires_at - datetime.datetime.now(datetime.UTC)) < datetime.timedelta(hours=1):
+        assert auth.refresh()
+
+    rolemap["fp"]["token"] = config["fp_github"]["token"] = auth.token
+    rolemap["fp"]["expires_at"] = config['fp_github']["expires_at"] = auth.expires_at
+
+
+@pytest.fixture
+def botname(installation: Installation) -> str:
+    """The username of the bot user (the user through which runbot_merge replies
+    to PR comments)
+    """
+    return f"{installation.app.slug}[bot]"
+
 # users is just so I can avoid autouse on toplevel users fixture b/c it (seems
 # to) break the existing local tests
 @pytest.fixture
@@ -668,6 +907,7 @@ def make_repo(
         config: dict,
         tunnel: str,
         users: dict,
+        installation: Installation,
 ) -> Iterator[RepoMaker]:
     """Fixtures which creates a repository on the github side, plugs webhooks
     in, and registers the repository for deletion on cleanup (unless
@@ -675,7 +915,7 @@ def make_repo(
     """
     owner = config['github']['owner']
     github = requests.Session()
-    github.headers['Authorization'] = 'token %s' % config['github']['token']
+    github.headers['Authorization'] = f'token {config["role_user"]["token"]}'
 
     # check whether "owner" is a user or an org, as repo-creation endpoint is
     # different
@@ -689,10 +929,11 @@ def make_repo(
         assert r.json()['login'] == owner
 
     repos = []
-    def repomaker(name: str, *, hooks: bool = True) -> Repo:
+    def repomaker(name: str, *, private: bool = False, hooks: bool = True) -> Repo:
         # create repo
         r = check(github.post(endpoint, json={
             'name': f'ignore_{name}_{secrets.token_urlsafe(6)}',
+            'private': private,
             'has_issues': True,
             'has_projects': False,
             'has_wiki': False,
@@ -710,7 +951,7 @@ def make_repo(
             if github.head(repo_url).ok:
                 break
 
-        repo = Repo(github, r['full_name'], repos)
+        repo = Repo(github, r['full_name'], repos, installation=installation)
 
         if hooks:
             # create webhook
@@ -781,11 +1022,12 @@ def RepoType() -> type[Repo]:
     return Repo
 
 class Repo:
-    def __init__(self, session, fullname, repos):
+    def __init__(self, session, fullname, repos, installation=None):
         self._session = session
         self.name = fullname
         self._repos = repos
         self.hook = False
+        self.installation = installation
         repos.append(self)
 
     def __repr__(self):
@@ -801,16 +1043,22 @@ class Repo:
             'ignored': True,
         })
 
-    def add_collaborator(self, login, token):
+    def add_collaborator(self, role: dict):
+        assert self.hook
         # send invitation to user
-        r = check(self._session.put(f'https://api.github.com/repos/{self.name}/collaborators/{login}'))
-        # accept invitation on behalf of user
-        check(requests.patch(f'https://api.github.com/user/repository_invitations/{r.json()["id"]}', headers={
-            'Authorization': 'token ' + token
-        }))
+        r = check(self._session.put(f'https://api.github.com/repos/{self.name}/collaborators/{role['login']}'))
+        if r.status_code == 201:
+            # if an invitation was created, accept on behalf of user
+            check(requests.patch(f'https://api.github.com/user/repository_invitations/{r.json()["id"]}', headers={
+                'Authorization': f'token {role['token']}'
+            }))
+        else:
+            # otherwise check that user was added as collaborator (should be the
+            # only other non-error status but you never know)
+            assert r.status_code == 204, r.text
         # sanity check that user is part of collaborators
         r = check(self._session.get(f'https://api.github.com/repos/{self.name}/collaborators'))
-        assert any(login == c['login'] for c in r.json())
+        assert any(role['login'] == c['login'] for c in r.json())
 
     def _get_session(self, token):
         s = self._session
@@ -1015,6 +1263,12 @@ class Repo:
                 raise TimeoutError(f"No response for repo {repo_name} over 60s")
             time.sleep(1)
 
+        # In appmode give the application authority over the fork, so fwbot can
+        # manipulate it (as the primary application of forks is to create the
+        # forwardport repository).
+        if self.installation:
+            self.installation.app.get_or_install(response['owner']['id'])
+
         return Repo(s, repo_name, self._repos)
 
     def get_pr(self, number):
@@ -1107,9 +1361,15 @@ class Repo:
         for hook in hook_urls:
             r = sess.patch(hook, json={'active': False})
             assert r.ok, r.text
+        handlers = []
+        if self.installation:
+            handlers, self.installation.app._app.passthrough_handlers[:] \
+                = self.installation.app._app.passthrough_handlers[:], []
         wait_for_hook()
         yield
         wait_for_hook()
+        if handlers:
+            self.installation.app._app.passthrough_handlers[:] = handlers
         for hook in reversed(hook_urls):
             r = sess.patch(hook, json={'active': True})
             assert r.ok, r.text

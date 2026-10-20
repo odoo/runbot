@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
+import hmac
 import itertools
+import json
 import re
 import time
 import typing
 
+import requests
 from lxml import html
 
 MESSAGE_TEMPLATE = """{message}
@@ -69,9 +73,9 @@ class matches(str):
             return NotImplemented
         return self._r.search(text)
 
-def seen(env, pr, users):
+def seen(env, pr):
     url = to_pr(env, pr).url
-    return users['user'], f'[![Pull request status dashboard]({url}.png)]({url})'
+    return f'[![Pull request status dashboard]({url}.png)]({url})'
 
 def make_basic(
         env,
@@ -83,6 +87,7 @@ def make_basic(
         statuses,
         fp_token=True,
         fp_remote=True,
+        private=False,
 ):
     """ Creates a project ``project_name`` **if none exists**, otherwise
     retrieves the existing one and adds a new repository and its fork.
@@ -124,11 +129,15 @@ def make_basic(
     if not project:
         project = env['runbot_merge.project'].create({
             'name': project_name,
-            'github_token': config['github']['token'],
+            'github_id': env['runbot_merge.github_connector'].create({
+                'name': "PAT",
+                'method': 'pat',
+                'main_pat': config['github']['token'],
+                'fp_pat': fp_token and config['fp_github']['token'],
+            }).id,
             'github_prefix': 'hansen',
             'github_name': config['github']['name'],
             'github_email': "foo@example.org",
-            'fp_github_token': fp_token and config['github']['token'],
             'fp_github_name': 'herbert',
             'branch_ids': [
                 (0, 0, {'name': 'a', 'sequence': 100}),
@@ -137,7 +146,7 @@ def make_basic(
             ],
         })
 
-    prod = make_repo(reponame)
+    prod = make_repo(reponame, private=private, hooks=project.github_id.method == 'pat')
     env['runbot_merge.events_sources'].create({'repository': prod.name})
     with prod:
         _0, _1, a_2, _3, _4, = prod.make_commits(
@@ -160,7 +169,7 @@ def make_basic(
             Commit('111', tree={'h': 'a'}),
             ref='heads/c',
         )
-    other = prod.fork() if fp_remote else None
+    other = prod.fork(token=config['role_user']['token']) if fp_remote else None
     repo = env['runbot_merge.repository'].create({
         'project_id': project.id,
         'name': prod.name,
@@ -314,3 +323,36 @@ def log_to_node(log):
             todo.append(c)
 
     return nodes[log[0]['sha']]
+
+def fakehook(port, env, repository, data):
+    assert isinstance(data, dict), f"webhook payloads are dicts (json objects), got {type(data)}"
+    project = env['runbot_merge.project'].search([])
+    assert len(project) == 1, "fakehook can't handle multiple projects being configured"
+    headers = {
+        "Content-Type": "application/json",
+        "X-Github-Event": "pull_request",
+    }
+    match project.github_id.method:
+        case 'pat':
+            headers["X-Github-Hook-Installation-Target-Type"] = 'repository'
+            headers["X-Github-Hook-Installation-Target-Id"] = '1'
+            secret = env['runbot_merge.events_sources'].search([('repository', '=', repository.name)]).secret
+        case 'app':
+            headers["X-Github-Hook-Installation-Target-Type"] = 'integration'
+            headers["X-Github-Hook-Installation-Target-Id"] = str(project.github_id.app_id)
+            secret = project.github_id.webhook_secret
+        case m:
+            raise ValueError(f"unknown auth method {m!r}")
+
+    payload = json.dumps(data)
+    if s := (secret and secret.strip()):
+        sig = hmac.new(s.encode(), payload.encode(), hashlib.sha256)
+        headers['X-Hub-Signature-256'] = f"sha256={sig.hexdigest()}"
+
+    r = requests.post(
+        f"http://localhost:{port}/runbot_merge/hooks",
+        headers=headers,
+        data=payload,
+    )
+    r.raise_for_status()
+    return r

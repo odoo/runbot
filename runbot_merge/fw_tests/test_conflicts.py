@@ -9,7 +9,7 @@ import pytest
 from utils import make_basic, Commit, validate_all, matches, seen, REF_PATTERN, to_pr
 
 
-def test_conflict(env, config, make_repo, users):
+def test_conflict(env, config, make_repo, users, botname):
     """ Create a PR to A which will (eventually) conflict with C when
     forward-ported.
     """
@@ -70,8 +70,8 @@ xxx
 '''),
     }
     assert prc.comments == [
-        seen(env, prc, users),
-        (users['user'],
+        (botname, seen(env, prc)),
+        (botname,
 f'''@{users['user']} @{users['reviewer']} cherrypicking of pull request {pra_id.display_name} failed.
 
 stdout:
@@ -93,13 +93,13 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 
     prb = prod.get_pr(prb_id.number)
     assert prb.comments == [
-        seen(env, prb, users),
-        (users['user'], '''\
+        (botname, seen(env, prb)),
+        (botname, '''\
 This PR targets b and is part of the forward-port chain. Further PRs will be created up to d.
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 '''),
-        (users['user'], """@%s @%s the next pull request (%s) is in conflict. \
+        (botname, """@%s @%s the next pull request (%s) is in conflict. \
 You can merge the chain up to here by saying
 > @hansen r+
 
@@ -235,11 +235,15 @@ def test_massive_conflict(env, config, make_repo):
     # region setup
     project = env['runbot_merge.project'].create({
         'name': "thing",
-        'github_token': config['github']['token'],
+        'github_id': env['runbot_merge.github_connector'].create({
+            'name': "PAT",
+            'method': 'pat',
+            'main_pat': config['github']['token'],
+            'fp_pat': config['fp_github']['token'],
+        }).id,
         'github_prefix': 'hansen',
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",
-        'fp_github_token': config['github']['token'],
         'fp_github_name': 'herbert',
         'branch_ids': [
             (0, 0, {'name': 'a', 'sequence': 100}),
@@ -446,11 +450,15 @@ def test_conflict_deleted_deep(env, config, make_repo):
 
     project = env['runbot_merge.project'].create({
         'name': "test",
-        'github_token': config['github']['token'],
+        'github_id': env['runbot_merge.github_connector'].create({
+            'name': "PAT",
+            'method': 'pat',
+            'main_pat': config['github']['token'],
+            'fp_pat': config['fp_github']['token'],
+        }).id,
         'github_prefix': 'hansen',
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",
-        'fp_github_token': config['github']['token'],
         'fp_github_name': 'herbert',
         'branch_ids': [
             (0, 0, {'name': 'a', 'sequence': 100}),
@@ -556,7 +564,7 @@ def test_multiple_commits_same_authorship(env, config, make_repo):
     assert get(c.committer) == get(committer)
 
 
-def test_multiple_commits_different_authorship(env, config, make_repo, users):
+def test_multiple_commits_different_authorship(env, config, make_repo, users, botname):
     """ When a PR has multiple commits by different authors, the resulting
     (squashed) conflict commit should have an empty email
     """
@@ -628,10 +636,10 @@ b
     env.run_crons()
 
     assert pr2.comments == [
-        seen(env, pr2, users),
-        (users['user'], matches('@%(user)s @%(reviewer)s $$CONFLICT' % users)),
+        (botname, seen(env, pr2)),
+        (botname, matches('@%(user)s @%(reviewer)s $$CONFLICT' % users)),
         (users['reviewer'], 'hansen r+'),
-        (users['user'], f"@{users['user']} @{users['reviewer']} unable to stage: "
+        (botname, f"@{users['user']} @{users['reviewer']} unable to stage: "
                         "All commits must have author and committer email, "
                         f"missing email on {pr2_id.head} indicates the "
                         "authorship is most likely incorrect."),
@@ -693,11 +701,15 @@ def foo():
 def setup_unstructured_conflict(env, config, make_repo):
     project = env['runbot_merge.project'].create({
         'name': "test",
-        'github_token': config['github']['token'],
+        'github_id': env['runbot_merge.github_connector'].create({
+            'name': "PAT",
+            'method': 'pat',
+            'main_pat': config['github']['token'],
+            'fp_pat': config['fp_github']['token'],
+        }).id,
         'github_prefix': 'hansen',
         'github_name': config['github']['name'],
         'github_email': "foo@example.org",
-        'fp_github_token': config['github']['token'],
         'fp_github_name': 'herbert',
         'branch_ids': [
             (0, 0, {'name': 'a', 'sequence': 100}),

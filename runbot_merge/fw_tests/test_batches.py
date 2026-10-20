@@ -303,7 +303,7 @@ def test_add_to_forward_ported(env, config, make_repo, users):
     assert not env['runbot_merge.pull_requests'].search([]) - known_set, \
         "there should not be any PR outside of the sequences we created"
 
-def test_add_to_forward_port_conflict(env, config, make_repo, users):
+def test_add_to_forward_port_conflict(env, config, make_repo, users, botname):
     """If a PR is added to an existing forward port sequence, and it causes
     conflicts when forward ported, it should be treated similarly to an *update*
     causing a conflict: the PR is still created, but it's set in conflict.
@@ -376,9 +376,9 @@ def test_add_to_forward_port_conflict(env, config, make_repo, users):
 
     pr2_c = r2.get_pr(pr2_c_id.number)
     assert pr2_c.comments == [
-        seen(env, pr2_c, users),
+        (botname, seen(env, pr2_c)),
         # should have conflicts
-        (users['user'], """@{user} cherrypicking of pull request {previous.display_name} failed.
+        (botname, """@{user} cherrypicking of pull request {previous.display_name} failed.
 
 stdout:
 ```
@@ -397,7 +397,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """.format(project=project, previous=pr2_b_id, **users))
     ]
 
-def test_add_pr_reverse(env, config, make_repo, users):
+def test_add_pr_reverse(env, config, make_repo, users, botname):
     """Adding new PRs in the same order the ports line up? Preposterous!
     """
     # region setup
@@ -449,7 +449,7 @@ def test_add_pr_reverse(env, config, make_repo, users):
     assert pr2_c_id.batch_id == pr1_c_id.batch_id
     # since c is the last branch, nothing should happen?
     assert pr2_c.comments == [
-        seen(env, pr2_c, users),
+        (botname, seen(env, pr2_c)),
     ]
 
     # now add a PR before it
@@ -466,7 +466,7 @@ def test_add_pr_reverse(env, config, make_repo, users):
     assert pr2_c_id.source_id == pr2_b_id
 
 
-def test_add_pr_reverse2(env, config, make_repo, users):
+def test_add_pr_reverse2(env, config, make_repo, users, botname):
     """Same as previous, but the later batch gets merged before we even add the PR in the middle batch
     """
     # region setup
@@ -518,7 +518,7 @@ def test_add_pr_reverse2(env, config, make_repo, users):
     assert pr2_c_id.batch_id == pr1_c_id.batch_id
     # since c is the last branch, nothing should happen?
     assert pr2_c.comments == [
-        seen(env, pr2_c, users),
+        (botname, seen(env, pr2_c)),
     ]
     pr1_c = r1.get_pr(pr1_c_id.number)
     with r1, r2:

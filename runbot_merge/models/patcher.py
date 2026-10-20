@@ -266,20 +266,21 @@ class Patch(models.Model):
         if not selected:
             return True
 
-        repo_info = {
-            r: {
-                'local': git.get_local(r).text(),
+        repo_info = {}
+        for r in patches.repository:
+            url, user, password = r._git()
+            repo_info[r] = {
+                'url': url,
+                'local': git.get_local(r).text().with_credentials(user, password),
                 'with_commit': self.browse(),
                 'target_head': None,
             }
-            for r in patches.repository
-        }
         for p in patches.filtered('commit'):
             repo_info[p.repository]['with_commit'] |= p
 
         for repo, info in repo_info.items():
+            remote = info['url']
             r = info['local']
-            remote = git.source_url(repo)
             if r.check(False).fetch(
                 remote,
                 f"+refs/heads/{target.name}:refs/heads/{target.name}",
@@ -348,7 +349,7 @@ class Patch(models.Model):
             res = r.check(False).stdout()\
                 .with_config(encoding="utf-8")\
                 .push(
-                    git.source_url(patch.repository),
+                    info['url'],
                     f"{c}:{target.name}",
                     f"--force-with-lease={target.name}:{sha}",
                 )

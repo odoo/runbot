@@ -90,20 +90,20 @@ def test_incomplete_statuses_request(env, project, make_repo, users, setreviewer
     'success', 'failure', 'pending', 'error',
 ])
 def test_complete_statuses_norequest(
-    env, project, make_repo, users, setreviewers, config, status
-):
+    env, project, make_repo, users, setreviewers, config, status, botname):
     """If *any* status has been sent on the status we don't trigger the
     request.
     """
     project.request_missing_statuses = True
-    repo = make_repo('repo')
+    repo = make_repo('repo', hooks=project.github_id.method == 'pat')
     env['runbot_merge.repository'].create({
         'project_id': project.id,
         'name': repo.name,
         'status_ids': [(0, 0, {'context': 'l/azy'}), (0, 0, {'context': 'o/ptional', 'prs': 'optional'})]
     })
     setreviewers(*project.repo_ids)
-    env['runbot_merge.events_sources'].create({'repository': repo.name})
+    if project.github_id.method == 'pat':
+        env['runbot_merge.events_sources'].create({'repository': repo.name})
 
     with repo:
         m = repo.make_commits(None, Commit('root', tree={'a': '1'}), ref='heads/master')
@@ -120,12 +120,12 @@ def test_complete_statuses_norequest(
     assert env['saas.calls'].search([]) == env['saas.calls']
     if status not in ('error', 'failure'):
         assert pr.comments == [
-            seen(env, pr, users),
+            (botname, seen(env, pr)),
             (users['reviewer'], 'hansen r+'),
         ]
     else:
         assert pr.comments == [
-            seen(env, pr, users),
+            (botname, seen(env, pr)),
             (users['reviewer'], 'hansen r+'),
-            (users['user'], "@{reviewer} you may want to rebuild or fix this PR as it has failed CI.".format_map(users)),
+            (botname, "@{reviewer} you may want to rebuild or fix this PR as it has failed CI.".format_map(users)),
         ]

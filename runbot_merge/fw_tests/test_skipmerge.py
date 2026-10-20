@@ -6,7 +6,7 @@ import pytest
 from utils import make_basic, Commit, to_pr, REF_PATTERN, seen, matches
 
 
-def test_base(env, config, make_repo, users, page):
+def test_base(env, config, make_repo, users, page, botname):
     prod, other = make_basic(env, config, make_repo, statuses='default')
 
     b_head = prod.commit('b')
@@ -34,8 +34,8 @@ def test_base(env, config, make_repo, users, page):
     assert pr0_id.number == pr0.number
     assert pr0.comments == [
         (users['reviewer'], 'hansen fw=skipmerge'),
-        seen(env, pr0, users),
-        (users['user'], "Starting forward-port. Not waiting for merge to create followup forward-ports."),
+        (botname, seen(env, pr0)),
+        (botname, "Starting forward-port. Not waiting for merge to create followup forward-ports."),
     ]
 
     assert pr1_id.parent_id == pr0_id
@@ -51,8 +51,8 @@ def test_base(env, config, make_repo, users, page):
     }
     pr1 = prod.get_pr(pr1_id.number)
     assert pr1.comments == [
-        seen(env, pr1, users),
-        (users['user'], """\
+        (botname, seen(env, pr1)),
+        (botname, """\
 This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.
 
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
@@ -70,8 +70,8 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     }
     pr2 = prod.get_pr(pr2_id.number)
     assert pr2.comments == [
-        seen(env, pr2, users),
-        (users['user'], """\
+        (botname, seen(env, pr2)),
+        (botname, """\
 @%s this PR targets c and is the last of the forward-port chain containing:
 * %s
 
@@ -83,7 +83,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
             users['user'],
             pr1_id.display_name,
     )),
-        (users['user'], "@%s this forward port of %s is awaiting action (not merged or closed)." % (
+        (botname, "@%s this forward port of %s is awaiting action (not merged or closed)." % (
             users['user'],
             pr0_id.display_name,
         ))
@@ -317,7 +317,7 @@ def test_conflict_recovery_manual(env, config, make_repo, users, page):
     env.run_crons()
     assert pr1.head == pr1_head, "since PR1 is detached the update to pr0 should not propagate"
 
-def test_suppress_ping_on_conflict(env, config, make_repo, users):
+def test_suppress_ping_on_conflict(env, config, make_repo, users, botname):
     """The default ping-on-conflict is useful to notify the author that they
     will need an action to resume forward porting.
 
@@ -346,8 +346,8 @@ def test_suppress_ping_on_conflict(env, config, make_repo, users):
     pr1_2 = r1.get_pr(pr1_2_id.number)
     project = env['runbot_merge.project'].search([])
     assert pr1_2.comments == [
-        seen(env, pr1_2, users),
-        (users['user'], f"""\
+        (botname, seen(env, pr1_2)),
+        (botname, f"""\
 cherrypicking of pull request {pr1_1_id.display_name} failed.
 
 stdout:
@@ -374,8 +374,8 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     ])
     pr2_2 = r2.get_pr(pr2_2_id.number)
     assert pr2_2.comments == [
-        seen(env, pr2_2, users),
-        (users['user'], f"""\
+        (botname, seen(env, pr2_2)),
+        (botname, f"""\
 while this was properly forward-ported, at least one co-dependent PR ({pr1_2_id.display_name}) did not succeed. You will need to fix it before this can be merged.
 
 Both this PR and the others will need to be approved via `@{project.github_prefix} r+` as they are all considered “in conflict”.
@@ -385,7 +385,7 @@ More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
     ]
 
 
-def test_suppress_ping_on_update(env, config, make_repo, users):
+def test_suppress_ping_on_update(env, config, make_repo, users, botname):
     """By default, if a PR is updated and its parent is merged, that parent gets
     a notification. However, in the case of skipmerge such updates are more
     likely than not, leading to unnecessary amounts of notifications. We can
@@ -415,18 +415,18 @@ def test_suppress_ping_on_update(env, config, make_repo, users):
     env.run_crons()
 
     assert pr2.comments == [
-        seen(env, pr2, users),
-        (users['user'], "This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.\n\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n"),
+        (botname, seen(env, pr2)),
+        (botname, "This PR targets b and is part of the forward-port chain. Further PRs will be created up to c.\n\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n"),
     ]
     assert pr1.comments == [
         (users['reviewer'], "hansen fw=skipmerge"),
-        seen(env, pr1, users),
-        (users['user'], "Starting forward-port. Not waiting for merge to create followup forward-ports."),
-        (users['user'], f"child PR {pr2_id.display_name} has become a normal PR because head updated from {oldhead} to {c}. This PR (and any of its parents) will need to be merged independently as approvals won't cross."),
+        (botname, seen(env, pr1)),
+        (botname, "Starting forward-port. Not waiting for merge to create followup forward-ports."),
+        (botname, f"child PR {pr2_id.display_name} has become a normal PR because head updated from {oldhead} to {c}. This PR (and any of its parents) will need to be merged independently as approvals won't cross."),
     ]
 
 
-def test_forwardport_resume_skipmerge(env, config, make_repo, users):
+def test_forwardport_resume_skipmerge(env, config, make_repo, users, botname):
     prod, _ = make_basic(env, config, make_repo, statuses='default')
 
     with prod:
@@ -487,8 +487,8 @@ def test_forwardport_resume_skipmerge(env, config, make_repo, users):
 
     project = env['runbot_merge.project'].search([])
     assert pr1.comments == [
-        seen(env, pr1, users),
-        (users['user'], f"""\
+        (botname, seen(env, pr1)),
+        (botname, f"""\
 @{users['user']} @{users['reviewer']} cherrypicking of pull request {pr0_id.display_name} failed.
 
 stdout:
@@ -507,13 +507,13 @@ Either perform the forward-port manually (and push to this branch, proceeding as
 More info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port
 """),
         (users['reviewer'], "hansen fw=skipmerge"),
-        (users['user'], "Forcing all forward ports."),
+        (botname, "Forcing all forward ports."),
     ]
 
     pr2 = prod.get_pr(pr2_id.number)
     assert pr2.comments == [
-        seen(env, pr2, users),
-        (users['user'], f"""\
+        (botname, seen(env, pr2)),
+        (botname, f"""\
 @{users['user']} @{users['reviewer']} this PR targets c and is the last of the forward-port chain.
 
 To merge the full chain, use

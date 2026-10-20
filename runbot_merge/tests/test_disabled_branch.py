@@ -3,7 +3,7 @@ import pytest
 from utils import seen, Commit, pr_page, to_pr
 
 
-def test_existing_pr_disabled_branch(env, project, repo, config, users, page):
+def test_existing_pr_disabled_branch(env, project, repo, config, users, page, botname):
     """ PRs to disabled branches are ignored, but what if the PR exists *before*
     the branch is disabled?
     """
@@ -63,15 +63,15 @@ def test_existing_pr_disabled_branch(env, project, repo, config, users, page):
     env.run_crons()
     assert pr.comments == [
         (users['reviewer'], "hansen r+"),
-        seen(env, pr, users),
-        (users['user'], "@%(user)s @%(reviewer)s the target branch 'other' has been disabled, you may want to close this PR." % users),
+        (botname, seen(env, pr)),
+        (botname, "@%(user)s @%(reviewer)s the target branch 'other' has been disabled, you may want to close this PR." % users),
     ]
 
     with repo:
         [c2] = repo.make_commits(ot, Commit('wheee', tree={'b': '3'}), ref=pr.ref, make=False)
     env.run_crons()
     assert pr.comments[3] == (
-        users['user'],
+        botname,
         "This PR targets the disabled branch {repository}:{target}, it needs to be retargeted before it can be merged.".format(
             repository=repo.name,
             target="other",
@@ -87,7 +87,7 @@ def test_existing_pr_disabled_branch(env, project, repo, config, users, page):
 
     assert pr.comments[4:] == [
         (users['reviewer'], 'hansen rebase-ff r+'),
-        (users['user'], "Merge method set to rebase and fast-forward."),
+        (botname, "Merge method set to rebase and fast-forward."),
     ]
 
     assert pr_id.state == 'ready'
@@ -97,7 +97,7 @@ def test_existing_pr_disabled_branch(env, project, repo, config, users, page):
     # staging of `pr` should have generated a staging branch
     _ = repo.get_ref('heads/staging.other2')
 
-def test_new_pr_no_branch(env, project, repo, users):
+def test_new_pr_no_branch(env, project, repo, users, botname):
     """ A new PR to an *unknown* branch should be ignored and warn
     """
 
@@ -113,10 +113,10 @@ def test_new_pr_no_branch(env, project, repo, users):
     with pytest.raises(TimeoutError):
         to_pr(env, pr, attempts=1)
     assert pr.comments == [
-        (users['user'], "This PR targets the un-managed branch %s:other, it needs to be retargeted before it can be merged." % repo.name),
+        (botname, "This PR targets the un-managed branch %s:other, it needs to be retargeted before it can be merged." % repo.name),
     ]
 
-def test_new_pr_disabled_branch(env, project, repo, users):
+def test_new_pr_disabled_branch(env, project, repo, users, botname):
     """ A new PR to a *disabled* branch should be accepted (rather than ignored)
     but should warn
     """
@@ -134,11 +134,11 @@ def test_new_pr_disabled_branch(env, project, repo, users):
     assert pr_id, "the PR should have been created in the backend"
     assert pr_id.state == 'opened'
     assert pr.comments == [
-        (users['user'], "This PR targets the disabled branch %s:other, it needs to be retargeted before it can be merged." % repo.name),
-        seen(env, pr, users),
+        (botname, "This PR targets the disabled branch %s:other, it needs to be retargeted before it can be merged." % repo.name),
+        (botname, seen(env, pr)),
     ]
 
-def test_review_disabled_branch(env, project, repo, users, config):
+def test_review_disabled_branch(env, project, repo, users, config, botname):
     with repo:
         [m] = repo.make_commits(None, Commit("init", tree={'m': 'm'}), ref='heads/master')
 
@@ -155,14 +155,14 @@ def test_review_disabled_branch(env, project, repo, users, config):
     env.run_crons()
 
     assert pr.comments == [
-        seen(env, pr, users),
-        (users['user'], "@{user} the target branch {target!r} has been disabled, you may want to close this PR.".format(
+        (botname, seen(env, pr)),
+        (botname, "@{user} the target branch {target!r} has been disabled, you may want to close this PR.".format(
             **users,
             target=target.name,
         )),
         (users['other'], "A normal comment"),
         (users['reviewer'], "hansen r+"),
-        (users['user'], "This PR targets the disabled branch {repository}:{target}, it needs to be retargeted before it can be merged.".format(
+        (botname, "This PR targets the disabled branch {repository}:{target}, it needs to be retargeted before it can be merged.".format(
             repository=repo.name,
             target=target.name,
         )),

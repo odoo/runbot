@@ -4,8 +4,8 @@ import hashlib
 import hmac
 import logging
 import json
+import typing
 from datetime import datetime, timedelta
-from typing import Callable
 
 import psycopg2.errors
 from werkzeug.exceptions import NotFound, UnprocessableEntity
@@ -13,6 +13,7 @@ from werkzeug.exceptions import NotFound, UnprocessableEntity
 from odoo.api import Environment
 from odoo.http import Controller, request, route, Response
 
+from . import apps
 from . import dashboard
 from . import misc
 from . import reviewer_provisioning
@@ -101,33 +102,53 @@ class MergebotController(Controller):
         return request.make_json_response([staging_dict(staging) for staging in stagings])
 
     @route('/runbot_merge/hooks', auth='none', type='http', csrf=False, methods=['POST'])
-    def index(self) -> Response:
+    def webhooks(self) -> Response:
         req = request.httprequest
-        event = req.headers['X-Github-Event']
         github._gh.getChild('hook').info(self._format(req))
 
         env = request.env(user=1)
         data = request.get_json_data()
-        if event == 'ping':
-            return handle_ping(env, request.get_json_data())
 
-        repo = data.get('repository', {}).get('full_name')
-        source = repo and env['runbot_merge.events_sources'].search([('repository', '=', repo)])
+        target = req.headers.get('X-Github-Hook-Installation-Target-Type')
+        target_id = req.headers.get('X-Github-Hook-Installation-Target-Id')
+        match target:
+            case 'repository':
+                # TODO: store repo ids and use that instead of name-based?
+                sourcename = data.get('repository', {}).get('full_name')
+                source = sourcename and env['runbot_merge.events_sources'].search([('repository', '=', sourcename)])
+                secret = source and source.secret
+            case 'integration':
+                connector_ = env['runbot_merge.github_connector']
+                source = connector_.search([('app_id', '=', int(target_id))])
+                sourcename = source.name
+                # TODO: also filter on repository?
+                secret = source.webhook_secret
+            case it:
+                _logger.warning(
+                    "Ignored hook %s with unknown installation type %s",
+                    req.headers.get('X-Github-Delivery'),
+                    it,
+                )
+                return Response(status=400, mimetype="text/plain")
+
         if not source:
             _logger.warning(
-                "Ignored hook %s to unknown source repository %s",
+                "Ignored hook %s (%s) to unknown source repository %s (%s:%s)",
                 req.headers.get("X-Github-Delivery"),
-                repo,
+                req.headers.get("X-Github-Event"),
+                sourcename,
+                target,
+                target_id,
             )
             return Response(status=403, mimetype="text/plain")
-        elif secret := source.secret:
+        elif secret:
             signature = 'sha256=' + hmac.new(secret.strip().encode(), req.get_data(), hashlib.sha256).hexdigest()
-            if not hmac.compare_digest(signature, req.headers.get('X-Hub-Signature-256', '')):
+            if not hmac.compare_digest(signature, sig := req.headers.get('X-Hub-Signature-256', '')):
                 _logger.warning(
                     "Ignored hook %s with incorrect signature on %s: got %s expected %s, in:\n%s",
                     req.headers.get('X-Github-Delivery'),
-                    repo,
-                    req.headers.get('X-Hub-Signature-256'),
+                    sourcename,
+                    sig,
                     signature,
                     req.headers,
                 )
@@ -136,22 +157,74 @@ class MergebotController(Controller):
             _logger.warning(
                 "Ignored hook %s with signature but no secret on %s",
                 req.headers.get('X-Github-Delivery'),
-                repo,
+                sourcename,
             )
             return Response(status=501, mimetype="text/plain")
         else:
-            _logger.info("No secret or signature for %s", repo)
-
-        c = EVENTS.get(event)
-        if not c:
-            _logger.warning('Unknown event %s', event)
-            return Response(
-                status=422,
-                mimetype="text/plain",
-                response="Not setup to receive event.",
+            _logger.info(
+                "Hook %s: no secret or signature for %s",
+                req.headers.get('X-Github-Delivery'),
+                sourcename,
             )
 
-        return c(env, data)
+        match req.headers['X-Github-Event']:
+            case 'ping':
+                return handle_ping(env, data)
+            case 'installation':
+                installation = data['installation']
+                app = env['runbot_merge.github_connector'].search([
+                    ('client_id', '=', installation['client_id']),
+                ])
+                match data['action']:
+                    case 'created':
+                        _logger.info("created installation %s for %s", installation['id'], app)
+                        env['runbot_merge.github_connector.installation'].create({
+                            'connector_id': app.id,
+                            'installation_id': installation['id'],
+                            'owner_id': installation['account']['id'],
+                            'owner_login': installation['account']['login'],
+                            'repository_selection': installation['repository_selection'],
+                            # TODO: repositories
+                        })
+                    case 'deleted':
+                        _logger.info("deleted installation %s for %s", installation['id'], app)
+                        env['runbot_merge.github_connector.installation'].search([
+                            ('connector_id', '=', app.id),
+                            ('installation_id', '=', installation['id']),
+                        ]).unlink()
+                    case ('suspend' | 'unsuspend' | 'new_permissions_accepted') as act:
+                        _logger.info("ignored installation action %r", act)
+                    case act:
+                        _logger.warning("unknown installation action %r", act)
+                return Response(mimetype="text/plain", response="ok")
+            case 'installation_repositories':
+                # TODO note that this is kinda shit, needs to characterise but
+                #      - despite both `added` and `removed` having
+                #        `repositories_added` and `repositories_removed` keys,
+                #        only the corresponding key is non-empty
+                #      - when switching between repository selection modes, you
+                #        always get ADD, no indication of the actual change,
+                #        and the repos to which access is now granted
+                #      - in `selected` mode, both adding and removing repos
+                #        triggers both events one after the other
+                #      - if selection_mode=all, I think repos being created or
+                #        deleted triggers added/removed events, to check
+                return Response(mimetype="text/plain", response="ok")
+            case 'pull_request':
+                return handle_pr(env, data)
+            case 'status':
+                return handle_status(env, data)
+            case 'issue_comment':
+                return handle_comment(env, data)
+            case 'pull_request_review':
+                return handle_review(env, data)
+            case event:
+                _logger.warning('Unknown event %s', event)
+                return Response(
+                    status=422,
+                    mimetype="text/plain",
+                    response="Not setup to receive event.",
+                )
 
     def _format(self, request):
         headers = '\n'.join('\t%s: %s' % entry for entry in request.headers.items())
@@ -510,14 +583,6 @@ def handle_review(env: Environment, event: dict) -> Response:
 def handle_ping(env: Environment, event: dict) -> Response:
     _logger.info("Got ping! %s", event['zen'])
     return Response(mimetype="text/plain", response="pong")
-
-EVENTS: dict[str, Callable[[Environment, dict], Response]] = {
-    'pull_request': handle_pr,
-    'status': handle_status,
-    'issue_comment': handle_comment,
-    'pull_request_review': handle_review,
-    'ping': handle_ping,
-}
 
 def _handle_comment(
         env: Environment,

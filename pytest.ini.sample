@@ -10,8 +10,11 @@ filterwarnings =
     error::
     ignore::DeprecationWarning
     ignore:pkg_resources:UserWarning
-;; 15mn per test including setup as it can get stuck
-timeout=900
+    ;; `webbrowser.open`  leaves subprocesses dangling when it selects a
+    ;; background browser
+    ignore:subprocess \d+ is still running:ResourceWarning
+;; 30mn per test including setup as it can get stuck
+timeout=1800
 ;; not sure it's necessary but doesn't seem harmful
 consider_namespace_packages = True
 ;; show full diff by default on assertion failure (if applicable)

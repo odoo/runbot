@@ -31,17 +31,10 @@ class Feedback(models.Model):
     message = fields.Char()
     close = fields.Boolean()
     reaction = fields.Char()
-    token_field = fields.Selection(
-        [('github_token', "Mergebot"), ('fp_github_token', 'Forwardport Bot')],
-        default='github_token',
-        string="Bot User",
-        help="Token field (from repo's project) to use to post messages"
-    )
 
     def _process_item(self):
         repo = self.repository
-        gh = repo.github(self.token_field)
-
+        gh = repo.github()
         message = self.message
         with contextlib.suppress(json.JSONDecodeError):
             data = json.loads(message or '')
@@ -107,15 +100,13 @@ class FeedbackTemplate(models.Model):
     def _format(self, **args):
         return self.template.format_map(args)
 
-    def _send(self, *, repository: Repository, pull_request: int, format_args: dict, token_field: Optional[str] = None) -> Optional[Feedback]:
+    def _send(self, *, repository: Repository, pull_request: int, format_args: dict) -> Feedback:
         try:
             feedback = {
                 'repository': repository.id,
                 'pull_request': pull_request,
                 'message': self.template.format_map(format_args),
             }
-            if token_field:
-                feedback['token_field'] = token_field
             return self.env['runbot_merge.pull_requests.feedback'].create(feedback)
         except Exception:
             _logger.exception("Failed to render template %s", self.get_external_id())

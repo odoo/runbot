@@ -20,7 +20,12 @@ def name_search(Model, name):
 def test_finding(env):
     project = env['runbot_merge.project'].create({
         'name': 'test',
-        'github_token': 'xxx', 'github_prefix': 'no',
+        'github_id': env['runbot_merge.github_connector'].create({
+            'name': "PAT",
+            'method': 'pat',
+            'main_pat': 'xxx',
+        }).id,
+        'github_prefix': 'no',
         'github_name': "xxx", 'github_email': "xxx@example.org",
     })
     repo_1 = env['runbot_merge.repository'].create({'project_id': project.id, 'name': 'r1'})
@@ -52,7 +57,7 @@ def test_finding(env):
         'partner_id': partner.id,
     }), id="byacl"),
 ])
-def test_basic(env, project, make_repo, users, setreviewers, config, setoverride):
+def test_basic(env, project, make_repo, users, setreviewers, config, setoverride, botname):
     """
     Test that we can override a status on a PR:
 
@@ -60,14 +65,15 @@ def test_basic(env, project, make_repo, users, setreviewers, config, setoverride
     * target url should be the comment (?)
     * description should be overridden by <user>
     """
-    repo = make_repo('repo')
+    repo = make_repo('repo', hooks=project.github_id.method == 'pat')
     repo_id = env['runbot_merge.repository'].create({
         'project_id': project.id,
         'name': repo.name,
         'status_ids': [(0, 0, {'context': 'l/int'})]
     })
     setreviewers(*project.repo_ids)
-    env['runbot_merge.events_sources'].create({'repository': repo.name})
+    if project.github_id.method == 'pat':
+        env['runbot_merge.events_sources'].create({'repository': repo.name})
     # "other" can override the lint
     partner = env['res.partner'].create({
         'name': config['role_other'].get('name', 'Other'),
@@ -99,9 +105,9 @@ def test_basic(env, project, make_repo, users, setreviewers, config, setoverride
     comments = pr.comments
     assert comments == [
         (users['reviewer'], 'hansen r+'),
-        seen(env, pr, users),
+        (botname, seen(env, pr)),
         (users['reviewer'], 'hansen override=l/int'),
-        (users['user'], f"@{users['reviewer']} you can't override=l/int."),
+        (botname, f"@{users['reviewer']} you can't override=l/int."),
         (users['other'], "hansen override=l/int"),
     ]
     assert pr_id.statuses == '{}'
@@ -115,14 +121,15 @@ def test_multiple(env, project, make_repo, users, setreviewers, config):
     """ Test that overriding multiple statuses in the same comment works
     """
 
-    repo = make_repo('repo')
+    repo = make_repo('repo', hooks=project.github_id.method == 'pat')
     repo_id = env['runbot_merge.repository'].create({
         'project_id': project.id,
         'name': repo.name,
         'status_ids': [(0, 0, {'context': 'l/int'}), (0, 0, {'context': 'c/i'})]
     })
     setreviewers(*project.repo_ids)
-    env['runbot_merge.events_sources'].create({'repository': repo.name})
+    if project.github_id.method == 'pat':
+        env['runbot_merge.events_sources'].create({'repository': repo.name})
     # "other" can override the lints
     env['res.partner'].create({
         'name': config['role_other'].get('name', 'Other'),
@@ -174,17 +181,18 @@ def test_multiple(env, project, make_repo, users, setreviewers, config):
             },
         }
 
-def test_no_repository(env, project, make_repo, users, setreviewers, config):
+def test_no_repository(env, project, make_repo, users, setreviewers, config, botname):
     """ A repo missing from an override allows overriding the status in every repo
     """
-    repo = make_repo('repo')
+    repo = make_repo('repo', hooks=project.github_id.method == 'pat')
     env['runbot_merge.repository'].create({
         'project_id': project.id,
         'name': repo.name,
         'status_ids': [(0, 0, {'context': 'l/int'})]
     })
     setreviewers(*project.repo_ids)
-    env['runbot_merge.events_sources'].create({'repository': repo.name})
+    if project.github_id.method == 'pat':
+        env['runbot_merge.events_sources'].create({'repository': repo.name})
     # "other" can override the lint
     env['res.partner'].create({
         'name': config['role_other'].get('name', 'Other'),
@@ -211,7 +219,7 @@ def test_no_repository(env, project, make_repo, users, setreviewers, config):
     comments = pr.comments
     assert comments == [
         (users['reviewer'], 'hansen r+'),
-        seen(env, pr, users),
+        (botname, seen(env, pr)),
         (users['other'], "hansen override=l/int"),
     ]
     assert pr_id.statuses == '{}'

@@ -650,7 +650,8 @@ def test_solve_case(env, project, repo, users, config, on_fail, cutoff):
     )
 
     # fail toplevel (4) -> 2 -> 1
-    for _ in range(3):
+    for staged in [pr_ids[:4], pr_ids[:2], pr_ids[:1]]:
+        assert env['runbot_merge.stagings'].search([('target.name', '=', 'master')]).pr_ids == staged
         with repo:
             repo.post_status('staging.master', 'failure')
         env.run_crons()

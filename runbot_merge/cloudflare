@@ -1,0 +1,57 @@
+#!/usr/bin/env python
+import os
+import re
+import signal
+import socket
+import subprocess
+import sys
+import threading
+import time
+from urllib.parse import urlsplit
+
+port = int(sys.argv[1])
+addr = f"http://localhost:{port}"
+
+shutdown = threading.Event()
+def cleanup(_sig, _frame):
+    shutdown.set()
+# don't know why but signal.sigwait doesn't seem to take SIGTERM in account so
+# we need the cursed version
+signal.signal(signal.SIGTERM, cleanup)
+signal.signal(signal.SIGINT, cleanup)
+
+cloudflared = subprocess.Popen(
+    ['cloudflared', 'tunnel', '--url', addr],
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.PIPE,
+    encoding='utf-8',
+)
+
+tunnel_url = None
+for line in cloudflared.stderr:
+    if m := re.search(r'https://.*\.trycloudflare\.com', line):
+        tunnel_url = m[0]
+        break
+
+# give cf some time upfront, it can cake 10~15 total
+time.sleep(5.0)
+# wait until the server is listening before returning the URL, as apparently the
+# "registering tunnel connection" line isn't quite it...
+url = urlsplit(tunnel_url)
+while True:
+    time.sleep(1.0)
+    try:
+        socket.create_connection((url.hostname, url.port or 443)).close()
+    except OSError:
+        pass # name isn't even available yet
+    else:
+        break
+
+print(tunnel_url, flush=True)
+# sys.stdout is close_fds=False, so need to close the underlying fd manually
+os.close(sys.stdout.fileno())
+
+shutdown.wait()
+
+cloudflared.terminate()
+cloudflared.wait(30)

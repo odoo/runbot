@@ -10,7 +10,7 @@ from markupsafe import Markup
 from psycopg2 import sql
 
 from odoo import models, fields, api
-from .pull_requests import ForwardPortError, PullRequests
+from .pull_requests import ForwardPortError, PullRequests, Repository
 from .utils import EnumSelection
 from .. import git
 
@@ -239,24 +239,33 @@ class Batch(models.Model):
             return
 
         proj = self.target.project_id
-        if not proj.fp_github_token:
-            _logger.warning(
-                "Can not forward-port %s (%s): no token on project %s",
-                self,
-                ', '.join(self.prs.mapped('display_name')),
-                proj.name
-            )
+        if not proj.fp_enabled:
+            remoteless = proj.repo_ids.filtered(lambda r: not r.fp_remote_target)
+            if remoteless == proj.repo_ids:
+                _logger.info(
+                    "Skipping forward-port of %s (%s): not enabled",
+                    self,
+                    ', '.join(self.prs.mapped('display_name')),
+                )
+            else:
+                _logger.warning(
+                    "Can not forward port %s (%s): repositories %s do not have a forward port remote configured",
+                    self,
+                    ', '.join(self.prs.mapped('display_name')),
+                    ", ".join(repr(r.name) for r in remoteless)
+                )
             return
 
-        notarget = [r.name for r in self.prs.repository if not r.fp_remote_target]
-        if notarget:
-            _logger.error(
-                "Can not forward-port %s (%s): repos %s don't have a forward port remote configured",
-                self,
-                ', '.join(self.prs.mapped('display_name')),
-                ', '.join(notarget),
-            )
-            return
+        for pr in self.prs:
+            repo = pr.repository
+            if not repo.project_id.github_id._fp_token(repo):
+                _logger.warning(
+                    "Can not forward-port %s (%s): no token for repository %s",
+                    self,
+                    ', '.join(self.prs.mapped('display_name')),
+                    repo.name
+                )
+                return
 
         all_targets = [p._find_next_target() for p in self.prs]
 
@@ -292,7 +301,6 @@ class Batch(models.Model):
                     self.env.ref('runbot_merge.forwardport.failure.discrepancy')._send(
                         repository=pr.repository,
                         pull_request=pr.number,
-                        token_field='fp_github_token',
                         format_args={'pr': pr, 'linked': linked, 'next': t.name, 'other': other.name},
                     )
             _logger.warning(
@@ -322,9 +330,10 @@ class Batch(models.Model):
         conflicts = {}
         commits_count = {}
         for pr in prs:
-            repo = git.get_local(pr.repository)
+            url, user, password = pr.repository._fw_git()
+            repo = git.get_local(pr.repository).with_credentials(user, password)
             conflicts[pr], head, commits_count[pr] = pr._create_port_branch(repo, target, forward=True)
-            r = repo.check(False).push(git.fw_url(pr.repository), f"{head}:refs/heads/{new_branch}")
+            r = repo.check(False).push(url, f"{head}:refs/heads/{new_branch}")
             if r.returncode:
                 self._delete_fw_branches(conflicts.keys(), new_branch)
 
@@ -332,8 +341,6 @@ class Batch(models.Model):
                     f"Unable to push forward-port branch for {pr.display_name}:\n{r.stderr.decode()}"
                 )
 
-        gh = requests.Session()
-        gh.headers['Authorization'] = f'token {proj.fp_github_token}'
         has_conflicts = any(conflicts.values())
         # could create a batch here but then we'd have to update `_from_gh` to
         # take a batch and then `create` to not automatically resolve batches,
@@ -350,13 +357,18 @@ class Batch(models.Model):
                 for p in root | source
             )
 
+            token = proj.github_id._fp_token(pr.repository.name)
             title, body = re.fullmatch(r'(?P<title>[^\n]+)\n*(?P<body>.*)', message, flags=re.DOTALL).groups()
-            r = gh.post(f'https://api.github.com/repos/{pr.repository.name}/pulls', json={
-                'base': target.name,
-                'head': f'{owner}:{new_branch}',
-                'title': title,
-                'body': body
-            })
+            r = requests.post(
+                f'https://api.github.com/repos/{pr.repository.name}/pulls',
+                headers={'Authorization': f'token {token}'},
+                json={
+                    'base': target.name,
+                    'head': f'{owner}:{new_branch}',
+                    'title': title,
+                    'body': body
+                }
+            )
             if not r.ok:
                 _logger.warning("Failed to create forward-port PR for %s, deleting branches", pr.display_name)
                 # delete all the branches this should automatically close the
@@ -384,7 +396,6 @@ class Batch(models.Model):
                 self.env.ref('runbot_merge.forwardport.failure.conflict')._send(
                     repository=pr.repository,
                     pull_request=pr.number,
-                    token_field='fp_github_token',
                     format_args={'source': source, 'pr': pr._suppress_ping(), 'new': new_pr, 'footer': FOOTER},
                 )
 
@@ -423,9 +434,11 @@ class Batch(models.Model):
 
     def _delete_fw_branches(self, previous_prs: Reversible[PullRequests], new_branch: str) -> None:
         for pr in reversed(previous_prs):
+            url, user, password = pr.repository._fw_git()
             r = git.get_local(pr.repository) \
                 .with_config(check=False) \
-                .push(git.fw_url(pr.repository), f":refs/heads/{new_branch}")
+                .with_credentials(user, password) \
+                .push(url, f":refs/heads/{new_branch}")
             if r.returncode:
                 _logger.warning("Deleting %s:%s=%s", pr.repository.fp_remote_target, new_branch, r.stderr.decode())
                 self.with_context(mail_post_autofollow=True).message_post(

@@ -15,7 +15,7 @@ _logger = logging.getLogger(__name__)
 
 class BatchValidate(models.Model):
     _name = 'runbot_merge.batch.validate'
-    _descrition = "Post-ready / pre-staging validations"
+    _description = "Post-ready / pre-staging validations"
 
     batch_id = fields.Many2one('runbot_merge.batch', index=True)
 
@@ -43,7 +43,7 @@ class BatchValidate(models.Model):
         for pr in validations.batch_id.prs:
             if pr.repository not in to_fetch:
                 to_fetch[pr.repository] = {
-                    'repo': git.get_local(pr.repository).stdout().with_config(text=True),
+                    'repo': git.get_local(pr.repository).stdout().text(),
                     'branches': {f"refs/heads/{pr.target.name}"},
                     'heads': {pr.head},
                 }
@@ -56,7 +56,10 @@ class BatchValidate(models.Model):
             heads = tasks['heads']
             source = tasks['repo']
             # resolve and fetch separately because
-            r = source.check(True).ls_remote(git.source_url(repo), *tasks['branches'])
+            url, user, password = repo._git()
+            r = source.check(True)\
+                .with_credentials(user, password)\
+                .ls_remote(url, *tasks['branches'])
             for line in r.stdout.splitlines(keepends=False):
                 oid, _tab, ref = line.partition('\t')
                 heads.add(oid)

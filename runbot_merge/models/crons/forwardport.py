@@ -99,7 +99,7 @@ class ForwardPortTasks(models.Model):
 
         gh = requests.Session()
         repository = pr.repository
-        gh.headers['Authorization'] = f'token {repository.project_id.fp_github_token}'
+        gh.headers['Authorization'] = f'token {repository.project_id.github_id._fp_token(repository.name)}'
         PullRequests = self.env['runbot_merge.pull_requests']
         self.env.cr.execute('LOCK runbot_merge_pull_requests IN SHARE MODE')
 
@@ -126,7 +126,6 @@ class ForwardPortTasks(models.Model):
                 self.env['runbot_merge.pull_requests.feedback'].create({
                     'repository': repository.id,
                     'pull_request': source.number,
-                    'token_field': 'fp_github_token',
                     'message': """\
 {pr.ping}unable to port this PR forwards due to inconsistency: goes from \
 {pr.target.name} to {next_target.name} but {batch} ({batch_prs}) targets \
@@ -138,9 +137,10 @@ class ForwardPortTasks(models.Model):
             ref = descendant.prs[:1].refname
             # NOTE: ports the new source everywhere instead of porting each
             #       PR to the next step as it does not *stop* on conflict
-            repo = git.get_local(source.repository)
+            url, user, password = source.repository._fw_git()
+            repo = git.get_local(source.repository).with_credentials(user, password)
             conflict, head, n = source._create_port_branch(repo, target, forward=True)
-            repo.push(git.fw_url(pr.repository), f'{head}:refs/heads/{ref}')
+            repo.push(url, f'{head}:refs/heads/{ref}')
 
             remote_target = repository.fp_remote_target
             owner, _ = remote_target.split('/', 1)
@@ -181,7 +181,6 @@ class ForwardPortTasks(models.Model):
                 self.env.ref('runbot_merge.forwardport.failure.conflict')._send(
                     repository=pr.repository,
                     pull_request=pr.number,
-                    token_field='fp_github_token',
                     format_args={'source': source, 'pr': pr._suppress_ping(), 'new': new_pr, 'footer': FOOTER},
                 )
             new_pr._fp_conflict_feedback(pr, {pr: conflict})

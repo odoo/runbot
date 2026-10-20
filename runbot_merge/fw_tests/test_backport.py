@@ -33,7 +33,7 @@ def backport_id(env, pr_id):
     assert backport_id
     return backport_id
 
-def test_golden_path(env, repo, config, pr_id, backport_id, users):
+def test_golden_path(env, repo, config, pr_id, backport_id, users, botname):
     branch_a, branch_b, _branch_c = env['runbot_merge.branch'].search([], order='name')
     backport_id.target = branch_a.id
     act2 = backport_id.action_apply()
@@ -66,9 +66,9 @@ X-original-commit: {pr_id.head}\
     _pr, _backport, fw_id = env['runbot_merge.pull_requests'].search([], order='number')
     fw_pr = repo.get_pr(fw_id.number)
     assert fw_pr.comments == [
-        seen(env, fw_pr, users),
-        (users['user'], '''\
-@{user} @{reviewer} this PR targets b and is the last of the forward-port chain.
+        (botname, seen(env, fw_pr)),
+        (botname, '''\
+@{fp} @{reviewer} this PR targets b and is the last of the forward-port chain.
 
 To merge the full chain, use
 > @hansen r+
