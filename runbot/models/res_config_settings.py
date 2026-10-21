@@ -17,7 +17,6 @@ class ResConfigSettings(models.TransientModel):
     runbot_timeout = fields.Integer('Max step timeout (in seconds)')
     runbot_starting_port = fields.Integer('Starting port for running builds')
     runbot_max_age = fields.Integer('Max commit age (in days)')
-    runbot_logdb_name = fields.Char('Local Logs DB name', default='runbot_logs', config_parameter='runbot.logdb_name')
     runbot_template = fields.Char('Postgresql template', help="Postgresql template to use when creating DB's")
     runbot_message = fields.Text('Frontend warning message', help="Will be displayed on the frontend when not empty")
     runbot_default_odoorc = fields.Text('Default odoorc for builds')
