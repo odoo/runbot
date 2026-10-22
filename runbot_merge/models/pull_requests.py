@@ -15,6 +15,7 @@ import statistics
 import subprocess
 import tempfile
 import typing
+import zlib
 from collections.abc import Iterable, Iterator
 from enum import IntEnum
 from functools import reduce
@@ -29,7 +30,7 @@ from odoo import Command, api, fields, models, tools
 from odoo.addons.base.controllers.rpc import OdooMarshaller
 from odoo.exceptions import UserError, ValidationError
 from odoo.osv import expression
-from odoo.tools import Reverse, groupby, html_escape, mute_logger
+from odoo.tools import Reverse, groupby, html_escape, mute_logger, file_open
 from odoo.tools.safe_eval import safe_eval
 
 from .. import controllers, exceptions, git, github, utils
@@ -2450,10 +2451,17 @@ class Commit(models.Model):
     """
     _name = _description = 'runbot_merge.commit'
     _rec_name = 'sha'
+    _log_access = False
 
     sha = fields.Char(required=True)
-    statuses = fields.Char(help="json-encoded mapping of status contexts to states", default="{}")
+    statuses = fields.Char(
+        help="json-encoded mapping of status contexts to states",
+        compute='_compute_statuses',
+        inverse='_write_statuses',
+    )
+    statuses_compressed = fields.Binary(attachment=False)
     to_check = fields.Boolean(default=False)
+    create_date = fields.Datetime(required=True, default=fields.Datetime.now)
 
     head_ids = fields.Many2many('runbot_merge.stagings', relation='runbot_merge_stagings_heads', column2='staging_id', column1='commit_id')
     commit_ids = fields.Many2many('runbot_merge.stagings', relation='runbot_merge_stagings_commits', column2='staging_id', column1='commit_id')
@@ -2524,6 +2532,11 @@ class Commit(models.Model):
             CREATE INDEX IF NOT EXISTS runbot_merge_to_process
             ON runbot_merge_commit ((1)) WHERE to_check
         """)
+        # disable TOAST compression since values are already compressed
+        self._cr.execute("""
+            ALTER TABLE runbot_merge_commit
+                ALTER COLUMN statuses_compressed SET STORAGE EXTERNAL
+        """)
         return res
 
     def _compute_prs(self):
@@ -2532,6 +2545,37 @@ class Commit(models.Model):
                 ('head', '=', c.sha),
             ])
 
+    @api.depends('statuses_compressed')
+    def _compute_statuses(self):
+        global statuses_decompressor
+        if statuses_decompressor is None:
+            with file_open('runbot_merge/data/runbot_merge.commit.statuses.v1.zdict', 'rb') as f:
+                dec = statuses_decompressor = zlib.decompressobj(wbits=-15, zdict=f.read())
+        else:
+            dec = statuses_decompressor
+
+        for commit in self:
+            if commit.statuses_compressed:
+                d = dec.copy()
+                commit.statuses = (d.decompress(commit.statuses_compressed) + d.flush()).decode()
+            else:
+                commit.statuses = '{}'
+
+    def _write_statuses(self):
+        global statuses_compressor
+        if statuses_compressor is None:
+            with file_open('runbot_merge/data/runbot_merge.commit.statuses.v1.zdict', 'rb') as f:
+                comp = statuses_compressor = zlib.compressobj(level=9, memLevel=9, wbits=-15, zdict=f.read())
+        else:
+            comp = statuses_compressor
+        for commit in self:
+            if commit.statuses and commit.statuses != '{}':
+                c = comp.copy()
+                commit.statuses_compressed = c.compress(commit.statuses.encode()) + c.flush()
+            else:
+                commit.statuses_compressed = False
+
+statuses_compressor = statuses_decompressor = None
 
 class Stagings(models.Model):
     _name = 'runbot_merge.stagings'

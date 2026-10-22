@@ -4,6 +4,8 @@ import hashlib
 import hmac
 import logging
 import json
+import random
+import time
 import typing
 from datetime import datetime, timedelta
 
@@ -12,6 +14,7 @@ from werkzeug.exceptions import NotFound, UnprocessableEntity
 
 from odoo.api import Environment
 from odoo.http import Controller, request, route, Response
+from odoo.service.model import MAX_TRIES_ON_CONCURRENCY_FAILURE
 
 from . import apps
 from . import dashboard
@@ -514,24 +517,44 @@ def handle_status(env: Environment, event: dict) -> Response:
         'status on %(sha)s %(context)s:%(state)s (%(target_url)s) [%(description)r]',
         event
     )
-    status_value = json.dumps({
+    status_value = {
         event['context']: {
             'state': event['state'],
             'target_url': event['target_url'],
             'description': event['description'],
             'updated_at': datetime.now().isoformat(timespec='seconds'),
         }
-    })
-    # create status, or merge update into commit *unless* the update is already
-    # part of the status (dupe status)
-    env.cr.execute("""
-        INSERT INTO runbot_merge_commit AS c (sha, to_check, statuses)
-        VALUES (%s, true, %s)
-        ON CONFLICT (sha) DO UPDATE
-            SET to_check = true,
-                statuses = c.statuses::jsonb || EXCLUDED.statuses::jsonb
-            WHERE NOT c.statuses::jsonb @> EXCLUDED.statuses::jsonb
-    """, [event['sha'], status_value], log_exceptions=False)
+    }
+    for n in range(1, MAX_TRIES_ON_CONCURRENCY_FAILURE+1):
+        try:
+            commit = env['runbot_merge.commit'].search([('sha', '=', event['sha'])])
+            if commit:
+                st = json.loads(commit.statuses)
+                updated = st | status_value
+                if updated != st:
+                    commit.statuses = json.dumps(updated)
+            else:
+                env['runbot_merge.commit'].create({
+                    'sha': event['sha'],
+                    'statuses': json.dumps(status_value),
+                })
+            env.cr.flush()
+            break
+        except (
+            psycopg2.errors.UniqueViolation,
+            psycopg2.errors.SerializationFailure,
+            # shouldn't come into play but might as well also handle these
+            psycopg2.errors.DeadlockDetected,
+            psycopg2.errors.LockNotAvailable,
+        ):
+            env.cr.rollback()
+            env.reset()
+            env.registry.reset_changes()
+            if n == MAX_TRIES_ON_CONCURRENCY_FAILURE:
+                _logger.warning("Serialization failure on statuses", exc_info=True)
+                return Response(status=500)
+            # fuzz sleep as in `retrying`
+            time.sleep(random.uniform(0.0, 2 ** n))
     env.ref("runbot_merge.process_updated_commits")._trigger()
 
     return Response(status=204)

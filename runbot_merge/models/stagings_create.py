@@ -184,8 +184,8 @@ For-Commit-Id: {it.head}
 
             # see above, `DO UPDATE` is necessary for `RETURNING` to work
             env.cr.execute(
-                "INSERT INTO runbot_merge_commit (sha, to_check, statuses) "
-                "VALUES (%s, false, '{}'), (%s, true, '{}') "
+                "INSERT INTO runbot_merge_commit (sha, to_check, create_date) "
+                "VALUES (%s, false, now() at time zone 'UTC'), (%s, true, now() at time zone 'UTC') "
                 "ON CONFLICT (sha) DO UPDATE SET to_check=runbot_merge_commit.to_check "
                 "RETURNING id",
                 [it.head, dummy_head]
@@ -197,8 +197,8 @@ For-Commit-Id: {it.head}
             # one as to-recheck in case there are already statuses we want to
             # propagate to the staging or something
             env.cr.execute(
-                "INSERT INTO runbot_merge_commit (sha, to_check, statuses) "
-                "VALUES (%s, true, '{}') "
+                "INSERT INTO runbot_merge_commit (sha, to_check, create_date) "
+                "VALUES (%s, true, now() at time zone 'UTC') "
                 "ON CONFLICT (sha) DO UPDATE SET to_check=true "
                 "RETURNING id",
                 [it.head]
