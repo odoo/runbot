@@ -5,8 +5,11 @@
         <field name="arch" type="xml">
             <form>
                 <group>
-                    <group colspan="4"><field name="reason"/></group>
-                    <group colspan="4"><field name="cancel_splits"/></group>
+                    <group colspan="4">
+                        <field name="reason"/>
+                        <field name="retry"/>
+                        <field name="cancel_splits"/>
+                    </group>
                 </group>
                 <footer>
                     <button string="Confirm" name="action_cancel" type="object" class="btn btn-primary"/>
