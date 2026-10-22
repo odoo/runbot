@@ -78,16 +78,22 @@ class Runbot(models.AbstractModel):
         self._commit()
         return processed
 
+    def _get_build_to_assign(self):
+        non_allocated_domain = [('local_state', '=', 'pending'), ('host', '=', False)]
+        build_to_assign = self.env['runbot.build'].search(non_allocated_domain, order='priority_level')
+        waiting_builds = build_to_assign.filtered(lambda b: b.params_id.reference_build_id and b.params_id.reference_build_id.local_state not in ('running', 'done'))
+        build_to_assign -= waiting_builds
+        priority_builds = build_to_assign.filtered(lambda b: b.build_type == 'priority' or b.config_id.use_extra_slot)
+        build_to_assign -= priority_builds
+        scheduled_builds = build_to_assign.filtered(lambda b: b.build_type == 'scheduled')
+        normal_builds = build_to_assign - scheduled_builds
+        return priority_builds, normal_builds, scheduled_builds, waiting_builds
+
     def _assign_pending_builds(self):
         _logger.info('Assigning pending builds to hosts')
-        builders = self.env['runbot.host'].search([('nb_worker', '>', 0), ('is_builder', '=', True), ('assigned_only', '=', False)])
-        non_allocated_domain = [('local_state', '=', 'pending'), ('host', '=', False)]
+        priority_builds, normal_builds, scheduled_builds, __ = self._get_build_to_assign()
 
-        build_to_assign = self.env['runbot.build'].search(non_allocated_domain, order='priority_level')
-        build_to_assign = build_to_assign.filtered(lambda b: not b.params_id.reference_build_id or b.params_id.reference_build_id.local_state in ('running', 'done'))
-        priority_builds = build_to_assign.filtered(lambda b: b.build_type == 'priority' or b.config_id.use_extra_slot)
-        scheduled_builds = build_to_assign.filtered(lambda b: b.build_type == 'scheduled')
-        normal_builds = build_to_assign.filtered(lambda b: b.build_type not in ('priority', 'scheduled'))
+        builders = self.env['runbot.host'].search([('nb_worker', '>', 0), ('is_builder', '=', True), ('assigned_only', '=', False)])
 
         groups = self.env['runbot.build']._read_group(
             [('host', 'in', builders.mapped('name')), ('local_state', 'in', ('testing', 'pending'))],
