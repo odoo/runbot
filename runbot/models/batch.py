@@ -548,7 +548,11 @@ class Batch(models.Model):
                         except ValueError:  # binary files
                             pass
                 if link_commit.file_changed <= (self.bundle_id.file_limit or 450) and link_commit.base_ahead <= (self.bundle_id.commit_limit or 50):
-                    link_commit.diff = commit.repo_id._git(['diff', f'{merge_base_sha}..{commit.name}', '--', '*'], errors='ignore')
+                    diff = commit.repo_id._git(['diff', f'{merge_base_sha}..{commit.name}', '--', '*'], errors='ignore')
+                    if len(diff) > 100_000_000:
+                        diff = "Too long " + str(len(diff))
+                        _logger.error('Diff too long while processing batch %s', self.id)
+                    link_commit.diff = diff
             except subprocess.CalledProcessError:
                 self._warning('Commit info failed between %s and %s', commit.name, base_head.name)
 

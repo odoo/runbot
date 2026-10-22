@@ -1,7 +1,7 @@
 #!/bin/bash
 if [ "$PGHOST" = "/var/run/postgresql" ]; then
     echo "Skipping postgres server stop, using /var/run/postgresql socket"
-else
+elif [ -n "${PGHOST:-}" ] && [ -n "${PGDATA:-}" ]; then
     echo "Shutting down PostgreSQL safely..."
     /usr/lib/postgresql/$PG_VERSION/bin/pg_ctl stop -D $PGDATA -m fast
 
