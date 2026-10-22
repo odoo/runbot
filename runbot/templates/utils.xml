@@ -286,11 +286,13 @@
         </template>
 
         <template id="runbot.slots_infos" name="Hosts slot nb pending/testing/slots">
-            <a href="/runbot/load_info" class="slots_infos">
+            <a href="/runbot/queue" class="slots_infos" title="View build queue">
                 <span t-attf-class="badge text-bg-{{pending_level}}">
                     Pending:
                     <t t-out="pending_count"/><span title="Assigned build (reserved host)" t-if="pending_assigned_count">(<t t-out="pending_assigned_count"/>)</span>
                 </span>
+            </a>
+            <a href="/runbot/load_info" class="slots_infos" title="View load infos">
                 <t t-set="testing" t-value="hosts_data._total_testing()"/>
                 <t t-set="workers" t-value="hosts_data._total_workers()"/>
                 <t t-set="klass">success</t>

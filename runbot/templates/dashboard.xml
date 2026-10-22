@@ -222,7 +222,7 @@
     </template>
 
     <template id="runbot.load_info">
-      <t t-call='runbot.layout'>
+       <t t-call="runbot.layout">
         <div class="container-fluid frontend">
           <div class="row">
             <div class="col-md-12">
@@ -230,46 +230,91 @@
             </div>
           </div>
 
-          <div t-foreach="build_by_bundle" t-as="bundle_builds" class="row bundle_row">
-            <t t-set="bundle" t-value="bundle_builds[0]"/>
-            <t t-set="builds" t-value="bundle_builds[1]"/>
+          <div class="table-responsive">
+            <table class="table table-sm">
+              <t t-foreach="build_by_bundle" t-as="bundle_builds">
+                <t t-set="bundle" t-value="bundle_builds[0]"/>
+                <t t-set="builds" t-value="bundle_builds[1]"/>
 
-            <div class="col-md-3 col-lg-2 cell">
-              <div class="text-truncate">
-                <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e" />
-                <a t-attf-href="/runbot/bundle/#{bundle.id}" title="View Bundle">
-                  <b t-out="bundle.name"/>
-                </a>
-              </div>
-              <div class="badge text-bg-info" t-out="len(builds)"/>
-            </div>
-            <div class="col-md-9 col-lg-10">
-              <div class="table-responsive">
-                <table class="table table-sm">
-                  <t t-foreach="builds" t-as="build">
-                    <t t-set="rowclass">
-                      <t t-call="runbot.build_class">
-                        <t t-set="build" t-value="build"/>
-                      </t>
+                <tr class="bundle_row">
+                  <td colspan="6">
+                    <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e"/>
+                    <a t-attf-href="/runbot/bundle/#{bundle.id}" title="View Bundle">
+                      <b t-out="bundle.name"/>
+                    </a>
+                    <span class="badge text-bg-info" t-out="len(builds)"/>
+                  </td>
+                </tr>
+                <t t-foreach="builds" t-as="build">
+                  <t t-set="rowclass">
+                    <t t-call="runbot.build_class">
+                      <t t-set="build" t-value="build"/>
                     </t>
-                    <tr t-attf-class="bg-{{rowclass.strip()}}-subtle {{'line-through' if build.orphan_result else ''}}">
-                      <td> Batch: <a t-attf-href="/runbot/batch/{{build.params_id.create_batch_id.id}}"><t t-out="build.params_id.create_batch_id.id"/></a></td>
-                      <td><a t-attf-href="/runbot/build/{{build.id}}"><t t-out="build.parent_path"/></a></td>
-                      <td t-out="build.local_state"/>
-                      <td t-out="build.host"/>
-                      <td t-out="build.config_id.name"/>
-                      <td>
-                        <t t-call="runbot.build_button">
-                          <t t-set="bu" t-value="build"/>
-                          <t t-set="klass" t-value="'btn-group-ssm'"/>
-                        </t>
-                      </td>
-                    </tr>
                   </t>
-                </table>
-              </div>
-            </div>
+                  <tr t-attf-class="bg-{{rowclass.strip()}}-subtle {{'line-through' if build.orphan_result else ''}}">
+                    <td>
+                        <t t-set="batch" t-value="build.params_id.create_batch_id"/>
+                        Batch: <a t-attf-href="/runbot/batch/{{batch.id}}"><t t-out="batch.id"/></a>
+                        <span t-if="batch.priority_level &lt; int(batch.create_date.timestamp())" class="badge text-bg-warning">high priority</span>
+                        <span t-if="batch.priority_level &gt; int(batch.create_date.timestamp())" class="badge text-bg-info">low priority</span>
+                        </td>
+                    <td><a t-attf-href="/runbot/build/{{build.id}}"><t t-out="build.parent_path"/></a></td>
+                    <td>
+                        <span t-attf-class="badge text-bg-{{'secondary' if build.local_state == 'pending' else 'info'}}" t-out="build.local_state"/>
+                        <span t-if="build.build_type=='scheduled'" class="badge text-bg-danger">scheduled</span>
+                        <span t-if="build.build_type=='priority'" class="badge text-bg-warning">priority</span>
+                    </td>
+                    <td><t t-out="build.active_step.name"/></td>
+                    <td><t t-out="build.host"/></td>
+                    <td><t t-out="build.config_id.name"/></td>
+                    <td><span title="build_time" t-out="s2human(build.build_time)"/></td>
+                    <td><span title="wait_time" t-out="s2human(build.wait_time-build.build_time)"/></td>
+                  </tr>
+                </t>
+              </t>
+            </table>
+          </div>
+        </div>
+      </t>
+    </template>
 
+    <template id="runbot.queue">
+      <t t-call="runbot.layout">
+        <div class="container-fluid frontend">
+          <div class="row">
+            <div class="col-md-12">
+                <t t-call="runbot.slots_infos"/>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-sm">
+              <t t-foreach="queue" t-as="queue_item">
+                <t t-set="build" t-value="queue_item[0]"/>
+                <t t-set="tag" t-value="queue_item[1]"/>
+                <t t-set="batch" t-value="build.params_id.create_batch_id"/>
+                <tr>
+                  <td t-out="queue_item_index + 1"/>
+                  <td>
+                    <span t-if="tag == 'waiting'" class="badge text-bg-info">waiting</span>
+                    <span t-elif="tag == 'priority'" class="badge text-bg-warning">extra slot</span>
+                    <span t-elif="tag == 'scheduled'" class="badge text-bg-danger">scheduled</span>
+                    <span t-else="" class="badge text-bg-success">normal</span>
+                  </td>
+                  <td t-out="s2human(time.time() - max(build.create_date, build.params_id.reference_build_id.build_end or build.create_date).timestamp())"/>
+                  <td t-out="build.priority_level"/>
+                  <td>
+                      <a t-attf-href="/runbot/batch/{{batch.id}}"><t t-out="batch.bundle_id.name"/></a>
+                  </td>
+                  <td>
+                    <span t-if="batch.priority_level &lt; int(batch.create_date.timestamp())" class="badge text-bg-warning">high priority</span>
+                    <span t-if="batch.priority_level &gt; int(batch.create_date.timestamp())" class="badge text-bg-info">low priority</span>
+                  </td>
+                  <td><a t-attf-href="/runbot/build/{{build.id}}"><t t-out="build.parent_path"/></a></td>
+                  <td><t t-out="build.config_id.name"/></td>
+                </tr>
+              </t>
+            </table>
           </div>
         </div>
       </t>

@@ -371,8 +371,7 @@
                       <span t-out="l.message"/>
                     </t>
                     <span t-elif="l.type == 'markdown'" t-out="l._markdown()"/>
-                    <span t-elif="l.type == 'server'" t-out="build._format_message(l)" class="pre" />
-                    <span t-else="" t-out="l.message"/>
+                    <span t-else="" t-out="build._format_message(l)" class="pre" />
                   </td>
                   <td t-attf-class="bg-{{message_class.strip() or logclass}}-subtle">
                     <t t-if="l.level in ('CRITICAL', 'ERROR', 'WARNING') and not l.with_context(active_test=False).error_content_id">

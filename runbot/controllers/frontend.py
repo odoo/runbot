@@ -647,6 +647,21 @@ class Runbot(Controller):
 
         return request.render("runbot.load_info", context)
 
+    @route(['/runbot/queue'], type='http', auth="user", website=True, sitemap=False)
+    def queue(self, **post):
+        priority_builds, normal_builds, scheduled_builds, waiting_builds = request.env['runbot.runbot']._get_build_to_assign()
+        queue = (
+            [(build, 'priority') for build in priority_builds]
+            + [(build, False) for build in normal_builds]
+            + [(build, 'scheduled') for build in scheduled_builds]
+            + [(build, 'waiting') for build in waiting_builds]
+        )
+        context = {
+            'queue': queue,
+        }
+        context.update(self._slots_infos())
+        return request.render("runbot.queue", context)
+
     @route([
         '/runbot/run/<build_id>',
         '/runbot/run/<build_id>/<db_suffix>',
