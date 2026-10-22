@@ -271,7 +271,7 @@ exec &>> /data/build/docker.txt
 touch /data/build/signals/start-{container_name}
 
 set +e
-if [ -f /entrypoint.sh ]; then
+if [ -f /entrypoint.sh ] && [ ! -d /var/run/postgresql ]; then
     echo "Executing dockerfile entrypoint:"
     bash /entrypoint.sh "$@"
     TEST_EXIT_CODE=$?
