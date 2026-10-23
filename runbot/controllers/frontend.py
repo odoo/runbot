@@ -164,7 +164,7 @@ class Runbot(Controller):
     @route([
         '/runbot/bundle/<model("runbot.bundle"):bundle>/force',
         '/runbot/bundle/<model("runbot.bundle"):bundle>/force/<int:auto_rebase>',
-    ], type='http', auth="user", methods=['GET', 'POST'], csrf=False)
+    ], type='http', auth="user", methods=['POST'])
     def force_bundle(self, bundle, auto_rebase=False, use_base_commits=False, **_post):
         if not request.env.user.has_group('runbot.group_runbot_advanced_user') and ':' not in bundle.name and not bundle.last_batch.needs_update():
             message = "Only users with a specific group can do that. Please contact runbot administrators"
@@ -263,8 +263,8 @@ class Runbot(Controller):
         raise NotFound
 
     @route([
-        '/runbot/build/<int:build_id>/<operation>',
-    ], type='http', auth="user", methods=['POST'], csrf=False)
+        '/runbot/build/<int:build_id>/<any(rebuild,kill,wakeup):operation>',
+    ], type='http', auth="user", methods=['POST'])
     def build_operations(self, build_id, operation, **post):
         build = request.env['runbot.build'].sudo().browse(build_id)
         build.check_access('read')
@@ -418,7 +418,7 @@ class Runbot(Controller):
         return request.render(view_id if view_id else "runbot.monitoring", qctx)
 
     @route(['/runbot/errors/assign/<int:build_error_id>',
-            ], type='http', auth='user', methods=['POST'], csrf=False, sitemap=False)
+            ], type='http', auth='user', methods=['POST'], sitemap=False)
     def build_errors_assign(self, build_error_id=None, **kwargs):
         build_error = request.env['runbot.build.error'].browse(build_error_id)
         if build_error.responsible:
