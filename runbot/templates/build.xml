@@ -117,7 +117,7 @@
               <div t-attf-class="card border-{{rowclass}} build_details">
                 <header class="card-header d-flex flex-wrap align-items-center gap-2">
                   <span class="h6 mb-1 me-auto">
-                    <i t-if="build.global_state in ('testing', 'pending', 'waiting')" t-attf-class="fa fa-spinner fa-fw text-{{rowclass}} me-1"/>
+                    <i t-if="build.global_state in ('testing', 'pending', 'waiting')" t-attf-class="fa fa-spinner fa-spin fa-fw text-{{rowclass}} me-1"/>
                     <i t-else="" t-attf-class="fa fa-{{build._fa_result()}} fa-fw text-{{rowclass}} me-1"/>
                     <t t-out="build.md_description if build.description else build.config_id.name"/>
                   </span>
@@ -285,7 +285,7 @@
                       <!-- status and link like the slot buttons -->
                       <div class="input-group input-group-ssm flex-nowrap w-auto">
                         <span t-attf-class="input-group-text text-bg-{{rowclass}} border-{{rowclass}}">
-                          <i t-if="child.global_state in ('testing', 'pending', 'waiting')" class="fa fa-spinner fa-fw"/>
+                          <i t-if="child.global_state in ('testing', 'pending', 'waiting')" class="fa fa-spinner fa-spin fa-fw"/>
                           <i t-else="" t-attf-class="fa fa-{{child._fa_result()}} fa-fw"/>
                         </span>
                         <a t-attf-href="/runbot/{{'batch/%s/' % from_batch.id if from_batch else ''}}build/{{child.id}}" class="btn btn-default text-nowrap">
