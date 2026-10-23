@@ -368,7 +368,7 @@
             <t t-set="color" t-value="bu._get_color_class()"/>
             <div t-attf-class="input-group input-group-ssm slot_button_group {{'slot_link_created' if slot.link_type == 'created' else 'slot_link_matched'}}">
                 <span t-attf-class="input-group-text text-bg-{{color}} border-{{color}}">
-                    <i t-if="slot.build_id.global_state in ('testing', 'pending', 'waiting')" class="fa fa-spinner fa-fw"/>
+                    <i t-if="slot.build_id.global_state in ('testing', 'pending', 'waiting')" class="fa fa-spinner fa-spin fa-fw"/>
                     <i t-else="" t-attf-class="fa fa-{{slot._fa_result()}} fa-fw"/>
                 </span>
                 <a t-if="slot.params_id.config_id == slot.trigger_id.light_config_id" class="btn btn-info" t-attf-href="/runbot/bundle/{{slot.batch_id.bundle_id.id}}">Light</a>
@@ -503,7 +503,7 @@
                 t-att-data-log_list="json.dumps(bu.log_list.split(',') if bu.log_list else [])"
                 t-att-data-host="bu.host or ''"
             >
-                <i t-attf-class="fa {{'fa-spinner' if bu.global_state == 'pending' else 'fa-cog'}} fa-fw"/>
+                <i t-attf-class="fa {{'fa-spinner fa-spin' if bu.global_state == 'pending' else 'fa-cog'}} fa-fw"/>
             </build-options-dropdown>
         </template>
 
