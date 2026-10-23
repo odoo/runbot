@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 import typing
 from collections.abc import Mapping
 from datetime import datetime
@@ -244,8 +245,19 @@ For-Commit-Id: {it.head}
             branch.project_id.name, repo.name, branch.name,
             it.head, stagingname,
         )
-        r = it.repo.with_config(stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False)\
-            .push('-f', git.source_url(repo), f'{it.head}:refs/heads/{stagingname}')
+        # retry first, as github and the network fail transiently every so often
+        for delay in (2, 5, 10, None):
+            r = it.repo.with_config(stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False)\
+                .push('-f', git.source_url(repo), f'{it.head}:refs/heads/{stagingname}')
+            # the token is part of the remote url, which git may print
+            stderr = r.stderr.replace(branch.project_id.github_token, '***')
+            if not r.returncode or delay is None:
+                break
+            _logger.warning(
+                "Failed to push %s to %s, retrying in %ss:\n%s",
+                stagingname, repo.name, delay, stderr,
+            )
+            time.sleep(delay)
         if r.returncode:
             branch.staging_enabled = False
             st.write({
@@ -257,13 +269,13 @@ For-Commit-Id: {it.head}
                 body=Markup(
                     "<p>Staging on {} has been disabled because pushing to {} failed:</p>"
                     "<pre>{}</pre>"
-                ).format(branch.name, repo.name, r.stderr),
+                ).format(branch.name, repo.name, stderr),
                 partner_ids=branch.env.ref("runbot_merge.group_admin").users.partner_id.ids,
             )
             _logger.error(
                 "Failed to create staging for branch %r:\n%s",
                 branch.name,
-                r.stderr
+                stderr
             )
             return None
 
