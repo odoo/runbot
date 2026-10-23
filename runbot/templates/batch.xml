@@ -117,8 +117,7 @@
                                 </ul>
                             </div>
                             <div t-if="has_checks" t-attf-class="card border-{{color}} batch_builds">
-                                <header class="card-header d-flex align-items-center gap-2">
-                                    <span class="h6 mb-1 me-auto">Checks</span>
+                                <header class="card-header d-flex align-items-center gap-2 justify-content-end">
                                     <t t-out="batch_toolbar"/>
                                 </header>
                                 <div class="card-body">
