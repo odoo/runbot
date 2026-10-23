@@ -199,8 +199,6 @@ ls ~/odoo/runbot/runbot/static
 - **nginx** contains the nginx config used to access running instances
 All of them are empty for now.
 
-A database defined by *runbot.runbot_db_template* icp will be created. By default, runbot use template0. This database will be used as a template for testing builds. You can change this database for more customisation.
-
 Other cron operations are still disabled for now.
 
 #### DOCKER images
@@ -294,23 +292,11 @@ Addon `-module` on a repo will remove the module from the default, it is advise
 Modules can also be filtered on a config step with the same logic as repo filter, except that repo's blacklist can be disabled to allow all modules by starting the list with `*` (all available modules)
 It is also possible to add test-tags to config step to allow more module to be installed but only testing some specific one. Test tags: `/module1,/module2`
 
-### db template
-Db creation will use `template0` by default. It is possible to specify a specific template to use in runbot config *Postgresql template*. It is mainly used to add extensions. This will also avoid having issue if `template0` is used when creating a new database.
-
-It is recommended to generate a `template_runbot`  database based on `template0` and set this value in the runbot settings
-
-```
-createdb template_runbot -T template0
-```
-
 ## Dockerfiles
 
-Runbot is using a Dockerfile Odoo model to define the Dockerfile used for builds and is shipped with a default one. This default Dockerfile is based on Ubuntu Bionic and is intended to build recent supported versions of Odoo.
+Runbot is using a Dockerfile model to define the Dockerfile used for builds and is shipped with a default one. This default Dockerfile is based on Ubuntu and is intended to build recent supported versions of Odoo. Note that runbot.odoo.com use customized dockerfile per version so the proposed dockerfile may not always be up to date.
 
-The model is using Odoo QWeb views as templates.
-
-A new Dockerfile can be created as needed either by duplicating the default one and adapt parameters in the view. e.g.: changing the key `'from': 'ubuntu:jammy'` to `'from': 'debian:buster'` will create a new Dockerfile based on Debian instead of ubuntu.
-Or by providing a plain Dockerfile in the template.
+A new Dockerfile can be created as needed either by duplicating the default one (all layer can be modified individually), or having a layer referencing the complete docker file (can add layers or customize the params)
 
 Once the Dockerfile is created and the `to_build` field is checked, the Dockerfile will be built (pay attention that no other operations will occur during the build).
 

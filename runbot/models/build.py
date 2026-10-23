@@ -1179,7 +1179,7 @@ class BuildResult(models.Model):
                 build._log("run", message, level='ERROR')
                 build._kill(result='ko')
 
-    def _docker_run(self, step, cmd=None, ro_volumes=None, env_variables=None, **kwargs):
+    def _docker_run(self, step, cmd=None, ro_volumes=None, env_variables=None, needs_postgres=True, **kwargs):
         self.ensure_one()
         _ro_volumes = ro_volumes or {}
         ro_volumes = {}
@@ -1243,6 +1243,9 @@ class BuildResult(models.Model):
         self.env.flush_all()
         env_variables = env_variables or []
         env_variables.append('ODOO_RUNBOT=1')
+        if not needs_postgres:
+            env_variables.append('PG_SOCK=""')
+
         self.cpu_limit = kwargs.get('cpu_limit')
         docker_file = self.env['runbot.dockerfile'].search([('image_tag', '=', kwargs['image_tag'].split('.')[0])], limit=1)    # TODO cleanup postgres remove
         use_host_postgres = self.params_id.config_data.get('use_host_postgres', docker_file and docker_file.use_host_postgres)

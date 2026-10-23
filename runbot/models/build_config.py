@@ -505,6 +505,7 @@ class ConfigStep(models.Model):
     restore_rename_db_suffix = fields.Char('Rename db suffix')
     restore_cluster = fields.Boolean('Restore the cluster if available', default=True)
     export_database = fields.Boolean('Export database after install', default=True)
+    needs_postgres = fields.Boolean('Needs postgres', default=True)
 
     # TODO change the default to True once we are sure that it works as expected
     check_exit_status = fields.Boolean('Check exit status', default=False, help='Check exit status of the main command')
@@ -635,6 +636,10 @@ class ConfigStep(models.Model):
                 logical_cpu_count = psutil.cpu_count(logical=True)
                 physical_cpu_count = psutil.cpu_count(logical=False)
                 docker_params['cpus'] = float((logical_cpu_count / physical_cpu_count) * container_cpus)
+
+            if 'needs_postgres' not in docker_params:
+                docker_params['needs_postgres'] = self.needs_postgres
+
             return build._docker_run(self, **docker_params)
         return True
 
@@ -1240,7 +1245,12 @@ class ConfigStep(models.Model):
                         use_backup = True
                         break
             if not use_backup:
-                build._log('_run_restore', 'Restoring template [%s](%s) from build [%s](%s)', zip_name, dump_url, reference_build.id, reference_build.build_url, log_type='markdown')
+                message = 'Restoring template [%s](%s) from build [%s](%s)'
+                params = [zip_name, dump_url, reference_build.id, reference_build.build_url]
+                if cluster_zip_url:
+                    message = f'{message} using [cluster](%s)'
+                    params.append(cluster_zip_url)
+                build._log('_run_restore', message, *params, log_type='markdown')
             default_target_suffix = dump_db.db_suffix
         target_suffix = build.params_id.restore_db_suffix or default_target_suffix
         restore_db_name = '%s-%s' % (build.dest, target_suffix)

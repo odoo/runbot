@@ -64,6 +64,7 @@
                       </field>
                     </group>
                     <group string="Python settings" invisible="job_type not in 'python'">
+                        <field name="needs_postgres"/>
                         <field name="python_code" widget="ace" options="{'mode': 'python'}"/>
                         <field name="python_result_code" widget="ace" options="{'mode': 'python'}"/>
                         <field name="running_job"/>
