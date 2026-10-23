@@ -274,8 +274,7 @@
                 </ul>
               </div>
               <div t-attf-class="card border-{{rowclass}} build_children" t-if="has_children">
-                <header class="card-header d-flex flex-wrap align-items-center gap-2">
-                  <span class="h6 mb-1 me-auto">Children</span>
+                <header class="card-header d-flex flex-wrap align-items-center gap-2 justify-content-end">
                   <t t-out="build_toolbar"/>
                 </header>
                 <div class="card-body">
