@@ -117,7 +117,8 @@
               <div t-attf-class="card border-{{rowclass}} build_details">
                 <header class="card-header d-flex flex-wrap align-items-center gap-2">
                   <span class="h6 mb-1 me-auto">
-                    <i t-attf-class="fa fa-fw fa-{{build._fa_result()}} text-{{rowclass}} me-1"/>
+                    <i t-if="build.global_state in ('testing', 'pending', 'waiting')" t-attf-class="fa fa-spinner fa-fw text-{{rowclass}} me-1"/>
+                    <i t-else="" t-attf-class="fa fa-{{build._fa_result()}} fa-fw text-{{rowclass}} me-1"/>
                     <t t-out="build.md_description if build.description else build.config_id.name"/>
                   </span>
                   <t t-if="not has_children" t-out="build_toolbar"/>
