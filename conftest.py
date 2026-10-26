@@ -472,7 +472,7 @@ def http_proxy(pytestconfig: pytest.Config, users_file: pathlib.Path) -> Iterato
 
         portfile = datadir / 'dcportfile'
         gh = cleanup.enter_context(subprocess.Popen(
-            ['dummy_central', users_file, '-p', '0', '--portfile', portfile, '--log', 'info'],
+            ['dummy_central', users_file, '-p', '0', '--portfile', portfile],
             stdout=sys.stdout.fileno(),
             stderr=sys.stderr.fileno(),
             env={**os.environ, 'RUST_BACKTRACE': '1'},
