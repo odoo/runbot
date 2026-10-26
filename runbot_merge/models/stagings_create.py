@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import typing
 from collections.abc import Mapping
 from datetime import datetime, timedelta
 from itertools import chain
@@ -234,7 +235,6 @@ For-Commit-Id: {it.head}
     tmpname = pattern % {
         'stage': 'tmp',
         'target': branch.name,
-        'sub': '',
     }
     # push all the new objects first via the tmp branches
     pushers = []
@@ -261,7 +261,6 @@ For-Commit-Id: {it.head}
     stagingname = pattern % {
         'stage': 'staging',
         'target': branch.name,
-        'sub': '',
     }
     # then sync the staging refs (there might be a more efficient command than push but...)
     for repo, it in staging_state.items():
@@ -317,11 +316,7 @@ For-Commit-Id: {it.head}
         for repo, state in staging_state.items()
     })
 
-    subpattern = pattern % {
-        'stage': 'staging',
-        'target': branch.name,
-        'sub': branch.project_id.staging_sub_pattern,
-    }
+    sub_pattern = branch.project_id.staging_sub_pattern
     if branch.presplit and len(staged) > 1:
         _logger.info("Pre-splitting staging...")
         midpoint = len(staged) // 2
@@ -339,9 +334,19 @@ For-Commit-Id: {it.head}
                 break
             if staged_split != split:
                 _logger.warning("Failed to fully stage presplit %d of %s", i, st)
-            branchname = subpattern % {'sub': i}
+            branchname = sub_pattern % {
+                'stage': 'staging',
+                'target': branch.name,
+                'sub': i,
+            }
             for repo, it in staging_state_split.items():
-                url, user, password = repo._git()
+                match branch.project_id.staging_sub_target:
+                    case 'main':
+                        url, user, password = repo._git()
+                    case 'fp':
+                        url, user, password = repo._fw_git()
+                    case v:
+                        typing.assert_never(v)
                 r = it.repo.with_config(stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False) \
                     .with_credentials(user, password) \
                     .push('-f', url, f'{it.head}:refs/heads/{branchname}')
@@ -364,9 +369,19 @@ For-Commit-Id: {it.head}
             if not staged:
                 _logger.warning("Failed to stage successor of %s", st)
             else:
-                branchname = subpattern % {"sub": '3'}
+                branchname = sub_pattern % {
+                    'stage': 'staging',
+                    'target': branch.name,
+                    'sub': '3',
+                }
                 for repo, it in staging_state.items():
-                    url, user, password = repo._git()
+                    match branch.project_id.staging_sub_target:
+                        case 'main':
+                            url, user, password = repo._git()
+                        case 'fp':
+                            url, user, password = repo._fw_git()
+                        case v:
+                            typing.assert_never(v)
                     r = it.repo.with_config(stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False) \
                         .with_credentials(user, password) \
                         .push('-f', url, f'{it.head}:refs/heads/{branchname}')

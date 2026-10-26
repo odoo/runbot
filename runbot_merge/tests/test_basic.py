@@ -97,8 +97,8 @@ def status_mode(request, env, project, repo, port, RepoType) -> Iterator[Literal
 
 
 @pytest.mark.parametrize('staging_pattern,staging_branch', [
-    ("%(stage)s.%(target)s%(sub)s", "staging.master"),
-    ("%(target)s%(sub)s-%(stage)s", "master-staging"),
+    ("%(stage)s.%(target)s", "staging.master"),
+    ("%(target)s-%(stage)s", "master-staging"),
 ])
 def test_trivial_flow(env, repo, page, users, config, project, partners, status_mode, botname, staging_pattern, staging_branch):
     project.repo_ids.required_statuses = 'legal/cla,ci/runbot'

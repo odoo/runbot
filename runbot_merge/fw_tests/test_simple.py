@@ -151,8 +151,8 @@ class MakeBasic(typing.Protocol):
 #   - a github owner to create a repo *for*
 #   - provide ability to create commits, branches, prs, ...
 @pytest.mark.parametrize('staging_pattern', [
-    "%(stage)s.%(target)s%(sub)s",
-    "%(target)s%(sub)s-%(stage)s",
+    "%(stage)s.%(target)s",
+    "%(target)s-%(stage)s",
 ])
 def test_straightforward_flow(env, config, users, make_basic, botname, staging_pattern):
     # TODO: ~all relevant data in users when creating partners

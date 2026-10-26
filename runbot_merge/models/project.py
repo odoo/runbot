@@ -31,7 +31,7 @@ class Project(models.Model):
     staging_enabled = fields.Boolean(default=True)
     staging_pattern = fields.Char(
         required=True,
-        default="%(stage)s.%(target)s%(sub)s",
+        default="%(stage)s.%(target)s",
         help="""\
 Pattern for the naming of the staging branches. Editing this will switch over
 every staging branch instantaneously, so any existing staging will be extremely
@@ -39,10 +39,17 @@ confused (and will probably timeout).
 
 - `stage` is either tmp or staging, it must be either at the start or end of the pattern
 - `target` is the target branch
-- `sub` is the sub-staging, used for presplits and optimistic secondary stagings
 """
     )
-    staging_sub_pattern = fields.Char(required=True, default=".%(sub)s")
+    staging_sub_target = fields.Selection([
+        ('main', "Main"),
+        ('fp', "Forwardport"),
+    ], default='main', help="Repository in which to create sub-staging branches")
+    staging_sub_pattern = fields.Char(
+        required=True,
+        default="%(stage)s.%(target)s.%(sub)s",
+        help="Same as `staging_pattern` but there is also a `sub` key for the sub-staging's identifier"
+    )
     staging_priority = fields.Selection([
         ('default', "Splits over ready PRs"),
         ('largest', "Largest of split and ready PRs"),

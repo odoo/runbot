@@ -1,3 +1,4 @@
+import itertools
 import logging
 
 from odoo import models
@@ -21,17 +22,33 @@ class BranchCleanup(models.TransientModel):
         )
         # loop around the repos first, so we can reuse the gh instance
         for r in deactivated.mapped('project_id.repo_ids'):
-            ref_pattern = f'refs/heads/{r.project_id.staging_pattern}'
-            refs = (
-                ref_pattern % {'stage': stage, 'target': b.name, 'sub': sub}
-                for b in deactivated
-                if b.project_id == r.project_id
+            branches = deactivated.filtered(lambda b: b.project_id == r.project_id)
+            main = [
+                (f'refs/heads/{r.project_id.staging_pattern}', stage, '')
                 for stage in ('tmp', 'staging')
-                for sub in ('', '1', '2', '3')
-                # tmp doesn't have substages so generating those is never useful
-                if stage == 'staging' or sub == ''
-            )
+            ]
+            subs = [
+                (f'refs/heads/{r.project_id.staging_sub_pattern}', 'staging', sub)
+                for sub in ('1', '2', '3')
+            ]
+            if r.project_id.staging_sub_target == 'main':
+                main.extend(subs)
+                subs.clear()
+            refs = {
+                pattern % {'stage': stage, 'target': b.name, 'sub': sub}
+                for b in branches
+                for pattern, stage, sub in main
+            }
             url, user, token = r._git()
             # turns out if you delete fully qualified refs they're sent straigt
             # to the remote, you don't get the info that they exist but...
             git.get_local(r).with_credentials(user, token).push(url, '--delete', *refs)
+
+            if subs:
+                refs = {
+                    pattern % {'stage': stage, 'target': b.name, 'sub': sub}
+                    for b in branches
+                    for pattern, stage, sub in subs
+                }
+                url, user, token = r._fw_git()
+                git.get_local(r).with_credentials(user, token).push(url, '--delete', *refs)

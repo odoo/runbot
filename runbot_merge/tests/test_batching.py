@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from utils import get_partner, Commit, to_pr, part_of, ensure_one, node, log_to_node
+from utils import get_partner, Commit, to_pr, part_of, ensure_one, node, log_to_node, make_basic
 
 
 def _pr(repo, prefix, trees, *, target='master', user, reviewer, statuses=(('default', 'success'),), cmd=''):
@@ -543,12 +543,52 @@ def test_presplit(env, project, repo, users, config):
     assert repo.commit(staging.head_ids.sha).tree == tree2
 
 
+def test_presplit_other_repo(env, project, repo, users, config):
+    with repo:
+        repo.make_commits(None, Commit("initial", tree={"a": "a"}), ref="heads/master")
+
+    fork = repo.fork(token=config['role_user']['token'])
+    project.staging_sub_target = 'fp'
+    project.staging_sub_pattern = '%(target)s-sub%(sub)s-%(stage)s'
+    project.branch_ids.presplit = True
+    project.fp_github_name = 'herbert'
+    if project.github_id.method == 'pat':
+        project.github_id.fp_pat = config['fp_github']['token']
+    else:
+        project.github_id.auth_token = config['fp_github']['token']
+        project.github_id.auth_expires_at = datetime.datetime.fromisoformat(config['fp_github']["expires_at"]).replace(tzinfo=None).isoformat(' ', 'seconds')
+    project.repo_ids.fp_remote_target = fork.name
+    with repo:
+        _pr(repo, 'PR1', [{'a': 'AAA'}, {'b': 'BBB'}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token'])
+        _pr(repo, 'PR2', [{'c': 'CCC'}, {'d': 'DDD'}], user=config['role_user']['token'], reviewer=config['role_reviewer']['token'])
+    env.run_crons()
+
+    r = fork._session.get(f'https://api.github.com/repos/{fork.name}/branches')
+    assert r.ok, r.text
+    tree1 = fork.commit('master-sub1-staging').tree
+    tree2 = fork.commit('master-sub2-staging').tree
+    with repo:
+        repo.post_status('staging.master', 'failure')
+    env.run_crons()
+
+    staging = env['runbot_merge.stagings'].search([])
+    assert staging.id == 2
+    assert repo.commit(staging.head_ids.sha).tree == tree1
+    with repo:
+        repo.post_status('staging.master', 'failure')
+    env.run_crons()
+
+    staging = env['runbot_merge.stagings'].search([])
+    assert staging.id == 3
+    assert repo.commit(staging.head_ids.sha).tree == tree2
+
+
 def test_prestage(env, project, repo, users, config):
     """If prestaging is enabled, and the threshold is passed, the mergebot
     should immediately create a sub-staging (3) for the still-available PRs
     """
-    project.staging_pattern = "%(target)s%(sub)s-%(stage)s"
-    project.staging_sub_pattern = '-%(sub)s'
+    project.staging_pattern = "%(target)s-%(stage)s"
+    project.staging_sub_pattern = '%(target)s-%(sub)s-%(stage)s'
     project.batch_limit = 1
     project.branch_ids.optimistic_staging_threshold = 1
     with repo:
