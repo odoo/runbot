@@ -173,9 +173,10 @@ RUN sed -i 's/^# *en_US.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/' /etc/locale.gen &amp;&a
     <record id="runbot.docker_layer_npminstall" model="runbot.docker_layer">
         <field name="sequence" eval="320"/>
         <field name="dockerfile_id" ref="runbot.docker_default"/>
-        <field name="layer_type">raw</field>
+        <field name="layer_type">template</field>
         <field name="name">RUN npm install</field>
-        <field name="content">RUN npm install --force -g rtlcss@3.4.0 es-check@6.0.0 eslint@8.1.0 prettier@2.7.1 eslint-config-prettier@8.5.0 eslint-plugin-prettier@4.2.1</field>
+        <field name="packages">rtlcss@3.4.0 es-check@6.0.0 eslint@8.1.0 prettier@2.7.1 eslint-config-prettier@8.5.0 eslint-plugin-prettier@4.2.1</field>
+        <field name="content">RUN npm install --force -g {$packages}</field>
     </record>
 
     <record id="runbot.docker_layer_masterdebiancontroll" model="runbot.docker_layer">
