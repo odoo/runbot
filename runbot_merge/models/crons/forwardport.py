@@ -4,13 +4,33 @@ import re
 
 import requests
 
-from odoo import fields, models
+from odoo import fields, models, api
 
 from ... import git
 
 FOOTER = '\nMore info at https://github.com/odoo/odoo/wiki/Mergebot#forward-port\n'
 
 _logger = logging.getLogger(__name__)
+
+class ForwardportCheck(models.Model):
+    _name = 'runbot_merge.forwardport.followup'
+    _inherit = ['runbot_merge.queue']
+    _description = "Check if a batch forward-port should be followed upon, asynchronously"
+    _cron_name = "runbot_merge.port_forward.followup"
+    _logger = _logger.getChild('followup')
+
+    batch_id = fields.Many2one('runbot_merge.batch', required=True, index=True)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        batches = set(self.search([]).batch_id.ids)
+        return super().create([
+            vals for vals in vals_list
+            if vals['batch_id'] not in batches
+        ])
+
+    def _process_item(self) -> None:
+        self.batch_id._schedule_fp_followup()
 
 
 class ForwardPortTasks(models.Model):

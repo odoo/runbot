@@ -231,7 +231,7 @@ class Batch(models.Model):
                 continue
             batch.unblocked_at = False
             Validator.search([('batch_id', '=', batch.id)]).unlink()
-        self._schedule_fp_followup()
+        self.env['runbot_merge.forwardport.followup'].create([{'batch_id': batch.id} for batch in self])
 
 
     def _port_forward(self):
@@ -557,8 +557,10 @@ class Batch(models.Model):
         # If we changed the fw policy to one which may trigger forward ports,
         # do trigger those here.
         if nonskip:
-            for tip in nonskip.mapped(lambda b: b.genealogy_ids[-1]):
-                tip._schedule_fp_followup()
+            self.env['runbot_merge.forwardport.followup'].create([
+                {'batch_id': tip.id}
+                for tip in nonskip.mapped(lambda b: b.genealogy_ids[-1])
+            ])
 
         return True
 
