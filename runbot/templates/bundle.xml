@@ -1,6 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
+        <template id="runbot.bundle_options_menu">
+            <t t-set="empty_menu" t-value="not request.env.user.has_group('runbot.group_runbot_advanced_user') and not bundle.project_id.next_freeze_tag_id"/>
+            <t t-if="not empty_menu" groups="runbot.group_runbot_advanced_user,runbot.group_freeze_leader">
+                <button type="button" class="btn btn-default dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fa fa-cog"/> Bundle Options <i class="fa fa-caret-down ms-1"/>
+                </button>
+                <ul class="dropdown-menu">
+                    <t groups="runbot.group_runbot_advanced_user">
+                        <li >
+                            <a t-attf-href="/odoo/bundle/{{bundle.id}}" class="dropdown-item" title="View in Backend">
+                                <i class="fa fa-list"/> View bundle in backend
+                            </a>
+                        </li>
+                        <li class="dropdown-divider"/>
+                        <li>
+                            <a groups="runbot.group_runbot_advanced_user" class="dropdown-item" t-attf-href="/runbot/bundle/{{bundle.id}}/force?use_base_commits=1" title="Force a new batch using base commits mainly for random errors debugging">
+                                <i class="fa fa-fast-backward"/> Start a batch without the branch commits
+                            </a>
+                        </li>
+                        <li>
+                            <a groups="runbot.group_runbot_advanced_user" class="dropdown-item" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Create a new Batch, applies new trigger configurations and updates build references for upgrades if needed">
+                                <i class="fa fa-play"/> Start a new batch
+                            </a>
+                        </li>
+                        <li>
+                            <a t-if="bundle.env.user.has_group('runbot.group_runbot_advanced_user') or (bundle.env.user.has_group('runbot.group_user') and ':' in bundle.name)" t-attf-href="/runbot/bundle/{{bundle.id}}/force?auto_rebase=1" class="dropdown-item"  title="Force A New Batch with automatic rebase, useful to test outdated branches without pushing before a merge">
+                                <i class="fa fa-fast-forward"/> Start a batch with simulated autorebase
+                            </a>
+                        </li>
+                    </t>
+                    <t t-if="request.env.user.has_group('runbot.group_freeze_leader') and bundle.project_id.next_freeze_tag_id">
+                        <li class="dropdown-divider" groups="runbot.group_runbot_advanced_user"/>
+                        <li>
+                            <t t-set="freeze_name" t-value="bundle.project_id.next_freeze_tag_id.name"/>
+                            <t t-set="freeze_btn_msg" t-value="f'Remove from next freeze {freeze_name}' if bundle.project_id.next_freeze_tag_id in bundle.tag_ids else f'Add to next freeze {freeze_name}'"/>
+                            <a class="dropdown-item" t-attf-href="/runbot/bundle/{{bundle.id}}/toggle_freeze" t-att-title="freeze_btn_msg">
+                                <i class="fa fa-snowflake-o"/> <t t-out="freeze_btn_msg"/>
+                            </a>
+                        </li>
+                    </t>
+                </ul>
+            </t>
+        </template>
         <template id="runbot.bundle">
             <t t-set="categories" t-value="env['runbot.category'].search([])"/>
             <t t-call='runbot.layout'>
@@ -19,35 +62,15 @@
                                 <header class="card-header d-flex flex-wrap align-items-center gap-2">
                                     <span class="h6 mb-1 me-auto">
                                         <i t-if="bundle.sticky" class="fa fa-star" style="color: #f0ad4e"/>
+                                        <i t-if="bundle.project_id.next_freeze_tag_id and bundle.project_id.next_freeze_tag_id in bundle.tag_ids" class="fa fa-snowflake-o text-info" t-attf-title="Tagged for next freeze {{bundle.project_id.next_freeze_tag_id.name}}"/>
                                         <span t-out="bundle.name"/>
+                                        <button type="button" class="border-0 bg-transparent p-0 link-primary ms-1" title="Copy branch name" aria-label="Copy branch name" t-att-data-copy-text="bundle.name"><i class="fa fa-clone"/></button>
                                     </span>
                                     <div class="btn-group btn-group-ssm" role="group">
-                                        <t t-call="runbot.branch_copy_button">
-                                            <t t-set="btn_size" t-value="'btn'"/>
-                                        </t>
-                                        <a groups="runbot.group_runbot_advanced_user"
-                                            t-attf-href="/odoo/bundle/{{bundle.id}}" class="btn btn-default" title="View in Backend">
-                                        <i class="fa fa-list"/> Form view
-                                        </a>
                                         <a groups="base.group_user" class="btn btn-default" t-attf-href="/runbot/stats/{{bundle.id}}" title="View stats">
                                             <i class="fa fa-bar-chart"/> Stats
                                         </a>
-                                        <t groups="runbot.group_runbot_advanced_user">
-                                            <button type="button" class="btn btn-default dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                                                <i class="fa fa-play"/> Actions <i class="fa fa-caret-down ms-1"/>
-                                            </button>
-                                            <ul class="dropdown-menu">
-                                                <li><a groups="runbot.group_runbot_advanced_user" class="dropdown-item" t-attf-href="/runbot/bundle/{{bundle.id}}/force?use_base_commits=1" title="Force a new batch using base commits mainly for random errors debugging">
-                                                    <i class="fa fa-fast-backward"/> Start a batch without the branch commits
-                                                </a></li>
-                                                <li><a groups="runbot.group_runbot_advanced_user" class="dropdown-item" t-attf-href="/runbot/bundle/{{bundle.id}}/force" title="Create a new Batch, applies new trigger configurations and updates build references for upgrades if needed">
-                                                    <i class="fa fa-play"/> Start a new batch
-                                                </a></li>
-                                                <li><a t-if="bundle.env.user.has_group('runbot.group_runbot_advanced_user') or (bundle.env.user.has_group('runbot.group_user') and ':' in bundle.name)" t-attf-href="/runbot/bundle/{{bundle.id}}/force?auto_rebase=1" class="dropdown-item"  title="Force A New Batch with automatic rebase, useful to test outdated branches without pushing before a merge">
-                                                    <i class="fa fa-fast-forward"/> Start a batch with simulated autorebase
-                                                </a></li>
-                                            </ul>
-                                        </t>
+                                        <t t-call="runbot.bundle_options_menu"/>
                                     </div>
                                 </header>
                                 <ul class="list-group list-group-flush">
