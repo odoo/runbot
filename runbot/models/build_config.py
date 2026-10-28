@@ -1963,6 +1963,7 @@ class ConfigStep(models.Model):
             "cmd": cmd,
             "container_name": build._get_docker_name(),
             "ro_volumes": exports,
+            "needs_postgres": False,
         }
 
     def _make_semgrep_results(self, build):
