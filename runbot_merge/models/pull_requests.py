@@ -2829,8 +2829,7 @@ class Stagings(models.Model):
                       + datetime.timedelta(minutes=staging.target.project_id.ci_timeout)
 
                 if timeout > staging.timeout_limit:
-                    staging.timeout_limit = timeout
-                    self.env.ref("runbot_merge.merge_cron")._trigger(timeout)
+                    staging.timeout_limit = timeout + datetime.timedelta(minutes=1)
                     _logger.debug("%s got pending status, bumping timeout to %s", staging, timeout)
 
     def action_cancel(self):
