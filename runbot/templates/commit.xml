@@ -77,6 +77,7 @@
             <table class="table table-sm table-borderless">
               <tr t-foreach='last_status_by_context' t-as='context'>
                 <t t-set="status" t-value="last_status_by_context[context]"/>
+                <td t-out="status.create_date.strftime('%Y-%m-%d %H:%M:%S')"/>
                 <td t-out="status.sent_date and status.sent_date.strftime('%Y-%m-%d %H:%M:%S') or '—'"/>
                 <td t-out="context"/>
                 <t t-call="runbot.commit_status_state_td">
