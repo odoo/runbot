@@ -324,13 +324,13 @@ def log_to_node(log):
 
     return nodes[log[0]['sha']]
 
-def fakehook(port, env, repository, data):
+def fakehook(port, env, repository, data, event='pull_request'):
     assert isinstance(data, dict), f"webhook payloads are dicts (json objects), got {type(data)}"
     project = env['runbot_merge.project'].search([])
     assert len(project) == 1, "fakehook can't handle multiple projects being configured"
     headers = {
         "Content-Type": "application/json",
-        "X-Github-Event": "pull_request",
+        "X-Github-Event": event,
     }
     match project.github_id.method:
         case 'pat':

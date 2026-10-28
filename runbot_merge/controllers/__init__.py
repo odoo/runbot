@@ -514,15 +514,16 @@ def handle_pr(env, event):
 
 def handle_status(env: Environment, event: dict) -> Response:
     _logger.info(
-        'status on %(sha)s %(context)s:%(state)s (%(target_url)s) [%(description)r]',
+        '%(sha)s:%(context)s:%(state)s (%(target_url)s) [%(description)r]',
         event
     )
+    updated_at = event.get('created_at', datetime.now().isoformat(timespec='seconds')).rstrip('Z')
     status_value = {
         event['context']: {
             'state': event['state'],
             'target_url': event['target_url'],
             'description': event['description'],
-            'updated_at': datetime.now().isoformat(timespec='seconds'),
+            'updated_at': updated_at,
         }
     }
     for n in range(1, MAX_TRIES_ON_CONCURRENCY_FAILURE+1):
@@ -530,6 +531,14 @@ def handle_status(env: Environment, event: dict) -> Response:
             commit = env['runbot_merge.commit'].search([('sha', '=', event['sha'])])
             if commit:
                 st = json.loads(commit.statuses)
+                # check if we already have a more recent status for this context
+                if (ctx := st.get(event['context'])) and ctx.get('updated_at', '') >= updated_at:
+                    _logger.info(
+                        "%(sha)s:%(context)s ignored: outdated",
+                        event
+                    )
+                    return Response("outdated status", status=200)  # or 409 conflict?
+
                 updated = st | status_value
                 if updated != st:
                     commit.statuses = json.dumps(updated)
