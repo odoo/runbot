@@ -239,6 +239,7 @@ def json_render(pr_id) -> Response:
             f'{sibling.url}.json'
             for sibling in (pr_id.batch_id.prs - pr_id)
         ],
+        'runbot_bundle': f'https://runbot.odoo.com/runbot/bundle/{pr.refname}',
     })
 
 

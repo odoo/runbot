@@ -63,7 +63,7 @@ runbot_merge.failure.approved,{pr.ping}{status!r} failed on this reviewed PR.,"N
 
 pr: pull request in question
 status: failed status"
-runbot_merge.pr.created,[![Pull request status dashboard]({pr.url}.png)]({pr.url}),"Initial comment on PR creation.
+runbot_merge.pr.created,[![Pull request status dashboard]({pr.url}.png)]({pr.url})\n\n🤖 [Open bundle on Runbot](https://runbot.odoo.com/runbot/bundle/{{pr.refname}}),"Initial comment on PR creation.
 
 pr: created pr"
 runbot_merge.pr.linked.not_ready,{pr.ping}linked pull request(s) {siblings} not ready. Linked PRs are not staged until all of them are ready.,"Comment when a PR is ready (approved & validated) but it is linked to other PRs which are not.

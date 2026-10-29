@@ -541,7 +541,10 @@
             <t t-call="runbot_merge.view_pull_request_info_{{tmpl.strip()}}"/>
             <dl class="runbot-merge-fields">
                 <dt>label</dt>
-                <dd><span t-field="pr.label"/></dd>
+                <dd><span t-field="pr.label"/>
+                    <a t-attf-href="https://runbot.odoo.com/runbot/bundle/{{pr.refname}}" title="Open bundle on Runbot"
+                        class="pill-ext-link">Runbot</a>
+                </dd>
                 <dt>head</dt>
                 <dd><a t-attf-href="{{pr.github_url}}/commits/{{pr.head}}"><span t-field="pr.head"/></a></dd>
                 <t t-if="pr.state == 'merged'">
