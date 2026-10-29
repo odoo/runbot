@@ -337,8 +337,8 @@
                                 <span class="text-success" t-out="'+%s' % commit_link.diff_add"/>
                                 <span class="text-danger" t-out="'−%s' % commit_link.diff_remove"/>
                                 · <t t-out="commit_link.file_changed"/> files
-                                · <span t-attf-title="{{commit_link.base_ahead}} commits ahead of the base">↑<t t-out="commit_link.base_ahead"/></span>
-                                <span t-attf-title="{{commit_link.base_behind}} commits behind the base">↓<t t-out="commit_link.base_behind"/></span>
+                                · <span t-attf-class="fw-semibold {{'text-info' if commit_link.base_ahead else 'text-body-tertiary'}}" t-attf-title="{{commit_link.base_ahead}} commits ahead of the base">↑<t t-out="commit_link.base_ahead"/></span>
+                                <span t-attf-class="fw-semibold {{'text-warning' if commit_link.base_behind else 'text-body-tertiary'}}" t-attf-title="{{commit_link.base_behind}} commits behind the base">↓<t t-out="commit_link.base_behind"/></span>
                             </span>
                         </div>
                         <div class="d-flex flex-wrap align-items-baseline column-gap-2 text-body-secondary">
