@@ -703,4 +703,5 @@ dl.runbot-merge-fields {
     background-color: var(--color-primary);
     border-radius: 1em;
     padding: 0.15em 0.75em;
+    font-size: 70%;
 }
