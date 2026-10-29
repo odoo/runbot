@@ -331,7 +331,7 @@
                                 <i t-if="match_icon" t-attf-class="fa fa-fw {{match_icon}}"/>
                                 <span class="font-monospace" t-out="commit.dname"/>
                             </a>
-                            <button type="button" class="border-0 bg-transparent p-0 link-primary" title="Copy commit hash" aria-label="Copy commit hash" t-att-data-copy-text="commit.name"><i class="fa fa-clipboard"/></button>
+                            <button type="button" class="border-0 bg-transparent p-0 link-primary" title="Copy commit hash" aria-label="Copy commit hash" t-att-data-copy-text="commit.name"><i class="fa fa-clone"/></button>
                             <a t-att-href="'https://%s/commit/%s' % (commit_link.branch_id.remote_id.base_url, commit.name)" title="View Commit on Github"><i class="fa fa-github"/></a>
                             <span t-if="not from_base and not hide_stats" class="text-nowrap">
                                 <span class="text-success" t-out="'+%s' % commit_link.diff_add"/>
@@ -523,7 +523,7 @@
 
         <template id="runbot.branch_copy_button">
             <button type="button" t-attf-class="btn btn-default {{btn_size or 'btn-ssm'}}" title="Copy Bundle name" aria-label="Copy Bundle name" t-att-data-copy-text="bundle.name.split(':')[-1]">
-              <i t-attf-class="fa fa-clipboard"/>
+              <i t-attf-class="fa fa-clone"/>
             </button>
         </template>
 

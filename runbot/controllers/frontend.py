@@ -699,6 +699,27 @@ class Runbot(Controller):
             return werkzeug.utils.redirect(f'/runbot/bundle/{bundle_id}?expand_custom=1')
         return werkzeug.utils.redirect(f'/runbot/bundle/{bundle_id}')
 
+    @route(['/runbot/bundle/<int:bundle_id>/toggle_freeze'], type='http', auth='user', sitemap=False)
+    def toggle_freeze_tag(self, bundle_id, **kwargs):
+        if not request.env.user.has_group('runbot.group_freeze_leader'):
+            raise Forbidden("Only Freeze Leaders can toggle the next freeze tag")
+        bundle = request.env['runbot.bundle'].browse(bundle_id)
+        if not bundle.exists():
+            raise NotFound()
+        if bundle.is_base or bundle.is_staging:
+            raise Forbidden("Base or Staging's bundle cannot be tagged")
+        tag = bundle.project_id.next_freeze_tag_id
+        if not tag:
+            return request.redirect(f'/runbot/bundle/{bundle.id}')
+        msg = f"freeze {bundle.project_id.next_freeze_tag_id.name}"
+        if tag in bundle.tag_ids:
+            bundle.sudo().tag_ids -= tag
+            bundle.sudo().with_context(mail_create_nosubscribe=True).message_post(body=f"Removed from {msg}")
+        else:
+            bundle.sudo().tag_ids |= tag
+            bundle.sudo().with_context(mail_create_nosubscribe=True).message_post(body=f"Added to {msg}")
+        return request.redirect(f'/runbot/bundle/{bundle.id}')
+
     @route(['/runbot/trigger_custom/<int:trigger_custom_id>/set_mode/<string:mode>'], type='http', auth='user', sitemap=False)
     def configure_custom_trigger(self, trigger_custom_id, mode, **kwargs):
         if not request.env.user.has_group('runbot.group_user'):
