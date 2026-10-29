@@ -421,7 +421,7 @@ class Runbot(models.AbstractModel):
         db_gc_days = int(icp.get_param('runbot.db_gc_days', default=30))
         min_create_date = datetime.now() - timedelta(days=db_gc_days)
         batches_to_backup = self.env['runbot.batch'].search([('bundle_id.sticky', '=', True), ('create_date', '>', min_create_date)])
-        builds_to_backup = batches_to_backup.slot_ids.filtered('trigger_id.backup_databases').build_id
+        builds_to_backup = batches_to_backup.slot_ids.filtered(lambda rec: rec.trigger_id.backup_databases and rec.build_id.global_state == 'done').build_id
         backup_location = self._path('backups')
         os.makedirs(backup_location, exist_ok=True)
         existing_backups = {f.removesuffix('.zip') for f in os.listdir(backup_location) if f.endswith('.zip')}
@@ -433,10 +433,13 @@ class Runbot(models.AbstractModel):
             _logger.info('Backing up database %s', database.name)
             url = f'{database.build_id._http_log_url()}{database.name}.zip'
             assert str(database.build_id.id) in database.name  # ensure that database are well uniquified by build in order to avoid to forget to adapt this if it changes in the future
+            backup_dest = self._path('backups', f'{database.name}.zip')
             try:
-                subprocess.run(['wget', '-O', self._path('backups', f'{database.name}.zip'), url], check=True)
+                subprocess.run(['wget', '-q', '-O', backup_dest, url], check=True)
             except subprocess.CalledProcessError as e:
                 _logger.error('Failed to backup database %s: %s', database.name, e)
+                if os.path.exists(backup_dest):
+                    os.remove(backup_dest)
         # cleanup old backup
         # we could keep them longer than on hosts but let's keep it simple for now
         for remaining_backup in existing_backups:
