@@ -952,26 +952,32 @@ class BuildResult(models.Model):
                 build_dir = Path(builds_dir) / dest
                 gcstamp = build_dir / '.gcstamp'
                 for bdir_file in build_dir.iterdir():
-                    if bdir_file.is_dir() and bdir_file.name not in ('logs', 'tests'):
-                        try:
-                            shutil.rmtree(bdir_file, onexc=remove_readonly)
-                        except Exception:
-                            _logger.exception('Failed to remove %s', bdir_file)
-                    elif bdir_file.name == 'logs':
-                        for log_file_path in bdir_file.iterdir():
-                            if log_file_path.is_dir():
-                                try:
-                                    shutil.rmtree(log_file_path, onexc=remove_readonly)
-                                except Exception:
-                                    _logger.exception('Failed to remove %s', log_file_path)
-                            elif log_file_path.name in ('run.txt', 'wake_up.txt'):
-                                log_file_path.unlink()
-                            elif log_file_path.name.endswith('.zip'):
-                                if not self.children_ids:
+                    if bdir_file.is_dir():
+                        if bdir_file.name == 'logs':
+                            # In logs folder, keep only some files, (txt, json, zip, zst)
+                            for log_file_path in bdir_file.iterdir():
+                                if log_file_path.is_dir():
+                                    try:
+                                        shutil.rmtree(log_file_path, onexc=remove_readonly)
+                                    except Exception:
+                                        _logger.exception('Failed to remove %s', log_file_path)
+                                elif log_file_path.name in ('run.txt', 'wake_up.txt'):
                                     log_file_path.unlink()
-                            elif not (log_file_path.name.endswith('.txt') or log_file_path.name.endswith('logs.json')):
-                                log_file_path.unlink()
-                    gcstamp.write_text(f'gc date: {datetime.datetime.now()}')
+                                elif log_file_path.name.split('.')[-1] in ('zip', 'zst'):
+                                    if not self.children_ids:
+                                        log_file_path.unlink()
+                                elif not (log_file_path.name.endswith('.txt') or log_file_path.name.endswith('logs.json')):
+                                    log_file_path.unlink()
+                                    # todo we should unlink text file that are too big in all cases.
+                        elif bdir_file.name != 'tests':  # TODO we should at least check for big file there.
+                            try:
+                                shutil.rmtree(bdir_file, onexc=remove_readonly)
+                            except Exception:
+                                _logger.exception('Failed to remove %s', bdir_file)
+                    else:  # remove all files at root level
+                        bdir_file.unlink()
+
+                gcstamp.write_text(f'gc date: {datetime.datetime.now()}')
 
     def _find_port(self):
         # currently used port
