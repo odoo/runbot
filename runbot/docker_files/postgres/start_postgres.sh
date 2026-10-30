@@ -33,6 +33,7 @@ elif [ -n "${PGHOST:-}" ] && [ -n "${PGDATA:-}" ]; then
         "-c work_mem=64MB"
         #"-c maintenance_work_mem=256MB"
         "-c autovacuum=off"
+        "-c jit=off"
     )
     /usr/lib/postgresql/$PG_VERSION/bin/pg_ctl start -D $PGDATA -l /data/build/logs/postgres.txt -o "${DEFAULT_PG_ARGS[*]} $PG_ARGS"
 
