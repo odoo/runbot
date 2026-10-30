@@ -9,12 +9,12 @@ elif [ -n "${PGHOST:-}" ] && [ -n "${PGDATA:-}" ]; then
     NEEDS_INIT=false
 
     if [ -z "$(ls -A $PGDATA)" ]; then
-        if [ -n "$RESTORE_CLUSTER_ZIP_URL" ]; then
-            echo "Found RESTORE_CLUSTER_ZIP_URL. Downloading cluster backup..."
-            curl -sSL "$RESTORE_CLUSTER_ZIP_URL" -o /tmp/cluster_backup.zip
+        if [ -n "$RESTORE_CLUSTER_URL" ]; then
+            echo "Found RESTORE_CLUSTER_URL. Downloading cluster backup..."
+            curl -sSL "$RESTORE_CLUSTER_URL" -o /tmp/cluster_backup.tar.zstd
             echo "Extracting backup into /data/build..."
-            unzip -q /tmp/cluster_backup.zip -d /data/build
-            rm /tmp/cluster_backup.zip
+            tar --zstd -xf /tmp/cluster_backup.tar.zstd -C /data/build
+            rm /tmp/cluster_backup.tar.zstd
             chmod 0700 "$PGDATA"
         else
             echo "Initializing fresh PostgreSQL database..."
