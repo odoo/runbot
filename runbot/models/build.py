@@ -963,7 +963,7 @@ class BuildResult(models.Model):
                                         _logger.exception('Failed to remove %s', log_file_path)
                                 elif log_file_path.name in ('run.txt', 'wake_up.txt'):
                                     log_file_path.unlink()
-                                elif log_file_path.name.split('.')[-1] in ('zip', 'zst'):
+                                elif log_file_path.name.split('.')[-1] in ('zip', 'zstd'):
                                     if not self.children_ids:
                                         log_file_path.unlink()
                                 elif not (log_file_path.name.endswith('.txt') or log_file_path.name.endswith('logs.json')):

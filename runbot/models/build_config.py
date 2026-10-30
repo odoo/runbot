@@ -903,7 +903,7 @@ class ConfigStep(models.Model):
         cmd.finals.append(['mkdir', dump_dir])
         cmd.finals.append(['pg_dump', db_name, '>', sql_dest])
         if not for_upgrade:
-            env_variables.append(f'CLUSTER_BACKUP_NAME={db_name}-cluster.zip')
+            env_variables.append(f'CLUSTER_ZSTD_NAME={db_name}-cluster.tar.zstd')
             filestore_path = '/data/build/datadir/filestore/%s' % db_name
             filestore_dest = '%s/filestore/' % dump_dir
             zip_path = '/data/build/logs/%s.zip' % db_name
@@ -1175,7 +1175,7 @@ class ConfigStep(models.Model):
         else:
             config_data = params.config_data
 
-        cluster_zip_url = None
+        cluster_url = None
         default_target_suffix = self.restore_rename_db_suffix or 'all'
         if dump_url := config_data.get('dump_url'):
             zip_name = dump_url.split('/')[-1]
@@ -1231,12 +1231,12 @@ class ConfigStep(models.Model):
             use_backup = False
             use_host_postgres = config_data.get('use_host_postgres', docker_file.use_host_postgres)
             if config_data.get('restore_cluster', self.restore_cluster) and not use_host_postgres:   # TODO cleanup postgres remove
-                cluster_zip_url = dump_url.replace('.zip', '-cluster.zip')
-                if requests.head(cluster_zip_url, timeout=5).status_code != 200:  # TODO remove check once all dumps have a cluster zip
-                    build._log('', 'Using dump url, [no cluster](%s) was found', cluster_zip_url, log_type='markdown')
-                    cluster_zip_url = None
+                cluster_url = dump_url.replace('.zip', '-cluster.tar.zstd')
+                if requests.head(cluster_url, timeout=5).status_code != 200:  # TODO remove check once all dumps have a cluster zip
+                    build._log('', 'Using dump url, [no cluster](%s) was found', cluster_url, log_type='markdown')
+                    cluster_url = None
 
-            if not cluster_zip_url and reference_build.trigger_id.backup_databases and requests.head(dump_url, timeout=5).status_code != 200:
+            if not cluster_url and reference_build.trigger_id.backup_databases and requests.head(dump_url, timeout=5).status_code != 200:
                 for backup_host in self.env['runbot.host'].search([('is_backup', '=', True)]):
                     backup_url = f'{backup_host._backup_url()}{zip_name}'
                     if requests.head(backup_url, timeout=5).status_code == 200:
@@ -1247,9 +1247,9 @@ class ConfigStep(models.Model):
             if not use_backup:
                 message = 'Restoring template [%s](%s) from build [%s](%s)'
                 params = [zip_name, dump_url, reference_build.id, reference_build.build_url]
-                if cluster_zip_url:
+                if cluster_url:
                     message = f'{message} using [cluster](%s)'
-                    params.append(cluster_zip_url)
+                    params.append(cluster_url)
                 build._log('_run_restore', message, *params, log_type='markdown')
             default_target_suffix = dump_db.db_suffix
         target_suffix = build.params_id.restore_db_suffix or default_target_suffix
@@ -1259,8 +1259,8 @@ class ConfigStep(models.Model):
         db_template = icp.get_param('runbot.runbot_db_template', default='template0')
         self.env['runbot.database'].create({'name': restore_db_name, 'build_id': build.id})
         env_variables = []
-        if cluster_zip_url:
-            env_variables.append(f'RESTORE_CLUSTER_ZIP_URL={cluster_zip_url}')
+        if cluster_url:
+            env_variables.append(f'RESTORE_CLUSTER_URL={cluster_url}')
             cmd = [
                 echo('### Moving filestore'),
                 f'mv /data/build/datadir/filestore/{download_db_name} /data/build/datadir/filestore/{restore_db_name}',
