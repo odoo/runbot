@@ -77,7 +77,9 @@ def seen(env, pr):
     pr_id = to_pr(env, pr)
     return f'''[![Pull request status dashboard]({pr_id.url}.png)]({pr_id.url})
 
-🤖 [Open bundle on Runbot](https://runbot.odoo.com/runbot/bundle/{pr_id.label})\
+🤖 [Open bundle on Runbot](https://runbot.odoo.com/runbot/bundle/{pr_id.label})
+
+❓ [What's this](https://mergebot.odoo.com/documentation)\
 '''
 
 def make_basic(

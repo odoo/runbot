@@ -1,0 +1,8 @@
+<odoo>
+    <record model="website.rewrite" id="website-redirect-docs">
+        <field name="name">/documentation</field>
+        <field name="redirect_type">302</field>
+        <field name="url_from">/documentation</field>
+        <field name="url_to">https://github.com/odoo/odoo/wiki/Mergebot</field>
+    </record>
+</odoo>
