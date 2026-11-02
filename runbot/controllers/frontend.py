@@ -121,7 +121,10 @@ class Runbot(Controller):
         ], website=True, auth='public', type='http', sitemap=False)
     def bundle(self, bundle=None, page=1, limit=50, expand_custom=False, category=None, **kwargs):
         if isinstance(bundle, str):
-            bundle = request.env['runbot.bundle'].search([('name', '=', bundle)], limit=1, order='id')
+            domain = [('name', '=', bundle)]
+            if ':' in bundle:
+                domain = [('branch_ids.pull_head_name', '=', bundle)]
+            bundle = request.env['runbot.bundle'].search(domain, limit=1, order='id')
             if not bundle:
                 raise NotFound
             slug = request.env['ir.http']._slug
