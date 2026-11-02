@@ -103,7 +103,7 @@ class Branch(models.Model):
                 reference_name = branch.name
             repo = branch.remote_id.repo_id
             forced_version = repo.enforce_version and repo.single_version  # we don't add a depend on repo.single_version to avoid mass recompute of existing branches
-            if forced_version and not (reference_name.startswith(f'{forced_version.name}-') or reference_name == forced_version.name):
+            if forced_version and not self._has_version_prefix(reference_name, forced_version.name):
                 reference_name = f'{forced_version.name}---{reference_name}'
             branch.reference_name = reference_name
 
@@ -302,6 +302,14 @@ class Branch(models.Model):
         regex = icp.get_param('runbot.runbot_is_base_regex', False)
         if regex:
             return re.match(regex, name)
+
+    @api.model
+    def _has_version_prefix(self, name, version_name):
+        return (
+            name == version_name
+            or name.startswith(f'{version_name}-')
+            or name.startswith(f'{version_name}/')
+        )
 
     def action_recompute_infos(self):
         return self._recompute_infos()
