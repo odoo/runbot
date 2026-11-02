@@ -11,8 +11,8 @@ elif [ -n "${PGHOST:-}" ] && [ -n "${PGDATA:-}" ]; then
         cd /data/build
 
         BACKUP_PATHS=("${PGDATA#/data/build/}")
-        if [ -d "$ODOO_FILESTORE" ]; then
-            BACKUP_PATHS+=("${ODOO_FILESTORE#/data/build/}")
+        if [ -d "$ODOO_DATADIR" ]; then
+            BACKUP_PATHS+=("${ODOO_DATADIR#/data/build/}")
         else
             echo "Warning: Filestore directory not found, skipping in backup."
         fi

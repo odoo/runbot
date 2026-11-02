@@ -4,7 +4,7 @@ if pg_isready -h /var/run/postgresql > /dev/null 2>&1; then
     PGHOST=/var/run/postgresql
     export PGHOST
 elif [ -n "${PGHOST:-}" ] && [ -n "${PGDATA:-}" ]; then
-    mkdir -p "$PGDATA" "$PGHOST" "$ODOO_FILESTORE"
+    mkdir -p "$PGDATA" "$PGHOST" "$ODOO_DATADIR"
     mkdir -p /data/build/logs/
     NEEDS_INIT=false
 

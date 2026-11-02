@@ -314,7 +314,7 @@ class Dockerfile(models.Model):
                 files_operations = ' && '.join(files_operations)
                 content += f"""RUN {files_operations}\n"""
                 content += """
-                ENV PGDATA=/data/build/postgres/${PG_VERSION} PGHOST=/data/build/pgsock ODOO_FILESTORE=/data/build/datadir/filestore
+                ENV PGDATA=/data/build/postgres/${PG_VERSION} PGHOST=/data/build/pgsock ODOO_DATADIR=/data/build/datadir
                 ENTRYPOINT ["/entrypoint.sh"]
                 """
             content += f"\nUSER {USERNAME}\nENV USER {USERNAME}\n"
