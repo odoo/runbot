@@ -293,8 +293,8 @@
                 </span>
             </a>
             <a href="/runbot/load_info" class="slots_infos" title="View load infos">
-                <t t-set="testing" t-value="hosts_data._total_testing()"/>
-                <t t-set="workers" t-value="hosts_data._total_workers()"/>
+                <t t-set="testing" t-value="env['runbot.host']._total_testing()"/>
+                <t t-set="workers" t-value="env['runbot.host']._total_workers()"/>
                 <t t-set="klass">success</t>
                 <t t-if="not workers" t-set="klass">danger</t>
                 <t t-else="">
