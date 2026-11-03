@@ -278,10 +278,11 @@ class Host(models.Model):
         self.psql_version = res[0].split()[1] if res else False
 
     def _total_testing(self):
-        return sum(host.nb_testing for host in self)
+        return self.env['runbot.build'].search_count([('local_state', '=', 'testing')])
 
     def _total_workers(self):
-        return sum(host.nb_worker for host in self)
+        [(total,)] = self.env['runbot.host']._read_group([('assigned_only', '=', False)], [], ['nb_worker:sum'])
+        return total
 
     def _disable(self):
         """ Reserve host if possible """
