@@ -187,7 +187,7 @@ dialog.modal {
 		}
 
 		&:hover {
-			--bs-card-cap-bg: var(--bs-secondary-bg);
+			background-color: var(--bs-secondary-bg) !important; /* over the text-bg-*-subtle status color */
 
 			.header_hover {
 				visibility: visible;

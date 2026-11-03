@@ -101,12 +101,13 @@
       <t t-set="more" t-value="str2bool(request.httprequest.cookies.get('more', ''), False)"/>
       <t t-set="show_failed_triggers" t-value="str2bool(request.httprequest.cookies.get('show_failed_triggers', '1'), False)"/>
       <t t-set="color" t-value="batch._get_color_class()"/>
+      <t t-set="header_class" t-value="'' if batch.state in ('preparing', 'ready') else 'text-bg-%s-subtle' % color"/>
 
       <div t-attf-class="batch_tile">
         <div t-attf-class="card border-{{color}}">
-          <a t-attf-href="/runbot/batch/#{batch.id}" class="card-header" t-att-title="dt2str(batch.create_date)">
+          <a t-attf-href="/runbot/batch/#{batch.id}" t-attf-class="card-header {{header_class}}" t-att-title="dt2str(batch.create_date)">
             <i t-if="batch.state in ('preparing', 'ready')" t-attf-class="fa fa-hourglass-half fa-fw text-{{color}}"/>
-            <i t-else="" t-attf-class="fa fa-{{batch._fa_result()}} fa-fw text-{{color}}"/>
+            <i t-else="" t-attf-class="fa fa-{{batch._fa_result()}} fa-fw"/>
             <t t-out="batch._get_formated_age()"/>
             <i class="fa fa-exclamation-triangle text-warning" t-if="batch.has_warning and batch.state in ('preparing', 'ready')"/>
             <span class="float-end header_hover">View batch...</span>
