@@ -113,12 +113,13 @@
           <div class="row">
             <!-- Build details-->
             <t t-set="rowclass" t-value="build._get_color_class()"/>
+            <t t-set="header_class" t-value="'' if build.global_state in ('testing', 'pending', 'waiting') else 'text-bg-%s-subtle' % rowclass"/>
             <div class="card-group">
               <div t-attf-class="card border-{{rowclass}} build_details">
-                <header class="card-header d-flex flex-wrap align-items-center gap-2">
+                <header t-attf-class="card-header d-flex flex-wrap align-items-center gap-2 {{header_class}}">
                   <span class="h6 mb-1 me-auto">
                     <i t-if="build.global_state in ('testing', 'pending', 'waiting')" t-attf-class="fa fa-spinner fa-spin fa-fw text-{{rowclass}} me-1"/>
-                    <i t-else="" t-attf-class="fa fa-{{build._fa_result()}} fa-fw text-{{rowclass}} me-1"/>
+                    <i t-else="" t-attf-class="fa fa-{{build._fa_result()}} fa-fw me-1"/>
                     <t t-out="build.md_description if build.description else build.config_id.name"/>
                   </span>
                   <t t-if="not has_children" t-out="build_toolbar"/>
@@ -274,7 +275,7 @@
                 </ul>
               </div>
               <div t-attf-class="card border-{{rowclass}} build_children" t-if="has_children">
-                <header class="card-header d-flex flex-wrap align-items-center gap-2 justify-content-end">
+                <header t-attf-class="card-header d-flex flex-wrap align-items-center gap-2 justify-content-end {{header_class}}">
                   <t t-out="build_toolbar"/>
                 </header>
                 <div class="card-body">

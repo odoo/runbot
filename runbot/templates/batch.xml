@@ -21,6 +21,7 @@
                 <div class="container-fluid">
                     <div class="row">
                         <t t-set="color" t-value="batch._get_color_class()"/>
+                        <t t-set="header_class" t-value="'' if batch.state in ('preparing', 'ready') else 'text-bg-%s-subtle' % color"/>
                         <t t-set="auto_slots" t-value="batch.slot_ids.filtered(lambda s: not s.trigger_id.manual)"/>
                         <t t-set="manual_slots" t-value="batch.slot_ids.filtered(lambda s: s.trigger_id.manual and (s.build_id or (user_id._is_internal() and ((not s.trigger_id.team_ids) or (user_id in s.trigger_id.team_ids.user_ids)))))"/>
                         <t t-set="old_slots" t-value="more and batch.with_context(active_test=False).slot_ids.filtered(lambda s: not s.active)"/>
@@ -34,10 +35,10 @@
                         </t>
                         <div class="card-group">
                             <div t-attf-class="card border-{{color}} batch_details">
-                                <header class="card-header d-flex align-items-center gap-2">
+                                <header t-attf-class="card-header d-flex align-items-center gap-2 {{header_class}}">
                                     <span class="h6 mb-1 me-auto">
                                         <i t-if="batch.state in ('preparing', 'ready')" t-attf-class="fa fa-hourglass-half fa-fw text-{{color}} me-1"/>
-                                        <i t-else="" t-attf-class="fa fa-{{batch._fa_result()}} fa-fw text-{{color}} me-1"/>
+                                        <i t-else="" t-attf-class="fa fa-{{batch._fa_result()}} fa-fw me-1"/>
                                         batch-<t t-out="batch.id"/>
                                         <small class="text-body-secondary ms-1" t-att-title="dt2str(batch.create_date)" t-out="batch._get_formated_age()"/>
                                     </span>
@@ -117,7 +118,7 @@
                                 </ul>
                             </div>
                             <div t-if="has_checks" t-attf-class="card border-{{color}} batch_builds">
-                                <header class="card-header d-flex align-items-center gap-2 justify-content-end">
+                                <header t-attf-class="card-header d-flex align-items-center gap-2 justify-content-end {{header_class}}">
                                     <t t-out="batch_toolbar"/>
                                 </header>
                                 <div class="card-body">

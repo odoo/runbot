@@ -543,6 +543,42 @@ code {
     background-color: var(--bs-tertiary-bg) !important;
 }
 
+/* Bootstrap has no subtle variant of the text-bg-* helpers */
+.text-bg-default-subtle {
+    color: var(--bs-body-color) !important;
+    background-color: var(--bs-tertiary-bg) !important;
+}
+
+.text-bg-primary-subtle {
+    color: var(--bs-primary-text-emphasis) !important;
+    background-color: var(--bs-primary-bg-subtle) !important;
+}
+
+.text-bg-secondary-subtle {
+    color: var(--bs-secondary-text-emphasis) !important;
+    background-color: var(--bs-secondary-bg-subtle) !important;
+}
+
+.text-bg-success-subtle {
+    color: var(--bs-success-text-emphasis) !important;
+    background-color: var(--bs-success-bg-subtle) !important;
+}
+
+.text-bg-info-subtle {
+    color: var(--bs-info-text-emphasis) !important;
+    background-color: var(--bs-info-bg-subtle) !important;
+}
+
+.text-bg-warning-subtle {
+    color: var(--bs-warning-text-emphasis) !important;
+    background-color: var(--bs-warning-bg-subtle) !important;
+}
+
+.text-bg-danger-subtle {
+    color: var(--bs-danger-text-emphasis) !important;
+    background-color: var(--bs-danger-bg-subtle) !important;
+}
+
 .border-default,
 .border-default-subtle {
     border-color: var(--bs-border-color) !important;
