@@ -8,6 +8,8 @@
 runbot/static/backups/
 runbot/static/build
 runbot/static/repo
+runbot/static/repo-gc
+runbot/static/repo-to_remove
 runbot/static/sources
 runbot/static/nginx
 runbot/static/databases

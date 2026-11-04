@@ -5,6 +5,7 @@ import logging
 import os
 import psutil
 import re
+import shutil
 import sys
 import threading
 import time
@@ -33,6 +34,11 @@ class RunbotClient():
         self.host = self.env['runbot.host']._get_current()
         self.count = 0
         self.max_count = 60
+        self.repos_to_gc = []
+        self.gc_process = None
+        self.gc_thread = None
+        self.gc_thread_repo = None
+        self.gc_thread_result = None
 
     def on_start(self):
         pass
@@ -47,6 +53,7 @@ class RunbotClient():
         signal.signal(signal.SIGQUIT, self.dump_stack)
         self.host = self.env['runbot.host']._get_current()
         self.update_next_git_gc_date()
+        self._gc_cleanup()
         self.host._bootstrap()
         logging.info(
             'Host %s running with %s slots on pid %s%s',
@@ -90,7 +97,7 @@ class RunbotClient():
                     self.host.last_end_loop = fields.Datetime.now()
                     self.env.cr.commit()
                     self.env.clear()
-                    _logger.info('Work done in %.2fs and %s queries', time.time() - start, self.env.cr.sql_log_count - previous_queries)
+                    _logger.info('Work done in %.2fs and %s queries%s', time.time() - start, self.env.cr.sql_log_count - previous_queries, self._gc_progress())
                     previous_queries = self.env.cr.sql_log_count
                     self.sleep(sleep_time)
             except Exception:
@@ -111,6 +118,8 @@ class RunbotClient():
 
         _logger.info("Interrupt detected")
         self.ask_interrupt.set()
+        if self.gc_process:
+            self.gc_process.terminate()  # git takes its own children down with it
 
     def dump_stack(self, _signal, _frame):
         import odoo
@@ -128,35 +137,132 @@ class RunbotClient():
             self.next_git_gc_date += timedelta(days=1)
         _logger.info('Next git gc scheduled on %s', self.next_git_gc_date)
 
+    def _gc_progress(self):
+        if self.gc_thread is not None and self.gc_thread.is_alive():
+            return f' ({self.gc_thread.name} in progress)'
+        return ''
+
+    def _gc_path(self, repo):
+        # basename of the live path, already sanitized the same way
+        return self.env['runbot.runbot']._path('repo-gc', os.path.basename(repo.path))
+
+    def _gc_to_remove_path(self, repo):
+        return self.env['runbot.runbot']._path('repo-to_remove', os.path.basename(repo.path))
+
+    def _gc_cleanup(self):
+        for directory in ('repo-gc', 'repo-to_remove'):
+            path = self.env['runbot.runbot']._path(directory)
+            leftovers = os.listdir(path) if os.path.isdir(path) else []
+            if leftovers:
+                _logger.info('Discarding leftover %s copies: %s', directory, leftovers)
+                shutil.rmtree(path, ignore_errors=True)
+
     def git_gc(self):
-        """ git gc once a day """
+        if self.gc_thread is not None:
+            if self.gc_thread.is_alive():
+                return
+            self._gc_finalize()  # move the repositories
+            return
+
+        if self.repos_to_gc:
+            self._gc_start_next()
+            return
+
         if self.next_git_gc_date < datetime.now():
-            _logger.info('Starting git gc on repositories')
-            commands = []
-            host_name = self.host.name
-            repos = self.env['runbot.repo'].search([('mode', '!=', 'disabled')])
-            for repo in repos:
-                commands.append((repo.name, repo._get_git_command(['gc', '--prune=all', '--quiet'])))
-                # update the repos once a day to speed up individual commit fetches
-                repo._update(force=True)
-
-            self.env.cr.rollback()
-
-            # gc commands can be slow, rollbacking to avoid to keep a transaction idle for multiple minutes.
-            messages = []
-            for repo_name, command in commands:
-                try:
-                    start = time.time()
-                    subprocess.check_output(command, stderr=subprocess.STDOUT).decode()
-                    _logger.info('Git gc on %s took %ss', repo_name, time.time() - start)
-                except subprocess.CalledProcessError as e:
-                    message = f'git gc failed for {repo_name} on {host_name} with exit status {e.returncode} and message "{e.output[:60]} ..."'
-                    messages.append(message)
-            for message in messages:
-                self.env['runbot.runbot']._warning(message)
-
-            self.env.cr.commit()
+            self.repos_to_gc = self.env['runbot.repo'].search([('mode', '!=', 'disabled')]).ids
+            _logger.info('Starting git gc cycle on %s repositories', len(self.repos_to_gc))
             self.update_next_git_gc_date()
+
+    def _gc_start_next(self):
+        repo = self.env['runbot.repo'].browse(self.repos_to_gc.pop(0))
+        if not repo.exists():
+            _logger.info('Skipping git gc for repo id %s: repo no longer exists', repo.id)
+            return
+        if not os.path.isdir(repo.path):
+            _logger.info('Skipping git gc for %s: repo path missing', repo.name)
+            return
+
+        _logger.info('Starting git gc of %s', repo.name)
+        gc_path = self._gc_path(repo)
+        # a copy may remain if a previous gc was killed and the orphan git process
+        # was still writing in it while the startup cleanup was removing it
+        shutil.rmtree(gc_path, ignore_errors=True)
+        os.makedirs(os.path.dirname(gc_path), exist_ok=True)
+        try:
+            shutil.copytree(
+                repo.path, gc_path,
+                copy_function=os.link,  # hardlink the files instead of copying them
+                symlinks=True,  # copy symlinks as symlinks, don't follow them
+            )
+        except OSError as e:
+            _logger.warning('Failed to snapshot %s for git gc: %s', repo.name, e)
+            shutil.rmtree(gc_path, ignore_errors=True)
+            return
+
+        # same fetch as repo._update, but on the copy, to bring it up to date with the
+        # remotes before swapping it in
+        fetch_command = repo._get_git_command(['fetch', '-p', '--all', '-j2'])
+        fetch_command[fetch_command.index(repo.path)] = gc_path
+
+        self.gc_thread_repo = (repo.id, repo.name, repo.path, gc_path)
+        self.gc_thread_result = {}
+        self.gc_thread = threading.Thread(
+            target=self._gc_thread_main,
+            args=(repo.name, gc_path, fetch_command, self.gc_thread_result),
+            name=f'gc of {repo.name}',  # also shows up in dumpstacks
+            daemon=True,
+        )
+        self.gc_thread.start()
+
+    def _gc_thread_main(self, repo_name, gc_path, fetch_command, result):
+        """Runs in a background thread: filesystem and subprocess only, no env/cursor access."""
+        steps = [
+            ('gc', ['git', '-C', gc_path, 'gc', '--prune=all', '--quiet'], True),
+            ('fetch', fetch_command, False),  # a failed fetch still leaves a gc'ed copy worth swapping
+        ]
+        for step, command, needed in steps:
+            start = time.time()
+            self.gc_process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            output, _ = self.gc_process.communicate()
+            _logger.info('Git %s of %s took %.2fs', step, repo_name, time.time() - start)
+            if self.gc_process.returncode:
+                result['error'] = f'git {step} failed for {repo_name} with exit status {self.gc_process.returncode} and message "{output.decode()[:300]}"'
+                if needed:
+                    return
+        result['done'] = True
+
+    def _gc_finalize(self):
+        repo_id, repo_name, live_path, gc_path = self.gc_thread_repo
+        result = self.gc_thread_result
+        self.gc_thread = None
+        self.gc_thread_repo = None
+        self.gc_thread_result = None
+
+        if 'error' in result:
+            self.env['runbot.runbot']._warning(f'{result["error"]} on {self.host.name}')
+        elif 'done' not in result:  # the thread crashed before setting anything
+            self.env['runbot.runbot']._warning(f'git gc crashed for {repo_name} on {self.host.name}')
+
+        if 'done' not in result:  # the gc itself failed, keep the live repo untouched
+            shutil.rmtree(gc_path, ignore_errors=True)
+            self.env.cr.commit()
+            return
+
+        repo = self.env['runbot.repo'].browse(repo_id)
+        to_remove_path = self._gc_to_remove_path(repo)
+        # a previous finalize may have failed before removing it, and the startup
+        # cleanup never ran since the process is still alive
+        shutil.rmtree(to_remove_path, ignore_errors=True)
+        os.makedirs(os.path.dirname(to_remove_path), exist_ok=True)
+        os.rename(live_path, to_remove_path)
+        os.rename(gc_path, live_path)
+        threading.Thread(target=shutil.rmtree, args=(to_remove_path,), kwargs={'ignore_errors': True}, daemon=True).start()
+
+        # closes the gap between the thread's fetch and the swap, and doubles as the
+        # daily forced update, speeding up individual commit fetches
+        repo._update(force=True)
+        self.env.cr.commit()
+        _logger.info('Swapped in the gc of %s', repo_name)
 
 
 def run(client_class):
