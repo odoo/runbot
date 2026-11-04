@@ -23,7 +23,7 @@
         <field name="layer_type">template</field>
         <field name="name">Install pip packages</field>
         <field name="values">{}</field>
-        <field name="content">RUN python3 -m pip install --no-cache-dir {$packages}</field>
+        <field name="content">RUN python3 -m pip install --no-cache-dir {$packages} &amp;&amp; if [ -d /venv/main ]; then chmod -R a+rX /venv/main; fi</field>
     </record>
 
     <record id="runbot.docker_layer_create_user_template" model="runbot.docker_layer">
