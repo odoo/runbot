@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import datetime
+import os
 import time
 from odoo import fields
 from odoo.tests.common import TransactionCase
@@ -202,8 +203,20 @@ class RunbotCase(TransactionCase):
         self.start_patcher('git_patcher', 'odoo.addons.runbot.models.repo.Repo._git', new=mock_git)
         self.start_patcher('hostname_patcher', 'odoo.addons.runbot.common.socket.gethostname', 'host.runbot.com')
         self.start_patcher('github_patcher', 'odoo.addons.runbot.models.repo.Remote._github', {})
-        self.start_patcher('makedirs', 'odoo.addons.runbot.common.os.makedirs', True)
-        self.start_patcher('mkdir', 'odoo.addons.runbot.common.os.mkdir', True)
+        # os is patched globally, only skip the directories in runbot static (readonly on runbot)
+        static_root = self.env['runbot.runbot']._root()
+        real_makedirs, real_mkdir = os.makedirs, os.mkdir
+
+        def makedirs(path, *args, **kwargs):
+            if not os.path.abspath(path).startswith(static_root):
+                real_makedirs(path, *args, **kwargs)
+
+        def mkdir(path, *args, **kwargs):
+            if not os.path.abspath(path).startswith(static_root):
+                real_mkdir(path, *args, **kwargs)
+
+        self.start_patcher('makedirs', 'odoo.addons.runbot.common.os.makedirs', new=makedirs)
+        self.start_patcher('mkdir', 'odoo.addons.runbot.common.os.mkdir', new=mkdir)
         self.start_patcher('local_pgadmin_cursor', 'odoo.addons.runbot.common.local_pgadmin_cursor', False)  # avoid to create databases
         self.start_patcher('host_local_pg_cursor', 'odoo.addons.runbot.models.host.local_pg_cursor')
         self.start_patcher('isdir', 'odoo.addons.runbot.common.os.path.isdir', True)

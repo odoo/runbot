@@ -55,6 +55,7 @@ class Trigger(models.Model):
     sequence = fields.Integer('Sequence')
     name = fields.Char("Name")
     description = fields.Char("Description", help="Informative description")
+    purpose = fields.Text("Purpose", help="What this trigger checks and how to interpret a failure")
     project_id = fields.Many2one('runbot.project', string="Project id", required=True)
     repo_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_triggers', string="Triggers", domain="[('project_id', '=', project_id)]")
     dependency_ids = fields.Many2many('runbot.repo', relation='runbot_trigger_dependencies', string="Dependencies")
