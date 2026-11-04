@@ -62,8 +62,8 @@ class BuilderClient(RunbotClient):
                 self.env.cr.commit()
                 self.host._set_psql_conn_count()
                 self.env.cr.commit()
-                self.git_gc()
-                self.env.cr.commit()
+            self.git_gc()
+            self.env.cr.commit()
             return self.env['runbot.runbot']._scheduler_loop_turn(self.host)
         else:
             self.host.last_success = datetime.now()
