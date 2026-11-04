@@ -36,6 +36,9 @@
                   <field name="on_dev"/>
                 </group>
               </group>
+              <group string="Purpose">
+                <field name="purpose" nolabel="1" colspan="2"/>
+              </group>
               <group>
                 <group string="Repositories">
                   <field name="repo_ids" nolabel="1" colspan="2"/>

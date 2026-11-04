@@ -907,6 +907,7 @@ class ConfigStep(models.Model):
             filestore_path = '/data/build/datadir/filestore/%s' % db_name
             filestore_dest = '%s/filestore/' % dump_dir
             zip_path = '/data/build/logs/%s.zip' % db_name
+            build.database_ids.filtered(lambda database: database.name == db_name).exported = True
             cmd.finals.append([echo('### Copying filestore')])
             cmd.finals.append(['cp', '-r', filestore_path, filestore_dest])
             cmd.finals.append([echo('### Generating zip')])
@@ -1348,9 +1349,11 @@ class ConfigStep(models.Model):
         if database_exported:
             db_suffix = config_data.get('db_name') or ((build.params_id.restore_db_suffix or build.params_id.dump_db.db_suffix) if not self.create_db else False) or self._get_db_name(build)
             db_suffix = re.sub(r'[^a-z0-9\-_]', '_', db_suffix.lower())
-            message += ' [@icon-download](%s%s-%s.zip)'
-            args += [build._http_log_url(), build.dest, db_suffix]
-            log_type = 'markdown'
+            db_name = f'{build.dest}-{db_suffix}'
+            if build.database_ids.filtered(lambda database: database.name == db_name and database.exported):
+                message += ' [@icon-download](%s%s.zip)'
+                args += [build._http_log_url(), db_name]
+                log_type = 'markdown'
         build._log('', message, *args, log_type=log_type)
 
         if self.coverage and self.coverage_make_report:
@@ -1838,6 +1841,7 @@ class ConfigStep(models.Model):
             cmd = Command(pres, command, [])
             env_variables = []
             if current_step.get('export_database'):
+                self.env['runbot.database'].create({'name': db_name, 'build_id': build.id})
                 self._add_export_database(build, cmd, db_name, env_variables)
             cpu_limit = self.cpu_limit
             if current_step.get('cpu_limit'):
