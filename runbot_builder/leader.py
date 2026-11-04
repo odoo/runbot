@@ -24,9 +24,8 @@ class LeaderClient(RunbotClient):
 
         self.last_update = self.env['runbot.repo'].search([('write_date', '>', self.last_update)])._update_git_config()
         self.env.cr.commit()
-        if self.count == 0:
-            self.git_gc()
-            self.env.cr.commit()
+        self.git_gc()
+        self.env.cr.commit()
 
         if self.host.send_status:
             self.env['runbot.commit.status']._send_to_process()
