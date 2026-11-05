@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 import platform
+import shutil
 
 import psutil
 
@@ -65,6 +66,9 @@ class Host(models.Model):
     memory = fields.Integer('Memory (GiB)', help="Host Total memory (GiB)", default=0)
     os_version = fields.Char('OS Version')
     psql_version = fields.Char('PSQL Version')
+    disk_size = fields.Integer('Disk Size (GiB)', help="Runbot Partition Size", default=0)
+    disk_used = fields.Integer('Disk Used (GiB)', help="Runbot Partition Used Space", default=0)
+    disk_usage = fields.Char('Disk Usage', compute='_compute_disk_usage')
 
     def _compute_nb(self):
         # Array of tuple (host, state, count)
@@ -81,6 +85,11 @@ class Host(models.Model):
     def _compute_build_ids(self):
         for host in self:
             host.build_ids = self.env['runbot.build'].search([('host', '=', host.name), ('local_state', 'in', ('pending', 'testing', 'running'))])
+
+    @api.depends('disk_used', 'disk_size')
+    def _compute_disk_usage(self):
+        for host in self:
+            host.disk_usage = f'{host.disk_used} / {host.disk_size} GiB' if host.disk_size else False
 
     def _static_url(self):
         use_ssl = self.env['ir.config_parameter'].sudo().get_param('runbot.use_ssl', default=True)
@@ -267,6 +276,9 @@ class Host(models.Model):
             res = local_cr.fetchone()
         self.psql_conn_count = res and res[0] or 0
 
+    def _get_disk_usage(self):
+        return shutil.disk_usage(self.env['runbot.runbot']._path())
+
     def _set_host_infos(self):
         self.ensure_one()
         self.cpu_count = psutil.cpu_count() or 0
@@ -276,6 +288,7 @@ class Host(models.Model):
             local_cr.execute("SELECT version();")
             res = local_cr.fetchone()
         self.psql_version = res[0].split()[1] if res else False
+        self.disk_size = round(self._get_disk_usage().total / 1024**3)
 
     def _total_testing(self):
         return self.env['runbot.build'].search_count([('local_state', '=', 'testing')])

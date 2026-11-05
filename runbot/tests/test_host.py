@@ -176,3 +176,13 @@ class TestHost(RunbotCase):
 
         self.patchers['docker_push'].assert_has_calls(expected_push_calls)
         self.patchers['docker_pull'].assert_not_called()
+
+    def test_compute_disk_usage(self):
+        host = self.env['runbot.host'].create({
+            'name': 'disk_host',
+            'disk_used': 125,
+            'disk_size': 250,
+        })
+        self.assertEqual(host.disk_usage, '125 / 250 GiB')
+        host.disk_size = 0
+        self.assertFalse(host.disk_usage)
