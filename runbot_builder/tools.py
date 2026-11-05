@@ -75,6 +75,7 @@ class RunbotClient():
                 context_manager = Profiler(db=self.env.cr.dbname) if self.host.profile else nullcontext()
                 with context_manager:
                     self.host.last_start_loop = fields.Datetime.now()
+                    self.host.disk_used = round(self._get_disk_usage().used / 1024**3)
                     self.env.cr.commit()
                     self.count = self.count % self.max_count
                     if self.host.paused:

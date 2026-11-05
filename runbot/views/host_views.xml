@@ -46,10 +46,13 @@
                             </field>
                         </page>
                         <page string="System">
-                            <field name="cpu_count" readonly="1"/>
-                            <field name="memory" readonly="1"/>
-                            <field name="os_version" readonly="1"/>
-                            <field name="psql_version" readonly="1"/>
+                            <group>
+                                <field name="cpu_count" readonly="1"/>
+                                <field name="memory" readonly="1"/>
+                                <field name="os_version" readonly="1"/>
+                                <field name="psql_version" readonly="1"/>
+                                <field name="disk_usage" readonly="1"/>
+                            </group>
                         </page>
                     </notebook>
                 </sheet>
