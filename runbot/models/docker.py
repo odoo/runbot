@@ -171,6 +171,8 @@ class Dockerfile(models.Model):
     image_identifier = fields.Char('Identifier', tracking=True)
     image_future_identifier = fields.Char('Future Identifier', tracking=True)
     image_previous_identifier = fields.Char('Previous Identifier', tracking=True)
+    image_size = fields.Integer('Current size (MiB)', compute='_compute_image_size')
+    image_future_size = fields.Integer('Future size (MiB)', compute='_compute_image_size')
     has_future = fields.Boolean(compute='_compute_has_future', store=True)
     image_tag = fields.Char(compute='_compute_image_tag', recursive=True, store=True)
     image_future_tag = fields.Char(compute='_compute_image_helper_tags')
@@ -283,6 +285,14 @@ class Dockerfile(models.Model):
     def _get_last_successful_result_for_ident(self, identifier=None):
         domain = [('result', '=', 'success'), ('dockerfile_id', 'in', self.ids), ('identifier', '=', identifier)]
         return self.env['runbot.docker_build_result'].search(domain, order='id desc', limit=1)
+
+    @api.depends('image_identifier', 'image_future_identifier', 'build_results.image_size')
+    def _compute_image_size(self):
+        for record in self:
+            current_result = record._get_last_successful_result_for_ident(record.image_identifier)
+            future_result = record._get_last_successful_result_for_ident(record.image_future_identifier)
+            record.image_size = current_result.image_size or 0
+            record.image_future_size = future_result.image_size or 0
 
     @api.depends('bundle_ids', 'referencing_dockerlayer_ids', 'project_ids', 'version_ids')
     def _compute_use_count(self):
@@ -454,6 +464,8 @@ class Dockerfile(models.Model):
         if success:
             docker_build_result_values['result'] = 'success'
             docker_build_result_values['identifier'] = image_id
+            if image := result.get('image'):
+                docker_build_result_values['image_size'] = round(image.attrs.get('Size', 0) / 1024 ** 2)
         else:
             docker_build_result_values['result'] = 'error'
             self.in_error = True
@@ -477,7 +489,6 @@ class Dockerfile(models.Model):
             if previous_result.content != docker_build_result_values['content']:  # docker image changed
                 should_save_result = True
 
-
         if should_save_result:
             if success:
                 docker_build_result_values['metadata'] = self._get_docker_metadata(docker_build_result_values['identifier'])
@@ -499,6 +510,7 @@ class DockerBuildOutput(models.Model):
     result = fields.Selection(string="Result", selection=[('error', 'Error'), ('success', 'Success')])
     host_id = fields.Many2one('runbot.host', string="Host")
     duration = fields.Float("Exec time")
+    image_size = fields.Integer("Image size (MiB)", help="Image size in MiB.")
     dockerfile_id = fields.Many2one('runbot.dockerfile', string="Docker file")
     output = fields.Text('Output')
     formated_output = fields.Html('Colored Output', compute='_compute_formated_output')
