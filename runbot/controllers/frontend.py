@@ -9,8 +9,8 @@ from dateutil.relativedelta import relativedelta
 from werkzeug.exceptions import BadRequest, Forbidden, NotFound
 
 from odoo import fields
-from odoo.http import Controller, Response, request, route
 from odoo.fields import Domain
+from odoo.http import Controller, Response, request, route
 from odoo.tools import str2bool
 
 _logger = logging.getLogger(__name__)
@@ -434,7 +434,7 @@ class Runbot(Controller):
 
     @route(['/runbot/errors',
             '/runbot/errors/page/<int:page>',
-            ], type='http', auth='user', website=True, sitemap=False)
+            ], type='http', auth='public', website=True, sitemap=False)
     def build_errors(self, sort=None, page=1, limit=20, **kwargs):
         sort_order_choices = {
             'last_seen_date desc': 'Last seen date: Newer First',
@@ -448,26 +448,29 @@ class Runbot(Controller):
         }
 
         sort_order = sort if sort in sort_order_choices else 'last_seen_date desc'
+        limit = min(max(int(limit), 1), 100)
 
-        current_user_errors = request.env['runbot.build.error'].search([
-            ('responsible', '=', request.env.user.id),
-        ], order='last_seen_date desc, build_count desc')
-        current_team_errors = request.env['runbot.build.error'].search([
-            ('responsible', '=', False),
-            ('team_id', 'in', request.env.user.runbot_team_ids.ids),
-        ], order='last_seen_date desc, build_count desc')
-        domain = [('responsible', '!=', request.env.user.id), ('build_count', '>', 1)]
-        build_errors_count = request.env['runbot.build.error'].search_count(domain)
+        BuildError = request.env['runbot.build.error']
+        current_user_errors = current_team_errors = BuildError
+        if not request.env.user._is_public():
+            current_user_errors = BuildError.search(Domain('responsible', '=', request.env.user.id), order='last_seen_date desc, build_count desc')
+            current_team_errors = BuildError.search(Domain([
+                ('responsible', '=', False),
+                ('team_id', 'in', request.env.user.runbot_team_ids.ids),
+            ]), order='last_seen_date desc, build_count desc')
+        domain = Domain([('responsible', '!=', request.env.user.id), ('build_count', '>', 1)])
+        build_errors_count = BuildError.search_count(domain)
         url_args = {}
         url_args['sort'] = sort
-        pager = request.website.pager(url='/runbot/errors/', url_args=url_args, total=build_errors_count, page=page, step=int(limit))
+        pager = request.website.pager(url='/runbot/errors/', url_args=url_args, total=build_errors_count, page=page, step=limit)
 
-        build_errors = request.env['runbot.build.error'].search(domain, order=sort_order, limit=limit, offset=pager.get('offset', 0))
+        build_errors = BuildError.search(domain, order=sort_order, limit=limit, offset=pager.get('offset', 0))
 
         qctx = {
             'current_user_errors': current_user_errors,
             'current_team_errors': current_team_errors,
             'build_errors': build_errors,
+            'build_errors_count': build_errors_count,
             'title': 'Build Errors',
             'sort_order_choices': sort_order_choices,
             'sort_order': sort_order,
@@ -475,6 +478,24 @@ class Runbot(Controller):
             'pager': pager,
         }
         return request.render('runbot.build_error', qctx)
+
+    @route([
+        '/runbot/error/<int:build_error_id>',
+        '/runbot/error/<string:build_error_slug>',
+    ], type='http', auth='public', website=True, sitemap=False)
+    def build_error_details(self, build_error_id=None, build_error_slug=None, **kwargs):
+        if build_error_slug:
+            # e.g. /runbot/error/some-error-name-42
+            build_error_id = request.env['ir.http']._unslug(build_error_slug)[1]
+            if not build_error_id:
+                raise NotFound()
+        build_error = request.env['runbot.build.error'].with_context(active_test=False).search([('id', '=', build_error_id)])
+        if not build_error:
+            raise NotFound()
+        return request.render('runbot.build_error_details', {
+            'build_error': build_error,
+            'title': 'Error %s' % build_error.id,
+        })
 
     @route(['/runbot/teams', '/runbot/teams/<model("runbot.team"):team>'], type='http', auth='user', website=True, sitemap=False)
     def team_dashboards(self, team=None, hide_empty=False, **kwargs):
