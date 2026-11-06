@@ -10,6 +10,7 @@ class Database(models.Model):
     name = fields.Char('Host name', required=True)
     build_id = fields.Many2one('runbot.build', index=True, required=True)
     db_suffix = fields.Char(compute='_compute_db_suffix')
+    exported = fields.Boolean('Exported', help='A zip dump of this database is generated at the end of the step')
 
     def _compute_db_suffix(self):
         for record in self:

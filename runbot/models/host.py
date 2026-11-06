@@ -83,7 +83,7 @@ class Host(models.Model):
             host.build_ids = self.env['runbot.build'].search([('host', '=', host.name), ('local_state', 'in', ('pending', 'testing', 'running'))])
 
     def _static_url(self):
-        use_ssl = self.env['ir.config_parameter'].get_param('runbot.use_ssl', default=True)
+        use_ssl = self.env['ir.config_parameter'].sudo().get_param('runbot.use_ssl', default=True)
         scheme = 'https' if use_ssl else 'http'
         return f'{scheme}://{self.name}/runbot/static/'
 
