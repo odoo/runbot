@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from odoo import fields
 from odoo.exceptions import AccessError, ValidationError
-from odoo.tests import new_test_user
+from odoo.tests import HttpCase, new_test_user, tagged
 
 from .common import RunbotCase
 
@@ -1124,3 +1124,33 @@ class TestCodeOwner(RunbotCase):
                 'regex': '*debian.*',
                 'github_teams': 'rd-test',
             })
+
+
+@tagged('-at_install', 'post_install')
+class TestBuildErrorPages(RunbotCase, HttpCase):
+
+    def test_error_pages(self):
+        self.project.group_ids = False
+        error_content = self.env['runbot.build.error.content'].create({'content': 'foo bar', 'project_id': self.project.id})
+        error = error_content.error_id
+        builds = self.Build.create([{'params_id': self.base_params.id}, {'params_id': self.base_params.id}])
+        self.env['runbot.build.error.link'].create([{'build_id': build.id, 'error_content_id': error_content.id} for build in builds])
+        # visible without login when the project requires no group
+        for url in (f'/runbot/error/{error.id}', f'/runbot/error/foo-bar-{error.id}', '/runbot/errors', '/runbot/errors?limit=0'):
+            with self.subTest(url=url):
+                response = self.url_open(url)
+                self.assertEqual(response.status_code, 200)
+                self.assertIn('foo bar', response.text)
+
+        self.project.group_ids = self.env.ref('runbot.group_user')
+        self.assertEqual(self.url_open(f'/runbot/error/{error.id}').status_code, 404)
+        self.assertEqual(self.url_open('/runbot/error/foo').status_code, 404)
+        self.assertNotIn('foo bar', self.url_open('/runbot/errors').text)
+        # os.path patches break the filestore (user avatar) and the http sessions
+        for patcher_name in ('isfile', 'isdir', 'file_exist'):
+            self.stop_patcher(patcher_name)
+        new_test_user(self.env, login='error_user', groups='base.group_user', password='error_user')
+        self.authenticate('error_user', 'error_user')
+        response = self.url_open(f'/runbot/error/{error.id}')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('foo bar', response.text)

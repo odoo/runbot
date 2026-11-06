@@ -36,7 +36,7 @@
             <tr>
               <td t-out="build_error.last_seen_date" t-options='{"widget": "datetime"}'/>
               <th>
-                <code t-out="build_error.name"/>
+                <a t-attf-href="/runbot/error/{{build_error.id}}"><code t-out="build_error.name"/></a>
               </th>
               <td>
                 <t t-foreach="build_error.trigger_ids" t-as="trigger">
@@ -44,17 +44,21 @@
                 </t>
               </td>
               <td>
-                <t t-if="build_error.responsible" t-out="build_error.responsible.name"/>
-                <a t-else="" t-attf-href="/runbot/errors/assign/{{build_error.id}}" data-runbot="action" role="button" class="btn btn-primary btn-sm">Assign to me</a>
+                <t t-if="build_error.responsible">
+                  <t groups="base.group_user" t-out="build_error.responsible.name"/>
+                  <t groups="!base.group_user" t-out="build_error.responsible.sudo().github_login or 'Assigned'"/>
+                </t>
+                <t t-else="">
+                  <a groups="base.group_user" t-attf-href="/runbot/errors/assign/{{build_error.id}}" data-runbot="action" role="button" class="btn btn-primary btn-sm">Assign to me</a>
+                </t>
               </td>
               <td class="text-nowrap">
                 <a t-att-href="build_error.last_seen_build_id.build_url" t-attf-title="View last affected build ({{build_error.last_seen_build_id.id}})">
                   <i class="fa fa-external-link"/>
                 </a>
-                <a groups="base.group_user" t-attf-href="/odoo/error/{{build_error.id}}" target="_blank" title="View in Backend">
-                  <span class="badge text-bg-info" t-out="build_error.build_count" t-attf-title="This error was seen {{build_error.build_count}} View in backend"/>
+                <a t-attf-href="/runbot/error/{{build_error.id}}">
+                  <span class="badge text-bg-info" t-out="build_error.build_count" t-attf-title="This error was seen {{build_error.build_count}} times"/>
                 </a>
-                <span groups="!base.group_user" class="badge text-bg-info" t-out="build_error.build_count" t-attf-title="This error was seen {{build_error.build_count}}"/>
                 <span class="fa fa-random" t-if="build_error.random"/>
               </td>
             </tr>
@@ -93,7 +97,7 @@
                 <t t-call="runbot.build_error_cards">
                   <t t-set="table_title">All builds errors</t>
                   <t t-set="build_errors" t-value="build_errors"/>
-                  <t t-set="build_errors_counter" t-value="current_user_errors.search_count([])"/>
+                  <t t-set="build_errors_counter" t-value="build_errors_count"/>
                   <t t-set="additional_buttons">
                     <t t-call="runbot.search_dropdown">
                       <t t-set="label">Sort By</t>
@@ -107,6 +111,168 @@
                   </t>
                 </t>
               </t>
+            </div>
+          </div>
+        </div>
+      </t>
+    </template>
+
+    <template id="runbot.build_error_details">
+      <t t-call="runbot.layout">
+        <t t-set="page_nav">
+          <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+              <a href="/runbot/errors" class="btn btn-link">Errors</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+              <a t-attf-href="/runbot/error/{{build_error.id}}" class="btn btn-link">error-<t t-out="build_error.id"/></a>
+            </li>
+          </ol>
+        </t>
+        <div class="container-fluid">
+          <div class="row">
+            <t t-set="color" t-value="'danger' if build_error.active else 'success'"/>
+            <div class="card-group">
+              <div class="card">
+                <header class="card-header d-flex flex-wrap align-items-center gap-2">
+                  <span class="h6 mb-1 me-auto">
+                    <i t-attf-class="fa fa-{{'exclamation-triangle' if build_error.active else 'check'}} fa-fw me-1"/>
+                    error-<t t-out="build_error.id"/>
+                    <small class="text-body-secondary ms-1" t-out="'Open' if build_error.active else 'Fixed'"/>
+                    <span t-if="build_error.random" class="badge text-bg-warning ms-1"><i class="fa fa-random"/> Random</span>
+                  </span>
+                  <a groups="base.group_user" t-attf-href="/odoo/error/{{build_error.id}}" class="btn btn-default btn-ssm" target="_blank" title="View in Backend">
+                    <i class="fa fa-list"/>
+                  </a>
+                </header>
+                <ul class="list-group list-group-flush">
+                  <li class="list-group-item">
+                    <dl>
+                      <dt>Name</dt>
+                      <dd><code t-out="build_error.name"/></dd>
+                      <dt>Assigned to</dt>
+                      <dd>
+                        <t t-if="build_error.responsible">
+                          <t groups="base.group_user" t-out="build_error.responsible.display_name"/>
+                          <t groups="!base.group_user" t-out="build_error.responsible.sudo().github_login or 'Assigned'"/>
+                        </t>
+                        <t t-else="">
+                          <a groups="base.group_user" t-attf-href="/runbot/errors/assign/{{build_error.id}}" data-runbot="action" role="button" class="btn btn-primary btn-ssm">Assign to me</a>
+                        </t>
+                      </dd>
+                      <dt>Team</dt>
+                      <dd t-out="build_error.team_id.sudo().display_name or 'None'"/>
+                      <t t-if="build_error.trigger_ids">
+                        <dt>Triggers</dt>
+                        <dd>
+                          <span t-foreach="build_error.trigger_ids" t-as="trigger" class="badge text-bg-info me-1" t-out="trigger.display_name"/>
+                        </dd>
+                      </t>
+                      <t t-if="build_error.version_ids">
+                        <dt>Versions</dt>
+                        <dd>
+                          <span t-foreach="build_error.version_ids" t-as="version" class="badge text-bg-secondary me-1" t-out="version.display_name"/>
+                        </dd>
+                      </t>
+                      <t t-if="build_error.tag_ids">
+                        <dt>Tags</dt>
+                        <dd>
+                          <span t-foreach="build_error.tag_ids" t-as="tag" class="badge text-bg-secondary me-1" t-out="tag.display_name"/>
+                        </dd>
+                      </t>
+                      <t t-if="build_error.test_tags">
+                        <dt>Test tags</dt>
+                        <dd>
+                          <code class="text-break" t-out="build_error.test_tags"/>
+                          <span t-if="build_error.tags_min_version_id" class="badge text-bg-secondary">from <t t-out="build_error.tags_min_version_id.display_name"/></span>
+                          <span t-if="build_error.tags_max_version_id" class="badge text-bg-secondary">up to <t t-out="build_error.tags_max_version_id.display_name"/></span>
+                        </dd>
+                      </t>
+                    </dl>
+                  </li>
+                  <li t-if="build_error.breaking_pr_id or build_error.fixing_pr_id or build_error.fixing_commit or build_error.previous_error_id" class="list-group-item">
+                    <dl>
+                      <t t-if="build_error.breaking_pr_id">
+                        <dt>Breaking PR</dt>
+                        <dd><a t-att-href="build_error.breaking_pr_url" target="_blank" t-out="build_error.breaking_pr_id.display_name"/></dd>
+                      </t>
+                      <t t-if="build_error.fixing_pr_id">
+                        <dt>Fixing PR</dt>
+                        <dd>
+                          <a t-att-href="build_error.fixing_pr_url" target="_blank" t-out="build_error.fixing_pr_id.display_name"/>
+                          <a t-if="build_error.fixing_bundle_id" t-att-href="build_error.fixing_bundle_url" class="ms-2" title="Fixing bundle"><i class="fa fa-cube me-1"/><t t-out="build_error.fixing_bundle_id.display_name"/></a>
+                        </dd>
+                      </t>
+                      <t t-if="build_error.fixing_commit">
+                        <dt>Fixing commit</dt>
+                        <dd><code t-out="build_error.fixing_commit"/></dd>
+                      </t>
+                      <t t-if="build_error.previous_error_id">
+                        <dt>Already seen error</dt>
+                        <dd><a t-attf-href="/runbot/error/{{build_error.previous_error_id.id}}">error-<t t-out="build_error.previous_error_id.id"/></a></dd>
+                      </t>
+                    </dl>
+                  </li>
+                  <li class="list-group-item">
+                    <dl>
+                      <dt>First seen</dt>
+                      <dd>
+                        <t t-out="build_error.first_seen_date and dt2str(build_error.first_seen_date)"/>
+                        <a t-if="build_error.first_seen_build_id" t-attf-href="/runbot/build/{{build_error.first_seen_build_id.id}}">build <t t-out="build_error.first_seen_build_id.id"/></a>
+                      </dd>
+                      <dt>Last seen</dt>
+                      <dd>
+                        <t t-out="build_error.last_seen_date and dt2str(build_error.last_seen_date)"/>
+                        <a t-if="build_error.last_seen_build_id" t-attf-href="/runbot/build/{{build_error.last_seen_build_id.id}}">build <t t-out="build_error.last_seen_build_id.id"/></a>
+                      </dd>
+                      <dt>Seen</dt>
+                      <dd><t t-out="build_error.build_count"/> builds</dd>
+                    </dl>
+                  </li>
+                </ul>
+              </div>
+              <div t-if="build_error.last_seen_batch_ids" class="card">
+                <header class="card-header">
+                  <span class="h6 mb-1">Last seen batches</span>
+                </header>
+                <table class="table table-sm mb-0">
+                  <thead>
+                    <tr>
+                      <th>Version</th>
+                      <th>Batch</th>
+                      <th>Bundle</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr t-foreach="build_error.last_seen_batch_ids" t-as="batch">
+                      <td t-out="batch.bundle_id.version_id.display_name"/>
+                      <td><a t-attf-href="/runbot/batch/{{batch.id}}">batch-<t t-out="batch.id"/></a></td>
+                      <td><a t-attf-href="/runbot/bundle/{{batch.bundle_id.id}}" t-out="batch.bundle_id.display_name"/></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-12">
+              <div class="card mt-2 overflow-hidden">
+                <header class="card-header">Contents</header>
+                <ul class="list-group list-group-flush">
+                  <li t-foreach="build_error.error_content_ids.sorted('last_seen_date DESC')" t-as="error_content" class="list-group-item">
+                    <div class="small text-body-secondary mb-1">
+                      <code t-out="error_content.module_name"/>
+                      <t t-if="error_content.function">in <code t-out="error_content.function"/></t>
+                      <t t-if="error_content.file_path">(<code t-out="error_content.file_path"/>)</t>
+                      · seen <t t-out="error_content.build_count"/> times,
+                      last <t t-out="error_content.last_seen_date and dt2str(error_content.last_seen_date)"/>
+                    </div>
+                    <div class="overflow-x-auto">
+                      <pre t-attf-class="bg-{{color}}-subtle p-2 mb-0" t-out="error_content.content.strip()"/>
+                    </div>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
