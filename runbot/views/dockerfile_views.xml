@@ -18,7 +18,9 @@
                 <field name="parent_id" invisible="variant_ids or is_template"/>
                 <field name="variant_ids" widget="many2many_tags" readonly="1" invisible="not variant_ids"/>
                 <field name="image_identifier" invisible="is_template"/>
+                <field name="image_size" invisible="is_template"/>
                 <field name="image_future_identifier" invisible="is_template"/>
+                <field name="image_future_size" invisible="is_template or not has_future"/>
                 <field name="auto_sync" invisible="is_template"/>
                 <field name="image_tag" invisible="is_template"/>
                 <field name="pull_on_build" invisible="is_template"/>
@@ -82,6 +84,7 @@
                       <field name="dockerfile_id"/>
                       <field name="host_id"/>
                       <field name="duration"/>
+                      <field name="image_size"/>
                       <field name="result" decoration-bg-danger="result != 'success'" decoration-bg-success="result == 'success'"/>
                       <field name="identifier"/>
                       <field name="create_date" options="{'numeric': true}"/>
@@ -103,6 +106,8 @@
           <list string="Dockerfile" decoration-danger="dockerfile == '' or in_error == True" decoration-warning="has_future == True" delete="0">
             <field name="image_tag"/>
             <field name="name"/>
+            <field name="image_size" string="Size (MiB)" optional="show"/>
+            <field name="image_future_size" string="Future Size" optional="hide"/>
             <field name="parent_id"/>
             <field name="to_build" groups="!runbot.group_runbot_admin"/>
             <field name="to_build" widget="boolean_toggle" groups="runbot.group_runbot_admin"/>
@@ -206,6 +211,7 @@
               <field name="dockerfile_id"/>
               <field name="host_id"/>
               <field name="duration"/>
+              <field name="image_size"/>
               <field name="result"/>
               <field name="identifier"/>
               <field name="summary"/>
@@ -238,6 +244,7 @@
           <field name="dockerfile_id"/>
           <field name="host_id"/>
           <field name="duration"/>
+          <field name="image_size"/>
           <field name="result"/>
           <field name="identifier"/>
           <field name="summary"/>

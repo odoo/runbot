@@ -302,7 +302,7 @@ ENV USER TestUser
             'image_id': 'xxx',
             'success': True,
             'duration': 69,
-            'image': 'd0d0caca',
+            'image': MagicMock(attrs={'Size': 125829120}),
             'msg': '',
         }
 
@@ -314,3 +314,4 @@ ENV USER TestUser
         dockerfile_file_handle.write.assert_called_once_with(expected_content)
         self.patchers['docker_path_hardlink_to'].assert_called()
         self.patchers['docker_get_docker_metadata'].assert_called()
+        self.assertEqual(dockerfile.build_results.mapped('image_size'), [120])
