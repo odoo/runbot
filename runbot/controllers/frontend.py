@@ -475,6 +475,13 @@ class Runbot(Controller):
         }
         return request.render('runbot.build_error', qctx)
 
+    @route(['/runbot/error/<model("runbot.build.error"):build_error>'], type='http', auth='user', website=True, sitemap=False)
+    def build_error_details(self, build_error, **kwargs):
+        return request.render('runbot.build_error_details', {
+            'build_error': build_error,
+            'title': 'Error %s' % build_error.id,
+        })
+
     @route(['/runbot/teams', '/runbot/teams/<model("runbot.team"):team>'], type='http', auth='user', website=True, sitemap=False)
     def team_dashboards(self, team=None, hide_empty=False, **kwargs):
         teams = request.env['runbot.team'].search([]) if not team else None
