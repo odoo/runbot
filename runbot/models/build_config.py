@@ -660,6 +660,9 @@ class ConfigStep(models.Model):
             description = child_data.pop('description', {})
             for create_config in self.env['runbot.build.config'].browse(child_data.get('config_id', config_ids.ids)):
                 child_data_values = {'config_data': {}, **child_data, 'config_id': create_config}
+                if 'make_stats' in config_data and 'make_stats' not in child_data_values['config_data']:
+                    # propagate make_stats to the whole build tree, unless the child defines its own
+                    child_data_values['config_data'] = {**child_data_values['config_data'], 'make_stats': config_data['make_stats']}
                 for _ in range(config_data.get('number_build', self.number_builds)):
                     count += 1
                     if count > max_build:
@@ -1625,6 +1628,7 @@ class ConfigStep(models.Model):
         current_dynamic_step = self._get_dynamic_step(build) or {}
         if current_dynamic_step and 'make_stats' in current_dynamic_step:
             make_stats = current_dynamic_step['make_stats']
+        make_stats = build.params_id.config_data.get('make_stats', make_stats)
         if not make_stats:  # TODO garbage collect non sticky stat
             return
         build._log('make_stats', 'Getting stats from log file')
@@ -1646,8 +1650,10 @@ class ConfigStep(models.Model):
                         'category': category,
                         'values': values,
                     } for category, values in stats_per_regex.items()
+                    if values  # don't store a row when the regex didn't match anything
                 ]
-                self.env['runbot.build.stat'].create(build_stats)
+                if build_stats:
+                    self.env['runbot.build.stat'].create(build_stats)
         except Exception as e:
             message = '**An error occured while computing statistics of %s:**\n`%s`' % (build.job, str(e).replace('\\n', '\n').replace("\\'", "'"))
             _logger.exception(message)
