@@ -394,6 +394,9 @@ class BuildResult(models.Model):
     # config of top_build is inherithed from params, but subbuild will have different configs
 
     orphan_result = fields.Boolean('No effect on the parent result', default=False)
+    used_in_base = fields.Boolean(
+        'Used in base', default=False, readonly=True,
+        help='The build tree was used by a base bundle at some point, directly or through a link. Never unset.')
 
     build_url = fields.Char('Build url', compute='_compute_build_url', store=False)
     build_error_link_ids = fields.One2many('runbot.build.error.link', 'build_id')
@@ -581,8 +584,12 @@ class BuildResult(models.Model):
         })
         return [values]
 
-    def create(self, vals):
-        records = super().create(vals)
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get('parent_id') and 'used_in_base' not in vals:
+                vals['used_in_base'] = self.browse(vals['parent_id']).used_in_base
+        records = super().create(vals_list)
         parents = records.parent_id
         # it doesn't make sense to create a build in another state than pending, and ok result,
         # so we can assume that we don't need to update the created records globals,
@@ -590,6 +597,16 @@ class BuildResult(models.Model):
         if parents:
             parents._update_globals()
         return records
+
+    def _mark_used_in_base(self):
+        builds = self.filtered(lambda build: not build.used_in_base)
+        if not builds:
+            return
+        trees = self.search([('id', 'child_of', builds.ids)])
+        linked_builds = trees.child_link_ids.child_id
+        if linked_builds:
+            trees |= self.search([('id', 'child_of', linked_builds.ids)])
+        trees.filtered(lambda build: not build.used_in_base).used_in_base = True
 
     def write(self, values):
         # some validation to ensure db consistency
@@ -813,6 +830,7 @@ class BuildResult(models.Model):
         values = {
             'params_id': self.params_id.id,
             'build_type': 'rebuild' if self.build_type != 'priority' else self.build_type,
+            'used_in_base': self.used_in_base,
         }
         if self.keep_host:
             values['host'] = self.host
@@ -1962,10 +1980,16 @@ class BuildLink(models.Model):
     def create(self, vals_list):
         links = super().create(vals_list)
         links.mapped('parent_id')._update_globals()
+        links._propagate_used_in_base()
         return links
+
+    def _propagate_used_in_base(self):
+        self.filtered(lambda link: link.parent_id.used_in_base).child_id._mark_used_in_base()
 
     def write(self, values):
         res = super().write(values)
+        if 'parent_id' in values or 'child_id' in values:
+            self._propagate_used_in_base()
         if 'orphan_result' in values or 'child_id' in values:
             self.parent_id._update_globals()
         return res

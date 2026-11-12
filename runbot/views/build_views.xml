@@ -85,6 +85,7 @@
                         <field name="build_type"/>
                         <field name="parent_id"/>
                         <field name="orphan_result"/>
+                        <field name="used_in_base"/>
                         <field name="build_url" widget="url" readonly="1"/>
                         <field name="gc_running_date" placeholder="Keep running until this date"/>
                         <field name="gc_date" readonly="1" options="{'numeric': true}"/>
