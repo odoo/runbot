@@ -130,7 +130,7 @@ class BuildParameters(models.Model):
     upgrade_from_build_id = fields.Many2one('runbot.build', index=True)  # use to download db
     dump_db = fields.Many2one('runbot.database', index=True)  # use to define db to download
 
-    fingerprint = fields.Char('Fingerprint', compute='_compute_fingerprint', store=True, index=True)
+    fingerprint = fields.Char('Fingerprint', compute='_compute_fingerprint', store=True)  # indexed by _unique_fingerprint
 
     slot_ids = fields.One2many('runbot.batch.slot', 'params_id')
 
@@ -316,7 +316,7 @@ class BuildResult(models.Model):
     create_batch_id = fields.Many2one('runbot.batch', related='params_id.create_batch_id', store=True, index=True)
     create_bundle_id = fields.Many2one('runbot.bundle', related='params_id.create_batch_id.bundle_id', index=True)
     dynamic_config = JsonDictField('Dynamic Config', related='params_id.dynamic_config')
-    priority_level = fields.Integer('Priority', related='create_batch_id.priority_level', store=True, index=True)
+    priority_level = fields.Integer('Priority', related='create_batch_id.priority_level', store=True)  # see _pending_priority_level_idx
 
     # state machine
     global_state = fields.Selection(make_selection(state_order), string='Status', default='pending')
@@ -413,6 +413,7 @@ class BuildResult(models.Model):
     access_token = fields.Char('Token', default=lambda self: uuid.uuid4().hex)
 
     _global_state_idx = models.Index("(global_state) WHERE global_state != 'done'")
+    _pending_priority_level_idx = models.Index("(priority_level) WHERE local_state = 'pending'")  # used to order builds to assign
 
     @api.depends('description', 'params_id.config_id')
     def _compute_display_name(self):

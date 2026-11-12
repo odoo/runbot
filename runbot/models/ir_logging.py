@@ -21,10 +21,11 @@ class IrLogging(models.Model):
     _order = 'id'
 
     build_id = fields.Many2one('runbot.build', 'Build', index=True, ondelete='cascade')
-    active_step_id = fields.Many2one('runbot.build.config.step', 'Active step', index=True)
-    type = fields.Selection(selection_add=TYPES, string='Type', required=True, index=True, ondelete={t[0]: 'cascade' for t in TYPES})
+    active_step_id = fields.Many2one('runbot.build.config.step', 'Active step')
+    type = fields.Selection(selection_add=TYPES, string='Type', required=True, index=False, ondelete={t[0]: 'cascade' for t in TYPES})
     error_content_id = fields.Many2one('runbot.build.error.content', compute='_compute_known_error')  # remember to never store this field
     dbname = fields.Char(string='Database Name', index=False)
+    level = fields.Char(index=False)
     metadata = JsonDictField('Metadata')
 
     @api.model_create_multi

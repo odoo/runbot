@@ -16,7 +16,7 @@ class BuildStat(models.Model):
         "Build stats must be unique for the same build step",
     )
 
-    build_id = fields.Many2one("runbot.build", "Build", index=True, ondelete="cascade")
+    build_id = fields.Many2one("runbot.build", "Build", ondelete="cascade")  # indexed by _build_config_key_unique
     config_step_id = fields.Many2one(
         "runbot.build.config.step", "Step", ondelete="cascade",
     )
