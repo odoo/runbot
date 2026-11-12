@@ -186,6 +186,8 @@ class Batch(models.Model):
 
         slot.link_type = link_type
         slot.build_id = build
+        if self.bundle_id.is_base:
+            build._mark_used_in_base()
         build._prepare_github_status()
 
     def _get_latest_batch_per_version(self, skip_versions):

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import datetime
 import logging
 
 from collections import defaultdict
@@ -27,6 +28,7 @@ class IrLogging(models.Model):
     dbname = fields.Char(string='Database Name', index=False)
     level = fields.Char(index=False)
     metadata = JsonDictField('Metadata')
+    create_date = fields.Datetime(index=True)
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -77,3 +79,18 @@ class IrLogging(models.Model):
             if 'create_date' in vals:
                 result_vals['create_date'] = vals['create_date']
         return result_vals_list
+
+    def _gc_ir_logging(self):
+        icp = self.env['ir.config_parameter'].sudo()
+        gc_days_info = int(icp.get_param('runbot.logs_gc_days_info', default=30))
+        gc_days = int(icp.get_param('runbot.logs_gc_days', default=180))
+        if gc_days_info > 0:
+            self.env.cr.execute("""
+                DELETE FROM ir_logging
+                WHERE create_date < %s
+                AND upper(level) NOT IN ('ERROR', 'WARNING', 'WARN', 'CRITICAL', 'SEPARATOR')
+            """, [self.env.cr.now() - datetime.timedelta(days=gc_days_info)])
+        _logger.info('Removed %s info logs older than %s days', self.env.cr.rowcount, gc_days_info)
+        if gc_days > 0:
+            self.env.cr.execute("DELETE FROM ir_logging WHERE create_date < %s", [self.env.cr.now() - datetime.timedelta(days=gc_days)])
+        _logger.info('Removed %s logs older than %s days', self.env.cr.rowcount, gc_days)
