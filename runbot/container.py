@@ -414,6 +414,16 @@ def docker_state(container_name, build_dir):
     return state
 
 
+def docker_run_time(container_name, build_dir):
+    container_name = sanitize_container_name(container_name)
+    try:
+        start = os.path.getmtime(os.path.join(build_dir, 'signals', f'start-{container_name}'))
+        end = os.path.getmtime(os.path.join(build_dir, 'signals', f'end-{container_name}'))
+    except FileNotFoundError:
+        return None
+    return end - start
+
+
 def docker_clear_state(container_name, build_dir):
     """Return True if container is still running"""
     container_name = sanitize_container_name(container_name)

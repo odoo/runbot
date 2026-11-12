@@ -765,22 +765,25 @@ class TestBuildResult(RunbotCase):
         self.env.flush_all()
         build = self.Build.create({
             'params_id': self.server_params.id,
+            'build_start': datetime.datetime(2025, 1, 1, 12, 00),
         })
+        offset = datetime.datetime(2024, 2, 4, 2, 42) - datetime.datetime(2025, 1, 1, 12, 00)
+        self.assertEqual(build._get_faketime_offset(), offset)
         cmd = build._cmd(py_version=3)
-        self.assertIn('faketime "2024-02-04 02:42:00 UTC" python3 odoo/server.py', str(cmd))
+        self.assertIn(f'faketime -f {int(offset.total_seconds())} python3 odoo/server.py', str(cmd))
 
-        # let's ensure that a time offset is added to a child build
-        build.build_start = datetime.datetime(2025, 1, 1, 12, 00)
+        # the fake clock of a child starts where the parent one was when the child was created
         with patch('odoo.addons.runbot.models.build.time') as mock_time:  # ensure build_time has the expected value
             mock_time.time.return_value = datetime.datetime(2025, 1, 1, 13, 00).timestamp()
             child_build = build._add_child({})
-        child_cmd = child_build._cmd(py_version=3)
-        self.assertIn('faketime "2024-02-04 03:42:00 UTC" python3 odoo/server.py', str(child_cmd))
+        child_build.build_start = datetime.datetime(2025, 1, 1, 13, 30)
+        self.assertEqual(child_build._get_faketime_offset(), datetime.datetime(2024, 2, 4, 3, 42) - datetime.datetime(2025, 1, 1, 13, 30))
 
         build.build_end = datetime.datetime(2025, 1, 1, 14, 00)
         second_child = build._add_child({})
-        second_child_cmd = second_child._cmd(py_version=3)
-        self.assertIn('faketime "2024-02-04 04:42:00 UTC" python3 odoo/server.py', str(second_child_cmd))
+        second_child.build_start = datetime.datetime(2025, 1, 1, 14, 00)
+        self.assertEqual(second_child._get_faketime_offset(), datetime.datetime(2024, 2, 4, 4, 42) - datetime.datetime(2025, 1, 1, 14, 00))
+        self.assertIn(f'faketime -f {int(second_child._get_faketime_offset().total_seconds())} python3 odoo/server.py', str(second_child._cmd(py_version=3)))
 
     def test_format_message(self):
         def get_log(message):

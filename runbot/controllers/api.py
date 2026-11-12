@@ -11,11 +11,15 @@ def _check_max_records(count):
         raise BadRequest(f'Too many records requested ({count}), maximum is {max_records}')
 
 
+def _datetime_ms(value):
+    return value.isoformat(sep=' ', timespec='milliseconds') if value else False
+
+
 def _serialize_log(log):
     error = log.error_content_id.error_id
     return {
         'id': log.id,
-        'create_date': log.create_date,
+        'create_date': _datetime_ms(log.create_date),
         'level': log.level,
         'type': log.type,
         'message': log.message,
@@ -64,6 +68,18 @@ def _serialize_build(build, depth=1, logs='errors', parent_values=None):
         'build_time': build.build_time,
         'docker_time': build.docker_time,
         'logs': [_serialize_log(log) for log in build_logs],
+        'jobs': [{
+            'name': job.name,
+            'start_date': _datetime_ms(job.start_date),
+            'duration': job.duration,
+            'python_time': job.python_time,
+            'git_time': job.git_time,
+            'docker_pull_time': job.docker_pull_time,
+            'docker_time': job.docker_time,
+            'result_time': job.result_time,
+            'docker_image': job._image_tag(),
+            'log_url': f'{build._http_log_url()}{job.log_name}.txt' if job.log_name else False,
+        } for job in build.sudo().job_ids],
         'log_files': [
             {'name': name, 'url': f'{build._http_log_url()}{name}.txt'}
             for name in (build.log_list or '').split(',') if name
