@@ -160,6 +160,46 @@ RUN python3 -m pip install --no-cache-dir -r /tmp/requirements.txt
             'parent_id': default_dockerfile.id,
         })
 
+    def test_docker_build_result_metadata_diff(self):
+        dockerfile = self.env['runbot.dockerfile'].create({'name': 'TestsMetadataDiff'})
+        other_dockerfile = self.env['runbot.dockerfile'].create({'name': 'TestsMetadataDiffOther'})
+
+        def result_vals(identifier, metadata, result='success', dockerfile=dockerfile):
+            return {'dockerfile_id': dockerfile.id, 'identifier': identifier, 'result': result, 'output': '', 'metadata': metadata}
+
+        # created in one call so that the compute is done in batch for all of them
+        result_a, result_b, result_error, result_no_meta, result_other, result_b_other_host, result_c = self.env['runbot.docker_build_result'].create([
+            result_vals('aaa', {'os': 'ubuntu', 'pip': ['a==1', 'b==1']}),
+            result_vals('bbb', {'os': 'ubuntu', 'pip': ['a==1', 'b==2'], 'node': 'v20'}),
+            result_vals('err', {'os': 'debian'}, result='error'),
+            result_vals('nom', {}),
+            result_vals('oth', {'os': 'debian'}, dockerfile=other_dockerfile),
+            result_vals('bbb', {'os': 'ubuntu', 'pip': ['a==1', 'b==2'], 'node': 'v20'}),  # same image built on another host
+            result_vals('ccc', {'os': 'ubuntu', 'pip': ['a==1', 'b==2'], 'node': 'v22'}),
+        ])
+
+        # the previous result can be one of the records being computed
+        self.assertEqual(result_c.metadata_diff_result_id, result_b_other_host)
+        # same identifier is skipped
+        self.assertEqual(result_b_other_host.metadata_diff_result_id, result_a)
+        self.assertEqual(result_b.metadata_diff_result_id, result_a)
+        self.assertFalse(result_a.metadata_diff_result_id)
+        self.assertFalse(result_error.metadata_diff_result_id)
+        self.assertFalse(result_no_meta.metadata_diff_result_id)
+        self.assertFalse(result_other.metadata_diff_result_id)
+
+        self.assertEqual(result_c.metadata_diff.dict, {'node': 'v20 --> v22'})
+        diff_b = result_b.metadata_diff.dict
+        self.assertEqual(set(diff_b), {'pip', 'node'})
+        self.assertEqual(sorted(diff_b['pip']), ['+ b==2', '- b==1'])
+        self.assertEqual(diff_b['node'], ' --> v20')
+
+        # computed alone, the result is the same
+        self.env.invalidate_all()
+        result_c_alone = self.env['runbot.docker_build_result'].browse(result_c.id)
+        self.assertEqual(result_c_alone.metadata_diff_result_id, result_b_other_host)
+        self.assertEqual(result_c_alone.metadata_diff.dict, {'node': 'v20 --> v22'})
+
 
 @tagged('-at_install', 'post_install')
 class TestDockerfileCache(RunbotCase, HttpCase):
