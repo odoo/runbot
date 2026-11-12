@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import contextlib
+import datetime
 import functools
 import itertools
 import logging
@@ -72,6 +73,11 @@ def dt2str(datetime):
 
 def now():
     return time.strftime(DEFAULT_SERVER_DATETIME_FORMAT)
+
+
+def utcnow():
+    """Naive utc datetime with microseconds, unlike fields.Datetime.now() and cr.now() (transaction start)"""
+    return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
 
 
 def findall(filename, pattern):

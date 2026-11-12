@@ -11,6 +11,7 @@ import shutil
 import time
 import uuid
 from collections import defaultdict
+from contextlib import contextmanager
 from pathlib import Path
 
 from dateutil import parser
@@ -37,6 +38,7 @@ from ..common import (
     sanitize,
     tail,
     transactioncache,
+    utcnow,
     DEFAULT_MAX_FILE_SIZE,
 )
 from ..container import Command, docker_pull, docker_run, docker_state, docker_stop
@@ -341,18 +343,20 @@ class BuildResult(models.Model):
     log_ids = fields.One2many('ir.logging', 'build_id', string='Logs')
     error_log_ids = fields.One2many('ir.logging', 'build_id', domain=[('level', 'in', ['WARNING', 'ERROR', 'CRITICAL'])], string='Error Logs')
     stat_ids = fields.One2many('runbot.build.stat', 'build_id', string='Statistics values')
-    log_list = fields.Char('Comma separted list of step_ids names with logs')
+    job_ids = fields.One2many('runbot.build.job', 'build_id', string='Jobs')
+    log_list = fields.Char('Comma separted list of step_ids names with logs')  # TODO remove, use job_ids.log_name
 
-    active_step = fields.Many2one('runbot.build.config.step', 'Active step')
+    active_step = fields.Many2one('runbot.build.config.step', 'Active step')  # TODO remove, use active_job_id.config_step_id
+    active_job_id = fields.Many2one('runbot.build.job', 'Active job', ondelete='set null')
     job = fields.Char('Active step display name', compute='_compute_job')
     dynamic_active_step_index = fields.Integer('Dynamic active step index')
     cpu_limit = fields.Integer('CPU limit for the current running docker')
-    job_start = fields.Datetime('Job start')
-    job_end = fields.Datetime('Job end')
+    job_start = fields.Datetime('Job start')  # TODO remove, use job_ids.start_date
+    job_end = fields.Datetime('Job end')  # TODO remove, use job_ids.duration
     build_start = fields.Datetime('Build start')
     build_end = fields.Datetime('Build end')
-    docker_start = fields.Datetime('Docker start')
-    docker_time = fields.Integer('Docker time', default=0, help='Accumulated time spent in Docker containers')
+    docker_start = fields.Datetime('Docker start')  # TODO move to runbot.build.job
+    docker_time = fields.Integer('Docker time', default=0, help='Accumulated time spent in Docker containers')  # TODO remove, use sum(job_ids.docker_time)
     job_time = fields.Integer(compute='_compute_job_time', string='Job time')
     build_time = fields.Integer(compute='_compute_build_time', string='Build time')
     final_build_time = fields.Integer(string='Final Build time')
@@ -1040,13 +1044,13 @@ class BuildResult(models.Model):
         if build.requested_action == 'wake_up':
             if build.local_state != 'done':
                 build.requested_action = False
-                build._log('wake_up', 'Impossible to wake-up, build is not done', log_type='markdown', level='SEPARATOR')
+                build._log('wake_up', 'Impossible to wake-up, build is not done', log_type='markdown')
             elif not os.path.exists(build._path()):
                 build.requested_action = False
-                build._log('wake_up', 'Impossible to wake-up, **build dir does not exists anymore**', log_type='markdown', level='SEPARATOR')
+                build._log('wake_up', 'Impossible to wake-up, **build dir does not exists anymore**', log_type='markdown')
             elif docker_state(build._get_docker_name(), build._path()) == 'RUNNING':
                 build.write({'requested_action': False, 'local_state': 'running'})
-                build._log('wake_up', 'Waking up failed, **docker is already running**', log_type='markdown', level='SEPARATOR')
+                build._log('wake_up', 'Waking up failed, **docker is already running**', log_type='markdown')
             else:
                 try:
                     port = self._find_port()
@@ -1058,12 +1062,12 @@ class BuildResult(models.Model):
                         'local_state': 'running',
                         'port': port,
                     })
-                    build._log('wake_up', '**Waking up build**', log_type='markdown', level='SEPARATOR')
                     step_ids = build.params_id.config_id.step_ids
                     if step_ids and step_ids[-1]._step_state() == 'running':
                         run_step = step_ids[-1]
                     else:
                         run_step = self.env.ref('runbot.runbot_build_config_step_run')
+                    build._start_job(run_step)
                     run_step._run_step(build, force=True)()
                     # reload_nginx will be triggered by _run_run_odoo
                 except Exception:
@@ -1108,11 +1112,13 @@ class BuildResult(models.Model):
             if self.env['runbot.host']._fetch_local_logs(builds=build)[0]:
                 return True  # avoid to make results with remaining logs
             # No job running, make result and select next job
+            docker_duration = 0
             if build.docker_start:
-                docker_duration = int(time.time() - dt2time(build.docker_start))
-                build.docker_time += docker_duration
+                docker_duration = (utcnow() - build.docker_start).total_seconds()
+                build.docker_time += int(docker_duration)
             build.job_end = now()
             build.docker_start = False
+            result_start = time.monotonic()
             # make result of previous job
             try:
                 build.active_step._make_results(build)
@@ -1127,7 +1133,8 @@ class BuildResult(models.Model):
 
             # compute statistics before starting next job
             build.active_step._make_stats(build)
-            build.active_step._log_end(build)
+            build.active_step._log_end(build, build.active_job_id)
+            build._end_job(docker_time=int(docker_duration * 1000), result_time=int((time.monotonic() - result_start) * 1000))
 
         step_ids = self.params_id.config_id.step_ids
         if not step_ids:  # no job to do, build is done
@@ -1164,7 +1171,7 @@ class BuildResult(models.Model):
                 return False
             new_step = step_ids[next_index]  # job to do, state is job_state (testing or running)
             if new_step.domain_filter and not self.filtered_domain(safe_eval(new_step.domain_filter)):
-                self._log('run', '**Skipping** step ~~%s~~ from config **%s**', new_step._get_display_name(build), self.params_id.config_id.name, log_type='markdown', level='SEPARATOR')
+                self._logger('Skipping step %s', new_step._get_display_name(build))
                 next_index += 1
                 continue
             break
@@ -1223,7 +1230,8 @@ class BuildResult(models.Model):
         image_id = None
         if docker_registry_url and self.host_id.use_remote_docker_registry:
             try:
-                result = docker_pull(f"{docker_registry_url}/{kwargs['image_tag']}")
+                with self._job_timer('docker_pull_time'):
+                    result = docker_pull(f"{docker_registry_url}/{kwargs['image_tag']}")
                 if result['success']:
                     result['image'].tag(kwargs['image_tag'])
                 if result.get('log_progress'):
@@ -1233,7 +1241,7 @@ class BuildResult(models.Model):
                 _logger.exception('Failed to pull docker image %s', kwargs['image_tag'])
                 self._log('Docker Run', 'Failed to pull docker image')
 
-        self._log('Preparing', 'Using Dockerfile Tag [%s](/runbot/dockerfile_result/%s/%s)', kwargs['image_tag'], kwargs['image_tag'], image_id, log_type='markdown')
+        self.active_job_id.write({'image_tag': kwargs['image_tag'], 'image_id': image_id})
 
         # network is disabled by default, can be enabled via kwargs['network_enabled'] (run, restore) or config_data['network_enabled'] (external, nightly,...)
         kwargs['network_enabled'] = kwargs.get('network_enabled') or self.params_id.config_data.get('network_enabled') or self.params_id.trigger_id.network_enabled or False
@@ -1244,7 +1252,7 @@ class BuildResult(models.Model):
             containers_memory_limit = int(float(containers_memory_limit) * 1024 ** 3) * memory_limit_factor
             kwargs['memory'] = int(containers_memory_limit)
 
-        self.docker_start = now()
+        self.docker_start = utcnow()
         if self.job_start:
             start_step_time = int(dt2time(self.docker_start) - dt2time(self.job_start))
             if start_step_time > 60:
@@ -1309,7 +1317,6 @@ class BuildResult(models.Model):
     def _checkout(self):
         self.ensure_one()  # will raise exception if hash not found, we don't want to fail for all build.
         # checkout branch
-        start = time.time()
         exports = {}
         for commit in self.env.context.get('defined_commit_ids') or self.params_id.commit_ids:
             build_export_path = self._docker_source_folder(commit)
@@ -1317,11 +1324,6 @@ class BuildResult(models.Model):
                 self._log('_checkout', 'Multiple repo have same export path in build, some source may be missing for %s' % build_export_path, level='ERROR')
                 self._kill(result='ko')
             exports[build_export_path] = commit._export(self)
-
-        checkout_time = time.time() - start
-        if checkout_time > 60:
-            self._log('checkout', 'Checkout took %s seconds' % int(checkout_time))
-
         return exports
 
     def _list_available_modules(self):
@@ -1444,6 +1446,37 @@ class BuildResult(models.Model):
             'line': '0',
         })
 
+    def _start_job(self, step):
+        self.ensure_one()
+        self.active_job_id = self.env['runbot.build.job'].create({
+            'build_id': self.id,
+            'config_step_id': step.id,
+            'name': step._get_display_name(self),
+            'start_date': utcnow(),
+        })
+        return self.active_job_id
+
+    def _end_job(self, **values):
+        self.ensure_one()
+        if job := self.active_job_id:
+            job.write({'duration': int((utcnow() - job.start_date).total_seconds() * 1000), **values})
+            self.active_job_id = False
+
+    @contextmanager
+    def _job_timer(self, field):
+        """Add the time spent in the block (ms) to `field` of the current job"""
+        start = time.monotonic()
+        try:
+            yield
+        finally:
+            if job := self.active_job_id:
+                job[field] += int((time.monotonic() - start) * 1000)
+
+    def _get_log_entries(self):
+        """Jobs and logs sorted by date"""
+        self.ensure_one()
+        return sorted([*self.job_ids, *self.log_ids], key=lambda entry: entry.start_date if entry._name == 'runbot.build.job' else entry.create_date)
+
     def _kill(self, result='killed'):
         host_name = self.env['runbot.host']._get_current_name()
         self.ensure_one()
@@ -1452,6 +1485,7 @@ class BuildResult(models.Model):
             return
         build._log('kill', 'Kill build %s' % build.dest)
         docker_stop(build._get_docker_name(), build._path())
+        build._end_job()
         build.local_state = 'done'
         build.active_step = False
         build.job_end = now()
@@ -1601,19 +1635,12 @@ class BuildResult(models.Model):
                     pres.append([f'python{py_version}', '-m', 'pip', 'install', '--progress-bar', 'off', '-r', f'{requirement_path}'])
         return pres
 
-    def _get_faketime_time_datetime(self, step_start_offset=0):
+    def _get_faketime_offset(self):
+        """Constant offset (whole seconds) between the fake clock and the real one, the fake clock being at `faketime` when the build starts"""
         self.ensure_one()
         if faketime_params := self.params_id.config_data.get('faketime'):
-            faketime_offset = self.params_id.config_data.get('faketime_offset', 0)
-            faketime_offset += step_start_offset
-            time_offset = datetime.timedelta(seconds=faketime_offset)
-            return parser.parse(faketime_params, ignoretz=True) + time_offset
-        return None
-
-    def _get_faketime_offset(self):
-        if fake_clock_at_start := self._get_faketime_time_datetime():
-            build_start = self.build_start or self.create_date
-            return fake_clock_at_start - build_start
+            fake_start = parser.parse(faketime_params, ignoretz=True) + datetime.timedelta(seconds=self.params_id.config_data.get('faketime_offset', 0))
+            return datetime.timedelta(seconds=int((fake_start - (self.build_start or self.create_date)).total_seconds()))
         return None
 
     def _cmd(self, python_params=None, py_version=None, local_only=True, sub_command=None, enable_log_db=True):
@@ -1627,8 +1654,8 @@ class BuildResult(models.Model):
         pres = self._make_pip_command(py_version)
 
         command_wrapper = []
-        if faketime_datetime := self._get_faketime_time_datetime(self.build_time):
-            command_wrapper = ['faketime', faketime_datetime.strftime('%Y-%m-%d %H:%M:%S UTC')]
+        if (faketime_offset := self._get_faketime_offset()) is not None:
+            command_wrapper = ['faketime', '-f', f'{int(faketime_offset.total_seconds()):+d}']
 
         addons_paths = self._get_addons_path()
         (server_commit, server_file) = self._get_server_info()

@@ -98,6 +98,10 @@ class Commit(models.Model):
             self.repo_id._fetch(self.tree_hash)
 
     def _export(self, build):
+        with build._job_timer('checkout_time'):
+            return self._export_sources(build)
+
+    def _export_sources(self, build):
         """Export a git repo into a sources"""
         #  TODO add automated tests
         self.ensure_one()

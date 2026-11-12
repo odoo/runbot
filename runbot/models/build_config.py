@@ -24,7 +24,6 @@ from ..common import (
     now,
     os,
     rfind,
-    s2human,
     time2str,
     DEFAULT_MAX_FILE_SIZE,
 )
@@ -605,17 +604,16 @@ class ConfigStep(models.Model):
 
     def _run(self, build):
         build.write({'job_start': now(), 'job_end': False})  # state, ...
-        log = build._log('run', f'Starting step **{self._get_display_name(build)}** from config **{build.params_id.config_id.name}**', log_type='markdown', level='SEPARATOR')
+        job = build._start_job(self)
+        python_start = time.monotonic()
         result = self._run_step(build)
+        job.python_time = int((time.monotonic() - python_start) * 1000)
         if callable(result):  # docker step, should have text logs
             if build.log_list:
                 build.log_list = f'{build.log_list},{self.sanitized_name(build)}'
             else:
                 build.log_list = self.sanitized_name(build)
-            log_url = f'http://{build.host}'
-            url = f"{log_url}/runbot/static/build/{build.dest}/logs/{self.sanitized_name(build)}.txt"
-            log_link = f'[@icon-file-text]({url})'
-            log.message = f'{log.message}  {log_link}'
+            job.log_name = self.sanitized_name(build)
         return result
 
     def _run_step(self, build, **kwargs):
@@ -1320,7 +1318,7 @@ class ConfigStep(models.Model):
             cmd = f"(psql {db_name} -c 'SELECT 1' > /dev/null 2>&1 && echo 'Database exists, skipping') || ({cmd})"
             return dict(cmd=cmd, network_enabled=True)
 
-    def _log_end(self, build):
+    def _log_end(self, build, job):
         # TODO fixme config data are not the same as the run part in dynamic steps
         job_type = self.job_type
         # in dynamic step, get the real job type
@@ -1339,19 +1337,11 @@ class ConfigStep(models.Model):
                     job_type = 'install_odoo'
 
         if job_type == 'create_build':
-            build._logger('Step %s finished in %s' % (self._get_display_name(build), s2human(build.job_time)))
             return
 
-        message = 'Step %s finished in %s'
-        args = [self._get_display_name(build), s2human(build.job_time)]
-        log_type = 'runbot'
         if database_exported:
             db_suffix = config_data.get('db_name') or ((build.params_id.restore_db_suffix or build.params_id.dump_db.db_suffix) if not self.create_db else False) or self._get_db_name(build)
-            db_suffix = re.sub(r'[^a-z0-9\-_]', '_', db_suffix.lower())
-            message += ' [@icon-download](%s%s-%s.zip)'
-            args += [build._http_log_url(), build.dest, db_suffix]
-            log_type = 'markdown'
-        build._log('', message, *args, log_type=log_type)
+            job.exported_db = re.sub(r'[^a-z0-9\-_]', '_', db_suffix.lower())
 
         if self.coverage and self.coverage_make_report:
             json_url = f'http://{build.host}/runbot/static/build/{build.dest}/logs/coverage/coverage.json'

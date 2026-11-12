@@ -334,7 +334,24 @@
                     <th/>
                   </tr>
                   <t t-set="child_by_id" t-value="{child.id: child for child in build.children_ids}"/>
-                  <t t-foreach="build.sudo().log_ids" t-as="l">
+                  <t t-foreach="build.sudo()._get_log_entries()" t-as="l">
+                    <tr t-if="l._name == 'runbot.build.job'" class="separator">
+                      <td style="white-space: nowrap; width:1%;">
+                        <small t-out="dt2str(l.start_date) if l.start_date else ''"/>
+                      </td>
+                      <td/>
+                      <td class="bg-separator-subtle" style="max-width: 0; width: 100%;">
+                        Step <b t-out="l.name"/>
+                        from config <b t-out="build.params_id.config_id.name"/>
+                        <a t-if="l.log_name" t-attf-href="{{build._http_log_url()}}{{l.log_name}}.txt" title="Log file"><i class="fa fa-file-text"/></a>
+                        <a t-if="l.image_tag" t-attf-href="/runbot/dockerfile_result/{{l.image_tag}}/{{l.image_id}}" title="Docker image"><i class="fa fa-cube"/> <t t-out="l.image_tag"/></a>
+                        <a t-if="l.exported_db" t-attf-href="{{build._http_log_url()}}{{build.dest}}-{{l.exported_db}}.zip" title="Download database"><i class="fa fa-download"/></a>
+                      </td>
+                      <td class="bg-separator-subtle" style="white-space: nowrap;">
+                        <small t-if="l != build.active_job_id" t-att-title="'python %.1fs (checkout %.1fs, docker pull %.1fs), docker %.1fs, results %.1fs' % (l.python_time / 1000, l.checkout_time / 1000, l.docker_pull_time / 1000, l.docker_time / 1000, l.result_time / 1000)" t-out="l._duration()"/>
+                      </td>
+                    </tr>
+                    <t t-else="">
                     <t t-set="subbuild" t-value="child_by_id.get(int(l.path)) if l.type == 'subbuild' else False"/>
                     <t t-set="logclass" t-value="dict(CRITICAL='danger', ERROR='danger', WARNING='warning', OK='success', SEPARATOR='separator').get(l.level)"/>
                     <tr t-att-class="'separator' if logclass == 'separator' else 'log-' + l.type" t-att-title="l.active_step_id.description or ''">
@@ -389,6 +406,7 @@
                           </small>
                         </td>
                       </tr>
+                    </t>
                     </t>
                   </t>
                 </table>
