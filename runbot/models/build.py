@@ -1017,7 +1017,6 @@ class BuildResult(models.Model):
         build.job_start = now()
         build.build_start = now()
         build.job_end = False
-        build._log('_schedule', 'Init build environment with config %s ' % build.params_id.config_id.name)
         try:
             os.makedirs(build._path('logs'), exist_ok=True)
         except Exception:
