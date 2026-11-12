@@ -4,7 +4,7 @@ import logging
 
 from collections import defaultdict
 
-from ..common import pseudo_markdown
+from ..common import pseudo_markdown, utcnow
 from ..fields import JsonDictField
 from odoo import models, fields, tools, api
 from odoo.exceptions import UserError
@@ -70,9 +70,8 @@ class IrLogging(models.Model):
                 fingerprints.pop(build_error_content.fingerprint)
 
     def _prepare_create_values(self, vals_list):
-        # keep the given create date
+        # keep the given create date, real time otherwise
         result_vals_list = super()._prepare_create_values(vals_list)
         for result_vals, vals in zip(result_vals_list, vals_list):
-            if 'create_date' in vals:
-                result_vals['create_date'] = vals['create_date']
+            result_vals['create_date'] = vals.get('create_date') or utcnow()
         return result_vals_list
