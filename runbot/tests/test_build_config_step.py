@@ -583,7 +583,7 @@ class TestBuildConfigStepDynamic(TestBuildConfigStepCommon):
         self.assertEqual(len(build.children_ids), 2, 'Two sub-builds should have been generated')
         self.assertEqual(build.children_ids[0].config_id.id, config.id)
         self.assertEqual(build.children_ids[1].config_id.id, config.id)
-        self.assertEqual(build.log_ids[-1].message, 'Starting step **create_at_install** from config **Dynamic parallel testing**')
+        self.assertEqual(build.job_ids[-1].name, 'create_at_install')
 
         # 0.2. install test database
         self.assertFalse(self.docker_run_calls, "No docker run should have been called yet")
@@ -591,9 +591,8 @@ class TestBuildConfigStepDynamic(TestBuildConfigStepCommon):
         self.assertEqual(build.active_step.id, self.config_step.id)
         self.assertEqual(build.dynamic_active_step_index, 1)
 
-        step_logs = build.log_ids[-2:]
-        self.assertEqual(step_logs[0].message, Like('Starting step **install all** from config **Dynamic parallel testing**...'))
-        self.assertEqual(step_logs[1].message, 'Using Dockerfile Tag [odoo:DockerDefault](/runbot/dockerfile_result/odoo:DockerDefault/None)')
+        job = build.active_job_id
+        self.assertEqual((job.name, job.log_name), ('install all', 'install_all'))
 
         self.assertEqual(len(self.docker_run_calls), 1, "One docker run should have been called for install_all step")
         cmd = self.docker_run_calls[0][0]
@@ -608,7 +607,8 @@ class TestBuildConfigStepDynamic(TestBuildConfigStepCommon):
         build._schedule()
         self.assertEqual(build.active_step.id, self.config_step.id)
         self.assertEqual(build.dynamic_active_step_index, 2)
-        self.assertEqual(build.log_ids[-1].message, 'Starting step **create_post_install** from config **Dynamic parallel testing**')
+        self.assertNotEqual(build.active_job_id, job)
+        self.assertEqual(build.job_ids[-1].name, 'create_post_install')
         self.assertEqual(len(build.children_ids), 6)
 
         # 0.4. parent done
@@ -704,9 +704,8 @@ class TestBuildConfigStepDynamic(TestBuildConfigStepCommon):
         self.assertEqual(build.active_step.id, self.config_step.id)
         self.assertEqual(build.dynamic_active_step_index, 0)
 
-        step_logs = build.log_ids[-2:]
-        self.assertEqual(step_logs[0].message, Like('Starting step **Install test_l10n database** from config...'))
-        self.assertEqual(step_logs[1].message, 'Using Dockerfile Tag [odoo:DockerDefault](/runbot/dockerfile_result/odoo:DockerDefault/None)')
+        job = build.job_ids[-1]
+        self.assertEqual(job.name, 'Install test_l10n database')
 
         self.assertEqual(len(self.docker_run_calls), 1, "One docker run should have been called for install_all step")
         cmd = self.docker_run_calls[0][0]
@@ -732,7 +731,7 @@ class TestBuildConfigStepDynamic(TestBuildConfigStepCommon):
         build._schedule()
         self.assertEqual(build.active_step.id, self.config_step.id)
         self.assertEqual(build.dynamic_active_step_index, 2)
-        self.assertEqual(build.log_ids[-1].message, 'Starting step **Create post install** from config **Dynamic L10N Standalone Testing**')
+        self.assertEqual(build.job_ids[-1].name, 'Create post install')
 
         # 0.4. parent done
         build._schedule()

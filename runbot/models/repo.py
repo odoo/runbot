@@ -517,6 +517,10 @@ class Repo(models.Model):
         return cmd
 
     def _git(self, cmd, errors='strict', quiet=False, input_data=None, raw=False):
+        with self.env['runbot.build.job']._git_timer():
+            return self._run_git(cmd, errors, quiet, input_data, raw)
+
+    def _run_git(self, cmd, errors, quiet, input_data, raw):
         cmd = self._get_git_command(cmd, errors)
         if input_data is not None and isinstance(input_data, str):
             input_data = input_data.encode('utf-8')

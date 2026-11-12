@@ -7,6 +7,7 @@ from . import build_config
 from . import build_config_codeowner
 from . import build_error
 from . import build_error_merge
+from . import build_job
 from . import bundle
 from . import codeowner
 from . import commit
