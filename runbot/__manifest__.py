@@ -6,7 +6,7 @@
     'author': "Odoo SA",
     'website': "http://runbot.odoo.com",
     'category': 'Website',
-    'version': '5.18',
+    'version': '5.19',
     'application': True,
     'depends': ['base', 'base_automation', 'website', 'auth_oauth'],
     'data': [
