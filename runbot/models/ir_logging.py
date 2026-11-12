@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import datetime
 import logging
 
 from collections import defaultdict
@@ -26,6 +27,7 @@ class IrLogging(models.Model):
     error_content_id = fields.Many2one('runbot.build.error.content', compute='_compute_known_error')  # remember to never store this field
     dbname = fields.Char(string='Database Name', index=False)
     metadata = JsonDictField('Metadata')
+    create_date = fields.Datetime(index=True)  # used by _gc_ir_logging
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -76,3 +78,20 @@ class IrLogging(models.Model):
             if 'create_date' in vals:
                 result_vals['create_date'] = vals['create_date']
         return result_vals_list
+
+    def _gc_ir_logging(self):
+        icp = self.env['ir.config_parameter'].sudo()
+        gc_days_info = int(icp.get_param('runbot.logs_gc_days_info', default=30))
+        gc_days = int(icp.get_param('runbot.logs_gc_days', default=180))
+        run_step = self.env.ref('runbot.runbot_build_config_step_run', raise_if_not_found=False)
+        self.env.cr.execute("""
+            DELETE FROM ir_logging
+            WHERE create_date < %s
+            AND (
+                active_step_id = %s
+                OR upper(level) NOT IN ('ERROR', 'WARNING', 'WARN', 'CRITICAL', 'SEPARATOR')
+            )
+        """, [self.env.cr.now() - datetime.timedelta(days=gc_days_info), run_step.id if run_step else None])
+        _logger.info('Removed %s info logs older than %s days', self.env.cr.rowcount, gc_days_info)
+        self.env.cr.execute("DELETE FROM ir_logging WHERE create_date < %s", [self.env.cr.now() - datetime.timedelta(days=gc_days)])
+        _logger.info('Removed %s logs older than %s days', self.env.cr.rowcount, gc_days)
