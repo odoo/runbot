@@ -667,8 +667,7 @@ class ConfigStep(models.Model):
                         build._log('create_build', f'More than {max_build} build created, stopping', level='WARNING')
                         return
                     config_name = config_name or create_config.name
-                    child = build._add_child(child_data_values, orphan=self.make_orphan, description=description or config_name, reference_parent=reference_parent)
-                    build._log('create_build', 'created with config %s' % config_name, log_type='subbuild', path=str(child.id))
+                    build._add_child(child_data_values, orphan=self.make_orphan, description=description or config_name, reference_parent=reference_parent)
 
     def _make_python_ctx(self, build):
         def log(*args, **kwargs):
@@ -729,7 +728,7 @@ class ConfigStep(models.Model):
 
         exports = build._checkout()
 
-        build._log('run', 'Start running build %s' % build.dest)
+        build._logger('Start running build')
         # run server
         cmd = build._cmd(local_only=False, enable_log_db=self.enable_log_db)
 
@@ -1154,7 +1153,7 @@ class ConfigStep(models.Model):
         if upgrade_paths:
             migrate_cmd += ['--upgrade-path', ','.join(upgrade_paths)]
 
-        build._log('run', 'Start migration build %s' % build.dest)
+        build._logger('Start migration build')
 
         migrate_cmd.finals.append(['psql', migrate_db_name, '-c', '"SELECT id, name, state FROM ir_module_module WHERE state NOT IN (\'installed\', \'uninstalled\', \'uninstallable\') AND name NOT LIKE \'test_%\' "', '>', '/data/build/logs/modules_states.txt'])
 
@@ -1452,7 +1451,7 @@ class ConfigStep(models.Model):
         build.write(return_value)  # old style support
 
     def _make_upgrade_results(self, build):
-        build._log('upgrade', 'Getting results for build %s' % build.dest)
+        build._logger('Getting results')
 
         if build.local_result != 'ko':
             checkers = [
@@ -1584,7 +1583,7 @@ class ConfigStep(models.Model):
         return -241
 
     def _make_custom_result(self, build, enabled_checkers=None, expected_logs=None):
-        build._log('run', 'Getting results for build %s' % build.dest)
+        build._logger('Getting results')
         if build.local_result != 'ko':
             checkers = [self._check_log]
             if enabled_checkers is None or "ERROR" in enabled_checkers:
@@ -1601,7 +1600,7 @@ class ConfigStep(models.Model):
             build.local_result = self._get_checkers_result(build, checkers)
 
     def _make_odoo_results(self, build):
-        build._log('run', 'Getting results for build %s' % build.dest)
+        build._logger('Getting results')
 
         if build.local_result != 'ko':
             checkers = [
@@ -1630,7 +1629,7 @@ class ConfigStep(models.Model):
             make_stats = current_dynamic_step['make_stats']
         if not make_stats:  # TODO garbage collect non sticky stat
             return
-        build._log('make_stats', 'Getting stats from log file')
+        build._logger('Getting stats from log file')
         log_path = build._path('logs', '%s.txt' % self.sanitized_name(build))
         if not os.path.exists(log_path):
             build._log('make_stats', 'Log **%s.txt** file not found', self.sanitized_name(build), level='INFO', log_type='markdown')
