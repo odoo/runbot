@@ -230,6 +230,12 @@
               <page string="Metadata">
                 <field name="metadata" widget="runbotjsonb" readonly="1"/>
               </page>
+              <page string="Diff" invisible="not metadata_diff_result_id or not metadata_diff">
+                <group>
+                  <field name="metadata_diff_result_id"/>
+                </group>
+                <field name="metadata_diff" widget="runbotjsonb" readonly="1"/>
+              </page>
             </notebook>
           </sheet>
         </form>
