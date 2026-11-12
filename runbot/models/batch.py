@@ -549,6 +549,8 @@ class Batch(models.Model):
                             pass
                 if link_commit.file_changed <= (self.bundle_id.file_limit or 450) and link_commit.base_ahead <= (self.bundle_id.commit_limit or 50):
                     diff = commit.repo_id._git(['diff', f'{merge_base_sha}..{commit.name}', '--', '*'], errors='ignore')
+                    # git only checks the first 8000 bytes to detect binary files, and postgres text cannot contain NUL
+                    diff = diff.replace('\x00', '\\0')
                     if len(diff) > 100_000_000:
                         diff = "Too long " + str(len(diff))
                         _logger.error('Diff too long while processing batch %s', self.id)
