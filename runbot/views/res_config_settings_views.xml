@@ -74,6 +74,9 @@
                     <setting>
                       <field name="runbot_logs_gc_days"/>
                     </setting>
+                    <setting>
+                      <field name="runbot_stats_gc_days_non_sticky"/>
+                    </setting>
                   </block>
 
                   <block title="Runbot Leader">

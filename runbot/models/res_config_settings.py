@@ -53,6 +53,11 @@ class ResConfigSettings(models.TransientModel):
         default=180,
         config_parameter='runbot.logs_gc_days',
         help='Number of days to keep all logs')
+    runbot_stats_gc_days_non_sticky = fields.Integer(
+        'Days before non sticky stats removal',
+        default=180,
+        config_parameter='runbot.stats_gc_days_non_sticky',
+        help='Number of days to keep the stats of builds that are not used by a sticky bundle (dev branches, failed stagings, ...). 0 to disable')
 
     runbot_pending_warning = fields.Integer('Pending warning limit', default=5, config_parameter='runbot.pending.warning')
     runbot_pending_critical = fields.Integer('Pending critical limit', default=5, config_parameter='runbot.pending.critical')
