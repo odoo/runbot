@@ -8,4 +8,22 @@
         <field name="state">code</field>
         <field name="code">model._gc_diff(delta_days=1)</field>
     </record>
+
+    <record id="ir_cron_gc_logs" model="ir.cron">
+        <field name="name">GC Logs</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="model_id" ref="base.model_ir_logging"/>
+        <field name="state">code</field>
+        <field name="code">model._gc_ir_logging()</field>
+    </record>
+
+    <record id="ir_cron_gc_stats" model="ir.cron">
+        <field name="name">GC Stats</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="model_id" ref="model_runbot_build_stat"/>
+        <field name="state">code</field>
+        <field name="code">model._gc_stats()</field>
+    </record>
 </odoo>
