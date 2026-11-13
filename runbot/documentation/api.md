@@ -6,12 +6,12 @@ a build is one test of a batch (one per trigger) and can have child builds.
 
 ## Routes
 
-- `/runbot/api/bundle/<ids_or_names>?project_id=1`: bundles by id, slug (`master-1`) or name (`master`), with their 40 last batches.
+- `GET /runbot/api/bundle/<ids_or_names>?project_id=1`: bundles by id, slug (`master-1`) or name (`master`), with their 40 last batches.
   The same name can exist in multiple projects, `project_id` (optional) restricts the result to one of them.
-- `/runbot/api/bundle?pr=odoo:297417`: bundles of pull requests, by number, optionally prefixed by the repo name.
+- `GET /runbot/api/bundle?pr=odoo:297417`: bundles of pull requests, by number, optionally prefixed by the repo name.
   A number without repo can match pull requests of several repos. When `pr` is given, ids and names are ignored.
-- `/runbot/api/batch/<ids>?depth=1&logs=errors`: batches with their commits, logs and slots (one per trigger, with its build).
-- `/runbot/api/build/<ids>?depth=1&logs=errors`: builds with their state, commits, logs, log_files, databases and children.
+- `GET /runbot/api/batch/<ids>?depth=1&logs=errors`: batches with their commits, logs and slots (one per trigger, with its build).
+- `GET /runbot/api/build/<ids>?depth=1&logs=errors`: builds with their state, commits, logs, log_files, databases and children.
 
 ## Conventions
 
