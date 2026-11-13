@@ -85,6 +85,17 @@ def _serialize_build(build, depth=1, logs='errors', parent_values=None):
 
 
 def _serialize_batch(batch, depth=1, logs='errors'):
+    statuses = {}
+    for st in batch.env['runbot.commit.status'].search([('commit_id', 'in', batch.commit_link_ids.commit_id.ids)]):
+        sent_at = st.sent_date.isoformat(timespec='seconds') + 'Z'
+        statuses.setdefault(st.commit_id, []).append({
+            'state': st.state,
+            'description': st.description,
+            'target_url': st.target_url,
+            'context': st.context,
+            'created_at': sent_at,
+            'updated_at': sent_at,
+        })
     return {
         'id': batch.id,
         'bundle_id': batch.bundle_id.id,
@@ -94,7 +105,11 @@ def _serialize_batch(batch, depth=1, logs='errors'):
         'create_date': batch.create_date,
         'state': batch.state,
         'result': batch._get_global_result(),
-        'commits': [{'repo': link.commit_id.repo_id.name, 'sha': link.commit_id.name} for link in batch.commit_link_ids],
+        'commits': [{
+            'repo': link.commit_id.repo_id.name,
+            'sha': link.commit_id.name,
+            'statuses': statuses.get(link.commit_id),
+        } for link in batch.commit_link_ids],
         'logs': [
             {'id': log.id, 'create_date': log.create_date, 'level': log.level, 'message': log.message}
             for log in batch.log_ids if log.level != 'INFO'
