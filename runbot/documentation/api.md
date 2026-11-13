@@ -12,6 +12,9 @@ a build is one test of a batch (one per trigger) and can have child builds.
   A number without repo can match pull requests of several repos. When `pr` is given, ids and names are ignored.
 - `GET /runbot/api/batch/<ids>?depth=1&logs=errors`: batches with their commits, logs and slots (one per trigger, with its build).
 - `GET /runbot/api/build/<ids>?depth=1&logs=errors`: builds with their state, commits, logs, jobs, log_files, databases and children.
+- `GET /runbot/api/commit/<ids_or_shas>`: commits by id, slug (`odoo-d14d38cc-123456`) or full sha, with their last status for each context, as on the commit page.
+  It can be more up to date than GitHub: a status with `sent_date` false was not sent to GitHub yet.
+  The same sha can exist in multiple repos or be rebased on different commits, so a sha can return multiple commits.
 
 ## Conventions
 

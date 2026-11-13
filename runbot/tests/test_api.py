@@ -30,4 +30,6 @@ class TestRunbotApi(RunbotCase, HttpCase):
                 self.assertEqual([bundle['id'] for bundle in self.get_json(url)], self.dev_bundle.ids)
         batch = self.get_json(f'/runbot/api/batch/{self.dev_batch.id}')[0]
         self.assertEqual([slot['build']['id'] for slot in batch['slots'] if slot['build']], self.build.ids)
+        commits = self.get_json(f'/runbot/api/commit/{self.initial_server_commit.name},{self.initial_server_commit.id}')
+        self.assertEqual([commit['id'] for commit in commits], self.initial_server_commit.ids)
         self.assertEqual(self.get_json(f'/runbot/api/build/{self.build.id}?logs=all')[0]['id'], self.build.id)
