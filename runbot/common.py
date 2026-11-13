@@ -443,6 +443,8 @@ def ansi_to_html(text: str):
         codes = [int(c) for c in codes.split(';') if c] if codes else [0]
 
         for code in codes:
+            if code not in ANSI_COLORS and code not in (0, 39):
+                continue
             if open_span:
                 result.append(Markup('</span>'))
                 open_span = False
