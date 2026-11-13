@@ -542,7 +542,7 @@
             <dl class="runbot-merge-fields">
                 <dt>label</dt>
                 <dd><span t-field="pr.label"/>
-                    <a t-attf-href="https://runbot.odoo.com/runbot/bundle/{{pr.refname}}" title="Open bundle on Runbot"
+                    <a t-attf-href="https://runbot.odoo.com/runbot/bundle/{{pr.label}}" title="Open bundle on Runbot"
                         class="pill-ext-link">Runbot</a>
                 </dd>
                 <dt>head</dt>
