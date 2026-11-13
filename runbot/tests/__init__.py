@@ -18,3 +18,5 @@ from . import test_dockerfile
 from . import test_host
 from . import test_ui
 from . import test_api
+
+from . import test_fields
