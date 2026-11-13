@@ -303,11 +303,12 @@ _mb_app = pytest.fixture(
     build_app(
         fake_github=True,
         permissions={
+            'checks': 'write',
             'contents': 'write',
             'deployments': 'write',
             'issues': 'write',
             'pull_requests': 'write',
-            'statuses': 'read',
+            'statuses': 'write',
         },
         events=['pull_request', 'issue_comment', 'status', 'pull_request_review']
     ),

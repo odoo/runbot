@@ -56,11 +56,12 @@ class AppController(Controller):
             "callback_urls": [f'{site_url}/runbot_merge/apps/authorized'],
             "hook_attributes": {"url": f'{site_url}/runbot_merge/hooks'},
             "default_permissions": {
+                'checks': 'write',
                 'contents': 'write',
                 'deployments': 'write',
                 'issues': 'write',
                 'pull_requests': 'write',
-                'statuses': 'read',
+                'statuses': 'write',
             },
             "default_events": ['pull_request', 'issue_comment', 'status', 'pull_request_review'],
         }, separators=(',', ':')))
