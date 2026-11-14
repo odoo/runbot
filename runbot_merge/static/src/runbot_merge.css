@@ -697,3 +697,11 @@ dl.runbot-merge-fields {
     padding-top: 0.25rem;
     border-left: 1px solid color-mix(in srgb, currentColor 15%, transparent);
 }
+
+.pill-ext-link {
+    color: var(--bg-primary);
+    background-color: var(--color-primary);
+    border-radius: 1em;
+    padding: 0.15em 0.75em;
+    font-size: 70%;
+}
