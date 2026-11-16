@@ -36,7 +36,7 @@
             <tr>
               <td t-out="build_error.last_seen_date" t-options='{"widget": "datetime"}'/>
               <th>
-                <code t-out="build_error.name"/>
+                <a t-attf-href="/runbot/error/{{build_error.id}}"><code t-out="build_error.name"/></a>
               </th>
               <td>
                 <t t-foreach="build_error.trigger_ids" t-as="trigger">
@@ -138,8 +138,7 @@
                     <small class="text-body-secondary ms-1" t-out="'Open' if build_error.active else 'Fixed'"/>
                     <span t-if="build_error.random" class="badge text-bg-warning ms-1"><i class="fa fa-random"/> Random</span>
                   </span>
-                  <a t-if="not build_error.responsible" t-attf-href="/runbot/errors/assign/{{build_error.id}}" data-runbot="action" role="button" class="btn btn-primary btn-ssm">Assign to me</a>
-                  <a t-attf-href="/odoo/error/{{build_error.id}}" class="btn btn-default btn-ssm" target="_blank" title="View in Backend">
+                  <a groups="base.group_user" t-attf-href="/odoo/error/{{build_error.id}}" class="btn btn-default btn-ssm" target="_blank" title="View in Backend">
                     <i class="fa fa-list"/>
                   </a>
                 </header>
@@ -149,7 +148,10 @@
                       <dt>Name</dt>
                       <dd><code t-out="build_error.name"/></dd>
                       <dt>Assigned to</dt>
-                      <dd t-out="build_error.responsible.display_name or 'Nobody'"/>
+                      <dd>
+                        <t t-if="build_error.responsible" t-out="build_error.responsible.display_name"/>
+                        <a t-else="" t-attf-href="/runbot/errors/assign/{{build_error.id}}" data-runbot="action" role="button" class="btn btn-primary btn-ssm">Assign to me</a>
+                      </dd>
                       <dt>Team</dt>
                       <dd t-out="build_error.team_id.display_name or 'None'"/>
                       <t t-if="build_error.trigger_ids">
@@ -190,7 +192,7 @@
                         <dt>Fixing PR</dt>
                         <dd>
                           <a t-att-href="build_error.fixing_pr_url" target="_blank" t-out="build_error.fixing_pr_id.display_name"/>
-                          <a t-if="build_error.fixing_bundle_id" t-att-href="build_error.fixing_bundle_url" t-out="build_error.fixing_bundle_id.display_name"/>
+                          <a t-if="build_error.fixing_bundle_id" t-att-href="build_error.fixing_bundle_url" class="ms-2" title="Fixing bundle"><i class="fa fa-cube me-1"/><t t-out="build_error.fixing_bundle_id.display_name"/></a>
                         </dd>
                       </t>
                       <t t-if="build_error.fixing_commit">
@@ -226,16 +228,20 @@
                   <span class="h6 mb-1">Last seen batches</span>
                 </header>
                 <table class="table table-sm mb-0">
-                  <tr>
-                    <th>Version</th>
-                    <th>Batch</th>
-                    <th>Bundle</th>
-                  </tr>
-                  <tr t-foreach="build_error.last_seen_batch_ids" t-as="batch">
-                    <td t-out="batch.bundle_id.version_id.display_name"/>
-                    <td><a t-attf-href="/runbot/batch/{{batch.id}}">batch-<t t-out="batch.id"/></a></td>
-                    <td><a t-attf-href="/runbot/bundle/{{batch.bundle_id.id}}" t-out="batch.bundle_id.display_name"/></td>
-                  </tr>
+                  <thead>
+                    <tr>
+                      <th>Version</th>
+                      <th>Batch</th>
+                      <th>Bundle</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr t-foreach="build_error.last_seen_batch_ids" t-as="batch">
+                      <td t-out="batch.bundle_id.version_id.display_name"/>
+                      <td><a t-attf-href="/runbot/batch/{{batch.id}}">batch-<t t-out="batch.id"/></a></td>
+                      <td><a t-attf-href="/runbot/bundle/{{batch.bundle_id.id}}" t-out="batch.bundle_id.display_name"/></td>
+                    </tr>
+                  </tbody>
                 </table>
               </div>
             </div>
@@ -245,7 +251,7 @@
               <div class="card mt-2 overflow-hidden">
                 <header class="card-header">Contents</header>
                 <ul class="list-group list-group-flush">
-                  <li t-foreach="build_error.error_content_ids" t-as="error_content" class="list-group-item">
+                  <li t-foreach="build_error.error_content_ids.sorted('last_seen_date DESC')" t-as="error_content" class="list-group-item">
                     <div class="small text-body-secondary mb-1">
                       <code t-out="error_content.module_name"/>
                       <t t-if="error_content.function">in <code t-out="error_content.function"/></t>
