@@ -1283,7 +1283,7 @@ class ConfigStep(models.Model):
                 'mkdir /data/build/restore',
                 'cd /data/build/restore',
                 echo('### getting archive'),
-                'wget --retry-on-host-error %s' % dump_url,
+                'wget -nv --retry-on-host-error %s' % dump_url,
                 'unzip -q %s' % zip_name,
                 echo('### restoring filestore'),
                 'mkdir -p /data/build/datadir/filestore/%s' % restore_db_name,

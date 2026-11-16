@@ -521,7 +521,7 @@ class TestUpgradeFlow(RunbotCase):
                         [
                             'mkdir /data/build/restore',
                             'cd /data/build/restore',
-                            f'wget --retry-on-host-error {dump_url}',
+                            f'wget -nv --retry-on-host-error {dump_url}',
                             f'unzip -q {zip_name}',
                             f'mkdir -p /data/build/datadir/filestore/{db_name}',
                             f'mv filestore/* /data/build/datadir/filestore/{db_name}',
