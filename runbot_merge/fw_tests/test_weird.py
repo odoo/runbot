@@ -1708,3 +1708,62 @@ def test_close_blocker(
 
     assert pr_b1_id.state == 'merged'
     assert env['runbot_merge.pull_requests'].search_count([]) == 4
+
+def test_inconsistent_fp(
+        env, make_repo, users, config, partners,
+):
+    """A project can actually mix forward-ported and non-forward-ported
+    repositories (upgrade)
+    """
+    repo1, _ = make_basic(env, config, make_repo, statuses='default')
+    project = env['runbot_merge.project'].search([])
+    repo2 = make_repo('othername', hooks=project.github_id.method == 'pat')
+    with repo2:
+        repo2.make_commits(None, Commit('111', tree={'h': 'a'}), ref='heads/c')
+    env['runbot_merge.events_sources'].create({'repository': repo2.name})
+    repo = env['runbot_merge.repository'].create({
+        'project_id': project.id,
+        'name': repo2.name,
+        'required_statuses': 'default',
+        'group_id': False,
+        'branch_filter': "[('name', '=', 'c')]",
+    })
+    env['res.partner'].search([
+        ('github_login', '=', config['role_reviewer']['user'])
+    ]).write({
+        'review_rights': [(0, 0, {'repository_id': repo.id, 'review': True})]
+    })
+    env['res.partner'].search([
+        ('github_login', '=', config['role_self_reviewer']['user'])
+    ]).write({
+        'review_rights': [(0, 0, {'repository_id': repo.id, 'self_review': True})]
+    })
+    with repo1, repo2:
+        for r in repo1, repo2:
+            r.make_commits('c', Commit('first', tree={'a': '63'}), ref='heads/xbranch')
+            pr = r.make_pr(target='c', head='xbranch')
+            r.post_status(pr.head, 'success')
+            pr.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+
+    with repo1, repo2:
+        repo1.post_status('staging.c', 'success')
+        repo2.post_status('staging.c', 'success')
+    env.run_crons()
+
+    assert env['runbot_merge.pull_requests'].search([]).mapped('state') == ['merged', 'merged']
+    assert env['runbot_merge.batch'].search([]).merge_date
+
+    with repo1:
+        repo1.make_commits('a', Commit('first', tree={'x': '42'}), ref='heads/abranch')
+        pr = repo1.make_pr(target='a', head='abranch')
+        repo1.post_status(pr.head, 'success')
+        pr.post_comment('hansen r+', config['role_reviewer']['token'])
+    env.run_crons()
+    with repo1:
+        repo1.post_status('staging.a', 'success')
+    env.run_crons()
+    pr_a = to_pr(env, pr)
+    assert pr_a.state == 'merged'
+    pr_b = env['runbot_merge.pull_requests'].search([('parent_id', '=', pr_a.id)])
+    assert pr_b, "should have forward-ported b even though repo 2 does not forward port at all"

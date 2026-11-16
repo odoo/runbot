@@ -151,7 +151,7 @@ confused (and will probably timeout).
     @api.depends('repo_ids.fp_remote_target')
     def _compute_fp_enabled(self):
         for project in self:
-            project.fp_enabled = all(repo.fp_remote_target for repo in project.repo_ids)
+            project.fp_enabled = any(repo.fp_remote_target for repo in project.repo_ids)
 
     # technically the email could change at any moment...
     @api.depends('github_id')
