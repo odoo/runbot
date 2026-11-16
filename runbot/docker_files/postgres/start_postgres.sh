@@ -11,7 +11,7 @@ elif [ -n "${PGHOST:-}" ] && [ -n "${PGDATA:-}" ]; then
     if [ -z "$(ls -A $PGDATA)" ]; then
         if [ -n "$RESTORE_CLUSTER_URL" ]; then
             echo "Found RESTORE_CLUSTER_URL. Downloading cluster backup..."
-            curl -sSL "$RESTORE_CLUSTER_URL" -o /tmp/cluster_backup.tar.zstd
+            wget -nv --retry-on-host-error -O /tmp/cluster_backup.tar.zstd "$RESTORE_CLUSTER_URL"
             echo "Extracting backup into /data/build..."
             tar --zstd -xf /tmp/cluster_backup.tar.zstd -C /data/build
             rm /tmp/cluster_backup.tar.zstd
