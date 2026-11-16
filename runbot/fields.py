@@ -36,6 +36,7 @@ class FieldDict(MutableMapping):
         new = self.dict.copy()
         new[key] = value
         self.record[self.field.name] = new
+        self.dict = new
 
     def __getitem__(self, key):
         return self.dict[key]
@@ -44,6 +45,7 @@ class FieldDict(MutableMapping):
         new = self.dict.copy()
         del new[key]
         self.record[self.field.name] = new
+        self.dict = new
 
     def __iter__(self):
         return iter(self.dict)
