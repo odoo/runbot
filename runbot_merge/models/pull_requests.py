@@ -2825,7 +2825,7 @@ class Stagings(models.Model):
                 self.env.ref("runbot_merge.merge_cron")._trigger()
 
             if last_pending:
-                timeout = datetime.datetime.fromisoformat(last_pending) \
+                timeout = datetime.datetime.fromisoformat(last_pending).replace(tzinfo=None) \
                       + datetime.timedelta(minutes=staging.target.project_id.ci_timeout)
 
                 if timeout > staging.timeout_limit:
