@@ -175,40 +175,37 @@
           <div class="row">
             <div class='col-md-12'>
               <h4><t t-esc="dockerfile.image_tag"/></h4>
-              <t t-if="dockerfile_result.identifier not in (dockerfile.image_identifier, dockerfile.image_future_identifier)">
-                <div class="alert alert-warning">
-                  This version of the docker image is outdated and was modified since, latest version <a t-attf-href="/runbot/dockerfile_result/{{dockerfile.last_successful_result.id}}">here</a>
-                </div>
-              </t>
-              <t t-else="">
-                <t t-if="dockerfile.image_identifier == dockerfile.image_future_identifier">
-                  <div class="alert alert-success">
-                    This is the latest version of the docker image
-                  </div>
-                </t>
-                <t t-else="">
-                  <t t-if="dockerfile.image_identifier == dockerfile_result.identifier">
-                    <div class="alert alert-info">
-                      This is the latest stable version of the docker image, but <a t-attf-href="/runbot/dockerfile_result/{{future_result.id}}">another future version</a> exists
-                      <details>
-                        <summary>Diff</summary>
-                        <t t-out="future_diff"/>
-                      </details>
-                    </div>
-                  </t>
-                  <t t-else="">
-                    <div class="alert alert-info">
-                      This is the future version of the docker image, <a t-attf-href="/runbot/dockerfile_result/{{current_result.id}}">current version here</a>
-                    </div>
-                  </t>
-                </t>
-              </t>
+              <t t-set="is_current" t-value="dockerfile_result.identifier == dockerfile.image_identifier"/>
+              <t t-set="is_future" t-value="dockerfile.has_future and dockerfile_result.identifier == dockerfile.image_future_identifier"/>
+              <div t-if="is_current and not dockerfile.has_future" class="alert alert-success">
+                This is the latest version of the docker image
+              </div>
+              <div t-elif="is_current" class="alert alert-info">
+                This is the current version of the docker image, but a future version exists
+              </div>
+              <div t-elif="is_future" class="alert alert-info">
+                This is the future version of the docker image
+              </div>
+              <div t-else="" class="alert alert-warning">
+                This version of the docker image is outdated and was modified since
+              </div>
+              <ul class="list-unstyled">
+                <li t-if="current_result and not is_current">
+                  <b>Current version</b>: <a t-attf-href="/runbot/dockerfile_result/{{current_result.id}}" t-esc="current_result.identifier"/>
+                  <t t-if="is_future">(<a t-attf-href="/runbot/dockerfile_result/diff/{{current_result.id}},{{dockerfile_result.id}}">see metadata diff</a>)</t>
+                  <t t-else="">(<a t-attf-href="/runbot/dockerfile_result/diff/{{dockerfile_result.id}},{{current_result.id}}">see metadata diff</a>)</t>
+                </li>
+                <li t-if="dockerfile.has_future and future_result and not is_future">
+                  <b>Future version</b>: <a t-attf-href="/runbot/dockerfile_result/{{future_result.id}}" t-esc="future_result.identifier"/>
+                  (<a t-attf-href="/runbot/dockerfile_result/diff/{{dockerfile_result.id}},{{future_result.id}}">see metadata diff</a>)
+                </li>
+              </ul>
             </div>
           </div>
           <div class="row">
             <div class='col-md-12'>
               <b>Identifier</b>: <t t-esc="dockerfile_result.identifier"></t><br/>
-              <b>Dockerfile</b>: <a t-attf-href="/runbot/dockerfile/result/{{current_result.id}}">raw</a><br/>
+              <b>Dockerfile</b>: <a t-attf-href="/runbot/dockerfile/result/{{dockerfile_result.id}}">raw</a><br/>
               <b>Metadata</b>: <pre><t t-esc="json.dumps((dockerfile_result.metadata.dict), indent=3)"></t></pre>
             </div>
           </div>

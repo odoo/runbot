@@ -1,0 +1,38 @@
+<odoo>
+  <template id="runbot.docker_result_identifier">
+    <t t-set="dockerfile" t-value="result.dockerfile_id"/>
+    <span class="text-muted" t-esc="dockerfile.image_tag"/>
+    <a t-attf-href="/runbot/dockerfile_result/{{result.id}}" t-esc="result.identifier"/>
+    <span t-if="result.identifier == dockerfile.image_identifier" class="badge text-bg-success">current</span>
+    <span t-elif="dockerfile.has_future and result.identifier == dockerfile.image_future_identifier" class="badge text-bg-info">future</span>
+  </template>
+
+  <template id="runbot.docker_result_diff_template">
+    <t t-call="runbot.layout">
+      <div class="container-fluid">
+        <h4>Metadata diff</h4>
+        <t t-foreach="diffs" t-as="result_diff">
+          <t t-set="result_a" t-value="result_diff[0]"/>
+          <t t-set="result_b" t-value="result_diff[1]"/>
+          <t t-set="diff" t-value="result_diff[2]"/>
+          <!-- only the most recent diff is open by default -->
+          <details class="mt-4" t-att-open="result_diff_first">
+            <summary class="border-bottom pb-1">
+              <h5 class="fs-6 d-inline">
+                <t t-call="runbot.docker_result_identifier"><t t-set="result" t-value="result_a"/></t>
+                →
+                <t t-call="runbot.docker_result_identifier"><t t-set="result" t-value="result_b"/></t>
+                <small class="text-muted ms-2"><t t-esc="result_a.create_date.strftime('%Y-%m-%d %H:%M')"/> → <t t-esc="result_b.create_date.strftime('%Y-%m-%d %H:%M')"/></small>
+              </h5>
+            </summary>
+            <div t-if="not diff" class="alert alert-success mt-2">No difference</div>
+            <t t-foreach="diff" t-as="key">
+              <h6 class="mt-3" t-esc="key"/>
+              <pre class="mb-0"><div t-foreach="diff[key]" t-as="line" t-att-class="'text-danger' if line.startswith('- ') else 'text-success' if line.startswith('+ ') else None" t-esc="line"/></pre>
+            </t>
+          </details>
+        </t>
+      </div>
+    </t>
+  </template>
+</odoo>

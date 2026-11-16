@@ -1,11 +1,12 @@
 import datetime
 import logging
 from collections import OrderedDict, defaultdict
+from itertools import pairwise
 from subprocess import CalledProcessError
 
 import werkzeug.utils
 from dateutil.relativedelta import relativedelta
-from werkzeug.exceptions import Forbidden, NotFound
+from werkzeug.exceptions import BadRequest, Forbidden, NotFound
 
 from odoo import fields
 from odoo.http import Controller, Response, request, route
@@ -811,7 +812,31 @@ class Runbot(Controller):
             'dockerfile': dockerfile,
             'future_result': future_result,
             'current_result': current_result,
-            'future_diff': current_result._getdocker_metadata_diff(future_result.id),
+        })
+
+    @route([
+        '/runbot/dockerfile_result/diff/<string:result_ids>',
+    ], type='http', auth='public', website=True, sitemap=False)
+    def dockerfile_result_diff(self, result_ids, **kwargs):
+        max_results = 100
+        result_ids = result_ids.split(',')
+        if len(result_ids) > max_results:
+            raise BadRequest(f'At most {max_results} results can be compared')
+        try:
+            result_ids = [int(result_id) for result_id in result_ids]
+        except ValueError:
+            raise NotFound
+        results = request.env['runbot.docker_build_result'].sudo().browse(result_ids)
+        if len(set(result_ids)) < 2 or len(results.exists()) != len(set(result_ids)):
+            raise NotFound
+        if not (all(results.dockerfile_id.mapped('public_visibility')) or request.env.user.has_group('runbot.group_runbot_admin')):
+            raise NotFound
+        diffs = []
+        for result_a, result_b in pairwise(results):
+            diff = result_a._getdocker_metadata_diff(result_b.id)
+            diffs.append((result_a, result_b, {key: [value] if isinstance(value, str) else value for key, value in diff.items()}))
+        return request.render("runbot.docker_result_diff_template", {
+            'diffs': diffs[::-1],
         })
 
     @route([

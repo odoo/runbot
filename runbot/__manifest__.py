@@ -37,6 +37,7 @@
         'templates/git.xml',
         'templates/nginx.xml',
         'templates/build_error.xml',
+        'templates/docker_result_diff.xml',
         'templates/batches_by_date.xml',
         'templates/commit_link_details.xml',
         'templates/bundles_by_tag.xml',

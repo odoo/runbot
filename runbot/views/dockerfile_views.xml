@@ -6,6 +6,9 @@
         <field name="arch" type="xml">
           <form string="Dockerfile" delete="0">
             <sheet>
+              <div name="button_box">
+                <button name="action_view_successful_results" type="object" class="oe_stat_button" icon="fa-list" string="Successful results" invisible="is_template"/>
+              </div>
               <widget name="web_ribbon" title="Empty" bg_color="bg-warning" invisible="dockerfile != ''"/>
               <widget name="web_ribbon" title="Newer identifier" bg_color="bg-danger" invisible="has_future != True"/>
               <widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
@@ -80,7 +83,9 @@
                 </page>
                 <page string="Build results">
                   <field name="build_results">
-                    <list>
+                    <list decoration-success="is_current" decoration-info="is_future">
+                      <field name="is_current" column_invisible="True"/>
+                      <field name="is_future" column_invisible="True"/>
                       <field name="dockerfile_id"/>
                       <field name="host_id"/>
                       <field name="duration"/>
@@ -246,13 +251,16 @@
       <field name="name">runbot.docker_build_result.list</field>
       <field name="model">runbot.docker_build_result</field>
       <field name="arch" type="xml">
-        <list string="Docker build result">
+        <list string="Docker build result" decoration-success="is_current" decoration-info="is_future">
+          <field name="is_current" column_invisible="True"/>
+          <field name="is_future" column_invisible="True"/>
           <field name="dockerfile_id"/>
           <field name="host_id"/>
           <field name="duration"/>
           <field name="image_size"/>
           <field name="result"/>
           <field name="identifier"/>
+          <field name="create_date" string="Date"/>
           <field name="summary"/>
         </list>
       </field>
@@ -277,6 +285,18 @@
       <field name="state">code</field>
       <field name="code">
         records.action_create_missing_variants()
+      </field>
+  </record>
+
+  <record id="docker_build_result_compare_metadata" model="ir.actions.server">
+      <field name="name">Compare metadata</field>
+      <field name="model_id" ref="runbot.model_runbot_docker_build_result"/>
+      <field name="binding_model_id" ref="runbot.model_runbot_docker_build_result"/>
+      <field name="binding_view_types">list</field>
+      <field name="type">ir.actions.server</field>
+      <field name="state">code</field>
+      <field name="code">
+        action = records.action_compare_metadata()
       </field>
   </record>
 
