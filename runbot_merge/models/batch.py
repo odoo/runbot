@@ -459,7 +459,7 @@ class Batch(models.Model):
         scheduled = self.browse(())
         for batch in self:
             fw_policy = batch.source.fw_policy
-            ident = str(batch) + ', '.join(batch.prs.mapped('display_name'))
+            ident = str(batch) + ' ' + ', '.join(batch.prs.mapped('display_name'))
 
             _logger.info('Checking if forward-port %s', ident)
             if fw_policy == 'no':
