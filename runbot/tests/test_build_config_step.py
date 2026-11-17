@@ -157,6 +157,54 @@ class TestCodeowner(TestBuildConfigStepCommon):
         messages = self.parent_build.log_ids.mapped('message')
         self.assertEqual(messages[5], 'All reviewers are already on pull request [base/odoo:1234](https://example.com/base/odoo/pull/1234)')
 
+    def test_codeowner_commit_message(self):
+        self.env['runbot.codeowner'].create([
+            {'github_teams': 'team_perf, team_py', 'project_id': self.project.id, 'regex': r'\[PERF\]', 'match_type': 'commit'},
+            {'github_teams': 'team_security', 'project_id': self.project.id, 'regex': r'\[SEC\]', 'match_type': 'commit'},
+            {'github_teams': 'team_benchmark, team_perf', 'project_id': self.project.id, 'regex': 'Benchmark:', 'match_type': 'commit'},
+        ])
+        self.diff = 'addons/module/file.py'
+        self.commit_log = (
+            'aaaaaaaaaaaa\n[PERF] module: faster café\n\nReduce queries\n\0'
+            'bbbbbbbbbbbb\n[IMP] module: improve throughput\n\nBenchmark: 2x faster\n\0'
+            'cccccccccccc\n[SEC] module: validate access rights\n\0'
+        )
+        self.config_step._run_codeowner(self.parent_build)
+        self.assertEqual(self.dev_pr.reviewers, 'team_benchmark,team_perf,team_py,team_security')
+
+    def test_codeowner_match_type_mismatch(self):
+        # Each pattern matches only the other source: the file path for the commit
+        # rule, and the commit message for the file rule. Neither should apply.
+        self.env['runbot.codeowner'].create([
+            {'github_teams': 'commit_only', 'project_id': self.project.id, 'regex': r'.*file\.py', 'match_type': 'commit'},
+            {'github_teams': 'file_only', 'project_id': self.project.id, 'regex': 'Benchmark:', 'match_type': 'file'},
+        ])
+        self.diff = 'addons/module/file.py'
+        self.commit_log = 'aaaaaaaaaaaa\nBenchmark: faster things\n\0'
+        self.config_step._run_codeowner(self.parent_build)
+        # Only the existing .py file rule should add a reviewer.
+        self.assertEqual(self.dev_pr.reviewers, 'team_py')
+
+    def test_codeowner_commit_message_scope(self):
+        other_project = self.Project.create({'name': 'Other project'})
+        for values in [
+            {'github_teams': 'team_perf', 'project_id': self.project.id, 'regex': r'\[PERF\]', 'match_type': 'commit', 'version_domain': str([('id', '=', self.version_13.id)])},
+            {'github_teams': 'other_project', 'project_id': other_project.id, 'regex': r'\[PERF\]', 'match_type': 'commit'},
+            {'github_teams': 'other_version', 'project_id': self.project.id, 'regex': r'\[PERF\]', 'match_type': 'commit', 'version_domain': str([('id', '!=', self.version_13.id)])},
+        ]:
+            self.env['runbot.codeowner'].create(values)
+        self.diff = 'addons/module/file.py'
+        self.commit_log = 'aaaaaaaaaaaa\n[PERF] module: faster things\n\0'
+        self.config_step._run_codeowner(self.parent_build)
+        self.assertEqual(self.dev_pr.reviewers, 'team_perf,team_py')
+
+    def test_codeowner_commit_message_no_match(self):
+        self.env['runbot.codeowner'].create({'github_teams': 'team_perf', 'project_id': self.project.id, 'regex': r'\[PERF\]', 'match_type': 'commit'})
+        self.diff = 'addons/module/file.py'
+        self.commit_log = 'aaaaaaaaaaaa\n[FIX] module: PERF is not a tag here\n\nnor here\n\0'
+        self.config_step._run_codeowner(self.parent_build)
+        self.assertEqual(self.dev_pr.reviewers, 'team_py')
+
     def test_codeowner_author_in_team(self):
         self.diff = 'addons/module/file.js\naddons/module/file.py\naddons/module/file.xml'
         self.team1.github_team = 'team_py'

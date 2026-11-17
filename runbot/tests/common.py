@@ -26,6 +26,8 @@ class RunbotCase(TransactionCase):
                 return ''
         if cmd[0] == 'diff':
             return self.diff
+        if cmd[0] == 'log':
+            return self.commit_log
         else:
             _logger.warning('Unsupported mock command %s' % cmd)
 
@@ -196,8 +198,9 @@ class RunbotCase(TransactionCase):
         self.commit_list = {}
         self.docker_run_calls = []
         self.diff = ''
+        self.commit_log = ''
 
-        def mock_git(repo, cmd, quiet=False, input_data=None, raw=False):
+        def mock_git(repo, cmd, errors='strict', quiet=False, input_data=None, raw=False):
             return self.mock_git_helper(repo, cmd, input_data=input_data, raw=raw)
 
         self.start_patcher('git_patcher', 'odoo.addons.runbot.models.repo.Repo._git', new=mock_git)

@@ -11,6 +11,7 @@
                         <field name="team_id"/>
                         <field name="organisation" invisible="1"/>
                         <field name="github_teams" widget="github_team"/>
+                        <field name="match_type"/>
                         <field name="regex"/>
                         <field name="version_domain" widget="domain" options="{'model': 'runbot.version', 'in_dialog': True, 'operators': ['in','=', '&lt;', '&gt;']}"/>
                     </group>
@@ -27,6 +28,7 @@
             <list string="Codeowners">
                 <field name="project_id"/>
                 <field name="version_domain"/>
+                <field name="match_type"/>
                 <field name="regex"/>
                 <field name="organisation" invisible="1"/>
                 <field name="team_id"/>

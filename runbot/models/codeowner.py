@@ -12,6 +12,17 @@ class Codeowner(models.Model):
 
     project_id = fields.Many2one('runbot.project', required=True, default=lambda self: self.env.ref('runbot.main_project', raise_if_not_found=False))
     regex = fields.Char('Regular Expression', help='Regex to match full file paths', required=True, tracking=True)
+    match_type = fields.Selection(
+        selection=[
+            ('file', 'File path'),
+            ('commit', 'Commit message'),
+        ],
+        default='file', required=True, tracking=True,
+        help="""
+            File path: regex.match on modified files.
+            Commit message: regex.search on the full message (title and body) of each commit of the PR.
+        """,
+    )
     github_teams = fields.Char(help='Comma separated list of github teams to notify', tracking=True)
     team_id = fields.Many2one('runbot.team', help='Not mandatory runbot team', tracking=True)
     version_domain = fields.Char('Version Domain', help='Codeowner only applies to the filtered versions')
