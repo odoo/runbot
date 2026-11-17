@@ -134,9 +134,9 @@ def test_trivial_flow(env, repo, page, users, config, project, partners, status_
         "merge method unset, review missing, no CI"
     assert dict(zip(
         (e.text_content() for e in pr_dashboard.cssselect('dl.runbot-merge-fields dt')),
-        (e.text_content() for e in pr_dashboard.cssselect('dl.runbot-merge-fields dd')),
+        (" ".join(e.text_content().split()) for e in pr_dashboard.cssselect('dl.runbot-merge-fields dd')),
     )) == {
-        'label': f"{config['github']['owner']}:other",
+        'label': f"{config['github']['owner']}:other Runbot",
         'head': c2,
     }
 

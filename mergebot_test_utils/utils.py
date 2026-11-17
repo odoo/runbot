@@ -74,8 +74,11 @@ class matches(str):
         return self._r.search(text)
 
 def seen(env, pr):
-    url = to_pr(env, pr).url
-    return f'[![Pull request status dashboard]({url}.png)]({url})'
+    pr_id = to_pr(env, pr)
+    return f'''[![Pull request status dashboard]({pr_id.url}.png)]({pr_id.url})
+
+🤖 [Open bundle on Runbot](https://runbot.odoo.com/runbot/bundle/{pr_id.label})\
+'''
 
 def make_basic(
         env,
