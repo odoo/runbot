@@ -37,7 +37,7 @@ def staging_dict(staging):
         'batches': [
             [
                 {
-                    'repository': pr.repository_id.name,
+                    'repository': pr.repository.name,
                     'number': pr.number,
                     'head': pr.head,
                     'merged_head': json.loads(pr.commits_map)[''],

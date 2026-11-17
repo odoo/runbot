@@ -163,11 +163,17 @@ def test_trivial_flow(env, repo, page, users, config, project, partners, status_
     env.run_crons()
     assert pr_id.staging_id
     assert pr_page(page, pr).cssselect('.alert-primary')
+    info = json.loads(page(f'/runbot_merge/stagings/{pr_id.staging_id.id}'))
+    assert info['pull_requests'] == [{
+        'name': pr_id.display_name,
+        'repository': repo.name,
+        'number': pr_id.number,
+    }]
 
     with repo:
         repo.post_status(staging_branch, 'success', 'ci/runbot', target_url='http://foo.com/pog')
         repo.post_status(staging_branch, 'success', 'legal/cla')
-        # the should not block the merge because it's not part of the requirements
+        # ci/lint should not block the merge because it's not part of the requirements
         repo.post_status(staging_branch, 'failure', 'ci/lint', target_url='http://ignored.com/whocares')
     # need to store this because after the crons have run the staging will
     # have succeeded and been disabled
