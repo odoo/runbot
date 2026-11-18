@@ -236,7 +236,7 @@ def docker_run(*args, **kwargs):
     return _docker_run(*args, **kwargs)
 
 
-def _docker_run(cmd=False, use_host_postgres=False, log_path=False, build_dir=False, container_name=False, image_tag=False, exposed_ports=None, cpu_limit=None, cpu_period=100000, cpus=0, memory=None, preexec_fn=None, ro_volumes=None, env_variables=None, network_enabled=False):
+def _docker_run(cmd=False, use_host_postgres=False, log_path=False, build_dir=False, container_name=False, image_tag=False, exposed_ports=None, cpu_limit=None, cpu_period=100000, cpus=0, memory=None, shm_size='128m', preexec_fn=None, ro_volumes=None, env_variables=None, network_enabled=False):
     """Run tests in a docker container
     :params use_host_postgres: # TODO cleanup postgres remove
     :param run_cmd: command string to run in container
@@ -249,6 +249,7 @@ def _docker_run(cmd=False, use_host_postgres=False, log_path=False, build_dir=Fa
     :param cpu_period: Specify the CPU CFS scheduler period, which is used alongside cpu_quota
     :param cpus: used to compute cpu_quota = cpu_period * cpus (equivalent of --cpus in docker CLI)
     :param memory: memory limit in bytes for the container
+    :param shm_size: size of /dev/shm in the container (docker format, e.g. '1024m')
     :params ro_volumes: dict of dest:source volumes to mount readonly in builddir
     :params env_variables: list of environment variables
     :params network_enabled: enable network boolean.
@@ -330,7 +331,7 @@ exit $TEST_EXIT_CODE
         entrypoint='/data/build/entrypoint.sh',
         name=container_name,
         volumes=volumes,
-        shm_size='128m',
+        shm_size=shm_size,
         mem_limit=memory,
         ports=ports,
         ulimits=ulimits,
