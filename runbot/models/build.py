@@ -1284,6 +1284,10 @@ class BuildResult(models.Model):
             containers_memory_limit = int(float(containers_memory_limit) * 1024 ** 3) * memory_limit_factor
             kwargs['memory'] = int(containers_memory_limit)
 
+        if 'shm_size' not in kwargs:
+            shm_size = int(self.env['ir.config_parameter'].sudo().get_param('runbot.containers_shm_size') or 1024)
+            kwargs['shm_size'] = f'{shm_size}m'
+
         self.docker_start = now()
         if self.job_start:
             start_step_time = int(dt2time(self.docker_start) - dt2time(self.job_start))

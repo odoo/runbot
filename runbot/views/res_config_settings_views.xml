@@ -54,6 +54,9 @@
                       <field name="runbot_memory_bytes" readonly='1' class="text-muted"/>
                     </setting>
                     <setting>
+                      <field name="runbot_containers_shm_size"/>
+                    </setting>
+                    <setting>
                       <field name="runbot_containers_cpus"/>
                     </setting>
                   </block>

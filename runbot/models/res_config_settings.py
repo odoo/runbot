@@ -11,6 +11,7 @@ class ResConfigSettings(models.TransientModel):
 
     runbot_workers = fields.Integer('Default number of workers')
     runbot_containers_memory = fields.Float('Containers Mem limit (in GiB)')
+    runbot_containers_shm_size = fields.Integer('Containers shm size (in MiB)', default=1024, config_parameter='runbot.containers_shm_size')
     runbot_containers_cpus = fields.Float('Allowed Containers CPUs (0 means no limit)')
     runbot_memory_bytes = fields.Float('Bytes', compute='_compute_memory_bytes')
     runbot_running_max = fields.Integer('Max running builds')
