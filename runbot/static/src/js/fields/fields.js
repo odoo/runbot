@@ -127,7 +127,7 @@ export class FieldCharFrontendUrl extends Component {
     static template = xml`
         <div class="o_field_many2one_selection">
             <div class="o_field_widget"><CharField t-props="props" /></div>
-            <div><a t-att-href="route" target="_blank"><span class="fa fa-play ms-2"/></a></div>
+            <div><a t-att-href="route" t-on-click.stop="" t-on-auxclick.stop="" target="_blank"><span class="fa fa-play ms-2"/></a></div>
         </div>
     `;
     static components = { CharField };
