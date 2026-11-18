@@ -47,6 +47,14 @@ _SAFE_OPCODES |= set(to_opcodes(['LOAD_DEREF', 'STORE_DEREF', 'LOAD_CLOSURE', 'M
 
 _logger = logging.getLogger(__name__)
 
+
+def _url_exists(url, timeout=5):
+    try:
+        return requests.head(url, timeout=timeout).status_code == 200
+    except requests.RequestException:
+        return False
+
+
 _re_warning = r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ WARNING .*'
 
 PYTHON_DEFAULT = "# type python code here\n\n\n\n\n\n"
@@ -1235,14 +1243,14 @@ class ConfigStep(models.Model):
             use_host_postgres = config_data.get('use_host_postgres', docker_file.use_host_postgres)
             if config_data.get('restore_cluster', self.restore_cluster) and not use_host_postgres:   # TODO cleanup postgres remove
                 cluster_url = dump_url.replace('.zip', '-cluster.tar.zstd')
-                if requests.head(cluster_url, timeout=5).status_code != 200:  # TODO remove check once all dumps have a cluster zip
+                if not _url_exists(cluster_url):  # TODO remove check once all dumps have a cluster zip
                     build._log('', 'Using dump url, [no cluster](%s) was found', cluster_url, log_type='markdown')
                     cluster_url = None
 
-            if not cluster_url and reference_build.trigger_id.backup_databases and requests.head(dump_url, timeout=5).status_code != 200:
+            if not cluster_url and reference_build.trigger_id.backup_databases and not _url_exists(dump_url):
                 for backup_host in self.env['runbot.host'].search([('is_backup', '=', True)]):
                     backup_url = f'{backup_host._backup_url()}{zip_name}'
-                    if requests.head(backup_url, timeout=5).status_code == 200:
+                    if _url_exists(backup_url):
                         build._log('_run_restore', 'Template [%s](%s) from build [%s](%s) is missing, using [backup](%s)', zip_name, dump_url, reference_build.id, reference_build.build_url, backup_url, log_type='markdown')
                         dump_url = backup_url
                         use_backup = True
