@@ -22,6 +22,7 @@ class FreezeWizard(models.Model):
     _description = "Wizard for freezing a project('s master)"
 
     project_id = fields.Many2one('runbot_merge.project', required=True)
+    disable_forwardport = fields.Boolean(related='project_id.forwardport_disabled')
     errors = fields.Text(compute='_compute_errors')
     branch_name = fields.Char(required=True, help="Name of the new branches to create")
 
@@ -62,12 +63,6 @@ class FreezeWizard(models.Model):
         ('unique_per_project', 'unique (project_id)',
          "There should be only one ongoing freeze per project"),
     ]
-
-    @api.model_create_multi
-    def create(self, vals_list):
-        r = super().create(vals_list)
-        self.env.ref('runbot_merge.port_forward').active = False
-        return r
 
     @api.onchange('release_label')
     def _onchange_release_label(self):
@@ -185,9 +180,11 @@ class FreezeWizard(models.Model):
         # if there are still errors, reopen the wizard
         if self.errors:
             return self.action_open()
+        self.project_id.disable_forwardport = True
 
         conflict_crons = self.env.ref('runbot_merge.merge_cron')\
                        | self.env.ref('runbot_merge.staging_cron')\
+                       | self.env.ref('runbot_merge.port_forward')\
                        | self.env.ref('runbot_merge.process_updated_commits')
         # we don't want to run concurrently to the crons above, though we
         # don't need to prevent read access to them
