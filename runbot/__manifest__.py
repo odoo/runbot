@@ -89,7 +89,6 @@
             'runbot/static/lib/bootstrap/css/bootstrap.css',
             'runbot/static/lib/fontawesome/css/font-awesome.css',
             'runbot/static/src/css/runbot_theme.css',
-            'runbot/static/src/css/table_group.css',
             'runbot/static/src/css/runbot.css',
 
             'web/static/src/module_loader.js',
@@ -97,9 +96,7 @@
             'runbot/static/lib/bootstrap/js/bootstrap.bundle.js',
             'runbot/static/src/js/polyfill_command_api.js',
             'runbot/static/src/js/utils/*',
-            'runbot/static/src/js/elements/*',
-            'runbot/static/src/js/table_filter.js',
-            'runbot/static/src/js/table_group.js',
+            'runbot/static/src/js/elements/**/*',
             'runbot/static/src/js/runbot.js',
         ],
         'runbot.assets_system_theme': [
