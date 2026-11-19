@@ -1,5 +1,6 @@
 import datetime
 import logging
+import re
 from collections import OrderedDict, defaultdict
 from itertools import pairwise
 from subprocess import CalledProcessError
@@ -526,7 +527,7 @@ class Runbot(Controller):
         return request.render('runbot.dashboard_page', qctx)
 
     @route(['/runbot/stats/'], type='jsonrpc', auth="user", website=False, sitemap=False)
-    def stats_json(self, bundle_id=False, trigger_id=False, key_category='', key_step=None, center_build_id=False, limit=100, **post):
+    def stats_json(self, bundle_id=False, trigger_id=False, key_category='', key_step=None, center_build_id=False, limit=100, build_filter='', **post):
         """ Json stats """
         trigger_id = trigger_id and int(trigger_id)
         bundle_id = bundle_id and int(bundle_id)
@@ -562,6 +563,14 @@ class Runbot(Controller):
 
         parents = {b.id: b.top_parent.id for b in builds.with_context(prefetch_fields=False)}
         dates = {b.top_parent.id: b.create_date for b in builds.with_context(prefetch_fields=False)}
+        if build_filter:
+            try:
+                build_filter_re = re.compile(build_filter, re.IGNORECASE)
+            except re.error as e:
+                return {'stats': {}, 'dates': dates, 'error': f'Invalid build filter: {e}'}
+            builds = builds.filtered(lambda b: build_filter_re.search(b.description or b.config_id.name or ''))
+            if not builds:
+                return {'stats': {}, 'dates': dates}
         query = "SELECT build_id, values FROM runbot_build_stat WHERE build_id IN %s AND category = %s"
         values = [tuple(builds.ids), key_category]
         if key_step:
