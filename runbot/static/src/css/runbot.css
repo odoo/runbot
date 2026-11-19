@@ -268,10 +268,6 @@ dialog.modal {
 	display: none;
 }
 
-expander-button.card-header:hover {
-	background-color: var(--bs-tertiary-bg);
-}
-
 .d-empty-none:empty {
     display: none !important;
 }
