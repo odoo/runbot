@@ -64,6 +64,31 @@ class ConfigStep(models.Model):
             reviewer_per_file[file] = file_reviewers
         return reviewer_per_file
 
+    def _reviewer_per_commit(self, commit_link, regexes):
+        reviewer_per_commit = {}
+        if not regexes:
+            return reviewer_per_commit
+
+        log = commit_link.commit_id.repo_id._git(
+            ['log', '-z', '--format=%H%n%B', '%s..%s' % (commit_link.merge_base_commit_id.name, commit_link.commit_id.name)],
+            errors='ignore',
+        )
+        for entry in log.split('\0'):
+            if not entry:
+                continue
+
+            sha, _, message = entry.partition('\n')
+            commit_reviewers = set()
+            for regex, teams in regexes:
+                if re.search(regex, message):
+                    commit_reviewers |= teams
+
+            if commit_reviewers:
+                title = message.partition('\n')[0]
+                reviewer_per_commit[sha, title] = commit_reviewers
+
+        return reviewer_per_commit
+
     def _run_codeowner(self, build):
         bundle = build.params_id.create_batch_id.bundle_id
         if bundle.is_base:
@@ -114,7 +139,8 @@ class ConfigStep(models.Model):
         pr_by_commit = self._pr_by_commit(build, prs)
         ownerships = self.env['runbot.module.ownership'].search([('team_id.github_team', '!=', False)])
         codeowners = build.env['runbot.codeowner'].search([('project_id', '=', bundle.project_id.id)])
-        regexes = self._codeowners_regexes(codeowners, build.params_id.version_id)
+        regexes = self._codeowners_regexes(codeowners.filtered(lambda c: c.match_type == 'file'), build.params_id.version_id)
+        commit_regexes = self._codeowners_regexes(codeowners.filtered(lambda c: c.match_type == 'commit'), build.params_id.version_id)
         modified_files = self._modified_files(build, pr_by_commit.keys())
 
         if not modified_files:
@@ -132,6 +158,10 @@ class ConfigStep(models.Model):
                     reviewers |= file_reviewers
                 else:
                     build._log('', 'No reviewer for file [%s](%s)', file, href, log_type='markdown')
+            for (sha, title), commit_reviewers in self._reviewer_per_commit(commit_link, commit_regexes).items():
+                href = 'https://%s/commit/%s' % (commit_link.branch_id.remote_id.base_url, sha)
+                build._log('', 'Adding %s to reviewers for commit [%s](%s) %s', ', '.join(sorted(commit_reviewers)), sha[:8], href, title, log_type='markdown')
+                reviewers |= commit_reviewers
 
             if reviewers:
                 pr = pr_by_commit[commit_link]
