@@ -1,9 +1,12 @@
 import time
 from contextlib import contextmanager
+from contextvars import ContextVar
 
 from odoo import fields, models
 
 from ..common import s2human
+
+current_job_id = ContextVar('runbot_current_job_id', default=None)  # not in env.context, it can be lost (transactioncache, ...)
 
 
 class BuildJob(models.Model):
@@ -36,7 +39,7 @@ class BuildJob(models.Model):
                 self[field] += int((time.monotonic() - start) * 1000)
 
     def _git_timer(self):
-        return self.browse(self.env.context.get('runbot_job_id'))._timer('git_time')
+        return self.browse(current_job_id.get())._timer('git_time')
 
     def _image_tag(self):
         self.ensure_one()

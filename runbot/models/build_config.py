@@ -29,6 +29,7 @@ from ..common import (
     DEFAULT_MAX_FILE_SIZE,
 )
 from ..container import Command, docker_get_gateway_ip
+from .build_job import current_job_id
 
 # There is an issue in unidiff 0.7.3 fixed in 0.7.4
 # https://github.com/matiasb/python-unidiff/commit/a3faffc54e5aacaee3ded4565c534482d5cc3465
@@ -622,7 +623,6 @@ class ConfigStep(models.Model):
         return result
 
     def _start_job_and_run(self, build, **kwargs):
-        assert 'runbot_job_id' not in self.env.context
         self.ensure_one()
         job = self.env['runbot.build.job'].create({
             'build_id': build.id,
@@ -631,8 +631,13 @@ class ConfigStep(models.Model):
             'start_date': datetime.datetime.now(),
         })
         build.active_job_id = job
-        with job._timer('python_time'):
-            return self.with_context(runbot_job_id=job.id)._run_step(build.with_context(runbot_job_id=job.id), **kwargs)
+        assert current_job_id.get() is None
+        token = current_job_id.set(job.id)
+        try:
+            with job._timer('python_time'):
+                return self._run_step(build, **kwargs)
+        finally:
+            current_job_id.reset(token)
 
     def _run_step(self, build, **kwargs):
         build.log_counter = self.env['ir.config_parameter'].sudo().get_param('runbot.runbot_maxlogs', 100)
