@@ -13,6 +13,10 @@
     table-layout: fixed;
 }
 
+.w-0 {
+    width: 0;
+}
+
 .active_project {
 	color: var(--active-project-color);
 }
