@@ -138,8 +138,24 @@ def _serialize_slot(slot, depth, logs):
     return data
 
 
-def _serialize_bundle(bundle):
+def _serialize_batch_summary(batch):
+    if not batch:
+        return False
+    build_states = batch.slot_ids.build_id.mapped('global_state')
     return {
+        'id': batch.id,
+        'state': batch.state,
+        'result': batch._get_global_result(),
+        'category': batch.category_id.name,
+        'create_date': batch.create_date,
+        # a done batch can still have builds in progress, e.g. after a rebuild
+        'global_state': batch.env['runbot.build']._get_youngest_state(build_states) if build_states else False,
+        'commits': [{'repo': link.commit_id.repo_id.name, 'sha': link.commit_id.name} for link in batch.commit_link_ids],
+    }
+
+
+def _serialize_bundle(bundle, batch_history=0):
+    data = {
         'id': bundle.id,
         'name': bundle.name,
         'project_id': bundle.project_id.id,
@@ -147,15 +163,12 @@ def _serialize_bundle(bundle):
         'version': bundle.version_id.name,
         'sticky': bundle.sticky,
         'is_base': bundle.is_base,
-        'last_batch_id': bundle.last_batch.id or False,
-        'batches': [{
-            'id': batch.id,
-            'state': batch.state,
-            'result': batch._get_global_result(),
-            'category': batch.category_id.name,
-            'create_date': batch.create_date,
-        } for batch in bundle.env['runbot.batch'].search([('bundle_id', '=', bundle.id), ('hidden', '=', False)], order='id desc', limit=40)],
+        'last_batch': _serialize_batch_summary(bundle.last_batch),
     }
+    if batch_history:
+        batches = bundle.env['runbot.batch'].search([('bundle_id', '=', bundle.id), ('hidden', '=', False)], order='id desc', limit=batch_history)
+        data['batches'] = [_serialize_batch_summary(batch) for batch in batches]
+    return data
 
 
 def _serialize_commit(commit):
@@ -219,7 +232,7 @@ class RunbotApi(Controller):
         return request.make_json_response([_serialize_commit(commit) for commit in commits])
 
     @route(['/runbot/api/bundle', '/runbot/api/bundle/<path:ids_or_names>'], type='http', auth='public', methods=['GET'], sitemap=False)
-    def api_bundle(self, ids_or_names='', project_id=None, pr='', **kwargs):
+    def api_bundle(self, ids_or_names='', project_id=None, pr='', batch_history=0, **kwargs):
         values = [value for value in (pr or ids_or_names).split(',') if value]
         _check_max_records(len(values))
         if pr:
@@ -242,4 +255,5 @@ class RunbotApi(Controller):
             domain = Domain('id', 'in', ids) | Domain('name', 'in', names)
         projects = request.env['runbot.project'].search([('id', '=', int(project_id))] if project_id else [])
         bundles = request.env['runbot.bundle'].search(Domain('project_id', 'in', projects.ids) & domain, order='id')
-        return request.make_json_response([_serialize_bundle(bundle) for bundle in bundles])
+        batch_history = min(max(int(batch_history or 0), 0), 40)
+        return request.make_json_response([_serialize_bundle(bundle, batch_history=batch_history) for bundle in bundles])
