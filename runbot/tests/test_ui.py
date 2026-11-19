@@ -102,6 +102,11 @@ class TestRunbotUi(HttpCase):
 
         self.start_tour('/runbot', 'runbot_frontend_main_flow', login='admin')
 
+        self.assertEqual(bundle.trigger_custom_ids.mapped('start_mode'), ['auto'])
+        rebuild = self.env['runbot.build'].search([('build_type', '=', 'rebuild')])
+        self.assertEqual(rebuild.params_id, build.params_id)
+        self.assertEqual(build.create_batch_id.slot_ids.build_id, rebuild)
+
     def test_error_main_flow(self):
         bundle = self.project.master_bundle_id
         fixing_pr = self._create_branch(

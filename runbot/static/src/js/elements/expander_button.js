@@ -1,7 +1,7 @@
 import { BaseButton } from "./base_button";
 
 const DEFAULT_COLLAPSED_CLASS = "d-none";
-const ICON_SELECTOR = ".fa";
+const ICON_SELECTOR = ".fa-expand, .fa-compress";
 const EXPANDED_ICON_CLASS = "fa-compress";
 const COLLAPSED_ICON_CLASS = "fa-expand";
 const EXPANDED_LABEL = "Collapse";
@@ -44,13 +44,25 @@ class ExpanderButton extends BaseButton {
             this.setAttribute("aria-label", label);
             this.title = label;
         }
-        this.icon?.classList.toggle(EXPANDED_ICON_CLASS, this.expanded);
-        this.icon?.classList.toggle(COLLAPSED_ICON_CLASS, !this.expanded);
+        // looked up once, as toggling its classes changes what the selector matches
+        const icon = this.icon;
+        icon?.classList.toggle(EXPANDED_ICON_CLASS, this.expanded);
+        icon?.classList.toggle(COLLAPSED_ICON_CLASS, !this.expanded);
     }
 
     _onToggle() {
         this.expanded = !this.expanded;
         this.render();
+        // keep the state in the url, e.g. to restore it on reload
+        if (this.dataset.param) {
+            const url = new URL(window.location);
+            if (this.expanded) {
+                url.searchParams.set(this.dataset.param, "1");
+            } else {
+                url.searchParams.delete(this.dataset.param);
+            }
+            window.history.replaceState(window.history.state, "", url);
+        }
     }
 }
 

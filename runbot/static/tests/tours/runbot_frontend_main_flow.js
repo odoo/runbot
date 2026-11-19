@@ -67,6 +67,42 @@ registry.category("web_tour.tours").add("runbot_frontend_main_flow", {
             trigger: `.batch_row .slot_name:contains("Frontend tour trigger")`,
         },
         {
+            content: "Disable all the triggers of the bundle",
+            trigger: `[aria-label="Triggers configuration"] action-button:contains("Disable all")`,
+            run: "click",
+        },
+        {
+            content: "The page is refreshed in place with the disabled preset active",
+            trigger: `[aria-label="Triggers configuration"] action-button.active[aria-pressed="true"]:contains("Disable all")`,
+        },
+        {
+            content: "Show the custom triggers",
+            trigger: `[aria-label="Triggers configuration"] expander-button[aria-expanded="false"]:contains("Custom")`,
+            run: "click",
+        },
+        {
+            content: "The custom triggers are shown and kept in the url",
+            trigger: `#customTriggers:visible:contains("Frontend tour trigger")`,
+            run() {
+                if (new URL(browser.location.href).searchParams.get("expand_custom") !== "1") {
+                    throw new Error(`Expected expand_custom=1 in ${browser.location.href}`);
+                }
+            },
+        },
+        {
+            content: "Reset the triggers to their default",
+            trigger: `[aria-label="Triggers configuration"] action-button:contains("Default")`,
+            run: "click",
+        },
+        {
+            content: "The page is refreshed in place with the default preset active",
+            trigger: `[aria-label="Triggers configuration"] action-button.active[aria-pressed="true"]:contains("Default")`,
+        },
+        {
+            content: "The custom triggers are still shown after the refresh",
+            trigger: `[aria-label="Triggers configuration"] expander-button[aria-expanded="true"]:contains("Custom")`,
+        },
+        {
             content: "Open the batch from the bundle page",
             trigger: `.batch_row .batch_tile > .card > a`,
             run: "click",
@@ -102,6 +138,26 @@ registry.category("web_tour.tours").add("runbot_frontend_main_flow", {
         {
             content: "Only the successful children are hidden",
             trigger: `.build_children:has(.build_child:contains("Frontend UI tour child ok"):not(:visible)):has(.build_child:contains("Frontend UI tour child ko"):visible)`,
+        },
+        {
+            content: "Open the build options",
+            trigger: `build-options-dropdown[data-description="Frontend UI tour build"]`,
+            run: "click",
+        },
+        {
+            content: "Rebuild the build",
+            trigger: `build-options-dropdown[data-description="Frontend UI tour build"] + .dropdown-menu action-button:contains("Rebuild"):not(:visible)`,
+            run: "click",
+            expectUnloadPage: true,
+        },
+        {
+            content: "The new build is opened within its batch",
+            trigger: `build-options-dropdown[data-description="Frontend UI tour build"][data-global_state="pending"]`,
+            run() {
+                if (!/^\/runbot\/batch\/\d+\/build\/\d+$/.test(browser.location.pathname)) {
+                    throw new Error(`Expected a build url within its batch, got ${browser.location.pathname}`);
+                }
+            },
         },
     ],
 });

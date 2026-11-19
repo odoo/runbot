@@ -60,7 +60,7 @@
                                                         <t t-else="">
                                                             Normal
                                                         </t>
-                                                        <a groups="runbot.group_user" role="button" class="btn btn-ssm btn-info" t-attf-href="/runbot/batch/{{batch.id}}/prioritize">Set to high</a>
+                                                        <action-button groups="runbot.group_user" class="btn btn-ssm btn-info" t-attf-data-url="/runbot/batch/{{batch.id}}/prioritize">Set to high</action-button>
                                                     </t>
                                                 </dd>
                                             </t>

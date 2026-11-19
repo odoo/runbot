@@ -45,7 +45,7 @@
               </td>
               <td>
                 <t t-if="build_error.responsible" t-out="build_error.responsible.name"/>
-                <a t-else="" t-attf-href="/runbot/errors/assign/{{build_error.id}}" data-runbot="action" role="button" class="btn btn-primary btn-sm">Assign to me</a>
+                <action-button t-else="" t-attf-data-url="/runbot/error/{{build_error.id}}/assign" class="btn btn-primary btn-sm">Assign to me</action-button>
               </td>
               <td class="text-nowrap">
                 <a t-att-href="build_error.last_seen_build_id.build_url" t-attf-title="View last affected build ({{build_error.last_seen_build_id.id}})">
