@@ -277,6 +277,7 @@ window.onload = function() {
     config.searchParams = {
       trigger_id: main_trigger,
       key_step: '',
+      build_filter: '',
       limit: 25,
       center_build_id: 0,
       key_category: 'module_loading_queries',
@@ -289,6 +290,19 @@ window.onload = function() {
   
     for([key, value] of new URLSearchParams(window.location.hash.replace("#","?"))){
       config.searchParams[key] = value;
+    }
+
+    const build_filter_input = document.getElementById('build_filter_input');
+    build_filter_input.value = config.searchParams.build_filter;
+    function applyBuildFilter() {
+      config.searchParams.build_filter = build_filter_input.value;
+      fetchUpdateChart();
+    }
+    document.getElementById('build_filter_button').onclick = applyBuildFilter;
+    build_filter_input.onkeydown = function(event){
+      if (event.key === 'Enter') {
+        applyBuildFilter();
+      }
     }
 
     document.getElementById('backward_button').onclick = function(){
