@@ -6,8 +6,9 @@ a build is one test of a batch (one per trigger) and can have child builds.
 
 ## Routes
 
-- `GET /runbot/api/bundle/<ids_or_names>?project_id=1`: bundles by id, slug (`master-1`) or name (`master`), with their 40 last batches.
+- `GET /runbot/api/bundle/<ids_or_names>?project_id=1`: bundles by id, slug (`master-1`) or name (`master`), with their last batch.
   The same name can exist in multiple projects, `project_id` (optional) restricts the result to one of them.
+  `batch_history=10` adds their 10 last batches (40 at most), of all categories, in `batches`.
 - `GET /runbot/api/bundle?pr=odoo:297417`: bundles of pull requests, by number, optionally prefixed by the repo name.
   A number without repo can match pull requests of several repos. When `pr` is given, ids and names are ignored.
 - `GET /runbot/api/batch/<ids>?depth=1&logs=errors`: batches with their commits, logs and slots (one per trigger, with its build).
@@ -35,6 +36,10 @@ a build is one test of a batch (one per trigger) and can have child builds.
 - `build_time` and `docker_time` are in seconds and only cover the build itself, not its children.
 - `jobs` are the steps run by the build, in order. Their times are in milliseconds: `duration` (wall time, 0 while running
   and for running steps), `python_time` (preparation, including `git_time` and `docker_pull_time`), `docker_time` and `result_time`.
+- `last_batch` of a bundle is its last batch of the default category (false if none), with its commits and the `global_state`
+  of its least advanced build (false if no build yet): a batch is `done` once all its builds are finished,
+  and stays `done` while a build is rebuilt.
+  The batches of `batches` only have their id, state, result, category and create_date: fetch them with the batch route.
 - Batch logs only include the non-INFO ones.
 - `slots` of a batch give the trigger and its `build` (false if none was created, `manual` triggers without build are not listed).
   `link_type` is `created`, `matched` (build reused from another batch) or `rebuild`. The build of a slot has no `trigger` key

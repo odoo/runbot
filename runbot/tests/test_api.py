@@ -28,6 +28,13 @@ class TestRunbotApi(RunbotCase, HttpCase):
         for url in ('/runbot/api/bundle/master-dev-tri', f'/runbot/api/bundle/{self.dev_bundle.id}', '/runbot/api/bundle?pr=odoo:1234'):
             with self.subTest(url=url):
                 self.assertEqual([bundle['id'] for bundle in self.get_json(url)], self.dev_bundle.ids)
+        self.dev_bundle.last_batch = self.dev_batch
+        bundle = self.get_json(f'/runbot/api/bundle/{self.dev_bundle.id}')[0]
+        self.assertNotIn('batches', bundle)
+        self.assertEqual(bundle['last_batch']['id'], self.dev_batch.id)
+        self.assertEqual(bundle['last_batch']['global_state'], 'pending')
+        bundle = self.get_json(f'/runbot/api/bundle/{self.dev_bundle.id}?batch_history=100')[0]
+        self.assertEqual([batch['id'] for batch in bundle['batches']], self.dev_batch.ids)
         batch = self.get_json(f'/runbot/api/batch/{self.dev_batch.id}')[0]
         self.assertEqual([slot['build']['id'] for slot in batch['slots'] if slot['build']], self.build.ids)
         commits = self.get_json(f'/runbot/api/commit/{self.initial_server_commit.name},{self.initial_server_commit.id}')
