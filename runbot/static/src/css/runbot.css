@@ -123,6 +123,20 @@ dialog.modal {
 	}
 }
 
+/* help to match the buttons at the end of a row with its build */
+.build_child {
+	border-radius: var(--bs-border-radius-sm);
+
+	&:where(:nth-child(even of .build_child:not(.d-none))) {
+		background-color: var(--bs-tertiary-bg);
+	}
+
+	&:hover,
+	&:focus-within {
+		background-color: var(--bs-secondary-bg);
+	}
+}
+
 .build_logs > .table tr:last-child > * {
 	border-bottom-width: 0; /* the card border is enough */
 }
