@@ -206,6 +206,9 @@
                 </group>
                 <group>
                   <field name="identity_file"/>
+                  <field name="builder_update"/>
+                  <field name="kill_slow_fetch"/>
+                  <field name="fetch_single_commit"/>
                   <field name="single_version"/>
                   <field name="enforce_version"/>
                 </group>
@@ -267,6 +270,8 @@
             <list string="Repositories">
                 <field name="sequence" widget="handle"/>
                 <field name="name"/>
+                <field name="kill_slow_fetch" optional="show"/>
+                <field name="fetch_single_commit" optional="show"/>
             </list>
         </field>
     </record>

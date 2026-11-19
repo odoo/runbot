@@ -438,6 +438,26 @@ class Repo(models.Model):
                              ('hook', 'Hook')],
                             default='poll',
                             string="Mode", required=True, help="hook: Wait for webhook on /runbot/hook/<id> i.e. github push event", tracking=True)
+    builder_update = fields.Boolean(
+        'Frequent builder updates',
+        help="Builders fully fetch this repo every `runbot.builder_repo_update_delay` seconds (default 1h) "
+             "instead of once a day, keeping refs fresh so that individual commit fetches stay small.",
+        tracking=True,
+    )
+    kill_slow_fetch = fields.Boolean(
+        'Kill slow fetch',
+        help="Kill a fetch still running after `runbot.runbot_fetch_timeout` seconds and retry it, hoping for a faster connection. "
+             "Full fetches of a newly initialized repo are never killed.",
+        default=False,
+        tracking=True,
+    )
+    fetch_single_commit = fields.Boolean(
+        'Fetch single commits',
+        help="When a commit is missing, fetch only this commit. "
+             "If disabled, fetch the whole repo instead, falling back to a single commit fetch if still missing.",
+        default=True,
+        tracking=True,
+    )
     hook_time = fields.Float('Last hook time', compute='_compute_hook_time')
     last_processed_hook_time = fields.Float('Last processed hook time')
     get_ref_time = fields.Float('Last refs db update', compute='_compute_get_ref_time')
@@ -516,11 +536,11 @@ class Repo(models.Model):
         cmd = ['git', '-C', self.path] + config_args + cmd
         return cmd
 
-    def _git(self, cmd, errors='strict', quiet=False, input_data=None, raw=False):
+    def _git(self, cmd, errors='strict', quiet=False, input_data=None, raw=False, kill_slow=True):
         with self.env['runbot.build.job']._git_timer():
-            return self._run_git(cmd, errors, quiet, input_data, raw)
+            return self._run_git(cmd, errors, quiet, input_data, raw, kill_slow)
 
-    def _run_git(self, cmd, errors, quiet, input_data, raw):
+    def _run_git(self, cmd, errors, quiet, input_data, raw, kill_slow=True):
         cmd = self._get_git_command(cmd, errors)
         if input_data is not None and isinstance(input_data, str):
             input_data = input_data.encode('utf-8')
@@ -536,7 +556,7 @@ class Repo(models.Model):
 
             while True:
                 try:
-                    output, _ = process.communicate(input=input_data, timeout=fetch_timeout)
+                    output, _ = process.communicate(input=input_data, timeout=fetch_timeout if kill_slow and self.kill_slow_fetch else None)
                     break
                 except subprocess.TimeoutExpired:
                     try:
@@ -560,7 +580,13 @@ class Repo(models.Model):
         return output.decode(errors=errors)
 
     def _fetch(self, sha):
-        self._git_init()
+        if self._git_init():
+            # a fresh repo has no refs: fetching a single commit would download its whole history,
+            # and the next ones too since commits fetched by sha are not used for negotiation
+            # can be legitimately long (whole history), don't kill it since a killed fetch restarts from scratch
+            self._update_fetch_cmd(kill_slow=False)
+        elif not self.fetch_single_commit and not self._hash_exists(sha):
+            self._update_fetch_cmd()
         if not self._hash_exists(sha):
             for remote in self.remote_ids:
                 try:
@@ -764,7 +790,8 @@ class Repo(models.Model):
             return False
         if not os.path.isdir(repo.path):
             os.makedirs(repo.path)
-        force = self._git_init() or force
+        just_init = self._git_init()
+        force = just_init or force
 
         fname_fetch_head = repo._path('FETCH_HEAD')
         if not force and os.path.isfile(fname_fetch_head):
@@ -778,9 +805,9 @@ class Repo(models.Model):
                     return False
 
         _logger.info('Updating repo %s', repo.name)
-        return self._update_fetch_cmd()
+        return self._update_fetch_cmd(kill_slow=not just_init)
 
-    def _update_fetch_cmd(self):
+    def _update_fetch_cmd(self, kill_slow=True):
         # Extracted from update_git to be easily overriden in external module
         self.ensure_one()
         try_count = 0
@@ -789,7 +816,7 @@ class Repo(models.Model):
         while not success and try_count < 5:
             time.sleep(delay)
             try:
-                self._git(['fetch', '-p', '--all', '-j2'])  # j2 to use two job and fetch multiple origin at the same time
+                self._git(['fetch', '-p', '--all', '-j2'], kill_slow=kill_slow)  # j2 to use two job and fetch multiple origin at the same time
                 success = True
             except subprocess.CalledProcessError as e:
                 try_count += 1

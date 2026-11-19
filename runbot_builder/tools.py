@@ -39,6 +39,7 @@ class RunbotClient():
         self.gc_thread = None
         self.gc_thread_repo = None
         self.gc_thread_result = None
+        self.repo_update_times = {}
 
     def on_start(self):
         pass
@@ -172,6 +173,20 @@ class RunbotClient():
             self.repos_to_gc = self.env['runbot.repo'].search([('mode', '!=', 'disabled')]).ids
             _logger.info('Starting git gc cycle on %s repositories', len(self.repos_to_gc))
             self.update_next_git_gc_date()
+
+    def update_repos(self):
+        """Fully fetch the repos flagged with builder_update every runbot.builder_repo_update_delay seconds"""
+        delay = int(self.env['ir.config_parameter'].sudo().get_param('runbot.builder_repo_update_delay', 3600))
+        repos = self.env['runbot.repo'].search([('builder_update', '=', True), ('mode', '!=', 'disabled')])
+        for repo in repos:
+            if self.gc_thread_repo and self.gc_thread_repo[0] == repo.id:
+                continue  # the gc finalize will update it
+            if time.time() - self.repo_update_times.get(repo.id, 0) < delay:
+                continue
+            self.env.cr.commit()  # avoid keeping a transaction open during the fetch
+            repo._update(force=True)
+            self.repo_update_times[repo.id] = time.time()
+            self.env.cr.commit()
 
     def _gc_start_next(self):
         repo = self.env['runbot.repo'].browse(self.repos_to_gc.pop(0))
