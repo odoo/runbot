@@ -653,6 +653,10 @@ class Runbot(Controller):
                 category: ','.join(str(trigger.id) for trigger in all_triggers if category in category_per_trigger[trigger])
                 for category in all_categories
             },
+            'step_scopes': {
+                step: ','.join(f'{trigger.id}:{category}' for (trigger, category), steps in step_per_trigger_category.items() if step in steps)
+                for step in all_steps
+            },
             'category_per_trigger': category_per_trigger,
             'step_per_trigger_category': step_per_trigger_category,
             'bundle': bundle,
