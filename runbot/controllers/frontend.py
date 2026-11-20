@@ -565,8 +565,9 @@ class Runbot(Controller):
         batch_domain = [
             ('state', '=', 'done'),
             ('bundle_id', '=', bundle_id),
+            ('category_id', '=', trigger.category_id.id),
         ]
-        batches = request.env['runbot.batch'].with_context(category_id=trigger.category_id.id)
+        batches = request.env['runbot.batch']
         if center_build_id:
             center_batch = request.env['runbot.build'].browse(center_build_id).slot_ids.batch_id.filtered(lambda b: b.bundle_id == bundle)
             if center_batch:
