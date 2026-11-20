@@ -527,16 +527,24 @@ class Runbot(Controller):
 
     def _get_stats_parents(self, top_builds):
         """Map the builds whose stats count in the given top builds to these top builds."""
-        builds = top_builds.search([('id', 'child_of', top_builds.ids)])
+        def without_orphans(tree):
+            # orphan builds don't count in their parent, e.g. once replaced by a rebuild, nor do their children
+            tree_no_prefetch = tree.with_context(prefetch_fields=False)
+            orphan_ids = set(tree_no_prefetch.filtered('orphan_result').ids)
+            if not orphan_ids:
+                return tree
+            return tree.browse([b.id for b in tree_no_prefetch if orphan_ids.isdisjoint(b.ancestors.ids)])
+
+        builds = without_orphans(top_builds.search([('id', 'child_of', top_builds.ids)]))
         parents = defaultdict(set)
         for build in builds.with_context(prefetch_fields=False):
             parents[build.id].add(build.top_parent.id)
 
         # linked builds are top builds of their own tree, possibly linked to several builds
         linked_parents = defaultdict(set)
-        for link in builds.child_link_ids:
+        for link in builds.child_link_ids.filtered(lambda link: not link.orphan_result):
             linked_parents[link.child_id.id] |= parents[link.parent_id.id]
-        linked_builds = builds.search([('id', 'child_of', list(linked_parents))])
+        linked_builds = without_orphans(builds.search([('id', 'child_of', list(linked_parents))]))
         for build in linked_builds.with_context(prefetch_fields=False):
             parents[build.id] |= linked_parents[build.top_parent.id]
         return parents
@@ -574,6 +582,9 @@ class Runbot(Controller):
             return {'stats': {}, 'dates': {}}
 
         parents = self._get_stats_parents(builds)
+        if not parents:
+            # only orphan builds
+            return {'stats': {}, 'dates': {}}
         dates = {b.top_parent.id: b.create_date for b in builds.with_context(prefetch_fields=False)}
         query = "SELECT build_id, values FROM runbot_build_stat WHERE build_id IN %s AND category = %s"
         values = [tuple(parents), key_category]
