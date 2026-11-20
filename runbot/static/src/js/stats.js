@@ -90,9 +90,12 @@ function process_chart_data(){
 
 
     var builds = Object.keys(config.result);
-    var newer_build_stats = config.result[builds.slice(-1)[0]];
     var older_build_stats = config.result[builds[0]];
-    var keys = Object.keys(newer_build_stats) ;
+    // keys of all the builds, some can miss in the newer one
+    const keys = [...new Set(builds.flatMap((build) => Object.keys(config.result[build])))];
+    function lastValue(key) {
+      return builds.map((build) => config.result[build][key]).findLast((value) => value !== undefined);
+    }
     if (aggregate != 'sum') {
       keys.splice(keys.indexOf('Aggregate Sum'), 1);
     }
@@ -105,7 +108,7 @@ function process_chart_data(){
     for (key of keys) {
       sort_value = NaN
       if (mode == 'normal') {
-        sort_value = newer_build_stats[key]
+        sort_value = lastValue(key);
       } else if (mode == 'change_count') {
         sort_value = 0
         previous = undefined
@@ -124,7 +127,7 @@ function process_chart_data(){
           if (older_build_stats[key] !== undefined) {
             previous_value = older_build_stats[key]
           }
-          sort_value = Math.abs(newer_build_stats[key] - previous_value)
+          sort_value = Math.abs(lastValue(key) - previous_value);
         }
       }
       sort_values[key] = sort_value
