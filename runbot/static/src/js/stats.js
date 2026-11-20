@@ -234,6 +234,11 @@ function updateForm() {
       selector.onchange = function(){
         var id = this.id.replace('_selector', '');
         config.searchParams[id] = this.value;
+        if (id == 'key_category' && config.searchParams.nb_dataset == -1) {
+          // the custom selection is made of the keys of the previous category, back to the default of the template
+          config.searchParams.nb_dataset = parseInt(document.querySelector('#nb_dataset_selector option[selected]').value, 10);
+          config.searchParams.visible_keys = '';
+        }
         if (localParams.indexOf(id) == -1){
           fetchUpdateChart();
         } else {
@@ -299,7 +304,7 @@ window.onload = function() {
       // preselected by the template, among the categories of the bundle
       key_category: document.getElementById('key_category_selector').value,
       mode: 'normal',
-      nb_dataset: 20,
+      nb_dataset: parseInt(document.getElementById('nb_dataset_selector').value, 10),
       display_aggregate: 'none', 
       visible_keys: '',
     };
