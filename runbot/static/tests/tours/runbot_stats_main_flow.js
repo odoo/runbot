@@ -7,6 +7,15 @@ registry.category("web_tour.tours").add("runbot_stats_main_flow", {
             trigger: `#js-legend li:first-child:contains("account") + li:contains("sale_management") + li:contains("base")`,
         },
         {
+            content: "Sort the stats by name",
+            trigger: "#mode_selector",
+            run: "select alpha",
+        },
+        {
+            content: "The stats are sorted by name",
+            trigger: `#js-legend li:first-child:contains("account") + li:contains("base") + li:contains("sale_management")`,
+        },
+        {
             content: "Show the sum of the stats",
             trigger: "#display_aggregate_selector",
             run: "select sum",

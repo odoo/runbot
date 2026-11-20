@@ -105,8 +105,6 @@ function process_chart_data(){
       sort_value = NaN
       if (mode == 'normal') {
         sort_value = newer_build_stats[key]
-      } else if (mode == 'alpha') {
-        sort_value = key
       } else if (mode == 'change_count') {
         sort_value = 0
         previous = undefined
@@ -130,7 +128,11 @@ function process_chart_data(){
       }
       sort_values[key] = sort_value
     }
-    keys.sort((m1, m2) => sort_values[m2] - sort_values[m1]);
+    if (mode == 'alpha') {
+      keys.sort((m1, m2) => m1.localeCompare(m2));
+    } else {
+      keys.sort((m1, m2) => sort_values[m2] - sort_values[m1]);
+    }
 
     if (config.searchParams.nb_dataset != -1) {
       visible_keys = new Set(keys.slice(0, config.searchParams.nb_dataset));
