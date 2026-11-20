@@ -528,7 +528,7 @@ class Repo(models.Model):
         return self.env['runbot.runbot']._path('sources', sanitize(self.name), *path_parts)
 
     def _reference_path(self, version_name):
-        return self.env['runbot.runbot']._path('references', sanitize(self.name), sanitize(version_name))
+        return self.env['runbot.runbot']._path('repo_references', sanitize(self.name), sanitize(version_name))
 
     def _checkout_reference(self, version_name, tree_hash):
         """Checkout tree_hash in the reference of a version, git only writes the files differing from the previous checkout"""
