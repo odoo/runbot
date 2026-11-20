@@ -555,7 +555,7 @@ class Runbot(Controller):
         batches |= batches.search(batch_domain, order='id desc', limit=limit)
         builds = batches.slot_ids.build_id.filtered(lambda b: b.params_id.trigger_id == trigger)
         if not builds:
-            return {}
+            return {'stats': {}, 'dates': {}}
 
         builds = builds.search([('id', 'child_of', builds.ids)])
         builds = builds | builds.linked_children_build_ids
