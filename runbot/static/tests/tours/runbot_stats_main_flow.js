@@ -3,6 +3,15 @@ import { registry } from "@web/core/registry";
 registry.category("web_tour.tours").add("runbot_stats_main_flow", {
     steps: () => [
         {
+            content: "The stats are loaded",
+            trigger: "#chart_spinner:not(:visible)",
+        },
+        {
+            content: "Show the module loading queries",
+            trigger: "#key_category_selector",
+            run: "select module_loading_queries",
+        },
+        {
             content: "The stats are sorted on their latest value",
             trigger: `#js-legend li:first-child:contains("account") + li:contains("sale_management") + li:contains("base")`,
         },
