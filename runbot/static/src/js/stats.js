@@ -138,7 +138,8 @@ function process_chart_data(){
     if (config.searchParams.nb_dataset != -1) {
       visible_keys = new Set(keys.slice(0, config.searchParams.nb_dataset));
     } else {
-      visible_keys = new Set(config.searchParams.visible_keys.split('-'))
+      // keys are encoded, as they can contain the separator
+      visible_keys = new Set(config.searchParams.visible_keys.split(',').filter(Boolean).map(decodeURIComponent));
     }
     console.log(visible_keys);
     function display_value(key, build_stats){
@@ -216,7 +217,7 @@ function generateLegend() {
             const curr = window.statsChart.data.datasets[index];
             curr.hidden = !curr.hidden;
             config.searchParams.nb_dataset=-1;
-            config.searchParams.visible_keys = window.statsChart.data.datasets.filter((dataset) => !dataset.hidden).map((dataset) => dataset.label).join("-");
+            config.searchParams.visible_keys = window.statsChart.data.datasets.filter((dataset) => !dataset.hidden).map((dataset) => encodeURIComponent(dataset.label)).join(",");
             updateChart();
         });
     });
