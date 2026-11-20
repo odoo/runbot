@@ -65,6 +65,11 @@ class ResConfigSettings(models.TransientModel):
 
     runbot_docker_registry_host_id = fields.Many2one('runbot.host', 'Docker builder', help='Runbot host which handles Docker builds.', config_parameter='runbot.docker_registry_host_id')
     runbot_docker_registry_url = fields.Char('Docker Registry url', help='Remote Registry Url', config_parameter='runbot.docker_registry_url')
+    runbot_docker_build_timeout = fields.Integer(
+        'Docker build timeout (in seconds)',
+        default=900,
+        config_parameter='runbot.docker_build_timeout',
+        help='Maximum duration of a Docker image build. 0 means no limit.')
     runbot_pause_all_hosts = fields.Boolean('Pause all hosts', config_parameter="runbot.pause_all_hosts")
     # TODO other icp
     # runbot.runbot_maxlogs 100

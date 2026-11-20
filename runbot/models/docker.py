@@ -474,7 +474,8 @@ class Dockerfile(models.Model):
             with open(self.env['runbot.runbot']._path('docker', tag_dir, 'Dockerfile'), 'w', encoding="utf-8") as Dockerfile:
                 Dockerfile.write(content)
             self.env.cr.commit()  # avoid to have a running transaction during the build
-            result = docker_build(docker_build_path, self.image_future_tag, self.pull_on_build, self.nocache)
+            timeout = int(self.env['ir.config_parameter'].sudo().get_param('runbot.docker_build_timeout', default=900)) or None
+            result = docker_build(docker_build_path, self.image_future_tag, self.pull_on_build, self.nocache, timeout=timeout)
             duration = result['duration']
             msg = result['msg']
             success = image_id = result.get('image_id')
