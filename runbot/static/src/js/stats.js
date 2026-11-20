@@ -293,7 +293,8 @@ window.onload = function() {
       key_step: '',
       limit: 25,
       center_build_id: 0,
-      key_category: 'module_loading_queries',
+      // preselected by the template, among the categories of the bundle
+      key_category: document.getElementById('key_category_selector').value,
       mode: 'normal',
       nb_dataset: 20,
       display_aggregate: 'none', 
