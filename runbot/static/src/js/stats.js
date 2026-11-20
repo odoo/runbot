@@ -250,7 +250,8 @@ function updateForm() {
       selector.onchange = function(){
         var id = this.id.replace('_selector', '');
         config.searchParams[id] = this.value;
-        if (id == 'key_category' && config.searchParams.nb_dataset == -1) {
+        const categoryChanged = id == 'key_category' || (id == 'trigger_id' && updateCategory());
+        if (categoryChanged && config.searchParams.nb_dataset == -1) {
           // the custom selection is made of the keys of the previous category, back to the default of the template
           config.searchParams.nb_dataset = parseInt(document.querySelector('#nb_dataset_selector option[selected]').value, 10);
           config.searchParams.visible_keys = '';
@@ -290,6 +291,19 @@ function updateChart(){
     window.statsChart.update();
   }
   generateLegend();
+}
+
+function updateCategory() {
+  // only the categories of the selected trigger can be chosen
+  const options = [...document.getElementById('key_category_selector').options];
+  for (const option of options) {
+    option.disabled = !option.dataset.triggers.split(',').includes(String(config.searchParams.trigger_id));
+  }
+  if (options.some((option) => !option.disabled && option.value === config.searchParams.key_category)) {
+    return false;
+  }
+  config.searchParams.key_category = options.find((option) => !option.disabled)?.value || '';
+  return true;
 }
 
 function compute_fetch_params(){
@@ -335,6 +349,7 @@ window.onload = function() {
     for([key, value] of new URLSearchParams(window.location.hash.replace("#","?"))){
       config.searchParams[key] = value;
     }
+    updateCategory();
 
     document.getElementById('backward_button').onclick = function(){
       config.searchParams['center_build_id'] = config.builds[0];

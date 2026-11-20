@@ -649,6 +649,10 @@ class Runbot(Controller):
         all_triggers = sorted(all_triggers, key=lambda t: (t.category_id.id, t.sequence, t.id))
         main_trigger = all_triggers[0] if all_triggers else None
         context = {
+            'category_triggers': {
+                category: ','.join(str(trigger.id) for trigger in all_triggers if category in category_per_trigger[trigger])
+                for category in all_categories
+            },
             'category_per_trigger': category_per_trigger,
             'step_per_trigger_category': step_per_trigger_category,
             'bundle': bundle,

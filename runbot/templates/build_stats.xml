@@ -18,7 +18,7 @@
                 </select>
                 <b>Stat Category:</b>
                 <select id="key_category_selector" class="form-select form-select-sm d-inline-block w-auto" aria-label="Stat Category">
-                  <option t-foreach="all_categories" t-as="category" t-attf-value="{{category}}"><t t-out="category.replace('_',' ').title()"/></option>
+                  <option t-foreach="all_categories" t-as="category" t-attf-value="{{category}}" t-att-data-triggers="category_triggers[category]"><t t-out="category.replace('_',' ').title()"/></option>
                 </select>
                 <b>Stat Step:</b>
                 <select id="key_step_selector" class="form-select form-select-sm d-inline-block w-auto" aria-label="Stat Step">
