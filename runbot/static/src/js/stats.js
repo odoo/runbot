@@ -9,25 +9,25 @@ var config = {
     plugins: {
       legend: {
         display: false
-      }
+      },
+      tooltip: {
+        mode: 'point',
+      },
     },
     responsive: true,
-    tooltips: {
-      mode: 'point'
-    },
     scales: {
       x: {
         display: true,
-        scaleLabel: {
+        title: {
           display: true,
-          labelString: 'Builds'
+          text: 'Builds',
         }
       },
       y: {
         display: true,
-        scaleLabel: {
+        title: {
           display: true,
-          labelString: 'Value'
+          text: 'Value',
         },
       },
     },
@@ -161,7 +161,6 @@ function process_chart_data(){
               data: builds.map(build => display_value(key, config.result[build])),
               borderColor: random_color(key),
               backgroundColor: 'rgba(0, 0, 0, 0)',
-              lineTension: 0,
               hidden: !visible_keys.has(key),
           }
       })
