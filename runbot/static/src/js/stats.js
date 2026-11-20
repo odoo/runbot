@@ -1,3 +1,4 @@
+const aggregateKeys = { sum: 'Aggregate Sum', average: 'Aggregate Average' };
 
 var config = {
   type: 'line',
@@ -140,6 +141,10 @@ function process_chart_data(){
 
     if (config.searchParams.nb_dataset != -1) {
       visible_keys = new Set(keys.slice(0, config.searchParams.nb_dataset));
+      // the chosen aggregate is shown, even when not in the top values
+      if (aggregate != 'none') {
+        visible_keys.add(aggregateKeys[aggregate]);
+      }
     } else {
       // keys are encoded, as they can contain the separator
       visible_keys = new Set(config.searchParams.visible_keys.split(',').filter(Boolean).map(decodeURIComponent));
@@ -238,6 +243,12 @@ function updateForm() {
           // the custom selection is made of the keys of the previous category, back to the default of the template
           config.searchParams.nb_dataset = parseInt(document.querySelector('#nb_dataset_selector option[selected]').value, 10);
           config.searchParams.visible_keys = '';
+        }
+        if (id == 'display_aggregate' && this.value != 'none' && config.searchParams.nb_dataset == -1) {
+          // show the chosen aggregate in the custom selection
+          const visibleKeys = new Set(config.searchParams.visible_keys.split(',').filter(Boolean));
+          visibleKeys.add(encodeURIComponent(aggregateKeys[this.value]));
+          config.searchParams.visible_keys = [...visibleKeys].join(',');
         }
         if (localParams.indexOf(id) == -1){
           fetchUpdateChart();
