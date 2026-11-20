@@ -5,6 +5,10 @@
 	repositoryformatversion = 0
 	filemode = true
 	bare = true
+[gc]
+	auto = 0
+[maintenance]
+	auto = false
 <t t-foreach="repo.remote_ids" t-as="remote_id">
 [remote "<t t-out="remote_id.remote_name"/>"]
 	url = <t t-out="remote_id._get_fetch_url()"/>

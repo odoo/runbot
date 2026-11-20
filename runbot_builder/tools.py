@@ -227,6 +227,7 @@ class RunbotClient():
             _logger.info('Git %s of %s took %.2fs', step, repo_name, time.time() - start)
             if self.gc_process.returncode:
                 result['error'] = f'git {step} failed for {repo_name} with exit status {self.gc_process.returncode} and message "{output.decode()[:300]}"'
+                _logger.warning(result['error'])  # the runbot warning is only created in the main loop
                 if needed:
                     return
         result['done'] = True
