@@ -580,12 +580,12 @@ class Runbot(Controller):
         batches |= batches.search(batch_domain, order='id desc', limit=limit)
         builds = batches.slot_ids.build_id.filtered(lambda b: b.params_id.trigger_id == trigger)
         if not builds:
-            return {'stats': {}, 'dates': {}}
+            return {'stats': {}, 'dates': {}, 'builds': []}
 
         parents = self._get_stats_parents(builds)
         if not parents:
             # only orphan builds
-            return {'stats': {}, 'dates': {}}
+            return {'stats': {}, 'dates': {}, 'builds': []}
         dates = {b.top_parent.id: b.create_date for b in builds.with_context(prefetch_fields=False)}
         query = "SELECT build_id, values FROM runbot_build_stat WHERE build_id IN %s AND category = %s"
         values = [tuple(parents), key_category]
@@ -611,9 +611,14 @@ class Runbot(Controller):
                         else:
                             current_values[key] = value
             # we need to update here to manage the post install case: we want to combine stats from all post_install childrens.
+        # ordered on their first batch, a rebuild being newer than the builds of the next batches
+        batch_per_build = {}
+        for slot in batches.slot_ids.sorted(lambda slot: slot.batch_id.id):
+            batch_per_build.setdefault(slot.build_id.id, slot.batch_id.id)
         return {
             'stats': res,
             'dates': dates,
+            'builds': sorted(res, key=batch_per_build.get),
         }
 
     @route(['/runbot/stats/<model("runbot.bundle"):bundle>'], type='http', auth="public", website=True, sitemap=False)

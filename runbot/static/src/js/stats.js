@@ -90,7 +90,7 @@ function process_chart_data(){
     var aggregates = {};
 
 
-    var builds = Object.keys(config.result);
+    const builds = config.builds;
     var older_build_stats = config.result[builds[0]];
     // keys of all the builds, some can miss in the newer one
     const keys = [...new Set(builds.flatMap((build) => Object.keys(config.result[build])))];
@@ -187,6 +187,8 @@ function fetchUpdateChart() {
     if (result) {
       config.result = result['stats'];
       config.dates = result['dates'];
+      // ordered by batch, unlike the keys of the stats; as strings, like the URL params
+      config.builds = result['builds'].map(String);
       Object.values(config.result).forEach((v) => {
         const values = Object.values(v);
         const sum = values.reduce((a, b) => a + b, 0);
@@ -197,6 +199,7 @@ function fetchUpdateChart() {
       // the previous stats don't match the new params
       config.result = {};
       config.dates = {};
+      config.builds = [];
     }
     updateChart()
   });
@@ -258,7 +261,7 @@ function updateForm() {
       }
     }
   }
-  const builds = config.result ? Object.keys(config.result) : [];
+  const builds = config.builds || [];
   // fast forward stays available without builds, to leave an empty centered range
   const enableFastForward = config.searchParams.center_build_id != 0 && (config.searchParams.center_build_id !== builds.slice(-1)[0]);
   const enableForward = builds.length > 0 && enableFastForward;
@@ -326,11 +329,11 @@ window.onload = function() {
     }
 
     document.getElementById('backward_button').onclick = function(){
-      config.searchParams['center_build_id'] = Object.keys(config.result)[0];
+      config.searchParams['center_build_id'] = config.builds[0];
       fetchUpdateChart();
     }
     document.getElementById('forward_button').onclick = function(){
-      config.searchParams['center_build_id'] = Object.keys(config.result).slice(-1)[0];
+      config.searchParams['center_build_id'] = config.builds.slice(-1)[0];
       fetchUpdateChart();
     }
     document.getElementById('fast_forward_button').onclick = function(){
