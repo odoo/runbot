@@ -48,7 +48,7 @@ config.options.onClick = function(event, activeElements) {
 
 };
 
-function fetch(path, data, then) {
+function fetchStats(path, data, then) {
   const xhttp = new XMLHttpRequest();
   xhttp.onreadystatechange = function() {
       if (this.readyState == 4 && this.status == 200) {
@@ -171,7 +171,7 @@ function fetchUpdateChart() {
   chart_spinner.style.visibility = 'visible';
   fetch_params = compute_fetch_params();
   console.log('fetch')
-  fetch('/runbot/stats/', fetch_params, function(result) {
+  fetchStats('/runbot/stats/', fetch_params, function(result) {
     chart_spinner.style.visibility = 'hidden';
     if (result) {
       config.result = result['stats'];
