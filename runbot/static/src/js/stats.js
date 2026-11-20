@@ -238,11 +238,14 @@ function updateForm() {
       }
     }
   }
-  let display_forward = config.result && config.searchParams.center_build_id != 0 && (config.searchParams.center_build_id !== Object.keys(config.result).slice(-1)[0])
-  document.getElementById("forward_button").style.visibility = display_forward ? "visible":"hidden";
-  document.getElementById("fast_forward_button").style.visibility = display_forward ? "visible":"hidden";
-  let display_backward = config.result && (config.searchParams.center_build_id !== Object.keys(config.result)[0])
-  document.getElementById("backward_button").style.visibility = display_backward ? "visible":"hidden";
+  const builds = config.result ? Object.keys(config.result) : [];
+  // fast forward stays available without builds, to leave an empty centered range
+  const enableFastForward = config.searchParams.center_build_id != 0 && (config.searchParams.center_build_id !== builds.slice(-1)[0]);
+  const enableForward = builds.length > 0 && enableFastForward;
+  document.getElementById("forward_button").disabled = !enableForward;
+  document.getElementById("fast_forward_button").disabled = !enableFastForward;
+  const enableBackward = builds.length > 0 && (config.searchParams.center_build_id !== builds[0]);
+  document.getElementById("backward_button").disabled = !enableBackward;
 }
 
 function updateChart(){

@@ -31,11 +31,11 @@ registry.category("web_tour.tours").add("runbot_stats_main_flow", {
         },
         {
             content: "The chart is centered, with newer builds",
-            trigger: "#forward_button",
+            trigger: "#forward_button:enabled",
         },
         {
             content: "The chart is centered on the oldest build",
-            trigger: "#backward_button:not(:visible)",
+            trigger: "#backward_button:disabled",
         },
         {
             content: "Go back to the latest builds",
@@ -44,7 +44,7 @@ registry.category("web_tour.tours").add("runbot_stats_main_flow", {
         },
         {
             content: "The chart shows the latest builds",
-            trigger: "#fast_forward_button:not(:visible)",
+            trigger: "#fast_forward_button:disabled",
         },
         {
             content: "Switch to another category",
