@@ -326,6 +326,7 @@ exit $TEST_EXIT_CODE
         ulimits.append(docker.types.Ulimit(name='cpu', soft=cpu_limit, hard=cpu_limit))
 
     docker_client = docker.from_env()
+    _remove_stale_container(docker_client, container_name)
     container = docker_client.containers.run(
         image_tag,
         entrypoint='/data/build/entrypoint.sh',
@@ -341,7 +342,7 @@ exit $TEST_EXIT_CODE
         init=True,
         command=['/bin/bash', '-c',
                  f'exec &>> /data/buildlogs.txt ;{run_cmd}'],
-        auto_remove=True,
+        auto_remove=False,
         detach=True,
         user=USERNAME,
         network_mode=None if network_enabled else 'none',
@@ -353,12 +354,26 @@ exit $TEST_EXIT_CODE
     return
 
 
+def _remove_stale_container(docker_client, container_name):
+    try:
+        container = docker_client.containers.get(container_name)
+    except docker.errors.NotFound:
+        return
+    if container.status in ('created', 'running', 'paused', 'restarting'):
+        return
+    _logger.warning('Removing stale container %s (%s)', container_name, container.status)
+    try:
+        container.remove()
+    except docker.errors.APIError as e:
+        _logger.error('Cannnot remove stale container %s. API Error "%s"', container_name, e)
+
+
 def docker_stop(container_name, build_dir=None):
     return _docker_stop(container_name, build_dir)
 
 
 def _docker_stop(container_name, build_dir):
-    """Stops the container named container_name"""
+    """Stops and removes the container named container_name"""
     container_name = sanitize_container_name(container_name)
     _logger.info('Stopping container %s', container_name)
     if container_name in docker_stop_failures:
@@ -377,7 +392,8 @@ def _docker_stop(container_name, build_dir):
     try:
         container = docker_client.containers.get(container_name)
         container.stop(timeout=1)
-        return
+        container.reload()
+        return _inspect_and_remove(container)
     except docker.errors.NotFound:
         _logger.error('Cannnot stop container %s. Container not found', container_name)
     except docker.errors.APIError as e:
@@ -457,25 +473,43 @@ def docker_ps():
 
 
 def _docker_ps():
-    """Return a list of running containers names"""
+    """Return a list of all containers objects (including exited)"""
     docker_client = docker.client.from_env()
-    return [c.name for c in docker_client.containers.list()]
+    return docker_client.containers.list(all=True)
 
 
-def docker_inspect_container(container_name):
-    return _docker_inspect_container(container_name)
+def _inspect_and_remove(container):
+    state = container.attrs.get('State', {})
+    final_state = {
+        'oom_killed': bool(state.get('OOMKilled')),
+        'exit_code': state.get('ExitCode', 0),
+    }
+    container.remove()
+    return final_state
 
 
-def _docker_inspect_container(container_name):
+def docker_reap(container_name, build_dir, grace_time=30):
+    return _docker_reap(container_name, build_dir, grace_time)
+
+
+def _docker_reap(container_name, build_dir, grace_time):
     container_name = sanitize_container_name(container_name)
+    docker_client = docker.from_env()
     try:
-        low_level_client = docker.APIClient()
-        return low_level_client.inspect_container(container_name)
-    except docker.errors.DockerException as e:
-        _logger.warning('Cannot inspect container %s: %s', container_name, e)
-        return {}
-    except docker.errors.APIError:
-        return {}
+        container = docker_client.containers.get(container_name)
+        if container.status in ('created', 'running', 'paused', 'restarting'):
+            end_file = os.path.join(build_dir, 'signals', f'end-{container_name}')
+            end_time = os.path.getmtime(end_file) if os.path.exists(end_file) else 0
+            if time.time() - end_time > grace_time:
+                _logger.warning('Container %s still %s %ss after its end signal, killing it', container_name, container.status, grace_time)
+                container.kill()
+            return {'running': True}
+        return _inspect_and_remove(container)
+    except docker.errors.NotFound:
+        return None
+    except docker.errors.APIError as e:
+        _logger.error('Cannnot reap container %s. API Error "%s"', container_name, e)
+        return None
 
 
 def docker_images():
