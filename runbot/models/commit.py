@@ -2,7 +2,7 @@
 import datetime
 import subprocess
 
-from ..common import os, RunbotException, make_github_session, s2human_long, transactioncache
+from ..common import os, CONFLICT_TREE_HASH, RunbotException, make_github_session, s2human_long, transactioncache
 import shutil
 
 from odoo import models, fields, api
@@ -39,6 +39,10 @@ class Commit(models.Model):
         for vals in vals_list:
             if 'date' not in vals:
                 vals['date'] = datetime.datetime.now()
+            if vals.get('rebase_on_id'):
+                # the tree of the merge is the exported tree, it is also what uniquifies the builds
+                base_name = self.browse(vals['rebase_on_id']).name
+                vals['tree_hash'] = self.env['runbot.repo'].browse(vals['repo_id'])._merge_tree(base_name, vals['name'])
         return super().create(vals_list)
 
     def _get_commit_infos(self, sha, repo):
@@ -64,7 +68,7 @@ class Commit(models.Model):
     def _rebase_on(self, commit):
         if self == commit:
             return self
-        return self._get(self.name, self.repo_id.id, {**self.read()[0], 'tree_hash': False}, commit.id)
+        return self._get(self.name, self.repo_id.id, self.read()[0], commit.id)
 
     def _list_files(self, patterns):
         #example: git ls-files --with-tree=abcf390f90dbdd39fd61abc53f8516e7278e0931 ':(glob)addons/*/*.py' ':(glob)odoo/addons/*/*.py'
@@ -113,7 +117,8 @@ class Commit(models.Model):
         _logger.info('git export: exporting to %s (new)', export_path)
         with self.env['runbot.build.job']._git_timer():
             if self.rebase_on_id:  # the merged tree is only written in the repo where the merge was computed
-                self.repo_id._merge_tree(self.rebase_on_id.name, self.name)
+                if self.repo_id._merge_tree(self.rebase_on_id.name, self.name) != self.tree_hash:
+                    raise RunbotException('Merge of %s on %s does not give the expected tree %s' % (self.name, self.rebase_on_id.name, self.tree_hash))
             reference_path = self.repo_id._checkout_reference(build.params_id.version_id.name, self._get_tree_hash())
             os.makedirs(os.path.dirname(export_path), exist_ok=True)
             # hardlinks: sources are read only and the reference unlinks the files it updates
@@ -170,14 +175,11 @@ class Commit(models.Model):
         return results
 
     def _get_tree_hash(self):
-        """Tree to export, the merge of the commit on its base for a rebased commit"""
+        """Tree to export, the merge on its base for a rebased commit"""
         if not self.tree_hash:
-            if self.rebase_on_id:
-                self.tree_hash = self.repo_id._merge_tree(self.rebase_on_id.name, self.name)
-            else:
-                self.tree_hash = self._get_commit_infos(self.name, self.repo_id).get('tree_hash')
-            if not self.tree_hash:
-                raise ValidationError("Commit %s has no tree hash, cannot export" % self.name)
+            self.tree_hash = self._get_commit_infos(self.name, self.repo_id).get('tree_hash')
+        if not self.tree_hash or self.tree_hash == CONFLICT_TREE_HASH:
+            raise ValidationError("Commit %s has no valid tree hash, cannot export" % self.name)
         return self.tree_hash
 
     def _source_path(self, *paths):

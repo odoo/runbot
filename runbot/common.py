@@ -20,6 +20,7 @@ from odoo.fields import Domain
 from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT, file_open, html_escape, OrderedSet
 
 DEFAULT_MAX_FILE_SIZE = 500 * 1024 * 1024
+CONFLICT_TREE_HASH = '<conflict>'
 
 _logger = logging.getLogger(__name__)
 

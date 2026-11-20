@@ -15,7 +15,7 @@ from pathlib import Path
 
 from odoo import models, fields, api
 from odoo.tools import file_open, mail
-from ..common import os, RunbotException, make_github_session, sanitize
+from ..common import os, CONFLICT_TREE_HASH, RunbotException, make_github_session, sanitize
 from ..fields import JsonDictField
 from odoo.exceptions import UserError
 from odoo.tools.safe_eval import safe_eval
@@ -548,8 +548,11 @@ class Repo(models.Model):
         self._fetch(sha)
         try:
             return self._git(['merge-tree', '--write-tree', base_sha, sha]).split('\n')[0]
-        except subprocess.CalledProcessError as e:
-            raise RunbotException('Merge of %s on %s failed: %s' % (sha, base_sha, e.output.decode()))
+        except subprocess.CalledProcessError as e:  # a conflict exits 1, as any other error, but it still returns the conflicted tree
+            output = e.output.decode()
+            if not any(re.fullmatch('[0-9a-f]{40}', line) for line in output.split('\n')):
+                raise RunbotException('Merge of %s on %s failed: %s' % (sha, base_sha, output))
+            return CONFLICT_TREE_HASH
 
     def _get_git_command(self, cmd, errors='strict'):
         """Execute a git command 'cmd'"""
