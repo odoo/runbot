@@ -565,11 +565,13 @@ class Runbot(Controller):
         query = "SELECT build_id, values FROM runbot_build_stat WHERE build_id IN %s AND category = %s"
         values = [tuple(builds.ids), key_category]
         if key_step:
-            query += " AND dynamic_step_name LIKE %s"
+            step_query = "dynamic_step_name LIKE %s"
             values.append(key_step)
             if config_steps := request.env['runbot.build.config.step'].search([('name', '=like', key_step)]):
-                query += " AND config_step_id in %s"
+                # stats of a config step have no dynamic step name
+                step_query += " OR (COALESCE(dynamic_step_name, '') = '' AND config_step_id IN %s)"
                 values.append(tuple(config_steps.ids))
+            query += f" AND ({step_query})"
 
         request.env.cr.execute(query, values)  # read manually is way faster than using orm
         res = {}
