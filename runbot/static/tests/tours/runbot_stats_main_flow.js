@@ -86,5 +86,18 @@ registry.category("web_tour.tours").add("runbot_stats_main_flow", {
             content: "The display is set to custom",
             trigger: `#nb_dataset_selector:has(option:checked[value="-1"])`,
         },
+        {
+            content: "Switch to another trigger",
+            trigger: "#trigger_id_selector",
+            run: "selectByLabel Stats tour other trigger",
+        },
+        {
+            content: "The category switches to one of the trigger",
+            trigger: `#key_category_selector:has(option:checked[value="js_test_memory_used"])`,
+        },
+        {
+            content: "The stats of the trigger are shown",
+            trigger: `#js-legend li:not(.disabled):contains("used_stat")`,
+        },
     ],
 });
