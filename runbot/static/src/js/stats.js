@@ -51,8 +51,9 @@ config.options.onClick = function(event, activeElements) {
 function fetchStats(path, data, then) {
   const xhttp = new XMLHttpRequest();
   xhttp.onreadystatechange = function() {
-      if (this.readyState == 4 && this.status == 200) {
-          const res = JSON.parse(this.responseText);
+      if (this.readyState == 4) {
+          // also called on errors, with no result
+          const res = this.status == 200 ? JSON.parse(this.responseText) : {};
           then(res.result);
       }
   };
@@ -183,6 +184,10 @@ function fetchUpdateChart() {
         v['Aggregate Sum'] = sum;
         v['Aggregate Average'] = sum / values.length;
       });
+    } else {
+      // the previous stats don't match the new params
+      config.result = {};
+      config.dates = {};
     }
     updateChart()
   });
