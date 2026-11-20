@@ -621,7 +621,7 @@ class Runbot(Controller):
             'builds': sorted(res, key=batch_per_build.get),
         }
 
-    @route(['/runbot/stats/<model("runbot.bundle"):bundle>'], type='http', auth="public", website=True, sitemap=False)
+    @route(['/runbot/stats/<model("runbot.bundle"):bundle>'], type='http', auth="user", website=True, sitemap=False)
     def modules_stats(self, bundle, search=None, **post):
         """Modules statistics"""
         top_builds = bundle.last_done_batch.slot_ids.build_id
