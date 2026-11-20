@@ -178,8 +178,12 @@ function fetchUpdateChart() {
     if (result) {
       config.result = result['stats'];
       config.dates = result['dates'];
-      Object.values(config.result).forEach(v => v['Aggregate Sum'] = Object.values(v).reduce((a, b) => a + b, 0))
-      Object.values(config.result).forEach(v => v['Aggregate Average'] = Object.values(v).reduce((a, b) => a + b, 0)/Object.values(v).length)
+      Object.values(config.result).forEach((v) => {
+        const values = Object.values(v);
+        const sum = values.reduce((a, b) => a + b, 0);
+        v['Aggregate Sum'] = sum;
+        v['Aggregate Average'] = sum / values.length;
+      });
     }
     updateChart()
   });
