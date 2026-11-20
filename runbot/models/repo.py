@@ -527,6 +527,30 @@ class Repo(models.Model):
     def _source_path(self, *path_parts):
         return self.env['runbot.runbot']._path('sources', sanitize(self.name), *path_parts)
 
+    def _reference_path(self, version_name):
+        return self.env['runbot.runbot']._path('references', sanitize(self.name), sanitize(version_name))
+
+    def _checkout_reference(self, version_name, tree_hash):
+        """Checkout tree_hash in the reference of a version, git only writes the files differing from the previous checkout"""
+        self.ensure_one()
+        reference_path = self._reference_path(version_name)
+        os.makedirs(reference_path, exist_ok=True)
+        command = self._get_git_command(['--work-tree', reference_path, '-c', 'checkout.workers=4', 'read-tree', '-u', '--reset', tree_hash])
+        result = subprocess.run(command, capture_output=True, env={**os.environ, 'GIT_INDEX_FILE': f'{reference_path}.index'})
+        if result.returncode:
+            raise RunbotException('Checkout of %s in %s failed: %s' % (tree_hash, reference_path, result.stderr.decode()))
+        return reference_path
+
+    def _merge_tree(self, base_sha, sha):
+        """Tree of sha merged on base_sha, written in the repo and identical on all hosts"""
+        self.ensure_one()
+        self._fetch(base_sha)
+        self._fetch(sha)
+        try:
+            return self._git(['merge-tree', '--write-tree', base_sha, sha]).split('\n')[0]
+        except subprocess.CalledProcessError as e:
+            raise RunbotException('Merge of %s on %s failed: %s' % (sha, base_sha, e.output.decode()))
+
     def _get_git_command(self, cmd, errors='strict'):
         """Execute a git command 'cmd'"""
         self.ensure_one()

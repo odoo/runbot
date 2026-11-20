@@ -64,14 +64,14 @@ class Commit(models.Model):
     def _rebase_on(self, commit):
         if self == commit:
             return self
-        return self._get(self.name, self.repo_id.id, self.read()[0], commit.id)
+        return self._get(self.name, self.repo_id.id, {**self.read()[0], 'tree_hash': False}, commit.id)
 
     def _list_files(self, patterns):
         #example: git ls-files --with-tree=abcf390f90dbdd39fd61abc53f8516e7278e0931 ':(glob)addons/*/*.py' ':(glob)odoo/addons/*/*.py'
         # note that glob is needed to avoid the star matching **
         self.ensure_one()
         self._fetch()
-        return self.repo_id._git(['ls-files', '--with-tree', self.tree_hash, *patterns]).split('\n')
+        return self.repo_id._git(['ls-files', '--with-tree', self._get_tree_hash(), *patterns]).split('\n')
 
     def _list_available_modules(self):
         addons_paths = (self.repo_id.addons_paths or '').split(',')
@@ -111,46 +111,13 @@ class Commit(models.Model):
             return export_path
 
         _logger.info('git export: exporting to %s (new)', export_path)
-        os.makedirs(export_path)
-
-        export_commit = self
-        if self.rebase_on_id:
-            export_commit = self.rebase_on_id
-            self.rebase_on_id.repo_id._fetch(export_commit.name)
-
-        export_sha = export_commit.tree_hash
-
         with self.env['runbot.build.job']._git_timer():
-            p1 = subprocess.Popen(['git', '--git-dir=%s' % self.repo_id.path, 'archive', export_sha, '--mtime', self.date.strftime('%Y-%m-%d %H:%M:%S')], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-            p2 = subprocess.Popen(['tar', '-xC', export_path], stdin=p1.stdout, stdout=subprocess.PIPE)
-            p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
-            (_, err) = p2.communicate()
-            p1.poll()  # fill the returncode
-        if p1.returncode:
-            _logger.info("git export: removing corrupted export %r", export_path)
-            shutil.rmtree(export_path)
-            raise RunbotException("Git archive failed for %s with error code %s. (%s)" % (self.name, p1.returncode, p1.stderr.read().decode()))
-        if err:
-            _logger.info("git export: removing corrupted export %r", export_path)
-            shutil.rmtree(export_path)
-            raise RunbotException("Export for %s failed. (%s)" % (self.name, err))
-
-        if self.rebase_on_id:
-            # we could be smart here and detect if merge_base == commit, in witch case checkouting base_commit is enough. Since we don't have this info
-            # and we are exporting in a custom folder anyway, lets
-            _logger.info('Applying patch for %s', self.name)
-            with self.env['runbot.build.job']._git_timer():
-                p1 = subprocess.Popen(['git', '--git-dir=%s' % self.repo_id.path, 'diff', '%s...%s' % (export_commit.name, self.name)], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-                p2 = subprocess.Popen(['patch', '-p0', '-d', export_path], stdin=p1.stdout, stdout=subprocess.PIPE)
-                p1.stdout.close()
-                (message, err) = p2.communicate()
-                p1.poll()
-            if err:
-                shutil.rmtree(export_path)
-                raise RunbotException("Apply patch failed for %s...%s. (%s)" % (export_sha, self.name, err))
-            if p1.returncode or p2.returncode:
-                shutil.rmtree(export_path)
-                raise RunbotException("Apply patch failed for %s...%s with error code %s+%s. (%s)" % (export_sha, self.name, p1.returncode, p2.returncode, message))
+            if self.rebase_on_id:  # the merged tree is only written in the repo where the merge was computed
+                self.repo_id._merge_tree(self.rebase_on_id.name, self.name)
+            reference_path = self.repo_id._checkout_reference(build.params_id.version_id.name, self._get_tree_hash())
+            os.makedirs(os.path.dirname(export_path), exist_ok=True)
+            # hardlinks: sources are read only and the reference unlinks the files it updates
+            shutil.copytree(reference_path, export_path, copy_function=os.link)
 
         return export_path
 
@@ -202,17 +169,19 @@ class Commit(models.Model):
             offset += size_in_bytes + 1
         return results
 
-    def _source_path(self, *paths):
+    def _get_tree_hash(self):
+        """Tree to export, the merge of the commit on its base for a rebased commit"""
         if not self.tree_hash:
-            vals = self._get_commit_infos(self.name, self.repo_id)
-            if vals.get('tree_hash'):
-                self.tree_hash = vals['tree_hash']
+            if self.rebase_on_id:
+                self.tree_hash = self.repo_id._merge_tree(self.rebase_on_id.name, self.name)
             else:
+                self.tree_hash = self._get_commit_infos(self.name, self.repo_id).get('tree_hash')
+            if not self.tree_hash:
                 raise ValidationError("Commit %s has no tree hash, cannot export" % self.name)
-        export_name = self.tree_hash
-        if self.rebase_on_id:
-            export_name = '%s_%s' % (self.name, self.rebase_on_id.name)
-        return self.repo_id._source_path(export_name, *paths)
+        return self.tree_hash
+
+    def _source_path(self, *paths):
+        return self.repo_id._source_path(self._get_tree_hash(), *paths)
 
     @api.depends('name', 'repo_id.name')
     def _compute_dname(self):
