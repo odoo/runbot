@@ -87,6 +87,23 @@ registry.category("web_tour.tours").add("runbot_stats_main_flow", {
             trigger: `#nb_dataset_selector:has(option:checked[value="-1"])`,
         },
         {
+            content: "The steps of the other triggers are disabled",
+            trigger: `#key_step_selector:has(option:disabled[value="ui_tour_other_stats"])`,
+        },
+        {
+            content: "Filter the stats on a step",
+            trigger: "#key_step_selector",
+            run: "select ui_tour_stats",
+        },
+        {
+            content: "The stats of the step are loaded",
+            trigger: "#chart_spinner:not(:visible)",
+        },
+        {
+            content: "The stats of the step are shown",
+            trigger: `#js-legend li:not(.disabled):contains("memory_stat")`,
+        },
+        {
             content: "Switch to another trigger",
             trigger: "#trigger_id_selector",
             run: "selectByLabel Stats tour other trigger",
@@ -94,6 +111,10 @@ registry.category("web_tour.tours").add("runbot_stats_main_flow", {
         {
             content: "The category switches to one of the trigger",
             trigger: `#key_category_selector:has(option:checked[value="js_test_memory_used"])`,
+        },
+        {
+            content: "The step is reset, the trigger not having it",
+            trigger: `#key_step_selector:has(option:checked[value=""]):has(option:disabled[value="ui_tour_stats"])`,
         },
         {
             content: "The stats of the trigger are shown",

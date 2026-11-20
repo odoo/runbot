@@ -22,8 +22,7 @@
                 </select>
                 <b>Stat Step:</b>
                 <select id="key_step_selector" class="form-select form-select-sm d-inline-block w-auto" aria-label="Stat Step">
-                  <!-- TODO improve me step should be dependant on selected category-->
-                  <option t-foreach="[''] + all_steps" t-as="step" t-attf-value="{{step}}"><t t-out="step.replace('_',' ').title()"/></option>
+                  <option t-foreach="[''] + all_steps" t-as="step" t-attf-value="{{step}}" t-att-data-scopes="step_scopes.get(step)"><t t-out="step.replace('_',' ').title()"/></option>
                 </select>
                 <b>Nb of builds:</b>
                 <select id="limit_selector" class="form-select form-select-sm d-inline-block w-auto" aria-label="Number Of Builds">

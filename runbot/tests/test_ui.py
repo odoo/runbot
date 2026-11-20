@@ -118,6 +118,10 @@ class TestRunbotUi(HttpCase):
             'name': 'ui_tour_stats',
             'job_type': 'install_odoo',
         })
+        other_step = self.env['runbot.build.config.step'].create({
+            'name': 'ui_tour_other_stats',
+            'job_type': 'install_odoo',
+        })
         other_trigger = self.env['runbot.trigger'].create({
             'name': 'Stats tour other trigger',
             'project_id': self.project.id,
@@ -128,15 +132,15 @@ class TestRunbotUi(HttpCase):
         older = self._create_done_build(bundle, 'Stats tour older build', trigger)
         newer = self._create_done_build(bundle, 'Stats tour newer build', trigger)
         other = self._create_done_build(bundle, 'Stats tour other build', other_trigger, newer.slot_ids.batch_id)
-        for build, category, values in (
-            (older, 'module_loading_queries', {'base': 10, 'account': 20, 'sale_management': 30}),
-            (newer, 'module_loading_queries', {'base': 15, 'account': 30, 'sale_management': 25}),
-            (newer, 'js_test_memory_total', {'memory_stat': 1}),
-            (other, 'js_test_memory_used', {'used_stat': 1}),
+        for build, build_step, category, values in (
+            (older, step, 'module_loading_queries', {'base': 10, 'account': 20, 'sale_management': 30}),
+            (newer, step, 'module_loading_queries', {'base': 15, 'account': 30, 'sale_management': 25}),
+            (newer, step, 'js_test_memory_total', {'memory_stat': 1}),
+            (other, other_step, 'js_test_memory_used', {'used_stat': 1}),
         ):
             self.env['runbot.build.stat'].create({
                 'build_id': build.id,
-                'config_step_id': step.id,
+                'config_step_id': build_step.id,
                 'category': category,
                 'values': values,
             })

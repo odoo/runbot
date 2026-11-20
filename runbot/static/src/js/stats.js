@@ -251,6 +251,9 @@ function updateForm() {
         var id = this.id.replace('_selector', '');
         config.searchParams[id] = this.value;
         const categoryChanged = id == 'key_category' || (id == 'trigger_id' && updateCategory());
+        if (id == 'trigger_id' || id == 'key_category') {
+          updateStep();
+        }
         if (categoryChanged && config.searchParams.nb_dataset == -1) {
           // the custom selection is made of the keys of the previous category, back to the default of the template
           config.searchParams.nb_dataset = parseInt(document.querySelector('#nb_dataset_selector option[selected]').value, 10);
@@ -306,6 +309,18 @@ function updateCategory() {
   return true;
 }
 
+function updateStep() {
+  // only the steps of the selected trigger and category can be chosen
+  const scope = `${config.searchParams.trigger_id}:${config.searchParams.key_category}`;
+  const options = [...document.getElementById('key_step_selector').options];
+  for (const option of options) {
+    option.disabled = option.value !== '' && !option.dataset.scopes.split(',').includes(scope);
+  }
+  if (options.find((option) => option.value === config.searchParams.key_step)?.disabled) {
+    config.searchParams.key_step = '';
+  }
+}
+
 function compute_fetch_params(){
   return {
     ...config.searchParams,
@@ -350,6 +365,7 @@ window.onload = function() {
       config.searchParams[key] = value;
     }
     updateCategory();
+    updateStep();
 
     document.getElementById('backward_button').onclick = function(){
       config.searchParams['center_build_id'] = config.builds[0];
