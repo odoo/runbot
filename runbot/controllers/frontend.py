@@ -525,6 +525,22 @@ class Runbot(Controller):
         }
         return request.render('runbot.dashboard_page', qctx)
 
+    def _get_stats_parents(self, top_builds):
+        """Map the builds whose stats count in the given top builds to these top builds."""
+        builds = top_builds.search([('id', 'child_of', top_builds.ids)])
+        parents = defaultdict(set)
+        for build in builds.with_context(prefetch_fields=False):
+            parents[build.id].add(build.top_parent.id)
+
+        # linked builds are top builds of their own tree, possibly linked to several builds
+        linked_parents = defaultdict(set)
+        for link in builds.child_link_ids:
+            linked_parents[link.child_id.id] |= parents[link.parent_id.id]
+        linked_builds = builds.search([('id', 'child_of', list(linked_parents))])
+        for build in linked_builds.with_context(prefetch_fields=False):
+            parents[build.id] |= linked_parents[build.top_parent.id]
+        return parents
+
     @route(['/runbot/stats/'], type='jsonrpc', auth="user", website=False, sitemap=False)
     def stats_json(self, bundle_id=False, trigger_id=False, key_category='', key_step=None, center_build_id=False, limit=100, **post):
         """ Json stats """
@@ -557,13 +573,10 @@ class Runbot(Controller):
         if not builds:
             return {'stats': {}, 'dates': {}}
 
-        builds = builds.search([('id', 'child_of', builds.ids)])
-        builds = builds | builds.linked_children_build_ids
-
-        parents = {b.id: b.top_parent.id for b in builds.with_context(prefetch_fields=False)}
+        parents = self._get_stats_parents(builds)
         dates = {b.top_parent.id: b.create_date for b in builds.with_context(prefetch_fields=False)}
         query = "SELECT build_id, values FROM runbot_build_stat WHERE build_id IN %s AND category = %s"
-        values = [tuple(builds.ids), key_category]
+        values = [tuple(parents), key_category]
         if key_step:
             step_query = "dynamic_step_name LIKE %s"
             values.append(key_step)
@@ -578,13 +591,13 @@ class Runbot(Controller):
 
         for (build_id, values) in request.env.cr.fetchall():
             if values:
-                current_values = res.get(parents[build_id], {})
-                for key, value in values.items():
-                    if key in current_values:
-                        current_values[key] += value
-                    else:
-                        current_values[key] = value
-                res[parents[build_id]] = current_values
+                for parent_id in parents[build_id]:
+                    current_values = res.setdefault(parent_id, {})
+                    for key, value in values.items():
+                        if key in current_values:
+                            current_values[key] += value
+                        else:
+                            current_values[key] = value
             # we need to update here to manage the post install case: we want to combine stats from all post_install childrens.
         return {
             'stats': res,
@@ -594,18 +607,18 @@ class Runbot(Controller):
     @route(['/runbot/stats/<model("runbot.bundle"):bundle>'], type='http', auth="public", website=True, sitemap=False)
     def modules_stats(self, bundle, search=None, **post):
         """Modules statistics"""
-        all_builds = bundle.last_done_batch.slot_ids.build_id
-        all_builds |= bundle.with_context(category_id=request.env.ref('runbot.nightly_category').id).last_done_batch.slot_ids.build_id
-        all_builds = request.env['runbot.build'].search([('id', 'child_of', all_builds.ids)])
-        all_builds = all_builds | all_builds.linked_children_build_ids
-        all_stats = all_builds.sudo().stat_ids
+        top_builds = bundle.last_done_batch.slot_ids.build_id
+        top_builds |= bundle.with_context(category_id=request.env.ref('runbot.nightly_category').id).last_done_batch.slot_ids.build_id
+        parents = self._get_stats_parents(top_builds)
+        all_stats = top_builds.browse(list(parents)).sudo().stat_ids
         category_per_trigger = {}
         step_per_trigger_category = {}
         all_categories = set()
         all_steps = set()
         all_triggers = set()
         for stat in all_stats:
-            stat_triggers = stat.build_id.params_id.trigger_id | stat.build_id.linked_parent_build_ids.params_id.trigger_id
+            # as the stats route, the trigger of the top builds
+            stat_triggers = top_builds.browse(parents[stat.build_id.id]).params_id.trigger_id
             has_stats = False
             for stat_trigger in stat_triggers:
                 if stat_trigger.has_stats:
