@@ -59,6 +59,89 @@ class TestHost(RunbotCase):
         self.start_patcher('find_patcher', 'odoo.addons.runbot.common.find', 0)
         self.start_patcher('host_bootstrap', 'odoo.addons.runbot.models.host.Host._bootstrap', None)
 
+    def _get_mock_container(self, name, running=False):
+        container = MagicMock()
+        container.name = name
+        container.attrs = {'State': {'Running': running}}
+        return container
+
+    def _create_test_build(self, local_state='done'):
+        return self.Build.create({
+            'params_id': self.server_params.id,
+            'port': '1234',
+            'local_state': local_state,
+        })
+
+    def test_docker_cleanup(self):
+        docker_stop = self.patchers['docker_stop']
+        docker_reap = self.patchers['docker_reap']
+
+        # containers not managed because not dest format
+        self.patchers['docker_ps'].return_value = [
+            self._get_mock_container('not-a-dest', running=True),
+            self._get_mock_container('1234-test', running=True),
+        ]
+        self.Runbot._docker_cleanup()
+        docker_stop.assert_not_called()
+        docker_reap.assert_not_called()
+
+        # container in dest format but without any matching build is silently skipped
+        self.patchers['docker_ps'].return_value = [self._get_mock_container('9999999999-20-0', running=True)]
+        self.Runbot._docker_cleanup()
+        docker_stop.assert_not_called()
+        docker_reap.assert_not_called()
+
+        # build not done: the container is left untouched, it will be reaped at the end of the step
+        running_build = self._create_test_build(local_state='running')
+        self.patchers['docker_ps'].return_value = [
+            self._get_mock_container(f'{running_build.dest}_step_running', running=True),
+            self._get_mock_container(f'{running_build.dest}_step_exited', running=False),
+        ]
+        self.Runbot._docker_cleanup()
+        docker_stop.assert_not_called()
+        docker_reap.assert_not_called()
+
+        # build done with a running container: the container is stopped (and removed by docker_stop)
+        done_build = self._create_test_build(local_state='done')
+        container_name = f'{done_build.dest}_run_odoo'
+        self.patchers['docker_ps'].return_value = [self._get_mock_container(container_name, running=True)]
+        self.Runbot._docker_cleanup()
+        docker_stop.assert_called_once_with(container_name, done_build._path())
+        docker_reap.assert_not_called()
+        self.assertFalse(done_build.log_ids)
+
+        # the exit code of a container stopped by runbot is not logged, but an OOM kill is
+        docker_stop.reset_mock()
+        docker_stop.return_value = {'oom_killed': True, 'exit_code': 137}
+        self.Runbot._docker_cleanup()
+        docker_stop.assert_called_once_with(container_name, done_build._path())
+        self.assertTrue(done_build.oom_killed)
+        self.assertEqual(done_build.log_ids.mapped('message'), [f'A process was killed by the OOM killer in container ({container_name})'])
+        done_build.log_ids.unlink()
+        done_build.oom_killed = False
+        docker_stop.return_value = None
+
+        # build done with a leftover exited container exiting cleanly: reaped without any log
+        docker_stop.reset_mock()
+        docker_reap.return_value = {'oom_killed': False, 'exit_code': 0}
+        container_name = f'{done_build.dest}_all'
+        self.patchers['docker_ps'].return_value = [self._get_mock_container(container_name)]
+        self.Runbot._docker_cleanup()
+        docker_stop.assert_not_called()
+        docker_reap.assert_called_once_with(container_name, done_build._path(), 30)
+        self.assertFalse(done_build.oom_killed)
+        self.assertFalse(done_build.log_ids)
+
+        # leftover container OOM killed with an exit code: the log mentions the container (and so the step)
+        docker_reap.reset_mock()
+        docker_reap.return_value = {'oom_killed': True, 'exit_code': 137}
+        self.Runbot._docker_cleanup()
+        docker_reap.assert_called_once_with(container_name, done_build._path(), 30)
+        self.assertTrue(done_build.oom_killed)
+        messages = done_build.log_ids.mapped('message')
+        self.assertIn(f'A process was killed by the OOM killer in container ({container_name})', messages)
+        self.assertIn(f'The main process exited with exit code 137 ({container_name})', messages)
+
     def test_build_logs(self):
 
         build = self.Build.create({
