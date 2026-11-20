@@ -1,4 +1,5 @@
 const aggregateKeys = { sum: 'Aggregate Sum', average: 'Aggregate Average' };
+let statsRequest;
 
 var config = {
   type: 'line',
@@ -49,19 +50,19 @@ config.options.onClick = function(event, activeElements) {
 
 };
 
-function fetchStats(path, data, then) {
-  const xhttp = new XMLHttpRequest();
-  xhttp.onreadystatechange = function() {
-      if (this.readyState == 4) {
-          // also called on errors, with no result
-          const res = this.status == 200 ? JSON.parse(this.responseText) : {};
-          then(res.result);
-      }
-  };
-  xhttp.open("POST", path);
-  xhttp.setRequestHeader('Content-Type', 'application/json');
-  xhttp.send(JSON.stringify({params:data}));
-};
+async function fetchStats(path, data, signal) {
+  try {
+    const response = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ params: data }),
+      signal,
+    });
+    return (await response.json()).result;
+  } catch {
+    // failed or aborted requests have no result
+  }
+}
 
 function random_color(name){
     var colors = ['#004acd', '#3658c3', '#4a66ba', '#5974b2', '#6581aa', '#6f8fa3', '#7a9c9d', '#85a899', '#91b596', '#a0c096', '#fdaf56', '#f89a59', '#f1865a', '#e87359', '#dc6158', '#ce5055', '#bf4150', '#ad344b', '#992a45', '#84243d'];
@@ -182,7 +183,14 @@ function fetchUpdateChart() {
   chart_spinner.style.visibility = 'visible';
   fetch_params = compute_fetch_params();
   console.log('fetch')
-  fetchStats('/runbot/stats/', fetch_params, function(result) {
+  // a newer request replaces the previous one, which could be answered last
+  statsRequest?.abort();
+  const request = new AbortController();
+  statsRequest = request;
+  fetchStats('/runbot/stats/', fetch_params, request.signal).then(function(result) {
+    if (request.signal.aborted) {
+      return;
+    }
     chart_spinner.style.visibility = 'hidden';
     if (result) {
       config.result = result['stats'];
