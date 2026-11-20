@@ -102,6 +102,38 @@ class TestRunbotUi(HttpCase):
 
         self.start_tour('/runbot', 'runbot_frontend_main_flow', login='admin')
 
+    def test_stats_main_flow(self):
+        bundle = self.env['runbot.bundle'].create({
+            'name': 'ui-tour-stats',
+            'project_id': self.project.id,
+        })
+        trigger = self.env['runbot.trigger'].create({
+            'name': 'Stats tour trigger',
+            'project_id': self.project.id,
+            'repo_ids': [(6, 0, self.repo.ids)],
+            'config_id': self.env.ref('runbot.runbot_build_config_default').id,
+            'has_stats': True,
+        })
+        step = self.env['runbot.build.config.step'].create({
+            'name': 'ui_tour_stats',
+            'job_type': 'install_odoo',
+        })
+        older = self._create_done_build(bundle, 'Stats tour older build', trigger)
+        newer = self._create_done_build(bundle, 'Stats tour newer build', trigger)
+        for build, category, values in (
+            (older, 'module_loading_queries', {'base': 10, 'account': 20, 'sale_management': 30}),
+            (newer, 'module_loading_queries', {'base': 15, 'account': 30, 'sale_management': 25}),
+            (newer, 'js_test_memory_total', {'memory_stat': 1}),
+        ):
+            self.env['runbot.build.stat'].create({
+                'build_id': build.id,
+                'config_step_id': step.id,
+                'category': category,
+                'values': values,
+            })
+
+        self.start_tour(f'/runbot/stats/{bundle.id}', 'runbot_stats_main_flow', login='admin')
+
     def test_error_main_flow(self):
         bundle = self.project.master_bundle_id
         fixing_pr = self._create_branch(
