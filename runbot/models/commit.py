@@ -96,6 +96,11 @@ class Commit(models.Model):
 
     @transactioncache  # hack to avoid to fetch two time the same commit inside the same transaction
     def _fetch(self):
+        if self.rebase_on_id:
+            # the merge is deterministic but the tree is only written in the repo where it was computed
+            if self.repo_id._merge_tree(self.rebase_on_id.name, self.name) != self.tree_hash:
+                raise RunbotException('Merge of %s on %s does not give the expected tree %s' % (self.name, self.rebase_on_id.name, self.tree_hash))
+            return
         try:
             self.repo_id._fetch(self.name)
         except RunbotException:
@@ -116,13 +121,12 @@ class Commit(models.Model):
 
         _logger.info('git export: exporting to %s (new)', export_path)
         with self.env['runbot.build.job']._git_timer():
-            if self.rebase_on_id:  # the merged tree is only written in the repo where the merge was computed
-                if self.repo_id._merge_tree(self.rebase_on_id.name, self.name) != self.tree_hash:
-                    raise RunbotException('Merge of %s on %s does not give the expected tree %s' % (self.name, self.rebase_on_id.name, self.tree_hash))
             reference_path = self.repo_id._checkout_reference(build.params_id.version_id.name, self._get_tree_hash())
             os.makedirs(os.path.dirname(export_path), exist_ok=True)
             # hardlinks: sources are read only and the reference unlinks the files it updates
-            shutil.copytree(reference_path, export_path, copy_function=os.link)
+            shutil.rmtree(f'{export_path}.tmp', ignore_errors=True)
+            shutil.copytree(reference_path, f'{export_path}.tmp', copy_function=os.link)
+            os.rename(f'{export_path}.tmp', export_path)  # an interrupted export must not look complete
 
         return export_path
 
