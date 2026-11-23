@@ -1,3 +1,6 @@
+import datetime
+from collections import defaultdict
+
 from werkzeug.exceptions import BadRequest
 
 from odoo.fields import Domain
@@ -13,6 +16,15 @@ def _check_max_records(count):
 
 def _datetime_ms(value):
     return value.isoformat(sep=' ', timespec='milliseconds') if value else False
+
+
+def _serialize_trigger(trigger):
+    if not trigger:
+        return False
+    data = {'id': trigger.id, 'name': trigger.name}
+    if trigger.purpose:
+        data['purpose'] = trigger.purpose
+    return data
 
 
 def _serialize_log(log):
@@ -41,7 +53,7 @@ def _serialize_build(build, depth=1, logs='errors', parent_values=None):
     assert logs in ('errors', 'all', 'none')
     params = build.params_id
     values = {
-        'trigger': build.trigger_id.name,
+        'trigger': _serialize_trigger(build.trigger_id),
         'config': build.config_id.name,
         'version': build.version_id.name,
         'dockerfile': params.dockerfile_id.sudo().name or False,
@@ -95,8 +107,6 @@ def _serialize_build(build, depth=1, logs='errors', parent_values=None):
         # keys left out of a child have the same value as on its parent
         **{key: value for key, value in values.items() if not parent_values or parent_values[key] != value},
     }
-    if 'trigger' in data and build.trigger_id.purpose:
-        data['trigger_purpose'] = build.trigger_id.purpose
     return data
 
 
@@ -121,20 +131,17 @@ def _serialize_batch(batch, depth=1, logs='errors'):
 
 def _serialize_slot(slot, depth, logs):
     data = {
-        'trigger': slot.trigger_id.name,
+        'trigger': _serialize_trigger(slot.trigger_id),
         'manual': slot.trigger_id.manual,
         'link_type': slot.link_type,
         'skipped': slot.skipped,
         'build': False,
     }
-    if slot.trigger_id.purpose:
-        data['trigger_purpose'] = slot.trigger_id.purpose
     if slot.build_id:
         data['build'] = _serialize_build(slot.build_id, depth=depth, logs=logs)
         # the trigger is given by the slot
         if data['build'].get('trigger') == data['trigger']:
             data['build'].pop('trigger')
-            data['build'].pop('trigger_purpose', None)
     return data
 
 
@@ -189,6 +196,82 @@ def _serialize_commit(commit):
             'create_date': status.create_date,
             'sent_date': status.sent_date,
         } for status in last_status_by_context.values()],
+    }
+
+
+
+ERROR_SORTS = ('last_seen_date desc', 'last_seen_date asc', 'first_seen_date desc', 'first_seen_date asc', 'build_count desc', 'build_count asc')
+
+
+def _serialize_error_summary(error):
+    return {
+        'id': error.id,
+        'name': error.name,
+        'active': error.active,
+        'random': error.random,
+        'assigned': bool(error.responsible),
+        'responsible_github_login': error.responsible.sudo().github_login or False,
+        'team': error.team_id.sudo().name or False,
+        'triggers': error.trigger_ids.mapped('name'),
+        'versions': error.version_ids.mapped('name'),
+        'test_tags': error.test_tags or False,
+        'first_seen_date': error.first_seen_date,
+        'first_seen_build_id': error.first_seen_build_id.id or False,
+        'last_seen_date': error.last_seen_date,
+        'last_seen_build_id': error.last_seen_build_id.id or False,
+        'build_count': error.build_count,
+    }
+
+
+def _serialize_error_versions(error):
+    today = datetime.date.today()
+    daily_counts = defaultdict(dict)
+    for (batch_date, version_id), count in error._get_log_dates(today - datetime.timedelta(days=30), today + datetime.timedelta(days=1))[error].items():
+        daily_counts[version_id][batch_date.strftime('%Y-%m-%d')] = count
+
+    def done_batch_id(batch, operator, order):
+        domain = [('bundle_id', '=', batch.bundle_id.id), ('category_id', '=', batch.category_id.id), ('state', '=', 'done'), ('id', operator, batch.id)]
+        return error.env['runbot.batch'].search(domain, order=order, limit=1).id or False
+
+    last_seen_batches = {batch.bundle_id.version_id: batch for batch in error.last_seen_batch_ids}
+    seen_batches = [(first, last_seen_batches.get(first.bundle_id.version_id, first)) for first in error.first_seen_batch_ids]
+    return [{
+        'version': first.bundle_id.version_id.name,
+        'previous_batch_id': done_batch_id(first, '<', 'id desc'),
+        'first_seen_batch_id': first.id,
+        'last_seen_batch_id': last.id,
+        'next_batch_id': done_batch_id(last, '>', 'id'),
+        'daily_counts': daily_counts[first.bundle_id.version_id.id],
+    } for first, last in seen_batches]
+
+
+def _serialize_error(error):
+    return {
+        **_serialize_error_summary(error),
+        'project_id': error.project_id.id or False,
+        'triggers': [_serialize_trigger(trigger) for trigger in error.trigger_ids],
+        'tags': error.tag_ids.mapped('name'),
+        'tags_min_version': error.tags_min_version_id.name or False,
+        'tags_max_version': error.tags_max_version_id.name or False,
+        'breaking_pr': error.breaking_pr_id.name or False,
+        'breaking_pr_url': error.breaking_pr_url or False,
+        'fixing_pr': error.fixing_pr_id.name or False,
+        'fixing_pr_url': error.fixing_pr_url or False,
+        'fixing_bundle_id': error.fixing_bundle_id.id or False,
+        'fixing_commit': error.fixing_commit or False,
+        'previous_error_id': error.previous_error_id.id or False,
+        'versions': _serialize_error_versions(error),
+        'contents': [{
+            'id': content.id,
+            'module_name': content.module_name,
+            'function': content.function,
+            'file_path': content.file_path,
+            'canonical_tag': content.canonical_tag or False,
+            'content': content.content,
+            'first_seen_date': content.first_seen_date,
+            'last_seen_date': content.last_seen_date,
+            'build_count': content.build_count,
+        } for content in error.error_content_ids.sorted('last_seen_date DESC')],
     }
 
 
@@ -257,3 +340,19 @@ class RunbotApi(Controller):
         bundles = request.env['runbot.bundle'].search(Domain('project_id', 'in', projects.ids) & domain, order='id')
         batch_history = min(max(int(batch_history or 0), 0), 40)
         return request.make_json_response([_serialize_bundle(bundle, batch_history=batch_history) for bundle in bundles])
+
+    @route(['/runbot/api/error/<string:ids>'], type='http', auth='public', methods=['GET'], sitemap=False)
+    def api_error(self, ids, **kwargs):
+        error_ids = [int(error_id) for error_id in ids.split(',')]
+        _check_max_records(len(error_ids))
+        errors = request.env['runbot.build.error'].with_context(active_test=False).search([('id', 'in', error_ids)], order='id')
+        return request.make_json_response([_serialize_error(error) for error in errors])
+
+    @route(['/runbot/api/errors'], type='http', auth='public', methods=['GET'], sitemap=False)
+    def api_errors(self, sort='last_seen_date desc', limit=20, offset=0, **kwargs):
+        assert sort in ERROR_SORTS
+        limit = int(limit)
+        assert limit > 0  # limit=0 means no limit for the orm
+        _check_max_records(limit)
+        errors = request.env['runbot.build.error'].search([('build_count', '>', 1)], order=f'{sort}, id desc', limit=limit, offset=int(offset))
+        return request.make_json_response([_serialize_error_summary(error) for error in errors])

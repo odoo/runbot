@@ -1,4 +1,4 @@
-from odoo.tests import HttpCase, tagged
+from odoo.tests import HttpCase, new_test_user, tagged
 
 from .common import RunbotCase
 
@@ -40,3 +40,24 @@ class TestRunbotApi(RunbotCase, HttpCase):
         commits = self.get_json(f'/runbot/api/commit/{self.initial_server_commit.name},{self.initial_server_commit.id}')
         self.assertEqual([commit['id'] for commit in commits], self.initial_server_commit.ids)
         self.assertEqual(self.get_json(f'/runbot/api/build/{self.build.id}?logs=all')[0]['id'], self.build.id)
+
+    def test_api_errors(self):
+        error_content = self.env['runbot.build.error.content'].create({'content': 'foo bar', 'project_id': self.project.id})
+        error = error_content.error_id
+        builds = self.Build.create([{'params_id': self.base_params.id}, {'params_id': self.base_params.id}])
+        self.env['runbot.build.error.link'].create([{'build_id': build.id, 'error_content_id': error_content.id} for build in builds])
+        # visible without login when the project requires no group
+        self.assertIn(error.id, [error['id'] for error in self.get_json('/runbot/api/errors?sort=build_count desc')])
+        error_data = self.get_json(f'/runbot/api/error/{error.id}')[0]
+        self.assertEqual(error_data['build_count'], 2)
+        self.assertEqual([content['id'] for content in error_data['contents']], error_content.ids)
+        self.assertEqual(self.url_open('/runbot/api/errors?limit=51').status_code, 400)
+
+        self.project.group_ids = self.env.ref('runbot.group_user')
+        self.assertEqual(self.get_json(f'/runbot/api/error/{error.id}'), [])
+        # os.path patches break the filestore (user avatar) and the http sessions
+        for patcher_name in ('isfile', 'isdir', 'file_exist'):
+            self.stop_patcher(patcher_name)
+        new_test_user(self.env, login='api_user', groups='base.group_user', password='api_user')
+        self.authenticate('api_user', 'api_user')
+        self.assertEqual([error['id'] for error in self.get_json(f'/runbot/api/error/{error.id}')], error.ids)
