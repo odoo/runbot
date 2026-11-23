@@ -50,6 +50,7 @@ class BuildErrorMerge(models.Model):
             domain = Domain.AND([domain, [(filter.field_name, '!=', False)]])
         groups = [merge_filter.field_name for merge_filter in self.merge_filter_ids]
         assert groups
+        groups.append('project_id')  # never merge errors from different projects
 
         return (
             domain,

@@ -18,6 +18,7 @@
               <button name="action_view_errors" string="See all linked errors" type="object" class="oe_highlight"/>
               <group string="Base info">
                 <field name="name"/>
+                <field name="project_id" readonly="error_content_ids"/>
                 <field name="error_content_ids" readonly="1">
                     <list limit="5">
                       <field name="content" readonly="1"/>
