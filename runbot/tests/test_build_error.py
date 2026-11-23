@@ -318,6 +318,26 @@ class TestBuildError(TestBuildErrorCommon):
         self.assertEqual(error.tags_min_version_id, self.version_13)
         self.assertEqual(error.tags_max_version_id, version_14)
 
+    def test_parse_logs_other_project(self):
+        other_project = self.env['runbot.project'].create({'name': 'Other'})
+        other_content = self.BuildErrorContent.create({'content': 'Error Very Bad Trip', 'project_id': other_project.id})
+        build = self.create_test_build({'local_result': 'ko', 'local_state': 'done'})
+        log = self.IrLog.create({
+            'name': 'test-parse-logs',
+            'type': 'server',
+            'path': 'runbot',
+            'level': 'ERROR',
+            'func': 'test_trip',
+            'line': 242,
+            'message': 'Error Very Bad Trip',
+            'build_id': build.id,
+        })
+        action = self.BuildError._parse_logs(log)
+        error_content = self.BuildErrorContent.browse(action.get('res_id'))
+        self.assertEqual(error_content.fingerprint, other_content.fingerprint)
+        self.assertEqual(error_content.project_id, self.project)
+        self.assertFalse(other_content.build_ids)
+
     def test_parse_logs_no_update_without_flag(self):
         build_13 = self.create_test_build({'local_result': 'ko', 'local_state': 'done'})
         log_13 = self.IrLog.create({
@@ -912,6 +932,24 @@ class TestBuildError(TestBuildErrorCommon):
 
         # and the runbot admin user can change it back
         error.with_user(runbot_manager).test_tags = False
+
+    def test_build_error_project_acl(self):
+        self.stop_patcher('isfile')  # prevent user creation
+        error_content = self.env['runbot.build.error.content'].create({'content': 'foo bar', 'project_id': self.project.id})
+        error = error_content.error_id
+        error_link = self.env['runbot.build.error.link'].create({'build_id': self.Build.create({'params_id': self.base_params.id}).id, 'error_content_id': error_content.id})
+        # runbot.group_user is implied by base.group_user
+        self.project.group_ids = self.env.ref('runbot.group_user')
+        internal_user = new_test_user(self.env, login='internal', groups='base.group_user')
+        self.assertEqual(self.BuildError.with_user(internal_user).search([('id', '=', error.id)]), error)
+        self.assertEqual(self.env['runbot.build.error.content'].with_user(internal_user).search([('id', '=', error_content.id)]), error_content)
+        self.assertEqual(self.env['runbot.build.error.link'].with_user(internal_user).search([('id', '=', error_link.id)]), error_link)
+
+        self.project.group_ids = self.env.ref('runbot.group_runbot_admin')
+        self.assertFalse(self.BuildError.with_user(internal_user).search([('id', '=', error.id)]))
+        self.assertFalse(self.env['runbot.build.error.content'].with_user(internal_user).search([('id', '=', error_content.id)]))
+        # links have no rule, their contents and builds are restricted
+        self.assertEqual(self.env['runbot.build.error.link'].with_user(internal_user).search([('id', '=', error_link.id)]), error_link)
 
 
 class TestErrorMerge(TestBuildErrorCommon):

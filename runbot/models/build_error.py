@@ -220,6 +220,7 @@ class BuildError(models.Model):
 
     name = fields.Char("Name")
     active = fields.Boolean('Open (not fixed)', default=True, tracking=True)
+    project_id = fields.Many2one('runbot.project', 'Project', index=True)  # for access rights
     description = fields.Text("Description", store=True, compute='_compute_description')
     content = fields.Text("Error contents", compute='_compute_content', search="_search_content")
     error_content_ids = fields.One2many('runbot.build.error.content', 'error_id')
@@ -630,6 +631,8 @@ class BuildError(models.Model):
         error = self
         fields_to_merge = ['responsible', 'fixing_pr_id', 'breaking_pr_id']
         fields_to_copy = ['manual_team_id']
+        if different_project_errors := others.filtered(lambda other: other.project_id != error.project_id):
+            raise UserError(f"Cannot merge errors {different_project_errors.ids} into error {error.id}: they belong to another project")
         for previous_error in others:
             # todo, check that all relevant fields are checked and transfered/logged
             if previous_error.test_tags and error.test_tags != previous_error.test_tags:
@@ -825,13 +828,14 @@ class BuildError(models.Model):
             fingerprint = self.env['runbot.build.error.content']._digest(cleaning_regs._r_sub(log.message))
             fingerprints.add(fingerprint)
             canonical_tag = log.metadata.get('test', {}).get('canonical_tag', False)
-            logs_by_key[fingerprint, canonical_tag] |= log
+            project_id = log.build_id.params_id.project_id.id
+            logs_by_key[project_id, fingerprint, canonical_tag] |= log
 
         build_error_contents = self.env['runbot.build.error.content']
         # add build ids to already detected errors
         existing_errors_contents = self.env['runbot.build.error.content'].search([('fingerprint', 'in', list(fingerprints)), ('error_id.active', '=', True)])
-        existing_error_contents_per_key = {(error.fingerprint, error.canonical_tag): error for error in existing_errors_contents}
-        build_error_contents |= existing_errors_contents
+        existing_error_contents_per_key = {(error.project_id.id, error.fingerprint, error.canonical_tag): error for error in existing_errors_contents}
+        build_error_contents |= existing_errors_contents.filtered(lambda content: (content.project_id.id, content.fingerprint, content.canonical_tag) in logs_by_key)
 
         # create an error for the remaining entries
         for key, logs in logs_by_key.items():
@@ -842,9 +846,10 @@ class BuildError(models.Model):
                     if not error.metadata and log.metadata:
                         error.metadata = log.metadata
                     continue
-                fingerprint, canonical_tag = key
+                project_id, fingerprint, canonical_tag = key
                 new_build_error_content = self.env['runbot.build.error.content'].with_context(mail_create_nosubscribe=True).create({
                     'error_id': None,
+                    'project_id': project_id,
                     'content': log.message,
                     'module_name': log.name.removeprefix('odoo.').removeprefix('addons.'),
                     'file_path': log.path,
@@ -857,7 +862,7 @@ class BuildError(models.Model):
                 build_error_contents |= new_build_error_content
                 existing_error_contents_per_key[key] = new_build_error_content
         for build_error_content in build_error_contents:
-            logs = logs_by_key.get((build_error_content.fingerprint, build_error_content.canonical_tag), [])
+            logs = logs_by_key.get((build_error_content.project_id.id, build_error_content.fingerprint, build_error_content.canonical_tag), [])
             for rec in logs:
                 if rec.build_id not in build_error_content.build_ids:
                     self.env['runbot.build.error.link'].with_context(mail_create_nosubscribe=True).create({
@@ -902,6 +907,7 @@ class BuildErrorContent(models.Model):
 
     error_active = fields.Boolean('Active', related='error_id.active')
     error_id = fields.Many2one('runbot.build.error', 'Linked to', index=True, required=True, tracking=True, ondelete='cascade')
+    project_id = fields.Many2one('runbot.project', 'Project', index=True, readonly=True)  # for access rights
     create_error_id = fields.Many2one('runbot.build.error', 'Original error', index=True)
     error_display_id = fields.Integer(compute='_compute_error_display_id', string="Error id")
     content = fields.Text('Error message', required=True)
@@ -941,6 +947,7 @@ class BuildErrorContent(models.Model):
         for error_content in self:
             if not error_content.error_id.previous_error_id:
                 previous_error_content = error_content.search([
+                    ('project_id', '=', error_content.project_id.id),
                     ('fingerprint', '=', error_content.fingerprint),
                     ('canonical_tag', '=', error_content.canonical_tag),
                     ('error_id.active', '=', False),
@@ -969,7 +976,7 @@ class BuildErrorContent(models.Model):
             if not vals.get('error_id'):
                 temp = self.new(vals)  # _get_similar_domain could use any field of the record
                 similar_domain = auto_merge._get_similar_domain(temp)
-                similar_domain = Domain.AND([similar_domain, [('error_id.active', '=', True)]])
+                similar_domain = Domain.AND([similar_domain, [('error_id.active', '=', True), ('error_id.project_id', '=', vals.get('project_id', False))]])
                 error_candidates = self.env['runbot.build.error.content'].search(similar_domain, order="id", limit=1)
                 if error_candidates:
                     vals['error_id'] = error_candidates[0].error_id.id
@@ -977,6 +984,7 @@ class BuildErrorContent(models.Model):
                     name = vals.get('content', '').split('\n')[0][:1000]
                     error = self.env['runbot.build.error'].create({
                         'name': name,
+                        'project_id': vals.get('project_id', False),
                     })
                     vals['error_id'] = error.id
             vals['create_error_id'] = vals['error_id']
@@ -994,6 +1002,12 @@ class BuildErrorContent(models.Model):
     def write(self, vals):
         if 'cleaned_content' in vals:
             vals.update({'fingerprint': self._digest(vals['cleaned_content'])})
+        if vals.get('error_id'):
+            error = self.env['runbot.build.error'].browse(int(vals['error_id']))  # may be given as a record
+            if not error.project_id and not error.error_content_ids and len(self.project_id) == 1:
+                error.project_id = self.project_id  # e.g. error created manually
+            if different_project_contents := self.filtered(lambda content: content.project_id != error.project_id):
+                raise UserError(f"Cannot link error contents {different_project_contents.ids} to error {error.id}: they belong to another project")
         initial_errors = self.mapped('error_id')
         result = super().write(vals)
         if vals.get('error_id') and not self.env.context.get('merging'):
@@ -1114,7 +1128,8 @@ class BuildErrorContent(models.Model):
         content_to_remove = self.env['runbot.build.error.content']
         for error_content in self[1:]:
             assert base_error_content.fingerprint == error_content.fingerprint, f'Errors {base_error_content.id} and {error_content.id} have a different fingerprint'
-            assert base_error_content.canonical_tag == error_content.canonical_tag, f'Errors {base_error_content.id} and {error_content.id} have a different fingerprint'
+            assert base_error_content.canonical_tag == error_content.canonical_tag, f'Errors {base_error_content.id} and {error_content.id} have a different canonical tag'
+            assert base_error_content.project_id == error_content.project_id, f'Errors {base_error_content.id} and {error_content.id} have a different project'
             existing_build_ids = set(base_error_content.build_error_link_ids.build_id.ids)
             links_to_relink = error_content.build_error_link_ids.filtered(lambda rec: rec.build_id.id not in existing_build_ids)
             links_to_remove |= error_content.build_error_link_ids - links_to_relink  # a link already exists to the base error
@@ -1168,8 +1183,11 @@ class BuildErrorContent(models.Model):
 
     def action_extract_errors_contents(self):
         original_errors = self.mapped('error_id')
+        if len(self.project_id) > 1:
+            raise UserError("Cannot extract error contents from different projects into the same error")
         new_error = self.env['runbot.build.error'].create({
             'name': self[0].content.split('\n')[0][:1000],
+            'project_id': self.project_id.id,
         })
         self.error_id = new_error
         new_error.message_post(body=f"This error was created to extract contents from errors {original_errors.ids}")
@@ -1200,8 +1218,8 @@ class BuildErrorContent(models.Model):
         to_merge = []
         for fingerprint in changed_fingerprints:
             errors_with_fingerprint = errors_content_by_fingerprint.filtered(lambda error_content: error_content.fingerprint == fingerprint)
-            for canonical_tag in sorted({e.canonical_tag or '' for e in errors_with_fingerprint}):
-                to_merge.append(errors_with_fingerprint.filtered(lambda error_content: (error_content.canonical_tag or '') == canonical_tag))
+            for project_id, canonical_tag in sorted({(e.project_id.id, e.canonical_tag or '') for e in errors_with_fingerprint}):
+                to_merge.append(errors_with_fingerprint.filtered(lambda error_content: error_content.project_id.id == project_id and (error_content.canonical_tag or '') == canonical_tag))
         # this must be done in other iteration since filtered may fail because of unlinked records from _merge
         for errors_content_to_merge in to_merge:
             errors_content_to_merge._relink()

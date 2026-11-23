@@ -18,3 +18,9 @@ rule_build_params,"limited to groups",model_runbot_build_params,base_runbot_mode
 rule_build_params_mgmt,"manager can see all",model_runbot_build_params,group_runbot_admin,"[(1, '=', 1)]",1,1,1,1
 rule_bundle,"limited to groups",model_runbot_bundle,base_runbot_model_access,"['|', ('project_id.group_ids', '=', False), ('project_id.group_ids', 'in', user.all_group_ids.ids)]",1,1,1,1
 rule_bundle_mgmt,"manager can see all",model_runbot_bundle,group_runbot_admin,"[(1, '=', 1)]",1,1,1,1
+rule_build_error,"limited to groups",model_runbot_build_error,base_runbot_model_access,"[('project_id', '!=', False), '|', ('project_id.group_ids', '=', False), ('project_id.group_ids', 'in', user.all_group_ids.ids)]",1,1,1,1
+rule_build_error_internal,"internal users see errors without project",model_runbot_build_error,group_user,"[('project_id', '=', False)]",1,1,1,1
+rule_build_error_mgmt,"manager can see all",model_runbot_build_error,group_runbot_admin,"[(1, '=', 1)]",1,1,1,1
+rule_build_error_content,"limited to groups",model_runbot_build_error_content,base_runbot_model_access,"[('project_id', '!=', False), '|', ('project_id.group_ids', '=', False), ('project_id.group_ids', 'in', user.all_group_ids.ids)]",1,1,1,1
+rule_build_error_content_internal,"internal users see error contents without project",model_runbot_build_error_content,group_user,"[('project_id', '=', False)]",1,1,1,1
+rule_build_error_content_mgmt,"manager can see all",model_runbot_build_error_content,group_runbot_admin,"[(1, '=', 1)]",1,1,1,1

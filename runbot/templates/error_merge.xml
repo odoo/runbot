@@ -10,7 +10,8 @@
                     <div class="col-md-12">
                         <div class="card">
                             <div class="card-header">
-                                <span><t t-esc="'|'.join(result[:-1])"/></span>
+                                <span><t t-esc="'|'.join(result[:-2])"/></span>
+                                <span t-if="result[-2]" class="badge text-bg-secondary ms-1" t-esc="result[-2].display_name"/>
                             </div>
                             <div class="card-body">
                                 <table class="table">
