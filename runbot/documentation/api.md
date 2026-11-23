@@ -16,18 +16,30 @@ a build is one test of a batch (one per trigger) and can have child builds.
 - `GET /runbot/api/commit/<ids_or_shas>`: commits by id, slug (`odoo-d14d38cc-123456`) or full sha, with their last status for each context, as on the commit page.
   It can be more up to date than GitHub: a status with `sent_date` false was not sent to GitHub yet.
   The same sha can exist in multiple repos or be rebased on different commits, so a sha can return multiple commits.
+- `GET /runbot/api/errors?sort=last_seen_date desc&limit=20&offset=0`: open errors seen in more than one build, as on the errors page.
+  `sort` is `last_seen_date`, `first_seen_date` or `build_count`, followed by `desc` or `asc`.
+- `GET /runbot/api/error/<ids>`: errors (open or fixed) with their PRs, versions and contents (one per distinct error message).
+  For each version the error was seen in: the last done batch of the same bundle and category before it appeared
+  (`previous_batch_id`, compare its commits with the first seen batch to find what broke), the first and last seen batches,
+  the first done batch after it was last seen (`next_batch_id`, false if none ran since: the error may still happen) and the number of
+  builds where it was seen per day over the last 30 days (`daily_counts`).
 
 ## Conventions
 
 - Endpoints take a comma separated list of ids (or names) and return a JSON list.
 - Records reference each other by id, fetch them with the matching route.
 - A key missing on a child build has the same value as on its parent (e.g. trigger, version, commits).
-- `trigger_purpose` is only given along with `trigger`, when the trigger has one.
+- A trigger is given as `id`, `name` and `purpose` (only when set), `triggers` is a list of them.
+  The errors list only gives the trigger names, use the error route for the details.
 - `canonical_tag` on a log line is the test tag of the test that logged it, if any, to run this test alone.
 - `known_error` on a log line is the already known runbot error matching it (false if none), with when it was first
-  and last seen, whether it is still open (`active`, false once fixed) and if it looks random (`random`, not fully reliable yet).
+  and last seen, whether it is still open (`active`, false once fixed) and if it looks random (`random`).
+  `random` comes from a heuristic: false only means the error was not detected as random, not that it isn't.
   Errors are only linked to nightly builds, so `last_seen_date` can be in the past even if the error still happens:
   it may be fixed, the last nightly may not be finished, or a random error may not have been reproduced in it.
+- Errors are only given for the projects the user can see: logging in is required for projects restricted to some groups.
+  `assigned` tells if someone is responsible for fixing the error, `responsible_github_login` gives their GitHub login if known.
+  The `limit` of the errors route has the same maximum as the number of ids.
 - `reference_build_id` is the build whose database a build restores, when known from its parameters:
   its `databases` give the download links.
   Builds can also restore a database chosen at run time, see the restore step in their logs.

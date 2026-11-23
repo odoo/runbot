@@ -122,7 +122,7 @@ class BuildErrorSeenMixin(models.AbstractModel):
     def _compute_graph(self):
         end_date = fields.Date.today()
         start_date = end_date - relativedelta(days=30)
-        log_date_per_error = self._get_log_dates(start_date, end_date)
+        log_date_per_error = self._get_log_dates(start_date, end_date + relativedelta(days=1))
         for error in self:
 
             fixing_prs = {pr.bundle_id.version_id.id: pr for pr in (error.fixing_pr_id | error.fixing_pr_id.forwardport_ids).filtered('close_date')}
