@@ -121,8 +121,11 @@ ARG PG_VERSION=18</field>
         <field name="dockerfile_id" ref="runbot.docker_default"/>
         <field name="layer_type">template</field>
         <field name="name">Setup postgresql server</field>
+        <field name="values" eval="{'os_release_name': '`lsb_release -s -c`'}"/>
         <field name="content">
 ENV PG_VERSION=${PG_VERSION}
+RUN curl -sSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /etc/apt/trusted.gpg.d/pgdg.asc \
+    &amp;&amp; echo "deb http://apt.postgresql.org/pub/repos/apt/ {os_release_name}-pgdg main" &gt; /etc/apt/sources.list.d/pgdg.list
 RUN set -x ; \
     apt-get update \
     &amp;&amp; DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends postgresql-${PG_VERSION} postgresql-${PG_VERSION}-pgvector locales\
@@ -184,13 +187,11 @@ RUN sed -i 's/^# *en_US.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/' /etc/locale.gen &amp;&a
         <field name="dockerfile_id" ref="runbot.docker_default"/>
         <field name="layer_type">template</field>
         <field name="name">Install branch debian/control with latest postgresql-client</field>
-        <field name="values" eval="{'odoo_branch': 'master', 'os_release_name': '`lsb_release -s -c`'}"/>
-        <field name="content"># This layer updates the repository list to get the latest postgresql-client, mainly needed if the host postgresql version is higher than the default version of the docker os
+        <field name="values" eval="{'odoo_branch': 'master'}"/>
+        <field name="content">
 # CACHE 60
 ADD https://raw.githubusercontent.com/odoo/odoo/{odoo_branch}/debian/control /tmp/control.txt
-RUN curl -sSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /etc/apt/trusted.gpg.d/psql_client.asc \
-    &amp;&amp; echo "deb http://apt.postgresql.org/pub/repos/apt/ {os_release_name}-pgdg main" &gt; /etc/apt/sources.list.d/pgclient.list \
-    &amp;&amp; apt-get update \
+RUN apt-get update \
     &amp;&amp; sed -n '/^Depends:/,/^[A-Z]/p' /tmp/control.txt \
         | awk '/^ [a-z]/ { gsub(/,/,"") ; gsub(" ", "") ; print $NF }' | sort -u \
         | DEBIAN_FRONTEND=noninteractive xargs apt-get install -y -qq --no-install-recommends \

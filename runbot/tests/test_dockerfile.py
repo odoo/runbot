@@ -45,6 +45,8 @@ RUN set -x ; \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends apt-transport-https build-essential ca-certificates curl wget faketime file fonts-freefont-ttf fonts-noto-cjk gawk gnupg gsfonts libldap2-dev libjpeg-dev libsasl2-dev libxslt1-dev lsb-release npm ocrmypdf sed sudo unzip zstd xfonts-75dpi zip zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 ENV PG_VERSION=${PG_VERSION}
+RUN curl -sSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /etc/apt/trusted.gpg.d/pgdg.asc \
+    && echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -s -c`-pgdg main" > /etc/apt/sources.list.d/pgdg.list
 RUN set -x ; \
     apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends postgresql-${PG_VERSION} postgresql-${PG_VERSION}-pgvector locales\
@@ -63,9 +65,7 @@ ENV NODE_PATH=/usr/lib/node_modules/
 ENV npm_config_prefix=/usr
 RUN npm install --force -g rtlcss@3.4.0 es-check@6.0.0 eslint@8.1.0 prettier@2.7.1 eslint-config-prettier@8.5.0 eslint-plugin-prettier@4.2.1
 ADD https://raw.githubusercontent.com/odoo/odoo/master/debian/control /tmp/control.txt
-RUN curl -sSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /etc/apt/trusted.gpg.d/psql_client.asc \
-    && echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -s -c`-pgdg main" > /etc/apt/sources.list.d/pgclient.list \
-    && apt-get update \
+RUN apt-get update \
     && sed -n '/^Depends:/,/^[A-Z]/p' /tmp/control.txt \
         | awk '/^ [a-z]/ { gsub(/,/,"") ; gsub(" ", "") ; print $NF }' | sort -u \
         | DEBIAN_FRONTEND=noninteractive xargs apt-get install -y -qq --no-install-recommends \
