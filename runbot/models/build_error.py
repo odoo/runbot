@@ -123,6 +123,8 @@ class BuildErrorSeenMixin(models.AbstractModel):
         end_date = fields.Date.today()
         start_date = end_date - relativedelta(days=30)
         log_date_per_error = self._get_log_dates(start_date, end_date)
+        all_events = self.env['runbot.event']._get_events('errors', start=datetime.datetime.combine(start_date, datetime.time.min))
+        serialized_events = list(zip(all_events, all_events._serialize()))
         for error in self:
 
             fixing_prs = {pr.bundle_id.version_id.id: pr for pr in (error.fixing_pr_id | error.fixing_pr_id.forwardport_ids).filtered('close_date')}
@@ -159,7 +161,12 @@ class BuildErrorSeenMixin(models.AbstractModel):
                     daily_version_freq[x_index][y_index] = c
                     max_count = max(max_count, c)
 
+            events = [
+                {**values, 'version_ids': [version.id for version in versions if event._match_version(version)]}
+                for event, values in serialized_events
+            ]
             error.history_data = {
+                'events': [event for event in events if event['version_ids']],
                 'breaking_pr_close_dates': breaking_pr_close_dates,
                 'fixing_pr_close_dates': fixing_pr_close_dates,
                 'versions_ids': versions_ids,
@@ -273,6 +280,12 @@ class BuildError(models.Model):
 
     disappearing_batch_ids = fields.Many2many('runbot.batch', compute='_compute_disappearing_batch_ids', string='Fixing batches')
 
+    event_ids = fields.Many2many('runbot.event', compute='_compute_event_ids', string='Events', help="Events impacting errors displayed in the history graph")
+    appearing_event_ids = fields.Many2many('runbot.event', compute='_compute_appearing_event_ids', string='Events before appearance',
+                                           help="Events impacting errors that happened just before a batch where the error appeared")
+    disappearing_event_ids = fields.Many2many('runbot.event', compute='_compute_disappearing_event_ids', string='Events before disappearance',
+                                              help="Events impacting errors that happened just before a batch where the error disappeared")
+
     only_trigger_ids = fields.Many2one('runbot.trigger', string='Only Triggers', compute='_compute_only_trigger_ids', search='_search_only_trigger_ids')
     only_version_ids = fields.Many2one('runbot.version', string='Only Versions', compute='_compute_only_version_ids', search='_search_only_version_ids')
 
@@ -367,6 +380,35 @@ class BuildError(models.Model):
                 if disappearing_batch:
                     disappearing_batches_ids.append(disappearing_batch.id)
             record.disappearing_batch_ids = self.env['runbot.batch'].browse(disappearing_batches_ids)
+
+    @api.depends('history_data')
+    def _compute_event_ids(self):
+        for record in self:
+            record.event_ids = self.env['runbot.event'].browse([event['id'] for event in (record.history_data or {}).get('events', [])])
+
+    def _get_events_before_batches(self, batches):
+        """ Events impacting errors between each batch and the previous done batch of the same bundle and category """
+        events = self.env['runbot.event']
+        for batch in batches:
+            previous_batch = self.env['runbot.batch'].search([
+                ('bundle_id', '=', batch.bundle_id.id),
+                ('id', '<', batch.id),
+                ('category_id', '=', batch.category_id.id),
+                ('state', '=', 'done')], order='id desc', limit=1)
+            if previous_batch:
+                events |= events._get_events('errors', start=previous_batch.create_date, end=batch.create_date, versions=batch.bundle_id.version_id)
+        return events.sorted()
+
+    @api.depends('first_seen_batch_ids')
+    def _compute_appearing_event_ids(self):
+        # one search per version as for disappearing_batch_ids, should only be used in form view
+        for record in self:
+            record.appearing_event_ids = record._get_events_before_batches(record.first_seen_batch_ids)
+
+    @api.depends('disappearing_batch_ids')
+    def _compute_disappearing_event_ids(self):
+        for record in self:
+            record.disappearing_event_ids = record._get_events_before_batches(record.disappearing_batch_ids)
 
     def _compute_only_trigger_ids(self):
         for record in self:

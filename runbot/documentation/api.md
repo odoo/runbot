@@ -16,6 +16,10 @@ a build is one test of a batch (one per trigger) and can have child builds.
 - `GET /runbot/api/commit/<ids_or_shas>`: commits by id, slug (`odoo-d14d38cc-123456`) or full sha, with their last status for each context, as on the commit page.
   It can be more up to date than GitHub: a status with `sent_date` false was not sent to GitHub yet.
   The same sha can exist in multiple repos or be rebased on different commits, so a sha can return multiple commits.
+- `GET /runbot/api/event?impact=errors&version=saas-19.2&date_from=2026-11-01&date_to=2026-11-30&limit=50`: impactful events
+  (configuration, deployment or code changes), most recent first. All parameters are optional: `impact` (`errors` or `stats`)
+  only returns the events flagged with it, `version` the ones applying to this version name, `date_from` (included) and `date_to` (excluded)
+  bound their `date`, as `2026-11-01` or `2026-11-01 12:00:00`. `GET /runbot/api/event/<ids>` returns events by id.
 
 ## Conventions
 
@@ -44,6 +48,8 @@ a build is one test of a batch (one per trigger) and can have child builds.
 - `slots` of a batch give the trigger and its `build` (false if none was created, `manual` triggers without build are not listed).
   `link_type` is `created`, `matched` (build reused from another batch) or `rebuild`. The build of a slot has no `trigger` key
   when it is the trigger of the slot.
+- An event can explain a change in the errors (`impact_errors`) or stats (`impact_stats`) of the builds created after its `date`.
+  `version_domain` is the domain on the versions it applies to, false if it applies to all versions.
 - Dates are UTC. Log `create_date` and job `start_date` have milliseconds, to place the logs within the jobs.
 
 ## Parameters

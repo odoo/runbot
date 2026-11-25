@@ -14,6 +14,7 @@ from . import commit
 from . import custom_trigger
 from . import database
 from . import docker
+from . import event
 from . import host
 from . import ir_action
 from . import ir_cron

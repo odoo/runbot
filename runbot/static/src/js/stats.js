@@ -34,6 +34,72 @@ var config = {
   },
 };
 
+// draw events impacting stats as vertical lines, between the last build before the event and the first one after it
+config.plugins = [{
+  id: 'runbotEvents',
+  afterDatasetsDraw(chart) {
+    const positions = config.eventPositions || [];
+    if (!positions.length) {
+      return;
+    }
+    const ctx = chart.ctx;
+    const xScale = chart.scales.x;
+    const area = chart.chartArea;
+    ctx.save();
+    ctx.strokeStyle = '#0d6efd';
+    ctx.fillStyle = '#0d6efd';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.font = '11px sans-serif';
+    for (const {index, event} of positions) {
+      const x = (xScale.getPixelForValue(index - 1) + xScale.getPixelForValue(index)) / 2;
+      ctx.beginPath();
+      ctx.moveTo(x, area.top);
+      ctx.lineTo(x, area.bottom);
+      ctx.stroke();
+      ctx.fillText(event.name, x + 4, area.top + 12);
+    }
+    ctx.restore();
+  },
+}];
+
+function computeEventPositions(builds) {
+  const positions = [];
+  for (const event of config.events || []) {
+    // dates are UTC "YYYY-MM-DD HH:MM:SS" strings, comparable as strings
+    const index = builds.findIndex(build => config.dates[build] >= event.date);
+    if (index > 0) {
+      positions.push({index, event});
+    }
+  }
+  return positions;
+}
+
+function generateEventList() {
+  const container = document.getElementById('js-events');
+  const items = (config.eventPositions || []).map(({event}) => {
+    const item = document.createElement('li');
+    const date = document.createElement('b');
+    date.textContent = event.date + ' ';
+    const name = document.createElement('span');
+    name.textContent = event.name;
+    item.append(date, name);
+    if (event.description) {
+      item.title = event.description;
+    }
+    return item;
+  });
+  if (!items.length) {
+    container.replaceChildren();
+    return;
+  }
+  const title = document.createElement('b');
+  title.textContent = 'Events:';
+  const list = document.createElement('ul');
+  list.append(...items);
+  container.replaceChildren(title, list);
+}
+
 config.options.onClick = function(event, activeElements) {
     if (activeElements.length === 0){
       return
@@ -77,6 +143,7 @@ function random_color(name){
 function process_chart_data(){
     if (! config.result || Object.keys(config.result).length == 0)
     {
+      config.eventPositions = [];
       config.data = {
         labels:[],
         datasets: [],
@@ -150,6 +217,7 @@ function process_chart_data(){
       return  build_stats[key] - previous_value
     }
 
+    config.eventPositions = computeEventPositions(builds);
     config.data = {
       builds: builds,
       labels: builds.map(build => config.dates[build]),
@@ -176,6 +244,7 @@ function fetchUpdateChart() {
     if (result) {
       config.result = result['stats'];
       config.dates = result['dates'];
+      config.events = result['events'] || [];
       Object.values(config.result).forEach(v => v['Aggregate Sum'] = Object.values(v).reduce((a, b) => a + b, 0))
       Object.values(config.result).forEach(v => v['Aggregate Average'] = Object.values(v).reduce((a, b) => a + b, 0)/Object.values(v).length)
     }
@@ -246,6 +315,7 @@ function updateChart(){
     window.statsChart.update();
   }
   generateLegend();
+  generateEventList();
 }
 
 function compute_fetch_params(){

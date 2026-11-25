@@ -68,6 +68,22 @@
                   <field name="history_data" nolabel="1" colspan="2" widget="history_graph" options="{'cell_size': 13, 'mouse_actions': True}"/>
                   <button name="action_appearing_batches" string="Appearing Batches" type="object" class="btn btn-primary" invisible="not first_seen_batch_ids"/>
                   <button name="action_disappearing_batches" string="Disappearing Batches" type="object" class="btn btn-primary" invisible="not disappearing_batch_ids"/>
+                  <label for="appearing_event_ids" colspan="2" invisible="not appearing_event_ids"/>
+                  <field name="appearing_event_ids" nolabel="1" colspan="2" readonly="1" invisible="not appearing_event_ids">
+                    <list>
+                      <field name="date"/>
+                      <field name="name"/>
+                      <field name="event_type"/>
+                    </list>
+                  </field>
+                  <label for="disappearing_event_ids" colspan="2" invisible="not disappearing_event_ids"/>
+                  <field name="disappearing_event_ids" nolabel="1" colspan="2" readonly="1" invisible="not disappearing_event_ids">
+                    <list>
+                      <field name="date"/>
+                      <field name="name"/>
+                      <field name="event_type"/>
+                    </list>
+                  </field>
                 </group>
               </group>
               <group name="test_tags_group" string="Disabling">
@@ -90,6 +106,17 @@
               <notebook>
                 <page string="Builds">
                   <field name="unique_build_error_link_ids" widget="one2many" context="{'hide_linked_error': 'True'}"/>
+                </page>
+                <page string="Events" name="events" invisible="not event_ids">
+                  <field name="event_ids" readonly="1">
+                    <list>
+                      <field name="date"/>
+                      <field name="name"/>
+                      <field name="event_type"/>
+                      <field name="description"/>
+                      <field name="version_domain" optional="hide"/>
+                    </list>
+                  </field>
                 </page>
                 <page string="Qualifiers" groups="runbot.group_runbot_admin,runbot.group_runbot_error_manager" invisible="not common_qualifiers">
                   <field name="common_qualifiers" widget="runbotjsonb"/>

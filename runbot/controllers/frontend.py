@@ -584,9 +584,14 @@ class Runbot(Controller):
                         current_values[key] = value
                 res[parents[build_id]] = current_values
             # we need to update here to manage the post install case: we want to combine stats from all post_install childrens.
+        build_dates = [dates[build_id] for build_id in res]
+        events = request.env['runbot.event']
+        if build_dates:
+            events = events._get_events('stats', start=min(build_dates), end=max(build_dates), versions=bundle.version_id)
         return {
             'stats': res,
             'dates': dates,
+            'events': events.sorted('date')._serialize(),
         }
 
     @route(['/runbot/stats/<model("runbot.bundle"):bundle>'], type='http', auth="public", website=True, sitemap=False)

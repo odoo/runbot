@@ -1,0 +1,70 @@
+<odoo>
+  <data>
+    <record id="event_form" model="ir.ui.view">
+        <field name="name">runbot.event.form</field>
+        <field name="model">runbot.event</field>
+        <field name="arch" type="xml">
+            <form string="Event">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="e.g. Upgrade of the docker base image"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="date"/>
+                            <field name="event_type"/>
+                            <field name="version_domain" widget="domain" options="{'model': 'runbot.version', 'in_dialog': True, 'operators': ['in','=', '&lt;', '&gt;']}"/>
+                        </group>
+                        <group string="Impacts">
+                            <field name="impact_errors"/>
+                            <field name="impact_stats"/>
+                        </group>
+                    </group>
+                    <field name="description" placeholder="What changed and what it can impact"/>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="event_list" model="ir.ui.view">
+        <field name="name">runbot.event.list</field>
+        <field name="model">runbot.event</field>
+        <field name="arch" type="xml">
+            <list string="Events">
+                <field name="date"/>
+                <field name="name"/>
+                <field name="event_type"/>
+                <field name="impact_errors"/>
+                <field name="impact_stats"/>
+                <field name="version_domain" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="event_search" model="ir.ui.view">
+        <field name="name">runbot.event.search</field>
+        <field name="model">runbot.event</field>
+        <field name="arch" type="xml">
+            <search string="Search events">
+                <field name="name"/>
+                <field name="description"/>
+                <filter string="Impacts errors" name="impact_errors" domain="[('impact_errors', '=', True)]"/>
+                <filter string="Impacts stats" name="impact_stats" domain="[('impact_stats', '=', True)]"/>
+                <separator/>
+                <filter string="Date" name="date" date="date"/>
+                <group>
+                    <filter string="Type" name="group_event_type" context="{'group_by': 'event_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="open_view_event_tree" model="ir.actions.act_window">
+        <field name="name">Events</field>
+        <field name="res_model">runbot.event</field>
+        <field name="view_mode">list,form</field>
+        <field name="path">runbot_event</field>
+    </record>
+  </data>
+</odoo>

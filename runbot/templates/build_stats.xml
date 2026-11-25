@@ -48,7 +48,10 @@
             </div>
           </nav>
           <div class="row">
-            <div class="col-md-10"><canvas id="canvas"></canvas></div>
+            <div class="col-md-10">
+              <canvas id="canvas"></canvas>
+              <div id="js-events" class="mt-2"></div>
+            </div>
             <div class="col-md-2">
                 <b>Mode:</b>
                 <select id="mode_selector" class="form-select" aria-label="Display mode">

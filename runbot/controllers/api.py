@@ -1,5 +1,6 @@
 from werkzeug.exceptions import BadRequest
 
+from odoo import fields
 from odoo.fields import Domain
 from odoo.http import Controller, Response, request, route
 from odoo.tools import file_open
@@ -257,3 +258,33 @@ class RunbotApi(Controller):
         bundles = request.env['runbot.bundle'].search(Domain('project_id', 'in', projects.ids) & domain, order='id')
         batch_history = min(max(int(batch_history or 0), 0), 40)
         return request.make_json_response([_serialize_bundle(bundle, batch_history=batch_history) for bundle in bundles])
+
+    @route(['/runbot/api/event', '/runbot/api/event/<string:ids>'], type='http', auth='public', methods=['GET'], sitemap=False)
+    def api_event(self, ids='', impact='', version='', date_from='', date_to='', limit=50, **kwargs):
+        Event = request.env['runbot.event']
+        if ids:
+            event_ids = [int(event_id) for event_id in ids.split(',')]
+            _check_max_records(len(event_ids))
+            return request.make_json_response(Event.browse(event_ids).exists()._serialize())
+        if impact and impact not in ('errors', 'stats'):
+            raise BadRequest(f'Invalid impact {impact}, expected errors or stats')
+        limit = int(limit)
+        _check_max_records(limit)
+        domain = Domain.TRUE
+        if impact:
+            domain &= Domain(f'impact_{impact}', '=', True)
+        try:
+            if date_from:
+                domain &= Domain('date', '>=', fields.Datetime.to_datetime(date_from))
+            if date_to:
+                domain &= Domain('date', '<', fields.Datetime.to_datetime(date_to))
+        except ValueError as e:
+            raise BadRequest(f'Invalid date: {e}')
+        # the version domain is evaluated in python, the limit can only be applied after
+        events = Event.search(domain, limit=None if version else limit)
+        if version:
+            versions = request.env['runbot.version'].search([('name', '=', version)])
+            if not versions:
+                raise BadRequest(f'Unknown version {version}')
+            events = events._filter_versions(versions)
+        return request.make_json_response(events[:limit]._serialize())
