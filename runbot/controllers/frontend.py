@@ -3,6 +3,7 @@ import logging
 from collections import OrderedDict, defaultdict
 from itertools import pairwise
 from subprocess import CalledProcessError
+from urllib.parse import urlsplit
 
 import werkzeug.utils
 from dateutil.relativedelta import relativedelta
@@ -157,7 +158,7 @@ class Runbot(Controller):
             'title': 'Bundle %s' % bundle.name,
             'active_category_id': category_id,
             'page_info_state': last_batch._get_global_result(),
-            'expand_custom': expand_custom,
+            'expand_custom': str2bool(expand_custom, False),
             'needs_update': bundle.last_batch and bundle.last_batch.sudo().needs_update(),
             'triggers': request.env['runbot.trigger'].search([('project_id', '=', bundle.project_id.id)]),
             'trigger_display': trigger_display,
@@ -165,10 +166,7 @@ class Runbot(Controller):
 
         return request.render('runbot.bundle', context)
 
-    @route([
-        '/runbot/bundle/<model("runbot.bundle"):bundle>/force',
-        '/runbot/bundle/<model("runbot.bundle"):bundle>/force/<int:auto_rebase>',
-    ], type='http', auth="user", methods=['GET', 'POST'], csrf=False)
+    @route(['/runbot/bundle/<model("runbot.bundle"):bundle>/force'], type='http', auth="user", methods=['POST'])
     def force_bundle(self, bundle, auto_rebase=False, use_base_commits=False, **_post):
         if not request.env.user.has_group('runbot.group_runbot_advanced_user') and ':' not in bundle.name and not bundle.last_batch.needs_update():
             message = "Only users with a specific group can do that. Please contact runbot administrators"
@@ -176,9 +174,9 @@ class Runbot(Controller):
         _logger.info('user %s forcing bundle %s', request.env.user.name, bundle.name)  # user must be able to read bundle
         batch = bundle.sudo()._force() or bundle.sudo().last_batch
         batch._log('Batch forced by %s', request.env.user.name)
-        batch._prepare(auto_rebase=bool(auto_rebase), use_base_commits=str2bool(use_base_commits, False))
+        batch._prepare(auto_rebase=str2bool(auto_rebase, False), use_base_commits=str2bool(use_base_commits, False))
         batch._process()
-        return werkzeug.utils.redirect('/runbot/batch/%s' % batch.id)
+        return ''
 
     @route(['/runbot/batch/<int:batch_id>'], website=True, auth='public', type='http', sitemap=False)
     def batch(self, batch_id=None, **kwargs):
@@ -192,16 +190,16 @@ class Runbot(Controller):
         }
         return request.render('runbot.batch', context)
 
-    @route(['/runbot/batch/<int:batch_id>/prioritize'], website=True, auth='user', type='http', sitemap=False)
+    @route(['/runbot/batch/<int:batch_id>/prioritize'], auth='user', type='http', methods=['POST'], sitemap=False)
     def batch_priority(self, batch_id=None, **kwargs):
         batch = request.env['runbot.batch'].browse(batch_id)
         batch.sudo().priority_level = int(batch.create_date.timestamp() - 3600)
-        return werkzeug.utils.redirect('/runbot/batch/%s' % batch_id)
+        return ''
 
-    @route(['/runbot/batch/slot/<model("runbot.batch.slot"):slot>/build'], auth='user', type='http')
+    @route(['/runbot/batch/slot/<model("runbot.batch.slot"):slot>/build'], auth='user', type='http', methods=['POST'])
     def slot_create_build(self, slot=None, **kwargs):
-        build = slot.sudo()._create_missing_build()
-        return werkzeug.utils.redirect(f'/runbot/batch/{slot.batch_id.id}/build/{build.id}')
+        slot.sudo()._create_missing_build()
+        return ''
 
     @route([
         '/runbot/commit/<model("runbot.commit"):commit>',
@@ -225,7 +223,7 @@ class Runbot(Controller):
         }
         return request.render('runbot.commit', context)
 
-    @route(['/runbot/commit/resend/<int:status_id>'], website=True, auth='user', type='http')
+    @route(['/runbot/commit/resend/<int:status_id>'], auth='user', type='http', methods=['POST'])
     def resend_status(self, status_id=None, **kwargs):
         CommitStatus = request.env['runbot.commit.status']
         status = CommitStatus.browse(status_id)
@@ -240,7 +238,7 @@ class Runbot(Controller):
             new_status.description = 'Status resent by %s' % request.env.user.name
             new_status._send()
             _logger.info('github status %s resent by %s', status_id, request.env.user.name)
-        return werkzeug.utils.redirect('/runbot/commit/%s' % status.commit_id.id)
+        return ''
 
     @route([
         '/runbot/tree_hash/<string(minlength=6, maxlength=40):tree_hash>',
@@ -268,18 +266,22 @@ class Runbot(Controller):
 
     @route([
         '/runbot/build/<int:build_id>/<operation>',
-    ], type='http', auth="user", methods=['POST'], csrf=False)
-    def build_operations(self, build_id, operation, **post):
+    ], type='http', auth="user", methods=['POST'])
+    def build_operations(self, build_id, operation, location='', **post):
         build = request.env['runbot.build'].sudo().browse(build_id)
         build.check_access('read')
         if operation == 'rebuild':
-            build = build._rebuild()
+            new_build = build._rebuild()
+            # follow the new build when rebuilding from its own page
+            url = urlsplit(location)
+            if url.path.endswith(f'/build/{build.id}'):
+                path = url.path.removesuffix(f'/build/{build.id}') + f'/build/{new_build.id}'
+                return url._replace(path=path).geturl()
         elif operation == 'kill':
             build._ask_kill()
         elif operation == 'wakeup':
             build._wake_up()
-
-        return str(build.id)
+        return ''
 
     @route([
         '/runbot/build/<int:build_id>',
@@ -421,16 +423,13 @@ class Runbot(Controller):
         }
         return request.render(view_id if view_id else "runbot.monitoring", qctx)
 
-    @route(['/runbot/errors/assign/<int:build_error_id>',
-            ], type='http', auth='user', methods=['POST'], csrf=False, sitemap=False)
+    @route(['/runbot/error/<int:build_error_id>/assign',
+            ], type='http', auth='user', methods=['POST'], sitemap=False)
     def build_errors_assign(self, build_error_id=None, **kwargs):
         build_error = request.env['runbot.build.error'].browse(build_error_id)
-        if build_error.responsible:
-            return build_error.responsible.name
-        if request.env.user._is_internal():
+        if not build_error.responsible and request.env.user._is_internal():
             build_error.sudo().responsible = request.env.user
-            return request.env.user.name
-        return 'Error'
+        return ''
 
     @route(['/runbot/errors',
             '/runbot/errors/page/<int:page>',
@@ -676,13 +675,13 @@ class Runbot(Controller):
         _logger.info('Redirecting to %s', run_url)
         return werkzeug.utils.redirect(run_url)
 
-    @route(['/runbot/parse_log/<model("ir.logging"):ir_log>'], type='http', auth='user', sitemap=False)
+    @route(['/runbot/parse_log/<model("ir.logging"):ir_log>'], type='http', auth='user', methods=['POST'], sitemap=False)
     def parse_log(self, ir_log, **kwargs):
         request.env['runbot.build.error']._parse_logs(ir_log, update_tags=True)
-        return werkzeug.utils.redirect('/runbot/build/%s' % ir_log.build_id.id)
+        return ''
 
-    @route(['/runbot/bundle/<int:bundle_id>/triggers/<string:action>'], type='http', auth='user', sitemap=False)
-    def configure_bundle_triggers(self, bundle_id, action, expand_custom=False, **kwargs):
+    @route(['/runbot/bundle/<int:bundle_id>/triggers/<string:action>'], type='http', auth='user', methods=['POST'], sitemap=False)
+    def configure_bundle_triggers(self, bundle_id, action, **kwargs):
         if not request.env.user.has_group('runbot.group_user'):
             raise NotFound()
 
@@ -699,11 +698,9 @@ class Runbot(Controller):
             bundle.sudo()._configure_custom_trigger_start_mode('light')
         else:
             raise NotFound()
-        if expand_custom:
-            return werkzeug.utils.redirect(f'/runbot/bundle/{bundle_id}?expand_custom=1')
-        return werkzeug.utils.redirect(f'/runbot/bundle/{bundle_id}')
+        return ''
 
-    @route(['/runbot/bundle/<int:bundle_id>/toggle_freeze'], type='http', auth='user', sitemap=False)
+    @route(['/runbot/bundle/<int:bundle_id>/toggle_freeze'], type='http', auth='user', methods=['POST'], sitemap=False)
     def toggle_freeze_tag(self, bundle_id, **kwargs):
         if not request.env.user.has_group('runbot.group_freeze_leader'):
             raise Forbidden("Only Freeze Leaders can toggle the next freeze tag")
@@ -714,7 +711,7 @@ class Runbot(Controller):
             raise Forbidden("Base or Staging's bundle cannot be tagged")
         tag = bundle.project_id.next_freeze_tag_id
         if not tag:
-            return request.redirect(f'/runbot/bundle/{bundle.id}')
+            return ''
         msg = f"freeze {bundle.project_id.next_freeze_tag_id.name}"
         if tag in bundle.tag_ids:
             bundle.sudo().tag_ids -= tag
@@ -722,9 +719,9 @@ class Runbot(Controller):
         else:
             bundle.sudo().tag_ids |= tag
             bundle.sudo().with_context(mail_create_nosubscribe=True).message_post(body=f"Added to {msg}")
-        return request.redirect(f'/runbot/bundle/{bundle.id}')
+        return ''
 
-    @route(['/runbot/trigger_custom/<int:trigger_custom_id>/set_mode/<string:mode>'], type='http', auth='user', sitemap=False)
+    @route(['/runbot/trigger_custom/<int:trigger_custom_id>/set_mode/<string:mode>'], type='http', auth='user', methods=['POST'], sitemap=False)
     def configure_custom_trigger(self, trigger_custom_id, mode, **kwargs):
         if not request.env.user.has_group('runbot.group_user'):
             raise NotFound()
@@ -734,7 +731,7 @@ class Runbot(Controller):
             raise NotFound()
 
         trigger_custom.sudo().start_mode = mode
-        return werkzeug.utils.redirect(f'/runbot/bundle/{trigger_custom.bundle_id.id}?expand_custom=1')
+        return ''
 
     @route(['/runbot/trigger/report/<model("runbot.trigger"):trigger_id>'], type='http', auth='user', website=True, sitemap=False)
     def report_view(self, trigger_id=None, **kwargs):
