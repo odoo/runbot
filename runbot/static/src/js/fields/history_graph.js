@@ -85,6 +85,17 @@ export class HistoryGraph extends Component {
                 }
             });
         });
+        // events impacting errors: a thick line at the event time within its day, on the rows of the matching versions
+        ctx.fillStyle = "#0d6efd";
+        const eventLineWidth = Math.max(2, cellSize / 5);
+        this.getEventPositions(data).forEach(({ col, fraction, event }) => {
+            const posX = col * cellSize + canvasBorder + fraction * cellSize - eventLineWidth / 2;
+            data.versions_ids.forEach((version_id, idy) => {
+                if (event.version_ids.includes(version_id)) {
+                    ctx.fillRect(posX, idy * cellSize + canvasBorder, eventLineWidth, cellSize);
+                }
+            });
+        });
         if (mouseActions) {
             canvas.onmousemove = (event) => {
                 let tooltip = canvas.parentElement.querySelector(".history-graph-tooltip");
@@ -93,6 +104,9 @@ export class HistoryGraph extends Component {
                 }
 
                 const { col, row, value, dateLabel, versionLabel } = this.getCellFromEvent(event);
+                const cellEvents = this.getEventPositions(data).filter(
+                    (pos) => pos.col === col && pos.event.version_ids.includes(data.versions_ids[row])
+                );
 
                 if ( col >= 0 && row >= 0) {
                     tooltip = document.createElement("div");
@@ -111,6 +125,11 @@ export class HistoryGraph extends Component {
                         Version: ${versionLabel}
                         Value: ${value}
                     `;
+                    for (const { event: cellEvent } of cellEvents) {
+                        const eventLine = document.createElement("div");
+                        eventLine.textContent = `Event: ${cellEvent.date} ${cellEvent.name}`;
+                        tooltip.appendChild(eventLine);
+                    }
                     canvas.parentElement.appendChild(tooltip);
                     this.renderErrorGraph({ col, row }); // Re-render to highlight the active cell
                 } else {
@@ -134,6 +153,19 @@ export class HistoryGraph extends Component {
                 }
             };
         }
+    }
+
+    getEventPositions(data) {
+        // event dates are UTC "YYYY-MM-DD HH:MM:SS" strings, as the date labels
+        return (data.events || []).flatMap((event) => {
+            const col = data.date_labels.indexOf(event.date.slice(0, 10));
+            if (col === -1) {
+                return [];
+            }
+            const [hours, minutes, seconds] = event.date.slice(11).split(":").map(Number);
+            const fraction = (hours * 3600 + minutes * 60 + seconds) / 86400;
+            return [{ col, fraction, event }];
+        });
     }
 
     getCellFromEvent(event) {
