@@ -2,72 +2,74 @@
 <odoo>
   <data>
     <template id="runbot.build_error_cards">
-      <table class="table table-group table-layout-fixed caption-top text-body-tertiary">
-        <caption>
-          <div class="row">
-            <h2 class="col-12 col-md-auto">
-              <t t-out="table_title"/>
-              <span t-if="build_errors_counter" class="badge text-bg-primary fs-6 align-middle" t-out="build_errors_counter"/>
-              <button type="button" class="btn btn-sm btn-outline-primary" data-toggle="table-group-collapse"/>
-            </h2>
-            <div class="btn-toolbar col-12 col-md-auto ms-auto gap-2">
-              <t t-out="additional_buttons"/>
+      <data-table data-group="true">
+        <table class="table table-layout-fixed caption-top text-body-tertiary">
+          <caption>
+            <div class="row">
+              <h2 class="col-12 col-md-auto">
+                <t t-out="table_title"/>
+                <span t-if="build_errors_counter" class="badge text-bg-primary fs-6 align-middle" t-out="build_errors_counter"/>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-toggle="table-group-collapse"/>
+              </h2>
+              <div class="btn-toolbar col-12 col-md-auto ms-auto gap-2">
+                <t t-out="additional_buttons"/>
+              </div>
             </div>
-          </div>
-        </caption>
-        <colgroup>
-          <col/>
-          <col class="w-50"/>
-          <col class="w-25"/>
-          <col/>
-          <col/>
-        </colgroup>
-        <thead>
-          <tr>
-            <th>Last seen</th>
-            <th>Summary</th>
-            <th>Triggers</th>
-            <th>Assigned to</th>
-            <th/>
-          </tr>
-        </thead>
-        <t t-foreach="build_errors" t-as="build_error">
-          <tbody class="table-group-divider table-group-hidden">
+          </caption>
+          <colgroup>
+            <col/>
+            <col class="w-50"/>
+            <col class="w-25"/>
+            <col/>
+            <col/>
+          </colgroup>
+          <thead>
             <tr>
-              <td t-out="build_error.last_seen_date" t-options='{"widget": "datetime"}'/>
-              <th>
-                <code t-out="build_error.name"/>
-              </th>
-              <td>
-                <t t-foreach="build_error.trigger_ids" t-as="trigger">
-                  <span class="badge text-bg-info" t-out="trigger.name"/>
-                </t>
-              </td>
-              <td>
-                <t t-if="build_error.responsible" t-out="build_error.responsible.name"/>
-                <a t-else="" t-attf-href="/runbot/errors/assign/{{build_error.id}}" data-runbot="action" role="button" class="btn btn-primary btn-sm">Assign to me</a>
-              </td>
-              <td class="text-nowrap">
-                <a t-att-href="build_error.last_seen_build_id.build_url" t-attf-title="View last affected build ({{build_error.last_seen_build_id.id}})">
-                  <i class="fa fa-external-link"/>
-                </a>
-                <a groups="base.group_user" t-attf-href="/odoo/error/{{build_error.id}}" target="_blank" title="View in Backend">
-                  <span class="badge text-bg-info" t-out="build_error.build_count" t-attf-title="This error was seen {{build_error.build_count}} View in backend"/>
-                </a>
-                <span groups="!base.group_user" class="badge text-bg-info" t-out="build_error.build_count" t-attf-title="This error was seen {{build_error.build_count}}"/>
-                <span class="fa fa-random" t-if="build_error.random"/>
-              </td>
+              <th>Last seen</th>
+              <th>Summary</th>
+              <th>Triggers</th>
+              <th>Assigned to</th>
+              <th/>
             </tr>
-            <tr>
-              <td colspan="5">
-                <div class="overflow-x-auto">
-                    <pre class="bg-danger-subtle p-2" t-out="build_error.content.strip()"/>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </t>
-      </table>
+          </thead>
+          <t t-foreach="build_errors" t-as="build_error">
+            <tbody class="table-group-divider table-group-hidden">
+              <tr>
+                <td t-out="build_error.last_seen_date" t-options='{"widget": "datetime"}'/>
+                <th>
+                  <code t-out="build_error.name"/>
+                </th>
+                <td>
+                  <t t-foreach="build_error.trigger_ids" t-as="trigger">
+                    <span class="badge text-bg-info" t-out="trigger.name"/>
+                  </t>
+                </td>
+                <td>
+                  <t t-if="build_error.responsible" t-out="build_error.responsible.name"/>
+                  <a t-else="" t-attf-href="/runbot/errors/assign/{{build_error.id}}" data-runbot="action" role="button" class="btn btn-primary btn-sm">Assign to me</a>
+                </td>
+                <td class="text-nowrap">
+                  <a t-att-href="build_error.last_seen_build_id.build_url" t-attf-title="View last affected build ({{build_error.last_seen_build_id.id}})">
+                    <i class="fa fa-external-link"/>
+                  </a>
+                  <a groups="base.group_user" t-attf-href="/odoo/error/{{build_error.id}}" target="_blank" title="View in Backend">
+                    <span class="badge text-bg-info" t-out="build_error.build_count" t-attf-title="This error was seen {{build_error.build_count}} View in backend"/>
+                  </a>
+                  <span groups="!base.group_user" class="badge text-bg-info" t-out="build_error.build_count" t-attf-title="This error was seen {{build_error.build_count}}"/>
+                  <span class="fa fa-random" t-if="build_error.random"/>
+                </td>
+              </tr>
+              <tr>
+                <td colspan="5">
+                  <div class="overflow-x-auto">
+                      <pre class="bg-danger-subtle p-2" t-out="build_error.content.strip()"/>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </t>
+        </table>
+      </data-table>
     </template>
 
     <template id="runbot.build_error">
