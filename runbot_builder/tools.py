@@ -183,8 +183,7 @@ class RunbotClient():
                 continue  # the gc finalize will update it
             if time.time() - self.repo_update_times.get(repo.id, 0) < delay:
                 continue
-            self.env.cr.commit()  # avoid keeping a transaction open during the fetch
-            repo._update(force=True)
+            repo.with_context(commit_before_git=True)._update(force=True)
             self.repo_update_times[repo.id] = time.time()
             self.env.cr.commit()
 

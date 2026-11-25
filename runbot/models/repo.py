@@ -545,7 +545,11 @@ class Repo(models.Model):
         if input_data is not None and isinstance(input_data, str):
             input_data = input_data.encode('utf-8')
 
-        fetch_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_fetch_timeout', default=30))
+        fetch_timeout = None
+        if kill_slow and self.kill_slow_fetch:
+            fetch_timeout = int(self.env['ir.config_parameter'].get_param('runbot.runbot_fetch_timeout', default=30))
+        if self.env.context.get('commit_before_git'):
+            self.env.cr.commit()
         for i in range(3):  # retry in case of timeout
             if not quiet:
                 _logger.info("git command: %s", shlex.join(cmd))
@@ -556,7 +560,7 @@ class Repo(models.Model):
 
             while True:
                 try:
-                    output, _ = process.communicate(input=input_data, timeout=fetch_timeout if kill_slow and self.kill_slow_fetch else None)
+                    output, _ = process.communicate(input=input_data, timeout=fetch_timeout)
                     break
                 except subprocess.TimeoutExpired:
                     try:
