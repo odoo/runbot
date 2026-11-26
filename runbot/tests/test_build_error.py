@@ -1046,6 +1046,35 @@ class TestErrorMerge(TestBuildErrorCommon):
             self.assertEqual(len(error_contents), 10)
             self.assertEqual(len(error_contents.error_id), 10)
 
+    def test_possible_duplicates(self):
+        def create_content(content, project=self.project, canonical_tag=False):
+            metadata = {'test': {'canonical_tag': canonical_tag}} if canonical_tag else {}
+            return self.BuildErrorContent.create({'content': content, 'project_id': project.id, 'metadata': metadata})
+
+        record_error = create_content('Record 42 not found in table 0x7f3a2b').error_id
+        other_record_error = create_content('Record 1337 not found in table 0x7f9c11').error_id
+        test_error = create_content('UncaughtPromiseError', canonical_tag='/web/tests/test_ui.py:TestUi.test_tour').error_id
+        other_test_error = create_content('Tour failed', canonical_tag='/web/tests/test_ui.py:TestUi.test_tour').error_id
+        unrelated_error = create_content('Some unrelated error').error_id
+        other_project = self.env['runbot.project'].create({'name': 'Other'})
+        create_content('Record 7 not found in table 0x7f0000', project=other_project)
+        closed_error = create_content('Record 8 not found in table 0x7f0001').error_id
+        closed_error.active = False
+        self.assertEqual(len((record_error | other_record_error | test_error | other_test_error | unrelated_error | closed_error)), 6)
+
+        self.assertEqual(record_error._get_possible_duplicates(), other_record_error, "closed errors and other projects are ignored")
+        self.assertEqual(other_record_error._get_possible_duplicates(), record_error)
+        self.assertEqual(test_error._get_possible_duplicates(), other_test_error)
+        self.assertFalse(unrelated_error._get_possible_duplicates())
+        self.assertEqual(closed_error._get_possible_duplicates(), record_error | other_record_error)
+        self.assertEqual((record_error | test_error)._get_possible_duplicates(), other_record_error | other_test_error)
+        self.assertFalse((record_error | other_record_error)._get_possible_duplicates())
+
+        action = record_error.action_view_possible_duplicates()
+        self.assertEqual(action['domain'], [('id', 'in', (record_error | other_record_error).ids)])
+        action = unrelated_error.action_view_possible_duplicates()
+        self.assertEqual(action['tag'], 'display_notification')
+
     def test_error_content_multiple_canonical_tags(self):
         error_content_1 = self.env['runbot.build.error.content'].create({
             'content': 'Tour foobar_tour failed at step step_14 in mode mode',

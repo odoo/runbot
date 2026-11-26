@@ -16,6 +16,7 @@
               </div>
               <widget name="web_ribbon" title="Test-tags" bg_color="bg-danger" invisible="not test_tags"/>
               <button name="action_view_errors" string="See all linked errors" type="object" class="oe_highlight"/>
+              <button name="action_view_possible_duplicates" string="Find possible duplicates" type="object" class="ms-2"/>
               <group string="Base info">
                 <field name="name"/>
                 <field name="project_id" readonly="error_content_ids"/>

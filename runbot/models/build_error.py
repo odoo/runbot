@@ -776,6 +776,49 @@ class BuildError(models.Model):
             'name': 'Errors with same breaking PR',
         }
 
+    def _get_possible_duplicates(self):
+        """
+        Return the open errors of the same project as self sharing a canonical
+        tag or a message differing only by hashes, hexadecimal values and numbers.
+        """
+        if not self.ids:
+            return self.browse()
+        self.env['runbot.build.error.content'].flush_model(['error_id', 'project_id', 'canonical_tag', 'content', 'cleaned_content'])
+        self.flush_model(['active'])
+        self.env.cr.execute(SQL(r"""
+            WITH loose_content AS (
+                SELECT content.error_id, content.project_id, content.canonical_tag,
+                       regexp_replace(COALESCE(content.cleaned_content, content.content), '\y[0-9a-f]{7,}\y|0x[0-9a-fA-F]+|\d+', %s, 'g') AS message
+                  FROM runbot_build_error_content AS content
+                  JOIN runbot_build_error AS error ON error.id = content.error_id
+                 WHERE error.active OR error.id IN %s
+            )
+            SELECT DISTINCT other.error_id
+              FROM loose_content AS content
+              JOIN loose_content AS other
+                ON other.project_id = content.project_id
+               AND (other.canonical_tag = content.canonical_tag OR other.message = content.message)
+             WHERE content.error_id IN %s AND other.error_id NOT IN %s
+        """, '%', *[tuple(self.ids)] * 3))
+        return self.browse([error_id for error_id, in self.env.cr.fetchall()])
+
+    def action_view_possible_duplicates(self):
+        duplicates = self._get_possible_duplicates()
+        if not duplicates:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {'message': 'No possible duplicates found', 'type': 'info'},
+            }
+        return {
+            'type': 'ir.actions.act_window',
+            'views': [(False, 'list'), (False, 'form')],
+            'res_model': 'runbot.build.error',
+            'domain': [('id', 'in', (self | duplicates).ids)],
+            'context': {'active_test': False},
+            'name': 'Possible duplicates',
+        }
+
     @api.depends('manual_team_id', 'auto_team_id')
     def _compute_team_id(self):
         for error in self:

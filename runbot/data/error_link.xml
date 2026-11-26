@@ -9,6 +9,16 @@
             records.action_link_errors()
         </field>
     </record>
+    <record model="ir.actions.server" id="action_view_possible_duplicates">
+        <field name="name">Find possible duplicates</field>
+        <field name="model_id" ref="runbot.model_runbot_build_error" />
+        <field name="binding_model_id" ref="runbot.model_runbot_build_error" />
+        <field name="type">ir.actions.server</field>
+        <field name="state">code</field>
+        <field name="code">
+            action = records.action_view_possible_duplicates()
+        </field>
+    </record>
     <record model="ir.actions.server" id="action_link_build_errors_contents">
         <field name="name">Link build errors contents</field>
         <field name="model_id" ref="runbot.model_runbot_build_error_content" />
