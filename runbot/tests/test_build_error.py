@@ -828,6 +828,21 @@ class TestBuildError(TestBuildErrorCommon):
         self.assertEqual(website_team, teams._get_team('/data/build/odoo/addons/website_crm/tests/test_website_crm'))
         self.assertEqual(website_team, teams._get_team('/data/build/odoo/addons/website/tests/test_ui'))
 
+    def test_build_error_team_wildcards_precedence(self):
+        l10n_team = self.RunbotTeam.create({'name': 'l10n_test', 'path_glob': '*l10n_*'})
+        l10n_us_team = self.RunbotTeam.create({'name': 'l10n_us_test', 'path_glob': '*l10n_us*'})
+        l10n_be_team = self.RunbotTeam.create({'name': 'l10n_be_test', 'path_glob': '*/addons/l10n_be*'})
+        l10n_odoo_team = self.RunbotTeam.create({'name': 'l10n_odoo_test', 'path_glob': '/data/build/odoo/addons/l10n_*'})
+
+        for teams in (l10n_team | l10n_us_team | l10n_be_team | l10n_odoo_team, l10n_odoo_team | l10n_be_team | l10n_us_team | l10n_team):
+            # the longest wildcard wins
+            self.assertEqual(l10n_us_team, teams._get_team('/data/build/enterprise/l10n_us_reports/tests/test_ui.py'))
+            self.assertEqual(l10n_be_team, teams._get_team('/data/build/enterprise/l10n_be_reports/tests/test_ui.py'))
+            self.assertEqual(l10n_team, teams._get_team('/data/build/enterprise/l10n_fr_reports/tests/test_ui.py'))
+            # wildcards not starting with `*` win, even when shorter
+            self.assertEqual(l10n_odoo_team, teams._get_team('/data/build/odoo/addons/l10n_us/tests/test_ui.py'))
+            self.assertEqual(l10n_odoo_team, teams._get_team('/data/build/odoo/addons/l10n_be/tests/test_ui.py'))
+
     def test_build_error_team_ownership(self):
         website_team = self.RunbotTeam.create({
             'name': 'website_test',
