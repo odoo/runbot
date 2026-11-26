@@ -79,12 +79,18 @@ class RunbotTeam(models.Model):
         if module and (owner_team := self._get_team_from_module(module)):
             return owner_team
 
+        # Check the most specific wildcards first: those not starting with `*`, then the longest ones
+        candidates = []
         for team in self:
             if not team.path_glob:
                 continue
-            if any([fnmatch(file_path, pattern.strip().strip('-')) for pattern in team.path_glob.split(',') if pattern.strip().startswith('-')]):
+            patterns = [pattern.strip() for pattern in team.path_glob.split(',') if pattern.strip()]
+            if any(fnmatch(file_path, pattern[1:]) for pattern in patterns if pattern.startswith('-')):
                 continue
-            if any([fnmatch(file_path, pattern.strip()) for pattern in team.path_glob.split(',') if not pattern.strip().startswith('-')]):
+            candidates += [(pattern, team) for pattern in patterns if not pattern.startswith('-')]
+        candidates.sort(key=lambda candidate: (candidate[0].startswith('*'), -len(candidate[0])))
+        for pattern, team in candidates:
+            if fnmatch(file_path, pattern):
                 return team
         return False
 
