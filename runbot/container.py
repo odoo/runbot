@@ -18,6 +18,9 @@ import re
 import subprocess
 import time
 
+import requests
+import urllib3
+
 from odoo.tools import file_path
 
 USERNAME = getpass.getuser()
@@ -109,41 +112,55 @@ class Command():
         return res.read()
 
 
-def docker_build(build_dir, image_tag, pull=False, nocache=False):
-    return _docker_build(build_dir, image_tag, pull, nocache)
+def docker_build(build_dir, image_tag, pull=False, nocache=False, timeout=None):
+    return _docker_build(build_dir, image_tag, pull, nocache, timeout)
 
 
-def _docker_build(build_dir, image_tag, pull=False, nocache=False):
+def _docker_build(build_dir, image_tag, pull=False, nocache=False, timeout=None):
     """Build the docker image
     :param build_dir: the build directory that contains Dockerfile.
     :param image_tag: name used to tag the resulting docker image
     :param nocache: bypass Docker layer cache when True
+    :param timeout: max build duration in seconds (None means no limit)
     :return: dict
     """
 
     with DockerManager(image_tag) as dm:
         last_step = None
         dm.result['success'] = False  # waiting for an image_id
-        for chunk in dm.consume(dm.docker_client.api.build(path=build_dir, tag=image_tag, rm=True, pull=pull, nocache=nocache)):
-            if 'stream' in chunk:
-                stream = chunk['stream']
-                if stream.startswith('Step '):
-                    last_step = stream[:120] + '...'
-                    if dm.log_progress:
-                        _logger.info(last_step)
-                if not dm.log_progress and ('running in' in stream or dm.duration > 1):
-                    dm.log_progress = True
-                    _logger.info('Building dockerfile %s', image_tag)
-                    if last_step:
-                        _logger.info(last_step)
-                match = re.search(
-                    r'(^Successfully built |sha256:)([0-9a-f]+)$',
-                    chunk['stream'],
-                )
-                if match:
-                    dm.result['image_id'] = match.group(2)
-                    dm.result['success'] = True
+        timed_out = False
+        try:
+            for chunk in dm.consume(dm.docker_client.api.build(path=build_dir, tag=image_tag, rm=True, pull=pull, nocache=nocache, timeout=timeout)):
+                if 'stream' in chunk:
+                    stream = chunk['stream']
+                    if stream.startswith('Step '):
+                        last_step = stream[:120] + '...'
+                        if dm.log_progress:
+                            _logger.info(last_step)
+                    if not dm.log_progress and ('running in' in stream or dm.duration > 1):
+                        dm.log_progress = True
+                        _logger.info('Building dockerfile %s', image_tag)
+                        if last_step:
+                            _logger.info(last_step)
+                    match = re.search(
+                        r'(^Successfully built |sha256:)([0-9a-f]+)$',
+                        chunk['stream'],
+                    )
+                    if match:
+                        dm.result['image_id'] = match.group(2)
+                        dm.result['success'] = True
+                        break
+                if timeout and dm.duration > timeout:
+                    timed_out = True
                     break
+        except (requests.exceptions.Timeout, urllib3.exceptions.ReadTimeoutError):
+            timed_out = True
+        if timed_out:
+            dm.duration = time.time() - dm.start
+            _logger.warning('Docker build of %s timed out after %ss', image_tag, timeout)
+            dm.result['msg'] += f'\nDocker build timed out after {timeout}s\n'
+            dm.result['success'] = False
+            dm.docker_client.close()
         return dm.result
 
 

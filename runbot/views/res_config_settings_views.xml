@@ -115,6 +115,9 @@
                     <setting class="col-lg-12">
                       <field name="runbot_docker_registry_url"/>
                     </setting>
+                    <setting>
+                      <field name="runbot_docker_build_timeout"/>
+                    </setting>
                   </block>
                 </app>
               </xpath>
