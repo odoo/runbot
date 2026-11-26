@@ -4,7 +4,7 @@ import datetime
 import subprocess
 
 from odoo import models, fields, api
-from ..common import dt2time, s2human_long, pseudo_markdown, markdown_escape
+from ..common import CONFLICT_TREE_HASH, dt2time, s2human_long, pseudo_markdown, markdown_escape
 from .build import get_color_class, fa_results
 
 _logger = logging.getLogger(__name__)
@@ -389,6 +389,10 @@ class Batch(models.Model):
         if auto_rebase:
             for commit_link in self.commit_link_ids:
                 commit_link.commit_id = commit_link.commit_id._rebase_on(commit_link.base_commit_id)
+            conflicts = self.commit_link_ids.commit_id.filtered(lambda commit: commit.tree_hash == CONFLICT_TREE_HASH)
+            if conflicts:
+                self._warning('Cannot rebase %s, no build created', ', '.join(conflicts.mapped('dname')))
+                return
         commit_link_by_repos = {commit_link.commit_id.repo_id.id: commit_link for commit_link in self.commit_link_ids}
         base_commit_link_by_repos = {commit_link.commit_id.repo_id.id: commit_link for commit_link in self.base_reference_batch_id.commit_link_ids}
         if use_base_commits:

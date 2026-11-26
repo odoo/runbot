@@ -34,6 +34,7 @@ class TestCommitStatus(HttpCase):
 
         self.server_commit = self.env['runbot.commit'].create({
             'name': 'dfdfcfcf0000ffffffffffffffffffffffffffff',
+            'tree_hash': '0dfdfcfcf0000fffffffffffffffffffffffffff',
             'repo_id': self.repo_odoo.id
         })
 
