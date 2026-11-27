@@ -45,7 +45,6 @@ class Host(models.Model):
     nb_running = fields.Integer(compute='_compute_nb')
     last_exception = fields.Char('Last exception')
     exception_count = fields.Integer('Exception count')
-    psql_conn_count = fields.Integer('SQL connections count', default=0)
     host_message_ids = fields.One2many('runbot.host.message', 'host_id')
     build_ids = fields.One2many('runbot.build', compute='_compute_build_ids')
 
@@ -212,14 +211,6 @@ class Host(models.Model):
     def _get_running_max(self):
         icp = self.env['ir.config_parameter']
         return self.nb_run_slot or int(icp.get_param('runbot.runbot_running_max', default=5))
-
-    def _set_psql_conn_count(self):
-        _logger.info('Updating psql connection count...')
-        self.ensure_one()
-        with local_pgadmin_cursor() as local_cr:
-            local_cr.execute("SELECT sum(numbackends) FROM pg_stat_database;")
-            res = local_cr.fetchone()
-        self.psql_conn_count = res and res[0] or 0
 
     def _get_disk_usage(self):
         return shutil.disk_usage(self.env['runbot.runbot']._path())
