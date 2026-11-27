@@ -284,7 +284,7 @@ fi
 set -e
 touch /data/build/signals/end-{container_name}
 exit $TEST_EXIT_CODE
-"""  # TODO cleanup postgres remove var/run/postgresql condition
+"""
     run_cmd_repr = str(run_cmd)
     if len(run_cmd_repr) > 300:
         run_cmd_repr = run_cmd_repr[:250] + '...' + run_cmd_repr[-50:]
