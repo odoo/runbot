@@ -391,13 +391,13 @@ def docker_state(container_name, build_dir):
     except FileNotFoundError:
         return 'VOID'
     container_name = sanitize_container_name(container_name)
-    exist = os.path.exists(os.path.join(build_dir, 'signals/exist-%s' % container_name)) or os.path.exists(os.path.join(build_dir, 'exist-%s' % container_name))  # TODO cleanup outside signals
-    started = os.path.exists(os.path.join(build_dir, 'signals/start-%s' % container_name)) or os.path.exists(os.path.join(build_dir, 'start-%s' % container_name))  # TODO cleanup outside signals
+    exist = os.path.exists(os.path.join(build_dir, 'signals/exist-%s' % container_name))
+    started = os.path.exists(os.path.join(build_dir, 'signals/start-%s' % container_name))
 
     if not exist:
         return 'VOID'
 
-    if os.path.exists(os.path.join(build_dir, f'signals/end-{container_name}')) or os.path.exists(os.path.join(build_dir, 'end-%s' % container_name)):  # TODO cleanup outside signals
+    if os.path.exists(os.path.join(build_dir, f'signals/end-{container_name}')):
 
         return 'END'
 
@@ -410,7 +410,7 @@ def docker_state(container_name, build_dir):
             state = 'RUNNING' if container.status in ('created', 'running', 'paused') else 'GHOST'
         except docker.errors.NotFound:
             state = 'GHOST'
-        if state == 'GHOST' and (os.path.exists(os.path.join(build_dir, f'signals/end-{container_name}')) or os.path.exists(os.path.join(build_dir, 'end-%s' % container_name))):  # TODO cleanup outside signals
+        if state == 'GHOST' and os.path.exists(os.path.join(build_dir, f'signals/end-{container_name}')):
             state = 'END'
     return state
 
@@ -428,12 +428,6 @@ def docker_run_time(container_name, build_dir):
 def docker_clear_state(container_name, build_dir):
     """Return True if container is still running"""
     container_name = sanitize_container_name(container_name)
-    if os.path.exists(os.path.join(build_dir, 'start-%s' % container_name)):  # TODO cleanup outside signals
-        os.remove(os.path.join(build_dir, 'start-%s' % container_name))  # TODO cleanup outside signals
-    if os.path.exists(os.path.join(build_dir, 'end-%s' % container_name)):  # TODO cleanup outside signals
-        os.remove(os.path.join(build_dir, 'end-%s' % container_name))  # TODO cleanup outside signals
-    if os.path.exists(os.path.join(build_dir, 'exist-%s' % container_name)):  # TODO cleanup outside signals
-        os.remove(os.path.join(build_dir, 'exist-%s' % container_name))  # TODO cleanup outside signals
     if os.path.exists(os.path.join(build_dir, 'signals/start-%s' % container_name)):
         os.remove(os.path.join(build_dir, 'signals/start-%s' % container_name))
     if os.path.exists(os.path.join(build_dir, 'signals/end-%s' % container_name)):
