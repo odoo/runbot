@@ -11,7 +11,7 @@ from docker.errors import ImageNotFound
 
 from odoo import models, fields, api
 from odoo.tools import config, ormcache
-from ..common import fqdn, local_pgadmin_cursor, os, list_local_dbs, local_pg_cursor
+from ..common import fqdn, os
 from ..container import docker_push, docker_pull, docker_prune, docker_images, docker_remove, docker_tag
 
 _logger = logging.getLogger(__name__)
@@ -45,7 +45,6 @@ class Host(models.Model):
     nb_running = fields.Integer(compute='_compute_nb')
     last_exception = fields.Char('Last exception')
     exception_count = fields.Integer('Exception count')
-    psql_conn_count = fields.Integer('SQL connections count', default=0)
     host_message_ids = fields.One2many('runbot.host.message', 'host_id')
     build_ids = fields.One2many('runbot.build', compute='_compute_build_ids')
 
@@ -65,7 +64,6 @@ class Host(models.Model):
     cpu_count = fields.Integer('CPU count', default=0)
     memory = fields.Integer('Memory (GiB)', help="Host Total memory (GiB)", default=0)
     os_version = fields.Char('OS Version')
-    psql_version = fields.Char('PSQL Version')
     disk_size = fields.Integer('Disk Size (GiB)', help="Runbot Partition Size", default=0)
     disk_used = fields.Integer('Disk Used (GiB)', help="Runbot Partition Used Space", default=0)
     disk_usage = fields.Char('Disk Usage', compute='_compute_disk_usage')
@@ -109,64 +107,9 @@ class Host(models.Model):
                 vals['disp_name'] = vals['name']
         return super().create(vals_list)
 
-    def _bootstrap_local_logs_db(self):
-        # TODO cleanup remove
-        """ bootstrap a local database that will collect logs from builds """
-        logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
-        if logs_db_name not in list_local_dbs():
-            _logger.info('Logging database %s not found. Creating it ...', logs_db_name)
-            with local_pgadmin_cursor() as local_cr:
-                local_cr.execute(f"""CREATE DATABASE "{logs_db_name}" TEMPLATE template0 LC_COLLATE 'C' ENCODING 'unicode'""")
-            try:
-                with local_pg_cursor(logs_db_name) as local_cr:
-                    # create_date, type, dbname, name, level, message, path, line, func
-                    local_cr.execute("""CREATE TABLE ir_logging (
-                        id bigserial NOT NULL,
-                        create_date timestamp without time zone,
-                        name character varying NOT NULL,
-                        level character varying,
-                        dbname character varying,
-                        func character varying NOT NULL,
-                        path character varying NOT NULL,
-                        line character varying NOT NULL,
-                        type character varying NOT NULL,
-                        metadata jsonb,
-                        message text NOT NULL);
-                    """)
-            except Exception as e:
-                _logger.exception('Failed to create local logs database: %s', e)
-        else:
-            # TODO cleanup remove in 20.0
-            with local_pg_cursor(logs_db_name) as local_cr:
-                local_cr.execute("""SELECT 1
-                FROM information_schema.columns
-                WHERE table_name='ir_logging' and column_name='metadata'""")
-                if not local_cr.fetchone():
-                    _logger.info('Adding metadata column to ir_logging table')
-                    local_cr.execute("""ALTER TABLE ir_logging ADD COLUMN metadata jsonb""")
-
-
-    def _bootstrap_db_template(self):
-        """ boostrap template database if needed """
-        icp = self.env['ir.config_parameter']
-        db_template = icp.get_param('runbot.runbot_db_template', default='template0')
-        if db_template and db_template != 'template0':
-            with local_pgadmin_cursor() as local_cr:
-                local_cr.execute("""SELECT datname FROM pg_catalog.pg_database WHERE datname = '%s';""" % db_template)
-                res = local_cr.fetchone()
-                if not res:
-                    local_cr.execute("""CREATE DATABASE "%s" TEMPLATE template0 LC_COLLATE 'C' ENCODING 'unicode'""" % db_template)
-                    # TODO UPDATE pg_database set datallowconn = false, datistemplate = true (but not enough privileges)
-
     def _bootstrap(self):
-        """ Create needed directories in static """
-        dirs = ['build', 'nginx', 'repo', 'sources', 'src', 'docker']
-        static_path = self.env['runbot.runbot']._root()
-        static_dirs = {d: self.env['runbot.runbot']._path(d) for d in dirs}
-        for dir, path in static_dirs.items():
-            os.makedirs(path, exist_ok=True)
-        self._bootstrap_db_template()
-        self._bootstrap_local_logs_db()
+        for dir in ['build', 'nginx', 'repo', 'sources', 'src', 'docker']:
+            os.makedirs(self.env['runbot.runbot']._path(dir), exist_ok=True)
 
     def _get_docker_registry_url(self):
         if self.docker_registry_url:
@@ -268,14 +211,6 @@ class Host(models.Model):
         icp = self.env['ir.config_parameter']
         return self.nb_run_slot or int(icp.get_param('runbot.runbot_running_max', default=5))
 
-    def _set_psql_conn_count(self):
-        _logger.info('Updating psql connection count...')
-        self.ensure_one()
-        with local_pgadmin_cursor() as local_cr:
-            local_cr.execute("SELECT sum(numbackends) FROM pg_stat_database;")
-            res = local_cr.fetchone()
-        self.psql_conn_count = res and res[0] or 0
-
     def _get_disk_usage(self):
         return shutil.disk_usage(self.env['runbot.runbot']._path())
 
@@ -284,10 +219,6 @@ class Host(models.Model):
         self.cpu_count = psutil.cpu_count() or 0
         self.memory = round(psutil.virtual_memory().total / (1024**3))
         self.os_version = platform.freedesktop_os_release().get('PRETTY_NAME', False)
-        with local_pgadmin_cursor() as local_cr:
-            local_cr.execute("SELECT version();")
-            res = local_cr.fetchone()
-        self.psql_version = res[0].split()[1] if res else False
         self.disk_size = round(self._get_disk_usage().total / 1024**3)
 
     def _total_testing(self):
@@ -305,8 +236,8 @@ class Host(models.Model):
         if nb_reserved < (nb_hosts / 2):
             self.assigned_only = True
 
-    def _fetch_local_logs(self, builds=None):
-        res = []
+    def _fetch_local_logs(self, builds):
+        res = defaultdict(list)
         cleanups = []
         for build in builds:
             if build._is_file('odoo_log.seek'):
@@ -338,7 +269,7 @@ class Host(models.Model):
                                 log_data['message'] = f'{log_data["message"]}\n{json_log["exc_info"]}'
 
                             new_seek = f.tell()
-                            res.append(log_data)
+                            res[build.id].append(log_data)
                         except (KeyError, json.JSONDecodeError):
                             _logger.exception('Failed to parse log line:')
                             break
@@ -347,65 +278,17 @@ class Host(models.Model):
                     def cleanup(build=build, new_seek=new_seek):
                         build._write_file('odoo_log.seek', str(new_seek))
                     cleanups.append(cleanup)
-                continue
-
-            # TODO cleanup remove
-            log_to_delete = []
-            build_ids = build.ids
-            logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
-            with local_pg_cursor(logs_db_name) as local_cr:
-                where_clause = "WHERE split_part(dbname, '-', 1) IN %s" if build_ids else ''
-                query = f"""
-                        SELECT *
-                        FROM (
-                                SELECT id, create_date, name, level, dbname, func, path, line, type, message, metadata
-                                FROM ir_logging
-                                )
-                            AS ir_logs
-                        {where_clause}
-                    ORDER BY id
-                    LIMIT 10000
-                    """
-                build_ids = [tuple(str(build) for build in build_ids)]
-                local_cr.execute(query, build_ids)
-                col_names = [col.name for col in local_cr.description]
-                for row in local_cr.fetchall():
-                    vals = dict(zip(col_names, row))
-                    res.append(vals)
-                    log_to_delete.append(int(vals.pop('id')))
-            if log_to_delete:
-                def cleanup(log_to_delete=log_to_delete):
-                    logs_db_name = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
-                    with local_pg_cursor(logs_db_name) as local_cr:
-                        local_cr.execute("DELETE FROM ir_logging WHERE id in %s", [tuple(log_to_delete)])
-                cleanups.append(cleanup)
 
         return res, cleanups
 
     def _process_logs(self, testing_builds):
         """move logs from host to the leader"""
-        ir_logs, cleanups = self._fetch_local_logs(testing_builds)
-        logs_by_build_id = defaultdict(list)
-
-        local_log_ids = []
-        for log in ir_logs:
-            if not log.get('build_id'):  # TODO cleanup remove condition, not needed once using only json log
-                try:
-                    log['build_id'] = int(log['dbname'].split('-', maxsplit=1)[0])
-                except (ValueError, AttributeError, KeyError):
-                    if log.get('id'):
-                        local_log_ids.append(log['id'])  # TODO cleanup remove not needed once using only json log
-            if log.get('build_id'):
-                logs_by_build_id[log['build_id']].append(log)
-
+        logs_by_build_id, cleanups = self._fetch_local_logs(testing_builds)
         logs_to_send = []
         for build in testing_builds:
             log_counter = build.log_counter
-            build_logs = logs_by_build_id[build.id]
+            build_logs = logs_by_build_id.get(build.id, [])
             for ir_log in build_logs:
-                if 'id' in ir_log:  # TODO cleanup
-                    local_log_ids.append(ir_log['id'])
-                ir_log['type'] = 'server'
                 log_counter -= 1
                 if log_counter == 0:
                     ir_log['level'] = 'SEPARATOR'
@@ -418,7 +301,6 @@ class Host(models.Model):
                     if len(ir_log['message']) > 10000:
                         ir_log['message'] = ir_log['message'][:10000] + "\n ...<message too long, truncated>"
 
-                ir_log['build_id'] = build.id
                 logs_to_send.append(ir_log)
             build.log_counter = log_counter
 

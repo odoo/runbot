@@ -31,6 +31,8 @@ from ..common import (
 from ..container import Command, docker_get_gateway_ip
 from .build_job import current_job_id
 
+DB_TEMPLATE = 'template_runbot'  # created in docker_files/postgres/start_postgres.sh
+
 # There is an issue in unidiff 0.7.3 fixed in 0.7.4
 # https://github.com/matiasb/python-unidiff/commit/a3faffc54e5aacaee3ded4565c534482d5cc3465
 # Since the unidiff packaged version in noble is 0.7.3
@@ -479,7 +481,7 @@ class ConfigStep(models.Model):
     sub_command = fields.Char('Subcommand', tracking=True)
     extra_params = fields.Char('Extra cmd args', tracking=True)
     additionnal_env = fields.Char('Extra env', help='Example: foo=bar;bar=foo. Cannot contains \' ', tracking=True)
-    enable_log_db = fields.Boolean("Enable log db", default=True)
+    collect_logs = fields.Boolean("Collect logs", default=True, help="Send the server logs of the build to the main runbot database")
     demo_mode = fields.Selection(
         [('default', 'Default'), ('without_demo', 'Without Demo'), ('with_demo', 'With Demo')],
         "Install demo data", default='default', tracking=True, required=True,
@@ -512,7 +514,6 @@ class ConfigStep(models.Model):
 
     restore_download_db_suffix = fields.Char('Download db suffix')
     restore_rename_db_suffix = fields.Char('Rename db suffix')
-    restore_cluster = fields.Boolean('Restore the cluster if available', default=True)
     export_database = fields.Boolean('Export database after install', default=True)
     needs_postgres = fields.Boolean('Needs postgres', default=True)
 
@@ -754,7 +755,7 @@ class ConfigStep(models.Model):
 
         build._logger('Start running build')
         # run server
-        cmd = build._cmd(local_only=False, enable_log_db=self.enable_log_db)
+        cmd = build._cmd(local_only=False, collect_logs=self.collect_logs)
 
         available_options = build._parse_config()
 
@@ -786,9 +787,7 @@ class ConfigStep(models.Model):
                 cmd += ['--smtp', smtp_host]
 
         if "--db-template" in available_options:
-            icp = self.env['ir.config_parameter']
-            db_template = icp.get_param('runbot.runbot_db_template', default='template0')
-            cmd += ['--db-template', db_template]
+            cmd += ['--db-template', DB_TEMPLATE]
 
         extra_params = self.extra_params or ''
         if extra_params:
@@ -826,7 +825,7 @@ class ConfigStep(models.Model):
             python_params += self._coverage_params(build, config_data)
         elif self.flamegraph:
             python_params = ['-m', 'flamegraph', '-o', self._perfs_data_path(build)]
-        cmd = build._cmd(python_params, py_version, sub_command=self.sub_command, enable_log_db=self.enable_log_db)
+        cmd = build._cmd(python_params, py_version, sub_command=self.sub_command, collect_logs=self.collect_logs)
         # create db if needed
         db_suffix = config_data.get('db_name') or ((build.params_id.restore_db_suffix or build.params_id.dump_db.db_suffix) if not self.create_db else False) or self._get_db_name(build)
         db_suffix = re.sub(r'[^a-z0-9\-_]', '_', db_suffix.lower())
@@ -880,9 +879,7 @@ class ConfigStep(models.Model):
             cmd.add_config_tuple('screenshots', '/data/build/tests')
 
         if "--db-template" in available_options:
-            icp = self.env['ir.config_parameter']
-            db_template = icp.get_param('runbot.runbot_db_template', default='template0')
-            cmd.add_config_tuple('db_template', db_template)
+            cmd.add_config_tuple('db_template', DB_TEMPLATE)
 
         if "--screencasts" in available_options and (self.env['ir.config_parameter'].sudo().get_param('runbot.enable_screencast', False) or config_data.get('screencast', False)):
             cmd.add_config_tuple('screencasts', '/data/build/tests')
@@ -1168,7 +1165,7 @@ class ConfigStep(models.Model):
         db_suffix = build.params_id.config_data.get('db_name') or build.params_id.restore_db_suffix or build.params_id.dump_db.db_suffix
         migrate_db_name = '%s-%s' % (build.dest, db_suffix)  # only ok if restore does not force db_suffix
 
-        migrate_cmd = build._cmd(enable_log_db=self.enable_log_db)
+        migrate_cmd = build._cmd(collect_logs=self.collect_logs)
         migrate_cmd += ['-u', 'all']
         migrate_cmd += ['-d', migrate_db_name]
         migrate_cmd += ['--stop-after-init']
@@ -1253,12 +1250,10 @@ class ConfigStep(models.Model):
             zip_name = f'{download_db_name}.zip'
             dump_url = f'{reference_build._http_log_url()}{zip_name}'
             use_backup = False
-            use_host_postgres = config_data.get('use_host_postgres', docker_file.use_host_postgres)
-            if config_data.get('restore_cluster', self.restore_cluster) and not use_host_postgres:   # TODO cleanup postgres remove
-                cluster_url = dump_url.replace('.zip', '-cluster.tar.zstd')
-                if not _url_exists(cluster_url):  # TODO remove check once all dumps have a cluster zip
-                    build._log('', 'Using dump url, [no cluster](%s) was found', cluster_url, log_type='markdown')
-                    cluster_url = None
+            cluster_url = dump_url.replace('.zip', '-cluster.tar.zstd')
+            if not _url_exists(cluster_url):  # TODO cleanup the zip restore once all dumps and backups have a cluster
+                build._log('', 'Using dump url, [no cluster](%s) was found', cluster_url, log_type='markdown')
+                cluster_url = None
 
             if not cluster_url and reference_build.trigger_id.backup_databases and not _url_exists(dump_url):
                 for backup_host in self.env['runbot.host'].search([('is_backup', '=', True)]):
@@ -1279,8 +1274,6 @@ class ConfigStep(models.Model):
         target_suffix = build.params_id.restore_db_suffix or default_target_suffix
         restore_db_name = '%s-%s' % (build.dest, target_suffix)
 
-        icp = self.env['ir.config_parameter']
-        db_template = icp.get_param('runbot.runbot_db_template', default='template0')
         self.env['runbot.database'].create({'name': restore_db_name, 'build_id': build.id})
         env_variables = []
         if cluster_url:
@@ -1302,7 +1295,7 @@ class ConfigStep(models.Model):
                 'mkdir -p /data/build/datadir/filestore/%s' % restore_db_name,
                 'mv filestore/* /data/build/datadir/filestore/%s' % restore_db_name,
                 echo('### restoring db'),
-                'createdb %s -T %s' % (restore_db_name, db_template),
+                'createdb %s -T %s' % (restore_db_name, DB_TEMPLATE),
                 'psql -q %s < dump.sql' % (restore_db_name),
                 echo('### cleaning'),
                 'cd /data/build',
@@ -1318,24 +1311,17 @@ class ConfigStep(models.Model):
         return dict(cmd=' && '.join(cmd), network_enabled=True, env_variables=env_variables, image_tag=docker_file.image_tag)
 
     def _run_upgrade_cluster(self, build, config_data=None):
-        if config_data:
-            config_data = {**config_data, **build.params_id.config_data}
-        else:
-            config_data = build.params_id.config_data
         """Allows to restore a zipped database to upgrade it in another cluster, mostly needed if a build uses multiple docker"""
         # Keep it simple for now: restore the first database of this build. This is mostly to upgrade a restored database from one cluster to another
         from_docker_file = build.params_id.upgrade_from_build_id.params_id.dockerfile_id
         to_docker_file = build.params_id.dockerfile_id
-        db_template = self.env['ir.config_parameter'].get_param('runbot.runbot_db_template', default='template0')
 
-        from_docker_file_use_host_postgres = config_data.get('use_host_postgres', from_docker_file.use_host_postgres)
-        to_docker_file_use_host_postgres = config_data.get('use_host_postgres', to_docker_file.use_host_postgres)
-        if from_docker_file != to_docker_file and (not to_docker_file_use_host_postgres or not from_docker_file_use_host_postgres):
+        if from_docker_file != to_docker_file:
             db_name = build.database_ids[0].name
             cmd = ' && '.join([
                 f'cd /data/build/logs/{db_name}',
                 echo('### restoring db'),
-                'createdb %s -T %s' % (db_name, db_template),
+                'createdb %s -T %s' % (db_name, DB_TEMPLATE),
                 'psql -q %s < dump.sql' % (db_name),
                 echo('### performing an analyze'),
                 'psql -q -d %s -c "ANALYZE;"' % db_name,

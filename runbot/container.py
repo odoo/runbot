@@ -236,9 +236,8 @@ def docker_run(*args, **kwargs):
     return _docker_run(*args, **kwargs)
 
 
-def _docker_run(cmd=False, use_host_postgres=False, log_path=False, build_dir=False, container_name=False, image_tag=False, exposed_ports=None, cpu_limit=None, cpu_period=100000, cpus=0, memory=None, shm_size='128m', preexec_fn=None, ro_volumes=None, env_variables=None, network_enabled=False):
+def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False, image_tag=False, exposed_ports=None, cpu_limit=None, cpu_period=100000, cpus=0, memory=None, shm_size='128m', preexec_fn=None, ro_volumes=None, env_variables=None, network_enabled=False):
     """Run tests in a docker container
-    :params use_host_postgres: # TODO cleanup postgres remove
     :param run_cmd: command string to run in container
     :param log_path: path to the logfile that will contain odoo stdout and stderr
     :param build_dir: the build directory that contains the Odoo sources to build.
@@ -284,7 +283,7 @@ fi
 set -e
 touch /data/build/signals/end-{container_name}
 exit $TEST_EXIT_CODE
-"""  # TODO cleanup postgres remove var/run/postgresql condition
+"""
     run_cmd_repr = str(run_cmd)
     if len(run_cmd_repr) > 300:
         run_cmd_repr = run_cmd_repr[:250] + '...' + run_cmd_repr[-50:]
@@ -307,8 +306,6 @@ exit $TEST_EXIT_CODE
         f'{build_dir}': {'bind': '/data/build', 'mode': 'rw'},
         f'{log_path}': {'bind': '/data/buildlogs.txt', 'mode': 'rw'},
     }
-    if use_host_postgres:  # TODO cleanup postgres remove
-        volumes['/var/run/postgresql'] = {'bind': '/var/run/postgresql', 'mode': 'rw'}
 
     if ro_volumes:
         for dest, source in ro_volumes.items():
@@ -391,13 +388,13 @@ def docker_state(container_name, build_dir):
     except FileNotFoundError:
         return 'VOID'
     container_name = sanitize_container_name(container_name)
-    exist = os.path.exists(os.path.join(build_dir, 'signals/exist-%s' % container_name)) or os.path.exists(os.path.join(build_dir, 'exist-%s' % container_name))  # TODO cleanup outside signals
-    started = os.path.exists(os.path.join(build_dir, 'signals/start-%s' % container_name)) or os.path.exists(os.path.join(build_dir, 'start-%s' % container_name))  # TODO cleanup outside signals
+    exist = os.path.exists(os.path.join(build_dir, 'signals/exist-%s' % container_name))
+    started = os.path.exists(os.path.join(build_dir, 'signals/start-%s' % container_name))
 
     if not exist:
         return 'VOID'
 
-    if os.path.exists(os.path.join(build_dir, f'signals/end-{container_name}')) or os.path.exists(os.path.join(build_dir, 'end-%s' % container_name)):  # TODO cleanup outside signals
+    if os.path.exists(os.path.join(build_dir, f'signals/end-{container_name}')):
 
         return 'END'
 
@@ -410,7 +407,7 @@ def docker_state(container_name, build_dir):
             state = 'RUNNING' if container.status in ('created', 'running', 'paused') else 'GHOST'
         except docker.errors.NotFound:
             state = 'GHOST'
-        if state == 'GHOST' and (os.path.exists(os.path.join(build_dir, f'signals/end-{container_name}')) or os.path.exists(os.path.join(build_dir, 'end-%s' % container_name))):  # TODO cleanup outside signals
+        if state == 'GHOST' and os.path.exists(os.path.join(build_dir, f'signals/end-{container_name}')):
             state = 'END'
     return state
 
@@ -428,12 +425,6 @@ def docker_run_time(container_name, build_dir):
 def docker_clear_state(container_name, build_dir):
     """Return True if container is still running"""
     container_name = sanitize_container_name(container_name)
-    if os.path.exists(os.path.join(build_dir, 'start-%s' % container_name)):  # TODO cleanup outside signals
-        os.remove(os.path.join(build_dir, 'start-%s' % container_name))  # TODO cleanup outside signals
-    if os.path.exists(os.path.join(build_dir, 'end-%s' % container_name)):  # TODO cleanup outside signals
-        os.remove(os.path.join(build_dir, 'end-%s' % container_name))  # TODO cleanup outside signals
-    if os.path.exists(os.path.join(build_dir, 'exist-%s' % container_name)):  # TODO cleanup outside signals
-        os.remove(os.path.join(build_dir, 'exist-%s' % container_name))  # TODO cleanup outside signals
     if os.path.exists(os.path.join(build_dir, 'signals/start-%s' % container_name)):
         os.remove(os.path.join(build_dir, 'signals/start-%s' % container_name))
     if os.path.exists(os.path.join(build_dir, 'signals/end-%s' % container_name)):

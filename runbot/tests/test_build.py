@@ -395,7 +395,7 @@ class TestBuildResult(RunbotCase):
         self.assertEqual(modules_to_test, sorted(['other_mod_2']))
 
     def test_build_cmd_log_config(self):
-        """ test that the log_db parameter is set in the .odoorc file """
+        """ test that the log_config parameter is set in the .odoorc file """
         build = self.Build.create({
             'params_id': self.server_params.id,
         })
@@ -403,7 +403,7 @@ class TestBuildResult(RunbotCase):
         self.assertIn('log_config = /data/build/logconfig.json', cmd.get_config())
 
     def test_build_cmd_custom_pre_post(self):
-        """ test that the log_db parameter is set in the .odoorc file """
+        """ test that the log_config parameter is set in the .odoorc file """
         custom_pre = ['pip install something:someversion'.split()]
         custom_post = ["psql -l > database list".split()]
         self.server_params.config_data = {
@@ -493,18 +493,10 @@ class TestBuildResult(RunbotCase):
         child_delta = fields.Datetime.from_string(child_build.gc_date) - datetime.datetime.now()
         self.assertEqual(child_delta.days, 24)
 
-        # test the real _local_cleanup method
-        self.patcher_objects['_local_cleanup_patcher'].stop()
-        self.start_patcher('build_local_pgadmin_cursor_patcher', 'odoo.addons.runbot.models.build.local_pgadmin_cursor')
-        self.start_patcher('build_path_patcher', 'odoo.addons.runbot.models.build.Path')
-        dbname = '%s-foobar' % build.dest
-        self.start_patcher('list_local_dbs_patcher', 'odoo.addons.runbot.models.build.list_local_dbs', return_value=[dbname])
-
-        build._local_cleanup()
-        self.assertFalse(self.patchers['_local_pg_dropdb_patcher'].called)
+        # test the gc filter used by _local_cleanup
+        self.assertEqual(list(build._filter_to_clean([build.dest], label='workspace')), [])
         build.job_end = datetime.datetime.now() - datetime.timedelta(days=31)
-        build._local_cleanup()
-        self.patchers['_local_pg_dropdb_patcher'].assert_called_with(dbname)
+        self.assertEqual(list(build._filter_to_clean([build.dest], label='workspace')), [build.dest])
 
     @patch('odoo.addons.runbot.models.build._logger')
     def test_build_skip(self, mock_logger):

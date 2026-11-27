@@ -94,7 +94,7 @@
                     <group string="Extra Parameters" invisible="job_type not in ('python', 'install_odoo', 'test_upgrade', 'run_odoo', 'dynamic')">
                         <field name="extra_params"/>
                         <field name="additionnal_env"/>
-                        <field name="enable_log_db"/>
+                        <field name="collect_logs"/>
                     </group>
                     <group string="Create settings" invisible="job_type not in ('python', 'create_build', 'dynamic')">
                         <field name="create_config_ids" widget="many2many_tags" options="{'no_create': True}" />
@@ -126,7 +126,6 @@
                     <group string="Restore settings" invisible="job_type != 'restore'">
                         <field name="restore_download_db_suffix"/>
                         <field name="restore_rename_db_suffix"/>
-                        <field name="restore_cluster"/>
                     </group>
 
                     <group string="Codeowner settings" invisible="job_type not in ('codeowner', 'python', 'dynamic')">

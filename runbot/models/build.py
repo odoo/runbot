@@ -28,8 +28,6 @@ from ..common import (
     dest_reg,
     dt2time,
     findall,
-    list_local_dbs,
-    local_pgadmin_cursor,
     markdown_escape,
     now,
     os,
@@ -899,14 +897,12 @@ class BuildResult(models.Model):
     def _filter_to_clean(self, dest_list, label):
         dest_by_builds_ids = defaultdict(list)
         ignored = set()
-        icp = self.env['ir.config_parameter']
-        hide_in_logs = icp.get_param('runbot.runbot_db_template', default='template0')
 
         for dest in dest_list:
             build = self._build_from_dest(dest)
             if build:
                 dest_by_builds_ids[build.id].append(dest)
-            elif dest != hide_in_logs:
+            else:
                 ignored.add(dest)
         if ignored:
             _logger.info('%s (%s) not deleted because not dest format', label, list(ignored))
@@ -926,12 +922,11 @@ class BuildResult(models.Model):
 
     def _local_cleanup(self, force=False, full=False):
         """
-        Remove datadir and drop databases of build older than db_gc_days or db_gc_days_child.
+        Remove build directories of build older than db_gc_days or db_gc_days_child.
         If force is set to True, does the same cleaning based on recordset without checking build age.
         """
         _logger.info('Local cleaning')
         _filter = self._filter_to_clean
-        additionnal_conditions = []
 
         if force is True:
             def filter_ids(dest_list, label):
@@ -942,16 +937,6 @@ class BuildResult(models.Model):
                     elif not build:
                         _logger.info('%s (%s) skipped because not dest format', label, dest)
             _filter = filter_ids
-            for _id in self.exists().ids:
-                additionnal_conditions.append("datname like '%s-%%'" % _id)
-
-        # TODO cleanup remove
-        log_db = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
-        existing_db = [db for db in list_local_dbs(additionnal_conditions=additionnal_conditions) if db != log_db]  # TODO cleanup remove
-
-        for db in _filter(dest_list=existing_db, label='db'):
-            self._logger('Removing database')
-            self._local_pg_dropdb(db)
 
         builds_dir = Path(self.env['runbot.runbot']._root()) / 'build'
         if force:
@@ -1319,13 +1304,10 @@ class BuildResult(models.Model):
             env_variables.append('PGDATA=')
 
         self.cpu_limit = kwargs.get('cpu_limit')
-        docker_file = self.env['runbot.dockerfile'].search([('image_tag', '=', kwargs['image_tag'].split('.')[0])], limit=1)    # TODO cleanup postgres remove
-        use_host_postgres = self.params_id.config_data.get('use_host_postgres', docker_file and docker_file.use_host_postgres)
 
         def start_docker():
             docker_run(
                 cmd=cmd,
-                use_host_postgres=use_host_postgres,    # TODO cleanup postgres remove
                 container_name=container_name,
                 build_dir=build_dir,
                 log_path=log_path,
@@ -1436,20 +1418,6 @@ class BuildResult(models.Model):
     def _get_dependant_modules(self, modules, depth=None):
         _, dependant_graph = self._dependency_graph()
         return self.search_modules_graph(modules, dependant_graph, depth)
-
-    def _local_pg_dropdb(self, dbname):
-        msg = ''
-        try:
-            with local_pgadmin_cursor() as local_cr:
-                query = 'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=%s'
-                local_cr.execute(query, [dbname])
-                local_cr.execute('SET statement_timeout=10000')  # avoid to be stuck if the dropdb is locked
-                local_cr.execute('DROP DATABASE IF EXISTS "%s"' % dbname)
-        except Exception as e:
-            msg = f"Failed to drop local logs database : {dbname} with exception: {e}"
-            _logger.exception(msg)
-            host_name = self.env['runbot.host']._get_current_name()
-            self.env['runbot.runbot']._warning(f'Host {host_name}: {msg}')
 
     def _log(self, func, message, *args, level='INFO', log_type='runbot', path='runbot'):
         def truncate(message, maxlenght=300000):
@@ -1664,7 +1632,7 @@ class BuildResult(models.Model):
             return datetime.timedelta(seconds=int((fake_start - (self.build_start or self.create_date)).total_seconds()))
         return None
 
-    def _cmd(self, python_params=None, py_version=None, local_only=True, sub_command=None, enable_log_db=True):
+    def _cmd(self, python_params=None, py_version=None, local_only=True, sub_command=None, collect_logs=True):
         """Return a list describing the command to start the build
         """
         self.ensure_one()
@@ -1707,11 +1675,10 @@ class BuildResult(models.Model):
             else:
                 command.add_config_tuple("http_interface", "0.0.0.0")
 
-        if enable_log_db:
-            if '--log-config' in available_options:
-                command.add_config_tuple("log_config", '/data/build/logconfig.json')
-                command.files['odoo_log.seek'] = "0"
-                command.files['logconfig.json'] = """{
+        if collect_logs and '--log-config' in available_options:
+            command.add_config_tuple("log_config", '/data/build/logconfig.json')
+            command.files['odoo_log.seek'] = "0"
+            command.files['logconfig.json'] = """{
   "version": 1,
   "keep_odoo_default": true,
   "formatters": {
@@ -1732,12 +1699,6 @@ class BuildResult(models.Model):
     "handlers": ["runbot"]
   }
 }""" % self.active_step.sanitized_name(self)
-            # TODO cleanup remove
-            log_db = self.env['ir.config_parameter'].get_param('runbot.logdb_name')
-            if "--log-db" in available_options:
-                command.add_config_tuple("log_db", log_db)
-                if "--log-db-level" in available_options:
-                    command.add_config_tuple("log_db_level", '25')
 
         if "--data-dir" in available_options:
             datadir = build._path('datadir')

@@ -217,8 +217,6 @@ class RunbotCase(TransactionCase):
 
         self.start_patcher('makedirs', 'odoo.addons.runbot.common.os.makedirs', new=makedirs)
         self.start_patcher('mkdir', 'odoo.addons.runbot.common.os.mkdir', new=mkdir)
-        self.start_patcher('local_pgadmin_cursor', 'odoo.addons.runbot.common.local_pgadmin_cursor', False)  # avoid to create databases
-        self.start_patcher('host_local_pg_cursor', 'odoo.addons.runbot.models.host.local_pg_cursor')
         self.start_patcher('isdir', 'odoo.addons.runbot.common.os.path.isdir', True)
         self.start_patcher('isfile', 'odoo.addons.runbot.common.os.path.isfile', True)
         self.start_patcher('docker_run', 'odoo.addons.runbot.container._docker_run', new=self.docker_run_patch)
@@ -236,9 +234,7 @@ class RunbotCase(TransactionCase):
 
         self.start_patcher('repo_commit', 'odoo.addons.runbot.models.runbot.Runbot._commit', None)
         self.start_patcher('_local_cleanup_patcher', 'odoo.addons.runbot.models.build.BuildResult._local_cleanup')
-        self.start_patcher('_local_pg_dropdb_patcher', 'odoo.addons.runbot.models.build.BuildResult._local_pg_dropdb')
 
-        self.start_patcher('set_psql_conn_count', 'odoo.addons.runbot.models.host.Host._set_psql_conn_count', None)
         self.start_patcher('reload_nginx', 'odoo.addons.runbot.models.runbot.Runbot._reload_nginx', None)
         self.start_patcher('update_commits_infos', 'odoo.addons.runbot.models.batch.Batch._update_commits_infos', None)
         self.start_patcher('getmtime', 'odoo.addons.runbot.common.os.path.getmtime', datetime.datetime.now().timestamp())
@@ -246,7 +242,7 @@ class RunbotCase(TransactionCase):
         self.start_patcher('_get_py_version', 'odoo.addons.runbot.models.build.BuildResult._get_py_version', 3)
         self.start_patcher('_write_file', 'odoo.addons.runbot.models.build.BuildResult._write_file', None)
         self.start_patcher('_parse_config', 'odoo.addons.runbot.models.build.BuildResult._parse_config', {'--test-enable', '--test-tags', '--with-demo', '--log-config'})
-        self.start_patcher('fetch_local_logs', 'odoo.addons.runbot.models.host.Host._fetch_local_logs', ([], []))
+        self.start_patcher('fetch_local_logs', 'odoo.addons.runbot.models.host.Host._fetch_local_logs', ({}, []))
 
         def _list_available_modules(self_commit):
             return self.addons_per_repo.get(self_commit.repo_id, [])

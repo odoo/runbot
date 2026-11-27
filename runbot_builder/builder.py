@@ -60,8 +60,6 @@ class BuilderClient(RunbotClient):
                 self.env.cr.commit()
                 self.env['runbot.runbot']._docker_cleanup()
                 self.env.cr.commit()
-                self.host._set_psql_conn_count()
-                self.env.cr.commit()
             self.git_gc()
             self.env.cr.commit()
             self.update_repos()

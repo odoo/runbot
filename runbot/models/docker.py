@@ -202,7 +202,6 @@ class Dockerfile(models.Model):
     variant_ids = fields.One2many('runbot.dockerfile', 'parent_id', string='Variants', help="Variants of this dockerfile, they inherit the parent dockerfile layers and can add their own layers.")
     message = fields.Text('Message', compute='_compute_message')
 
-    use_host_postgres = fields.Boolean('Use host postgres', help="Mount host postgres socket and skip oot entrypoint", default=True)    # TODO cleanup postgres remove
     _runbot_dockerfile_image_tag_unique = models.Constraint(
         'unique(image_tag)',
         "A Dockerfile with this tag already exists.",

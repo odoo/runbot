@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import contextlib
 import functools
 import itertools
 import logging
 import os
-import psycopg2
 import re
 import requests
 import socket
@@ -196,42 +194,6 @@ def precise_s2human(time):
     if not hours and (seconds > 0 or not parts):
         parts.append(f"{seconds}s")
     return ''.join(parts)
-
-
-@contextlib.contextmanager
-def local_pgadmin_cursor():
-    cnx = None
-    try:
-        cnx = psycopg2.connect("dbname=postgres")
-        cnx.autocommit = True  # required for admin commands
-        yield cnx.cursor()
-    finally:
-        if cnx:
-            cnx.close()
-
-@contextlib.contextmanager
-def local_pg_cursor(db_name):
-    cnx = None
-    try:
-        cnx = psycopg2.connect(f"dbname={db_name}")
-        yield cnx.cursor()
-    finally:
-        if cnx:
-            cnx.commit()
-            cnx.close()
-
-def list_local_dbs(additionnal_conditions=None):
-    additionnal_condition_str = ''
-    if additionnal_conditions:
-        additionnal_condition_str = 'AND (%s)' % ' OR '.join(additionnal_conditions)
-    with local_pgadmin_cursor() as local_cr:
-        local_cr.execute("""
-            SELECT datname
-                FROM pg_database
-                WHERE pg_get_userbyid(datdba) = current_user
-                %s
-        """ % additionnal_condition_str)
-        return [d[0] for d in local_cr.fetchall()]
 
 
 def pseudo_markdown(text):

@@ -18,8 +18,6 @@ class ResConfigSettings(models.TransientModel):
     runbot_timeout = fields.Integer('Max step timeout (in seconds)')
     runbot_starting_port = fields.Integer('Starting port for running builds')
     runbot_max_age = fields.Integer('Max commit age (in days)')
-    runbot_logdb_name = fields.Char('Local Logs DB name', default='runbot_logs', config_parameter='runbot.logdb_name')  # TODO remove all logic related to this
-    runbot_template = fields.Char('Postgresql template', help="Postgresql template to use when creating DB's")  # TODO remove all logic related to this
     runbot_message = fields.Text('Frontend warning message', help="Will be displayed on the frontend when not empty")
     runbot_default_odoorc = fields.Text('Default odoorc for builds')
     runbot_upgrade_exception_message = fields.Text('Upgrade exception message', help='Template to auto-generate a github message when creating an upgrade exception')
@@ -82,7 +80,6 @@ class ResConfigSettings(models.TransientModel):
                    runbot_timeout=int(get_param('runbot.runbot_timeout', default=10000)),
                    runbot_starting_port=int(get_param('runbot.runbot_starting_port', default=2000)),
                    runbot_max_age=int(get_param('runbot.runbot_max_age', default=30)),
-                   runbot_template=get_param('runbot.runbot_db_template'),
                    runbot_message=get_param('runbot.runbot_message', default=''),
                    runbot_default_odoorc=get_param('runbot.runbot_default_odoorc'),
                    runbot_upgrade_exception_message=get_param('runbot.runbot_upgrade_exception_message'),
@@ -103,7 +100,6 @@ class ResConfigSettings(models.TransientModel):
         set_param("runbot.runbot_timeout", self.runbot_timeout)
         set_param("runbot.runbot_starting_port", self.runbot_starting_port)
         set_param("runbot.runbot_max_age", self.runbot_max_age)
-        set_param('runbot.runbot_db_template', self.runbot_template)
         set_param('runbot.runbot_message', self.runbot_message)
         set_param('runbot.runbot_default_odoorc', self.runbot_default_odoorc)
         set_param('runbot.runbot_upgrade_exception_message', self.runbot_upgrade_exception_message)
