@@ -2,9 +2,7 @@
 #
 # We expect the PG cluster has no active client connections at this point.
 
-if [ "$PGHOST" = "/var/run/postgresql" ]; then
-    echo "Skipping postgres server stop, using /var/run/postgresql socket"
-elif [ -n "${PGHOST:-}" ] && [ -n "${PGDATA:-}" ]; then
+if [ -n "${PGHOST:-}" ] && [ -n "${PGDATA:-}" ]; then
     PG_BIN="/usr/lib/postgresql/$PG_VERSION/bin"
     if [ -n "$CLUSTER_ZSTD_NAME" ]; then
         echo "Compacting PostgreSQL databases before backup..."

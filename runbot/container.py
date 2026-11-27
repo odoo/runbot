@@ -236,9 +236,8 @@ def docker_run(*args, **kwargs):
     return _docker_run(*args, **kwargs)
 
 
-def _docker_run(cmd=False, use_host_postgres=False, log_path=False, build_dir=False, container_name=False, image_tag=False, exposed_ports=None, cpu_limit=None, cpu_period=100000, cpus=0, memory=None, shm_size='128m', preexec_fn=None, ro_volumes=None, env_variables=None, network_enabled=False):
+def _docker_run(cmd=False, log_path=False, build_dir=False, container_name=False, image_tag=False, exposed_ports=None, cpu_limit=None, cpu_period=100000, cpus=0, memory=None, shm_size='128m', preexec_fn=None, ro_volumes=None, env_variables=None, network_enabled=False):
     """Run tests in a docker container
-    :params use_host_postgres: # TODO cleanup postgres remove
     :param run_cmd: command string to run in container
     :param log_path: path to the logfile that will contain odoo stdout and stderr
     :param build_dir: the build directory that contains the Odoo sources to build.
@@ -307,8 +306,6 @@ exit $TEST_EXIT_CODE
         f'{build_dir}': {'bind': '/data/build', 'mode': 'rw'},
         f'{log_path}': {'bind': '/data/buildlogs.txt', 'mode': 'rw'},
     }
-    if use_host_postgres:  # TODO cleanup postgres remove
-        volumes['/var/run/postgresql'] = {'bind': '/var/run/postgresql', 'mode': 'rw'}
 
     if ro_volumes:
         for dest, source in ro_volumes.items():

@@ -1304,13 +1304,10 @@ class BuildResult(models.Model):
             env_variables.append('PGDATA=')
 
         self.cpu_limit = kwargs.get('cpu_limit')
-        docker_file = self.env['runbot.dockerfile'].search([('image_tag', '=', kwargs['image_tag'].split('.')[0])], limit=1)    # TODO cleanup postgres remove
-        use_host_postgres = self.params_id.config_data.get('use_host_postgres', docker_file and docker_file.use_host_postgres)
 
         def start_docker():
             docker_run(
                 cmd=cmd,
-                use_host_postgres=use_host_postgres,    # TODO cleanup postgres remove
                 container_name=container_name,
                 build_dir=build_dir,
                 log_path=log_path,

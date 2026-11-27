@@ -1,9 +1,5 @@
 #!/bin/bash
-if pg_isready -h /var/run/postgresql > /dev/null 2>&1; then
-    echo "Skipping postgres server start, using /var/run/postgresql socket"
-    PGHOST=/var/run/postgresql
-    export PGHOST
-elif [ -n "${PGHOST:-}" ] && [ -n "${PGDATA:-}" ]; then
+if [ -n "${PGHOST:-}" ] && [ -n "${PGDATA:-}" ]; then
     mkdir -p "$PGDATA" "$PGHOST" "$ODOO_FILESTORE"
     mkdir -p /data/build/logs/
     NEEDS_INIT=false

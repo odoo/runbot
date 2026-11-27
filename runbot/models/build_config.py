@@ -1250,12 +1250,10 @@ class ConfigStep(models.Model):
             zip_name = f'{download_db_name}.zip'
             dump_url = f'{reference_build._http_log_url()}{zip_name}'
             use_backup = False
-            use_host_postgres = config_data.get('use_host_postgres', docker_file.use_host_postgres)
-            if not use_host_postgres:
-                cluster_url = dump_url.replace('.zip', '-cluster.tar.zstd')
-                if not _url_exists(cluster_url):  # TODO cleanup the zip restore once all dumps and backups have a cluster
-                    build._log('', 'Using dump url, [no cluster](%s) was found', cluster_url, log_type='markdown')
-                    cluster_url = None
+            cluster_url = dump_url.replace('.zip', '-cluster.tar.zstd')
+            if not _url_exists(cluster_url):  # TODO cleanup the zip restore once all dumps and backups have a cluster
+                build._log('', 'Using dump url, [no cluster](%s) was found', cluster_url, log_type='markdown')
+                cluster_url = None
 
             if not cluster_url and reference_build.trigger_id.backup_databases and not _url_exists(dump_url):
                 for backup_host in self.env['runbot.host'].search([('is_backup', '=', True)]):
@@ -1313,18 +1311,12 @@ class ConfigStep(models.Model):
         return dict(cmd=' && '.join(cmd), network_enabled=True, env_variables=env_variables, image_tag=docker_file.image_tag)
 
     def _run_upgrade_cluster(self, build, config_data=None):
-        if config_data:
-            config_data = {**config_data, **build.params_id.config_data}
-        else:
-            config_data = build.params_id.config_data
         """Allows to restore a zipped database to upgrade it in another cluster, mostly needed if a build uses multiple docker"""
         # Keep it simple for now: restore the first database of this build. This is mostly to upgrade a restored database from one cluster to another
         from_docker_file = build.params_id.upgrade_from_build_id.params_id.dockerfile_id
         to_docker_file = build.params_id.dockerfile_id
 
-        from_docker_file_use_host_postgres = config_data.get('use_host_postgres', from_docker_file.use_host_postgres)
-        to_docker_file_use_host_postgres = config_data.get('use_host_postgres', to_docker_file.use_host_postgres)
-        if from_docker_file != to_docker_file and (not to_docker_file_use_host_postgres or not from_docker_file_use_host_postgres):
+        if from_docker_file != to_docker_file:
             db_name = build.database_ids[0].name
             cmd = ' && '.join([
                 f'cd /data/build/logs/{db_name}',
