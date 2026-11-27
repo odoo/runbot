@@ -32,6 +32,25 @@ class IrLogging(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        nul_build_ids = set()
+        for log in vals_list:
+            for key, value in log.items():
+                # PostgreSQL rejects NUL characters in text values
+                if isinstance(value, str) and '\x00' in value:
+                    log[key] = value.replace('\x00', '\\x00')
+                    if log.get('build_id'):
+                        nul_build_ids.add(log['build_id'])
+        vals_list = list(vals_list) + [{
+            'build_id': build_id,
+            'level': 'WARNING',
+            'type': 'runbot',
+            'name': 'odoo.runbot',
+            'message': 'A log contained NUL characters, they were replaced by "\\x00". Binary data should not be logged.',
+            'path': 'runbot',
+            'func': 'create',
+            'line': '0',
+        } for build_id in nul_build_ids]
+
         logs_by_build_id = defaultdict(list)
         for log in vals_list:
             if 'build_id' in log:

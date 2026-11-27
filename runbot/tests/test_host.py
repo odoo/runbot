@@ -118,6 +118,23 @@ class TestHost(RunbotCase):
         self.test_host._process_logs(build)
         logs[1][0].assert_called()
 
+    def test_build_logs_nul_character(self):
+        build = self.Build.create({
+            'params_id': self.server_params.id,
+            'port': '1234567',
+            'active_step': self.env.ref('runbot.runbot_build_config_step_test_all').id,
+            'log_counter': 20,
+        })
+
+        logs = fetch_local_logs_return_value(nb_logs=1, message='printer output: \x1b@\x00end', build_dest=build.dest)
+        self.patchers['fetch_local_logs'].return_value = logs
+        self.test_host._process_logs(build)
+        logs[1][0].assert_called()
+        build_logs = self.env['ir.logging'].search([('build_id', '=', build.id)])
+        self.assertEqual(build_logs.mapped('message')[0], 'printer output: \x1b@\\x00end')
+        self.assertEqual(build_logs.mapped('level'), ['INFO', 'WARNING'])
+        self.assertEqual(build.local_result, 'warn', 'A log with NUL characters should set the build in warn')
+
     def test_docker_builder_existing_image(self):
         self.start_patcher('build_patcher', 'odoo.addons.runbot.models.docker.Dockerfile._build')
 
