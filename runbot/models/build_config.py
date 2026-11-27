@@ -514,7 +514,6 @@ class ConfigStep(models.Model):
 
     restore_download_db_suffix = fields.Char('Download db suffix')
     restore_rename_db_suffix = fields.Char('Rename db suffix')
-    restore_cluster = fields.Boolean('Restore the cluster if available', default=True)
     export_database = fields.Boolean('Export database after install', default=True)
     needs_postgres = fields.Boolean('Needs postgres', default=True)
 
@@ -1252,9 +1251,9 @@ class ConfigStep(models.Model):
             dump_url = f'{reference_build._http_log_url()}{zip_name}'
             use_backup = False
             use_host_postgres = config_data.get('use_host_postgres', docker_file.use_host_postgres)
-            if config_data.get('restore_cluster', self.restore_cluster) and not use_host_postgres:   # TODO cleanup postgres remove
+            if not use_host_postgres:
                 cluster_url = dump_url.replace('.zip', '-cluster.tar.zstd')
-                if not _url_exists(cluster_url):  # TODO remove check once all dumps have a cluster zip
+                if not _url_exists(cluster_url):  # TODO cleanup the zip restore once all dumps and backups have a cluster
                     build._log('', 'Using dump url, [no cluster](%s) was found', cluster_url, log_type='markdown')
                     cluster_url = None
 
