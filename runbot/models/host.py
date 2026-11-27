@@ -109,26 +109,9 @@ class Host(models.Model):
                 vals['disp_name'] = vals['name']
         return super().create(vals_list)
 
-    def _bootstrap_db_template(self):
-        """ boostrap template database if needed """
-        icp = self.env['ir.config_parameter']
-        db_template = icp.get_param('runbot.runbot_db_template', default='template0')
-        if db_template and db_template != 'template0':
-            with local_pgadmin_cursor() as local_cr:
-                local_cr.execute("""SELECT datname FROM pg_catalog.pg_database WHERE datname = '%s';""" % db_template)
-                res = local_cr.fetchone()
-                if not res:
-                    local_cr.execute("""CREATE DATABASE "%s" TEMPLATE template0 LC_COLLATE 'C' ENCODING 'unicode'""" % db_template)
-                    # TODO UPDATE pg_database set datallowconn = false, datistemplate = true (but not enough privileges)
-
     def _bootstrap(self):
-        """ Create needed directories in static """
-        dirs = ['build', 'nginx', 'repo', 'sources', 'src', 'docker']
-        static_path = self.env['runbot.runbot']._root()
-        static_dirs = {d: self.env['runbot.runbot']._path(d) for d in dirs}
-        for dir, path in static_dirs.items():
-            os.makedirs(path, exist_ok=True)
-        self._bootstrap_db_template()
+        for dir in ['build', 'nginx', 'repo', 'sources', 'src', 'docker']:
+            os.makedirs(self.env['runbot.runbot']._path(dir), exist_ok=True)
 
     def _get_docker_registry_url(self):
         if self.docker_registry_url:
