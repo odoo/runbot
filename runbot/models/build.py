@@ -39,7 +39,7 @@ from ..common import (
     transactioncache,
     DEFAULT_MAX_FILE_SIZE,
 )
-from ..container import Command, docker_pull, docker_run, docker_run_time, docker_state, docker_stop
+from ..container import Command, docker_pull, docker_reap, docker_run, docker_run_time, docker_state, docker_stop
 from ..fields import JsonDictField
 
 _logger = logging.getLogger(__name__)
@@ -1135,6 +1135,11 @@ class BuildResult(models.Model):
                 return True  # avoid to make results with remaining logs
             # No job running, make result and select next job
             job_values = {}
+            if build.docker_start:
+                final_state = docker_reap(build._get_docker_name(), build._path())
+                if final_state and final_state.get('running'):
+                    return False
+                build._log_container_final_state(final_state)
             if build.docker_start and build.local_state != 'running':  # running dockers are not part of the test time
                 docker_duration = docker_run_time(build._get_docker_name(), build._path())
                 if docker_duration is None:  # killed or never started, no end signal
@@ -1506,13 +1511,26 @@ class BuildResult(models.Model):
         if build.host != host_name:
             return
         build._log('kill', 'Kill build %s' % build.dest)
-        docker_stop(build._get_docker_name(), build._path())
+        final_state = docker_stop(build._get_docker_name(), build._path())
+        build._log_container_final_state(final_state, stopped=True)
         build._end_job()
         build.local_state = 'done'
         build.active_step = False
         build.job_end = now()
         if result:
             build.local_result = result
+
+    def _log_container_final_state(self, final_state, container_name=None, stopped=False):
+        self.ensure_one()
+        if not final_state or final_state.get('running'):
+            return
+        container_info = f' ({container_name})' if container_name else ''
+        if final_state.get('oom_killed'):
+            self.oom_killed = True
+            self._log('docker', 'A process was killed by the OOM killer in container%s', container_info)
+        exit_code = final_state.get('exit_code')
+        if exit_code and not stopped:
+            self._log('docker', 'The main process exited with exit code %s%s', exit_code, container_info)
 
     def _ask_kill(self, message=None):
         self.ensure_one()
