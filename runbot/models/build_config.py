@@ -479,7 +479,7 @@ class ConfigStep(models.Model):
     sub_command = fields.Char('Subcommand', tracking=True)
     extra_params = fields.Char('Extra cmd args', tracking=True)
     additionnal_env = fields.Char('Extra env', help='Example: foo=bar;bar=foo. Cannot contains \' ', tracking=True)
-    enable_log_db = fields.Boolean("Enable log db", default=True)
+    collect_logs = fields.Boolean("Collect logs", default=True, help="Send the server logs of the build to the main runbot database")
     demo_mode = fields.Selection(
         [('default', 'Default'), ('without_demo', 'Without Demo'), ('with_demo', 'With Demo')],
         "Install demo data", default='default', tracking=True, required=True,
@@ -754,7 +754,7 @@ class ConfigStep(models.Model):
 
         build._logger('Start running build')
         # run server
-        cmd = build._cmd(local_only=False, enable_log_db=self.enable_log_db)
+        cmd = build._cmd(local_only=False, collect_logs=self.collect_logs)
 
         available_options = build._parse_config()
 
@@ -826,7 +826,7 @@ class ConfigStep(models.Model):
             python_params += self._coverage_params(build, config_data)
         elif self.flamegraph:
             python_params = ['-m', 'flamegraph', '-o', self._perfs_data_path(build)]
-        cmd = build._cmd(python_params, py_version, sub_command=self.sub_command, enable_log_db=self.enable_log_db)
+        cmd = build._cmd(python_params, py_version, sub_command=self.sub_command, collect_logs=self.collect_logs)
         # create db if needed
         db_suffix = config_data.get('db_name') or ((build.params_id.restore_db_suffix or build.params_id.dump_db.db_suffix) if not self.create_db else False) or self._get_db_name(build)
         db_suffix = re.sub(r'[^a-z0-9\-_]', '_', db_suffix.lower())
@@ -1168,7 +1168,7 @@ class ConfigStep(models.Model):
         db_suffix = build.params_id.config_data.get('db_name') or build.params_id.restore_db_suffix or build.params_id.dump_db.db_suffix
         migrate_db_name = '%s-%s' % (build.dest, db_suffix)  # only ok if restore does not force db_suffix
 
-        migrate_cmd = build._cmd(enable_log_db=self.enable_log_db)
+        migrate_cmd = build._cmd(collect_logs=self.collect_logs)
         migrate_cmd += ['-u', 'all']
         migrate_cmd += ['-d', migrate_db_name]
         migrate_cmd += ['--stop-after-init']

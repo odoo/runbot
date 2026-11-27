@@ -395,7 +395,7 @@ class TestBuildResult(RunbotCase):
         self.assertEqual(modules_to_test, sorted(['other_mod_2']))
 
     def test_build_cmd_log_config(self):
-        """ test that the log_db parameter is set in the .odoorc file """
+        """ test that the log_config parameter is set in the .odoorc file """
         build = self.Build.create({
             'params_id': self.server_params.id,
         })
@@ -403,7 +403,7 @@ class TestBuildResult(RunbotCase):
         self.assertIn('log_config = /data/build/logconfig.json', cmd.get_config())
 
     def test_build_cmd_custom_pre_post(self):
-        """ test that the log_db parameter is set in the .odoorc file """
+        """ test that the log_config parameter is set in the .odoorc file """
         custom_pre = ['pip install something:someversion'.split()]
         custom_post = ["psql -l > database list".split()]
         self.server_params.config_data = {

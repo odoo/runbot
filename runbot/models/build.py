@@ -1662,7 +1662,7 @@ class BuildResult(models.Model):
             return datetime.timedelta(seconds=int((fake_start - (self.build_start or self.create_date)).total_seconds()))
         return None
 
-    def _cmd(self, python_params=None, py_version=None, local_only=True, sub_command=None, enable_log_db=True):
+    def _cmd(self, python_params=None, py_version=None, local_only=True, sub_command=None, collect_logs=True):
         """Return a list describing the command to start the build
         """
         self.ensure_one()
@@ -1705,7 +1705,7 @@ class BuildResult(models.Model):
             else:
                 command.add_config_tuple("http_interface", "0.0.0.0")
 
-        if enable_log_db and '--log-config' in available_options:
+        if collect_logs and '--log-config' in available_options:
             command.add_config_tuple("log_config", '/data/build/logconfig.json')
             command.files['odoo_log.seek'] = "0"
             command.files['logconfig.json'] = """{
