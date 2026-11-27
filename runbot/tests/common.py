@@ -217,7 +217,6 @@ class RunbotCase(TransactionCase):
 
         self.start_patcher('makedirs', 'odoo.addons.runbot.common.os.makedirs', new=makedirs)
         self.start_patcher('mkdir', 'odoo.addons.runbot.common.os.mkdir', new=mkdir)
-        self.start_patcher('local_pgadmin_cursor', 'odoo.addons.runbot.common.local_pgadmin_cursor', False)  # avoid to create databases
         self.start_patcher('isdir', 'odoo.addons.runbot.common.os.path.isdir', True)
         self.start_patcher('isfile', 'odoo.addons.runbot.common.os.path.isfile', True)
         self.start_patcher('docker_run', 'odoo.addons.runbot.container._docker_run', new=self.docker_run_patch)
@@ -235,7 +234,6 @@ class RunbotCase(TransactionCase):
 
         self.start_patcher('repo_commit', 'odoo.addons.runbot.models.runbot.Runbot._commit', None)
         self.start_patcher('_local_cleanup_patcher', 'odoo.addons.runbot.models.build.BuildResult._local_cleanup')
-        self.start_patcher('_local_pg_dropdb_patcher', 'odoo.addons.runbot.models.build.BuildResult._local_pg_dropdb')
 
         self.start_patcher('reload_nginx', 'odoo.addons.runbot.models.runbot.Runbot._reload_nginx', None)
         self.start_patcher('update_commits_infos', 'odoo.addons.runbot.models.batch.Batch._update_commits_infos', None)

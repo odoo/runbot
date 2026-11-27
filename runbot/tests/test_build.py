@@ -493,18 +493,10 @@ class TestBuildResult(RunbotCase):
         child_delta = fields.Datetime.from_string(child_build.gc_date) - datetime.datetime.now()
         self.assertEqual(child_delta.days, 24)
 
-        # test the real _local_cleanup method
-        self.patcher_objects['_local_cleanup_patcher'].stop()
-        self.start_patcher('build_local_pgadmin_cursor_patcher', 'odoo.addons.runbot.models.build.local_pgadmin_cursor')
-        self.start_patcher('build_path_patcher', 'odoo.addons.runbot.models.build.Path')
-        dbname = '%s-foobar' % build.dest
-        self.start_patcher('list_local_dbs_patcher', 'odoo.addons.runbot.models.build.list_local_dbs', return_value=[dbname])
-
-        build._local_cleanup()
-        self.assertFalse(self.patchers['_local_pg_dropdb_patcher'].called)
+        # test the gc filter used by _local_cleanup
+        self.assertEqual(list(build._filter_to_clean([build.dest], label='workspace')), [])
         build.job_end = datetime.datetime.now() - datetime.timedelta(days=31)
-        build._local_cleanup()
-        self.patchers['_local_pg_dropdb_patcher'].assert_called_with(dbname)
+        self.assertEqual(list(build._filter_to_clean([build.dest], label='workspace')), [build.dest])
 
     @patch('odoo.addons.runbot.models.build._logger')
     def test_build_skip(self, mock_logger):

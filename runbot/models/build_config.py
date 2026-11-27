@@ -31,6 +31,8 @@ from ..common import (
 from ..container import Command, docker_get_gateway_ip
 from .build_job import current_job_id
 
+DB_TEMPLATE = 'template_runbot'  # created in docker_files/postgres/start_postgres.sh
+
 # There is an issue in unidiff 0.7.3 fixed in 0.7.4
 # https://github.com/matiasb/python-unidiff/commit/a3faffc54e5aacaee3ded4565c534482d5cc3465
 # Since the unidiff packaged version in noble is 0.7.3
@@ -786,9 +788,7 @@ class ConfigStep(models.Model):
                 cmd += ['--smtp', smtp_host]
 
         if "--db-template" in available_options:
-            icp = self.env['ir.config_parameter']
-            db_template = icp.get_param('runbot.runbot_db_template', default='template0')
-            cmd += ['--db-template', db_template]
+            cmd += ['--db-template', DB_TEMPLATE]
 
         extra_params = self.extra_params or ''
         if extra_params:
@@ -880,9 +880,7 @@ class ConfigStep(models.Model):
             cmd.add_config_tuple('screenshots', '/data/build/tests')
 
         if "--db-template" in available_options:
-            icp = self.env['ir.config_parameter']
-            db_template = icp.get_param('runbot.runbot_db_template', default='template0')
-            cmd.add_config_tuple('db_template', db_template)
+            cmd.add_config_tuple('db_template', DB_TEMPLATE)
 
         if "--screencasts" in available_options and (self.env['ir.config_parameter'].sudo().get_param('runbot.enable_screencast', False) or config_data.get('screencast', False)):
             cmd.add_config_tuple('screencasts', '/data/build/tests')
@@ -1279,8 +1277,6 @@ class ConfigStep(models.Model):
         target_suffix = build.params_id.restore_db_suffix or default_target_suffix
         restore_db_name = '%s-%s' % (build.dest, target_suffix)
 
-        icp = self.env['ir.config_parameter']
-        db_template = icp.get_param('runbot.runbot_db_template', default='template0')
         self.env['runbot.database'].create({'name': restore_db_name, 'build_id': build.id})
         env_variables = []
         if cluster_url:
@@ -1302,7 +1298,7 @@ class ConfigStep(models.Model):
                 'mkdir -p /data/build/datadir/filestore/%s' % restore_db_name,
                 'mv filestore/* /data/build/datadir/filestore/%s' % restore_db_name,
                 echo('### restoring db'),
-                'createdb %s -T %s' % (restore_db_name, db_template),
+                'createdb %s -T %s' % (restore_db_name, DB_TEMPLATE),
                 'psql -q %s < dump.sql' % (restore_db_name),
                 echo('### cleaning'),
                 'cd /data/build',
@@ -1326,7 +1322,6 @@ class ConfigStep(models.Model):
         # Keep it simple for now: restore the first database of this build. This is mostly to upgrade a restored database from one cluster to another
         from_docker_file = build.params_id.upgrade_from_build_id.params_id.dockerfile_id
         to_docker_file = build.params_id.dockerfile_id
-        db_template = self.env['ir.config_parameter'].get_param('runbot.runbot_db_template', default='template0')
 
         from_docker_file_use_host_postgres = config_data.get('use_host_postgres', from_docker_file.use_host_postgres)
         to_docker_file_use_host_postgres = config_data.get('use_host_postgres', to_docker_file.use_host_postgres)
@@ -1335,7 +1330,7 @@ class ConfigStep(models.Model):
             cmd = ' && '.join([
                 f'cd /data/build/logs/{db_name}',
                 echo('### restoring db'),
-                'createdb %s -T %s' % (db_name, db_template),
+                'createdb %s -T %s' % (db_name, DB_TEMPLATE),
                 'psql -q %s < dump.sql' % (db_name),
                 echo('### performing an analyze'),
                 'psql -q -d %s -c "ANALYZE;"' % db_name,

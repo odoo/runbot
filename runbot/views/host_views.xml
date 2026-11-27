@@ -50,7 +50,6 @@
                                 <field name="cpu_count" readonly="1"/>
                                 <field name="memory" readonly="1"/>
                                 <field name="os_version" readonly="1"/>
-                                <field name="psql_version" readonly="1"/>
                                 <field name="disk_usage" readonly="1"/>
                             </group>
                         </page>
@@ -73,7 +72,6 @@
                 <field name="name"/>
                 <field name="disp_name" optional="hide"/>
                 <field name="os_version" optional="hide"/>
-                <field name="psql_version" optional="hide"/>
                 <field name="assigned_only" widget="boolean_toggle" string="Reserved"/>
                 <field name="use_remote_docker_registry" widget="boolean_toggle" string="Use Docker Registry"/>
                 <field name="cpu_count" string="# CPU"/>

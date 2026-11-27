@@ -11,7 +11,7 @@ from docker.errors import ImageNotFound
 
 from odoo import models, fields, api
 from odoo.tools import config, ormcache
-from ..common import fqdn, local_pgadmin_cursor, os
+from ..common import fqdn, os
 from ..container import docker_push, docker_pull, docker_prune, docker_images, docker_remove, docker_tag
 
 _logger = logging.getLogger(__name__)
@@ -64,7 +64,6 @@ class Host(models.Model):
     cpu_count = fields.Integer('CPU count', default=0)
     memory = fields.Integer('Memory (GiB)', help="Host Total memory (GiB)", default=0)
     os_version = fields.Char('OS Version')
-    psql_version = fields.Char('PSQL Version')
     disk_size = fields.Integer('Disk Size (GiB)', help="Runbot Partition Size", default=0)
     disk_used = fields.Integer('Disk Used (GiB)', help="Runbot Partition Used Space", default=0)
     disk_usage = fields.Char('Disk Usage', compute='_compute_disk_usage')
@@ -220,10 +219,6 @@ class Host(models.Model):
         self.cpu_count = psutil.cpu_count() or 0
         self.memory = round(psutil.virtual_memory().total / (1024**3))
         self.os_version = platform.freedesktop_os_release().get('PRETTY_NAME', False)
-        with local_pgadmin_cursor() as local_cr:
-            local_cr.execute("SELECT version();")
-            res = local_cr.fetchone()
-        self.psql_version = res[0].split()[1] if res else False
         self.disk_size = round(self._get_disk_usage().total / 1024**3)
 
     def _total_testing(self):

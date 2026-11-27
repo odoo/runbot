@@ -28,8 +28,6 @@ from ..common import (
     dest_reg,
     dt2time,
     findall,
-    list_local_dbs,
-    local_pgadmin_cursor,
     markdown_escape,
     now,
     os,
@@ -899,14 +897,12 @@ class BuildResult(models.Model):
     def _filter_to_clean(self, dest_list, label):
         dest_by_builds_ids = defaultdict(list)
         ignored = set()
-        icp = self.env['ir.config_parameter']
-        hide_in_logs = icp.get_param('runbot.runbot_db_template', default='template0')
 
         for dest in dest_list:
             build = self._build_from_dest(dest)
             if build:
                 dest_by_builds_ids[build.id].append(dest)
-            elif dest != hide_in_logs:
+            else:
                 ignored.add(dest)
         if ignored:
             _logger.info('%s (%s) not deleted because not dest format', label, list(ignored))
@@ -926,12 +922,11 @@ class BuildResult(models.Model):
 
     def _local_cleanup(self, force=False, full=False):
         """
-        Remove datadir and drop databases of build older than db_gc_days or db_gc_days_child.
+        Remove build directories of build older than db_gc_days or db_gc_days_child.
         If force is set to True, does the same cleaning based on recordset without checking build age.
         """
         _logger.info('Local cleaning')
         _filter = self._filter_to_clean
-        additionnal_conditions = []
 
         if force is True:
             def filter_ids(dest_list, label):
@@ -942,14 +937,6 @@ class BuildResult(models.Model):
                     elif not build:
                         _logger.info('%s (%s) skipped because not dest format', label, dest)
             _filter = filter_ids
-            for _id in self.exists().ids:
-                additionnal_conditions.append("datname like '%s-%%'" % _id)
-
-        existing_db = list(list_local_dbs(additionnal_conditions=additionnal_conditions))
-
-        for db in _filter(dest_list=existing_db, label='db'):
-            self._logger('Removing database')
-            self._local_pg_dropdb(db)
 
         builds_dir = Path(self.env['runbot.runbot']._root()) / 'build'
         if force:
@@ -1434,20 +1421,6 @@ class BuildResult(models.Model):
     def _get_dependant_modules(self, modules, depth=None):
         _, dependant_graph = self._dependency_graph()
         return self.search_modules_graph(modules, dependant_graph, depth)
-
-    def _local_pg_dropdb(self, dbname):
-        msg = ''
-        try:
-            with local_pgadmin_cursor() as local_cr:
-                query = 'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=%s'
-                local_cr.execute(query, [dbname])
-                local_cr.execute('SET statement_timeout=10000')  # avoid to be stuck if the dropdb is locked
-                local_cr.execute('DROP DATABASE IF EXISTS "%s"' % dbname)
-        except Exception as e:
-            msg = f"Failed to drop local logs database : {dbname} with exception: {e}"
-            _logger.exception(msg)
-            host_name = self.env['runbot.host']._get_current_name()
-            self.env['runbot.runbot']._warning(f'Host {host_name}: {msg}')
 
     def _log(self, func, message, *args, level='INFO', log_type='runbot', path='runbot'):
         def truncate(message, maxlenght=300000):
