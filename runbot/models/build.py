@@ -1131,7 +1131,7 @@ class BuildResult(models.Model):
                         build._log('_schedule', 'Docker with state %s not started after 60 seconds, skipping' % _docker_state, level='ERROR')
                     else:
                         build._log('_schedule', 'Docker was likely killed, skipping%s' % details, level='ERROR')
-            if self.env['runbot.host']._fetch_local_logs(builds=build)[0]:
+            if build.local_state == 'testing' and self.env['runbot.host']._fetch_local_logs(builds=build)[0]:
                 return True  # avoid to make results with remaining logs
             # No job running, make result and select next job
             job_values = {}
