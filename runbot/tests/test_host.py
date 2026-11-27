@@ -28,7 +28,7 @@ def fetch_local_logs_return_value(build, nb_logs=10, message='', log_type='serve
         }]
         cleanups.append(MagicMock())
         log_date += timedelta(seconds=20)
-    return (logs, cleanups)
+    return ({build.id: logs}, cleanups)
 
 class TestHost(RunbotCase):
 

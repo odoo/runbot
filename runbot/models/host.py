@@ -242,7 +242,7 @@ class Host(models.Model):
             self.assigned_only = True
 
     def _fetch_local_logs(self, builds):
-        res = []
+        res = defaultdict(list)
         cleanups = []
         for build in builds:
             if build._is_file('odoo_log.seek'):
@@ -274,7 +274,7 @@ class Host(models.Model):
                                 log_data['message'] = f'{log_data["message"]}\n{json_log["exc_info"]}'
 
                             new_seek = f.tell()
-                            res.append(log_data)
+                            res[build.id].append(log_data)
                         except (KeyError, json.JSONDecodeError):
                             _logger.exception('Failed to parse log line:')
                             break
@@ -288,16 +288,11 @@ class Host(models.Model):
 
     def _process_logs(self, testing_builds):
         """move logs from host to the leader"""
-        ir_logs, cleanups = self._fetch_local_logs(testing_builds)
-        logs_by_build_id = defaultdict(list)
-
-        for log in ir_logs:  # TODO cleanup this could be avoided by keeping them grouped in _fetch_local_logs
-            logs_by_build_id[log['build_id']].append(log)
-
+        logs_by_build_id, cleanups = self._fetch_local_logs(testing_builds)
         logs_to_send = []
         for build in testing_builds:
             log_counter = build.log_counter
-            build_logs = logs_by_build_id[build.id]
+            build_logs = logs_by_build_id.get(build.id, [])
             for ir_log in build_logs:
                 log_counter -= 1
                 if log_counter == 0:
