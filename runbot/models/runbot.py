@@ -215,24 +215,27 @@ class Runbot(models.AbstractModel):
         nginx_conf_path = self.env['runbot.runbot']._path('nginx', 'nginx.conf')
         content = ''
         if os.path.isfile(nginx_conf_path):
-            with file_open(nginx_conf_path, 'r') as f:
+            with file_open(nginx_conf_path, 'r', env=self.env) as f:
                 content = f.read()
-        if content != nginx_config:
+        config_changed = content != nginx_config
+        if config_changed:
             _logger.info('reload nginx')
             with open(nginx_conf_path, 'w') as f:
                 f.write(str(nginx_config))
-            try:
-                pid = int(file_open(self.env['runbot.runbot']._path('nginx', 'nginx.pid')).read().strip(' \n'))
-                os.kill(pid, signal.SIGHUP)
-            except Exception:
-                _logger.info('start nginx')
-                if subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf']):
-                    # obscure nginx bug leaving orphan worker listening on nginx port
-                    if not subprocess.call(['pkill', '-f', '-P1', 'nginx: worker']):
-                        _logger.warning('failed to start nginx - orphan worker killed, retrying')
-                        subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf'])
-                    else:
-                        _logger.warning('failed to start nginx - failed to kill orphan worker - oh well')
+        try:
+            pid = int(file_open(self.env['runbot.runbot']._path('nginx', 'nginx.pid'), env=self.env).read().strip(' \n'))
+            os.kill(pid, signal.SIGHUP if config_changed else 0)
+        except Exception:
+            if not config_changed:
+                self._warning('Host %s: nginx was not running', host_name)
+            _logger.info('start nginx')
+            if subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf']):
+                # obscure nginx bug leaving orphan worker listening on nginx port
+                if not subprocess.call(['pkill', '-f', '-P1', 'nginx: worker']):
+                    self._warning('Host %s: failed to start nginx - orphan worker killed, retrying', host_name)
+                    subprocess.call(['/usr/sbin/nginx', '-p', nginx_dir, '-c', 'nginx.conf'])
+                else:
+                    self._warning('Host %s: failed to start nginx - failed to kill orphan worker', host_name)
 
     def _fetch_loop_turn(self, host, pull_info_failures, default_sleep=1):
         with self._manage_host_exception(host) as manager:
